@@ -19,7 +19,7 @@ path = "src/main.rs"
 [dependencies]
 clap = { version = "4.5.48", features = ["derive"] }
 env_logger = "0.11.8"
-regex = "1.11.2"
+regex = "1.12.2"
 rowan = "0.16.1"
 serde = { version = "1.0.226", features = ["derive"] }
 textwrap = "0.16.2"
