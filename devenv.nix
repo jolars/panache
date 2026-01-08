@@ -9,6 +9,7 @@
     pkgs.quartoMinimal
     pkgs.wasm-pack
     pkgs.llvmPackages.bintools
+    pkgs.bashInteractive
   ];
 
   languages.rust = {
