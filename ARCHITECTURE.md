@@ -2,7 +2,7 @@
 
 ## Overview
 
-The quartofmt formatter now uses a two-stage parsing approach:
+The panache formatter now uses a two-stage parsing approach:
 
 1. **Block Parser** (`src/block_parser.rs`) - Parses document structure into blocks
 2. **Inline Parser** (`src/inline_parser.rs`) - Processes inline elements within block content

@@ -1,4 +1,4 @@
-use quartofmt::format;
+use panache::format;
 
 #[test]
 fn latex_command_in_paragraph() {
@@ -21,7 +21,7 @@ fn latex_command_with_multiple_args() {
 
 #[test]
 fn latex_command_no_wrap() {
-    let cfg = quartofmt::ConfigBuilder::default().line_width(30).build();
+    let cfg = panache::ConfigBuilder::default().line_width(30).build();
     let input = "This is a very long line with \\pdfpcnote{a very long note that should not be wrapped or reformatted} that exceeds line width.\n";
     let output = format(input, Some(cfg));
 

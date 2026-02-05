@@ -1,4 +1,4 @@
-use quartofmt::format;
+use panache::format;
 
 #[test]
 fn atx_trailing_hashes_are_removed() {

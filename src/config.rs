@@ -82,7 +82,7 @@ pub enum BlankLines {
     Collapse,
 }
 
-const CANDIDATE_NAMES: &[&str] = &[".quartofmt.toml", "quartofmt.toml"];
+const CANDIDATE_NAMES: &[&str] = &[".panache.toml", "panache.toml"];
 
 fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
     toml::from_str::<Config>(s).map_err(|e| {
@@ -112,7 +112,7 @@ fn find_in_tree(start_dir: &Path) -> Option<PathBuf> {
 
 fn xdg_config_path() -> Option<PathBuf> {
     if let Ok(xdg) = env::var("XDG_CONFIG_HOME") {
-        let p = Path::new(&xdg).join("quartofmt").join("config.toml");
+        let p = Path::new(&xdg).join("panache").join("config.toml");
         if p.is_file() {
             return Some(p);
         }
@@ -120,7 +120,7 @@ fn xdg_config_path() -> Option<PathBuf> {
     if let Ok(home) = env::var("HOME") {
         let p = Path::new(&home)
             .join(".config")
-            .join("quartofmt")
+            .join("panache")
             .join("config.toml");
         if p.is_file() {
             return Some(p);
@@ -131,8 +131,8 @@ fn xdg_config_path() -> Option<PathBuf> {
 
 /// Load configuration with precedence:
 /// 1) explicit path (error if unreadable/invalid)
-/// 2) walk up from start_dir: .quartofmt.toml, quartofmt.toml
-/// 3) XDG: $XDG_CONFIG_HOME/quartofmt/config.toml or ~/.config/quartofmt/config.toml
+/// 2) walk up from start_dir: .panache.toml, panache.toml
+/// 3) XDG: $XDG_CONFIG_HOME/panache/config.toml or ~/.config/panache/config.toml
 /// 4) default config
 pub fn load(explicit: Option<&Path>, start_dir: &Path) -> io::Result<(Config, Option<PathBuf>)> {
     if let Some(path) = explicit {

@@ -1,14 +1,14 @@
 {
-  "name": "quartofmt-wasm",
+  "name": "panache-wasm",
   "type": "module",
   "version": "0.1.0",
   "files": [
-    "quartofmt_wasm_bg.wasm",
-    "quartofmt_wasm.js",
-    "quartofmt_wasm.d.ts"
+    "panache_wasm_bg.wasm",
+    "panache_wasm.js",
+    "panache_wasm.d.ts"
   ],
-  "main": "quartofmt_wasm.js",
-  "types": "quartofmt_wasm.d.ts",
+  "main": "panache_wasm.js",
+  "types": "panache_wasm.d.ts",
   "sideEffects": [
     "./snippets/*"
   ]

@@ -1,19 +1,19 @@
 [package]
-name = "quartofmt"
+name = "panache"
 version = "0.1.0"
 edition = "2024"
-description = "A formatter for Quarto documents"
+description = "A formatter for Pandoc, Quarto, and RMarkdown documents"
 license = "MIT"
-repository = "https://github.com/jolars/quartofmt"
-homepage = "https://github.com/jolars/quartofmt"
+repository = "https://github.com/jolars/panache"
+homepage = "https://github.com/jolars/panache"
 keywords = ["quarto", "pandoc", "markdown", "formatter"]
 categories = ["command-line-utilities", "text-processing"]
 
 [workspace]
-members = ["crates/quartofmt-wasm"]
+members = ["crates/panache-wasm"]
 
 [[bin]]
-name = "quartofmt"
+name = "panache"
 path = "src/main.rs"
 
 [dependencies]

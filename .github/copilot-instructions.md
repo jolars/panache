@@ -1,8 +1,8 @@
-# LLM Agent Instructions for quartofmt
+# LLM Agent Instructions for panache
 
 ## Repository Overview
 
-**quartofmt** is a CLI formatter for Quarto (`.qmd`), Pandoc, and Markdown
+**panache** is a CLI formatter for Quarto (`.qmd`), Pandoc, and Markdown
 files written in Rust. It's designed to understand Quarto/Pandoc-specific
 syntax that other formatters like Prettier and mdformat struggle with,
 including fenced divs, tables, and math formatting.
@@ -14,7 +14,7 @@ headings, lists, tables, etc.) in the [`docs/pandoc-spec/`](docs/pandoc-spec/)
 directory. These documents represent the definitive reference for elements
 that the parser should understand and handle correctly. This specification
 is essential for understanding formatting requirements, implementing parser
-logic, and ensuring spec compliance. quartofmt aims to support the full
+logic, and ensuring spec compliance. panache aims to support the full
 suite of Pandoc syntax, including all extensions. It will also support all
 the Quarto-specific syntax extensions.
 
@@ -78,7 +78,7 @@ cargo check && cargo test && cargo clippy -- -D warnings && cargo fmt -- --check
 
 ```bash
 # Basic functionality test
-printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/release/quartofmt
+printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/release/panache
 
 # Expected: Line wrapping at ~80 characters with proper Markdown formatting
 ```
@@ -112,7 +112,7 @@ The inline parser is a WIP placeholder that currently passes through block conte
 src/
 ├── main.rs              # CLI entry point with clap argument parsing
 ├── lib.rs               # Public API with format() and parse() functions
-├── config.rs            # Configuration handling (.quartofmt.toml, XDG paths)
+├── config.rs            # Configuration handling (.panache.toml, XDG paths)
 ├── formatter.rs         # Main formatting logic and AST traversal
 ├── block_parser.rs      # Block parser module entry point
 ├── block_parser/
@@ -131,11 +131,11 @@ src/
 
 ### Configuration System
 
-quartofmt uses a hierarchical config lookup:
+panache uses a hierarchical config lookup:
 
 1. Explicit `--config` path (errors if invalid)
-2. `.quartofmt.toml` or `quartofmt.toml` in current/parent directories
-3. `~/.config/quartofmt/config.toml` (XDG)
+2. `.panache.toml` or `panache.toml` in current/parent directories
+3. `~/.config/panache/config.toml` (XDG)
 4. Built-in defaults (80 char width, auto line endings, reflow wrap)
 
 ### Test Architecture
@@ -159,7 +159,7 @@ tests/
 
 ```
 crates/
-└── quartofmt-wasm/   # WebAssembly bindings for web playground
+└── panache-wasm/   # WebAssembly bindings for web playground
     ├── Cargo.toml
     └── src/
 ```
@@ -228,7 +228,7 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 ### Formatting Rules
 
 - Default 80 character line width (configurable)
-- **Most formatting behavior will be configurable through .quartofmt.toml**
+- **Most formatting behavior will be configurable through .panache.toml**
 - Preserves frontmatter and code blocks
 - Converts setext headings to ATX format
 - Handles Quarto-specific syntax (fenced divs, math blocks)
@@ -239,7 +239,7 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 
 ## Configuration Files and Settings
 
-- `.quartofmt.toml`: Project-specific config (line_width, line-ending, wrap mode)
+- `.panache.toml`: Project-specific config (line_width, line-ending, wrap mode)
 - `.envrc`: direnv configuration for Nix environment
 - `.gitignore`: Excludes target/, devenv artifacts, Nix build outputs
 - `devenv.nix`: Development environment with go-task, quarto, wasm-pack
@@ -248,7 +248,7 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 
 The `docs/playground/` contains a WASM-based web interface:
 
-- Built via `wasm-pack build --target web` in `crates/quartofmt-wasm/`
+- Built via `wasm-pack build --target web` in `crates/panache-wasm/`
 - Uses TypeScript bindings for browser integration
 - Served via local Python HTTP server for development
 

@@ -2,10 +2,10 @@ project:
   type: website
 
 website:
-  title: "quartofmt"
-  description: "A code formatter for Quarto documents"
-  site-url: "https://jolars.github.io/quartofmt/"
-  repo-url: "https://github.com/jolars/quartofmt"
+  title: "panache"
+  description: "A code formatter for Pandoc, Quarto, and RMarkdown documents"
+  site-url: "https://jolars.github.io/panache/"
+  repo-url: "https://github.com/jolars/panache"
   repo-actions: [edit, issue]
   search: true
 

@@ -1,5 +1,5 @@
-use quartofmt::config::WrapMode;
-use quartofmt::{Config, format};
+use panache::config::WrapMode;
+use panache::{Config, format};
 
 fn cfg_preserve() -> Config {
     Config {

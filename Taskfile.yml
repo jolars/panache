@@ -19,12 +19,12 @@ tasks:
   test-trace:
     desc: Run tests with trace logging for parser
     cmds:
-      - RUST_LOG=quartofmt::parser=trace cargo test
+      - RUST_LOG=panache::parser=trace cargo test
 
   test-lexer:
     desc: Run tests with trace logging for lexer
     cmds:
-      - RUST_LOG=quartofmt::lexer=trace cargo test
+      - RUST_LOG=panache::lexer=trace cargo test
 
   test-quiet:
     desc: Run tests quietly (no debug output)
@@ -44,10 +44,10 @@ tasks:
       - cd docs && quarto preview --no-browser
 
   wasm-build:
-    desc: Build quartofmt-wasm for web playground
+    desc: Build panache-wasm for web playground
     cmds:
-      - cd crates/quartofmt-wasm && wasm-pack build --target web
-      - cp -r crates/quartofmt-wasm/pkg docs/playground/
+      - cd crates/panache-wasm && wasm-pack build --target web
+      - cp -r crates/panache-wasm/pkg docs/playground/
       - rm -rf docs/playground/pkg/.gitignore 
 
   playground-serve:

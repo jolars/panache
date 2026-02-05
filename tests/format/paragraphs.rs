@@ -1,4 +1,4 @@
-use quartofmt::format;
+use panache::format;
 
 #[test]
 fn preserves_inline_code_whitespace() {

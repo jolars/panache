@@ -1,4 +1,4 @@
-use quartofmt::format;
+use panache::format;
 
 #[test]
 fn front_matter_and_paragraph() {

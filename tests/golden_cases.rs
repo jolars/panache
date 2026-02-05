@@ -1,4 +1,4 @@
-use quartofmt::format;
+use panache::format;
 use std::{fs, path::Path};
 
 fn normalize(s: &str) -> String {

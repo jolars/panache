@@ -25,7 +25,7 @@
 
 ## Config/CLI/editor integration
 
-- Provide CLI: quartofmt [--check] [--write] [--config PATH] [--stdin|PATHS].
+- Provide CLI: panache [--check] [--write] [--config PATH] [--stdin|PATHS].
 - Neovim: expose a robust CLI with --stdin --stdout for formatprg or provide an LSP/formatter endpoint.
 
 ## Architecture polish

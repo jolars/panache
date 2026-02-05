@@ -38,9 +38,9 @@ fn detect_line_ending(input: &str) -> &str {
 /// # Examples
 ///
 /// ```rust
-/// use quartofmt::format;
+/// use panache::format;
 ///
-/// let cfg = quartofmt::ConfigBuilder::default().line_width(80).build();
+/// let cfg = panache::ConfigBuilder::default().line_width(80).build();
 ///
 /// let input = "This is a very long line that should be wrapped.";
 /// let formatted = format(input, Some(cfg));
@@ -89,7 +89,7 @@ pub fn format_with_defaults(input: &str) -> String {
 /// # Examples
 ///
 /// ```rust
-/// use quartofmt::parse;
+/// use panache::parse;
 ///
 /// let input = "# Heading\n\nParagraph text.";
 /// let tree = parse(input);

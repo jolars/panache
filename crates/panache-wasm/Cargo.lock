@@ -267,7 +267,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "quartofmt"
+name = "panache"
 version = "1.0.0"
 dependencies = [
  "clap",
@@ -281,10 +281,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "quartofmt-wasm"
+name = "panache-wasm"
 version = "0.1.0"
 dependencies = [
- "quartofmt",
+ "panache",
  "wasm-bindgen",
 ]
 

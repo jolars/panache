@@ -1,8 +1,8 @@
-use quartofmt::format;
+use panache::format;
 
 #[test]
 fn list_item_link_no_break() {
-    let cfg = quartofmt::ConfigBuilder::default().line_width(30).build();
+    let cfg = panache::ConfigBuilder::default().line_width(30).build();
     let input = "- A list item with a link ![some link that is very long](./example.com/very/long/path/to/file) in it\n";
     let output = format(input, Some(cfg));
 

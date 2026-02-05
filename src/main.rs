@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 
-use quartofmt::format;
+use panache::format;
 
 #[derive(Parser)]
-#[command(name = "quartofmt")]
+#[command(name = "panache")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "A formatter for Quarto documents")]
 struct Cli {
@@ -50,7 +50,7 @@ fn main() -> io::Result<()> {
     let cli = Cli::parse();
 
     let start_dir = start_dir_for(&cli.file)?;
-    let (cfg, _cfg_path) = quartofmt::config::load(cli.config.as_deref(), &start_dir)?;
+    let (cfg, _cfg_path) = panache::config::load(cli.config.as_deref(), &start_dir)?;
 
     let input = read_all(cli.file.as_ref())?;
     let output = format(&input, Some(cfg));

@@ -1,4 +1,4 @@
-use quartofmt::format;
+use panache::format;
 
 #[test]
 fn quote_single_line() {

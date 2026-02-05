@@ -1,5 +1,5 @@
-use quartofmt::ConfigBuilder;
-use quartofmt::format;
+use panache::ConfigBuilder;
+use panache::format;
 
 #[test]
 fn math_no_wrap() {

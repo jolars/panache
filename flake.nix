@@ -19,8 +19,8 @@
           inherit system;
         };
 
-        quartofmt = pkgs.rustPlatform.buildRustPackage {
-          pname = "quartofmt";
+        panache = pkgs.rustPlatform.buildRustPackage {
+          pname = "panache";
           version = "0.1.0";
 
           src = ./.;
@@ -31,7 +31,7 @@
 
           meta = with pkgs.lib; {
             description = "A formatter for Quarto, R Markdown, and Markdown files";
-            homepage = "https://github.com/jolars/quartofmt";
+            homepage = "https://github.com/jolars/panache";
             license = licenses.mit;
             maintainers = [ ];
           };
@@ -39,14 +39,14 @@
       in
       {
         packages = {
-          default = quartofmt;
-          quartofmt = quartofmt;
+          default = panache;
+          panache = panache;
         };
 
         apps = {
           default = {
             type = "app";
-            program = "${quartofmt}/bin/quartofmt";
+            program = "${panache}/bin/panache";
           };
         };
 

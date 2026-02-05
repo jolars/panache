@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <style>textarea{width:49%;height:70vh} .row{display:flex;gap:1%}</style>
-<h1>quartofmt playground</h1>
+<h1>panache playground</h1>
 <label>
     Line width:
     <input id="lw" type="number" min="10" max="200" value="80">
@@ -12,7 +12,7 @@
 </div>
 <pre id="debug" style="white-space:pre-wrap"></pre>
 <script type="module">
-  import init, { format_qmd, tokenize_debug } from './pkg/quartofmt_wasm.js';
+  import init, { format_qmd, tokenize_debug } from './pkg/panache_wasm.js';
   await init();
   const $ = id => document.getElementById(id);
   const fmt = () => {

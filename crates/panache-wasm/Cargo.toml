@@ -1,5 +1,5 @@
 [package]
-name = "quartofmt-wasm"
+name = "panache-wasm"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,4 +8,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-quartofmt = { path = "../.." }
+panache = { path = "../.." }

@@ -278,6 +278,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4895175b425cb1f87721b59f0f286c2092bd4af812243672510e1ac53e2e0ad"
 
 [[package]]
+name = "panache"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "diff",
+ "env_logger",
+ "log",
+ "regex",
+ "rowan",
+ "serde",
+ "similar-asserts",
+ "textwrap",
+ "toml",
+]
+
+[[package]]
+name = "panache-wasm"
+version = "0.1.0"
+dependencies = [
+ "panache",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "portable-atomic"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -299,30 +323,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89ae43fd86e4158d6db51ad8e2b80f313af9cc74f5c0e03ccb87de09998732de"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "quartofmt"
-version = "0.1.0"
-dependencies = [
- "clap",
- "diff",
- "env_logger",
- "log",
- "regex",
- "rowan",
- "serde",
- "similar-asserts",
- "textwrap",
- "toml",
-]
-
-[[package]]
-name = "quartofmt-wasm"
-version = "0.1.0"
-dependencies = [
- "quartofmt",
- "wasm-bindgen",
 ]
 
 [[package]]

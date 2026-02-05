@@ -1,12 +1,7 @@
 ---
-title: quartofmt
+title: panache
 ---
 
-This is the documentation for `quartofmt` package, which is a command line tool
-for formatting quarto documents.
+This is the documentation for `panache` package, which is a command line tool
+for formatting Pandoc, Quarto, and RMarkdown documents.
 
-## Installation
-
-```sh
-quarto install quarto-format
-```

@@ -1,6 +1,6 @@
-# quartofmt: A Formatter for Quarto, Pandoc, and Markdown
+# panache: A Formatter for Pandoc, Quarto and RMarkdown
 
-[![Build and Test](https://github.com/jolars/quartofmt/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/quartofmt/actions/workflows/build-and-test.yml)
+[![Build and Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
 
 A CLI formatter for Quarto (`.qmd`), Pandoc, and Markdown files.
 
@@ -18,24 +18,24 @@ cargo install --path .
 
 ```bash
 # Format a file and output to stdout
-quartofmt document.qmd
+panache document.qmd
 
 # Format a file in place
-quartofmt --write document.qmd
+panache --write document.qmd
 
 # Check if a file is formatted
-quartofmt --check document.qmd
+panache --check document.qmd
 
 # Format from stdin
-quartofmt document.qmd | cat
+panache document.qmd | cat
 ```
 
 ## Configuration
 
-quartofmt looks for a configuration in:
+panache looks for a configuration in:
 
-1. `.quartofmt.toml` or `quartofmt.toml` in current directory or parent directories
-2. `~/.config/quartofmt/config.toml`
+1. `.panache.toml` or `panache.toml` in current directory or parent directories
+2. `~/.config/panache/config.toml`
 
 ### Example config
 
