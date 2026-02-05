@@ -5,6 +5,7 @@ mod blockquotes;
 mod code_blocks;
 mod container_stack;
 mod headings;
+mod horizontal_rules;
 mod lists;
 mod paragraphs;
 mod utils;
@@ -13,6 +14,7 @@ use blockquotes::count_blockquote_markers;
 use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use headings::{emit_atx_heading, try_parse_atx_heading};
+use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
 
 fn init_logger() {
@@ -326,6 +328,13 @@ impl<'a> BlockParser<'a> {
             || matches!(self.containers.last(), Some(Container::BlockQuote { .. }));
 
         if has_blank_before {
+            // Try to parse horizontal rule
+            if try_parse_horizontal_rule(content).is_some() {
+                emit_horizontal_rule(&mut self.builder, content);
+                self.pos += 1;
+                return true;
+            }
+
             // Try to parse ATX heading from stripped content
             if let Some(heading_level) = try_parse_atx_heading(content) {
                 emit_atx_heading(&mut self.builder, content, heading_level);

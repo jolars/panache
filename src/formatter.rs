@@ -246,6 +246,20 @@ impl Formatter {
                 }
             }
 
+            SyntaxKind::HorizontalRule => {
+                // Output normalized horizontal rule (always use "---")
+                self.output.push_str("---");
+                self.output.push('\n');
+
+                // Ensure blank line after if followed by block element
+                if let Some(next) = node.next_sibling()
+                    && is_block_element(next.kind())
+                    && !self.output.ends_with("\n\n")
+                {
+                    self.output.push('\n');
+                }
+            }
+
             SyntaxKind::LatexEnvironment => {
                 // Output the environment exactly as written
                 let text = node.text().to_string();
@@ -313,6 +327,39 @@ impl Formatter {
                         SyntaxKind::BlankLine => {
                             self.output.push_str(blank_prefix);
                             self.output.push('\n');
+                        }
+                        SyntaxKind::HorizontalRule => {
+                            self.output.push_str(&content_prefix);
+                            self.output.push_str("---");
+                            self.output.push('\n');
+                        }
+                        SyntaxKind::Heading => {
+                            // Format heading with blockquote prefix
+                            let heading_text = self.format_heading(&child);
+                            for line in heading_text.lines() {
+                                self.output.push_str(&content_prefix);
+                                self.output.push_str(line);
+                                self.output.push('\n');
+                            }
+                        }
+                        SyntaxKind::List => {
+                            // Format list with blockquote prefix
+                            // Save current output, format list to temp, then prefix each line
+                            let saved_output = self.output.clone();
+                            self.output.clear();
+                            self.format_node(&child, indent);
+                            let list_output = self.output.clone();
+                            self.output = saved_output;
+
+                            for line in list_output.lines() {
+                                if line.is_empty() {
+                                    self.output.push_str(blank_prefix);
+                                } else {
+                                    self.output.push_str(&content_prefix);
+                                    self.output.push_str(line);
+                                }
+                                self.output.push('\n');
+                            }
                         }
                         _ => {
                             // Handle other content within block quotes
@@ -579,6 +626,46 @@ impl Formatter {
                 self.output.push_str(&node.text().to_string());
             }
         }
+    }
+
+    /// Format a heading and return its text (without adding to output).
+    fn format_heading(&self, node: &SyntaxNode) -> String {
+        let mut level = 1;
+        let mut content = String::new();
+        let mut saw_content = false;
+
+        for child in node.children() {
+            match child.kind() {
+                SyntaxKind::AtxHeadingMarker => {
+                    let t = child.text().to_string();
+                    level = t.chars().take_while(|&c| c == '#').count().clamp(1, 6);
+                }
+                SyntaxKind::SetextHeadingUnderline => {
+                    let t = child.text().to_string();
+                    if t.chars().all(|c| c == '=') {
+                        level = 1;
+                    } else {
+                        level = 2;
+                    }
+                }
+                SyntaxKind::HeadingContent => {
+                    let mut t = child.text().to_string();
+                    t = t.trim_end().to_string();
+                    let trimmed_hash = t.trim_end_matches('#').to_string();
+                    if trimmed_hash.len() != t.len() {
+                        t = trimmed_hash.trim_end().to_string();
+                    }
+                    content = t.trim().to_string();
+                    saw_content = true;
+                }
+                _ => {}
+            }
+        }
+        if !saw_content {
+            content = node.text().to_string();
+        }
+
+        format!("{} {}", "#".repeat(level), content)
     }
 }
 
