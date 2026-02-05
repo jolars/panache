@@ -97,22 +97,36 @@ represented using the `rowan` crate, which provides a red-green tree structure
 for efficient syntax tree manipulation. The formatter then traverses this tree to apply
 the formatting rules.
 
-**IMPORTANT**: Currently, there is only a WIP block parser. The inline parser/lexer
-is not yet implemented.
+**IMPORTANT**: The block parser is currently in active development with support for:
+- ATX headings
+- Fenced code blocks (backtick and tilde)
+- Paragraphs
+- Blockquotes (with nesting support)
+- Blank lines
+
+The inline parser is a WIP placeholder that currently passes through block content unchanged.
 
 ### Source Structure
 
 ```
 src/
-├── main.rs           # CLI entry point with clap argument parsing
-├── lib.rs            # Public API with format() function
-├── config.rs         # Configuration handling (.quartofmt.toml, XDG paths)
-├── formatter.rs      # Main formatting logic and AST traversal
-├── block_parser.rs   # block parser module
-├── inline_parser.rs  # WIP inline parser module (not yet implemented)
-├── syntax.rs         # Syntax node definitions and AST types
-├── inline_parser/    # Additional modules, including tests, for the inline parser
-└── block_parser/     # Additional modules, including tests, for the block parser
+├── main.rs              # CLI entry point with clap argument parsing
+├── lib.rs               # Public API with format() and parse() functions
+├── config.rs            # Configuration handling (.quartofmt.toml, XDG paths)
+├── formatter.rs         # Main formatting logic and AST traversal
+├── block_parser.rs      # Block parser module entry point
+├── block_parser/
+│   ├── blockquotes.rs   # Blockquote parsing and resolution
+│   ├── code_blocks.rs   # Fenced code block parsing
+│   ├── headings.rs      # ATX heading parsing
+│   ├── paragraphs.rs    # Paragraph parsing
+│   ├── resolvers.rs     # Container block resolution (2nd pass)
+│   ├── utils.rs         # Helper functions (strip_leading_spaces, etc.)
+│   └── tests/           # Block parser unit tests
+├── inline_parser.rs     # WIP inline parser module (placeholder)
+├── inline_parser/
+│   └── tests.rs         # Inline parser tests
+└── syntax.rs            # Syntax node definitions and AST types
 ```
 
 ### Configuration System
@@ -257,7 +271,11 @@ The `docs/playground/` contains a WASM-based web interface:
 
 ### Architecture Dependencies
 
-- Block parser captures block structures (including nested ones), then inline parser/lexer handles inline syntax
+- Block parser captures block structures (including nested ones) using a two-pass approach:
+  1. First pass: Parse flat block structures (headings, code blocks, paragraphs, etc.)
+  2. Second pass: Resolve container blocks (blockquotes, lists) from flat structure
+- Each block type is isolated in its own module under `src/block_parser/`
+- Inline parser runs after block parser to handle inline syntax within blocks
 - Parser builds rowan CST consumed by formatter
 - Config system must maintain backward compatibility
 - WASM crate depends on main crate - changes affect both
