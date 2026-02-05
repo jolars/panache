@@ -7,6 +7,7 @@ mod container_stack;
 mod headings;
 mod horizontal_rules;
 mod lists;
+mod metadata;
 mod paragraphs;
 mod utils;
 
@@ -16,6 +17,7 @@ use container_stack::{Container, ContainerStack, byte_index_at_column, leading_i
 use headings::{emit_atx_heading, try_parse_atx_heading};
 use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
+use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -56,6 +58,14 @@ impl<'a> BlockParser<'a> {
         self.builder.start_node(SyntaxKind::DOCUMENT.into());
 
         log::debug!("Starting document parse");
+
+        // Check for Pandoc title block at document start
+        if self.pos == 0
+            && !self.lines.is_empty()
+            && let Some(new_pos) = try_parse_pandoc_title_block(&self.lines, 0, &mut self.builder)
+        {
+            self.pos = new_pos;
+        }
 
         while self.pos < self.lines.len() {
             let line = self.lines[self.pos];
@@ -394,8 +404,19 @@ impl<'a> BlockParser<'a> {
             || self.lines[self.pos - 1].trim().is_empty()
             || matches!(self.containers.last(), Some(Container::BlockQuote { .. }));
 
+        // At top level only (not inside blockquotes), check for YAML metadata
+        if self.current_blockquote_depth() == 0 && content.trim() == "---" {
+            let at_document_start = self.pos == 0;
+            if let Some(new_pos) =
+                try_parse_yaml_block(&self.lines, self.pos, &mut self.builder, at_document_start)
+            {
+                self.pos = new_pos;
+                return true;
+            }
+        }
+
         if has_blank_before {
-            // Try to parse horizontal rule
+            // Try to parse horizontal rule (but only if not YAML)
             if try_parse_horizontal_rule(content).is_some() {
                 emit_horizontal_rule(&mut self.builder, content);
                 self.pos += 1;

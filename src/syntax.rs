@@ -7,15 +7,15 @@ pub enum SyntaxKind {
     WHITESPACE = 0,
     NEWLINE,
     TEXT,
-    DivMarker,        // :::
-    FrontmatterDelim, // --- or +++
-    BlockQuoteMarker, // >
-    ImageLinkStart,   // ![
-    ListMarker,       // - + *
-    CommentStart,     // <!--
-    CommentEnd,       // -->
-    Attribute,        // {#label} for headings, math, etc.
-    HorizontalRule,   // --- or *** or ___
+    DivMarker,         // :::
+    YamlMetadataDelim, // --- or ... (for YAML blocks)
+    BlockQuoteMarker,  // >
+    ImageLinkStart,    // ![
+    ListMarker,        // - + *
+    CommentStart,      // <!--
+    CommentEnd,        // -->
+    Attribute,         // {#label} for headings, math, etc.
+    HorizontalRule,    // --- or *** or ___
     BlankLine,
 
     // Links
@@ -43,7 +43,8 @@ pub enum SyntaxKind {
     // Composite nodes
     ROOT,
     DOCUMENT,
-    FRONTMATTER,
+    YamlMetadata,
+    PandocTitleBlock,
     FencedDiv,
     PARAGRAPH,
     BlockQuote,

@@ -592,7 +592,7 @@ impl Formatter {
                 self.output.push('\n');
             }
 
-            SyntaxKind::CodeBlock | SyntaxKind::FRONTMATTER => {
+            SyntaxKind::CodeBlock | SyntaxKind::YamlMetadata | SyntaxKind::PandocTitleBlock => {
                 // Preserve these blocks as-is
                 let text = node.text().to_string();
                 self.output.push_str(&text);
