@@ -45,7 +45,7 @@ pub(crate) fn try_identify_blockquote(children: &[SyntaxNode], start: usize) -> 
     Some(end)
 }
 
-fn is_valid_blockquote_line(line: &str) -> bool {
+pub(crate) fn is_valid_blockquote_line(line: &str) -> bool {
     // Check for up to 3 spaces, then >, following Pandoc spec
     if line.starts_with('>') {
         return true;

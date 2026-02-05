@@ -112,6 +112,10 @@ impl Formatter {
                     }
                 },
                 NodeOrToken::Node(n) => {
+                    if n.kind() == SyntaxKind::List {
+                        b.pending_space = true;
+                        continue;
+                    }
                     let text = n.text().to_string();
                     b.push_piece(&text);
                 }
@@ -174,9 +178,11 @@ impl Formatter {
                     match el {
                         rowan::NodeOrToken::Node(n) => self.format_node(&n, indent),
                         rowan::NodeOrToken::Token(t) => match t.kind() {
-                            SyntaxKind::WHITESPACE
-                            | SyntaxKind::NEWLINE
-                            | SyntaxKind::BlankLine => {}
+                            SyntaxKind::WHITESPACE => {}
+                            SyntaxKind::NEWLINE => {}
+                            SyntaxKind::BlankLine => {
+                                self.output.push('\n');
+                            }
                             SyntaxKind::ImageLinkStart
                             | SyntaxKind::LinkStart
                             | SyntaxKind::LatexCommand => {
@@ -344,8 +350,28 @@ impl Formatter {
             }
 
             SyntaxKind::List => {
+                // Add blank line before top-level lists (indent == 0) that follow content.
+                // Don't add for nested lists (indent > 0) as they follow their parent item's content.
+                if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") {
+                    self.output.push('\n');
+                }
+                let mut prev_was_item = false;
                 for child in node.children() {
+                    if child.kind() == SyntaxKind::ListItem {
+                        if prev_was_item {
+                            while self.output.ends_with("\n\n") {
+                                self.output.pop();
+                            }
+                        }
+                        prev_was_item = true;
+                    }
+                    if child.kind() == SyntaxKind::BlankLine {
+                        continue;
+                    }
                     self.format_node(&child, indent);
+                }
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
                 }
             }
 
@@ -427,10 +453,10 @@ impl Formatter {
                     self.output.push('\n');
                 }
 
-                // Format nested lists inside this list item with increased indent
+                // Format nested lists inside this list item aligned to the content column.
                 for child in node.children() {
                     if child.kind() == SyntaxKind::List {
-                        self.format_node(&child, total_indent + 2);
+                        self.format_node(&child, total_indent + marker.len() + 1);
                     }
                 }
             }

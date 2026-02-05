@@ -1,6 +1,7 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+#[allow(dead_code)]
 pub(crate) fn try_parse_paragraph(
     lines: &[&str],
     pos: usize,

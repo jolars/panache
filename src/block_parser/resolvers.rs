@@ -28,7 +28,7 @@ fn resolve_container_children(builder: &mut GreenNodeBuilder<'static>, children:
             build_blockquote_node(builder, &children[i..blockquote_end]);
             i = blockquote_end;
         } else {
-            // Regular node, copy as-is
+            // Regular node, copy as-is (list nesting is handled in the parser)
             copy_node_recursively(builder, &children[i]);
             i += 1;
         }
