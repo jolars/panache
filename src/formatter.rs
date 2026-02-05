@@ -1,4 +1,4 @@
-use crate::config::{Config, WrapMode};
+use crate::config::{BlankLines, Config, WrapMode};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 use rowan::NodeOrToken;
@@ -7,6 +7,7 @@ use textwrap::wrap_algorithms::WrapAlgorithm;
 pub struct Formatter {
     output: String,
     config: Config,
+    consecutive_blank_lines: usize,
 }
 
 fn is_block_element(kind: SyntaxKind) -> bool {
@@ -26,6 +27,7 @@ impl Formatter {
         Self {
             output: String::with_capacity(8192),
             config,
+            consecutive_blank_lines: 0,
         }
     }
 
@@ -159,6 +161,11 @@ impl Formatter {
     }
 
     fn format_node(&mut self, node: &SyntaxNode, indent: usize) {
+        // Reset blank line counter when we hit a non-blank node
+        if node.kind() != SyntaxKind::BlankLine {
+            self.consecutive_blank_lines = 0;
+        }
+
         let line_width = self.config.line_width;
 
         match node.kind() {
@@ -523,8 +530,22 @@ impl Formatter {
             }
 
             SyntaxKind::BlankLine => {
-                // Preserve the actual blank line content (multiple newlines/whitespace)
-                self.output.push_str(&node.text().to_string());
+                // Apply blank_lines config to collapse consecutive blank lines
+                match self.config.blank_lines {
+                    BlankLines::Preserve => {
+                        // Always output blank line
+                        self.output.push('\n');
+                        self.consecutive_blank_lines += 1;
+                    }
+                    BlankLines::Collapse => {
+                        // Only output if we haven't already output one blank line
+                        if self.consecutive_blank_lines == 0 {
+                            self.output.push('\n');
+                            self.consecutive_blank_lines = 1;
+                        }
+                        // Otherwise skip this blank line (collapsing to one)
+                    }
+                }
             }
 
             _ => {

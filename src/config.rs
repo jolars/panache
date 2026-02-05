@@ -12,6 +12,7 @@ pub struct Config {
     pub line_width: usize,
     pub math_indent: usize,
     pub wrap: Option<WrapMode>,
+    pub blank_lines: BlankLines,
 }
 
 impl Default for Config {
@@ -21,6 +22,7 @@ impl Default for Config {
             line_width: 80,
             math_indent: 0,
             wrap: Some(WrapMode::Reflow),
+            blank_lines: BlankLines::Collapse,
         }
     }
 }
@@ -46,6 +48,11 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn blank_lines(mut self, mode: BlankLines) -> Self {
+        self.config.blank_lines = mode;
+        self
+    }
+
     pub fn build(self) -> Config {
         self.config
     }
@@ -64,6 +71,15 @@ pub enum LineEnding {
     Auto,
     Lf,
     Crlf,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum BlankLines {
+    /// Preserve original blank lines (any number)
+    Preserve,
+    /// Collapse multiple consecutive blank lines to a single blank line
+    Collapse,
 }
 
 const CANDIDATE_NAMES: &[&str] = &[".quartofmt.toml", "quartofmt.toml"];

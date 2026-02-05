@@ -4,6 +4,7 @@ pub mod formatter;
 pub mod inline_parser;
 pub mod syntax;
 
+pub use config::BlankLines;
 pub use config::Config;
 pub use config::ConfigBuilder;
 pub use formatter::format_tree;
