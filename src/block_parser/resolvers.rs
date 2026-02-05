@@ -1,3 +1,7 @@
+// Old resolver - kept for reference but no longer used.
+// Stack-based container handling is now in block_parser.rs.
+#![allow(dead_code)]
+
 use crate::block_parser::blockquotes::{build_blockquote_node, try_identify_blockquote};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;

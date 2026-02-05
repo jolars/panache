@@ -1,3 +1,7 @@
+// Old heading parser - kept for reference but no longer used.
+// Inline heading parsing is now in block_parser.rs.
+#![allow(dead_code)]
+
 use crate::block_parser::utils::strip_leading_spaces;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;

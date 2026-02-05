@@ -1,3 +1,7 @@
+// Old blockquote resolver - kept for reference but no longer used.
+// Stack-based blockquote handling is now in block_parser.rs.
+#![allow(dead_code)]
+
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
