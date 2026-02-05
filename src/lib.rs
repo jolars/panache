@@ -7,6 +7,7 @@ pub mod syntax;
 pub use config::Config;
 pub use config::ConfigBuilder;
 pub use formatter::format_tree;
+pub use syntax::SyntaxNode;
 
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -77,4 +78,28 @@ pub fn format(input: &str, config: Option<Config>) -> String {
 
 pub fn format_with_defaults(input: &str) -> String {
     format(input, None)
+}
+
+/// Parses a Quarto document string into a syntax tree.
+///
+/// This function normalizes line endings and runs both the block parser
+/// and inline parser to produce a complete concrete syntax tree (CST).
+///
+/// # Examples
+///
+/// ```rust
+/// use quartofmt::parse;
+///
+/// let input = "# Heading\n\nParagraph text.";
+/// let tree = parse(input);
+/// println!("{:#?}", tree);
+/// ```
+///
+/// # Arguments
+///
+/// * `input` - The Quarto document content to parse
+pub fn parse(input: &str) -> SyntaxNode {
+    let normalized_input = input.replace("\r\n", "\n");
+    let block_tree = block_parser::BlockParser::new(&normalized_input).parse();
+    inline_parser::InlineParser::new(block_tree).parse()
 }
