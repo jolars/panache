@@ -97,6 +97,20 @@ impl<'a> BlockParser<'a> {
             .count()
     }
 
+    /// Strip exactly n blockquote markers from a line, returning the rest.
+    fn strip_n_blockquote_markers<'b>(&self, line: &'b str, n: usize) -> &'b str {
+        use blockquotes::try_parse_blockquote_marker;
+        let mut remaining = line;
+        for _ in 0..n {
+            if let Some((_, content_start)) = try_parse_blockquote_marker(remaining) {
+                remaining = &remaining[content_start..];
+            } else {
+                break;
+            }
+        }
+        remaining
+    }
+
     /// Close blockquotes down to a target depth.
     fn close_blockquotes_to_depth(&mut self, target_depth: usize) {
         let mut current = self.current_blockquote_depth();
@@ -194,17 +208,35 @@ impl<'a> BlockParser<'a> {
                 return true;
             }
 
-            // For nested blockquotes, also need blank line before
-            if current_bq_depth > 0
-                && bq_depth > current_bq_depth
-                && !matches!(self.containers.last(), Some(Container::BlockQuote { .. }))
-            {
-                // We're in a blockquote but not directly (e.g., in a paragraph inside)
-                // Check if previous line inside blockquote was blank
-                // For now, require the paragraph to be closed first
+            // For nested blockquotes, also need blank line before (blank_before_blockquote)
+            // Check if previous line inside the blockquote was blank
+            let can_nest = if current_bq_depth > 0 {
+                // Check if we're right after a blank line or at start of blockquote
+                matches!(self.containers.last(), Some(Container::BlockQuote { .. }))
+                    || (self.pos > 0 && {
+                        let prev_line = self.lines[self.pos - 1];
+                        let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
+                        prev_bq_depth >= current_bq_depth && prev_inner.trim().is_empty()
+                    })
+            } else {
+                true
+            };
+
+            if !can_nest {
+                // Can't nest deeper - treat extra > as content
+                // Only strip markers up to current depth
+                let content_at_current_depth =
+                    self.strip_n_blockquote_markers(line, current_bq_depth);
+
                 if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                    // Lazy continuation - add to existing paragraph
-                    self.append_paragraph_line(inner_content);
+                    // Lazy continuation with the extra > as content
+                    self.append_paragraph_line(content_at_current_depth);
+                    self.pos += 1;
+                    return true;
+                } else {
+                    // Start new paragraph with the extra > as content
+                    self.start_paragraph_if_needed();
+                    self.append_paragraph_line(content_at_current_depth);
                     self.pos += 1;
                     return true;
                 }
@@ -227,13 +259,35 @@ impl<'a> BlockParser<'a> {
             return self.parse_inner_content(inner_content);
         } else if bq_depth < current_bq_depth {
             // Need to close some blockquotes, but first check for lazy continuation
-            // Lazy continuation: line without > continues a paragraph in a blockquote
-            if bq_depth == 0 && matches!(self.containers.last(), Some(Container::Paragraph { .. }))
-            {
-                // This is lazy continuation - add to existing paragraph
-                self.append_paragraph_line(line);
-                self.pos += 1;
-                return true;
+            // Lazy continuation: line without > continues content in a blockquote
+            if bq_depth == 0 {
+                // Check for lazy paragraph continuation
+                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                    self.append_paragraph_line(line);
+                    self.pos += 1;
+                    return true;
+                }
+
+                // Check for lazy list continuation - if we're in a list item and
+                // this line looks like a list item with matching marker
+                if self.in_blockquote_list()
+                    && let Some((marker, marker_len, spaces_after)) = try_parse_list_marker(line)
+                {
+                    let (indent_cols, indent_bytes) = leading_indent(line);
+                    if let Some(level) = self.find_matching_list_level(&marker, indent_cols) {
+                        // Continue the list inside the blockquote
+                        self.continue_list_at_level(level);
+                        self.add_list_item(
+                            line,
+                            marker_len,
+                            spaces_after,
+                            indent_cols,
+                            indent_bytes,
+                        );
+                        self.pos += 1;
+                        return true;
+                    }
+                }
             }
 
             // Not lazy continuation - close paragraph if open
@@ -258,13 +312,26 @@ impl<'a> BlockParser<'a> {
 
         // No blockquote markers - parse as regular content
         // But check for lazy continuation first
-        if current_bq_depth > 0
-            && matches!(self.containers.last(), Some(Container::Paragraph { .. }))
-        {
-            // Lazy continuation
-            self.append_paragraph_line(line);
-            self.pos += 1;
-            return true;
+        if current_bq_depth > 0 {
+            // Check for lazy paragraph continuation
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.append_paragraph_line(line);
+                self.pos += 1;
+                return true;
+            }
+
+            // Check for lazy list continuation
+            if self.in_blockquote_list()
+                && let Some((marker, marker_len, spaces_after)) = try_parse_list_marker(line)
+            {
+                let (indent_cols, indent_bytes) = leading_indent(line);
+                if let Some(level) = self.find_matching_list_level(&marker, indent_cols) {
+                    self.continue_list_at_level(level);
+                    self.add_list_item(line, marker_len, spaces_after, indent_cols, indent_bytes);
+                    self.pos += 1;
+                    return true;
+                }
+            }
         }
 
         self.parse_inner_content(line)
@@ -411,6 +478,20 @@ impl<'a> BlockParser<'a> {
             .stack
             .iter()
             .any(|c| matches!(c, Container::List { .. }))
+    }
+
+    /// Check if we're in a list inside a blockquote.
+    fn in_blockquote_list(&self) -> bool {
+        let mut seen_blockquote = false;
+        for c in &self.containers.stack {
+            if matches!(c, Container::BlockQuote { .. }) {
+                seen_blockquote = true;
+            }
+            if seen_blockquote && matches!(c, Container::List { .. }) {
+                return true;
+            }
+        }
+        false
     }
 
     fn find_matching_list_level(&self, marker: &ListMarker, indent_cols: usize) -> Option<usize> {
