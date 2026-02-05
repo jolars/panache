@@ -1,156 +1,75 @@
-// Old blockquote resolver - kept for reference but no longer used.
-// Stack-based blockquote handling is now in block_parser.rs.
-#![allow(dead_code)]
+//! Blockquote parsing utilities.
 
-use crate::syntax::{SyntaxKind, SyntaxNode};
-use rowan::GreenNodeBuilder;
+/// Check if line starts with a blockquote marker (up to 3 spaces + >).
+/// Returns (marker_end_byte, content_start_byte) if found.
+pub(crate) fn try_parse_blockquote_marker(line: &str) -> Option<(usize, usize)> {
+    let bytes = line.as_bytes();
+    let mut i = 0;
 
-pub(crate) fn try_identify_blockquote(children: &[SyntaxNode], start: usize) -> Option<usize> {
-    if start >= children.len() {
+    // Skip up to 3 spaces
+    let mut spaces = 0;
+    while i < bytes.len() && bytes[i] == b' ' && spaces < 3 {
+        spaces += 1;
+        i += 1;
+    }
+
+    // Must have > next
+    if i >= bytes.len() || bytes[i] != b'>' {
         return None;
     }
+    let marker_end = i + 1;
 
-    // Check if this paragraph looks like a blockquote (starts with >)
-    let first_node = &children[start];
-    if first_node.kind() != SyntaxKind::PARAGRAPH {
-        return None;
-    }
-
-    let text = first_node.text().to_string();
-    let first_line = text.lines().next().unwrap_or("");
-
-    // Check if line has valid blockquote indentation (max 3 spaces before >)
-    if !is_valid_blockquote_line(first_line) {
-        return None;
-    }
-
-    // Find consecutive blockquote paragraphs and blank lines
-    let mut end = start + 1;
-    while end < children.len() {
-        let node = &children[end];
-        match node.kind() {
-            SyntaxKind::PARAGRAPH => {
-                let text = node.text().to_string();
-                let first_line = text.lines().next().unwrap_or("");
-                if is_valid_blockquote_line(first_line) {
-                    end += 1;
-                } else {
-                    break;
-                }
-            }
-            SyntaxKind::BlankLine => {
-                // Blank lines can be part of blockquotes
-                end += 1;
-            }
-            _ => break,
-        }
-    }
-
-    Some(end)
-}
-
-pub(crate) fn is_valid_blockquote_line(line: &str) -> bool {
-    // Check for up to 3 spaces, then >, following Pandoc spec
-    if line.starts_with('>') {
-        return true;
-    }
-    if line.starts_with(' ') && line.len() > 1 && line[1..].starts_with('>') {
-        return true;
-    }
-    if line.starts_with("  ") && line.len() > 2 && line[2..].starts_with('>') {
-        return true;
-    }
-    if line.starts_with("   ") && line.len() > 3 && line[3..].starts_with('>') {
-        return true;
-    }
-    // 4 or more spaces before > is not a valid blockquote
-    false
-}
-
-fn strip_blockquote_marker(line: &str) -> Option<&str> {
-    // Handle up to 3 spaces before >, then extract content after >
-    if let Some(stripped) = line.strip_prefix('>') {
-        // Remove optional space after >
-        Some(stripped.strip_prefix(' ').unwrap_or(stripped))
-    } else if let Some(rest) = line.strip_prefix(' ')
-        && let Some(stripped) = rest.strip_prefix('>')
-    {
-        Some(stripped.strip_prefix(' ').unwrap_or(stripped))
-    } else if let Some(rest) = line.strip_prefix("  ")
-        && let Some(stripped) = rest.strip_prefix('>')
-    {
-        Some(stripped.strip_prefix(' ').unwrap_or(stripped))
-    } else if let Some(rest) = line.strip_prefix("   ")
-        && let Some(stripped) = rest.strip_prefix('>')
-    {
-        Some(stripped.strip_prefix(' ').unwrap_or(stripped))
+    // Optional space after >
+    let content_start = if marker_end < bytes.len() && bytes[marker_end] == b' ' {
+        marker_end + 1
     } else {
-        None
-    }
+        marker_end
+    };
+
+    Some((marker_end, content_start))
 }
 
-pub(crate) fn build_blockquote_node(builder: &mut GreenNodeBuilder<'static>, nodes: &[SyntaxNode]) {
-    use crate::block_parser::BlockParser;
+/// Count how many blockquote levels a line has, returning (depth, remaining_content).
+pub(crate) fn count_blockquote_markers(line: &str) -> (usize, &str) {
+    let mut depth = 0;
+    let mut remaining = line;
 
-    builder.start_node(SyntaxKind::BlockQuote.into());
-
-    // Extract content from blockquote markers and recursively parse
-    let mut content_lines = Vec::new();
-
-    for node in nodes {
-        match node.kind() {
-            SyntaxKind::PARAGRAPH => {
-                let text = node.text().to_string();
-                for line in text.lines() {
-                    if let Some(stripped) = strip_blockquote_marker(line) {
-                        // Line has blockquote marker - extract content
-                        content_lines.push(stripped.to_string());
-                    } else {
-                        // Lazy line without marker - include as-is
-                        content_lines.push(line.to_string());
-                    }
-                }
-            }
-            SyntaxKind::BlankLine => {
-                content_lines.push(String::new());
-            }
-            _ => {}
-        }
+    while let Some((_, content_start)) = try_parse_blockquote_marker(remaining) {
+        depth += 1;
+        remaining = &remaining[content_start..];
     }
 
-    if !content_lines.is_empty() {
-        let content = content_lines.join("\n");
-        if !content.trim().is_empty() {
-            // Create a sub-parser for the blockquote content - this enables recursion!
-            let sub_parser = BlockParser::new(&content);
-            let sub_tree = sub_parser.parse();
-
-            // Copy the sub-tree's document children into our blockquote
-            if let Some(doc) = sub_tree
-                .children()
-                .find(|n| n.kind() == SyntaxKind::DOCUMENT)
-            {
-                for child in doc.children() {
-                    copy_node_recursively(builder, &child);
-                }
-            }
-        }
-    }
-
-    builder.finish_node();
+    (depth, remaining)
 }
 
-fn copy_node_recursively(builder: &mut GreenNodeBuilder<'static>, node: &SyntaxNode) {
-    builder.start_node(node.kind().into());
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    for child in node.children_with_tokens() {
-        match child {
-            rowan::NodeOrToken::Node(n) => copy_node_recursively(builder, &n),
-            rowan::NodeOrToken::Token(t) => {
-                builder.token(t.kind().into(), t.text());
-            }
-        }
+    #[test]
+    fn test_simple_marker() {
+        assert_eq!(try_parse_blockquote_marker("> text"), Some((1, 2)));
     }
 
-    builder.finish_node();
+    #[test]
+    fn test_marker_no_space() {
+        assert_eq!(try_parse_blockquote_marker(">text"), Some((1, 1)));
+    }
+
+    #[test]
+    fn test_marker_with_leading_spaces() {
+        assert_eq!(try_parse_blockquote_marker("   > text"), Some((4, 5)));
+    }
+
+    #[test]
+    fn test_four_spaces_not_blockquote() {
+        assert_eq!(try_parse_blockquote_marker("    > text"), None);
+    }
+
+    #[test]
+    fn test_count_nested() {
+        let (depth, content) = count_blockquote_markers("> > > nested");
+        assert_eq!(depth, 3);
+        assert_eq!(content, "nested");
+    }
 }

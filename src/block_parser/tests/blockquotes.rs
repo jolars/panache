@@ -318,3 +318,20 @@ fn spec_lazy_blockquote_form() {
         "Should contain lazy continuation"
     );
 }
+
+#[test]
+fn blockquote_with_code_block() {
+    let input = "> ```python\n> print(\"hello\")\n> ```\n";
+    let parser = BlockParser::new(input);
+    let tree = parser.parse();
+
+    // Should have 1 BlockQuote with 1 CodeBlock inside
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::CodeBlock), 1);
+
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquote = &blockquotes[0];
+
+    // Code block should be inside the blockquote
+    assert_eq!(count_nodes_of_type(blockquote, SyntaxKind::CodeBlock), 1);
+}

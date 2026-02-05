@@ -143,6 +143,43 @@ pub(crate) fn markers_match(a: &ListMarker, b: &ListMarker) -> bool {
     }
 }
 
+/// Emit a list item node to the builder.
+/// Returns the content column for the list item.
+pub(crate) fn emit_list_item(
+    builder: &mut GreenNodeBuilder<'static>,
+    content: &str,
+    marker_len: usize,
+    spaces_after: usize,
+    indent_cols: usize,
+    indent_bytes: usize,
+) -> usize {
+    builder.start_node(SyntaxKind::ListItem.into());
+
+    let marker_text = &content[indent_bytes..indent_bytes + marker_len];
+    builder.token(SyntaxKind::ListMarker.into(), marker_text);
+
+    if spaces_after > 0 {
+        let space_start = indent_bytes + marker_len;
+        let space_end = space_start + spaces_after;
+        if space_end <= content.len() {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &content[space_start..space_end],
+            );
+        }
+    }
+
+    let content_col = indent_cols + marker_len + spaces_after;
+    let content_start = indent_bytes + marker_len + spaces_after;
+
+    if content_start < content.len() {
+        builder.token(SyntaxKind::TEXT.into(), &content[content_start..]);
+    }
+    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+
+    content_col
+}
+
 #[allow(dead_code)]
 pub(crate) fn try_parse_list(
     lines: &[&str],

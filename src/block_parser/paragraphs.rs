@@ -1,43 +1,41 @@
-use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
+//! Paragraph handling utilities.
+//!
+//! Note: Most paragraph logic is in the main BlockParser since paragraphs
+//! are tightly integrated with container handling.
 
+use super::container_stack::{byte_index_at_column, leading_indent};
+
+/// Strip leading whitespace up to the content column.
 #[allow(dead_code)]
-pub(crate) fn try_parse_paragraph(
-    lines: &[&str],
-    pos: usize,
-    builder: &mut GreenNodeBuilder<'static>,
-) -> Option<usize> {
-    log::debug!("Trying to parse paragraph at position {}", pos);
-
-    if pos >= lines.len() {
-        return None;
+pub(crate) fn strip_to_content_col(line: &str, target: usize) -> &str {
+    if target == 0 {
+        return line;
     }
-    let line = lines[pos];
-
-    if line.trim().is_empty() {
-        return None;
+    let (indent_cols, _) = leading_indent(line);
+    if indent_cols >= target {
+        let idx = byte_index_at_column(line, target);
+        &line[idx..]
+    } else {
+        line.trim_start()
     }
+}
 
-    // Start paragraph node
-    builder.start_node(SyntaxKind::PARAGRAPH.into());
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let mut current_pos = pos;
-    while current_pos < lines.len() {
-        let line = lines[current_pos];
-        if line.trim().is_empty() {
-            break;
-        }
-
-        // Add line as TEXT token (could be improved to handle inline elements)
-        builder.token(SyntaxKind::TEXT.into(), line);
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
-
-        current_pos += 1;
-
-        log::debug!("Added line to paragraph: {}", line);
+    #[test]
+    fn test_strip_no_target() {
+        assert_eq!(strip_to_content_col("  hello", 0), "  hello");
     }
 
-    builder.finish_node(); // PARAGRAPH
+    #[test]
+    fn test_strip_exact_indent() {
+        assert_eq!(strip_to_content_col("  hello", 2), "hello");
+    }
 
-    Some(current_pos)
+    #[test]
+    fn test_strip_less_indent() {
+        assert_eq!(strip_to_content_col(" hello", 2), "hello");
+    }
 }
