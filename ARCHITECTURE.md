@@ -26,8 +26,12 @@ Formatter → Formatted Output
 - ATX headings (`# Heading`)
 - Paragraphs
 - Fenced code blocks (``` and ~~~)
+- Blockquotes (with nesting support)
+- Lists (ordered and unordered)
+- Horizontal rules (`---`, `***`, `___`)
+- Metadata/frontmatter (YAML, TOML)
 - Blank lines
-- Basic structure parsing
+- Container stack infrastructure for nested blocks
 
 ### 🔄 Inline Parser (Infrastructure Ready)
 The inline parser infrastructure is set up but currently acts as a pass-through. The foundation is ready for implementing:

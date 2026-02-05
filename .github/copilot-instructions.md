@@ -21,7 +21,7 @@ the Quarto-specific syntax extensions.
 **Key Facts:**
 
 - **Language**: Rust (2024 edition), stable toolchain
-- **Size**: ~15k lines across 35+ files
+- **Size**: ~4k lines across 23 files
 - **Architecture**: Binary crate with workspace containing WASM crate for web playground
 - **Status**: Early development - expect bugs and breaking changes
 
@@ -85,7 +85,7 @@ printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/r
 
 ### Timing Notes
 
-- `cargo test`: ~1 second (75 tests)
+- `cargo test`: ~1 second (126 tests total: 103 lib tests, 20 block parser tests, 1 golden test, 2 inline parser tests)
 - `cargo build --release`: ~25 seconds
 - `cargo check`: ~1 second
 
@@ -102,6 +102,9 @@ the formatting rules.
 - Fenced code blocks (backtick and tilde)
 - Paragraphs
 - Blockquotes (with nesting support)
+- Lists (ordered and unordered)
+- Horizontal rules
+- Metadata/frontmatter (YAML, TOML)
 - Blank lines
 
 The inline parser is a WIP placeholder that currently passes through block content unchanged.
@@ -116,13 +119,16 @@ src/
 ├── formatter.rs         # Main formatting logic and AST traversal
 ├── block_parser.rs      # Block parser module entry point
 ├── block_parser/
-│   ├── blockquotes.rs   # Blockquote parsing and resolution
-│   ├── code_blocks.rs   # Fenced code block parsing
-│   ├── headings.rs      # ATX heading parsing
-│   ├── paragraphs.rs    # Paragraph parsing
-│   ├── resolvers.rs     # Container block resolution (2nd pass)
-│   ├── utils.rs         # Helper functions (strip_leading_spaces, etc.)
-│   └── tests/           # Block parser unit tests
+│   ├── blockquotes.rs      # Blockquote parsing and resolution
+│   ├── code_blocks.rs      # Fenced code block parsing
+│   ├── container_stack.rs  # Container block stack management
+│   ├── headings.rs         # ATX heading parsing
+│   ├── horizontal_rules.rs # Horizontal rule parsing
+│   ├── lists.rs            # List parsing (ordered/unordered)
+│   ├── metadata.rs         # Frontmatter parsing (YAML, TOML)
+│   ├── paragraphs.rs       # Paragraph parsing
+│   ├── utils.rs            # Helper functions (strip_leading_spaces, etc.)
+│   └── tests/              # Block parser unit tests
 ├── inline_parser.rs     # WIP inline parser module (placeholder)
 ├── inline_parser/
 │   └── tests.rs         # Inline parser tests
@@ -143,7 +149,7 @@ panache uses a hierarchical config lookup:
 ```
 tests/
 ├── golden_cases.rs   # Main integration tests using test case directories
-├── cases/           # Input/expected output pairs (14 test scenarios)
+├── cases/           # Input/expected output pairs (9 test scenarios)
 │   ├── wrap_paragraph/
 │   │   ├── input.qmd     # Raw input
 │   │   └── expected.qmd  # Expected formatted output
@@ -220,9 +226,8 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 
 ### Testing Approach
 
-- Unit tests embedded in source modules (34 tests)
-- Integration tests in `tests/format/` (39 tests)
-- Golden tests comparing input/expected pairs (1 comprehensive test covering 14 scenarios)
+- Unit tests embedded in source modules (103 lib tests, 20 block parser tests, 2 inline parser tests)
+- Golden tests comparing input/expected pairs (1 comprehensive test covering 9 scenarios)
 - Property: formatting is idempotent
 
 ### Formatting Rules
