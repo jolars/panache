@@ -2,9 +2,11 @@ use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::{GreenNode, GreenNodeBuilder};
 
 mod code_spans;
+mod inline_math;
 mod tests;
 
 use code_spans::{emit_code_span, try_parse_code_span};
+use inline_math::{emit_inline_math, try_parse_inline_math};
 
 /// The InlineParser takes a block-level CST and processes inline elements within text content.
 /// It traverses the tree, finds TEXT tokens that need inline parsing, and replaces them
@@ -102,7 +104,16 @@ impl InlineParser {
                 }
             }
 
-            // TODO: Try other inline elements (emphasis, links, math, etc.)
+            // Try to parse inline math
+            if bytes[pos] == b'$' {
+                if let Some((len, content)) = try_parse_inline_math(&text[pos..]) {
+                    emit_inline_math(builder, content);
+                    pos += len;
+                    continue;
+                }
+            }
+
+            // TODO: Try other inline elements (emphasis, links, etc.)
 
             // No inline element matched - emit as plain text
             let next_pos = self.find_next_inline_start(&text[pos..]);
