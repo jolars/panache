@@ -1,11 +1,124 @@
-//! Parsing for links and automatic links.
+//! Parsing for links, images, and automatic links.
 //!
 //! Implements:
 //! - Automatic links: `<http://example.com>` and `<user@example.com>`
 //! - Inline links: `[text](url)` and `[text](url "title")`
+//! - Inline images: `![alt](url)` and `![alt](url "title")`
 
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
+
+/// Try to parse an inline image starting at the current position.
+///
+/// Inline images have the form `![alt](url)` or `![alt](url "title")`.
+/// Returns Some((length, alt_text, dest_content)) if a valid image is found.
+pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str)> {
+    if !text.starts_with("![") {
+        return None;
+    }
+
+    // Find the closing ]
+    let mut bracket_depth = 0;
+    let mut escape_next = false;
+    let mut close_bracket_pos = None;
+
+    for (i, ch) in text[2..].char_indices() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+
+        match ch {
+            '\\' => escape_next = true,
+            '[' => bracket_depth += 1,
+            ']' => {
+                if bracket_depth == 0 {
+                    close_bracket_pos = Some(i + 2);
+                    break;
+                }
+                bracket_depth -= 1;
+            }
+            _ => {}
+        }
+    }
+
+    let close_bracket = close_bracket_pos?;
+    let alt_text = &text[2..close_bracket];
+
+    // Check for immediate ( after ]
+    let after_bracket = close_bracket + 1;
+    if text.len() <= after_bracket || !text[after_bracket..].starts_with('(') {
+        return None;
+    }
+
+    // Find closing ) for destination (reuse same logic as links)
+    let dest_start = after_bracket + 1;
+    let remaining = &text[dest_start..];
+
+    let mut paren_depth = 0;
+    let mut escape_next = false;
+    let mut in_quotes = false;
+    let mut close_paren_pos = None;
+
+    for (i, ch) in remaining.char_indices() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+
+        match ch {
+            '\\' => escape_next = true,
+            '"' => in_quotes = !in_quotes,
+            '(' if !in_quotes => paren_depth += 1,
+            ')' if !in_quotes => {
+                if paren_depth == 0 {
+                    close_paren_pos = Some(i);
+                    break;
+                }
+                paren_depth -= 1;
+            }
+            _ => {}
+        }
+    }
+
+    let close_paren = close_paren_pos?;
+    let dest_content = &remaining[..close_paren];
+
+    // Total length: ![ + alt + ] + ( + dest + )
+    let total_len = dest_start + close_paren + 1;
+
+    Some((total_len, alt_text, dest_content))
+}
+
+/// Emit an inline image node to the builder.
+/// Note: alt_text may contain inline elements and should be parsed recursively.
+pub fn emit_inline_image(builder: &mut GreenNodeBuilder, _text: &str, alt_text: &str, dest: &str) {
+    builder.start_node(SyntaxKind::ImageLink.into());
+
+    // Opening ![
+    builder.start_node(SyntaxKind::ImageLinkStart.into());
+    builder.token(SyntaxKind::ImageLinkStart.into(), "![");
+    builder.finish_node();
+
+    // Alt text (recursively parse inline elements)
+    builder.start_node(SyntaxKind::ImageAlt.into());
+    // Use the standalone parse_inline_text function for recursive parsing
+    crate::inline_parser::parse_inline_text(builder, alt_text);
+    builder.finish_node();
+
+    // Closing ] and opening (
+    builder.token(SyntaxKind::TEXT.into(), "](");
+
+    // Destination
+    builder.start_node(SyntaxKind::LinkDest.into());
+    builder.token(SyntaxKind::TEXT.into(), dest);
+    builder.finish_node();
+
+    // Closing )
+    builder.token(SyntaxKind::TEXT.into(), ")");
+
+    builder.finish_node();
+}
 
 /// Try to parse an automatic link starting at the current position.
 ///
@@ -269,5 +382,47 @@ mod tests {
         let input = "[text](url(with)parens)";
         let result = try_parse_inline_link(input);
         assert_eq!(result, Some((23, "text", "url(with)parens")));
+    }
+
+    #[test]
+    fn test_parse_inline_image_simple() {
+        let input = "![alt](image.jpg)";
+        let result = try_parse_inline_image(input);
+        assert_eq!(result, Some((17, "alt", "image.jpg")));
+    }
+
+    #[test]
+    fn test_parse_inline_image_with_title() {
+        let input = r#"![alt](image.jpg "A title")"#;
+        let result = try_parse_inline_image(input);
+        assert_eq!(result, Some((27, "alt", r#"image.jpg "A title""#)));
+    }
+
+    #[test]
+    fn test_parse_inline_image_with_nested_brackets() {
+        let input = "![outer [inner] alt](image.jpg)";
+        let result = try_parse_inline_image(input);
+        assert_eq!(result, Some((31, "outer [inner] alt", "image.jpg")));
+    }
+
+    #[test]
+    fn test_parse_inline_image_no_space_between_brackets_and_parens() {
+        let input = "![alt] (image.jpg)";
+        let result = try_parse_inline_image(input);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_inline_image_no_closing_bracket() {
+        let input = "![alt(image.jpg)";
+        let result = try_parse_inline_image(input);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_inline_image_no_closing_paren() {
+        let input = "![alt](image.jpg";
+        let result = try_parse_inline_image(input);
+        assert_eq!(result, None);
     }
 }

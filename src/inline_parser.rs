@@ -14,7 +14,10 @@ use code_spans::{emit_code_span, try_parse_code_span};
 use emphasis::{emit_emphasis, try_parse_emphasis};
 use escapes::{emit_escape, try_parse_escape};
 use inline_math::{emit_inline_math, try_parse_inline_math};
-use links::{emit_autolink, emit_inline_link, try_parse_autolink, try_parse_inline_link};
+use links::{
+    emit_autolink, emit_inline_image, emit_inline_link, try_parse_autolink, try_parse_inline_image,
+    try_parse_inline_link,
+};
 
 /// Parse inline elements from text content.
 /// This is a standalone function used by both the main inline parser
@@ -57,6 +60,17 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && let Some((len, url)) = try_parse_autolink(&text[pos..])
         {
             emit_autolink(builder, &text[pos..pos + len], url);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse inline image (must come before inline link since it starts with ![)
+        if pos + 1 < text.len()
+            && bytes[pos] == b'!'
+            && bytes[pos + 1] == b'['
+            && let Some((len, alt_text, dest)) = try_parse_inline_image(&text[pos..])
+        {
+            emit_inline_image(builder, &text[pos..pos + len], alt_text, dest);
             pos += len;
             continue;
         }
@@ -258,5 +272,49 @@ mod inline_tests {
 
         let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
         assert_eq!(links.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_inline_image() {
+        let input = "Here is an image: ![alt text](image.jpg).";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
+        assert_eq!(images.len(), 1);
+        assert_eq!(images[0], "![alt text](image.jpg)");
+    }
+
+    #[test]
+    fn test_parse_image_with_title() {
+        let input = r#"See ![photo](pic.jpg "My Photo") here."#;
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
+        assert_eq!(images.len(), 1);
+        assert_eq!(images[0], r#"![photo](pic.jpg "My Photo")"#);
+    }
+
+    #[test]
+    fn test_multiple_images() {
+        let input = "![img1](a.jpg) and ![img2](b.jpg)";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
+        assert_eq!(images.len(), 2);
+    }
+
+    #[test]
+    fn test_link_and_image_together() {
+        let input = "A [link](url) and an ![image](pic.jpg).";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
+        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
+        assert_eq!(links.len(), 1);
+        assert_eq!(images.len(), 1);
     }
 }
