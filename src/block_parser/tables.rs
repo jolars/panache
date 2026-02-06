@@ -484,6 +484,202 @@ fn emit_table_row(
     builder.finish_node();
 }
 
+// ============================================================================
+// Pipe Table Parsing
+// ============================================================================
+
+/// Check if a line is a pipe table separator line.
+/// Returns the column alignments if it's a valid separator.
+fn try_parse_pipe_separator(line: &str) -> Option<Vec<Alignment>> {
+    let trimmed = line.trim();
+
+    // Must contain at least one pipe
+    if !trimmed.contains('|') && !trimmed.contains('+') {
+        return None;
+    }
+
+    // Split by pipes (or + for orgtbl variant)
+    let cells: Vec<&str> = if trimmed.contains('+') {
+        // Orgtbl variant: use + as separator in separator line
+        trimmed.split(['|', '+']).collect()
+    } else {
+        trimmed.split('|').collect()
+    };
+
+    let mut alignments = Vec::new();
+
+    for cell in cells {
+        let cell = cell.trim();
+
+        // Skip empty cells (from leading/trailing pipes)
+        if cell.is_empty() {
+            continue;
+        }
+
+        // Must be dashes with optional colons
+        let starts_colon = cell.starts_with(':');
+        let ends_colon = cell.ends_with(':');
+
+        // Remove colons to check if rest is all dashes
+        let without_colons = cell.trim_start_matches(':').trim_end_matches(':');
+
+        // Must have at least one dash
+        if without_colons.is_empty() || !without_colons.chars().all(|c| c == '-') {
+            return None;
+        }
+
+        // Determine alignment from colon positions
+        let alignment = match (starts_colon, ends_colon) {
+            (true, true) => Alignment::Center,
+            (true, false) => Alignment::Left,
+            (false, true) => Alignment::Right,
+            (false, false) => Alignment::Default,
+        };
+
+        alignments.push(alignment);
+    }
+
+    // Must have at least one column
+    if alignments.is_empty() {
+        None
+    } else {
+        Some(alignments)
+    }
+}
+
+/// Split a pipe table row into cells.
+fn split_pipe_row(line: &str) -> Vec<String> {
+    let trimmed = line.trim();
+
+    // Handle escaped pipes: \|
+    // For now, simple split - in future handle escapes properly
+    let cells: Vec<&str> = trimmed.split('|').collect();
+
+    cells
+        .iter()
+        .enumerate()
+        .filter_map(|(i, cell)| {
+            let cell = cell.trim();
+            // Skip first and last if they're empty (from leading/trailing pipes)
+            if (i == 0 || i == cells.len() - 1) && cell.is_empty() {
+                None
+            } else {
+                Some(cell.to_string())
+            }
+        })
+        .collect()
+}
+
+/// Try to parse a pipe table starting at the given position.
+/// Returns the number of lines consumed if successful.
+pub(crate) fn try_parse_pipe_table(
+    lines: &[&str],
+    start_pos: usize,
+    builder: &mut GreenNodeBuilder<'static>,
+) -> Option<usize> {
+    if start_pos + 1 >= lines.len() {
+        return None;
+    }
+
+    // First line should have pipes (potential header)
+    let header_line = lines[start_pos];
+    if !header_line.contains('|') {
+        return None;
+    }
+
+    // Second line should be separator
+    let separator_line = lines[start_pos + 1];
+    let alignments = try_parse_pipe_separator(separator_line)?;
+
+    // Parse header cells
+    let header_cells = split_pipe_row(header_line);
+
+    // Number of columns should match (approximately - be lenient)
+    if header_cells.len() != alignments.len() && !header_cells.is_empty() {
+        // Only fail if very different
+        if header_cells.len() < alignments.len() / 2 || header_cells.len() > alignments.len() * 2 {
+            return None;
+        }
+    }
+
+    // Find table end (first blank line or end of input)
+    let mut end_pos = start_pos + 2;
+    while end_pos < lines.len() {
+        let line = lines[end_pos];
+        if line.trim().is_empty() {
+            break;
+        }
+        // Row should have pipes
+        if !line.contains('|') {
+            break;
+        }
+        end_pos += 1;
+    }
+
+    // Must have at least one data row
+    if end_pos <= start_pos + 2 {
+        return None;
+    }
+
+    // Check for caption before table
+    let caption_before = find_caption_before_table(lines, start_pos);
+
+    // Check for caption after table
+    let caption_after = find_caption_after_table(lines, end_pos);
+
+    // Build the pipe table
+    builder.start_node(SyntaxKind::PipeTable.into());
+
+    // Emit caption before if present
+    if let Some(caption_pos) = caption_before {
+        emit_table_caption(builder, lines, caption_pos, caption_pos + 1);
+    }
+
+    // Emit header row
+    builder.start_node(SyntaxKind::TableHeader.into());
+    builder.token(SyntaxKind::TEXT.into(), header_line);
+    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    builder.finish_node();
+
+    // Emit separator
+    builder.start_node(SyntaxKind::TableSeparator.into());
+    builder.token(SyntaxKind::TEXT.into(), separator_line);
+    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    builder.finish_node();
+
+    // Emit data rows
+    for line in lines.iter().take(end_pos).skip(start_pos + 2) {
+        builder.start_node(SyntaxKind::TableRow.into());
+        builder.token(SyntaxKind::TEXT.into(), line);
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        builder.finish_node();
+    }
+
+    // Emit caption after if present
+    if let Some((cap_start, cap_end)) = caption_after {
+        // Emit blank line before caption if needed
+        if cap_start > end_pos {
+            builder.start_node(SyntaxKind::BlankLine.into());
+            builder.token(SyntaxKind::BlankLine.into(), "");
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.finish_node();
+        }
+        emit_table_caption(builder, lines, cap_start, cap_end);
+    }
+
+    builder.finish_node(); // PipeTable
+
+    // Calculate lines consumed
+    let table_start = caption_before.unwrap_or(start_pos);
+    let table_end = if let Some((_, cap_end)) = caption_after {
+        cap_end
+    } else {
+        end_pos
+    };
+
+    Some(table_end - table_start)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -621,5 +817,93 @@ mod tests {
         assert!(result.is_some());
         // Should consume through end of multi-line caption
         assert_eq!(result.unwrap(), 6);
+    }
+
+    // Pipe table tests
+    #[test]
+    fn test_pipe_separator_detection() {
+        assert!(try_parse_pipe_separator("|------:|:-----|---------|:------:|").is_some());
+        assert!(try_parse_pipe_separator("|---|---|").is_some());
+        assert!(try_parse_pipe_separator("-----|-----:").is_some()); // No leading pipe
+        assert!(try_parse_pipe_separator("|-----+-------|").is_some()); // Orgtbl variant
+        assert!(try_parse_pipe_separator("not a separator").is_none());
+    }
+
+    #[test]
+    fn test_pipe_alignments() {
+        let aligns = try_parse_pipe_separator("|------:|:-----|---------|:------:|").unwrap();
+        assert_eq!(aligns.len(), 4);
+        assert_eq!(aligns[0], Alignment::Right);
+        assert_eq!(aligns[1], Alignment::Left);
+        assert_eq!(aligns[2], Alignment::Default);
+        assert_eq!(aligns[3], Alignment::Center);
+    }
+
+    #[test]
+    fn test_split_pipe_row() {
+        let cells = split_pipe_row("| Right | Left | Center |");
+        assert_eq!(cells.len(), 3);
+        assert_eq!(cells[0], "Right");
+        assert_eq!(cells[1], "Left");
+        assert_eq!(cells[2], "Center");
+
+        // Without leading/trailing pipes
+        let cells2 = split_pipe_row("Right | Left | Center");
+        assert_eq!(cells2.len(), 3);
+    }
+
+    #[test]
+    fn test_basic_pipe_table() {
+        let input = vec![
+            "",
+            "| Right | Left | Center |",
+            "|------:|:-----|:------:|",
+            "|   12  |  12  |   12   |",
+            "|  123  |  123 |  123   |",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_pipe_table(&input, 1, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 4); // header + sep + 2 rows
+    }
+
+    #[test]
+    fn test_pipe_table_no_edge_pipes() {
+        let input = vec![
+            "",
+            "fruit| price",
+            "-----|-----:",
+            "apple|2.05",
+            "pear|1.37",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_pipe_table(&input, 1, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 4);
+    }
+
+    #[test]
+    fn test_pipe_table_with_caption() {
+        let input = vec![
+            "",
+            "| Col1 | Col2 |",
+            "|------|------|",
+            "| A    | B    |",
+            "",
+            "Table: My pipe table",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_pipe_table(&input, 1, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 5); // header + sep + row + blank + caption
     }
 }

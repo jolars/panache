@@ -21,6 +21,7 @@ fn is_block_element(kind: SyntaxKind) -> bool {
             | SyntaxKind::MathBlock
             | SyntaxKind::CodeBlock
             | SyntaxKind::SimpleTable
+            | SyntaxKind::PipeTable
     )
 }
 
@@ -518,6 +519,23 @@ impl Formatter {
 
             SyntaxKind::SimpleTable => {
                 // Handle table with proper caption formatting
+                for child in node.children() {
+                    match child.kind() {
+                        SyntaxKind::TableCaption => {
+                            // Re-add the "Table:" prefix
+                            self.output.push_str("Table: ");
+                            self.output.push_str(&child.text().to_string());
+                        }
+                        _ => {
+                            // For other table parts, preserve as-is
+                            self.output.push_str(&child.text().to_string());
+                        }
+                    }
+                }
+            }
+
+            SyntaxKind::PipeTable => {
+                // Handle pipe table with proper caption formatting
                 for child in node.children() {
                     match child.kind() {
                         SyntaxKind::TableCaption => {

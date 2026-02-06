@@ -71,13 +71,13 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Colon count normalization based on nesting
 - ✅ Proper formatting with attribute preservation
 
-### Tables 🚧
+### Tables ✅
 
-- 🚧 Extension: `simple_tables` - Simple table syntax (parsing only, formatting deferred)
+- ✅ Extension: `simple_tables` - Simple table syntax (parsing complete, formatting deferred)
+- ✅ Extension: `table_captions` - Table captions (both before and after tables)
+- ✅ Extension: `pipe_tables` - GitHub/PHP Markdown tables (all alignments, orgtbl variant)
 - ❌ Extension: `multiline_tables` - Multiline cell content
 - ❌ Extension: `grid_tables` - Grid-style tables
-- ❌ Extension: `pipe_tables` - GitHub/PHP Markdown tables
-- ❌ Extension: `table_captions` - Table captions
 
 ### Line Blocks ❌
 
