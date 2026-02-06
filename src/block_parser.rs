@@ -5,6 +5,7 @@ use rowan::GreenNodeBuilder;
 mod blockquotes;
 mod code_blocks;
 mod container_stack;
+mod definition_lists;
 mod display_math;
 mod fenced_divs;
 mod headings;
@@ -17,6 +18,7 @@ mod utils;
 use blockquotes::count_blockquote_markers;
 use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
+use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
 use display_math::{parse_display_math_block, try_parse_math_fence_open};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
 use headings::{emit_atx_heading, try_parse_atx_heading};
@@ -166,6 +168,12 @@ impl<'a> BlockParser<'a> {
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.containers
                     .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            // Skip blank lines between terms and definitions in definition lists
+            if self.in_definition_item() && self.next_line_is_definition_marker() {
+                self.pos += 1;
+                return true;
             }
 
             // For blank lines inside blockquotes, we need to handle them at the right depth
@@ -568,6 +576,96 @@ impl<'a> BlockParser<'a> {
             return true;
         }
 
+        // Definition list marker?
+        if let Some((marker_char, indent, spaces_after)) = try_parse_definition_marker(content) {
+            // Close paragraph before starting definition
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            // Start definition list if not in one
+            if !self.in_definition_list() {
+                self.builder.start_node(SyntaxKind::DefinitionList.into());
+                self.containers.push(Container::DefinitionList {});
+            }
+
+            // Close previous definition if one is open (but keep DefinitionItem open)
+            if matches!(self.containers.last(), Some(Container::Definition { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            // Start new definition item if not in one
+            if !matches!(
+                self.containers.last(),
+                Some(Container::DefinitionItem { .. })
+            ) {
+                self.builder.start_node(SyntaxKind::DefinitionItem.into());
+                self.containers.push(Container::DefinitionItem {
+                    in_definition: true,
+                });
+            }
+
+            // Start Definition node
+            self.builder.start_node(SyntaxKind::Definition.into());
+            emit_definition_marker(&mut self.builder, marker_char, indent);
+            if spaces_after > 0 {
+                self.builder
+                    .token(SyntaxKind::WHITESPACE.into(), &" ".repeat(spaces_after));
+            }
+
+            // Calculate content column (marker + spaces)
+            let content_col = indent + 1 + spaces_after;
+
+            // Emit remaining content on this line if any
+            let after_marker_and_spaces = &content[indent + 1 + spaces_after..];
+            if !after_marker_and_spaces.trim().is_empty() {
+                self.builder
+                    .token(SyntaxKind::TEXT.into(), after_marker_and_spaces.trim_end());
+            }
+            self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+
+            self.containers.push(Container::Definition { content_col });
+            self.pos += 1;
+            return true;
+        }
+
+        // Term line (if next line has definition marker)?
+        if !content.trim().is_empty() && self.next_line_is_definition_marker() {
+            // Close any open structures
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            // Start definition list if not in one
+            if !self.in_definition_list() {
+                self.builder.start_node(SyntaxKind::DefinitionList.into());
+                self.containers.push(Container::DefinitionList {});
+            }
+
+            // Close previous definition item if exists
+            while matches!(
+                self.containers.last(),
+                Some(Container::Definition { .. }) | Some(Container::DefinitionItem { .. })
+            ) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            // Start new definition item
+            self.builder.start_node(SyntaxKind::DefinitionItem.into());
+            self.containers.push(Container::DefinitionItem {
+                in_definition: false,
+            });
+
+            // Emit term
+            emit_term(&mut self.builder, content);
+            self.pos += 1;
+            return true;
+        }
+
         // Paragraph
         self.start_paragraph_if_needed();
         self.append_paragraph_line(content);
@@ -616,6 +714,34 @@ impl<'a> BlockParser<'a> {
             }
         }
         None
+    }
+
+    fn in_definition_list(&self) -> bool {
+        self.containers
+            .stack
+            .iter()
+            .any(|c| matches!(c, Container::DefinitionList { .. }))
+    }
+
+    fn in_definition_item(&self) -> bool {
+        self.containers
+            .stack
+            .iter()
+            .any(|c| matches!(c, Container::DefinitionItem { .. }))
+    }
+
+    fn next_line_is_definition_marker(&self) -> bool {
+        // Look ahead past blank lines to find a definition marker
+        let mut check_pos = self.pos + 1;
+        while check_pos < self.lines.len() {
+            let line = self.lines[check_pos];
+            if line.trim().is_empty() {
+                check_pos += 1;
+                continue;
+            }
+            return try_parse_definition_marker(line).is_some();
+        }
+        false
     }
 
     fn continue_list_at_level(&mut self, level: usize) {

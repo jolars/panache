@@ -17,6 +17,16 @@ pub(crate) enum Container {
     ListItem {
         content_col: usize,
     },
+    DefinitionList {
+        // Definition lists don't need special tracking
+    },
+    DefinitionItem {
+        // Track if we're in a term or definition
+        in_definition: bool,
+    },
+    Definition {
+        content_col: usize,
+    },
     Paragraph {
         content_col: usize,
     },

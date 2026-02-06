@@ -16,6 +16,7 @@ fn is_block_element(kind: SyntaxKind) -> bool {
         kind,
         SyntaxKind::PARAGRAPH
             | SyntaxKind::List
+            | SyntaxKind::DefinitionList
             | SyntaxKind::BlockQuote
             | SyntaxKind::MathBlock
             | SyntaxKind::CodeBlock
@@ -437,6 +438,78 @@ impl Formatter {
                         continue;
                     }
                     self.format_node(&child, indent);
+                }
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
+            }
+
+            SyntaxKind::DefinitionList => {
+                // Add blank line before top-level definition lists
+                if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") {
+                    self.output.push('\n');
+                }
+                for child in node.children() {
+                    if child.kind() == SyntaxKind::BlankLine {
+                        continue;
+                    }
+                    self.format_node(&child, indent);
+                }
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
+            }
+
+            SyntaxKind::DefinitionItem => {
+                // Format term and definitions in compact format (no blank lines)
+                for child in node.children() {
+                    if child.kind() == SyntaxKind::BlankLine {
+                        continue; // Skip blank lines for compact format
+                    }
+                    self.format_node(&child, indent);
+                }
+            }
+
+            SyntaxKind::Term => {
+                // Format term - just emit text with newline
+                for child in node.children_with_tokens() {
+                    match child {
+                        NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::TEXT => {
+                            self.output.push_str(tok.text());
+                        }
+                        NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::NEWLINE => {
+                            self.output.push('\n');
+                        }
+                        NodeOrToken::Node(n) => {
+                            self.format_node(&n, indent);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            SyntaxKind::Definition => {
+                // Format definition with marker and content
+                self.output.push_str(":   ");
+                for child in node.children_with_tokens() {
+                    match child {
+                        NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::TEXT => {
+                            self.output.push_str(tok.text());
+                        }
+                        NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::NEWLINE => {
+                            self.output.push('\n');
+                        }
+                        NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DefinitionMarker => {
+                            // Skip - we already added `:   `
+                        }
+                        NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::WHITESPACE => {
+                            // Skip - we normalize spacing
+                        }
+                        NodeOrToken::Node(n) => {
+                            self.format_node(&n, indent + 4);
+                        }
+                        _ => {}
+                    }
                 }
                 if !self.output.ends_with('\n') {
                     self.output.push('\n');

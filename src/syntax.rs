@@ -67,6 +67,11 @@ pub enum SyntaxKind {
     BlockQuote,
     List,
     ListItem,
+    DefinitionList,
+    DefinitionItem,
+    Term,
+    Definition,
+    DefinitionMarker, // : or ~
     Comment,
 
     // Headings

@@ -49,7 +49,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `startnum` - Start ordered lists at arbitrary number
 - ❌ Extension: `example_lists` - Example lists with `(@)` markers
 - ❌ Extension: `task_lists` - GitHub-style `- [ ]` and `- [x]`
-- ❌ Extension: `definition_lists` - Term/definition syntax
+- ✅ Extension: `definition_lists` - Term/definition syntax
 
 ### Code Blocks ✅
 
