@@ -3,11 +3,13 @@ use rowan::{GreenNode, GreenNodeBuilder};
 
 mod architecture_tests;
 mod code_spans;
+mod escapes;
 mod future_tests;
 mod inline_math;
 mod tests;
 
 use code_spans::{emit_code_span, try_parse_code_span};
+use escapes::{emit_escape, try_parse_escape};
 use inline_math::{emit_inline_math, try_parse_inline_math};
 
 /// The InlineParser takes a block-level CST and processes inline elements within text content.
@@ -32,32 +34,7 @@ impl InlineParser {
     /// Recursively parse a node, replacing TEXT tokens with inline elements.
     fn parse_node(&self, node: &SyntaxNode) -> GreenNode {
         let mut builder = GreenNodeBuilder::new();
-        builder.start_node(node.kind().into());
-
-        for child in node.children_with_tokens() {
-            match child {
-                rowan::NodeOrToken::Node(n) => {
-                    // Recursively parse child nodes
-                    let green = self.parse_node(&n);
-                    // Unwrap the green node and add it as a child by starting/finishing
-                    // Actually, we need to just call the builder methods to add the subtree
-                    // The rowan API doesn't have add_child - we need to checkpoint/restore
-                    // Let me rebuild this differently
-                    self.copy_node_to_builder(&mut builder, &n);
-                }
-                rowan::NodeOrToken::Token(t) => {
-                    // Check if this is a TEXT token that needs inline parsing
-                    if self.should_parse_inline(&t) {
-                        self.parse_inline_text(&mut builder, t.text());
-                    } else {
-                        // Pass through other tokens unchanged
-                        builder.token(t.kind().into(), t.text());
-                    }
-                }
-            }
-        }
-
-        builder.finish_node();
+        self.copy_node_to_builder(&mut builder, node);
         builder.finish()
     }
 
@@ -84,10 +61,23 @@ impl InlineParser {
     }
 
     /// Check if a token should be parsed for inline elements.
+    /// Per spec: "Backslash escapes do not work in verbatim contexts"
     fn should_parse_inline(&self, token: &SyntaxToken) -> bool {
-        // For now, only parse TEXT tokens
-        // Later we might exclude TEXT in certain contexts (e.g., inside CodeBlock)
-        token.kind() == SyntaxKind::TEXT
+        if token.kind() != SyntaxKind::TEXT {
+            return false;
+        }
+
+        // Check if we're in a verbatim context (code block, math block)
+        if let Some(parent) = token.parent() {
+            match parent.kind() {
+                SyntaxKind::CodeBlock | SyntaxKind::MathBlock | SyntaxKind::CodeContent => {
+                    return false;
+                }
+                _ => {}
+            }
+        }
+
+        true
     }
 
     /// Parse inline elements from text content.
@@ -97,22 +87,32 @@ impl InlineParser {
         let bytes = text.as_bytes();
 
         while pos < text.len() {
+            // Try to parse backslash escape FIRST (highest precedence)
+            // This prevents escaped delimiters from being parsed
+            if bytes[pos] == b'\\'
+                && let Some((len, ch, escape_type)) = try_parse_escape(&text[pos..])
+            {
+                emit_escape(builder, ch, escape_type);
+                pos += len;
+                continue;
+            }
+
             // Try to parse code span
-            if bytes[pos] == b'`' {
-                if let Some((len, content, backtick_count)) = try_parse_code_span(&text[pos..]) {
-                    emit_code_span(builder, content, backtick_count);
-                    pos += len;
-                    continue;
-                }
+            if bytes[pos] == b'`'
+                && let Some((len, content, backtick_count)) = try_parse_code_span(&text[pos..])
+            {
+                emit_code_span(builder, content, backtick_count);
+                pos += len;
+                continue;
             }
 
             // Try to parse inline math
-            if bytes[pos] == b'$' {
-                if let Some((len, content)) = try_parse_inline_math(&text[pos..]) {
-                    emit_inline_math(builder, content);
-                    pos += len;
-                    continue;
-                }
+            if bytes[pos] == b'$'
+                && let Some((len, content)) = try_parse_inline_math(&text[pos..])
+            {
+                emit_inline_math(builder, content);
+                pos += len;
+                continue;
             }
 
             // TODO: Try other inline elements (emphasis, links, etc.)
@@ -142,7 +142,7 @@ impl InlineParser {
     fn find_next_inline_start(&self, text: &str) -> usize {
         for (i, ch) in text.char_indices() {
             match ch {
-                '`' | '*' | '_' | '[' | '!' | '<' | '$' | '\\' => return i.max(1),
+                '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' => return i.max(1),
                 _ => {}
             }
         }

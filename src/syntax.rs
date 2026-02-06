@@ -7,6 +7,10 @@ pub enum SyntaxKind {
     WHITESPACE = 0,
     NEWLINE,
     TEXT,
+    Backslash,         // \ (for escaping)
+    EscapedChar,       // Any escaped character
+    NonbreakingSpace,  // \<space>
+    HardLineBreak,     // \<newline>
     DivMarker,         // :::
     YamlMetadataDelim, // --- or ... (for YAML blocks)
     BlockQuoteMarker,  // >
