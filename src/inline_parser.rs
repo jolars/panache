@@ -1,7 +1,9 @@
 use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::{GreenNode, GreenNodeBuilder};
 
+mod architecture_tests;
 mod code_spans;
+mod future_tests;
 mod inline_math;
 mod tests;
 
