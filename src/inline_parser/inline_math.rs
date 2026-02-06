@@ -4,6 +4,11 @@ use rowan::GreenNodeBuilder;
 
 /// Try to parse an inline math span starting at the current position.
 /// Returns the number of characters consumed if successful, or None if not inline math.
+///
+/// Per Pandoc spec (tex_math_dollars extension):
+/// - Opening $ must have non-space character immediately to its right
+/// - Closing $ must have non-space character immediately to its left
+/// - Closing $ must not be followed immediately by a digit
 pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
     // Must start with exactly one $
     if !text.starts_with('$') || text.starts_with("$$") {
@@ -11,6 +16,11 @@ pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
     }
 
     let rest = &text[1..];
+
+    // Opening $ must have non-space character immediately to its right
+    if rest.is_empty() || rest.starts_with(char::is_whitespace) {
+        return None;
+    }
 
     // Look for closing $
     let mut pos = 0;
@@ -31,7 +41,23 @@ pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
                 return None;
             }
 
-            // Found closing $
+            // Closing $ must have non-space character immediately to its left
+            if pos == 0 || rest[..pos].ends_with(char::is_whitespace) {
+                // Continue searching - this $ doesn't close the math
+                pos += 1;
+                continue;
+            }
+
+            // Closing $ must not be followed immediately by a digit
+            if let Some(next_ch) = rest[pos + 1..].chars().next() {
+                if next_ch.is_ascii_digit() {
+                    // Continue searching - this $ doesn't close the math
+                    pos += 1;
+                    continue;
+                }
+            }
+
+            // Found valid closing $
             let math_content = &rest[..pos];
             let total_len = 1 + pos + 1; // opening $ + content + closing $
             return Some((total_len, math_content));
@@ -76,9 +102,10 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_inline_math_with_spaces() {
-        let result = try_parse_inline_math("$ a + b $");
-        assert_eq!(result, Some((9, " a + b ")));
+    fn test_parse_inline_math_with_spaces_inside() {
+        // Spaces inside math are OK, just not immediately after opening or before closing
+        let result = try_parse_inline_math("$a + b$");
+        assert_eq!(result, Some((7, "a + b")));
     }
 
     #[test]
@@ -126,5 +153,51 @@ mod tests {
         // This should find the first unescaped $, but our simple impl
         // will find the escaped one. We'll improve this later.
         assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_spec_opening_must_have_non_space_right() {
+        // Per Pandoc spec: opening $ must have non-space immediately to right
+        let result = try_parse_inline_math("$ x$");
+        assert_eq!(result, None, "Opening $ with space should not parse");
+    }
+
+    #[test]
+    fn test_spec_closing_must_have_non_space_left() {
+        // Per Pandoc spec: closing $ must have non-space immediately to left
+        let result = try_parse_inline_math("$x $");
+        assert_eq!(result, None, "Closing $ with space should not parse");
+    }
+
+    #[test]
+    fn test_spec_closing_not_followed_by_digit() {
+        // Per Pandoc spec: closing $ must not be followed by digit
+        let result = try_parse_inline_math("$x$5");
+        assert_eq!(result, None, "Closing $ followed by digit should not parse");
+    }
+
+    #[test]
+    fn test_spec_dollar_amounts() {
+        // $20,000 should not parse as math
+        let result = try_parse_inline_math("$20,000");
+        assert_eq!(result, None, "Dollar amounts should not parse as math");
+    }
+
+    #[test]
+    fn test_valid_math_after_spec_checks() {
+        // $x$ alone should still parse
+        let result = try_parse_inline_math("$x$");
+        assert_eq!(result, Some((3, "x")), "Valid math should parse");
+    }
+
+    #[test]
+    fn test_math_followed_by_non_digit() {
+        // $x$a should parse (not followed by digit)
+        let result = try_parse_inline_math("$x$a");
+        assert_eq!(
+            result,
+            Some((3, "x")),
+            "Math followed by non-digit should parse"
+        );
     }
 }
