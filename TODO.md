@@ -73,7 +73,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ### Tables 🚧
 
-- ✅ Extension: `simple_tables` - Simple table syntax (parsing only, formatting deferred)
+- 🚧 Extension: `simple_tables` - Simple table syntax (parsing only, formatting deferred)
 - ❌ Extension: `multiline_tables` - Multiline cell content
 - ❌ Extension: `grid_tables` - Grid-style tables
 - ❌ Extension: `pipe_tables` - GitHub/PHP Markdown tables
@@ -301,32 +301,6 @@ These extensions are **not enabled by default** in Pandoc and are lower priority
 - ❌ **Fuzzing** - cargo-fuzz for robustness
 - ❌ **Property tests** - Token concatenation = input
 - ❌ **Corpus testing** - Real Quarto documents
-
----
-
-## Immediate Next Steps (Suggested Priority)
-
-1. **Images** - Similar to links, now that link foundation is done
-   - Inline images `![alt](url)`
-   - Reference images `![alt][ref]`
-
-2. **Reference links** - Complete the link implementation
-   - Reference links `[text][ref]`
-   - Link reference definitions
-   - Implicit reference links `[text][]`
-
-3. **Table support** - Critical for Quarto documents
-   - Simple tables
-   - Pipe tables (most common)
-   - Grid tables (if time permits)
-
-3. **Definition lists** - Common in documentation
-
-4. **Task lists** - GitHub-style checkboxes (common)
-
-5. **Footnotes** - Complete reference-style footnotes
-
-6. **Citations** - Essential for academic Quarto docs
 
 ---
 
