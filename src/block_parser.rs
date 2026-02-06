@@ -26,7 +26,7 @@ use headings::{emit_atx_heading, try_parse_atx_heading};
 use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
-use tables::try_parse_simple_table;
+use tables::{is_caption_followed_by_table, try_parse_simple_table};
 
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -588,6 +588,12 @@ impl<'a> BlockParser<'a> {
 
         // Definition list marker?
         if let Some((marker_char, indent, spaces_after)) = try_parse_definition_marker(content) {
+            // Check if this is actually a table caption, not a definition marker
+            if is_caption_followed_by_table(&self.lines, self.pos) {
+                // Don't parse as definition - let table parser handle it
+                return false;
+            }
+
             // Close paragraph before starting definition
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.containers
@@ -674,6 +680,13 @@ impl<'a> BlockParser<'a> {
             emit_term(&mut self.builder, content);
             self.pos += 1;
             return true;
+        }
+
+        // Check if this is a table caption followed by a table
+        // If so, don't parse as paragraph - let table parser handle it
+        if is_caption_followed_by_table(&self.lines, self.pos) {
+            // Don't parse as paragraph - this will be consumed by table parser
+            return false;
         }
 
         // Paragraph
