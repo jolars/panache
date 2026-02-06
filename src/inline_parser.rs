@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::{GreenNode, GreenNodeBuilder};
 
@@ -130,11 +131,13 @@ fn find_next_inline_start(text: &str) -> usize {
 /// with properly parsed inline elements (emphasis, links, math, etc.).
 pub struct InlineParser {
     root: SyntaxNode,
+    #[allow(dead_code)] // TODO: Will be used for extension configuration
+    config: Config,
 }
 
 impl InlineParser {
-    pub fn new(root: SyntaxNode) -> Self {
-        Self { root }
+    pub fn new(root: SyntaxNode, config: Config) -> Self {
+        Self { root, config }
     }
 
     /// Parse inline elements within the block-level CST.
@@ -198,6 +201,7 @@ impl InlineParser {
 mod inline_tests {
     use super::*;
     use crate::block_parser::BlockParser;
+    use crate::config::Config;
 
     fn find_nodes_by_kind(node: &SyntaxNode, kind: SyntaxKind) -> Vec<String> {
         let mut results = Vec::new();
@@ -209,11 +213,16 @@ mod inline_tests {
         results
     }
 
+    fn parse_inline(input: &str) -> SyntaxNode {
+        let config = Config::default();
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
+    }
+
     #[test]
     fn test_inline_parser_preserves_text() {
         let input = "This is plain text.";
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         // Should preserve the text unchanged for now
         let text = inline_tree.to_string();
@@ -223,8 +232,7 @@ mod inline_tests {
     #[test]
     fn test_parse_autolink() {
         let input = "Visit <https://example.com> for more.";
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
         assert_eq!(autolinks.len(), 1);
@@ -234,8 +242,7 @@ mod inline_tests {
     #[test]
     fn test_parse_email_autolink() {
         let input = "Email me at <user@example.com>.";
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
         assert_eq!(autolinks.len(), 1);
@@ -245,8 +252,7 @@ mod inline_tests {
     #[test]
     fn test_parse_inline_link() {
         let input = "Click [here](https://example.com) to continue.";
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
         assert_eq!(links.len(), 1);
@@ -256,8 +262,7 @@ mod inline_tests {
     #[test]
     fn test_parse_link_with_title() {
         let input = r#"See [this](url "title") link."#;
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
         assert_eq!(links.len(), 1);
@@ -267,8 +272,7 @@ mod inline_tests {
     #[test]
     fn test_multiple_links() {
         let input = "Visit [site1](url1) and [site2](url2).";
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
         assert_eq!(links.len(), 2);
@@ -277,8 +281,7 @@ mod inline_tests {
     #[test]
     fn test_parse_inline_image() {
         let input = "Here is an image: ![alt text](image.jpg).";
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
         assert_eq!(images.len(), 1);
@@ -288,8 +291,7 @@ mod inline_tests {
     #[test]
     fn test_parse_image_with_title() {
         let input = r#"See ![photo](pic.jpg "My Photo") here."#;
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
         assert_eq!(images.len(), 1);
@@ -299,8 +301,7 @@ mod inline_tests {
     #[test]
     fn test_multiple_images() {
         let input = "![img1](a.jpg) and ![img2](b.jpg)";
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
         assert_eq!(images.len(), 2);
@@ -309,8 +310,7 @@ mod inline_tests {
     #[test]
     fn test_link_and_image_together() {
         let input = "A [link](url) and an ![image](pic.jpg).";
-        let block_tree = BlockParser::new(input).parse();
-        let inline_tree = InlineParser::new(block_tree).parse();
+        let inline_tree = parse_inline(input);
 
         let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
         let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);

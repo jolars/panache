@@ -1,4 +1,5 @@
 use crate::block_parser::BlockParser;
+use crate::block_parser::tests::helpers::parse_blocks;
 use crate::syntax::SyntaxKind;
 
 fn count_nodes_of_type(root: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
@@ -43,8 +44,7 @@ fn find_nodes_of_type(
 #[test]
 fn single_blockquote_paragraph() {
     let input = "> This is a simple blockquote.";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node and 1 Paragraph node
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -60,8 +60,7 @@ fn single_blockquote_paragraph() {
 #[test]
 fn multi_line_blockquote() {
     let input = "> This is line one.\n> This is line two.";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node and 1 Paragraph node (multi-line paragraph)
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -71,8 +70,7 @@ fn multi_line_blockquote() {
 #[test]
 fn nested_blockquotes() {
     let input = "> Outer quote\n>\n> > Inner quote\n>\n> Back to outer";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 2 BlockQuote nodes (outer and inner)
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 2);
@@ -93,8 +91,7 @@ fn nested_blockquotes() {
 #[test]
 fn triple_nested_blockquotes() {
     let input = "> Level 1\n>\n> > Level 2\n> >\n> > > Level 3";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 3 BlockQuote nodes
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 3);
@@ -103,8 +100,7 @@ fn triple_nested_blockquotes() {
 #[test]
 fn blockquote_with_blank_lines() {
     let input = "> First paragraph\n>\n> Second paragraph";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -118,8 +114,7 @@ fn blockquote_with_blank_lines() {
 #[test]
 fn blockquote_with_heading() {
     let input = "> # This is a heading in a blockquote\n>\n> And this is a paragraph.";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -135,8 +130,7 @@ fn blockquote_with_heading() {
 #[test]
 fn blockquote_requires_blank_line_before() {
     let input = "Regular paragraph\n> This should not be a blockquote";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 0 BlockQuote nodes (no blank line before)
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 0);
@@ -147,8 +141,7 @@ fn blockquote_requires_blank_line_before() {
 #[test]
 fn blockquote_at_start_of_document() {
     let input = "> This is at the start of the document";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node (no blank line needed at start)
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -157,8 +150,7 @@ fn blockquote_at_start_of_document() {
 #[test]
 fn blockquote_after_blank_line() {
     let input = "Regular paragraph\n\n> This should be a blockquote";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node (has blank line before)
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -169,8 +161,7 @@ fn blockquote_after_blank_line() {
 #[test]
 fn complex_nested_structure() {
     let input = "> Outer quote with paragraph\n>\n> > Inner quote\n> >\n> > > Triple nested\n> >\n> > Back to double nested\n>\n> Back to outer";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have multiple BlockQuote nodes (at least 3 levels)
     let blockquote_count = count_nodes_of_type(&tree, SyntaxKind::BlockQuote);
@@ -194,8 +185,7 @@ fn complex_nested_structure() {
 #[test]
 fn spec_basic_blockquote() {
     let input = "> This is a block quote. This\n> paragraph has two lines.\n>\n> 1. This is a list inside a block quote.\n> 2. Second item.";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -209,8 +199,7 @@ fn spec_basic_blockquote() {
 #[test]
 fn spec_nested_blockquote() {
     let input = "> This is a block quote.\n>\n> > A block quote within a block quote.";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 2 BlockQuote nodes (outer and inner)
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 2);
@@ -227,8 +216,7 @@ fn spec_nested_blockquote() {
 fn spec_blank_before_blockquote_required() {
     // This should NOT create a nested blockquote due to blank_before_blockquote
     let input = "> This is a block quote.\n>> Not nested, since blank_before_blockquote is enabled by default";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have only 1 BlockQuote node (the >> line becomes part of the paragraph)
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -240,8 +228,7 @@ fn spec_blank_before_blockquote_required() {
 #[test]
 fn spec_blockquote_with_indented_code() {
     let input = ">     code";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -262,11 +249,9 @@ fn spec_blockquote_optional_space_after_marker() {
     let input1 = "> With space";
     let input2 = ">Without space";
 
-    let parser1 = BlockParser::new(input1);
-    let tree1 = parser1.parse();
+    let tree1 = parse_blocks(input1);
 
-    let parser2 = BlockParser::new(input2);
-    let tree2 = parser2.parse();
+    let tree2 = parse_blocks(input2);
 
     // Both should create blockquotes
     assert_eq!(count_nodes_of_type(&tree1, SyntaxKind::BlockQuote), 1);
@@ -279,11 +264,9 @@ fn spec_blockquote_max_three_space_indent() {
     let input1 = "   > Three spaces should work";
     let input2 = "    > Four spaces should not work"; // This should be treated as code block or regular paragraph
 
-    let parser1 = BlockParser::new(input1);
-    let tree1 = parser1.parse();
+    let tree1 = parse_blocks(input1);
 
-    let parser2 = BlockParser::new(input2);
-    let tree2 = parser2.parse();
+    let tree2 = parse_blocks(input2);
 
     // First should create blockquote
     assert_eq!(count_nodes_of_type(&tree1, SyntaxKind::BlockQuote), 1);
@@ -297,8 +280,7 @@ fn spec_blockquote_max_three_space_indent() {
 #[test]
 fn spec_lazy_blockquote_form() {
     let input = "> This is a block quote. This\nparagraph has two lines.";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node containing the lazy continuation
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
@@ -322,8 +304,7 @@ fn spec_lazy_blockquote_form() {
 #[test]
 fn blockquote_with_code_block() {
     let input = "> ```python\n> print(\"hello\")\n> ```\n";
-    let parser = BlockParser::new(input);
-    let tree = parser.parse();
+    let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote with 1 CodeBlock inside
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);

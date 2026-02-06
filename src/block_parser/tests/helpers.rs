@@ -1,8 +1,10 @@
 use crate::block_parser::BlockParser;
+use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub fn parse_blocks(input: &str) -> SyntaxNode {
-    BlockParser::new(input).parse()
+    let config = Config::default();
+    BlockParser::new(input, &config).parse()
 }
 
 pub fn find_first(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxNode> {

@@ -3,14 +3,17 @@
 #[cfg(test)]
 use crate::block_parser::BlockParser;
 #[cfg(test)]
+use crate::config::Config;
+#[cfg(test)]
 use crate::inline_parser::InlineParser;
 #[cfg(test)]
 use crate::syntax::SyntaxKind;
 
 #[cfg(test)]
 fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
-    let block_tree = BlockParser::new(input).parse();
-    InlineParser::new(block_tree).parse()
+    let config = Config::default();
+    let block_tree = BlockParser::new(input, &config).parse();
+    InlineParser::new(block_tree, config).parse()
 }
 
 #[cfg(test)]

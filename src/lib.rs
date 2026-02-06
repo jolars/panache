@@ -61,13 +61,13 @@ pub fn format(input: &str, config: Option<Config>) -> String {
     let normalized_input = input.replace("\r\n", "\n");
 
     // Step 1: Parse blocks to create initial CST
-    let block_tree = block_parser::BlockParser::new(&normalized_input).parse();
+    let config = config.unwrap_or_default();
+    let block_tree = block_parser::BlockParser::new(&normalized_input, &config).parse();
 
     // Step 2: Run inline parser on block content to create final CST
-    let tree = inline_parser::InlineParser::new(block_tree).parse();
+    let tree = inline_parser::InlineParser::new(block_tree, config.clone()).parse();
 
     // Step 3: Format the final CST
-    let config = config.unwrap_or_default();
     let out = format_tree(&tree, &config);
 
     if line_ending == "\r\n" {
@@ -101,6 +101,7 @@ pub fn format_with_defaults(input: &str) -> String {
 /// * `input` - The Quarto document content to parse
 pub fn parse(input: &str) -> SyntaxNode {
     let normalized_input = input.replace("\r\n", "\n");
-    let block_tree = block_parser::BlockParser::new(&normalized_input).parse();
-    inline_parser::InlineParser::new(block_tree).parse()
+    let config = Config::default();
+    let block_tree = block_parser::BlockParser::new(&normalized_input, &config).parse();
+    inline_parser::InlineParser::new(block_tree, config).parse()
 }

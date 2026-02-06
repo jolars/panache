@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
@@ -30,16 +31,19 @@ pub struct BlockParser<'a> {
     pos: usize,
     builder: GreenNodeBuilder<'static>,
     containers: ContainerStack,
+    #[allow(dead_code)] // TODO: Will be used for extension configuration
+    config: &'a Config,
 }
 
 impl<'a> BlockParser<'a> {
-    pub fn new(input: &'a str) -> Self {
+    pub fn new(input: &'a str, config: &'a Config) -> Self {
         let lines: Vec<&str> = input.lines().collect();
         Self {
             lines,
             pos: 0,
             builder: GreenNodeBuilder::new(),
             containers: ContainerStack::new(),
+            config,
         }
     }
 
