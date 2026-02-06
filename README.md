@@ -58,8 +58,6 @@ some of the table syntax.
 - Be configurable, but have sane defaults (that most people can
   agree on)
 - Format math
+- Hook into external formatters for code blocks (e.g. `air` for R code blocks,
+  `ruff` for Python code blocks, etc.)
 
-Notably, I don't expect to support formatting the code blocks or yaml
-frontmatter. The primary reason for this is that it is now possible
-to do this already by language injection through tree sitter, for instance,
-which means that a good formatter should already be able to handle this.
