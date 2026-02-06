@@ -85,7 +85,7 @@ printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/r
 
 ### Timing Notes
 
-- `cargo test`: ~1 second (126 tests total: 103 lib tests, 20 block parser tests, 1 golden test, 2 inline parser tests)
+- `cargo test`: ~1 second (238 tests total: 103 lib tests, 110+ inline parser tests, 20 block parser tests, 19 format tests, 1 golden test, 2 doc tests)
 - `cargo build --release`: ~25 seconds
 - `cargo check`: ~1 second
 
@@ -100,14 +100,26 @@ the formatting rules.
 **IMPORTANT**: The block parser is currently in active development with support for:
 - ATX headings
 - Fenced code blocks (backtick and tilde)
+- Fenced divs (Quarto/Pandoc)
 - Paragraphs
 - Blockquotes (with nesting support)
-- Lists (ordered and unordered)
+- Lists (ordered and unordered, including task lists)
 - Horizontal rules
-- Metadata/frontmatter (YAML, TOML)
+- Metadata/frontmatter (YAML, TOML, Pandoc title blocks)
 - Blank lines
 
-The inline parser is a WIP placeholder that currently passes through block content unchanged.
+The inline parser has basic inline elements implemented:
+- ✅ Code spans with proper backtick matching
+- ✅ Emphasis and strong emphasis (asterisks and underscores)
+- ✅ Inline math (dollar signs)
+- ✅ Links (automatic `<url>` and inline `[text](url)`)
+- ✅ Images (`![alt](url)`)
+- ✅ Escapes (backslash escaping)
+- ✅ Proper CommonMark precedence (code > escapes > links > emphasis)
+- ❌ Reference links/images `[text][ref]` (not yet implemented)
+- ❌ Footnotes `^[inline]` and `[^ref]` (not yet implemented)
+- ❌ Citations `[@cite]` (not yet implemented)
+- ❌ Strikethrough, subscript/superscript, other extensions (not yet implemented)
 
 ### Source Structure
 
@@ -115,23 +127,31 @@ The inline parser is a WIP placeholder that currently passes through block conte
 src/
 ├── main.rs              # CLI entry point with clap argument parsing
 ├── lib.rs               # Public API with format() and parse() functions
-├── config.rs            # Configuration handling (.panache.toml, XDG paths)
+├── config.rs            # Configuration handling (.panache.toml, flavor, extensions)
 ├── formatter.rs         # Main formatting logic and AST traversal
 ├── block_parser.rs      # Block parser module entry point
 ├── block_parser/
 │   ├── blockquotes.rs      # Blockquote parsing and resolution
 │   ├── code_blocks.rs      # Fenced code block parsing
 │   ├── container_stack.rs  # Container block stack management
+│   ├── fenced_divs.rs      # Quarto/Pandoc fenced div parsing
 │   ├── headings.rs         # ATX heading parsing
 │   ├── horizontal_rules.rs # Horizontal rule parsing
-│   ├── lists.rs            # List parsing (ordered/unordered)
-│   ├── metadata.rs         # Frontmatter parsing (YAML, TOML)
+│   ├── lists.rs            # List parsing (ordered/unordered/task)
+│   ├── metadata.rs         # Frontmatter parsing (YAML, TOML, Pandoc)
 │   ├── paragraphs.rs       # Paragraph parsing
 │   ├── utils.rs            # Helper functions (strip_leading_spaces, etc.)
 │   └── tests/              # Block parser unit tests
-├── inline_parser.rs     # WIP inline parser module (placeholder)
+├── inline_parser.rs     # Inline parser module entry point
 ├── inline_parser/
-│   └── tests.rs         # Inline parser tests
+│   ├── architecture_tests.rs # Tests for nested inline structures
+│   ├── code_spans.rs        # Code span parsing (backticks)
+│   ├── emphasis.rs          # Emphasis/strong parsing
+│   ├── escapes.rs           # Escape sequence parsing
+│   ├── inline_math.rs       # Inline math parsing (dollars)
+│   ├── links.rs             # Link and image parsing
+│   ├── future_tests.rs      # Tests for unimplemented features
+│   └── tests.rs             # Integration tests
 └── syntax.rs            # Syntax node definitions and AST types
 ```
 
@@ -143,6 +163,22 @@ panache uses a hierarchical config lookup:
 2. `.panache.toml` or `panache.toml` in current/parent directories
 3. `~/.config/panache/config.toml` (XDG)
 4. Built-in defaults (80 char width, auto line endings, reflow wrap)
+
+**Extension Configuration**: The config system includes:
+- `flavor` field: Choose Markdown flavor (Pandoc, Quarto, RMarkdown, GFM, CommonMark)
+- `extensions` section: 60+ bool flags for individual Pandoc extensions
+- Each flavor has sensible defaults that can be overridden
+
+Example `.panache.toml`:
+```toml
+flavor = "quarto"
+line_width = 80
+
+[extensions]
+# Override flavor defaults:
+hard_line_breaks = false
+citations = true
+```
 
 ### Test Architecture
 
@@ -226,9 +262,12 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 
 ### Testing Approach
 
-- Unit tests embedded in source modules (103 lib tests, 20 block parser tests, 2 inline parser tests)
+- Unit tests embedded in source modules (110+ inline parser tests, 20+ block parser tests)
+- Integration tests for inline elements (architecture_tests.rs verifies nesting)
 - Golden tests comparing input/expected pairs (1 comprehensive test covering 9 scenarios)
+- Format tests organized by feature (20 tests for specific formatting scenarios)
 - Property: formatting is idempotent
+- Test helpers abstract Config creation (parse_blocks(), parse_inline())
 
 ### Formatting Rules
 
@@ -244,10 +283,15 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 
 ## Configuration Files and Settings
 
-- `.panache.toml`: Project-specific config (line_width, line-ending, wrap mode)
+- `.panache.toml`: Project-specific config (flavor, line_width, line-ending, wrap mode, extensions)
 - `.envrc`: direnv configuration for Nix environment
 - `.gitignore`: Excludes target/, devenv artifacts, Nix build outputs
 - `devenv.nix`: Development environment with go-task, quarto, wasm-pack
+
+**Config is threaded through parsers**:
+- `BlockParser::new(input, &Config)` - borrows config
+- `InlineParser::new(block_tree, Config)` - owns config
+- Test helpers use `Config::default()` to simplify test code
 
 ## Web Playground
 
@@ -281,8 +325,13 @@ The `docs/playground/` contains a WASM-based web interface:
   2. Second pass: Resolve container blocks (blockquotes, lists) from flat structure
 - Each block type is isolated in its own module under `src/block_parser/`
 - Inline parser runs after block parser to handle inline syntax within blocks
+  - Uses delimiter-based parsing with proper precedence (CommonMark spec)
+  - Recursive parsing for nested inline elements (e.g., code/emphasis in links)
+  - Standalone `parse_inline_text()` function enables recursive calls
 - Parser builds rowan CST consumed by formatter
-- Config system must maintain backward compatibility
+- Config system provides extension flags to enable/disable features
+  - Config fields marked `#[allow(dead_code)]` until features use them
+- Test helpers abstract Config creation to keep tests clean
 - WASM crate depends on main crate - changes affect both
 
 **Trust these instructions and search only when information is incomplete or incorrect.**
