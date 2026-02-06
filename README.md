@@ -1,4 +1,4 @@
-# panache: A Formatter for Pandoc, Quarto and RMarkdown
+# panache <img src='https://raw.githubusercontent.com/jolars/panache/refs/heads/main/images/logo.png' align="right" width="139" />
 
 [![Build and Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
 
