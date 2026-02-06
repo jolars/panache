@@ -372,10 +372,29 @@ impl Formatter {
             }
 
             SyntaxKind::PARAGRAPH => {
+                let text = node.text().to_string();
+
+                // If paragraph contains display math across lines ($$\n...\n$$), preserve as-is
+                // Check that it's actually dollar signs, not just any characters
+                let has_multiline_display_math = text.contains("$$\n") || text.contains("\n$$");
+                if has_multiline_display_math {
+                    self.output.push_str(&text);
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
+                    }
+                    return;
+                }
+
+                // Check if paragraph contains inline display math ($$...$$)
+                // Only reformat if it's on a single line
+                if self.contains_inline_display_math(node) {
+                    self.format_paragraph_with_display_math(node, indent, line_width);
+                    return;
+                }
+
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
                 match wrap_mode {
                     WrapMode::Preserve => {
-                        let text = node.text().to_string();
                         self.output.push_str(&text);
                         if !self.output.ends_with('\n') {
                             self.output.push('\n');
@@ -430,8 +449,25 @@ impl Formatter {
             }
 
             SyntaxKind::InlineMath => {
-                for child in node.children() {
-                    self.output.push_str(&child.text().to_string());
+                // Check if this is display math (has BlockMathMarker)
+                let is_display_math = node.children_with_tokens().any(|t| {
+                    matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BlockMathMarker)
+                });
+
+                if is_display_math {
+                    // Display math - output with space padding
+                    self.output.push_str("$$ ");
+                    for child in node.children() {
+                        if child.kind() == SyntaxKind::TEXT {
+                            self.output.push_str(&child.text().to_string());
+                        }
+                    }
+                    self.output.push_str(" $$");
+                } else {
+                    // Regular inline math
+                    for child in node.children() {
+                        self.output.push_str(&child.text().to_string());
+                    }
                 }
             }
 
@@ -678,6 +714,119 @@ impl Formatter {
         }
 
         format!("{} {}", "#".repeat(level), content)
+    }
+
+    /// Check if display math in paragraph is already formatted on separate lines
+    fn contains_inline_display_math(&self, node: &SyntaxNode) -> bool {
+        for child in node.descendants() {
+            if child.kind() == SyntaxKind::InlineMath {
+                // Check if it contains BlockMathMarker ($$)
+                for token in child.children_with_tokens() {
+                    if let NodeOrToken::Token(t) = token
+                        && t.kind() == SyntaxKind::BlockMathMarker
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Format a paragraph that contains inline display math by splitting it.
+    /// Converts: "Some text $$x = y$$ more text" into text with display math formatted.
+    fn format_paragraph_with_display_math(
+        &mut self,
+        node: &SyntaxNode,
+        _indent: usize,
+        line_width: usize,
+    ) {
+        let mut parts: Vec<(bool, String)> = Vec::new(); // (is_display_math, content)
+        let mut current_text = String::new();
+
+        for child in node.children_with_tokens() {
+            match child {
+                NodeOrToken::Node(n) => {
+                    if n.kind() == SyntaxKind::InlineMath {
+                        // Check if this is display math
+                        let has_block_marker = n.children_with_tokens().any(|t| {
+                            matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BlockMathMarker)
+                        });
+
+                        if has_block_marker {
+                            // Save current text as paragraph part
+                            if !current_text.trim().is_empty() {
+                                parts.push((false, current_text.clone()));
+                                current_text.clear();
+                            }
+
+                            // Extract math content
+                            let math_content: String = n
+                                .children_with_tokens()
+                                .filter_map(|c| match c {
+                                    NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
+                                        Some(t.text().to_string())
+                                    }
+                                    _ => None,
+                                })
+                                .collect();
+
+                            parts.push((true, math_content));
+                        } else {
+                            // Regular inline math - keep in text
+                            current_text.push_str(&n.text().to_string());
+                        }
+                    } else {
+                        current_text.push_str(&n.text().to_string());
+                    }
+                }
+                NodeOrToken::Token(t) => {
+                    if t.kind() != SyntaxKind::NEWLINE {
+                        current_text.push_str(t.text());
+                    } else {
+                        current_text.push(' '); // Replace newlines with spaces for wrapping
+                    }
+                }
+            }
+        }
+
+        // Save any remaining text
+        if !current_text.trim().is_empty() {
+            parts.push((false, current_text));
+        }
+
+        // Format each part - display math on separate lines within paragraph
+        for (i, (is_display_math, content)) in parts.iter().enumerate() {
+            if *is_display_math {
+                // Format as display math on separate lines
+                self.output.push('\n');
+                self.output.push_str("$$\n");
+                self.output.push_str(content.trim());
+                self.output.push_str("\n$$\n");
+            } else {
+                // Add space before if not at start
+                if i > 0 && !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
+
+                // Format as paragraph text with wrapping
+                let text = content.trim();
+                if !text.is_empty() {
+                    let lines = textwrap::wrap(text, line_width);
+                    for (j, line) in lines.iter().enumerate() {
+                        if j > 0 {
+                            self.output.push('\n');
+                        }
+                        self.output.push_str(line);
+                    }
+                }
+            }
+        }
+
+        // End with newline
+        if !self.output.ends_with('\n') {
+            self.output.push('\n');
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-/// Parsing for inline math ($...$)
+/// Parsing for inline math ($...$) and display math ($$...$$)
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -75,6 +75,58 @@ pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
     None
 }
 
+/// Try to parse display math ($$...$$) starting at the current position.
+/// Returns the number of characters consumed and the math content if successful.
+/// Display math can span multiple lines in inline contexts.
+pub fn try_parse_display_math(text: &str) -> Option<(usize, &str)> {
+    // Must start with at least $$
+    if !text.starts_with("$$") {
+        return None;
+    }
+
+    // Count opening dollar signs
+    let opening_count = text.chars().take_while(|&c| c == '$').count();
+    if opening_count < 2 {
+        return None;
+    }
+
+    let rest = &text[opening_count..];
+
+    // Look for matching closing delimiter
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '$' {
+            // Check if it's escaped
+            if pos > 0 && rest.as_bytes()[pos - 1] == b'\\' {
+                // Escaped dollar, continue searching
+                pos += ch.len_utf8();
+                continue;
+            }
+
+            // Count closing dollar signs
+            let closing_count = rest[pos..].chars().take_while(|&c| c == '$').count();
+
+            // Must have at least as many closing dollars as opening
+            if closing_count >= opening_count {
+                let math_content = &rest[..pos];
+                let total_len = opening_count + pos + closing_count;
+                return Some((total_len, math_content));
+            }
+
+            // Not enough dollars, skip this run and continue
+            pos += closing_count;
+            continue;
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    // No matching close found
+    None
+}
+
 /// Emit an inline math node to the builder.
 pub fn emit_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
     builder.start_node(SyntaxKind::InlineMath.into());
@@ -87,6 +139,23 @@ pub fn emit_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
 
     // Closing $
     builder.token(SyntaxKind::InlineMathMarker.into(), "$");
+
+    builder.finish_node();
+}
+
+/// Emit a display math node to the builder (when occurring inline in paragraph).
+pub fn emit_display_math(builder: &mut GreenNodeBuilder, content: &str, dollar_count: usize) {
+    builder.start_node(SyntaxKind::InlineMath.into()); // Note: Using InlineMath for now
+
+    // Opening $$
+    let marker = "$".repeat(dollar_count);
+    builder.token(SyntaxKind::BlockMathMarker.into(), &marker);
+
+    // Math content
+    builder.token(SyntaxKind::TEXT.into(), content);
+
+    // Closing $$
+    builder.token(SyntaxKind::BlockMathMarker.into(), &marker);
 
     builder.finish_node();
 }
@@ -199,5 +268,42 @@ mod tests {
             Some((3, "x")),
             "Math followed by non-digit should parse"
         );
+    }
+
+    // Display math tests
+    #[test]
+    fn test_parse_display_math_simple() {
+        let result = try_parse_display_math("$$x = y$$");
+        assert_eq!(result, Some((9, "x = y")));
+    }
+
+    #[test]
+    fn test_parse_display_math_multiline() {
+        let result = try_parse_display_math("$$\nx = y\n$$");
+        assert_eq!(result, Some((11, "\nx = y\n")));
+    }
+
+    #[test]
+    fn test_parse_display_math_triple_dollars() {
+        let result = try_parse_display_math("$$$x = y$$$");
+        assert_eq!(result, Some((11, "x = y")));
+    }
+
+    #[test]
+    fn test_parse_display_math_no_close() {
+        let result = try_parse_display_math("$$no close");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_not_display_math() {
+        let result = try_parse_display_math("$single dollar");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_display_math_with_trailing_text() {
+        let result = try_parse_display_math("$$x = y$$ and more");
+        assert_eq!(result, Some((9, "x = y")));
     }
 }

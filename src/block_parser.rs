@@ -5,6 +5,7 @@ use rowan::GreenNodeBuilder;
 mod blockquotes;
 mod code_blocks;
 mod container_stack;
+mod display_math;
 mod fenced_divs;
 mod headings;
 mod horizontal_rules;
@@ -16,6 +17,7 @@ mod utils;
 use blockquotes::count_blockquote_markers;
 use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
+use display_math::{parse_display_math_block, try_parse_math_fence_open};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
 use headings::{emit_atx_heading, try_parse_atx_heading};
 use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
@@ -446,6 +448,27 @@ impl<'a> BlockParser<'a> {
             return true;
         }
 
+        // Check for display math block
+        // Close paragraph first if one is open, then parse as MathBlock
+        if let Some(math_fence) = try_parse_math_fence_open(content) {
+            // Close paragraph before opening display math block
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            let bq_depth = self.current_blockquote_depth();
+            let new_pos = parse_display_math_block(
+                &mut self.builder,
+                &self.lines,
+                self.pos,
+                math_fence,
+                bq_depth,
+            );
+            self.pos = new_pos;
+            return true;
+        }
+
         // Check for fenced div opening
         if has_blank_before && let Some(div_fence) = try_parse_div_fence_open(content) {
             // Close paragraph before opening fenced div
@@ -721,6 +744,7 @@ mod tests {
     mod blanklines;
     mod blockquotes;
     mod code_blocks;
+    mod display_math;
     mod headings;
     mod helpers;
     mod lists;

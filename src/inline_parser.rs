@@ -14,7 +14,9 @@ mod tests;
 use code_spans::{emit_code_span, try_parse_code_span};
 use emphasis::{emit_emphasis, try_parse_emphasis};
 use escapes::{emit_escape, try_parse_escape};
-use inline_math::{emit_inline_math, try_parse_inline_math};
+use inline_math::{
+    emit_display_math, emit_inline_math, try_parse_display_math, try_parse_inline_math,
+};
 use links::{
     emit_autolink, emit_inline_image, emit_inline_link, try_parse_autolink, try_parse_inline_image,
     try_parse_inline_link,
@@ -47,13 +49,22 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             continue;
         }
 
-        // Try to parse inline math
-        if bytes[pos] == b'$'
-            && let Some((len, content)) = try_parse_inline_math(&text[pos..])
-        {
-            emit_inline_math(builder, content);
-            pos += len;
-            continue;
+        // Try to parse inline math (must check for $$ first for display math)
+        if bytes[pos] == b'$' {
+            // Try display math first ($$...$$)
+            if let Some((len, content)) = try_parse_display_math(&text[pos..]) {
+                let dollar_count = text[pos..].chars().take_while(|&c| c == '$').count();
+                emit_display_math(builder, content, dollar_count);
+                pos += len;
+                continue;
+            }
+
+            // Try inline math ($...$)
+            if let Some((len, content)) = try_parse_inline_math(&text[pos..]) {
+                emit_inline_math(builder, content);
+                pos += len;
+                continue;
+            }
         }
 
         // Try to parse automatic link

@@ -123,10 +123,10 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Reference images `![alt][ref]`
 - ❌ Extension: `implicit_figures` - Paragraph with just image becomes figure
 
-### Math 🚧
+### Math ✅
 
 - ✅ Inline math `$x = y$` - Full implementation with proper escaping
-- ❌ Display math `$$equation$$` - Not yet implemented (block or inline contexts)
+- ✅ Display math `$$equation$$` - Block and inline contexts, with proper formatting
 - ✅ Multi-dollar math spans (e.g., `$$$ $$ $$$`)
 - ✅ Math containing special characters
 - ✅ Extension: `tex_math_dollars` - Dollar-delimited math
