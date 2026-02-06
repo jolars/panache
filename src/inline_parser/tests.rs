@@ -13,7 +13,63 @@ mod link_tests {
 
 #[cfg(test)]
 mod code_tests {
-    // TODO: Add tests for inline code parsing (`code`)
+    use crate::block_parser::BlockParser;
+    use crate::inline_parser::InlineParser;
+    use crate::syntax::SyntaxKind;
+
+    fn find_code_spans(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut code_spans = Vec::new();
+        for child in node.descendants() {
+            if child.kind() == SyntaxKind::CodeSpan {
+                code_spans.push(child.to_string());
+            }
+        }
+        code_spans
+    }
+
+    #[test]
+    fn test_simple_code_span() {
+        let input = "This has `code` in it.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let code_spans = find_code_spans(&inline_tree);
+        assert_eq!(code_spans.len(), 1);
+        assert_eq!(code_spans[0], "`code`");
+    }
+
+    #[test]
+    fn test_multiple_code_spans() {
+        let input = "Both `foo` and `bar` are code.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let code_spans = find_code_spans(&inline_tree);
+        assert_eq!(code_spans.len(), 2);
+        assert_eq!(code_spans[0], "`foo`");
+        assert_eq!(code_spans[1], "`bar`");
+    }
+
+    #[test]
+    fn test_code_span_with_backticks() {
+        let input = "Use `` `backtick` `` for literal backticks.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let code_spans = find_code_spans(&inline_tree);
+        assert_eq!(code_spans.len(), 1);
+        assert_eq!(code_spans[0], "`` `backtick` ``");
+    }
+
+    #[test]
+    fn test_no_code_spans() {
+        let input = "Plain text with no code.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let code_spans = find_code_spans(&inline_tree);
+        assert_eq!(code_spans.len(), 0);
+    }
 }
 
 #[cfg(test)]

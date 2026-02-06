@@ -18,10 +18,16 @@ pub enum SyntaxKind {
     HorizontalRule,    // --- or *** or ___
     BlankLine,
 
-    // Links
-    LinkStart, // [
-    Link,      // [text](url)
-    ImageLink, // ![alt](url)
+    // Links and images
+    LinkStart,      // [
+    Link,           // [text](url)
+    LinkText,       // text part of link
+    LinkDest,       // (url) or (url "title")
+    LinkRef,        // [ref] in reference links
+    ImageLink,      // ![alt](url)
+    ImageAlt,       // alt text in image
+    AutoLink,       // <http://example.com>
+    AutoLinkMarker, // < and >
 
     // Math
     InlineMathMarker, // $
@@ -37,8 +43,15 @@ pub enum SyntaxKind {
 
     // Code
     CodeSpan,
+    CodeSpanMarker,  // ` or `` or ```
     CodeFenceMarker, // ``` or ~~~
     CodeBlock,
+
+    // Inline emphasis and formatting
+    Emphasis,       // *text* or _text_
+    Strong,         // **text** or __text__
+    EmphasisMarker, // * or _ (for emphasis)
+    StrongMarker,   // ** or __ (for strong)
 
     // Composite nodes
     ROOT,
