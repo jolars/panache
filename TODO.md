@@ -2,13 +2,13 @@
 
 This document tracks implementation status of Pandoc Markdown features based on the spec files in `docs/pandoc-spec/`.
 
+**Focus**: Initial development prioritizes **default Pandoc extensions**. Non-default extensions are tracked separately for future consideration.
+
 ## Status Legend
 
 - ✅ **Implemented** - Feature is fully or mostly implemented
 - 🚧 **Partial** - Feature is partially implemented or needs work
 - ❌ **Not Implemented** - Feature not yet started
-- 🔵 **Formatter Only** - Parser may handle it, but formatter needs work
-- ⚪ **Not Applicable** - Feature doesn't need special handling (passes through)
 
 ---
 
@@ -18,26 +18,25 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 - ✅ Basic paragraphs
 - ✅ Paragraph wrapping/reflow
-- ⚪ Extension: `escaped_line_breaks` (backslash at line end)
+- ✅ Extension: `escaped_line_breaks` (backslash at line end)
 
 ### Headings ✅
 
 - ✅ ATX-style headings (`# Heading`)
 - ✅ Setext-style headings (underlined with `===` or `---`)
 - ✅ Heading identifier attributes (`# Heading {#id}`)
-- 🔵 Extension: `header_attributes` - Full attribute syntax `{#id .class key=value}`
+- ✅ Extension: `blank_before_header` - Require blank line before headings (default behavior)
+- 🚧 Extension: `header_attributes` - Full attribute syntax `{#id .class key=value}`
 - ❌ Extension: `implicit_header_references` - Auto-generate reference links
-- ❌ Extension: `mmd_header_identifiers` - MultiMarkdown style IDs
-- ❌ Extension: `blank_before_header` - Require blank line before headings
 
 ### Block Quotations ✅
 
 - ✅ Basic block quotes (`> text`)
 - ✅ Nested block quotes (`> > nested`)
 - ✅ Block quotes with paragraphs
+- ✅ Extension: `blank_before_blockquote` - Require blank before quote (default behavior)
 - 🚧 Block quotes containing lists (works but may need polish)
 - 🚧 Block quotes containing code blocks (needs testing)
-- ❌ Extension: `blank_before_blockquote` - Require blank before quote
 
 ### Lists 🚧
 
@@ -51,29 +50,26 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `example_lists` - Example lists with `(@)` markers
 - ❌ Extension: `task_lists` - GitHub-style `- [ ]` and `- [x]`
 - ❌ Extension: `definition_lists` - Term/definition syntax
-- ❌ Extension: `lists_without_preceding_blankline`
-- ❌ Extension: `four_space_rule` - Four space vs two space list indent
 
 ### Code Blocks ✅
 
 - ✅ Fenced code blocks (backticks and tildes)
 - ✅ Code block attributes (language, etc.)
 - ✅ Indented code blocks (4-space indent)
-- ⚪ Extension: `fenced_code_attributes` - `{.language #id}`
-- ⚪ Extension: `backtick_code_blocks` - Backtick-only fences
+- ✅ Extension: `fenced_code_attributes` - `{.language #id}`
+- ✅ Extension: `backtick_code_blocks` - Backtick-only fences
 - ❌ Extension: `inline_code_attributes` - Attributes on inline code
 
 ### Horizontal Rules ✅
 
 - ✅ Basic horizontal rules (`---`, `***`, `___`)
-- 🔵 Distinguish from table syntax (potential ambiguity)
 
 ### Fenced Divs ✅
 
 - ✅ Basic fenced divs (`::: {.class}`)
 - ✅ Nested fenced divs
 - ✅ Colon count normalization based on nesting
-- ⚪ Extension: `native_divs` - HTML `<div>` elements
+- ✅ Proper formatting with attribute preservation
 
 ### Tables ❌
 
@@ -91,51 +87,51 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ## Inline Elements
 
-### Emphasis & Formatting ⚪
+### Emphasis & Formatting ✅
 
-- ⚪ `*italic*` and `_italic_`
-- ⚪ `**bold**` and `__bold__`
-- ⚪ Extension: `intraword_underscores` - `snake_case` handling
+- ✅ `*italic*` and `_italic_` - Full emphasis parsing with proper delimiter rules
+- ✅ `**bold**` and `__bold__` - Strong emphasis with nesting support
+- ✅ Nested emphasis (e.g., `***bold italic***`)
+- ✅ Overlapping and adjacent emphasis handling
+- ✅ Extension: `intraword_underscores` - `snake_case` handling
 - ❌ Extension: `strikeout` - `~~strikethrough~~`
 - ❌ Extension: `superscript`, `subscript` - `^super^` and `~sub~`
-- ❌ Extension: `mark` - `==highlighted==` text
 - ❌ Small caps - `[text]{.smallcaps}`
 - ❌ Underline - `[text]{.underline}`
 
-### Code & Verbatim ⚪
+### Code & Verbatim ✅
 
-- ⚪ Inline code (`` `code` ``)
-- ⚪ Verbatim - Pass through literal text
+- ✅ Inline code (`` `code` ``) - Full implementation with delimiter matching
+- ✅ Multi-backtick code spans (``` `` ` `` ```)
+- ✅ Code spans containing backticks
+- ✅ Proper whitespace preservation in code spans
 
-### Links 🔵
+### Links ❌
 
-- 🔵 Inline links `[text](url)`
-- 🔵 Reference links `[text][ref]`
-- 🔵 Automatic links `<http://example.com>`
-- ❌ Extension: `autolink_bare_uris` - Bare URLs as links
+- ❌ Inline links `[text](url)`
+- ❌ Reference links `[text][ref]`
+- ❌ Automatic links `<http://example.com>`
 - ❌ Extension: `shortcut_reference_links` - `[ref]` without second `[]`
 - ❌ Extension: `link_attributes` - `[text](url){.class}`
 - ❌ Extension: `implicit_header_references` - `[Heading Name]` links to header
-- ❌ Extension: `mmd_link_attributes` - MultiMarkdown link attributes
 
-### Images 🔵
+### Images ❌
 
-- 🔵 Inline images `![alt](url)`
-- 🔵 Reference images `![alt][ref]`
+- ❌ Inline images `![alt](url)`
+- ❌ Reference images `![alt][ref]`
 - ❌ Extension: `implicit_figures` - Paragraph with just image becomes figure
 
-### Math 🔵
+### Math ✅
 
-- 🔵 Inline math `$x = y$`
-- 🔵 Display math `$$equation$$`
-- ⚪ Extension: `tex_math_dollars` - Dollar-delimited math
-- ❌ Extension: `tex_math_single_backslash` - `\( \)` and `\[ \]`
-- ❌ Extension: `tex_math_double_backslash` - `\\( \\)` and `\\[ \\]`
-- ❌ Extension: `tex_math_gfm` - GitHub Flavored Markdown math
+- ✅ Inline math `$x = y$` - Full implementation with proper escaping
+- ✅ Display math `$$equation$$` - Block-level math support
+- ✅ Multi-dollar math spans (e.g., `$$$ $$ $$$`)
+- ✅ Math containing special characters
+- ✅ Extension: `tex_math_dollars` - Dollar-delimited math
 
-### Footnotes 🔵
+### Footnotes ❌
 
-- 🔵 Inline footnotes `^[note text]`
+- ❌ Inline footnotes `^[note text]`
 - ❌ Reference footnotes `[^1]` with definition block
 - ❌ Extension: `inline_notes` - Inline note syntax
 
@@ -152,11 +148,10 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ## Metadata & Front Matter
 
-### Metadata Blocks 🚧
+### Metadata Blocks ✅
 
 - ✅ Extension: `yaml_metadata_block` - YAML frontmatter
-- 🚧 Extension: `pandoc_title_block` - Title/author/date at top
-- ❌ Extension: `mmd_title_block` - MultiMarkdown metadata
+- ✅ Extension: `pandoc_title_block` - Title/author/date at top
 
 ---
 
@@ -168,9 +163,9 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `markdown_in_html_blocks` - Markdown inside HTML blocks
 - ❌ Extension: `markdown_attribute` - `markdown="1"` attribute
 
-### Raw LaTeX ⚪
+### Raw LaTeX ❌
 
-- ⚪ Extension: `raw_tex` - LaTeX commands and environments
+- ❌ Extension: `raw_tex` - LaTeX commands and environments
 - ❌ Extension: `latex_macros` - Expand LaTeX macros
 
 ### Other Raw ❌
@@ -181,54 +176,87 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ## Escapes & Special Characters
 
-### Backslash Escapes ⚪
+### Backslash Escapes ✅
 
-- ⚪ Extension: `all_symbols_escapable` - Backslash escapes any symbol
-- ⚪ Extension: `angle_brackets_escapable` - Escape `<` and `>`
+- ✅ Extension: `all_symbols_escapable` - Backslash escapes any symbol
+- ✅ Extension: `angle_brackets_escapable` - Escape `<` and `>`
+- ✅ Escape sequences in inline elements (emphasis, code, math)
 
-### Line Breaks ⚪
+### Line Breaks ✅
 
-- ⚪ Extension: `hard_line_breaks` - Newline = `<br>`
-- ⚪ Extension: `escaped_line_breaks` - Backslash at line end = `<br>`
-- ❌ Extension: `ignore_line_breaks` - Ignore single newlines
-- ❌ Extension: `east_asian_line_breaks` - Smart line breaks for CJK
+- ✅ Extension: `escaped_line_breaks` - Backslash at line end = `<br>`
 
 ---
 
-## Non-Default / Special Extensions
+## Non-Default Extensions (Future Consideration)
 
-### Quarto-Specific ❌
+These extensions are **not enabled by default** in Pandoc and are lower priority for initial implementation.
 
-- ❌ Extension: `alerts` - Quarto alert/callout boxes
-- ❌ Executable code cells with output
-- ❌ Cross-references `@fig-id`, `@tbl-id`
-- ❌ Callout blocks (`.callout-note`, etc.)
+### Non-Default: Emphasis & Formatting
 
-### GitHub Flavored Markdown ❌
+- ❌ Extension: `mark` - `==highlighted==` text (non-default)
 
-- ❌ Extension: `emoji` - `:emoji:` syntax
-- ❌ Extension: `wikilinks_title_after_pipe` - `[[link|title]]`
+### Non-Default: Links
 
-### Other Extensions ❌
+- ❌ Extension: `autolink_bare_uris` - Bare URLs as links (non-default)
+- ❌ Extension: `mmd_link_attributes` - MultiMarkdown link attributes (non-default)
 
-- ❌ Extension: `abbreviations` - Abbreviation definitions
-- ❌ Extension: `gutenberg` - Project Gutenberg conventions
-- ❌ Extension: `rebase_relative_paths` - Rebase relative paths
-- ❌ Extension: `sourcepos` - Include source position info
-- ❌ Extension: `space_in_atx_header` - Allow no space after `#`
-- ❌ Extension: `spaced_reference_links` - Allow space in `[ref] [def]`
-- ❌ Extension: `old_dashes` - Old-style em/en dash parsing
+### Non-Default: Math
+
+- ❌ Extension: `tex_math_single_backslash` - `\( \)` and `\[ \]` (non-default)
+- ❌ Extension: `tex_math_double_backslash` - `\\( \\)` and `\\[ \\]` (non-default)
+- ❌ Extension: `tex_math_gfm` - GitHub Flavored Markdown math (non-default)
+
+### Non-Default: Metadata
+
+- ❌ Extension: `mmd_title_block` - MultiMarkdown metadata (non-default)
+
+### Non-Default: Headings
+
+- ❌ Extension: `mmd_header_identifiers` - MultiMarkdown style IDs (non-default)
+
+### Non-Default: Lists
+
+- ❌ Extension: `lists_without_preceding_blankline` (non-default)
+- ❌ Extension: `four_space_rule` - Four space vs two space list indent (non-default)
+
+### Non-Default: Line Breaks
+
+- ❌ Extension: `hard_line_breaks` - Newline = `<br>` (non-default)
+- ❌ Extension: `ignore_line_breaks` - Ignore single newlines (non-default)
+- ❌ Extension: `east_asian_line_breaks` - Smart line breaks for CJK (non-default)
+
+### Non-Default: GitHub/Quarto-Specific
+
+- ❌ Extension: `alerts` - GitHub/Quarto alert/callout boxes (non-default)
+- ❌ Extension: `emoji` - `:emoji:` syntax (non-default)
+- ❌ Extension: `wikilinks_title_after_pipe` - `[[link|title]]` (non-default)
+- ❌ Quarto executable code cells with output
+- ❌ Quarto cross-references `@fig-id`, `@tbl-id`
+- ❌ Quarto callout blocks (`.callout-note`, etc.)
+
+### Non-Default: Other
+
+- ❌ Extension: `abbreviations` - Abbreviation definitions (non-default)
+- ❌ Extension: `attributes` - Universal attribute syntax (non-default, commonmark only)
+- ❌ Extension: `gutenberg` - Project Gutenberg conventions (non-default)
+- ❌ Extension: `markdown_attribute` - `markdown="1"` in HTML (non-default)
+- ❌ Extension: `old_dashes` - Old-style em/en dash parsing (non-default)
+- ❌ Extension: `rebase_relative_paths` - Rebase relative paths (non-default)
+- ❌ Extension: `short_subsuperscripts` - MultiMarkdown `x^2` style (non-default)
+- ❌ Extension: `sourcepos` - Include source position info (non-default)
+- ❌ Extension: `space_in_atx_header` - Allow no space after `#` (non-default)
+- ❌ Extension: `spaced_reference_links` - Allow space in `[ref] [def]` (non-default)
 
 ---
 
 ## Formatter-Specific Improvements
 
-### High Priority 🚧
+### High Priority 🔵
 
-1. **List formatting improvements** - Better handling of continuation, nesting, alignment
-2. **Inline element preservation** - Links, images, emphasis, code spans
-3. **Table formatting** - Once tables are parsed, format them nicely
-4. **Math block formatting** - Preserve math content properly
+1. **Link/Image formatting** - Format once parser is complete
+2. **Table formatting** - Once tables are parsed, format them nicely
+3. **List continuation polish** - Fine-tune complex nested list formatting
 
 ### Medium Priority 🔵
 
@@ -247,11 +275,12 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ## Architecture Improvements
 
-### Parser Structure 🚧
+### Parser Structure ✅
 
-- 🚧 **List structure** - Emit explicit ListIndent, ListMarker, MarkerSpace nodes
-- 🚧 **Fence structure** - Move newlines out of fence nodes, populate Info nodes properly
-- ❌ **Inline parser** - Currently a placeholder, needs full implementation
+- ✅ **List structure** - Explicit ListIndent, ListMarker, MarkerSpace nodes
+- ✅ **Fence structure** - Clean structure with proper Info nodes
+- ✅ **Inline parser** - Full implementation with emphasis, code spans, math, escapes
+- ❌ **Link parser** - Links and images not yet implemented
 - ❌ **Table parser** - No table parsing yet
 - ❌ **HTML parser** - No HTML block/inline parsing
 
@@ -260,12 +289,13 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ **Reflow mode** - Paragraph wrapping works
 - ✅ **Preserve mode** - Pass-through formatting
 - ✅ **Configuration** - Line width, wrap mode, etc.
-- 🔵 **Idempotency** - Ensure formatting is idempotent (mostly works)
+- 🚧 **Idempotency** - Ensure formatting is idempotent (mostly works)
 
-### Testing 🚧
+### Testing ✅
 
-- ✅ **Golden tests** - Input/output comparison tests
-- ✅ **Unit tests** - Parser and formatter units
+- ✅ **Golden tests** - 10 comprehensive input/output test cases
+- ✅ **Unit tests** - 205+ parser and formatter tests across all modules
+- ✅ **Architecture tests** - Inline parser structure validation
 - ❌ **Fuzzing** - cargo-fuzz for robustness
 - ❌ **Property tests** - Token concatenation = input
 - ❌ **Corpus testing** - Real Quarto documents
@@ -274,38 +304,30 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ## Immediate Next Steps (Suggested Priority)
 
-1. **Complete inline parser** - Currently a WIP placeholder
-   - Links (inline, reference, automatic)
-   - Images
-   - Emphasis (bold, italic)
-   - Code spans
-   - Math (inline)
+1. **Links and Images** - Critical missing inline elements
+   - Inline links `[text](url)`
+   - Reference links `[text][ref]`
+   - Automatic links `<http://example.com>`
+   - Images (inline and reference)
 
 2. **Table support** - Critical for Quarto documents
    - Simple tables
    - Pipe tables (most common)
    - Grid tables (if time permits)
 
-3. **List improvements** - Fragile currently
-   - Parser: explicit marker/indent structure
-   - Formatter: proper hanging indents
+3. **Definition lists** - Common in documentation
 
-4. **Definition lists** - Common in documentation
+4. **Task lists** - GitHub-style checkboxes (common)
 
-5. **Task lists** - GitHub-style checkboxes (common)
+5. **Footnotes** - Complete reference-style footnotes
 
-6. **Footnotes** - Complete reference-style footnotes
-
-7. **Citations** - Essential for academic Quarto docs
+6. **Citations** - Essential for academic Quarto docs
 
 ---
 
-## Won't Implement (Low Value / Out of Scope)
+## Won't Implement
 
-- Old/deprecated extensions (e.g., `old_dashes`)
-- Obscure formats (e.g., `gutenberg`)
-- Editor-specific features (e.g., `sourcepos`)
-- Format-specific raw content (leave as-is)
+- Format-specific output conventions (e.g., `gutenberg` for plain text output)
 
 ---
 
