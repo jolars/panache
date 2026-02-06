@@ -3,6 +3,7 @@
 This document tracks implementation status of Pandoc Markdown features based on the spec files in `docs/pandoc-spec/`.
 
 ## Status Legend
+
 - ✅ **Implemented** - Feature is fully or mostly implemented
 - 🚧 **Partial** - Feature is partially implemented or needs work
 - ❌ **Not Implemented** - Feature not yet started
@@ -14,11 +15,13 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ## Block-Level Elements
 
 ### Paragraphs ✅
+
 - ✅ Basic paragraphs
 - ✅ Paragraph wrapping/reflow
 - ⚪ Extension: `escaped_line_breaks` (backslash at line end)
 
 ### Headings ✅
+
 - ✅ ATX-style headings (`# Heading`)
 - ✅ Setext-style headings (underlined with `===` or `---`)
 - ✅ Heading identifier attributes (`# Heading {#id}`)
@@ -28,6 +31,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `blank_before_header` - Require blank line before headings
 
 ### Block Quotations ✅
+
 - ✅ Basic block quotes (`> text`)
 - ✅ Nested block quotes (`> > nested`)
 - ✅ Block quotes with paragraphs
@@ -36,6 +40,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `blank_before_blockquote` - Require blank before quote
 
 ### Lists 🚧
+
 - ✅ Bullet lists (`-`, `+`, `*`)
 - ✅ Ordered lists (`1.`, `2.`, etc.)
 - ✅ Nested lists
@@ -50,6 +55,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `four_space_rule` - Four space vs two space list indent
 
 ### Code Blocks ✅
+
 - ✅ Fenced code blocks (backticks and tildes)
 - ✅ Code block attributes (language, etc.)
 - ✅ Indented code blocks (4-space indent)
@@ -58,16 +64,19 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `inline_code_attributes` - Attributes on inline code
 
 ### Horizontal Rules ✅
+
 - ✅ Basic horizontal rules (`---`, `***`, `___`)
 - 🔵 Distinguish from table syntax (potential ambiguity)
 
 ### Fenced Divs ✅
+
 - ✅ Basic fenced divs (`::: {.class}`)
 - ✅ Nested fenced divs
 - ✅ Colon count normalization based on nesting
 - ⚪ Extension: `native_divs` - HTML `<div>` elements
 
 ### Tables ❌
+
 - ❌ Extension: `simple_tables` - Simple table syntax
 - ❌ Extension: `multiline_tables` - Multiline cell content
 - ❌ Extension: `grid_tables` - Grid-style tables
@@ -75,6 +84,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `table_captions` - Table captions
 
 ### Line Blocks ❌
+
 - ❌ Extension: `line_blocks` - Poetry/verse with `|` prefix
 
 ---
@@ -82,6 +92,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ## Inline Elements
 
 ### Emphasis & Formatting ⚪
+
 - ⚪ `*italic*` and `_italic_`
 - ⚪ `**bold**` and `__bold__`
 - ⚪ Extension: `intraword_underscores` - `snake_case` handling
@@ -92,10 +103,12 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Underline - `[text]{.underline}`
 
 ### Code & Verbatim ⚪
+
 - ⚪ Inline code (`` `code` ``)
 - ⚪ Verbatim - Pass through literal text
 
 ### Links 🔵
+
 - 🔵 Inline links `[text](url)`
 - 🔵 Reference links `[text][ref]`
 - 🔵 Automatic links `<http://example.com>`
@@ -106,11 +119,13 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `mmd_link_attributes` - MultiMarkdown link attributes
 
 ### Images 🔵
+
 - 🔵 Inline images `![alt](url)`
 - 🔵 Reference images `![alt][ref]`
 - ❌ Extension: `implicit_figures` - Paragraph with just image becomes figure
 
 ### Math 🔵
+
 - 🔵 Inline math `$x = y$`
 - 🔵 Display math `$$equation$$`
 - ⚪ Extension: `tex_math_dollars` - Dollar-delimited math
@@ -119,14 +134,17 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `tex_math_gfm` - GitHub Flavored Markdown math
 
 ### Footnotes 🔵
+
 - 🔵 Inline footnotes `^[note text]`
 - ❌ Reference footnotes `[^1]` with definition block
 - ❌ Extension: `inline_notes` - Inline note syntax
 
 ### Citations ❌
+
 - ❌ Extension: `citations` - `[@cite]` and `@cite` syntax
 
 ### Spans ❌
+
 - ❌ Extension: `bracketed_spans` - `[text]{.class}` inline
 - ❌ Extension: `native_spans` - HTML `<span>` elements
 
@@ -135,6 +153,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ## Metadata & Front Matter
 
 ### Metadata Blocks 🚧
+
 - ✅ Extension: `yaml_metadata_block` - YAML frontmatter
 - 🚧 Extension: `pandoc_title_block` - Title/author/date at top
 - ❌ Extension: `mmd_title_block` - MultiMarkdown metadata
@@ -144,15 +163,18 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ## Raw Content & Special Syntax
 
 ### Raw HTML ❌
+
 - ❌ Extension: `raw_html` - Inline and block HTML
 - ❌ Extension: `markdown_in_html_blocks` - Markdown inside HTML blocks
 - ❌ Extension: `markdown_attribute` - `markdown="1"` attribute
 
 ### Raw LaTeX ⚪
+
 - ⚪ Extension: `raw_tex` - LaTeX commands and environments
 - ❌ Extension: `latex_macros` - Expand LaTeX macros
 
 ### Other Raw ❌
+
 - ❌ Extension: `raw_attribute` - Generic raw blocks `{=format}`
 
 ---
@@ -160,10 +182,12 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ## Escapes & Special Characters
 
 ### Backslash Escapes ⚪
+
 - ⚪ Extension: `all_symbols_escapable` - Backslash escapes any symbol
 - ⚪ Extension: `angle_brackets_escapable` - Escape `<` and `>`
 
 ### Line Breaks ⚪
+
 - ⚪ Extension: `hard_line_breaks` - Newline = `<br>`
 - ⚪ Extension: `escaped_line_breaks` - Backslash at line end = `<br>`
 - ❌ Extension: `ignore_line_breaks` - Ignore single newlines
@@ -174,16 +198,19 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ## Non-Default / Special Extensions
 
 ### Quarto-Specific ❌
+
 - ❌ Extension: `alerts` - Quarto alert/callout boxes
 - ❌ Executable code cells with output
 - ❌ Cross-references `@fig-id`, `@tbl-id`
 - ❌ Callout blocks (`.callout-note`, etc.)
 
 ### GitHub Flavored Markdown ❌
+
 - ❌ Extension: `emoji` - `:emoji:` syntax
 - ❌ Extension: `wikilinks_title_after_pipe` - `[[link|title]]`
 
 ### Other Extensions ❌
+
 - ❌ Extension: `abbreviations` - Abbreviation definitions
 - ❌ Extension: `gutenberg` - Project Gutenberg conventions
 - ❌ Extension: `rebase_relative_paths` - Rebase relative paths
@@ -197,18 +224,21 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ## Formatter-Specific Improvements
 
 ### High Priority 🚧
+
 1. **List formatting improvements** - Better handling of continuation, nesting, alignment
 2. **Inline element preservation** - Links, images, emphasis, code spans
 3. **Table formatting** - Once tables are parsed, format them nicely
 4. **Math block formatting** - Preserve math content properly
 
 ### Medium Priority 🔵
+
 1. **Footnote formatting** - Once parsed, format reference-style footnotes
 2. **Definition list formatting** - Format term/definition pairs
 3. **Raw HTML passthrough** - Preserve HTML blocks/inline
 4. **Citation formatting** - Format citation syntax consistently
 
 ### Low Priority 🔵
+
 1. **Emoji passthrough** - Preserve `:emoji:` syntax
 2. **Abbreviation expansion** - Handle abbreviation blocks
 3. **Smart quote/dash handling** - Typography improvements
@@ -218,6 +248,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ## Architecture Improvements
 
 ### Parser Structure 🚧
+
 - 🚧 **List structure** - Emit explicit ListIndent, ListMarker, MarkerSpace nodes
 - 🚧 **Fence structure** - Move newlines out of fence nodes, populate Info nodes properly
 - ❌ **Inline parser** - Currently a placeholder, needs full implementation
@@ -225,12 +256,14 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ **HTML parser** - No HTML block/inline parsing
 
 ### Formatter Structure ✅
+
 - ✅ **Reflow mode** - Paragraph wrapping works
 - ✅ **Preserve mode** - Pass-through formatting
 - ✅ **Configuration** - Line width, wrap mode, etc.
 - 🔵 **Idempotency** - Ensure formatting is idempotent (mostly works)
 
 ### Testing 🚧
+
 - ✅ **Golden tests** - Input/output comparison tests
 - ✅ **Unit tests** - Parser and formatter units
 - ❌ **Fuzzing** - cargo-fuzz for robustness
