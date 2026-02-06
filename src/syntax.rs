@@ -89,6 +89,11 @@ pub enum SyntaxKind {
 
     // Tables
     SimpleTable,
+    TableHeader,
+    TableSeparator,
+    TableRow,
+    TableCell,
+    TableCaption,
 
     // Code block parts
     CodeFenceOpen,

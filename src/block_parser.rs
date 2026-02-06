@@ -13,6 +13,7 @@ mod horizontal_rules;
 mod lists;
 mod metadata;
 mod paragraphs;
+mod tables;
 mod utils;
 
 use blockquotes::count_blockquote_markers;
@@ -25,6 +26,7 @@ use headings::{emit_atx_heading, try_parse_atx_heading};
 use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
+use tables::try_parse_simple_table;
 
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -432,6 +434,14 @@ impl<'a> BlockParser<'a> {
         }
 
         if has_blank_before {
+            // Try to parse simple table
+            if let Some(lines_consumed) =
+                try_parse_simple_table(&self.lines, self.pos, &mut self.builder)
+            {
+                self.pos += lines_consumed;
+                return true;
+            }
+
             // Try to parse horizontal rule (but only if not YAML)
             if try_parse_horizontal_rule(content).is_some() {
                 emit_horizontal_rule(&mut self.builder, content);
