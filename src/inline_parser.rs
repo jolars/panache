@@ -3,12 +3,14 @@ use rowan::{GreenNode, GreenNodeBuilder};
 
 mod architecture_tests;
 mod code_spans;
+mod emphasis;
 mod escapes;
 mod future_tests;
 mod inline_math;
 mod tests;
 
 use code_spans::{emit_code_span, try_parse_code_span};
+use emphasis::{emit_emphasis, try_parse_emphasis};
 use escapes::{emit_escape, try_parse_escape};
 use inline_math::{emit_inline_math, try_parse_inline_math};
 
@@ -115,7 +117,16 @@ impl InlineParser {
                 continue;
             }
 
-            // TODO: Try other inline elements (emphasis, links, etc.)
+            // Try to parse emphasis
+            if (bytes[pos] == b'*' || bytes[pos] == b'_')
+                && let Some((len, inner_text, level, delim_char)) = try_parse_emphasis(&text[pos..])
+            {
+                emit_emphasis(builder, inner_text, level, delim_char);
+                pos += len;
+                continue;
+            }
+
+            // TODO: Try other inline elements (links, etc.)
 
             // No inline element matched - emit as plain text
             let next_pos = self.find_next_inline_start(&text[pos..]);

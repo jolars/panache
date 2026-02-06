@@ -3,7 +3,138 @@
 
 #[cfg(test)]
 mod emphasis_tests {
-    // TODO: Add tests for emphasis parsing (*text*, **text**, _text_, __text__)
+    use crate::block_parser::BlockParser;
+    use crate::inline_parser::InlineParser;
+    use crate::syntax::SyntaxKind;
+
+    fn find_emphasis(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut emphasis = Vec::new();
+        for child in node.descendants() {
+            if child.kind() == SyntaxKind::Emphasis {
+                emphasis.push(child.to_string());
+            }
+        }
+        emphasis
+    }
+
+    fn find_strong(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut strong = Vec::new();
+        for child in node.descendants() {
+            if child.kind() == SyntaxKind::Strong {
+                strong.push(child.to_string());
+            }
+        }
+        strong
+    }
+
+    #[test]
+    fn test_simple_emphasis() {
+        let input = "This is *italic* text.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let emphasis = find_emphasis(&inline_tree);
+        assert_eq!(emphasis.len(), 1);
+        assert_eq!(emphasis[0], "*italic*");
+    }
+
+    #[test]
+    fn test_simple_strong() {
+        let input = "This is **bold** text.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let strong = find_strong(&inline_tree);
+        assert_eq!(strong.len(), 1);
+        assert_eq!(strong[0], "**bold**");
+    }
+
+    #[test]
+    fn test_multiple_emphasis() {
+        let input = "Both *foo* and *bar* are italic.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let emphasis = find_emphasis(&inline_tree);
+        assert_eq!(emphasis.len(), 2);
+        assert_eq!(emphasis[0], "*foo*");
+        assert_eq!(emphasis[1], "*bar*");
+    }
+
+    #[test]
+    fn test_mixed_emphasis_and_strong() {
+        let input = "Mix *italic* and **bold** together.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let emphasis = find_emphasis(&inline_tree);
+        let strong = find_strong(&inline_tree);
+
+        assert_eq!(emphasis.len(), 1);
+        assert_eq!(emphasis[0], "*italic*");
+        assert_eq!(strong.len(), 1);
+        assert_eq!(strong[0], "**bold**");
+    }
+
+    #[test]
+    fn test_triple_emphasis() {
+        let input = "This is ***both*** text.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        // Triple emphasis creates nested Strong and Emphasis
+        let strong = find_strong(&inline_tree);
+        let emphasis = find_emphasis(&inline_tree);
+
+        assert_eq!(strong.len(), 1);
+        assert_eq!(emphasis.len(), 1);
+    }
+
+    #[test]
+    fn test_underscore_emphasis() {
+        let input = "This is _italic_ text.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let emphasis = find_emphasis(&inline_tree);
+        assert_eq!(emphasis.len(), 1);
+        assert_eq!(emphasis[0], "_italic_");
+    }
+
+    #[test]
+    fn test_intraword_underscore_no_emphasis() {
+        let input = "This is feas_ible text.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let emphasis = find_emphasis(&inline_tree);
+        assert_eq!(
+            emphasis.len(),
+            0,
+            "Underscores within words should not create emphasis"
+        );
+    }
+
+    #[test]
+    fn test_emphasis_with_spaces() {
+        // Spaces around delimiters should prevent emphasis
+        let input = "This is * not * italic.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let emphasis = find_emphasis(&inline_tree);
+        assert_eq!(emphasis.len(), 0);
+    }
+
+    #[test]
+    fn test_no_emphasis() {
+        let input = "Plain text with no emphasis.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let emphasis = find_emphasis(&inline_tree);
+        assert_eq!(emphasis.len(), 0);
+    }
 }
 
 #[cfg(test)]

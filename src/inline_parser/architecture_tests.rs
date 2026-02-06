@@ -1,14 +1,19 @@
 // Architecture and nesting tests for inline parser
 
+#[cfg(test)]
 use crate::block_parser::BlockParser;
+#[cfg(test)]
 use crate::inline_parser::InlineParser;
+#[cfg(test)]
 use crate::syntax::SyntaxKind;
 
+#[cfg(test)]
 fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
     let block_tree = BlockParser::new(input).parse();
     InlineParser::new(block_tree).parse()
 }
 
+#[cfg(test)]
 fn count_nodes_of_kind(node: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
     node.descendants().filter(|n| n.kind() == kind).count()
 }

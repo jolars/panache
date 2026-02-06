@@ -49,12 +49,12 @@ pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
             }
 
             // Closing $ must not be followed immediately by a digit
-            if let Some(next_ch) = rest[pos + 1..].chars().next() {
-                if next_ch.is_ascii_digit() {
-                    // Continue searching - this $ doesn't close the math
-                    pos += 1;
-                    continue;
-                }
+            if let Some(next_ch) = rest[pos + 1..].chars().next()
+                && next_ch.is_ascii_digit()
+            {
+                // Continue searching - this $ doesn't close the math
+                pos += 1;
+                continue;
             }
 
             // Found valid closing $

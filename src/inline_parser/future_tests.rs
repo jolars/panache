@@ -31,7 +31,7 @@ mod future_architecture_tests {
     }
 
     #[test]
-    #[ignore = "Emphasis not yet implemented"]
+    #[ignore = "Nested inline elements not yet implemented"]
     fn emphasis_with_code_inside() {
         // *emphasis with `code` inside* should parse as:
         // - Emphasis node containing:
@@ -41,6 +41,10 @@ mod future_architecture_tests {
         //
         // Current approach: Would need to match emphasis delimiters,
         // then recursively parse content between them.
+        //
+        // NOTE: Basic emphasis now works, but nested inline parsing
+        // (code inside emphasis) requires recursive parsing which
+        // is not yet implemented.
     }
 
     #[test]
