@@ -8,6 +8,7 @@ pub struct Formatter {
     output: String,
     config: Config,
     consecutive_blank_lines: usize,
+    fenced_div_depth: usize,
 }
 
 fn is_block_element(kind: SyntaxKind) -> bool {
@@ -28,6 +29,7 @@ impl Formatter {
             output: String::with_capacity(8192),
             config,
             consecutive_blank_lines: 0,
+            fenced_div_depth: 0,
         }
     }
 
@@ -509,48 +511,58 @@ impl Formatter {
             }
 
             SyntaxKind::FencedDiv => {
-                let mut fence_open = None;
-                let mut fence_close = None;
-                let mut div_content = None;
+                // Use more colons for nested divs: 3 base + 2 per depth level
+                let colon_count = 3 + (self.fenced_div_depth * 2);
+                let colons = ":".repeat(colon_count);
+
+                let mut attributes = None;
 
                 for child in node.children() {
                     match child.kind() {
                         SyntaxKind::DivFenceOpen => {
-                            fence_open = Some(child.text().to_string());
+                            // Extract and store attributes for later
                         }
 
-                        SyntaxKind::DivContent => {
-                            div_content = Some(child);
+                        SyntaxKind::DivInfo => {
+                            attributes = Some(child.text().to_string());
                         }
 
                         SyntaxKind::DivFenceClose => {
-                            fence_close = Some(child.text().to_string());
+                            // Will be handled after content
                         }
 
+                        // Process any other child nodes (paragraphs, nested divs, etc.)
                         _ => {}
                     }
                 }
 
-                if let Some(open) = fence_open {
-                    self.output.push_str(&open);
+                // Emit normalized opening fence
+                if let Some(attrs) = &attributes {
+                    self.output.push_str(&colons);
+                    self.output.push(' ');
+                    self.output.push_str(attrs);
+                    self.output.push('\n');
                 }
-                if let Some(content_node) = div_content {
-                    for grandchild in content_node.children() {
-                        if grandchild.kind() == SyntaxKind::DOCUMENT {
-                            for doc_child in grandchild.children() {
-                                self.format_node(&doc_child, indent);
-                            }
-                        } else {
-                            self.format_node(&grandchild, indent);
-                        }
+
+                // Increment depth for nested content
+                self.fenced_div_depth += 1;
+
+                // Process content
+                for child in node.children() {
+                    if !matches!(
+                        child.kind(),
+                        SyntaxKind::DivFenceOpen | SyntaxKind::DivInfo | SyntaxKind::DivFenceClose
+                    ) {
+                        self.format_node(&child, indent);
                     }
                 }
-                if let Some(close) = fence_close {
-                    self.output.push_str(&close);
-                    if !close.ends_with('\n') {
-                        self.output.push('\n');
-                    }
-                }
+
+                // Decrement depth after processing content
+                self.fenced_div_depth -= 1;
+
+                // Emit normalized closing fence
+                self.output.push_str(&colons);
+                self.output.push('\n');
             }
 
             SyntaxKind::InlineMathMarker => {

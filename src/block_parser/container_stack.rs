@@ -7,6 +7,9 @@ pub(crate) enum Container {
     BlockQuote {
         content_col: usize,
     },
+    FencedDiv {
+        // No special tracking needed - closed by fence marker
+    },
     List {
         marker: ListMarker,
         base_indent_cols: usize,

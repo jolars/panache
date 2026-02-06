@@ -4,6 +4,7 @@ use rowan::GreenNodeBuilder;
 mod blockquotes;
 mod code_blocks;
 mod container_stack;
+mod fenced_divs;
 mod headings;
 mod horizontal_rules;
 mod lists;
@@ -14,6 +15,7 @@ mod utils;
 use blockquotes::count_blockquote_markers;
 use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
+use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
 use headings::{emit_atx_heading, try_parse_atx_heading};
 use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
@@ -440,6 +442,58 @@ impl<'a> BlockParser<'a> {
             return true;
         }
 
+        // Check for fenced div opening
+        if has_blank_before && let Some(div_fence) = try_parse_div_fence_open(content) {
+            // Close paragraph before opening fenced div
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            // Start FencedDiv node
+            self.builder.start_node(SyntaxKind::FencedDiv.into());
+
+            // Emit opening fence
+            self.builder.start_node(SyntaxKind::DivFenceOpen.into());
+            self.builder.token(SyntaxKind::TEXT.into(), content);
+            self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            self.builder.finish_node(); // DivFenceOpen
+
+            // Store attributes as DivInfo
+            self.builder.start_node(SyntaxKind::DivInfo.into());
+            self.builder
+                .token(SyntaxKind::TEXT.into(), &div_fence.attributes);
+            self.builder.finish_node(); // DivInfo
+
+            // Push FencedDiv container
+            self.containers.push(Container::FencedDiv {});
+
+            self.pos += 1;
+            return true;
+        }
+
+        // Check for fenced div closing
+        if self.in_fenced_div() && is_div_closing_fence(content) {
+            // Close paragraph before closing fenced div
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            // Emit closing fence
+            self.builder.start_node(SyntaxKind::DivFenceClose.into());
+            self.builder.token(SyntaxKind::TEXT.into(), content);
+            self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            self.builder.finish_node(); // DivFenceClose
+
+            // Pop the FencedDiv container (this will finish the FencedDiv node)
+            self.containers
+                .close_to(self.containers.depth() - 1, &mut self.builder);
+
+            self.pos += 1;
+            return true;
+        }
+
         // List marker?
         if let Some((marker, marker_len, spaces_after)) = try_parse_list_marker(content) {
             let (indent_cols, indent_bytes) = leading_indent(content);
@@ -499,6 +553,13 @@ impl<'a> BlockParser<'a> {
             .stack
             .iter()
             .any(|c| matches!(c, Container::List { .. }))
+    }
+
+    fn in_fenced_div(&self) -> bool {
+        self.containers
+            .stack
+            .iter()
+            .any(|c| matches!(c, Container::FencedDiv { .. }))
     }
 
     /// Check if we're in a list inside a blockquote.
