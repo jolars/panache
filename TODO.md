@@ -106,11 +106,12 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Code spans containing backticks
 - ✅ Proper whitespace preservation in code spans
 
-### Links ❌
+### Links ✅
 
-- ❌ Inline links `[text](url)`
+- ✅ Inline links `[text](url)`
+- ✅ Automatic links `<http://example.com>`
+- ✅ Nested inline elements in link text (code, emphasis, math)
 - ❌ Reference links `[text][ref]`
-- ❌ Automatic links `<http://example.com>`
 - ❌ Extension: `shortcut_reference_links` - `[ref]` without second `[]`
 - ❌ Extension: `link_attributes` - `[text](url){.class}`
 - ❌ Extension: `implicit_header_references` - `[Heading Name]` links to header
@@ -304,13 +305,16 @@ These extensions are **not enabled by default** in Pandoc and are lower priority
 
 ## Immediate Next Steps (Suggested Priority)
 
-1. **Links and Images** - Critical missing inline elements
-   - Inline links `[text](url)`
-   - Reference links `[text][ref]`
-   - Automatic links `<http://example.com>`
-   - Images (inline and reference)
+1. **Images** - Similar to links, now that link foundation is done
+   - Inline images `![alt](url)`
+   - Reference images `![alt][ref]`
 
-2. **Table support** - Critical for Quarto documents
+2. **Reference links** - Complete the link implementation
+   - Reference links `[text][ref]`
+   - Link reference definitions
+   - Implicit reference links `[text][]`
+
+3. **Table support** - Critical for Quarto documents
    - Simple tables
    - Pipe tables (most common)
    - Grid tables (if time permits)

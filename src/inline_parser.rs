@@ -7,12 +7,109 @@ mod emphasis;
 mod escapes;
 mod future_tests;
 mod inline_math;
+mod links;
 mod tests;
 
 use code_spans::{emit_code_span, try_parse_code_span};
 use emphasis::{emit_emphasis, try_parse_emphasis};
 use escapes::{emit_escape, try_parse_escape};
 use inline_math::{emit_inline_math, try_parse_inline_math};
+use links::{emit_autolink, emit_inline_link, try_parse_autolink, try_parse_inline_link};
+
+/// Parse inline elements from text content.
+/// This is a standalone function used by both the main inline parser
+/// and by nested contexts like link text.
+pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
+    let mut pos = 0;
+    let bytes = text.as_bytes();
+
+    while pos < text.len() {
+        // Try to parse backslash escape FIRST (highest precedence)
+        // This prevents escaped delimiters from being parsed
+        if bytes[pos] == b'\\'
+            && let Some((len, ch, escape_type)) = try_parse_escape(&text[pos..])
+        {
+            emit_escape(builder, ch, escape_type);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse code span
+        if bytes[pos] == b'`'
+            && let Some((len, content, backtick_count)) = try_parse_code_span(&text[pos..])
+        {
+            emit_code_span(builder, content, backtick_count);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse inline math
+        if bytes[pos] == b'$'
+            && let Some((len, content)) = try_parse_inline_math(&text[pos..])
+        {
+            emit_inline_math(builder, content);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse automatic link
+        if bytes[pos] == b'<'
+            && let Some((len, url)) = try_parse_autolink(&text[pos..])
+        {
+            emit_autolink(builder, &text[pos..pos + len], url);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse inline link
+        if bytes[pos] == b'['
+            && let Some((len, link_text, dest)) = try_parse_inline_link(&text[pos..])
+        {
+            emit_inline_link(builder, &text[pos..pos + len], link_text, dest);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse emphasis
+        if (bytes[pos] == b'*' || bytes[pos] == b'_')
+            && let Some((len, inner_text, level, delim_char)) = try_parse_emphasis(&text[pos..])
+        {
+            emit_emphasis(builder, inner_text, level, delim_char);
+            pos += len;
+            continue;
+        }
+
+        // No inline element matched - emit as plain text
+        let next_pos = find_next_inline_start(&text[pos..]);
+        let text_chunk = if next_pos > 0 {
+            &text[pos..pos + next_pos]
+        } else {
+            &text[pos..]
+        };
+
+        if !text_chunk.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), text_chunk);
+        }
+
+        if next_pos > 0 {
+            pos += next_pos;
+        } else {
+            break;
+        }
+    }
+}
+
+/// Find the next position where an inline element might start.
+/// Returns the number of bytes to skip, or 0 if at end.
+fn find_next_inline_start(text: &str) -> usize {
+    for (i, ch) in text.char_indices() {
+        match ch {
+            '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' => return i.max(1),
+            _ => {}
+        }
+    }
+    text.len()
+}
 
 /// The InlineParser takes a block-level CST and processes inline elements within text content.
 /// It traverses the tree, finds TEXT tokens that need inline parsing, and replaces them
@@ -51,7 +148,7 @@ impl InlineParser {
                 }
                 rowan::NodeOrToken::Token(t) => {
                     if self.should_parse_inline(&t) {
-                        self.parse_inline_text(builder, t.text());
+                        parse_inline_text(builder, t.text());
                     } else {
                         builder.token(t.kind().into(), t.text());
                     }
@@ -81,90 +178,22 @@ impl InlineParser {
 
         true
     }
-
-    /// Parse inline elements from text content.
-    /// This is where the actual inline parsing happens.
-    fn parse_inline_text(&self, builder: &mut GreenNodeBuilder, text: &str) {
-        let mut pos = 0;
-        let bytes = text.as_bytes();
-
-        while pos < text.len() {
-            // Try to parse backslash escape FIRST (highest precedence)
-            // This prevents escaped delimiters from being parsed
-            if bytes[pos] == b'\\'
-                && let Some((len, ch, escape_type)) = try_parse_escape(&text[pos..])
-            {
-                emit_escape(builder, ch, escape_type);
-                pos += len;
-                continue;
-            }
-
-            // Try to parse code span
-            if bytes[pos] == b'`'
-                && let Some((len, content, backtick_count)) = try_parse_code_span(&text[pos..])
-            {
-                emit_code_span(builder, content, backtick_count);
-                pos += len;
-                continue;
-            }
-
-            // Try to parse inline math
-            if bytes[pos] == b'$'
-                && let Some((len, content)) = try_parse_inline_math(&text[pos..])
-            {
-                emit_inline_math(builder, content);
-                pos += len;
-                continue;
-            }
-
-            // Try to parse emphasis
-            if (bytes[pos] == b'*' || bytes[pos] == b'_')
-                && let Some((len, inner_text, level, delim_char)) = try_parse_emphasis(&text[pos..])
-            {
-                emit_emphasis(builder, inner_text, level, delim_char);
-                pos += len;
-                continue;
-            }
-
-            // TODO: Try other inline elements (links, etc.)
-
-            // No inline element matched - emit as plain text
-            let next_pos = self.find_next_inline_start(&text[pos..]);
-            let text_chunk = if next_pos > 0 {
-                &text[pos..pos + next_pos]
-            } else {
-                &text[pos..]
-            };
-
-            if !text_chunk.is_empty() {
-                builder.token(SyntaxKind::TEXT.into(), text_chunk);
-            }
-
-            if next_pos > 0 {
-                pos += next_pos;
-            } else {
-                break;
-            }
-        }
-    }
-
-    /// Find the next position where an inline element might start.
-    /// Returns the number of bytes to skip, or 0 if at end.
-    fn find_next_inline_start(&self, text: &str) -> usize {
-        for (i, ch) in text.char_indices() {
-            match ch {
-                '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' => return i.max(1),
-                _ => {}
-            }
-        }
-        text.len()
-    }
 }
 
 #[cfg(test)]
 mod inline_tests {
     use super::*;
     use crate::block_parser::BlockParser;
+
+    fn find_nodes_by_kind(node: &SyntaxNode, kind: SyntaxKind) -> Vec<String> {
+        let mut results = Vec::new();
+        for child in node.descendants() {
+            if child.kind() == kind {
+                results.push(child.to_string());
+            }
+        }
+        results
+    }
 
     #[test]
     fn test_inline_parser_preserves_text() {
@@ -175,5 +204,59 @@ mod inline_tests {
         // Should preserve the text unchanged for now
         let text = inline_tree.to_string();
         assert!(text.contains("This is plain text."));
+    }
+
+    #[test]
+    fn test_parse_autolink() {
+        let input = "Visit <https://example.com> for more.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
+        assert_eq!(autolinks.len(), 1);
+        assert_eq!(autolinks[0], "<https://example.com>");
+    }
+
+    #[test]
+    fn test_parse_email_autolink() {
+        let input = "Email me at <user@example.com>.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
+        assert_eq!(autolinks.len(), 1);
+        assert_eq!(autolinks[0], "<user@example.com>");
+    }
+
+    #[test]
+    fn test_parse_inline_link() {
+        let input = "Click [here](https://example.com) to continue.";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0], "[here](https://example.com)");
+    }
+
+    #[test]
+    fn test_parse_link_with_title() {
+        let input = r#"See [this](url "title") link."#;
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0], r#"[this](url "title")"#);
+    }
+
+    #[test]
+    fn test_multiple_links() {
+        let input = "Visit [site1](url1) and [site2](url2).";
+        let block_tree = BlockParser::new(input).parse();
+        let inline_tree = InlineParser::new(block_tree).parse();
+
+        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
+        assert_eq!(links.len(), 2);
     }
 }

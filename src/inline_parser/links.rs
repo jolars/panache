@@ -1,0 +1,273 @@
+//! Parsing for links and automatic links.
+//!
+//! Implements:
+//! - Automatic links: `<http://example.com>` and `<user@example.com>`
+//! - Inline links: `[text](url)` and `[text](url "title")`
+
+use crate::syntax::SyntaxKind;
+use rowan::GreenNodeBuilder;
+
+/// Try to parse an automatic link starting at the current position.
+///
+/// Automatic links have the form `<url>` or `<email@example.com>`.
+/// Returns Some((length, url_content)) if a valid automatic link is found.
+pub fn try_parse_autolink(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with('<') {
+        return None;
+    }
+
+    // Find the closing >
+    let close_pos = text[1..].find('>')?;
+    let content = &text[1..1 + close_pos];
+
+    // Automatic links cannot contain spaces or newlines
+    if content.contains(|c: char| c.is_whitespace()) {
+        return None;
+    }
+
+    // Must contain at least one character
+    if content.is_empty() {
+        return None;
+    }
+
+    // Basic validation: should look like a URL or email
+    // URL: contains :// or starts with scheme:
+    // Email: contains @
+    let is_url = content.contains("://") || content.contains(':');
+    let is_email = content.contains('@');
+
+    if !is_url && !is_email {
+        return None;
+    }
+
+    // Total length includes < and >
+    Some((close_pos + 2, content))
+}
+
+/// Emit an automatic link node to the builder.
+pub fn emit_autolink(builder: &mut GreenNodeBuilder, _text: &str, url: &str) {
+    builder.start_node(SyntaxKind::AutoLink.into());
+
+    // Opening <
+    builder.start_node(SyntaxKind::AutoLinkMarker.into());
+    builder.token(SyntaxKind::AutoLinkMarker.into(), "<");
+    builder.finish_node();
+
+    // URL content
+    builder.token(SyntaxKind::TEXT.into(), url);
+
+    // Closing >
+    builder.start_node(SyntaxKind::AutoLinkMarker.into());
+    builder.token(SyntaxKind::AutoLinkMarker.into(), ">");
+    builder.finish_node();
+
+    builder.finish_node();
+}
+
+/// Try to parse an inline link starting at the current position.
+///
+/// Inline links have the form `[text](url)` or `[text](url "title")`.
+/// Returns Some((length, text_content, dest_content)) if a valid link is found.
+pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str)> {
+    if !text.starts_with('[') {
+        return None;
+    }
+
+    // Find the closing ]
+    let mut bracket_depth = 0;
+    let mut escape_next = false;
+    let mut close_bracket_pos = None;
+
+    for (i, ch) in text[1..].char_indices() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+
+        match ch {
+            '\\' => escape_next = true,
+            '[' => bracket_depth += 1,
+            ']' => {
+                if bracket_depth == 0 {
+                    close_bracket_pos = Some(i + 1);
+                    break;
+                }
+                bracket_depth -= 1;
+            }
+            _ => {}
+        }
+    }
+
+    let close_bracket = close_bracket_pos?;
+    let link_text = &text[1..close_bracket];
+
+    // Check for immediate ( after ]
+    let after_bracket = close_bracket + 1;
+    if text.len() <= after_bracket || !text[after_bracket..].starts_with('(') {
+        return None;
+    }
+
+    // Find closing ) for destination
+    let dest_start = after_bracket + 1;
+    let remaining = &text[dest_start..];
+
+    let mut paren_depth = 0;
+    let mut escape_next = false;
+    let mut in_quotes = false;
+    let mut close_paren_pos = None;
+
+    for (i, ch) in remaining.char_indices() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+
+        match ch {
+            '\\' => escape_next = true,
+            '"' => in_quotes = !in_quotes,
+            '(' if !in_quotes => paren_depth += 1,
+            ')' if !in_quotes => {
+                if paren_depth == 0 {
+                    close_paren_pos = Some(i);
+                    break;
+                }
+                paren_depth -= 1;
+            }
+            _ => {}
+        }
+    }
+
+    let close_paren = close_paren_pos?;
+    let dest_content = &remaining[..close_paren];
+
+    // Total length: [ + text + ] + ( + dest + )
+    let total_len = dest_start + close_paren + 1;
+
+    Some((total_len, link_text, dest_content))
+}
+
+/// Emit an inline link node to the builder.
+/// Note: link_text may contain inline elements and should be parsed recursively.
+pub fn emit_inline_link(builder: &mut GreenNodeBuilder, _text: &str, link_text: &str, dest: &str) {
+    builder.start_node(SyntaxKind::Link.into());
+
+    // Opening [
+    builder.start_node(SyntaxKind::LinkStart.into());
+    builder.token(SyntaxKind::LinkStart.into(), "[");
+    builder.finish_node();
+
+    // Link text (recursively parse inline elements)
+    builder.start_node(SyntaxKind::LinkText.into());
+    // Use the standalone parse_inline_text function for recursive parsing
+    crate::inline_parser::parse_inline_text(builder, link_text);
+    builder.finish_node();
+
+    // Closing ] and opening (
+    builder.token(SyntaxKind::TEXT.into(), "](");
+
+    // Destination
+    builder.start_node(SyntaxKind::LinkDest.into());
+    builder.token(SyntaxKind::TEXT.into(), dest);
+    builder.finish_node();
+
+    // Closing )
+    builder.token(SyntaxKind::TEXT.into(), ")");
+
+    builder.finish_node();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_autolink_url() {
+        let input = "<https://example.com>";
+        let result = try_parse_autolink(input);
+        assert_eq!(result, Some((21, "https://example.com")));
+    }
+
+    #[test]
+    fn test_parse_autolink_email() {
+        let input = "<user@example.com>";
+        let result = try_parse_autolink(input);
+        assert_eq!(result, Some((18, "user@example.com")));
+    }
+
+    #[test]
+    fn test_parse_autolink_no_close() {
+        let input = "<https://example.com";
+        let result = try_parse_autolink(input);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_autolink_with_space() {
+        let input = "<https://example.com >";
+        let result = try_parse_autolink(input);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_autolink_not_url_or_email() {
+        let input = "<notaurl>";
+        let result = try_parse_autolink(input);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_inline_link_simple() {
+        let input = "[text](url)";
+        let result = try_parse_inline_link(input);
+        assert_eq!(result, Some((11, "text", "url")));
+    }
+
+    #[test]
+    fn test_parse_inline_link_with_title() {
+        let input = r#"[text](url "title")"#;
+        let result = try_parse_inline_link(input);
+        assert_eq!(result, Some((19, "text", r#"url "title""#)));
+    }
+
+    #[test]
+    fn test_parse_inline_link_with_nested_brackets() {
+        let input = "[outer [inner] text](url)";
+        let result = try_parse_inline_link(input);
+        assert_eq!(result, Some((25, "outer [inner] text", "url")));
+    }
+
+    #[test]
+    fn test_parse_inline_link_no_space_between_brackets_and_parens() {
+        let input = "[text] (url)";
+        let result = try_parse_inline_link(input);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_inline_link_no_closing_bracket() {
+        let input = "[text(url)";
+        let result = try_parse_inline_link(input);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_inline_link_no_closing_paren() {
+        let input = "[text](url";
+        let result = try_parse_inline_link(input);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_inline_link_escaped_bracket() {
+        let input = r"[text\]more](url)";
+        let result = try_parse_inline_link(input);
+        assert_eq!(result, Some((17, r"text\]more", "url")));
+    }
+
+    #[test]
+    fn test_parse_inline_link_parens_in_url() {
+        let input = "[text](url(with)parens)";
+        let result = try_parse_inline_link(input);
+        assert_eq!(result, Some((23, "text", "url(with)parens")));
+    }
+}
