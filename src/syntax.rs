@@ -89,6 +89,7 @@ pub enum SyntaxKind {
 
     // Tables
     SimpleTable,
+    MultilineTable,
     PipeTable,
     GridTable,
     TableHeader,

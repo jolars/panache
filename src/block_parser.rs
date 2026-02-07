@@ -27,8 +27,8 @@ use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 use tables::{
-    is_caption_followed_by_table, try_parse_grid_table, try_parse_pipe_table,
-    try_parse_simple_table,
+    is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
+    try_parse_pipe_table, try_parse_simple_table,
 };
 
 fn init_logger() {
@@ -440,6 +440,14 @@ impl<'a> BlockParser<'a> {
             // Try to parse grid table (check before pipe/simple since + is most specific)
             if let Some(lines_consumed) =
                 try_parse_grid_table(&self.lines, self.pos, &mut self.builder)
+            {
+                self.pos += lines_consumed;
+                return true;
+            }
+
+            // Try to parse multiline table (check before pipe/simple since full-width dashes are specific)
+            if let Some(lines_consumed) =
+                try_parse_multiline_table(&self.lines, self.pos, &mut self.builder)
             {
                 self.pos += lines_consumed;
                 return true;

@@ -1353,3 +1353,395 @@ mod grid_table_tests {
         assert_eq!(result.unwrap(), 7);
     }
 }
+
+// ============================================================================
+// Multiline Table Parsing
+// ============================================================================
+
+/// Check if a line is a multiline table separator (continuous dashes).
+/// Multiline table separators span the full width and are all dashes.
+/// Returns Some(columns) if valid, None otherwise.
+fn try_parse_multiline_separator(line: &str) -> Option<Vec<Column>> {
+    let trimmed = line.trim_start();
+    let leading_spaces = line.len() - trimmed.len();
+
+    // Must have leading spaces <= 3 to not be a code block
+    if leading_spaces > 3 {
+        return None;
+    }
+
+    let trimmed = trimmed.trim_end();
+
+    // Must be all dashes (continuous line of dashes)
+    if trimmed.is_empty() || !trimmed.chars().all(|c| c == '-') {
+        return None;
+    }
+
+    // Must have at least 3 dashes
+    if trimmed.len() < 3 {
+        return None;
+    }
+
+    // This is a full-width separator - columns will be determined by column separator lines
+    Some(vec![Column {
+        start: leading_spaces,
+        end: leading_spaces + trimmed.len(),
+        alignment: Alignment::Default,
+    }])
+}
+
+/// Check if a line is a column separator line for multiline tables.
+/// Column separators have dashes with spaces between them to define columns.
+fn is_column_separator(line: &str) -> bool {
+    try_parse_table_separator(line).is_some()
+}
+
+/// Try to parse a multiline table starting at the given position.
+/// Returns the number of lines consumed if successful.
+pub(crate) fn try_parse_multiline_table(
+    lines: &[&str],
+    start_pos: usize,
+    builder: &mut GreenNodeBuilder<'static>,
+) -> Option<usize> {
+    if start_pos >= lines.len() {
+        return None;
+    }
+
+    let first_line = lines[start_pos];
+
+    // First line can be either:
+    // 1. A full-width dash separator (for tables with headers)
+    // 2. A column separator (for headerless tables)
+    let is_full_width_start = try_parse_multiline_separator(first_line).is_some();
+    let is_column_sep_start = !is_full_width_start && is_column_separator(first_line);
+
+    if !is_full_width_start && !is_column_sep_start {
+        return None;
+    }
+
+    // Look ahead to find the structure
+    let mut pos = start_pos + 1;
+    let mut found_column_sep = is_column_sep_start; // Already found if headerless
+    let mut column_sep_pos = if is_column_sep_start { start_pos } else { 0 };
+    let mut has_header = false;
+    let mut found_blank_line = false;
+    let mut found_closing_sep = false;
+
+    // Scan for header section and column separator
+    while pos < lines.len() {
+        let line = lines[pos];
+
+        // Check for column separator (defines columns) - only if we started with full-width
+        if is_full_width_start && is_column_separator(line) && !found_column_sep {
+            found_column_sep = true;
+            column_sep_pos = pos;
+            has_header = pos > start_pos + 1; // Has header if there's content before column sep
+            pos += 1;
+            continue;
+        }
+
+        // Check for blank line (row separator in body)
+        if line.trim().is_empty() {
+            found_blank_line = true;
+            pos += 1;
+            // Check if next line is closing dashes (full-width or column sep for headerless)
+            if pos < lines.len() {
+                let next = lines[pos];
+                if try_parse_multiline_separator(next).is_some()
+                    || (is_column_sep_start && is_column_separator(next))
+                {
+                    found_closing_sep = true;
+                    pos += 1; // Include the closing separator
+                    break;
+                }
+            }
+            continue;
+        }
+
+        // Check for closing full-width dashes
+        if try_parse_multiline_separator(line).is_some() {
+            found_closing_sep = true;
+            pos += 1;
+            break;
+        }
+
+        // Check for closing column separator (for headerless tables)
+        if is_column_sep_start && is_column_separator(line) && found_blank_line {
+            found_closing_sep = true;
+            pos += 1;
+            break;
+        }
+
+        // Content row
+        pos += 1;
+    }
+
+    // Must have found a column separator to be a valid multiline table
+    if !found_column_sep {
+        return None;
+    }
+
+    // Must have had at least one blank line between rows (distinguishes from simple tables)
+    if !found_blank_line {
+        return None;
+    }
+
+    // Must have a closing separator
+    if !found_closing_sep {
+        return None;
+    }
+
+    // Must have consumed more than just the opening separator
+    if pos <= start_pos + 2 {
+        return None;
+    }
+
+    let end_pos = pos;
+
+    // Check for caption before table
+    let caption_before = find_caption_before_table(lines, start_pos);
+
+    // Check for caption after table
+    let caption_after = find_caption_after_table(lines, end_pos);
+
+    // Build the multiline table
+    builder.start_node(SyntaxKind::MultilineTable.into());
+
+    // Emit caption before if present
+    if let Some(caption_pos) = caption_before {
+        emit_table_caption(builder, lines, caption_pos, caption_pos + 1);
+    }
+
+    // Emit opening separator
+    builder.start_node(SyntaxKind::TableSeparator.into());
+    builder.token(SyntaxKind::TEXT.into(), lines[start_pos]);
+    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    builder.finish_node();
+
+    // Track state for emitting
+    let mut in_header = has_header;
+    let mut current_row_lines: Vec<&str> = Vec::new();
+
+    for (i, line) in lines.iter().enumerate().take(end_pos).skip(start_pos + 1) {
+        // Column separator (header/body divider)
+        if i == column_sep_pos {
+            // Emit any accumulated header lines
+            if !current_row_lines.is_empty() {
+                emit_multiline_row(builder, &current_row_lines, SyntaxKind::TableHeader);
+                current_row_lines.clear();
+            }
+
+            builder.start_node(SyntaxKind::TableSeparator.into());
+            builder.token(SyntaxKind::TEXT.into(), line);
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.finish_node();
+            in_header = false;
+            continue;
+        }
+
+        // Closing separator (full-width or column separator at end)
+        if try_parse_multiline_separator(line).is_some() || is_column_separator(line) {
+            // Emit any accumulated row lines
+            if !current_row_lines.is_empty() {
+                let kind = if in_header {
+                    SyntaxKind::TableHeader
+                } else {
+                    SyntaxKind::TableRow
+                };
+                emit_multiline_row(builder, &current_row_lines, kind);
+                current_row_lines.clear();
+            }
+
+            builder.start_node(SyntaxKind::TableSeparator.into());
+            builder.token(SyntaxKind::TEXT.into(), line);
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.finish_node();
+            continue;
+        }
+
+        // Blank line (row separator)
+        if line.trim().is_empty() {
+            // Emit accumulated row
+            if !current_row_lines.is_empty() {
+                let kind = if in_header {
+                    SyntaxKind::TableHeader
+                } else {
+                    SyntaxKind::TableRow
+                };
+                emit_multiline_row(builder, &current_row_lines, kind);
+                current_row_lines.clear();
+            }
+
+            builder.start_node(SyntaxKind::BlankLine.into());
+            builder.token(SyntaxKind::BlankLine.into(), "");
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.finish_node();
+            continue;
+        }
+
+        // Content line - accumulate for current row
+        current_row_lines.push(line);
+    }
+
+    // Emit any remaining accumulated lines
+    if !current_row_lines.is_empty() {
+        let kind = if in_header {
+            SyntaxKind::TableHeader
+        } else {
+            SyntaxKind::TableRow
+        };
+        emit_multiline_row(builder, &current_row_lines, kind);
+    }
+
+    // Emit caption after if present
+    if let Some((cap_start, cap_end)) = caption_after {
+        if cap_start > end_pos {
+            builder.start_node(SyntaxKind::BlankLine.into());
+            builder.token(SyntaxKind::BlankLine.into(), "");
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.finish_node();
+        }
+        emit_table_caption(builder, lines, cap_start, cap_end);
+    }
+
+    builder.finish_node(); // MultilineTable
+
+    // Calculate lines consumed
+    let table_start = caption_before.unwrap_or(start_pos);
+    let table_end = if let Some((_, cap_end)) = caption_after {
+        cap_end
+    } else {
+        end_pos
+    };
+
+    Some(table_end - table_start)
+}
+
+/// Emit a multiline table row (may span multiple lines).
+fn emit_multiline_row(builder: &mut GreenNodeBuilder<'static>, lines: &[&str], kind: SyntaxKind) {
+    builder.start_node(kind.into());
+    for line in lines {
+        builder.token(SyntaxKind::TEXT.into(), line);
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    }
+    builder.finish_node();
+}
+
+#[cfg(test)]
+mod multiline_table_tests {
+    use super::*;
+
+    #[test]
+    fn test_multiline_separator_detection() {
+        assert!(
+            try_parse_multiline_separator(
+                "-------------------------------------------------------------"
+            )
+            .is_some()
+        );
+        assert!(try_parse_multiline_separator("---").is_some());
+        assert!(try_parse_multiline_separator("  -----").is_some()); // with leading spaces
+        assert!(try_parse_multiline_separator("--").is_none()); // too short
+        assert!(try_parse_multiline_separator("--- ---").is_none()); // has spaces
+        assert!(try_parse_multiline_separator("+---+").is_none()); // grid separator
+    }
+
+    #[test]
+    fn test_basic_multiline_table() {
+        let input = vec![
+            "-------------------------------------------------------------",
+            " Centered   Default           Right Left",
+            "  Header    Aligned         Aligned Aligned",
+            "----------- ------- --------------- -------------------------",
+            "   First    row                12.0 Example of a row that",
+            "                                    spans multiple lines.",
+            "",
+            "  Second    row                 5.0 Here's another one.",
+            "-------------------------------------------------------------",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_multiline_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 9);
+    }
+
+    #[test]
+    fn test_multiline_table_headerless() {
+        let input = vec![
+            "----------- ------- --------------- -------------------------",
+            "   First    row                12.0 Example of a row that",
+            "                                    spans multiple lines.",
+            "",
+            "  Second    row                 5.0 Here's another one.",
+            "----------- ------- --------------- -------------------------",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_multiline_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 6);
+    }
+
+    #[test]
+    fn test_multiline_table_with_caption() {
+        let input = vec![
+            "-------------------------------------------------------------",
+            " Col1       Col2",
+            "----------- -------",
+            "   A        B",
+            "",
+            "-------------------------------------------------------------",
+            "",
+            "Table: Here's the caption.",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_multiline_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        // table (6 lines) + blank + caption
+        assert_eq!(result.unwrap(), 8);
+    }
+
+    #[test]
+    fn test_multiline_table_single_row() {
+        let input = vec![
+            "---------------------------------------------",
+            " Header1    Header2",
+            "----------- -----------",
+            "   Data     More data",
+            "",
+            "---------------------------------------------",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_multiline_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 6);
+    }
+
+    #[test]
+    fn test_not_multiline_table() {
+        // Simple table should not be parsed as multiline
+        let input = vec![
+            "  Right     Left     Center     Default",
+            "-------     ------ ----------   -------",
+            "     12     12        12            12",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_multiline_table(&input, 0, &mut builder);
+
+        // Should not parse because first line isn't a full-width separator
+        assert!(result.is_none());
+    }
+}
