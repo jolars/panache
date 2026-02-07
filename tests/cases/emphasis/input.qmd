@@ -15,3 +15,5 @@ Mixed markers: *italic with **bold** inside*
 Adjacent: *first* and *second* emphasis
 
 Intraword: un*frigging*believable and un**frigging**believable
+
+This is _ not emphasized _

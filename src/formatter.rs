@@ -111,6 +111,11 @@ impl Formatter {
                     SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BlankLine => {
                         b.pending_space = true;
                     }
+                    SyntaxKind::EscapedChar => {
+                        // Re-add backslash for escaped characters
+                        let escaped = format!("\\{}", t.text());
+                        b.push_piece(&escaped);
+                    }
                     _ => {
                         b.push_piece(t.text());
                     }
@@ -120,7 +125,7 @@ impl Formatter {
                         b.pending_space = true;
                         continue;
                     }
-                    let text = n.text().to_string();
+                    let text = self.format_inline_node(&n);
                     b.push_piece(&text);
                 }
             }
@@ -136,6 +141,47 @@ impl Formatter {
             words.push(w);
         }
         words
+    }
+
+    /// Format an inline node to normalized string (e.g., emphasis with asterisks)
+    #[allow(clippy::only_used_in_recursion)]
+    fn format_inline_node(&self, node: &SyntaxNode) -> String {
+        use rowan::NodeOrToken;
+
+        match node.kind() {
+            SyntaxKind::Emphasis => {
+                let mut content = String::new();
+                for child in node.children_with_tokens() {
+                    match child {
+                        NodeOrToken::Node(n) => content.push_str(&self.format_inline_node(&n)),
+                        NodeOrToken::Token(t) => {
+                            if t.kind() != SyntaxKind::EmphasisMarker {
+                                content.push_str(t.text());
+                            }
+                        }
+                    }
+                }
+                format!("*{}*", content)
+            }
+            SyntaxKind::Strong => {
+                let mut content = String::new();
+                for child in node.children_with_tokens() {
+                    match child {
+                        NodeOrToken::Node(n) => content.push_str(&self.format_inline_node(&n)),
+                        NodeOrToken::Token(t) => {
+                            if t.kind() != SyntaxKind::StrongMarker {
+                                content.push_str(t.text());
+                            }
+                        }
+                    }
+                }
+                format!("**{}**", content)
+            }
+            _ => {
+                // For other inline nodes, just return their text
+                node.text().to_string()
+            }
+        }
     }
 
     fn wrapped_lines_for_paragraph(&self, node: &SyntaxNode, width: usize) -> Vec<String> {
@@ -186,6 +232,11 @@ impl Formatter {
                             SyntaxKind::NEWLINE => {}
                             SyntaxKind::BlankLine => {
                                 self.output.push('\n');
+                            }
+                            SyntaxKind::EscapedChar => {
+                                // Re-add the backslash for escaped characters
+                                self.output.push('\\');
+                                self.output.push_str(t.text());
                             }
                             SyntaxKind::ImageLinkStart
                             | SyntaxKind::LinkStart
@@ -780,6 +831,38 @@ impl Formatter {
                         // Otherwise skip this blank line (collapsing to one)
                     }
                 }
+            }
+
+            SyntaxKind::Emphasis => {
+                // Normalize emphasis to always use single asterisks
+                self.output.push('*');
+                for child in node.children_with_tokens() {
+                    match child {
+                        rowan::NodeOrToken::Node(n) => self.format_node(&n, indent),
+                        rowan::NodeOrToken::Token(t) => {
+                            if t.kind() != SyntaxKind::EmphasisMarker {
+                                self.output.push_str(t.text());
+                            }
+                        }
+                    }
+                }
+                self.output.push('*');
+            }
+
+            SyntaxKind::Strong => {
+                // Normalize strong emphasis to always use double asterisks
+                self.output.push_str("**");
+                for child in node.children_with_tokens() {
+                    match child {
+                        rowan::NodeOrToken::Node(n) => self.format_node(&n, indent),
+                        rowan::NodeOrToken::Token(t) => {
+                            if t.kind() != SyntaxKind::StrongMarker {
+                                self.output.push_str(t.text());
+                            }
+                        }
+                    }
+                }
+                self.output.push_str("**");
             }
 
             _ => {

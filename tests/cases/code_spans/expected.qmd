@@ -10,4 +10,4 @@ Code in emphasis: *text with `code` inside*
 
 Adjacent code: `first` and `second` code spans
 
-Escaped backtick outside: `not code`
+Escaped backtick outside: \`not code\`
