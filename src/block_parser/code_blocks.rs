@@ -33,7 +33,13 @@ pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
         return None;
     }
 
-    let info_string = trimmed[fence_count..].trim().to_string();
+    let info_string_raw = &trimmed[fence_count..];
+    // Trim at most one leading space, preserve everything else
+    let info_string = if let Some(stripped) = info_string_raw.strip_prefix(' ') {
+        stripped.to_string()
+    } else {
+        info_string_raw.to_string()
+    };
 
     Some(FenceInfo {
         fence_char,
@@ -88,6 +94,7 @@ pub(crate) fn parse_fenced_code_block(
     if !fence.info_string.is_empty() {
         builder.token(SyntaxKind::CodeInfo.into(), &fence.info_string);
     }
+    builder.token(SyntaxKind::NEWLINE.into(), "\n");
     builder.finish_node(); // CodeFenceOpen
 
     let mut current_pos = start_pos + 1;
@@ -119,11 +126,9 @@ pub(crate) fn parse_fenced_code_block(
     // Add content
     if !content_lines.is_empty() {
         builder.start_node(SyntaxKind::CodeContent.into());
-        for (i, content_line) in content_lines.iter().enumerate() {
-            if i > 0 {
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
-            }
+        for content_line in content_lines.iter() {
             builder.token(SyntaxKind::TEXT.into(), content_line);
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
         }
         builder.finish_node(); // CodeContent
     }
@@ -143,6 +148,7 @@ pub(crate) fn parse_fenced_code_block(
             SyntaxKind::CodeFenceMarker.into(),
             &closing_trimmed[..closing_count],
         );
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
         builder.finish_node(); // CodeFenceClose
     }
 

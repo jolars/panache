@@ -747,7 +747,13 @@ impl Formatter {
                 self.output.push('\n');
             }
 
-            SyntaxKind::CodeBlock | SyntaxKind::YamlMetadata | SyntaxKind::PandocTitleBlock => {
+            SyntaxKind::CodeBlock => {
+                log::trace!("Formatting code block");
+                // Normalize code blocks to use backticks
+                self.format_code_block(node);
+            }
+
+            SyntaxKind::YamlMetadata | SyntaxKind::PandocTitleBlock => {
                 // Preserve these blocks as-is
                 let text = node.text().to_string();
                 self.output.push_str(&text);
@@ -934,6 +940,46 @@ impl Formatter {
         if !self.output.ends_with('\n') {
             self.output.push('\n');
         }
+    }
+
+    /// Format a code block, normalizing fence markers to backticks
+    fn format_code_block(&mut self, node: &SyntaxNode) {
+        use rowan::NodeOrToken;
+
+        let mut info_string = String::new();
+        let mut content = String::new();
+
+        // Extract info string and content from the AST
+        for child in node.children_with_tokens() {
+            if let NodeOrToken::Node(n) = child {
+                match n.kind() {
+                    SyntaxKind::CodeFenceOpen => {
+                        // Find the info string
+                        for token in n.children_with_tokens() {
+                            if let NodeOrToken::Token(t) = token
+                                && t.kind() == SyntaxKind::CodeInfo
+                            {
+                                info_string = t.text().to_string();
+                            }
+                        }
+                    }
+                    SyntaxKind::CodeContent => {
+                        content = n.text().to_string();
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Output normalized code block with exactly 3 backticks
+        self.output.push_str("```");
+        if !info_string.is_empty() {
+            self.output.push_str(&info_string);
+        }
+        self.output.push('\n');
+        self.output.push_str(&content);
+        self.output.push_str("```");
+        self.output.push('\n');
     }
 }
 

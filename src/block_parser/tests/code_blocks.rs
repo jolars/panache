@@ -28,7 +28,7 @@ fn parses_simple_backtick_code_block() {
     assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "print(\"hello\")");
+    assert_eq!(content, "print(\"hello\")\n");
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn parses_simple_tilde_code_block() {
     assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "print(\"hello\")");
+    assert_eq!(content, "print(\"hello\")\n");
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn parses_code_block_with_language() {
     assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "print(\"hello\")");
+    assert_eq!(content, "print(\"hello\")\n");
 
     let info = get_code_info(&node).unwrap();
     assert_eq!(info, "python");
@@ -64,7 +64,7 @@ fn parses_code_block_with_attributes() {
     assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "print(\"hello\")");
+    assert_eq!(content, "print(\"hello\")\n");
 
     let info = get_code_info(&node).unwrap();
     assert_eq!(info, "{python}");
@@ -78,7 +78,7 @@ fn parses_code_block_with_complex_attributes() {
     assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "print(\"hello\")");
+    assert_eq!(content, "print(\"hello\")\n");
 
     let info = get_code_info(&node).unwrap();
     assert_eq!(info, "{python #mycode .numberLines startFrom=\"100\"}");
@@ -92,7 +92,7 @@ fn parses_multiline_code_block() {
     assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "for i in range(10):\n    print(i)");
+    assert_eq!(content, "for i in range(10):\n    print(i)\n");
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn closing_fence_must_have_at_least_same_length() {
     assert!(find_first(&node, SyntaxKind::CodeBlock).is_some());
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "code\n```"); // The ``` becomes part of content
+    assert_eq!(content, "code\n```\n"); // The ``` becomes part of content
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn closing_fence_can_be_longer() {
     assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "code");
+    assert_eq!(content, "code\n");
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn mixed_fence_chars_dont_close() {
     assert!(find_first(&node, SyntaxKind::CodeBlock).is_some());
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "code\n~~~");
+    assert_eq!(content, "code\n~~~\n");
 }
 
 #[test]
@@ -189,5 +189,5 @@ fn code_block_with_leading_spaces() {
     assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
 
     let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "  print(\"hello\")");
+    assert_eq!(content, "  print(\"hello\")\n");
 }
