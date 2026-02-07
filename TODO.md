@@ -255,7 +255,3 @@ These extensions are **not enabled by default** in Pandoc and are lower priority
 ## Won't Implement
 
 - Format-specific output conventions (e.g., `gutenberg` for plain text output)
-
----
-
-**Last Updated:** 2026-02-06
