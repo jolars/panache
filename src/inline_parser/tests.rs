@@ -499,3 +499,80 @@ mod footnote_tests {
         assert!(footnotes[0].contains("[link](http://example.com)"));
     }
 }
+
+#[cfg(test)]
+mod bracketed_span_tests {
+    use crate::block_parser::BlockParser;
+    use crate::config::Config;
+    use crate::inline_parser::InlineParser;
+    use crate::syntax::SyntaxKind;
+
+    fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
+        let config = Config::default();
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
+    }
+
+    fn assert_has_kind(tree: &crate::syntax::SyntaxNode, kind: SyntaxKind) {
+        assert!(
+            tree.descendants().any(|n| n.kind() == kind),
+            "Expected to find {:?} in tree",
+            kind
+        );
+    }
+
+    fn assert_has_text(tree: &crate::syntax::SyntaxNode, kind: SyntaxKind, expected: &str) {
+        let node = tree
+            .descendants()
+            .find(|n| n.kind() == kind)
+            .expect(&format!("Expected to find {:?}", kind));
+        assert_eq!(node.text().to_string(), expected);
+    }
+
+    #[test]
+    fn simple_span() {
+        let tree = parse_inline("[text]{.class}");
+        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
+        assert_has_text(&tree, SyntaxKind::SpanContent, "text");
+    }
+
+    #[test]
+    fn span_with_emphasis() {
+        let tree = parse_inline("[**bold** text]{.highlight}");
+        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
+        assert_has_kind(&tree, SyntaxKind::Strong);
+    }
+
+    #[test]
+    fn span_with_code() {
+        let tree = parse_inline("[`code` text]{.mono}");
+        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
+        assert_has_kind(&tree, SyntaxKind::CodeSpan);
+    }
+
+    #[test]
+    fn span_in_paragraph() {
+        let tree = parse_inline("Before [span]{.class} after");
+        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
+        let text = tree.text().to_string();
+        assert!(text.contains("Before"));
+        assert!(text.contains("after"));
+    }
+
+    #[test]
+    fn multiple_spans() {
+        let tree = parse_inline("[first]{.a} and [second]{.b}");
+        let spans: Vec<_> = tree
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::BracketedSpan)
+            .collect();
+        assert_eq!(spans.len(), 2);
+    }
+
+    #[test]
+    fn nested_brackets_in_span() {
+        let tree = parse_inline("[[nested]]{.class}");
+        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
+        assert_has_text(&tree, SyntaxKind::SpanContent, "[nested]");
+    }
+}

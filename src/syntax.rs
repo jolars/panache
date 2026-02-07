@@ -45,6 +45,13 @@ pub enum SyntaxKind {
     InlineFootnoteEnd,   // ]
     InlineFootnote,      // ^[text]
 
+    // Spans
+    BracketedSpan,    // [text]{.class}
+    SpanContent,      // text inside span
+    SpanAttributes,   // {.class key="val"}
+    SpanBracketOpen,  // [
+    SpanBracketClose, // ]
+
     // Code
     CodeSpan,
     CodeSpanMarker,  // ` or `` or ```

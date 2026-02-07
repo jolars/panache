@@ -3,6 +3,7 @@ use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::{GreenNode, GreenNodeBuilder};
 
 mod architecture_tests;
+mod bracketed_spans;
 mod code_spans;
 mod emphasis;
 mod escapes;
@@ -12,6 +13,7 @@ mod inline_math;
 mod links;
 mod tests;
 
+use bracketed_spans::{emit_bracketed_span, try_parse_bracketed_span};
 use code_spans::{emit_code_span, try_parse_code_span};
 use emphasis::{emit_emphasis, try_parse_emphasis};
 use escapes::{emit_escape, try_parse_escape};
@@ -126,6 +128,20 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         {
             log::debug!("Matched inline link at pos {}: dest={}", pos, dest);
             emit_inline_link(builder, &text[pos..pos + len], link_text, dest);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse bracketed span (after link since both start with [)
+        if bytes[pos] == b'['
+            && let Some((len, content, attributes)) = try_parse_bracketed_span(&text[pos..])
+        {
+            log::debug!(
+                "Matched bracketed span at pos {}: attrs={}",
+                pos,
+                attributes
+            );
+            emit_bracketed_span(builder, &content, &attributes);
             pos += len;
             continue;
         }

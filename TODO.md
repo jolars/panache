@@ -141,9 +141,9 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 - ❌ Extension: `citations` - `[@cite]` and `@cite` syntax
 
-### Spans ❌
+### Spans ✅
 
-- ❌ Extension: `bracketed_spans` - `[text]{.class}` inline
+- ✅ Extension: `bracketed_spans` - `[text]{.class}` inline
 - ❌ Extension: `native_spans` - HTML `<span>` elements
 
 ---
