@@ -77,7 +77,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Extension: `table_captions` - Table captions (both before and after tables)
 - ✅ Extension: `pipe_tables` - GitHub/PHP Markdown tables (all alignments, orgtbl variant)
 - ❌ Extension: `multiline_tables` - Multiline cell content
-- ❌ Extension: `grid_tables` - Grid-style tables
+- ✅ Extension: `grid_tables` - Grid-style tables (parsing complete, formatting deferred)
 
 ### Line Blocks ❌
 

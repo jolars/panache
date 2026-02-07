@@ -907,3 +907,449 @@ mod tests {
         assert_eq!(result.unwrap(), 5); // header + sep + row + blank + caption
     }
 }
+
+// ============================================================================
+// Grid Table Parsing
+// ============================================================================
+
+/// Check if a line is a grid table row separator (starts with +, contains -, ends with +).
+/// Returns Some(vec of column info) if valid, None otherwise.
+fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
+    let trimmed = line.trim_start();
+    let leading_spaces = line.len() - trimmed.len();
+
+    // Must have leading spaces <= 3 to not be a code block
+    if leading_spaces > 3 {
+        return None;
+    }
+
+    // Must start with + and end with +
+    if !trimmed.starts_with('+') || !trimmed.trim_end().ends_with('+') {
+        return None;
+    }
+
+    // Split by + to get column segments
+    let trimmed = trimmed.trim_end();
+    let segments: Vec<&str> = trimmed.split('+').collect();
+
+    // Need at least 3 parts: empty before first +, column(s), empty after last +
+    if segments.len() < 3 {
+        return None;
+    }
+
+    let mut columns = Vec::new();
+    let mut current_pos = leading_spaces + 1; // Start after first +
+
+    // Parse each segment between + signs
+    for segment in segments.iter().skip(1).take(segments.len() - 2) {
+        if segment.is_empty() {
+            continue;
+        }
+
+        // Segment must be dashes/equals with optional colons for alignment
+        let seg_trimmed = *segment;
+
+        // Check for alignment colons
+        let starts_colon = seg_trimmed.starts_with(':');
+        let ends_colon = seg_trimmed.ends_with(':');
+
+        // Get the fill character (after removing colons)
+        let inner = seg_trimmed.trim_start_matches(':').trim_end_matches(':');
+
+        // Must be all dashes or all equals
+        if inner.is_empty() {
+            return None;
+        }
+
+        let first_char = inner.chars().next().unwrap();
+        if first_char != '-' && first_char != '=' {
+            return None;
+        }
+
+        if !inner.chars().all(|c| c == first_char) {
+            return None;
+        }
+
+        let is_header_sep = first_char == '=';
+
+        let alignment = match (starts_colon, ends_colon) {
+            (true, true) => Alignment::Center,
+            (true, false) => Alignment::Left,
+            (false, true) => Alignment::Right,
+            (false, false) => Alignment::Default,
+        };
+
+        columns.push(GridColumn {
+            start: current_pos,
+            end: current_pos + segment.len(),
+            alignment,
+            is_header_separator: is_header_sep,
+        });
+
+        current_pos += segment.len() + 1; // +1 for the + separator
+    }
+
+    if columns.is_empty() {
+        None
+    } else {
+        Some(columns)
+    }
+}
+
+/// Column information for grid tables.
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields will be used for formatting in the future
+struct GridColumn {
+    start: usize,
+    end: usize,
+    alignment: Alignment,
+    is_header_separator: bool,
+}
+
+/// Check if a line is a grid table content row (starts with |, contains |, ends with |).
+fn is_grid_content_row(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    let leading_spaces = line.len() - trimmed.len();
+
+    if leading_spaces > 3 {
+        return false;
+    }
+
+    let trimmed = trimmed.trim_end();
+    trimmed.starts_with('|') && trimmed.ends_with('|')
+}
+
+/// Try to parse a grid table starting at the given position.
+/// Returns the number of lines consumed if successful.
+pub(crate) fn try_parse_grid_table(
+    lines: &[&str],
+    start_pos: usize,
+    builder: &mut GreenNodeBuilder<'static>,
+) -> Option<usize> {
+    if start_pos >= lines.len() {
+        return None;
+    }
+
+    // First line must be a grid separator
+    let first_line = lines[start_pos];
+    let _columns = try_parse_grid_separator(first_line)?;
+
+    // Track table structure
+    let mut end_pos = start_pos + 1;
+    let mut found_header_sep = false;
+    let mut in_footer = false;
+
+    // Scan table lines
+    while end_pos < lines.len() {
+        let line = lines[end_pos];
+
+        // Check for blank line (table ends)
+        if line.trim().is_empty() {
+            break;
+        }
+
+        // Check for separator line
+        if let Some(sep_cols) = try_parse_grid_separator(line) {
+            // Check if this is a header separator (=)
+            if sep_cols.iter().any(|c| c.is_header_separator) {
+                if !found_header_sep {
+                    found_header_sep = true;
+                } else if !in_footer {
+                    // Second = separator starts footer
+                    in_footer = true;
+                }
+            }
+            end_pos += 1;
+            continue;
+        }
+
+        // Check for content row
+        if is_grid_content_row(line) {
+            end_pos += 1;
+            continue;
+        }
+
+        // Not a valid grid table line - table ends
+        break;
+    }
+
+    // Must have consumed at least 3 lines (top separator, content, bottom separator)
+    // Or just top + content rows that end with a separator
+    if end_pos <= start_pos + 1 {
+        return None;
+    }
+
+    // Last consumed line should be a separator for a well-formed table
+    // But we'll be lenient and accept tables ending with content rows
+
+    // Check for caption before table
+    let caption_before = find_caption_before_table(lines, start_pos);
+
+    // Check for caption after table
+    let caption_after = find_caption_after_table(lines, end_pos);
+
+    // Build the grid table
+    builder.start_node(SyntaxKind::GridTable.into());
+
+    // Emit caption before if present
+    if let Some(caption_pos) = caption_before {
+        emit_table_caption(builder, lines, caption_pos, caption_pos + 1);
+    }
+
+    // Track whether we've passed the header separator
+    let mut past_header_sep = false;
+    let mut in_footer_section = false;
+
+    // Emit table rows
+    for line in lines.iter().take(end_pos).skip(start_pos) {
+        if let Some(sep_cols) = try_parse_grid_separator(line) {
+            let is_header_sep = sep_cols.iter().any(|c| c.is_header_separator);
+
+            if is_header_sep {
+                if !past_header_sep {
+                    // This is the header/body separator
+                    builder.start_node(SyntaxKind::TableSeparator.into());
+                    builder.token(SyntaxKind::TEXT.into(), line);
+                    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    builder.finish_node();
+                    past_header_sep = true;
+                } else {
+                    // Footer separator
+                    if !in_footer_section {
+                        in_footer_section = true;
+                    }
+                    builder.start_node(SyntaxKind::TableSeparator.into());
+                    builder.token(SyntaxKind::TEXT.into(), line);
+                    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    builder.finish_node();
+                }
+            } else {
+                // Regular separator
+                builder.start_node(SyntaxKind::TableSeparator.into());
+                builder.token(SyntaxKind::TEXT.into(), line);
+                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                builder.finish_node();
+            }
+        } else if is_grid_content_row(line) {
+            // Content row
+            let row_kind = if !past_header_sep && found_header_sep {
+                SyntaxKind::TableHeader
+            } else if in_footer_section {
+                SyntaxKind::TableFooter
+            } else {
+                SyntaxKind::TableRow
+            };
+
+            builder.start_node(row_kind.into());
+            builder.token(SyntaxKind::TEXT.into(), line);
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.finish_node();
+        }
+    }
+
+    // Emit caption after if present
+    if let Some((cap_start, cap_end)) = caption_after {
+        if cap_start > end_pos {
+            builder.start_node(SyntaxKind::BlankLine.into());
+            builder.token(SyntaxKind::BlankLine.into(), "");
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.finish_node();
+        }
+        emit_table_caption(builder, lines, cap_start, cap_end);
+    }
+
+    builder.finish_node(); // GridTable
+
+    // Calculate lines consumed
+    let table_start = caption_before.unwrap_or(start_pos);
+    let table_end = if let Some((_, cap_end)) = caption_after {
+        cap_end
+    } else {
+        end_pos
+    };
+
+    Some(table_end - table_start)
+}
+
+#[cfg(test)]
+mod grid_table_tests {
+    use super::*;
+
+    #[test]
+    fn test_grid_separator_detection() {
+        assert!(try_parse_grid_separator("+---+---+").is_some());
+        assert!(try_parse_grid_separator("+===+===+").is_some());
+        assert!(try_parse_grid_separator("+---------------+---------------+").is_some());
+        assert!(try_parse_grid_separator("+:---+---:+").is_some()); // with alignment
+        assert!(try_parse_grid_separator("+:---:+").is_some()); // center aligned
+        assert!(try_parse_grid_separator("not a separator").is_none());
+        assert!(try_parse_grid_separator("|---|---|").is_none()); // pipe table sep
+    }
+
+    #[test]
+    fn test_grid_separator_alignment() {
+        let cols = try_parse_grid_separator("+:---+---:+:---:+---+").unwrap();
+        assert_eq!(cols.len(), 4);
+        assert_eq!(cols[0].alignment, Alignment::Left);
+        assert_eq!(cols[1].alignment, Alignment::Right);
+        assert_eq!(cols[2].alignment, Alignment::Center);
+        assert_eq!(cols[3].alignment, Alignment::Default);
+    }
+
+    #[test]
+    fn test_grid_header_separator() {
+        let cols = try_parse_grid_separator("+===+===+").unwrap();
+        assert!(cols.iter().all(|c| c.is_header_separator));
+
+        let cols2 = try_parse_grid_separator("+---+---+").unwrap();
+        assert!(cols2.iter().all(|c| !c.is_header_separator));
+    }
+
+    #[test]
+    fn test_grid_content_row_detection() {
+        assert!(is_grid_content_row("| content | content |"));
+        assert!(is_grid_content_row("|  |  |"));
+        assert!(!is_grid_content_row("+---+---+")); // separator, not content
+        assert!(!is_grid_content_row("no pipes here"));
+    }
+
+    #[test]
+    fn test_basic_grid_table() {
+        let input = vec![
+            "+-------+-------+",
+            "| Col1  | Col2  |",
+            "+=======+=======+",
+            "| A     | B     |",
+            "+-------+-------+",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_grid_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 5);
+    }
+
+    #[test]
+    fn test_grid_table_multirow() {
+        let input = vec![
+            "+---------------+---------------+",
+            "| Fruit         | Advantages    |",
+            "+===============+===============+",
+            "| Bananas       | - wrapper     |",
+            "|               | - color       |",
+            "+---------------+---------------+",
+            "| Oranges       | - scurvy      |",
+            "|               | - tasty       |",
+            "+---------------+---------------+",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_grid_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 9);
+    }
+
+    #[test]
+    fn test_grid_table_with_footer() {
+        let input = vec![
+            "+-------+-------+",
+            "| Fruit | Price |",
+            "+=======+=======+",
+            "| Apple | $1.00 |",
+            "+-------+-------+",
+            "| Pear  | $1.50 |",
+            "+=======+=======+",
+            "| Total | $2.50 |",
+            "+=======+=======+",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_grid_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 9);
+    }
+
+    #[test]
+    fn test_grid_table_headerless() {
+        let input = vec![
+            "+-------+-------+",
+            "| A     | B     |",
+            "+-------+-------+",
+            "| C     | D     |",
+            "+-------+-------+",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_grid_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 5);
+    }
+
+    #[test]
+    fn test_grid_table_with_alignment() {
+        let input = vec![
+            "+-------+-------+-------+",
+            "| Right | Left  | Center|",
+            "+======:+:======+:=====:+",
+            "| A     | B     | C     |",
+            "+-------+-------+-------+",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_grid_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 5);
+    }
+
+    #[test]
+    fn test_grid_table_with_caption_before() {
+        let input = vec![
+            ": Sample table",
+            "",
+            "+-------+-------+",
+            "| A     | B     |",
+            "+=======+=======+",
+            "| C     | D     |",
+            "+-------+-------+",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_grid_table(&input, 2, &mut builder);
+
+        assert!(result.is_some());
+        // Should include caption + blank + table
+        assert_eq!(result.unwrap(), 7);
+    }
+
+    #[test]
+    fn test_grid_table_with_caption_after() {
+        let input = vec![
+            "+-------+-------+",
+            "| A     | B     |",
+            "+=======+=======+",
+            "| C     | D     |",
+            "+-------+-------+",
+            "",
+            "Table: My grid table",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_grid_table(&input, 0, &mut builder);
+
+        assert!(result.is_some());
+        // table + blank + caption
+        assert_eq!(result.unwrap(), 7);
+    }
+}
