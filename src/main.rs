@@ -2,29 +2,41 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
-use panache::format;
+use panache::{format, parse};
 
 #[derive(Parser)]
 #[command(name = "panache")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "A formatter for Quarto documents")]
 struct Cli {
-    /// Input file to format (stdin if not provided)
+    #[command(subcommand)]
+    command: Option<Commands>,
+
+    /// Input file (stdin if not provided)
+    #[arg(global = true)]
     file: Option<PathBuf>,
 
     /// Path to config file
-    #[arg(long)]
+    #[arg(long, global = true)]
     config: Option<PathBuf>,
+}
 
-    /// Check if files are formatted without making changes
-    #[arg(long)]
-    check: bool,
+#[derive(Subcommand)]
+enum Commands {
+    /// Format a Quarto document (default)
+    Format {
+        /// Check if files are formatted without making changes
+        #[arg(long)]
+        check: bool,
 
-    /// Format files in place
-    #[arg(long)]
-    write: bool,
+        /// Format files in place
+        #[arg(long)]
+        write: bool,
+    },
+    /// Parse and display the AST tree for debugging
+    Parse,
 }
 
 fn read_all(path: Option<&PathBuf>) -> io::Result<String> {
@@ -61,25 +73,41 @@ fn main() -> io::Result<()> {
     }
 
     let input = read_all(cli.file.as_ref())?;
-    let output = format(&input, Some(cfg));
 
-    if cli.check {
-        if input != output {
-            eprintln!("File is not formatted");
-            std::process::exit(1);
+    match cli.command {
+        Some(Commands::Parse) => {
+            let tree = parse(&input);
+            println!("{:#?}", tree);
+            Ok(())
         }
-        println!("File is correctly formatted");
-    } else if cli.write {
-        if let Some(file_path) = &cli.file {
-            fs::write(file_path, &output)?;
-            println!("Formatted {}", file_path.display());
-        } else {
-            eprintln!("Cannot use --write with stdin input");
-            std::process::exit(1);
+        Some(Commands::Format { check, write }) => {
+            let output = format(&input, Some(cfg));
+
+            if check {
+                if input != output {
+                    eprintln!("File is not formatted");
+                    std::process::exit(1);
+                }
+                println!("File is correctly formatted");
+            } else if write {
+                if let Some(file_path) = &cli.file {
+                    fs::write(file_path, &output)?;
+                    println!("Formatted {}", file_path.display());
+                } else {
+                    eprintln!("Cannot use --write with stdin input");
+                    std::process::exit(1);
+                }
+            } else {
+                print!("{output}");
+            }
+
+            Ok(())
         }
-    } else {
-        print!("{output}");
+        None => {
+            // Default to format when no subcommand specified
+            let output = format(&input, Some(cfg));
+            print!("{output}");
+            Ok(())
+        }
     }
-
-    Ok(())
 }
