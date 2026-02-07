@@ -413,3 +413,89 @@ mod escape_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod footnote_tests {
+    use crate::block_parser::BlockParser;
+    use crate::config::Config;
+    use crate::inline_parser::InlineParser;
+    use crate::syntax::SyntaxKind;
+
+    fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
+        let config = Config::default();
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
+    }
+
+    fn find_footnotes(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut footnotes = Vec::new();
+        for child in node.descendants() {
+            if child.kind() == SyntaxKind::InlineFootnote {
+                footnotes.push(child.to_string());
+            }
+        }
+        footnotes
+    }
+
+    #[test]
+    fn test_simple_inline_footnote() {
+        let input = "Here is some text^[This is a footnote] with more text.";
+        let tree = parse_inline(input);
+
+        let footnotes = find_footnotes(&tree);
+        assert_eq!(footnotes.len(), 1);
+        assert_eq!(footnotes[0], "^[This is a footnote]");
+    }
+
+    #[test]
+    fn test_multiple_inline_footnotes() {
+        let input = "First^[footnote 1] and second^[footnote 2] notes.";
+        let tree = parse_inline(input);
+
+        let footnotes = find_footnotes(&tree);
+        assert_eq!(footnotes.len(), 2);
+        assert_eq!(footnotes[0], "^[footnote 1]");
+        assert_eq!(footnotes[1], "^[footnote 2]");
+    }
+
+    #[test]
+    fn test_footnote_with_inline_elements() {
+        let input = "Text^[Note with *emphasis* and `code`] end.";
+        let tree = parse_inline(input);
+
+        let footnotes = find_footnotes(&tree);
+        assert_eq!(footnotes.len(), 1);
+        // The footnote should contain the inline elements
+        assert!(footnotes[0].contains("*emphasis*"));
+        assert!(footnotes[0].contains("`code`"));
+    }
+
+    #[test]
+    fn test_footnote_empty() {
+        let input = "Text with empty^[] footnote.";
+        let tree = parse_inline(input);
+
+        let footnotes = find_footnotes(&tree);
+        assert_eq!(footnotes.len(), 1);
+        assert_eq!(footnotes[0], "^[]");
+    }
+
+    #[test]
+    fn test_no_footnote_without_bracket() {
+        let input = "Text with ^ caret but no bracket.";
+        let tree = parse_inline(input);
+
+        let footnotes = find_footnotes(&tree);
+        assert_eq!(footnotes.len(), 0);
+    }
+
+    #[test]
+    fn test_footnote_with_link() {
+        let input = "Text^[See [link](http://example.com) for more] end.";
+        let tree = parse_inline(input);
+
+        let footnotes = find_footnotes(&tree);
+        assert_eq!(footnotes.len(), 1);
+        assert!(footnotes[0].contains("[link](http://example.com)"));
+    }
+}

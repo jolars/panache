@@ -7,6 +7,7 @@ mod code_spans;
 mod emphasis;
 mod escapes;
 mod future_tests;
+mod inline_footnotes;
 mod inline_math;
 mod links;
 mod tests;
@@ -14,6 +15,7 @@ mod tests;
 use code_spans::{emit_code_span, try_parse_code_span};
 use emphasis::{emit_emphasis, try_parse_emphasis};
 use escapes::{emit_escape, try_parse_escape};
+use inline_footnotes::{emit_inline_footnote, try_parse_inline_footnote};
 use inline_math::{
     emit_display_math, emit_inline_math, try_parse_display_math, try_parse_inline_math,
 };
@@ -45,6 +47,17 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && let Some((len, content, backtick_count)) = try_parse_code_span(&text[pos..])
         {
             emit_code_span(builder, content, backtick_count);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse inline footnote (^[...])
+        if bytes[pos] == b'^'
+            && pos + 1 < text.len()
+            && bytes[pos + 1] == b'['
+            && let Some((len, content)) = try_parse_inline_footnote(&text[pos..])
+        {
+            emit_inline_footnote(builder, content);
             pos += len;
             continue;
         }
@@ -130,7 +143,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
 fn find_next_inline_start(text: &str) -> usize {
     for (i, ch) in text.char_indices() {
         match ch {
-            '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' => return i.max(1),
+            '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' | '^' => return i.max(1),
             _ => {}
         }
     }

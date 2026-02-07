@@ -131,11 +131,11 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Math containing special characters
 - ✅ Extension: `tex_math_dollars` - Dollar-delimited math
 
-### Footnotes ❌
+### Footnotes ✅
 
-- ❌ Inline footnotes `^[note text]`
+- ✅ Inline footnotes `^[note text]` - Full support with nested inline elements
 - ❌ Reference footnotes `[^1]` with definition block
-- ❌ Extension: `inline_notes` - Inline note syntax
+- ✅ Extension: `inline_notes` - Inline note syntax
 
 ### Citations ❌
 
