@@ -40,6 +40,8 @@ impl Formatter {
         node: &SyntaxNode,
         arena: &'a mut Vec<Box<str>>,
     ) -> Vec<textwrap::core::Word<'a>> {
+        use rowan::NodeOrToken;
+
         struct Builder<'a> {
             arena: &'a mut Vec<Box<str>>,
             piece_idx: Vec<usize>,
@@ -92,7 +94,6 @@ impl Formatter {
                 self.last_piece_pos = Some(self.piece_idx.len() - 1);
             }
 
-            // Glue when there was no whitespace; otherwise start a new word and mark the space.
             fn push_piece(&mut self, text: &str) {
                 if self.pending_space {
                     self.flush_pending();
@@ -103,33 +104,79 @@ impl Formatter {
             }
         }
 
-        let mut b = Builder::new(arena);
+        fn process_node_recursive(formatter: &Formatter, node: &SyntaxNode, b: &mut Builder) {
+            for el in node.children_with_tokens() {
+                match el {
+                    NodeOrToken::Token(t) => match t.kind() {
+                        SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BlankLine => {
+                            b.pending_space = true;
+                        }
+                        SyntaxKind::EscapedChar => {
+                            let escaped = format!("\\{}", t.text());
+                            b.push_piece(&escaped);
+                        }
+                        SyntaxKind::EmphasisMarker | SyntaxKind::StrongMarker => {
+                            // Skip original markers - we'll add normalized ones
+                        }
+                        SyntaxKind::TEXT => {
+                            let text = t.text();
 
-        for el in node.children_with_tokens() {
-            match el {
-                NodeOrToken::Token(t) => match t.kind() {
-                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BlankLine => {
-                        b.pending_space = true;
-                    }
-                    SyntaxKind::EscapedChar => {
-                        // Re-add backslash for escaped characters
-                        let escaped = format!("\\{}", t.text());
-                        b.push_piece(&escaped);
-                    }
-                    _ => {
-                        b.push_piece(t.text());
-                    }
-                },
-                NodeOrToken::Node(n) => {
-                    if n.kind() == SyntaxKind::List {
-                        b.pending_space = true;
-                        continue;
-                    }
-                    let text = self.format_inline_node(&n);
-                    b.push_piece(&text);
+                            // If text starts with 4+ spaces, it might be indented code - preserve as-is
+                            if text.starts_with("    ") {
+                                b.push_piece(text);
+                            } else {
+                                // Split TEXT tokens on whitespace to create separate words
+
+                                // Check if text starts with whitespace
+                                if !text.is_empty() && text.starts_with(char::is_whitespace) {
+                                    b.pending_space = true;
+                                }
+
+                                let words: Vec<&str> = text.split_whitespace().collect();
+
+                                for (i, word) in words.iter().enumerate() {
+                                    if i > 0 {
+                                        b.pending_space = true;
+                                    }
+                                    b.push_piece(word);
+                                }
+
+                                // If text ends with whitespace, mark pending space for next piece
+                                if !words.is_empty() && text.ends_with(char::is_whitespace) {
+                                    b.pending_space = true;
+                                }
+                            }
+                        }
+                        _ => {
+                            b.push_piece(t.text());
+                        }
+                    },
+                    NodeOrToken::Node(n) => match n.kind() {
+                        SyntaxKind::List => {
+                            b.pending_space = true;
+                        }
+                        SyntaxKind::Emphasis => {
+                            b.push_piece("*");
+                            process_node_recursive(formatter, &n, b);
+                            b.push_piece("*");
+                        }
+                        SyntaxKind::Strong => {
+                            b.push_piece("**");
+                            process_node_recursive(formatter, &n, b);
+                            b.push_piece("**");
+                        }
+                        _ => {
+                            // For other inline nodes, format and push as single piece
+                            let text = formatter.format_inline_node(&n);
+                            b.push_piece(&text);
+                        }
+                    },
                 }
             }
         }
+
+        let mut b = Builder::new(arena);
+        process_node_recursive(self, node, &mut b);
 
         let mut words: Vec<textwrap::core::Word<'a>> = Vec::with_capacity(b.piece_idx.len());
         for (i, &idx) in b.piece_idx.iter().enumerate() {
@@ -185,12 +232,19 @@ impl Formatter {
     }
 
     fn wrapped_lines_for_paragraph(&self, node: &SyntaxNode, width: usize) -> Vec<String> {
+        log::debug!("wrapped_lines_for_paragraph called with width={}", width);
         let mut arena: Vec<Box<str>> = Vec::new();
         let words = self.build_words(node, &mut arena);
+        log::debug!("Built {} words for paragraph", words.len());
+        log::trace!(
+            "Words: {:?}",
+            words.iter().map(|w| w.word).collect::<Vec<_>>()
+        );
 
         let algo = WrapAlgorithm::new();
         let line_widths = [width];
         let lines = algo.wrap(&words, &line_widths);
+        log::debug!("Wrapped into {} lines", lines.len());
 
         let mut out_lines = Vec::with_capacity(lines.len());
 
@@ -204,6 +258,7 @@ impl Formatter {
                     acc.push_str(w.penalty);
                 }
             }
+            log::trace!("Line: '{}'", acc);
             out_lines.push(acc);
         }
         out_lines
@@ -428,11 +483,13 @@ impl Formatter {
 
             SyntaxKind::PARAGRAPH => {
                 let text = node.text().to_string();
+                log::debug!("Formatting paragraph, text length: {}", text.len());
 
                 // If paragraph contains display math across lines ($$\n...\n$$), preserve as-is
                 // Check that it's actually dollar signs, not just any characters
                 let has_multiline_display_math = text.contains("$$\n") || text.contains("\n$$");
                 if has_multiline_display_math {
+                    log::debug!("Paragraph has multiline display math, preserving");
                     self.output.push_str(&text);
                     if !self.output.ends_with('\n') {
                         self.output.push('\n');
@@ -443,11 +500,17 @@ impl Formatter {
                 // Check if paragraph contains inline display math ($$...$$)
                 // Only reformat if it's on a single line
                 if self.contains_inline_display_math(node) {
+                    log::debug!("Paragraph has inline display math");
                     self.format_paragraph_with_display_math(node, indent, line_width);
                     return;
                 }
 
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+                log::debug!(
+                    "Paragraph wrap mode: {:?}, line_width: {}",
+                    wrap_mode,
+                    line_width
+                );
                 match wrap_mode {
                     WrapMode::Preserve => {
                         log::trace!("Preserving paragraph line breaks");
