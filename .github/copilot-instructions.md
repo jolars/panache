@@ -83,6 +83,38 @@ printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/r
 # Expected: Line wrapping at ~80 characters with proper Markdown formatting
 ```
 
+### Debugging with Logging
+
+panache has comprehensive logging infrastructure for debugging:
+
+```bash
+# Production: High-level metrics only (available in release builds)
+RUST_LOG=info panache document.qmd
+
+# Development: See all parsing decisions (debug builds only)
+RUST_LOG=debug panache document.qmd
+
+# Detailed debugging: Every parsing step (debug builds only)
+RUST_LOG=trace panache document.qmd
+
+# Module-specific: Only inline parser debug logs
+RUST_LOG=panache::inline_parser=debug panache document.qmd
+
+# Multiple modules with different levels
+RUST_LOG=panache::block_parser=trace,panache::formatter=debug panache document.qmd
+```
+
+**Log levels and content:**
+- **INFO**: Formatting lifecycle, config loading (available in release)
+- **DEBUG**: All parsing decisions, element matches, table detection
+- **TRACE**: Text previews, container operations, detailed steps
+
+**Modules with logging:**
+- `panache::block_parser` - Block element detection (headings, tables, code blocks, etc.)
+- `panache::inline_parser` - Inline element matching (emphasis, code, math, links, footnotes)
+- `panache::formatter` - Formatting decisions and node traversal
+- `panache::config` - Config file loading and resolution
+
 ### Timing Notes
 
 - `cargo test`: ~1 second (238 tests total: 103 lib tests, 110+ inline parser tests, 20 block parser tests, 19 format tests, 1 golden test, 2 doc tests)
@@ -106,6 +138,7 @@ the formatting rules.
 - Lists (ordered and unordered, including task lists)
 - Horizontal rules
 - Metadata/frontmatter (YAML, TOML, Pandoc title blocks)
+- Tables (simple, pipe, grid, multiline)
 - Blank lines
 
 The inline parser has basic inline elements implemented:
@@ -115,9 +148,10 @@ The inline parser has basic inline elements implemented:
 - ✅ Links (automatic `<url>` and inline `[text](url)`)
 - ✅ Images (`![alt](url)`)
 - ✅ Escapes (backslash escaping)
+- ✅ Inline footnotes `^[inline note]`
 - ✅ Proper CommonMark precedence (code > escapes > links > emphasis)
 - ❌ Reference links/images `[text][ref]` (not yet implemented)
-- ❌ Footnotes `^[inline]` and `[^ref]` (not yet implemented)
+- ❌ Reference footnotes `[^ref]` (not yet implemented)
 - ❌ Citations `[@cite]` (not yet implemented)
 - ❌ Strikethrough, subscript/superscript, other extensions (not yet implemented)
 
@@ -148,6 +182,12 @@ src/
 │   ├── code_spans.rs        # Code span parsing (backticks)
 │   ├── emphasis.rs          # Emphasis/strong parsing
 │   ├── escapes.rs           # Escape sequence parsing
+│   ├── inline_footnotes.rs  # Inline footnote parsing (^[...])
+│   ├── inline_math.rs       # Inline math parsing (dollars)
+│   ├── links.rs             # Link and image parsing
+│   ├── future_tests.rs      # Tests for unimplemented features
+│   └── tests.rs             # Integration tests
+└── syntax.rs            # Syntax node definitions and AST types
 │   ├── inline_math.rs       # Inline math parsing (dollars)
 │   ├── links.rs             # Link and image parsing
 │   ├── future_tests.rs      # Tests for unimplemented features
@@ -259,6 +299,24 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 - **textwrap**: Text wrapping functionality
 - **toml**: Configuration file parsing
 - **serde**: Serialization for config structs
+- **log** + **env_logger**: Logging infrastructure (debug builds have DEBUG/TRACE, release builds have INFO only)
+
+### Logging Infrastructure
+
+panache has comprehensive logging (~50 strategic log statements):
+- **Release builds**: INFO logs only (formatting metrics, config loading) - zero overhead for DEBUG/TRACE
+- **Debug builds**: Full DEBUG and TRACE logging available
+- **Modules logged**: block_parser, inline_parser, formatter, config
+- **Usage**: `RUST_LOG=debug cargo run` or `RUST_LOG=panache::inline_parser=trace cargo run`
+- **Purpose**: Debug parsing decisions, understand element matching, trace formatter behavior
+
+Example log output (DEBUG level):
+```
+[DEBUG] Parsed ATX heading at line 0: level 1
+[DEBUG] Matched emphasis at pos 10: level=2, delim=*
+[DEBUG] Parsed grid table at line 8 (5 lines)
+[INFO] Formatting document with config: line_width=80, wrap=Some(Reflow)
+```
 
 ### Testing Approach
 

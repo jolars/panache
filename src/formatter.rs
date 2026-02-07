@@ -199,6 +199,7 @@ impl Formatter {
             }
 
             SyntaxKind::Heading => {
+                log::trace!("Formatting heading");
                 // Determine level
                 let mut level = 1;
                 let mut content = String::new();
@@ -289,6 +290,7 @@ impl Formatter {
             }
 
             SyntaxKind::BlockQuote => {
+                log::trace!("Formatting blockquote");
                 // Determine nesting depth by counting ancestor BlockQuote nodes (including self)
                 let mut depth = 0usize;
                 let mut cur = Some(node.clone());
@@ -397,12 +399,14 @@ impl Formatter {
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
                 match wrap_mode {
                     WrapMode::Preserve => {
+                        log::trace!("Preserving paragraph line breaks");
                         self.output.push_str(&text);
                         if !self.output.ends_with('\n') {
                             self.output.push('\n');
                         }
                     }
                     WrapMode::Reflow => {
+                        log::trace!("Reflowing paragraph to {} width", line_width);
                         let lines = self.wrapped_lines_for_paragraph(node, line_width);
 
                         for (i, line) in lines.iter().enumerate() {
@@ -934,5 +938,12 @@ impl Formatter {
 }
 
 pub fn format_tree(tree: &SyntaxNode, config: &Config) -> String {
-    Formatter::new(config.clone()).format(tree)
+    log::info!(
+        "Formatting document with config: line_width={}, wrap={:?}",
+        config.line_width,
+        config.wrap
+    );
+    let result = Formatter::new(config.clone()).format(tree);
+    log::info!("Formatting complete: {} bytes output", result.len());
+    result
 }

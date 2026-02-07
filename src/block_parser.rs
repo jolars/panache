@@ -212,6 +212,10 @@ impl<'a> BlockParser<'a> {
             while self.containers.depth() > levels_to_keep {
                 match self.containers.last() {
                     Some(Container::ListItem { .. }) | Some(Container::List { .. }) => {
+                        log::trace!(
+                            "Closing list container at blank line (depth {})",
+                            self.containers.depth()
+                        );
                         self.containers
                             .close_to(self.containers.depth() - 1, &mut self.builder);
                     }
@@ -441,6 +445,11 @@ impl<'a> BlockParser<'a> {
             if let Some(lines_consumed) =
                 try_parse_grid_table(&self.lines, self.pos, &mut self.builder)
             {
+                log::debug!(
+                    "Parsed grid table at line {} ({} lines)",
+                    self.pos,
+                    lines_consumed
+                );
                 self.pos += lines_consumed;
                 return true;
             }
@@ -449,6 +458,11 @@ impl<'a> BlockParser<'a> {
             if let Some(lines_consumed) =
                 try_parse_multiline_table(&self.lines, self.pos, &mut self.builder)
             {
+                log::debug!(
+                    "Parsed multiline table at line {} ({} lines)",
+                    self.pos,
+                    lines_consumed
+                );
                 self.pos += lines_consumed;
                 return true;
             }
@@ -457,6 +471,11 @@ impl<'a> BlockParser<'a> {
             if let Some(lines_consumed) =
                 try_parse_pipe_table(&self.lines, self.pos, &mut self.builder)
             {
+                log::debug!(
+                    "Parsed pipe table at line {} ({} lines)",
+                    self.pos,
+                    lines_consumed
+                );
                 self.pos += lines_consumed;
                 return true;
             }
@@ -465,12 +484,18 @@ impl<'a> BlockParser<'a> {
             if let Some(lines_consumed) =
                 try_parse_simple_table(&self.lines, self.pos, &mut self.builder)
             {
+                log::debug!(
+                    "Parsed simple table at line {} ({} lines)",
+                    self.pos,
+                    lines_consumed
+                );
                 self.pos += lines_consumed;
                 return true;
             }
 
             // Try to parse horizontal rule (but only if not YAML)
             if try_parse_horizontal_rule(content).is_some() {
+                log::debug!("Parsed horizontal rule at line {}", self.pos);
                 emit_horizontal_rule(&mut self.builder, content);
                 self.pos += 1;
                 return true;
@@ -478,6 +503,11 @@ impl<'a> BlockParser<'a> {
 
             // Try to parse ATX heading from stripped content
             if let Some(heading_level) = try_parse_atx_heading(content) {
+                log::debug!(
+                    "Parsed ATX heading at line {}: level {}",
+                    self.pos,
+                    heading_level
+                );
                 emit_atx_heading(&mut self.builder, content, heading_level);
                 self.pos += 1;
                 return true;
@@ -487,6 +517,11 @@ impl<'a> BlockParser<'a> {
         // Check for fenced code block
         if has_blank_before && let Some(fence) = try_parse_fence_open(content) {
             let bq_depth = self.current_blockquote_depth();
+            log::debug!(
+                "Parsed fenced code block at line {}: {} fence",
+                self.pos,
+                fence.fence_char
+            );
             let new_pos =
                 parse_fenced_code_block(&mut self.builder, &self.lines, self.pos, fence, bq_depth);
             self.pos = new_pos;
@@ -496,6 +531,11 @@ impl<'a> BlockParser<'a> {
         // Check for display math block
         // Close paragraph first if one is open, then parse as MathBlock
         if let Some(math_fence) = try_parse_math_fence_open(content) {
+            log::debug!(
+                "Parsed display math block at line {}: {} dollars",
+                self.pos,
+                math_fence.fence_count
+            );
             // Close paragraph before opening display math block
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.containers
@@ -516,6 +556,11 @@ impl<'a> BlockParser<'a> {
 
         // Check for fenced div opening
         if has_blank_before && let Some(div_fence) = try_parse_div_fence_open(content) {
+            log::debug!(
+                "Parsed fenced div at line {}: {} colons",
+                self.pos,
+                div_fence.fence_count
+            );
             // Close paragraph before opening fenced div
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.containers

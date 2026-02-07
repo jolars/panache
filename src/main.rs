@@ -47,10 +47,18 @@ fn start_dir_for(input_path: &Option<PathBuf>) -> io::Result<PathBuf> {
 }
 
 fn main() -> io::Result<()> {
+    env_logger::init();
+
     let cli = Cli::parse();
 
     let start_dir = start_dir_for(&cli.file)?;
-    let (cfg, _cfg_path) = panache::config::load(cli.config.as_deref(), &start_dir)?;
+    let (cfg, cfg_path) = panache::config::load(cli.config.as_deref(), &start_dir)?;
+
+    if let Some(path) = &cfg_path {
+        log::debug!("Using config from: {}", path.display());
+    } else {
+        log::debug!("Using default config");
+    }
 
     let input = read_all(cli.file.as_ref())?;
     let output = format(&input, Some(cfg));

@@ -5,6 +5,7 @@ use super::utils::strip_leading_spaces;
 /// Information about a detected div fence opening.
 pub(crate) struct DivFenceInfo {
     pub attributes: String,
+    pub fence_count: usize,
 }
 
 /// Try to detect a fenced div opening from content.
@@ -59,7 +60,10 @@ pub(crate) fn try_parse_div_fence_open(content: &str) -> Option<DivFenceInfo> {
         content_before_colons.split_whitespace().next()?.to_string()
     };
 
-    Some(DivFenceInfo { attributes })
+    Some(DivFenceInfo {
+        attributes,
+        fence_count: colon_count,
+    })
 }
 
 /// Check if a line is a valid closing fence for a div.

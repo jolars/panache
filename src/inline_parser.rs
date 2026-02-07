@@ -28,6 +28,11 @@ use links::{
 /// This is a standalone function used by both the main inline parser
 /// and by nested contexts like link text.
 pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
+    log::trace!(
+        "Parsing inline text: {:?} ({} bytes)",
+        &text[..text.len().min(40)],
+        text.len()
+    );
     let mut pos = 0;
     let bytes = text.as_bytes();
 
@@ -37,6 +42,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         if bytes[pos] == b'\\'
             && let Some((len, ch, escape_type)) = try_parse_escape(&text[pos..])
         {
+            log::debug!("Matched escape at pos {}: \\{}", pos, ch);
             emit_escape(builder, ch, escape_type);
             pos += len;
             continue;
@@ -46,6 +52,11 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         if bytes[pos] == b'`'
             && let Some((len, content, backtick_count)) = try_parse_code_span(&text[pos..])
         {
+            log::debug!(
+                "Matched code span at pos {}: {} backticks",
+                pos,
+                backtick_count
+            );
             emit_code_span(builder, content, backtick_count);
             pos += len;
             continue;
@@ -57,6 +68,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && bytes[pos + 1] == b'['
             && let Some((len, content)) = try_parse_inline_footnote(&text[pos..])
         {
+            log::debug!("Matched inline footnote at pos {}", pos);
             emit_inline_footnote(builder, content);
             pos += len;
             continue;
@@ -67,6 +79,11 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             // Try display math first ($$...$$)
             if let Some((len, content)) = try_parse_display_math(&text[pos..]) {
                 let dollar_count = text[pos..].chars().take_while(|&c| c == '$').count();
+                log::debug!(
+                    "Matched display math at pos {}: {} dollars",
+                    pos,
+                    dollar_count
+                );
                 emit_display_math(builder, content, dollar_count);
                 pos += len;
                 continue;
@@ -74,6 +91,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
 
             // Try inline math ($...$)
             if let Some((len, content)) = try_parse_inline_math(&text[pos..]) {
+                log::debug!("Matched inline math at pos {}", pos);
                 emit_inline_math(builder, content);
                 pos += len;
                 continue;
@@ -84,6 +102,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         if bytes[pos] == b'<'
             && let Some((len, url)) = try_parse_autolink(&text[pos..])
         {
+            log::debug!("Matched autolink at pos {}: {}", pos, url);
             emit_autolink(builder, &text[pos..pos + len], url);
             pos += len;
             continue;
@@ -95,6 +114,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && bytes[pos + 1] == b'['
             && let Some((len, alt_text, dest)) = try_parse_inline_image(&text[pos..])
         {
+            log::debug!("Matched inline image at pos {}: dest={}", pos, dest);
             emit_inline_image(builder, &text[pos..pos + len], alt_text, dest);
             pos += len;
             continue;
@@ -104,6 +124,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         if bytes[pos] == b'['
             && let Some((len, link_text, dest)) = try_parse_inline_link(&text[pos..])
         {
+            log::debug!("Matched inline link at pos {}: dest={}", pos, dest);
             emit_inline_link(builder, &text[pos..pos + len], link_text, dest);
             pos += len;
             continue;
@@ -113,6 +134,12 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         if (bytes[pos] == b'*' || bytes[pos] == b'_')
             && let Some((len, inner_text, level, delim_char)) = try_parse_emphasis(&text[pos..])
         {
+            log::debug!(
+                "Matched emphasis at pos {}: level={}, delim={}",
+                pos,
+                level,
+                delim_char
+            );
             emit_emphasis(builder, inner_text, level, delim_char);
             pos += len;
             continue;

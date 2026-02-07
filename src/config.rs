@@ -495,8 +495,11 @@ fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
 }
 
 fn read_config(path: &Path) -> io::Result<Config> {
+    log::debug!("Reading config from: {}", path.display());
     let s = fs::read_to_string(path)?;
-    parse_config_str(&s, path)
+    let config = parse_config_str(&s, path)?;
+    log::info!("Loaded config from: {}", path.display());
+    Ok(config)
 }
 
 fn find_in_tree(start_dir: &Path) -> Option<PathBuf> {
@@ -553,6 +556,7 @@ pub fn load(explicit: Option<&Path>, start_dir: &Path) -> io::Result<(Config, Op
         return Ok((cfg, Some(p)));
     }
 
+    log::debug!("No config file found, using defaults");
     Ok((Config::default(), None))
 }
 
