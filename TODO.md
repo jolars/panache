@@ -161,9 +161,9 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ## Raw Content & Special Syntax
 
-### Raw HTML ❌
+### Raw HTML ✅
 
-- ❌ Extension: `raw_html` - Inline and block HTML
+- ✅ Extension: `raw_html` - Inline and block HTML
 - ❌ Extension: `markdown_in_html_blocks` - Markdown inside HTML blocks
 - ❌ Extension: `markdown_attribute` - `markdown="1"` attribute
 

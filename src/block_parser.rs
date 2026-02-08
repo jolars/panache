@@ -10,6 +10,7 @@ mod display_math;
 mod fenced_divs;
 mod headings;
 mod horizontal_rules;
+mod html_blocks;
 mod indented_code;
 mod latex_envs;
 mod lists;
@@ -26,6 +27,7 @@ use display_math::{parse_display_math_block, try_parse_math_fence_open};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
 use headings::{emit_atx_heading, try_parse_atx_heading};
 use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
+use html_blocks::{parse_html_block, try_parse_html_block_start};
 use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
@@ -454,6 +456,29 @@ impl<'a> BlockParser<'a> {
                 self.pos = new_pos;
                 return true;
             }
+        }
+
+        // Check for HTML block (if raw_html extension is enabled)
+        if self.config.extensions.raw_html
+            && let Some(block_type) = try_parse_html_block_start(content)
+        {
+            log::debug!("Parsed HTML block at line {}: {:?}", self.pos, block_type);
+            // Close paragraph before opening HTML block
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            let bq_depth = self.current_blockquote_depth();
+            let new_pos = parse_html_block(
+                &mut self.builder,
+                &self.lines,
+                self.pos,
+                block_type,
+                bq_depth,
+            );
+            self.pos = new_pos;
+            return true;
         }
 
         if has_blank_before {

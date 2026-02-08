@@ -81,6 +81,11 @@ pub enum SyntaxKind {
     DefinitionMarker, // : or ~
     Comment,
 
+    // HTML blocks
+    HtmlBlock,        // Generic HTML block
+    HtmlBlockTag,     // Opening/closing tags
+    HtmlBlockContent, // Content between tags
+
     // Headings
     Heading,
     HeadingContent,

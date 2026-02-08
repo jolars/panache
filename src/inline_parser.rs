@@ -263,7 +263,7 @@ impl InlineParser {
             return false;
         }
 
-        // Check if we're in a verbatim context (code block, math block, LaTeX environment)
+        // Check if we're in a verbatim context (code block, math block, LaTeX environment, HTML block)
         if let Some(parent) = token.parent() {
             match parent.kind() {
                 SyntaxKind::CodeBlock
@@ -272,7 +272,10 @@ impl InlineParser {
                 | SyntaxKind::LatexEnvironment
                 | SyntaxKind::LatexEnvBegin
                 | SyntaxKind::LatexEnvEnd
-                | SyntaxKind::LatexEnvContent => {
+                | SyntaxKind::LatexEnvContent
+                | SyntaxKind::HtmlBlock
+                | SyntaxKind::HtmlBlockTag
+                | SyntaxKind::HtmlBlockContent => {
                     return false;
                 }
                 _ => {}
