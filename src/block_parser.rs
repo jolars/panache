@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
+mod attributes;
 mod blockquotes;
 mod code_blocks;
 mod container_stack;

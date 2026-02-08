@@ -314,6 +314,7 @@ impl Formatter {
                 // Determine level
                 let mut level = 1;
                 let mut content = String::new();
+                let mut attributes = String::new();
                 let mut saw_content = false;
 
                 for child in node.children() {
@@ -343,6 +344,9 @@ impl Formatter {
                             content = t.trim().to_string();
                             saw_content = true;
                         }
+                        SyntaxKind::Attribute => {
+                            attributes = child.text().to_string();
+                        }
                         _ => {}
                     }
                 }
@@ -352,6 +356,10 @@ impl Formatter {
                 self.output.push_str(&"#".repeat(level));
                 self.output.push(' ');
                 self.output.push_str(&content);
+                if !attributes.is_empty() {
+                    self.output.push(' ');
+                    self.output.push_str(&attributes);
+                }
                 self.output.push('\n');
 
                 if let Some(next) = node.next_sibling()

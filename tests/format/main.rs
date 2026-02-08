@@ -1,6 +1,7 @@
 mod comments;
 mod external_formatters;
 mod frontmatter;
+mod header_attributes;
 mod headings;
 mod links;
 mod lists_unordered;

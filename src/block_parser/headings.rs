@@ -3,6 +3,8 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::attributes::{emit_attributes, try_parse_trailing_attributes};
+
 /// Try to parse an ATX heading from content, returns heading level (1-6) if found.
 pub(crate) fn try_parse_atx_heading(content: &str) -> Option<usize> {
     let trimmed = content.trim_start();
@@ -50,16 +52,29 @@ pub(crate) fn emit_atx_heading(
         .find(|c: char| !c.is_whitespace())
         .unwrap_or(after_marker.len());
 
-    // Emit heading content (strip trailing hashes)
+    // Strip trailing hashes
     let heading_content = after_marker[content_start..].trim_end();
     let heading_content = heading_content.trim_end_matches(|c: char| c == '#' || c.is_whitespace());
 
+    // Try to parse trailing attributes
+    let (text_content, attributes) =
+        if let Some((attrs, text_before)) = try_parse_trailing_attributes(heading_content) {
+            (text_before, Some(attrs))
+        } else {
+            (heading_content, None)
+        };
+
     // Heading content node
     builder.start_node(SyntaxKind::HeadingContent.into());
-    if !heading_content.is_empty() {
-        builder.token(SyntaxKind::TEXT.into(), heading_content);
+    if !text_content.is_empty() {
+        builder.token(SyntaxKind::TEXT.into(), text_content);
     }
     builder.finish_node();
+
+    // Emit attributes if present
+    if let Some(attrs) = attributes {
+        emit_attributes(builder, &attrs);
+    }
 
     builder.finish_node(); // Heading
 }

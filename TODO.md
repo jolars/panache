@@ -26,7 +26,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Setext-style headings (underlined with `===` or `---`)
 - ✅ Heading identifier attributes (`# Heading {#id}`)
 - ✅ Extension: `blank_before_header` - Require blank line before headings (default behavior)
-- 🚧 Extension: `header_attributes` - Full attribute syntax `{#id .class key=value}`
+- ✅ Extension: `header_attributes` - Full attribute syntax `{#id .class key=value}`
 - ❌ Extension: `implicit_header_references` - Auto-generate reference links
 
 ### Block Quotations ✅
