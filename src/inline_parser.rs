@@ -10,6 +10,7 @@ mod escapes;
 mod future_tests;
 mod inline_footnotes;
 mod inline_math;
+mod latex;
 mod links;
 mod tests;
 
@@ -21,6 +22,7 @@ use inline_footnotes::{emit_inline_footnote, try_parse_inline_footnote};
 use inline_math::{
     emit_display_math, emit_inline_math, try_parse_display_math, try_parse_inline_math,
 };
+use latex::{parse_latex_command, try_parse_latex_command};
 use links::{
     emit_autolink, emit_inline_image, emit_inline_link, try_parse_autolink, try_parse_inline_image,
     try_parse_inline_link,
@@ -46,6 +48,17 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         {
             log::debug!("Matched escape at pos {}: \\{}", pos, ch);
             emit_escape(builder, ch, escape_type);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse LaTeX command (after escapes, before code)
+        // This handles \cite{ref}, \textbf{text}, etc.
+        if bytes[pos] == b'\\'
+            && let Some(len) = try_parse_latex_command(&text[pos..])
+        {
+            log::debug!("Matched LaTeX command at pos {}", pos);
+            parse_latex_command(builder, &text[pos..], len);
             pos += len;
             continue;
         }
