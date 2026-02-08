@@ -1,4 +1,6 @@
-use crate::block_parser::tests::helpers::{assert_block_kinds, find_first, parse_blocks};
+use crate::block_parser::tests::helpers::{
+    assert_block_kinds, count_children, find_all, find_first, parse_blocks,
+};
 use crate::syntax::{SyntaxKind, SyntaxToken};
 
 fn get_code_content(node: &crate::syntax::SyntaxNode) -> Option<String> {
@@ -190,4 +192,62 @@ fn code_block_with_leading_spaces() {
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "  print(\"hello\")\n");
+}
+
+// Indented code block tests
+
+#[test]
+fn parses_indented_code_block() {
+    let input = "
+    code line 1
+    code line 2";
+    let tree = parse_blocks(input);
+
+    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 1);
+    let code_blocks = find_all(&tree, SyntaxKind::CodeBlock);
+    let code = &code_blocks[0];
+    let text = code.text().to_string();
+    assert!(text.contains("code line 1"));
+    assert!(text.contains("code line 2"));
+}
+
+#[test]
+fn indented_code_block_with_blank_line() {
+    let input = "
+    code line 1
+
+    code line 2";
+    let tree = parse_blocks(input);
+
+    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 1);
+}
+
+#[test]
+fn indented_code_requires_blank_line_before() {
+    let input = "paragraph
+    not code";
+    let tree = parse_blocks(input);
+
+    // Should be a single paragraph, not a code block
+    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 0);
+    assert_eq!(find_all(&tree, SyntaxKind::PARAGRAPH).len(), 1);
+}
+
+#[test]
+fn indented_code_with_tab() {
+    let input = "
+\tcode with tab";
+    let tree = parse_blocks(input);
+
+    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 1);
+}
+
+#[test]
+fn indented_code_in_blockquote() {
+    let input = ">
+>     code in blockquote";
+    let tree = parse_blocks(input);
+
+    assert_eq!(find_all(&tree, SyntaxKind::BlockQuote).len(), 1);
+    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 1);
 }

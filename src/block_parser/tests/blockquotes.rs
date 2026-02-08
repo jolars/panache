@@ -262,7 +262,7 @@ fn spec_blockquote_optional_space_after_marker() {
 fn spec_blockquote_max_three_space_indent() {
     // Up to 3 spaces before > should be allowed
     let input1 = "   > Three spaces should work";
-    let input2 = "    > Four spaces should not work"; // This should be treated as code block or regular paragraph
+    let input2 = "    > Four spaces should not work"; // This should be treated as code block
 
     let tree1 = parse_blocks(input1);
 
@@ -271,9 +271,9 @@ fn spec_blockquote_max_three_space_indent() {
     // First should create blockquote
     assert_eq!(count_nodes_of_type(&tree1, SyntaxKind::BlockQuote), 1);
 
-    // Second should NOT create blockquote (should be treated as regular paragraph)
+    // Second should NOT create blockquote (should be treated as code block)
     assert_eq!(count_nodes_of_type(&tree2, SyntaxKind::BlockQuote), 0);
-    assert_eq!(count_nodes_of_type(&tree2, SyntaxKind::PARAGRAPH), 1);
+    assert_eq!(count_nodes_of_type(&tree2, SyntaxKind::CodeBlock), 1);
 }
 
 // Test lazy blockquote form

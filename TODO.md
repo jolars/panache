@@ -99,14 +99,14 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Small caps - `[text]{.smallcaps}`
 - ❌ Underline - `[text]{.underline}`
 
-### Code & Verbatim ⚠️
+### Code & Verbatim ✅
 
 - ✅ **Inline code** (`` `code` ``) - Full implementation with delimiter matching
 - ✅ Multi-backtick code spans (``` `` ` `` ```)
 - ✅ Code spans containing backticks
 - ✅ Proper whitespace preservation in code spans
 - ✅ **Fenced code blocks** (``` and ~~~) - Full implementation
-- ❌ **Indented code blocks** (4 spaces or 1 tab) - Not yet implemented
+- ✅ **Indented code blocks** (4 spaces or 1 tab) - Full implementation with blockquote support
 
 ### Links ✅
 

@@ -10,6 +10,7 @@ mod display_math;
 mod fenced_divs;
 mod headings;
 mod horizontal_rules;
+mod indented_code;
 mod lists;
 mod metadata;
 mod paragraphs;
@@ -24,6 +25,7 @@ use display_math::{parse_display_math_block, try_parse_math_fence_open};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
 use headings::{emit_atx_heading, try_parse_atx_heading};
 use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
+use indented_code::{is_indented_code_line, parse_indented_code_block};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 use tables::{
@@ -429,6 +431,18 @@ impl<'a> BlockParser<'a> {
             || self.lines[self.pos - 1].trim().is_empty()
             || matches!(self.containers.last(), Some(Container::BlockQuote { .. }));
 
+        // For indented code blocks, we need a stricter condition - only actual blank lines count
+        // Being at document start (pos == 0) is OK only if we're not inside a blockquote
+        let at_document_start = self.pos == 0 && self.current_blockquote_depth() == 0;
+        let prev_line_blank = if self.pos > 0 {
+            let prev_line = self.lines[self.pos - 1];
+            let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
+            prev_line.trim().is_empty() || (prev_bq_depth > 0 && prev_inner.trim().is_empty())
+        } else {
+            false
+        };
+        let has_blank_before_strict = at_document_start || prev_line_blank;
+
         // At top level only (not inside blockquotes), check for YAML metadata
         if self.current_blockquote_depth() == 0 && content.trim() == "---" {
             let at_document_start = self.pos == 0;
@@ -524,6 +538,16 @@ impl<'a> BlockParser<'a> {
             );
             let new_pos =
                 parse_fenced_code_block(&mut self.builder, &self.lines, self.pos, fence, bq_depth);
+            self.pos = new_pos;
+            return true;
+        }
+
+        // Check for indented code block (must have actual blank line before)
+        if has_blank_before_strict && is_indented_code_line(content) {
+            let bq_depth = self.current_blockquote_depth();
+            log::debug!("Parsed indented code block at line {}", self.pos);
+            let new_pos =
+                parse_indented_code_block(&mut self.builder, &self.lines, self.pos, bq_depth);
             self.pos = new_pos;
             return true;
         }
