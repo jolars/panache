@@ -124,7 +124,8 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Inline images `![alt](url)`
 - ✅ Nested inline elements in alt text (code, emphasis, math)
 - ❌ Reference images `![alt][ref]`
-- ❌ Extension: `implicit_figures` - Paragraph with just image becomes figure
+- ✅ Image attributes `![alt](url){#id .class key=value}`
+- N/A Extension: `implicit_figures` - Conversion feature, not formatting concern
 
 ### Math ✅
 

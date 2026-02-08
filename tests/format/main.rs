@@ -3,6 +3,7 @@ mod external_formatters;
 mod frontmatter;
 mod header_attributes;
 mod headings;
+mod image_attributes;
 mod inline_code_attributes;
 mod links;
 mod lists_unordered;

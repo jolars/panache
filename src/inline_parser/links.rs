@@ -4,15 +4,22 @@
 //! - Automatic links: `<http://example.com>` and `<user@example.com>`
 //! - Inline links: `[text](url)` and `[text](url "title")`
 //! - Inline images: `![alt](url)` and `![alt](url "title")`
+//! - Image attributes: `![alt](url){#id .class key=value}`
 
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+// Import attribute parsing
+use crate::block_parser::attributes::{
+    AttributeBlock, emit_attributes, try_parse_trailing_attributes,
+};
+
 /// Try to parse an inline image starting at the current position.
 ///
 /// Inline images have the form `![alt](url)` or `![alt](url "title")`.
-/// Returns Some((length, alt_text, dest_content)) if a valid image is found.
-pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str)> {
+/// Can also have trailing attributes: `![alt](url){#id .class}`.
+/// Returns Some((length, alt_text, dest_content, attributes)) if a valid image is found.
+pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str, Option<AttributeBlock>)> {
     if !text.starts_with("![") {
         return None;
     }
@@ -84,15 +91,34 @@ pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str)> {
     let close_paren = close_paren_pos?;
     let dest_content = &remaining[..close_paren];
 
-    // Total length: ![ + alt + ] + ( + dest + )
-    let total_len = dest_start + close_paren + 1;
+    // Check for trailing attributes {#id .class key=value}
+    let after_paren = dest_start + close_paren + 1;
+    let after_close = &text[after_paren..];
 
-    Some((total_len, alt_text, dest_content))
+    if let Some((attrs, _)) = try_parse_trailing_attributes(after_close) {
+        // Attributes must start immediately after closing paren (no space)
+        if after_close.starts_with('{') {
+            // Calculate total length including attributes
+            let attr_len = after_close.find('}').map(|i| i + 1).unwrap_or(0);
+            let total_len = after_paren + attr_len;
+            return Some((total_len, alt_text, dest_content, Some(attrs)));
+        }
+    }
+
+    // No attributes, just return the image
+    let total_len = after_paren;
+    Some((total_len, alt_text, dest_content, None))
 }
 
 /// Emit an inline image node to the builder.
 /// Note: alt_text may contain inline elements and should be parsed recursively.
-pub fn emit_inline_image(builder: &mut GreenNodeBuilder, _text: &str, alt_text: &str, dest: &str) {
+pub fn emit_inline_image(
+    builder: &mut GreenNodeBuilder,
+    _text: &str,
+    alt_text: &str,
+    dest: &str,
+    attributes: Option<AttributeBlock>,
+) {
     builder.start_node(SyntaxKind::ImageLink.into());
 
     // Opening ![
@@ -116,6 +142,11 @@ pub fn emit_inline_image(builder: &mut GreenNodeBuilder, _text: &str, alt_text: 
 
     // Closing )
     builder.token(SyntaxKind::TEXT.into(), ")");
+
+    // Emit attributes if present
+    if let Some(attrs) = attributes {
+        emit_attributes(builder, &attrs);
+    }
 
     builder.finish_node();
 }
@@ -388,21 +419,21 @@ mod tests {
     fn test_parse_inline_image_simple() {
         let input = "![alt](image.jpg)";
         let result = try_parse_inline_image(input);
-        assert_eq!(result, Some((17, "alt", "image.jpg")));
+        assert_eq!(result, Some((17, "alt", "image.jpg", None)));
     }
 
     #[test]
     fn test_parse_inline_image_with_title() {
         let input = r#"![alt](image.jpg "A title")"#;
         let result = try_parse_inline_image(input);
-        assert_eq!(result, Some((27, "alt", r#"image.jpg "A title""#)));
+        assert_eq!(result, Some((27, "alt", r#"image.jpg "A title""#, None)));
     }
 
     #[test]
     fn test_parse_inline_image_with_nested_brackets() {
         let input = "![outer [inner] alt](image.jpg)";
         let result = try_parse_inline_image(input);
-        assert_eq!(result, Some((31, "outer [inner] alt", "image.jpg")));
+        assert_eq!(result, Some((31, "outer [inner] alt", "image.jpg", None)));
     }
 
     #[test]
@@ -424,5 +455,55 @@ mod tests {
         let input = "![alt](image.jpg";
         let result = try_parse_inline_image(input);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_inline_image_with_simple_class() {
+        let input = "![alt](img.png){.large}";
+        let result = try_parse_inline_image(input);
+        let (len, alt, dest, attrs) = result.unwrap();
+        assert_eq!(len, 23);
+        assert_eq!(alt, "alt");
+        assert_eq!(dest, "img.png");
+        assert!(attrs.is_some());
+        let attrs = attrs.unwrap();
+        assert_eq!(attrs.classes, vec!["large"]);
+    }
+
+    #[test]
+    fn test_parse_inline_image_with_id() {
+        let input = "![Figure 1](fig1.png){#fig-1}";
+        let result = try_parse_inline_image(input);
+        let (len, alt, dest, attrs) = result.unwrap();
+        assert_eq!(len, 29);
+        assert_eq!(alt, "Figure 1");
+        assert_eq!(dest, "fig1.png");
+        assert!(attrs.is_some());
+        let attrs = attrs.unwrap();
+        assert_eq!(attrs.identifier, Some("fig-1".to_string()));
+    }
+
+    #[test]
+    fn test_parse_inline_image_with_full_attributes() {
+        let input = "![alt](img.png){#fig .large width=\"80%\"}";
+        let result = try_parse_inline_image(input);
+        let (len, alt, dest, attrs) = result.unwrap();
+        assert_eq!(len, 40);
+        assert_eq!(alt, "alt");
+        assert_eq!(dest, "img.png");
+        assert!(attrs.is_some());
+        let attrs = attrs.unwrap();
+        assert_eq!(attrs.identifier, Some("fig".to_string()));
+        assert_eq!(attrs.classes, vec!["large"]);
+        assert_eq!(attrs.key_values.len(), 1);
+        assert_eq!(attrs.key_values[0].0, "width");
+    }
+
+    #[test]
+    fn test_parse_inline_image_attributes_must_be_adjacent() {
+        // Space between ) and { should not parse as attributes
+        let input = "![alt](img.png) {.large}";
+        let result = try_parse_inline_image(input);
+        assert_eq!(result, Some((15, "alt", "img.png", None)));
     }
 }

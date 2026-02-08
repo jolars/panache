@@ -168,10 +168,10 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         if pos + 1 < text.len()
             && bytes[pos] == b'!'
             && bytes[pos + 1] == b'['
-            && let Some((len, alt_text, dest)) = try_parse_inline_image(&text[pos..])
+            && let Some((len, alt_text, dest, attributes)) = try_parse_inline_image(&text[pos..])
         {
             log::debug!("Matched inline image at pos {}: dest={}", pos, dest);
-            emit_inline_image(builder, &text[pos..pos + len], alt_text, dest);
+            emit_inline_image(builder, &text[pos..pos + len], alt_text, dest, attributes);
             pos += len;
             continue;
         }
