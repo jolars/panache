@@ -266,7 +266,7 @@ impl Extensions {
             // Raw
             raw_html: true,
             markdown_in_html_blocks: false,
-            raw_tex: false,
+            raw_tex: true,
 
             // Escapes
             all_symbols_escapable: true,
