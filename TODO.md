@@ -167,10 +167,10 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Extension: `markdown_in_html_blocks` - Markdown inside HTML blocks
 - ❌ Extension: `markdown_attribute` - `markdown="1"` attribute
 
-### Raw LaTeX ⚠️
+### Raw LaTeX ✅
 
 - ✅ Extension: `raw_tex` - Inline LaTeX commands (`\cite{ref}`, `\textbf{text}`, etc.)
-- ❌ Extension: `raw_tex` - Block LaTeX environments (`\begin{tabular}...\end{tabular}`)
+- ✅ Extension: `raw_tex` - Block LaTeX environments (`\begin{tabular}...\end{tabular}`)
 - ❌ Extension: `latex_macros` - Expand LaTeX macros
 
 ### Other Raw ❌

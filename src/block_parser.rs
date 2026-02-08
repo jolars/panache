@@ -11,6 +11,7 @@ mod fenced_divs;
 mod headings;
 mod horizontal_rules;
 mod indented_code;
+mod latex_envs;
 mod lists;
 mod metadata;
 mod paragraphs;
@@ -26,6 +27,7 @@ use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
 use headings::{emit_atx_heading, try_parse_atx_heading};
 use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use indented_code::{is_indented_code_line, parse_indented_code_block};
+use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 use tables::{
@@ -632,6 +634,33 @@ impl<'a> BlockParser<'a> {
                 .close_to(self.containers.depth() - 1, &mut self.builder);
 
             self.pos += 1;
+            return true;
+        }
+
+        // Check for LaTeX environment (if raw_tex extension is enabled)
+        if self.config.extensions.raw_tex
+            && let Some(env_info) = try_parse_latex_env_begin(content)
+        {
+            log::debug!(
+                "Parsed LaTeX environment at line {}: \\begin{{{}}}",
+                self.pos,
+                env_info.env_name
+            );
+            // Close paragraph before opening LaTeX environment
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            let bq_depth = self.current_blockquote_depth();
+            let new_pos = parse_latex_environment(
+                &mut self.builder,
+                &self.lines,
+                self.pos,
+                env_info,
+                bq_depth,
+            );
+            self.pos = new_pos;
             return true;
         }
 
