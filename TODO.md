@@ -95,7 +95,8 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Overlapping and adjacent emphasis handling
 - ✅ Extension: `intraword_underscores` - `snake_case` handling
 - ✅ Extension: `strikeout` - `~~strikethrough~~`
-- ❌ Extension: `superscript`, `subscript` - `^super^` and `~sub~`
+- ✅ Extension: `superscript` - `^super^`
+- ✅ Extension: `subscript` - `~sub~`
 - ❌ Small caps - `[text]{.smallcaps}`
 - ❌ Underline - `[text]{.underline}`
 

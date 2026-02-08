@@ -13,6 +13,8 @@ mod inline_math;
 mod latex;
 mod links;
 mod strikeout;
+mod subscript;
+mod superscript;
 mod tests;
 
 use bracketed_spans::{emit_bracketed_span, try_parse_bracketed_span};
@@ -29,6 +31,8 @@ use links::{
     try_parse_inline_link,
 };
 use strikeout::{emit_strikeout, try_parse_strikeout};
+use subscript::{emit_subscript, try_parse_subscript};
+use superscript::{emit_superscript, try_parse_superscript};
 
 /// Parse inline elements from text content.
 /// This is a standalone function used by both the main inline parser
@@ -87,6 +91,28 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         {
             log::debug!("Matched inline footnote at pos {}", pos);
             emit_inline_footnote(builder, content);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse superscript (^text^)
+        // Must come after inline footnote check to avoid conflict with ^[
+        if bytes[pos] == b'^'
+            && let Some((len, content)) = try_parse_superscript(&text[pos..])
+        {
+            log::debug!("Matched superscript at pos {}", pos);
+            emit_superscript(builder, content);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse subscript (~text~)
+        // Must come before strikeout check to avoid conflict with ~~
+        if bytes[pos] == b'~'
+            && let Some((len, content)) = try_parse_subscript(&text[pos..])
+        {
+            log::debug!("Matched subscript at pos {}", pos);
+            emit_subscript(builder, content);
             pos += len;
             continue;
         }

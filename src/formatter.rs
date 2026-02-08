@@ -977,6 +977,38 @@ impl Formatter {
                 self.output.push_str("~~");
             }
 
+            SyntaxKind::Superscript => {
+                // Format superscript with carets
+                self.output.push('^');
+                for child in node.children_with_tokens() {
+                    match child {
+                        rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
+                        rowan::NodeOrToken::Token(t) => {
+                            if t.kind() != SyntaxKind::SuperscriptMarker {
+                                self.output.push_str(t.text());
+                            }
+                        }
+                    }
+                }
+                self.output.push('^');
+            }
+
+            SyntaxKind::Subscript => {
+                // Format subscript with tildes
+                self.output.push('~');
+                for child in node.children_with_tokens() {
+                    match child {
+                        rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
+                        rowan::NodeOrToken::Token(t) => {
+                            if t.kind() != SyntaxKind::SubscriptMarker {
+                                self.output.push_str(t.text());
+                            }
+                        }
+                    }
+                }
+                self.output.push('~');
+            }
+
             _ => {
                 // Fallback: append node text (should be rare with children_with_tokens above)
                 self.output.push_str(&node.text().to_string());

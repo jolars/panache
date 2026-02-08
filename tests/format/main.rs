@@ -9,4 +9,6 @@ mod paragraphs;
 mod preserve_wrap;
 mod quotes;
 mod strikeout;
+mod subscript;
+mod superscript;
 mod tex;
