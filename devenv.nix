@@ -10,6 +10,8 @@
     pkgs.wasm-pack
     pkgs.llvmPackages.bintools
     pkgs.bashInteractive
+    pkgs.cmark
+    pkgs.pandoc
   ];
 
   languages.rust = {
