@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
-mod attributes;
+pub mod attributes; // Public for use in inline_parser
 mod blockquotes;
 mod code_blocks;
 mod container_stack;

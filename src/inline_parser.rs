@@ -71,14 +71,15 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
 
         // Try to parse code span
         if bytes[pos] == b'`'
-            && let Some((len, content, backtick_count)) = try_parse_code_span(&text[pos..])
+            && let Some((len, content, backtick_count, attributes)) =
+                try_parse_code_span(&text[pos..])
         {
             log::debug!(
                 "Matched code span at pos {}: {} backticks",
                 pos,
                 backtick_count
             );
-            emit_code_span(builder, content, backtick_count);
+            emit_code_span(builder, content, backtick_count, attributes);
             pos += len;
             continue;
         }

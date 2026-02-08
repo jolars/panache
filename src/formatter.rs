@@ -201,6 +201,35 @@ impl Formatter {
         use rowan::NodeOrToken;
 
         match node.kind() {
+            SyntaxKind::CodeSpan => {
+                let mut content = String::new();
+                let mut backtick_count = 1;
+                let mut attributes = String::new();
+
+                for child in node.children_with_tokens() {
+                    match child {
+                        NodeOrToken::Node(n) if n.kind() == SyntaxKind::Attribute => {
+                            attributes = n.text().to_string();
+                        }
+                        NodeOrToken::Token(t) => {
+                            if t.kind() == SyntaxKind::CodeSpanMarker {
+                                backtick_count = t.text().len();
+                            } else if t.kind() != SyntaxKind::Attribute {
+                                content.push_str(t.text());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                format!(
+                    "{}{}{}{}",
+                    "`".repeat(backtick_count),
+                    content,
+                    "`".repeat(backtick_count),
+                    attributes
+                )
+            }
             SyntaxKind::Emphasis => {
                 let mut content = String::new();
                 for child in node.children_with_tokens() {

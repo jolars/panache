@@ -58,7 +58,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Indented code blocks (4-space indent)
 - ✅ Extension: `fenced_code_attributes` - `{.language #id}`
 - ✅ Extension: `backtick_code_blocks` - Backtick-only fences
-- ❌ Extension: `inline_code_attributes` - Attributes on inline code
+- ✅ Extension: `inline_code_attributes` - Attributes on inline code
 
 ### Horizontal Rules ✅
 
