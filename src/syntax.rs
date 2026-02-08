@@ -59,10 +59,12 @@ pub enum SyntaxKind {
     CodeBlock,
 
     // Inline emphasis and formatting
-    Emphasis,       // *text* or _text_
-    Strong,         // **text** or __text__
-    EmphasisMarker, // * or _ (for emphasis)
-    StrongMarker,   // ** or __ (for strong)
+    Emphasis,        // *text* or _text_
+    Strong,          // **text** or __text__
+    Strikeout,       // ~~text~~
+    EmphasisMarker,  // * or _ (for emphasis)
+    StrongMarker,    // ** or __ (for strong)
+    StrikeoutMarker, // ~~ (for strikeout)
 
     // Composite nodes
     ROOT,

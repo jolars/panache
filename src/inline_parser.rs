@@ -12,6 +12,7 @@ mod inline_footnotes;
 mod inline_math;
 mod latex;
 mod links;
+mod strikeout;
 mod tests;
 
 use bracketed_spans::{emit_bracketed_span, try_parse_bracketed_span};
@@ -27,6 +28,7 @@ use links::{
     emit_autolink, emit_inline_image, emit_inline_link, try_parse_autolink, try_parse_inline_image,
     try_parse_inline_link,
 };
+use strikeout::{emit_strikeout, try_parse_strikeout};
 
 /// Parse inline elements from text content.
 /// This is a standalone function used by both the main inline parser
@@ -85,6 +87,18 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         {
             log::debug!("Matched inline footnote at pos {}", pos);
             emit_inline_footnote(builder, content);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse strikeout (~~text~~)
+        if bytes[pos] == b'~'
+            && pos + 1 < text.len()
+            && bytes[pos + 1] == b'~'
+            && let Some((len, content)) = try_parse_strikeout(&text[pos..])
+        {
+            log::debug!("Matched strikeout at pos {}", pos);
+            emit_strikeout(builder, content);
             pos += len;
             continue;
         }
@@ -199,7 +213,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
 fn find_next_inline_start(text: &str) -> usize {
     for (i, ch) in text.char_indices() {
         match ch {
-            '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' | '^' => return i.max(1),
+            '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' | '^' | '~' => return i.max(1),
             _ => {}
         }
     }

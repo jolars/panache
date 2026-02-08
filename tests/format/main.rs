@@ -8,4 +8,5 @@ mod math;
 mod paragraphs;
 mod preserve_wrap;
 mod quotes;
+mod strikeout;
 mod tex;

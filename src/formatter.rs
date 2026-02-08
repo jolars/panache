@@ -961,6 +961,22 @@ impl Formatter {
                 self.output.push_str("**");
             }
 
+            SyntaxKind::Strikeout => {
+                // Format strikeout with tildes
+                self.output.push_str("~~");
+                for child in node.children_with_tokens() {
+                    match child {
+                        rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
+                        rowan::NodeOrToken::Token(t) => {
+                            if t.kind() != SyntaxKind::StrikeoutMarker {
+                                self.output.push_str(t.text());
+                            }
+                        }
+                    }
+                }
+                self.output.push_str("~~");
+            }
+
             _ => {
                 // Fallback: append node text (should be rare with children_with_tokens above)
                 self.output.push_str(&node.text().to_string());
