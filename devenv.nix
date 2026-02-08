@@ -12,6 +12,8 @@
     pkgs.bashInteractive
     pkgs.cmark
     pkgs.pandoc
+    pkgs.air
+    pkgs.ruff
   ];
 
   languages.rust = {
