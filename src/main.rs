@@ -58,7 +58,8 @@ fn start_dir_for(input_path: &Option<PathBuf>) -> io::Result<PathBuf> {
     }
 }
 
-fn main() -> io::Result<()> {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     env_logger::init();
 
     let cli = Cli::parse();
@@ -81,7 +82,7 @@ fn main() -> io::Result<()> {
             Ok(())
         }
         Some(Commands::Format { check, write }) => {
-            let output = format(&input, Some(cfg));
+            let output = format(&input, Some(cfg)).await;
 
             if check {
                 if input != output {
@@ -105,7 +106,7 @@ fn main() -> io::Result<()> {
         }
         None => {
             // Default to format when no subcommand specified
-            let output = format(&input, Some(cfg));
+            let output = format(&input, Some(cfg)).await;
             print!("{output}");
             Ok(())
         }

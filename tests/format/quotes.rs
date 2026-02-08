@@ -1,18 +1,18 @@
 use panache::format;
 
-#[test]
-fn quote_single_line() {
+#[tokio::test]
+async fn quote_single_line() {
     let input = "> This is a single line quote.\n";
-    let output = format(input, None);
+    let output = format(input, None).await;
 
     assert!(output.starts_with("> "));
     assert!(output.contains("single line quote"));
 }
 
-#[test]
-fn quote_multi_line_continuous() {
+#[tokio::test]
+async fn quote_multi_line_continuous() {
     let input = "> This is a multi-line quote\n> that continues on the next line.\n";
-    let output = format(input, None);
+    let output = format(input, None).await;
 
     for line in output.lines() {
         assert!(

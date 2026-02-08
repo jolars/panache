@@ -5,8 +5,8 @@ fn normalize(s: &str) -> String {
     s.replace("\r\n", "\n")
 }
 
-#[test]
-fn golden_cases() {
+#[tokio::test]
+async fn golden_cases() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("cases");
@@ -26,10 +26,10 @@ fn golden_cases() {
         let expected_path = dir.join("expected.qmd");
 
         let input = normalize(&fs::read_to_string(&input_path).unwrap());
-        let output = format(&input, None);
+        let output = format(&input, None).await;
 
         // Idempotency: formatting twice should equal once
-        let output_twice = format(&output, None);
+        let output_twice = format(&output, None).await;
         similar_asserts::assert_eq!(
             output,
             output_twice,

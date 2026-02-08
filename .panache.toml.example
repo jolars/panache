@@ -1,0 +1,59 @@
+# Example panache configuration with external formatters
+
+# Markdown flavor (affects default extensions)
+flavor = "quarto"  # Options: pandoc, quarto, rmarkdown, gfm, commonmark
+
+# Line width for wrapping
+line_width = 80
+
+# Wrapping mode
+wrap = "reflow"  # Options: "reflow", "preserve"
+
+# Blank line handling
+blank_lines = "collapse"  # Options: "collapse", "preserve"
+
+# External code formatters
+# Each formatter runs on code blocks with the matching language tag
+# Formatters are invoked with code piped to stdin and expect formatted code on stdout
+
+[formatters.r]
+cmd = "styler"
+args = ["--scope=spaces"]
+enabled = true
+
+[formatters.python]
+cmd = "black"
+args = ["-", "--line-length=88"]
+enabled = true
+
+[formatters.rust]
+cmd = "rustfmt"
+args = []
+enabled = true
+
+[formatters.javascript]
+cmd = "prettier"
+args = ["--parser=babel", "--stdin-filepath=file.js"]
+enabled = true
+
+[formatters.typescript]
+cmd = "prettier"
+args = ["--parser=typescript", "--stdin-filepath=file.ts"]
+enabled = true
+
+[formatters.json]
+cmd = "jq"
+args = ["."]
+enabled = true
+
+[formatters.yaml]
+cmd = "yamlfmt"
+args = ["-"]
+enabled = false  # Disabled by default
+
+# Notes:
+# - Formatters must accept input via stdin and output to stdout
+# - Empty cmd or disabled=false will skip formatting for that language
+# - Formatter failures preserve original code with a warning
+# - Formatters timeout after 30 seconds
+# - Formatters respect their own config files (.prettierrc, .rustfmt.toml, etc.)

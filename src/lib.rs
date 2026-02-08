@@ -1,5 +1,6 @@
 pub mod block_parser;
 pub mod config;
+pub mod external_formatters;
 pub mod formatter;
 pub mod inline_parser;
 pub mod syntax;
@@ -7,7 +8,7 @@ pub mod syntax;
 pub use config::BlankLines;
 pub use config::Config;
 pub use config::ConfigBuilder;
-pub use formatter::format_tree;
+pub use formatter::format_tree_async;
 pub use syntax::SyntaxNode;
 
 fn init_logger() {
@@ -37,20 +38,22 @@ fn detect_line_ending(input: &str) -> &str {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```no_run
+/// # async {
 /// use panache::format;
 ///
 /// let cfg = panache::ConfigBuilder::default().line_width(80).build();
 ///
 /// let input = "This is a very long line that should be wrapped.";
-/// let formatted = format(input, Some(cfg));
+/// let formatted = format(input, Some(cfg)).await;
+/// # };
 /// ```
 ///
 /// # Arguments
 ///
 /// * `input` - The Quarto document content to format
-/// * `line_width` - Optional line width (defaults to 80)
-pub fn format(input: &str, config: Option<Config>) -> String {
+/// * `config` - Optional configuration (defaults to default config)
+pub async fn format(input: &str, config: Option<Config>) -> String {
     #[cfg(debug_assertions)]
     {
         init_logger();
@@ -67,8 +70,8 @@ pub fn format(input: &str, config: Option<Config>) -> String {
     // Step 2: Run inline parser on block content to create final CST
     let tree = inline_parser::InlineParser::new(block_tree, config.clone()).parse();
 
-    // Step 3: Format the final CST
-    let out = format_tree(&tree, &config);
+    // Step 3: Format the final CST (with external formatters if configured)
+    let out = formatter::format_tree_async(&tree, &config).await;
 
     if line_ending == "\r\n" {
         out.replace("\n", "\r\n")
@@ -77,8 +80,8 @@ pub fn format(input: &str, config: Option<Config>) -> String {
     }
 }
 
-pub fn format_with_defaults(input: &str) -> String {
-    format(input, None)
+pub async fn format_with_defaults(input: &str) -> String {
+    format(input, None).await
 }
 
 /// Parses a Quarto document string into a syntax tree.

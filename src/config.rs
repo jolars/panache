@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io;
@@ -401,6 +402,34 @@ impl Extensions {
     }
 }
 
+/// Configuration for an external code formatter.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct FormatterConfig {
+    /// Command to execute (e.g., "black", "air", "rustfmt")
+    pub cmd: String,
+    /// Arguments to pass to the command (e.g., ["-", "--line-length=80"])
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// Whether this formatter is enabled
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for FormatterConfig {
+    fn default() -> Self {
+        Self {
+            cmd: String::new(),
+            args: Vec::new(),
+            enabled: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -411,6 +440,9 @@ pub struct Config {
     pub math_indent: usize,
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
+    /// External code formatters keyed by language name (e.g., "r", "python")
+    #[serde(default)]
+    pub formatters: HashMap<String, FormatterConfig>,
 }
 
 impl Default for Config {
@@ -424,6 +456,7 @@ impl Default for Config {
             math_indent: 0,
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
+            formatters: HashMap::new(),
         }
     }
 }
@@ -560,12 +593,92 @@ pub fn load(explicit: Option<&Path>, start_dir: &Path) -> io::Result<(Config, Op
     Ok((Config::default(), None))
 }
 
-#[test]
-fn missing_fields_panics_on_unwrap() {
-    let toml_str = r#"
-        wrap = "reflow"
-    "#;
-    let cfg = toml::from_str::<Config>(toml_str).unwrap();
-    let line_width = cfg.line_width; // This will panic and fail the test
-    assert_eq!(line_width, 80);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_fields_uses_defaults() {
+        let toml_str = r#"
+            wrap = "reflow"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        assert_eq!(cfg.line_width, 80);
+        assert!(cfg.formatters.is_empty());
+    }
+
+    #[test]
+    fn formatter_config_basic() {
+        let toml_str = r#"
+            [formatters.python]
+            cmd = "black"
+            args = ["-"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let python_fmt = cfg.formatters.get("python").unwrap();
+        assert_eq!(python_fmt.cmd, "black");
+        assert_eq!(python_fmt.args, vec!["-"]);
+        assert!(python_fmt.enabled);
+    }
+
+    #[test]
+    fn formatter_config_multiple_languages() {
+        let toml_str = r#"
+            [formatters.r]
+            cmd = "air"
+            args = ["--preset=tidyverse"]
+            
+            [formatters.python]
+            cmd = "black"
+            args = ["-", "--line-length=88"]
+            
+            [formatters.rust]
+            cmd = "rustfmt"
+            enabled = false
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert_eq!(cfg.formatters.len(), 3);
+
+        let r_fmt = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmt.cmd, "air");
+        assert_eq!(r_fmt.args, vec!["--preset=tidyverse"]);
+        assert!(r_fmt.enabled);
+
+        let py_fmt = cfg.formatters.get("python").unwrap();
+        assert_eq!(py_fmt.cmd, "black");
+        assert_eq!(py_fmt.args.len(), 2);
+
+        let rust_fmt = cfg.formatters.get("rust").unwrap();
+        assert_eq!(rust_fmt.cmd, "rustfmt");
+        assert!(!rust_fmt.enabled);
+    }
+
+    #[test]
+    fn formatter_config_no_args() {
+        let toml_str = r#"
+            [formatters.rustfmt]
+            cmd = "rustfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let fmt = cfg.formatters.get("rustfmt").unwrap();
+        assert_eq!(fmt.cmd, "rustfmt");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.enabled);
+    }
+
+    #[test]
+    fn formatter_empty_cmd_is_valid() {
+        // Empty cmd is technically valid in deserialization
+        // Validation happens at runtime
+        let toml_str = r#"
+            [formatters.test]
+            cmd = ""
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = cfg.formatters.get("test").unwrap();
+        assert_eq!(fmt.cmd, "");
+    }
 }

@@ -1,7 +1,10 @@
 use crate::config::{BlankLines, Config, WrapMode};
+use crate::external_formatters::format_code_async;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 use rowan::NodeOrToken;
+use std::collections::HashMap;
+use std::time::Duration;
 use textwrap::wrap_algorithms::WrapAlgorithm;
 
 pub struct Formatter {
@@ -9,6 +12,7 @@ pub struct Formatter {
     config: Config,
     consecutive_blank_lines: usize,
     fenced_div_depth: usize,
+    formatted_code: HashMap<String, String>,
 }
 
 fn is_block_element(kind: SyntaxKind) -> bool {
@@ -26,12 +30,13 @@ fn is_block_element(kind: SyntaxKind) -> bool {
 }
 
 impl Formatter {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, formatted_code: HashMap<String, String>) -> Self {
         Self {
             output: String::with_capacity(8192),
             config,
             consecutive_blank_lines: 0,
             fenced_div_depth: 0,
+            formatted_code,
         }
     }
 
@@ -265,11 +270,11 @@ impl Formatter {
     }
 
     pub fn format(mut self, node: &SyntaxNode) -> String {
-        self.format_node(node, 0);
+        self.format_node_sync(node, 0);
         self.output
     }
 
-    fn format_node(&mut self, node: &SyntaxNode, indent: usize) {
+    fn format_node_sync(&mut self, node: &SyntaxNode, indent: usize) {
         // Reset blank line counter when we hit a non-blank node
         if node.kind() != SyntaxKind::BlankLine {
             self.consecutive_blank_lines = 0;
@@ -281,7 +286,7 @@ impl Formatter {
             SyntaxKind::ROOT | SyntaxKind::DOCUMENT => {
                 for el in node.children_with_tokens() {
                     match el {
-                        rowan::NodeOrToken::Node(n) => self.format_node(&n, indent),
+                        rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
                         rowan::NodeOrToken::Token(t) => match t.kind() {
                             SyntaxKind::WHITESPACE => {}
                             SyntaxKind::NEWLINE => {}
@@ -468,7 +473,7 @@ impl Formatter {
                             // Save current output, format list to temp, then prefix each line
                             let saved_output = self.output.clone();
                             self.output.clear();
-                            self.format_node(&child, indent);
+                            self.format_node_sync(&child, indent);
                             let list_output = self.output.clone();
                             self.output = saved_output;
 
@@ -487,7 +492,7 @@ impl Formatter {
                             // Save current output, format code block to temp, then prefix each line
                             let saved_output = self.output.clone();
                             self.output.clear();
-                            self.format_node(&child, indent);
+                            self.format_node_sync(&child, indent);
                             let code_output = self.output.clone();
                             self.output = saved_output;
 
@@ -503,7 +508,7 @@ impl Formatter {
                         }
                         _ => {
                             // Handle other content within block quotes
-                            self.format_node(&child, indent);
+                            self.format_node_sync(&child, indent);
                         }
                     }
                 }
@@ -584,7 +589,7 @@ impl Formatter {
                     if child.kind() == SyntaxKind::BlankLine {
                         continue;
                     }
-                    self.format_node(&child, indent);
+                    self.format_node_sync(&child, indent);
                 }
                 if !self.output.ends_with('\n') {
                     self.output.push('\n');
@@ -600,7 +605,7 @@ impl Formatter {
                     if child.kind() == SyntaxKind::BlankLine {
                         continue;
                     }
-                    self.format_node(&child, indent);
+                    self.format_node_sync(&child, indent);
                 }
                 if !self.output.ends_with('\n') {
                     self.output.push('\n');
@@ -613,7 +618,7 @@ impl Formatter {
                     if child.kind() == SyntaxKind::BlankLine {
                         continue; // Skip blank lines for compact format
                     }
-                    self.format_node(&child, indent);
+                    self.format_node_sync(&child, indent);
                 }
             }
 
@@ -628,7 +633,7 @@ impl Formatter {
                             self.output.push('\n');
                         }
                         NodeOrToken::Node(n) => {
-                            self.format_node(&n, indent);
+                            self.format_node_sync(&n, indent);
                         }
                         _ => {}
                     }
@@ -653,7 +658,7 @@ impl Formatter {
                             // Skip - we normalize spacing
                         }
                         NodeOrToken::Node(n) => {
-                            self.format_node(&n, indent + 4);
+                            self.format_node_sync(&n, indent + 4);
                         }
                         _ => {}
                     }
@@ -790,7 +795,7 @@ impl Formatter {
                 // Format nested lists inside this list item aligned to the content column.
                 for child in node.children() {
                     if child.kind() == SyntaxKind::List {
-                        self.format_node(&child, total_indent + marker.len() + 1);
+                        self.format_node_sync(&child, total_indent + marker.len() + 1);
                     }
                 }
             }
@@ -838,7 +843,7 @@ impl Formatter {
                         child.kind(),
                         SyntaxKind::DivFenceOpen | SyntaxKind::DivInfo | SyntaxKind::DivFenceClose
                     ) {
-                        self.format_node(&child, indent);
+                        self.format_node_sync(&child, indent);
                     }
                 }
 
@@ -929,7 +934,7 @@ impl Formatter {
                 self.output.push('*');
                 for child in node.children_with_tokens() {
                     match child {
-                        rowan::NodeOrToken::Node(n) => self.format_node(&n, indent),
+                        rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
                         rowan::NodeOrToken::Token(t) => {
                             if t.kind() != SyntaxKind::EmphasisMarker {
                                 self.output.push_str(t.text());
@@ -945,7 +950,7 @@ impl Formatter {
                 self.output.push_str("**");
                 for child in node.children_with_tokens() {
                     match child {
-                        rowan::NodeOrToken::Node(n) => self.format_node(&n, indent),
+                        rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
                         rowan::NodeOrToken::Token(t) => {
                             if t.kind() != SyntaxKind::StrongMarker {
                                 self.output.push_str(t.text());
@@ -1145,16 +1150,162 @@ impl Formatter {
             }
         }
 
+        // Check if we have formatted version from external formatter
+        let final_content = self.formatted_code.get(&content).unwrap_or(&content);
+
         // Output normalized code block with exactly 3 backticks
         self.output.push_str("```");
         if !info_string.is_empty() {
             self.output.push_str(&info_string);
         }
         self.output.push('\n');
-        self.output.push_str(&content);
+        self.output.push_str(final_content);
         self.output.push_str("```");
         self.output.push('\n');
     }
+}
+
+/// Collect all code blocks and their info strings from the syntax tree.
+fn collect_code_blocks(tree: &SyntaxNode) -> Vec<(String, String)> {
+    let mut blocks = Vec::new();
+
+    for node in tree.descendants() {
+        if node.kind() == SyntaxKind::CodeBlock {
+            let mut info_string = String::new();
+            let mut content = String::new();
+
+            for child in node.children_with_tokens() {
+                if let NodeOrToken::Node(n) = child {
+                    match n.kind() {
+                        SyntaxKind::CodeFenceOpen => {
+                            for token in n.children_with_tokens() {
+                                if let NodeOrToken::Token(t) = token
+                                    && t.kind() == SyntaxKind::CodeInfo
+                                {
+                                    info_string = t.text().to_string().trim().to_lowercase();
+                                }
+                            }
+                        }
+                        SyntaxKind::CodeContent => {
+                            content = n.text().to_string();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if !content.is_empty() {
+                blocks.push((info_string, content));
+            }
+        }
+    }
+
+    blocks
+}
+
+/// Spawn external formatters for code blocks and await results.
+/// Returns a HashMap of original code -> formatted code (only successful formats).
+async fn spawn_and_await_formatters(
+    blocks: Vec<(String, String)>,
+    config: &Config,
+) -> HashMap<String, String> {
+    let mut tasks = Vec::new();
+    let timeout = Duration::from_secs(30);
+
+    // Spawn all formatter tasks immediately
+    for (lang, code) in blocks {
+        if let Some(formatter_cfg) = config.formatters.get(&lang)
+            && formatter_cfg.enabled
+            && !formatter_cfg.cmd.is_empty()
+        {
+            let formatter_cfg = formatter_cfg.clone();
+            let code = code.clone();
+            let lang = lang.clone();
+
+            let task = tokio::spawn(async move {
+                log::info!("Formatting {} code with {}", lang, formatter_cfg.cmd);
+                let result = format_code_async(&code, &formatter_cfg, timeout).await;
+                (lang, code, result)
+            });
+
+            tasks.push(task);
+        }
+    }
+
+    let mut formatted = HashMap::new();
+
+    // Await all results
+    for task in tasks {
+        if let Ok((lang, original_code, result)) = task.await {
+            match result {
+                Ok(formatted_code) => {
+                    log::debug!(
+                        "Successfully formatted {} code: {} bytes -> {} bytes",
+                        lang,
+                        original_code.len(),
+                        formatted_code.len()
+                    );
+                    // Only store if content changed
+                    if formatted_code != original_code {
+                        formatted.insert(original_code, formatted_code);
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to format {} code: {}", lang, e);
+                    // Original code will be used (not in map)
+                }
+            }
+        }
+    }
+
+    formatted
+}
+
+/// Async entry point for formatting with external formatter support.
+pub async fn format_tree_async(tree: &SyntaxNode, config: &Config) -> String {
+    log::info!(
+        "Formatting document with config: line_width={}, wrap={:?}",
+        config.line_width,
+        config.wrap
+    );
+
+    // Step 1: Spawn all external formatters immediately (run in background)
+    let formatted_code_future = if !config.formatters.is_empty() {
+        let code_blocks = collect_code_blocks(tree);
+        if !code_blocks.is_empty() {
+            log::debug!(
+                "Found {} code blocks, spawning formatters...",
+                code_blocks.len()
+            );
+            let config_clone = config.clone();
+            Some(tokio::spawn(async move {
+                spawn_and_await_formatters(code_blocks, &config_clone).await
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Step 2: Format markdown (runs while formatters are working in background)
+    let formatter_with_empty_map = Formatter::new(config.clone(), HashMap::new());
+    let mut output = formatter_with_empty_map.format(tree);
+
+    // Step 3: Await formatter results and apply if available
+    if let Some(handle) = formatted_code_future
+        && let Ok(formatted_code) = handle.await
+        && !formatted_code.is_empty()
+    {
+        log::debug!("Applying {} formatted code blocks", formatted_code.len());
+        // Replace code in the output
+        for (original, formatted) in &formatted_code {
+            output = output.replace(original, formatted);
+        }
+    }
+
+    log::info!("Formatting complete: {} bytes output", output.len());
+    output
 }
 
 pub fn format_tree(tree: &SyntaxNode, config: &Config) -> String {
@@ -1163,7 +1314,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config) -> String {
         config.line_width,
         config.wrap
     );
-    let result = Formatter::new(config.clone()).format(tree);
+    let result = Formatter::new(config.clone(), HashMap::new()).format(tree);
     log::info!("Formatting complete: {} bytes output", result.len());
     result
 }

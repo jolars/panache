@@ -40,9 +40,59 @@ panache looks for a configuration in:
 ### Example config
 
 ```toml
+# Markdown flavor and line width
+flavor = "quarto"
 line_width = 80
 line-ending = "auto"
+wrap = "reflow"
+
+# External code formatters (new!)
+[formatters.r]
+cmd = "styler"
+args = ["--scope=spaces"]
+
+[formatters.python]
+cmd = "black"
+args = ["-", "--line-length=88"]
+
+[formatters.rust]
+cmd = "rustfmt"
+args = []
 ```
+
+See `.panache.toml.example` for a complete configuration reference.
+
+### External Code Formatters
+
+panache can invoke external formatters for code blocks:
+
+- **Formatters run in true parallel**: External formatters execute simultaneously with panache's markdown formatting for maximum performance
+- Each formatter must accept code via stdin and output to stdout
+- Formatters respect their own config files (`.prettierrc`, `pyproject.toml`, etc.)
+- On error, original code is preserved with a warning logged
+- 30-second timeout per formatter invocation
+
+**Performance**: If your document has 3 code blocks and each formatter takes 1 second, all 3 will complete in ~1 second (not 3 seconds sequentially).
+
+**Example**: Format R code with `styler` and Python with `black`:
+
+```toml
+[formatters.r]
+cmd = "styler"
+args = ["--scope=spaces"]
+
+[formatters.python]
+cmd = "black"
+args = ["-"]
+```
+
+**Supported formatters** (any CLI tool that reads stdin/writes stdout):
+- R: `styler`, `formatR`
+- Python: `black`, `ruff format`, `autopep8`
+- Rust: `rustfmt`
+- JavaScript/TypeScript: `prettier`, `deno fmt`
+- JSON: `jq`
+- And any other stdin/stdout formatter!
 
 ## Motivation
 
@@ -58,6 +108,5 @@ some of the table syntax.
 - Be configurable, but have sane defaults (that most people can
   agree on)
 - Format math
-- Hook into external formatters for code blocks (e.g. `air` for R code blocks,
-  `ruff` for Python code blocks, etc.)
+- ✅ Hook into external formatters for code blocks (e.g. `styler` for R, `black` for Python)
 
