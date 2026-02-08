@@ -25,7 +25,9 @@ considered part of the block quote marker and not part of the indentation of the
 contents. Thus, to put an indented code block in a block quote, you need five
 spaces after the `>`:
 
->     code
+> ```
+> code
+> ```
 
 ### Extension: `blank_before_blockquote`
 

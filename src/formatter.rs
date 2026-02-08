@@ -482,6 +482,25 @@ impl Formatter {
                                 self.output.push('\n');
                             }
                         }
+                        SyntaxKind::CodeBlock => {
+                            // Format code block with blockquote prefix
+                            // Save current output, format code block to temp, then prefix each line
+                            let saved_output = self.output.clone();
+                            self.output.clear();
+                            self.format_node(&child, indent);
+                            let code_output = self.output.clone();
+                            self.output = saved_output;
+
+                            for line in code_output.lines() {
+                                if line.is_empty() {
+                                    self.output.push_str(blank_prefix);
+                                } else {
+                                    self.output.push_str(&content_prefix);
+                                    self.output.push_str(line);
+                                }
+                                self.output.push('\n');
+                            }
+                        }
                         _ => {
                             // Handle other content within block quotes
                             self.format_node(&child, indent);
