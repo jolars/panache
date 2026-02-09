@@ -145,11 +145,6 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 - ✅ Inline footnotes `^[note text]` - Full support with nested inline elements
 - ✅ Reference footnotes `[^1]` with definition block
-  - ✅ Parsing and inline reference support
-  - ✅ Lazy continuation in definitions
-  - ⚠️  **Known limitation**: Footnote content is preserved as-is (not wrapped/formatted)
-    - Content should be parsed as container blocks (like lists/blockquotes)
-    - Requires refactoring to use container stack approach
 - ✅ Extension: `inline_notes` - Inline note syntax
 - ✅ Extension: `footnotes` - Reference-style footnotes
 
@@ -252,7 +247,7 @@ These extensions are **not enabled by default** in Pandoc and are lower priority
 
 ### Non-Default: Quarto-Specific
 
-- ❌ Quarto executable code cells with output
+- ✅ Quarto executable code cells with output
 - ❌ Quarto cross-references `@fig-id`, `@tbl-id`
 - ❌ Quarto callout blocks (`.callout-note`, etc.)
 
