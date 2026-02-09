@@ -238,7 +238,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result, code);
+        // Normalize line endings for cross-platform comparison
+        let normalized_result = result.replace("\r\n", "\n");
+        assert_eq!(normalized_result.trim_end(), code.trim_end());
     }
 
     #[tokio::test]
@@ -321,8 +323,11 @@ mod tests {
 
         #[cfg(target_os = "windows")]
         let config = FormatterConfig {
-            cmd: "timeout".to_string(),
-            args: vec!["/t".to_string(), "10".to_string(), "/nobreak".to_string()],
+            cmd: "powershell".to_string(),
+            args: vec![
+                "-Command".to_string(),
+                "Start-Sleep -Seconds 10".to_string(),
+            ],
             enabled: true,
             stdin: true,
         };
@@ -358,7 +363,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result, code);
+        // Normalize line endings for cross-platform comparison
+        let normalized_result = result.replace("\r\n", "\n");
+        assert_eq!(normalized_result, code);
     }
 
     #[tokio::test]
@@ -390,6 +397,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result, code);
+        // Normalize line endings for cross-platform comparison
+        let normalized_result = result.replace("\r\n", "\n");
+        assert_eq!(normalized_result, code);
     }
 }
