@@ -170,3 +170,220 @@ fn list_after_paragraph() {
         ],
     );
 }
+
+// Fancy lists tests - require fancy_lists extension
+
+#[test]
+fn fancy_list_lower_alpha_period() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "a. first\nb. second\nc. third\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn fancy_list_lower_alpha_right_paren() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "a) first\nb) second\nc) third\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn fancy_list_lower_alpha_parens() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "(a) first\n(b) second\n(c) third\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn fancy_list_upper_alpha_period() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "A.  first\nB.  second\nC.  third\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn fancy_list_upper_alpha_period_requires_two_spaces() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    // One space should NOT parse as list (to avoid false positives like "B. Russell")
+    let input = "A. first\nB. second\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    assert!(find_first(&tree, SyntaxKind::List).is_none());
+
+    // Two spaces SHOULD parse as list
+    let input_valid = "A.  first\nB.  second\n";
+    let tree_valid = crate::block_parser::BlockParser::new(input_valid, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree_valid, SyntaxKind::List).expect("should find list with 2 spaces");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+}
+
+#[test]
+fn fancy_list_lower_roman_period() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "i. first\nii. second\niii. third\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn fancy_list_lower_roman_right_paren() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "i) first\nii) second\niii) third\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn fancy_list_lower_roman_parens() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "(i) first\n(ii) second\n(iii) third\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn fancy_list_upper_roman_period() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "I. first\nII. second\nIII. third\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn fancy_list_upper_roman_right_paren() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "I) first\nII) second\nIII) third\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn fancy_list_disabled_by_default() {
+    // Without fancy_lists enabled, alphabetic markers should not parse as lists
+    let input = "a. first\nb. second\n";
+    let tree = parse_blocks(input);
+    assert!(find_first(&tree, SyntaxKind::List).is_none());
+}
+
+#[test]
+fn fancy_list_complex_roman() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input =
+        "iv. fourth\nv. fifth\nvi. sixth\nvii. seventh\nviii. eighth\nix. ninth\nx. tenth\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 7);
+}

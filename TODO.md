@@ -46,7 +46,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Nested lists
 - 🚧 List item continuation (works but formatter needs improvement)
 - 🚧 Complex nested mixed lists (fragile, needs parser structure improvement)
-- ❌ Extension: `fancy_lists` - Roman numerals, letters `(a)`, `A)`, etc.
+- ✅ Extension: `fancy_lists` - Roman numerals, letters `(a)`, `A)`, etc.
 - ❌ Extension: `startnum` - Start ordered lists at arbitrary number
 - ❌ Extension: `example_lists` - Example lists with `(@)` markers
 - ✅ Extension: `task_lists` - GitHub-style `- [ ]` and `- [x]`

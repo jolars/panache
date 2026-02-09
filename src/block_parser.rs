@@ -320,7 +320,8 @@ impl<'a> BlockParser<'a> {
                 // Check for lazy list continuation - if we're in a list item and
                 // this line looks like a list item with matching marker
                 if self.in_blockquote_list()
-                    && let Some((marker, marker_len, spaces_after)) = try_parse_list_marker(line)
+                    && let Some((marker, marker_len, spaces_after)) =
+                        try_parse_list_marker(line, self.config)
                 {
                     let (indent_cols, indent_bytes) = leading_indent(line);
                     if let Some(level) = self.find_matching_list_level(&marker, indent_cols) {
@@ -371,7 +372,8 @@ impl<'a> BlockParser<'a> {
 
             // Check for lazy list continuation
             if self.in_blockquote_list()
-                && let Some((marker, marker_len, spaces_after)) = try_parse_list_marker(line)
+                && let Some((marker, marker_len, spaces_after)) =
+                    try_parse_list_marker(line, self.config)
             {
                 let (indent_cols, indent_bytes) = leading_indent(line);
                 if let Some(level) = self.find_matching_list_level(&marker, indent_cols) {
@@ -390,7 +392,7 @@ impl<'a> BlockParser<'a> {
     fn compute_levels_to_keep(&self, next_line: &str) -> usize {
         let (next_bq_depth, next_inner) = count_blockquote_markers(next_line);
         let (next_indent_cols, _) = leading_indent(next_inner);
-        let next_marker = try_parse_list_marker(next_inner);
+        let next_marker = try_parse_list_marker(next_inner, self.config);
 
         let mut keep_level = 0;
 
@@ -717,7 +719,9 @@ impl<'a> BlockParser<'a> {
         }
 
         // List marker?
-        if let Some((marker, marker_len, spaces_after)) = try_parse_list_marker(content) {
+        if let Some((marker, marker_len, spaces_after)) =
+            try_parse_list_marker(content, self.config)
+        {
             let (indent_cols, indent_bytes) = leading_indent(content);
             if indent_cols >= 4 && !self.in_list() {
                 // Code block at top-level, treat as paragraph

@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -9,18 +10,130 @@ pub(crate) enum ListMarker {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum OrderedMarker {
-    Decimal { number: String, style: DecimalStyle },
+    Decimal {
+        number: String,
+        style: ListDelimiter,
+    },
     Hash,
+    LowerAlpha {
+        letter: char,
+        style: ListDelimiter,
+    },
+    UpperAlpha {
+        letter: char,
+        style: ListDelimiter,
+    },
+    LowerRoman {
+        numeral: String,
+        style: ListDelimiter,
+    },
+    UpperRoman {
+        numeral: String,
+        style: ListDelimiter,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DecimalStyle {
+pub(crate) enum ListDelimiter {
     Period,
     RightParen,
     Parens,
 }
 
-pub(crate) fn try_parse_list_marker(line: &str) -> Option<(ListMarker, usize, usize)> {
+/// Parse a Roman numeral (lower or upper case).
+/// Returns (numeral_string, length) if valid, None otherwise.
+fn try_parse_roman_numeral(text: &str, uppercase: bool) -> Option<(String, usize)> {
+    let valid_chars = if uppercase { "IVXLCDM" } else { "ivxlcdm" };
+
+    let count = text
+        .chars()
+        .take_while(|c| valid_chars.contains(*c))
+        .count();
+
+    if count == 0 {
+        return None;
+    }
+
+    let numeral = &text[..count];
+    let numeral_upper = numeral.to_uppercase();
+
+    // Only consider chars that are valid Roman numeral symbols
+    // Reject if it contains only non-Roman letters (a-z except i, v, x, l, c, d, m)
+    let has_only_roman_chars = numeral_upper.chars().all(|c| "IVXLCDM".contains(c));
+    if !has_only_roman_chars {
+        return None;
+    }
+
+    // For single-character numerals, only accept the most common ones to avoid
+    // ambiguity with alphabetic list markers (a-z, A-Z).
+    // Single L, C, D, M are valid Roman numerals but unlikely in list contexts.
+    if count == 1 {
+        let ch = numeral_upper.chars().next().unwrap();
+        if !matches!(ch, 'I' | 'V' | 'X') {
+            return None;
+        }
+    }
+
+    // Validate it's a proper Roman numeral (basic validation)
+    // Must not have more than 3 consecutive same characters (except M)
+    if numeral_upper.contains("IIII")
+        || numeral_upper.contains("XXXX")
+        || numeral_upper.contains("CCCC")
+        || numeral_upper.contains("VV")
+        || numeral_upper.contains("LL")
+        || numeral_upper.contains("DD")
+    {
+        return None;
+    }
+
+    // Must have valid subtractive notation (I before V/X, X before L/C, C before D/M)
+    // V, L, D can never appear before a larger numeral (no subtractive use)
+    let chars: Vec<char> = numeral_upper.chars().collect();
+    for i in 0..chars.len().saturating_sub(1) {
+        let curr = chars[i];
+        let next = chars[i + 1];
+
+        // Get Roman numeral values for comparison
+        let curr_val = match curr {
+            'I' => 1,
+            'V' => 5,
+            'X' => 10,
+            'L' => 50,
+            'C' => 100,
+            'D' => 500,
+            'M' => 1000,
+            _ => return None,
+        };
+        let next_val = match next {
+            'I' => 1,
+            'V' => 5,
+            'X' => 10,
+            'L' => 50,
+            'C' => 100,
+            'D' => 500,
+            'M' => 1000,
+            _ => return None,
+        };
+
+        // Check for invalid subtractive notation
+        if curr_val < next_val {
+            // Subtractive notation - check if it's valid
+            match (curr, next) {
+                ('I', 'V') | ('I', 'X') => {} // Valid: IV=4, IX=9
+                ('X', 'L') | ('X', 'C') => {} // Valid: XL=40, XC=90
+                ('C', 'D') | ('C', 'M') => {} // Valid: CD=400, CM=900
+                _ => return None,             // Invalid subtractive notation
+            }
+        }
+    }
+
+    Some((numeral.to_string(), count))
+}
+
+pub(crate) fn try_parse_list_marker(
+    line: &str,
+    config: &Config,
+) -> Option<(ListMarker, usize, usize)> {
     let trimmed = line.trim_start_matches([' ', '\t']);
 
     // Try bullet markers (including task lists)
@@ -66,8 +179,9 @@ pub(crate) fn try_parse_list_marker(line: &str) -> Option<(ListMarker, usize, us
         return Some((ListMarker::Ordered(OrderedMarker::Hash), 2, spaces_after));
     }
 
-    // Try parenthesized decimal: (2)
+    // Try parenthesized markers: (2), (a), (ii)
     if let Some(rest) = trimmed.strip_prefix('(') {
+        // Try decimal: (2)
         let digit_count = rest.chars().take_while(|c| c.is_ascii_digit()).count();
         if digit_count > 0 && rest.len() > digit_count && rest.chars().nth(digit_count) == Some(')')
         {
@@ -85,11 +199,118 @@ pub(crate) fn try_parse_list_marker(line: &str) -> Option<(ListMarker, usize, us
                 return Some((
                     ListMarker::Ordered(OrderedMarker::Decimal {
                         number: number.to_string(),
-                        style: DecimalStyle::Parens,
+                        style: ListDelimiter::Parens,
                     }),
                     marker_len,
                     spaces_after,
                 ));
+            }
+        }
+
+        // Try fancy lists if enabled (parenthesized markers)
+        if config.extensions.fancy_lists {
+            // Try Roman numerals first (to avoid ambiguity with letters i, v, x, etc.)
+
+            // Try lowercase Roman: (ii)
+            if let Some((numeral, len)) = try_parse_roman_numeral(rest, false)
+                && rest.len() > len
+                && rest.chars().nth(len) == Some(')')
+            {
+                let after_marker = &rest[len + 1..];
+                if after_marker.starts_with(' ')
+                    || after_marker.starts_with('\t')
+                    || after_marker.is_empty()
+                {
+                    let spaces_after = after_marker
+                        .chars()
+                        .take_while(|c| c.is_whitespace())
+                        .count();
+                    return Some((
+                        ListMarker::Ordered(OrderedMarker::LowerRoman {
+                            numeral,
+                            style: ListDelimiter::Parens,
+                        }),
+                        len + 2,
+                        spaces_after,
+                    ));
+                }
+            }
+
+            // Try uppercase Roman: (II)
+            if let Some((numeral, len)) = try_parse_roman_numeral(rest, true)
+                && rest.len() > len
+                && rest.chars().nth(len) == Some(')')
+            {
+                let after_marker = &rest[len + 1..];
+                if after_marker.starts_with(' ')
+                    || after_marker.starts_with('\t')
+                    || after_marker.is_empty()
+                {
+                    let spaces_after = after_marker
+                        .chars()
+                        .take_while(|c| c.is_whitespace())
+                        .count();
+                    return Some((
+                        ListMarker::Ordered(OrderedMarker::UpperRoman {
+                            numeral,
+                            style: ListDelimiter::Parens,
+                        }),
+                        len + 2,
+                        spaces_after,
+                    ));
+                }
+            }
+
+            // Try lowercase letter: (a)
+            if let Some(ch) = rest.chars().next()
+                && ch.is_ascii_lowercase()
+                && rest.len() > 1
+                && rest.chars().nth(1) == Some(')')
+            {
+                let after_marker = &rest[2..];
+                if after_marker.starts_with(' ')
+                    || after_marker.starts_with('\t')
+                    || after_marker.is_empty()
+                {
+                    let spaces_after = after_marker
+                        .chars()
+                        .take_while(|c| c.is_whitespace())
+                        .count();
+                    return Some((
+                        ListMarker::Ordered(OrderedMarker::LowerAlpha {
+                            letter: ch,
+                            style: ListDelimiter::Parens,
+                        }),
+                        3,
+                        spaces_after,
+                    ));
+                }
+            }
+
+            // Try uppercase letter: (A)
+            if let Some(ch) = rest.chars().next()
+                && ch.is_ascii_uppercase()
+                && rest.len() > 1
+                && rest.chars().nth(1) == Some(')')
+            {
+                let after_marker = &rest[2..];
+                if after_marker.starts_with(' ')
+                    || after_marker.starts_with('\t')
+                    || after_marker.is_empty()
+                {
+                    let spaces_after = after_marker
+                        .chars()
+                        .take_while(|c| c.is_whitespace())
+                        .count();
+                    return Some((
+                        ListMarker::Ordered(OrderedMarker::UpperAlpha {
+                            letter: ch,
+                            style: ListDelimiter::Parens,
+                        }),
+                        3,
+                        spaces_after,
+                    ));
+                }
             }
         }
     }
@@ -101,8 +322,8 @@ pub(crate) fn try_parse_list_marker(line: &str) -> Option<(ListMarker, usize, us
         let delim = trimmed.chars().nth(digit_count);
 
         let (style, marker_len) = match delim {
-            Some('.') => (DecimalStyle::Period, digit_count + 1),
-            Some(')') => (DecimalStyle::RightParen, digit_count + 1),
+            Some('.') => (ListDelimiter::Period, digit_count + 1),
+            Some(')') => (ListDelimiter::RightParen, digit_count + 1),
             _ => return None,
         };
 
@@ -126,6 +347,135 @@ pub(crate) fn try_parse_list_marker(line: &str) -> Option<(ListMarker, usize, us
         }
     }
 
+    // Try fancy lists if enabled (non-parenthesized)
+    if config.extensions.fancy_lists {
+        // Try Roman numerals first, as they may overlap with letters
+
+        // Try lowercase Roman: i. or ii)
+        if let Some((numeral, len)) = try_parse_roman_numeral(trimmed, false)
+            && trimmed.len() > len
+            && let Some(delim) = trimmed.chars().nth(len)
+            && (delim == '.' || delim == ')')
+        {
+            let style = if delim == '.' {
+                ListDelimiter::Period
+            } else {
+                ListDelimiter::RightParen
+            };
+            let marker_len = len + 1;
+
+            let after_marker = &trimmed[marker_len..];
+            if after_marker.starts_with(' ')
+                || after_marker.starts_with('\t')
+                || after_marker.is_empty()
+            {
+                let spaces_after = after_marker
+                    .chars()
+                    .take_while(|c| c.is_whitespace())
+                    .count();
+                return Some((
+                    ListMarker::Ordered(OrderedMarker::LowerRoman { numeral, style }),
+                    marker_len,
+                    spaces_after,
+                ));
+            }
+        }
+
+        // Try uppercase Roman: I. or II)
+        if let Some((numeral, len)) = try_parse_roman_numeral(trimmed, true)
+            && trimmed.len() > len
+            && let Some(delim) = trimmed.chars().nth(len)
+            && (delim == '.' || delim == ')')
+        {
+            let style = if delim == '.' {
+                ListDelimiter::Period
+            } else {
+                ListDelimiter::RightParen
+            };
+            let marker_len = len + 1;
+
+            let after_marker = &trimmed[marker_len..];
+            if after_marker.starts_with(' ')
+                || after_marker.starts_with('\t')
+                || after_marker.is_empty()
+            {
+                let spaces_after = after_marker
+                    .chars()
+                    .take_while(|c| c.is_whitespace())
+                    .count();
+                return Some((
+                    ListMarker::Ordered(OrderedMarker::UpperRoman { numeral, style }),
+                    marker_len,
+                    spaces_after,
+                ));
+            }
+        }
+
+        // Try lowercase letter: a. or a)
+        if let Some(ch) = trimmed.chars().next()
+            && ch.is_ascii_lowercase()
+            && trimmed.len() > 1
+            && let Some(delim) = trimmed.chars().nth(1)
+            && (delim == '.' || delim == ')')
+        {
+            let style = if delim == '.' {
+                ListDelimiter::Period
+            } else {
+                ListDelimiter::RightParen
+            };
+            let marker_len = 2;
+
+            let after_marker = &trimmed[marker_len..];
+            if after_marker.starts_with(' ')
+                || after_marker.starts_with('\t')
+                || after_marker.is_empty()
+            {
+                let spaces_after = after_marker
+                    .chars()
+                    .take_while(|c| c.is_whitespace())
+                    .count();
+                return Some((
+                    ListMarker::Ordered(OrderedMarker::LowerAlpha { letter: ch, style }),
+                    marker_len,
+                    spaces_after,
+                ));
+            }
+        }
+
+        // Try uppercase letter: A. or A)
+        if let Some(ch) = trimmed.chars().next()
+            && ch.is_ascii_uppercase()
+            && trimmed.len() > 1
+            && let Some(delim) = trimmed.chars().nth(1)
+            && (delim == '.' || delim == ')')
+        {
+            let style = if delim == '.' {
+                ListDelimiter::Period
+            } else {
+                ListDelimiter::RightParen
+            };
+            let marker_len = 2;
+
+            let after_marker = &trimmed[marker_len..];
+            // Special rule: uppercase letter with period needs 2 spaces minimum
+            let min_spaces = if delim == '.' { 2 } else { 1 };
+            let spaces_after = after_marker
+                .chars()
+                .take_while(|c| c.is_whitespace())
+                .count();
+
+            if (after_marker.starts_with(' ') || after_marker.starts_with('\t'))
+                && spaces_after >= min_spaces
+            {
+                return Some((
+                    ListMarker::Ordered(OrderedMarker::UpperAlpha { letter: ch, style }),
+                    marker_len,
+                    spaces_after,
+                ));
+            }
+        }
+    }
+
     None
 }
 
@@ -138,6 +488,22 @@ pub(crate) fn markers_match(a: &ListMarker, b: &ListMarker) -> bool {
         (
             ListMarker::Ordered(OrderedMarker::Decimal { style: s1, .. }),
             ListMarker::Ordered(OrderedMarker::Decimal { style: s2, .. }),
+        ) => s1 == s2,
+        (
+            ListMarker::Ordered(OrderedMarker::LowerAlpha { style: s1, .. }),
+            ListMarker::Ordered(OrderedMarker::LowerAlpha { style: s2, .. }),
+        ) => s1 == s2,
+        (
+            ListMarker::Ordered(OrderedMarker::UpperAlpha { style: s1, .. }),
+            ListMarker::Ordered(OrderedMarker::UpperAlpha { style: s2, .. }),
+        ) => s1 == s2,
+        (
+            ListMarker::Ordered(OrderedMarker::LowerRoman { style: s1, .. }),
+            ListMarker::Ordered(OrderedMarker::LowerRoman { style: s2, .. }),
+        ) => s1 == s2,
+        (
+            ListMarker::Ordered(OrderedMarker::UpperRoman { style: s1, .. }),
+            ListMarker::Ordered(OrderedMarker::UpperRoman { style: s2, .. }),
         ) => s1 == s2,
         _ => false,
     }
@@ -186,6 +552,7 @@ pub(crate) fn try_parse_list(
     pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
     _has_blank_line_before: bool,
+    config: &Config,
 ) -> Option<usize> {
     #[derive(Debug, Clone)]
     struct MarkerInfo {
@@ -269,9 +636,9 @@ pub(crate) fn try_parse_list(
         idx
     }
 
-    fn parse_marker_info(line: &str) -> Option<MarkerInfo> {
+    fn parse_marker_info(line: &str, config: &Config) -> Option<MarkerInfo> {
         let (indent_cols, indent_bytes) = leading_indent(line);
-        let (marker, marker_len, spaces_after) = try_parse_list_marker(line)?;
+        let (marker, marker_len, spaces_after) = try_parse_list_marker(line, config)?;
         Some(MarkerInfo {
             marker,
             indent_cols,
@@ -355,7 +722,7 @@ pub(crate) fn try_parse_list(
     }
 
     let first_line = lines[pos];
-    let first = parse_marker_info(first_line)?;
+    let first = parse_marker_info(first_line, config)?;
 
     // List markers indented >= 4 spaces are treated as code blocks at top level.
     if first.indent_cols >= 4 {
@@ -390,7 +757,7 @@ pub(crate) fn try_parse_list(
 
             let next_line = lines[peek];
             let (next_indent_cols, _) = leading_indent(next_line);
-            let next_marker = parse_marker_info(next_line);
+            let next_marker = parse_marker_info(next_line, config);
 
             let cur_item = item_stack.last().expect("list item must exist");
             let cur_list = list_stack.last().expect("list must exist");
@@ -429,7 +796,7 @@ pub(crate) fn try_parse_list(
         }
 
         // Try list marker.
-        if let Some(info) = parse_marker_info(line) {
+        if let Some(info) = parse_marker_info(line, config) {
             // First: can this marker start a new item in an existing list level?
             let mut matched_level = None;
             for level in (0..list_stack.len()).rev() {
@@ -510,9 +877,121 @@ pub(crate) fn try_parse_list(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     #[test]
     fn detects_bullet_markers() {
-        assert!(try_parse_list_marker("* item").is_some());
+        let config = Config::default();
+        assert!(try_parse_list_marker("* item", &config).is_some());
     }
+
+    #[test]
+    fn detects_fancy_alpha_markers() {
+        let mut config = Config::default();
+        config.extensions.fancy_lists = true;
+
+        // Test lowercase alpha period
+        assert!(
+            try_parse_list_marker("a. item", &config).is_some(),
+            "a. should parse"
+        );
+        assert!(
+            try_parse_list_marker("b. item", &config).is_some(),
+            "b. should parse"
+        );
+        assert!(
+            try_parse_list_marker("c. item", &config).is_some(),
+            "c. should parse"
+        );
+
+        // Test lowercase alpha right paren
+        assert!(
+            try_parse_list_marker("a) item", &config).is_some(),
+            "a) should parse"
+        );
+        assert!(
+            try_parse_list_marker("b) item", &config).is_some(),
+            "b) should parse"
+        );
+    }
+}
+
+#[test]
+fn markers_match_fancy_lists() {
+    use ListDelimiter::*;
+    use ListMarker::*;
+    use OrderedMarker::*;
+
+    // Same type and style should match
+    let a_period = Ordered(LowerAlpha {
+        letter: 'a',
+        style: Period,
+    });
+    let b_period = Ordered(LowerAlpha {
+        letter: 'b',
+        style: Period,
+    });
+    assert!(
+        markers_match(&a_period, &b_period),
+        "a. and b. should match"
+    );
+
+    let i_period = Ordered(LowerRoman {
+        numeral: "i".to_string(),
+        style: Period,
+    });
+    let ii_period = Ordered(LowerRoman {
+        numeral: "ii".to_string(),
+        style: Period,
+    });
+    assert!(
+        markers_match(&i_period, &ii_period),
+        "i. and ii. should match"
+    );
+
+    // Different styles should not match
+    let a_paren = Ordered(LowerAlpha {
+        letter: 'a',
+        style: RightParen,
+    });
+    assert!(
+        !markers_match(&a_period, &a_paren),
+        "a. and a) should not match"
+    );
+}
+
+#[test]
+fn detects_complex_roman_numerals() {
+    let mut config = Config::default();
+    config.extensions.fancy_lists = true;
+
+    // Test various Roman numerals
+    assert!(
+        try_parse_list_marker("iv. item", &config).is_some(),
+        "iv. should parse"
+    );
+    assert!(
+        try_parse_list_marker("v. item", &config).is_some(),
+        "v. should parse"
+    );
+    assert!(
+        try_parse_list_marker("vi. item", &config).is_some(),
+        "vi. should parse"
+    );
+    assert!(
+        try_parse_list_marker("vii. item", &config).is_some(),
+        "vii. should parse"
+    );
+    assert!(
+        try_parse_list_marker("viii. item", &config).is_some(),
+        "viii. should parse"
+    );
+    assert!(
+        try_parse_list_marker("ix. item", &config).is_some(),
+        "ix. should parse"
+    );
+    assert!(
+        try_parse_list_marker("x. item", &config).is_some(),
+        "x. should parse"
+    );
 }
