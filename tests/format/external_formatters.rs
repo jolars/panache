@@ -11,6 +11,7 @@ async fn code_block_with_external_formatter() {
             cmd: "tr".to_string(),
             args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
             enabled: true,
+            stdin: true,
         },
     );
 
@@ -61,6 +62,7 @@ async fn code_block_with_disabled_formatter() {
             cmd: "tr".to_string(),
             args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
             enabled: false,
+            stdin: true,
         },
     );
 
@@ -92,6 +94,7 @@ async fn code_block_with_failing_formatter() {
             cmd: "false".to_string(), // Always fails
             args: vec![],
             enabled: true,
+            stdin: true,
         },
     );
 
