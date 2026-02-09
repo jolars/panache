@@ -17,6 +17,8 @@ pub struct Formatter {
     pub(super) consecutive_blank_lines: usize,
     pub(super) fenced_div_depth: usize,
     pub(super) formatted_code: HashMap<String, String>,
+    /// Stack of max marker widths for nested lists (for right-aligning markers)
+    max_marker_widths: Vec<usize>,
 }
 
 impl Formatter {
@@ -27,6 +29,7 @@ impl Formatter {
             consecutive_blank_lines: 0,
             fenced_div_depth: 0,
             formatted_code,
+            max_marker_widths: Vec::new(),
         }
     }
 
@@ -75,6 +78,65 @@ impl Formatter {
     // Delegate to code_blocks module
     fn format_code_block(&mut self, node: &SyntaxNode) {
         code_blocks::format_code_block(node, &self.config, &self.formatted_code, &mut self.output);
+    }
+
+    /// Extract the marker text from a ListItem node
+    fn extract_list_marker(node: &SyntaxNode) -> Option<String> {
+        for el in node.children_with_tokens() {
+            if let NodeOrToken::Token(t) = el
+                && t.kind() == SyntaxKind::ListMarker
+            {
+                return Some(t.text().to_string());
+            }
+        }
+        None
+    }
+
+    /// Check if a marker should be right-aligned (Roman numerals and alphabetic markers)
+    fn is_alignable_marker(marker: &str) -> bool {
+        // Don't align example lists (they start with '(@')
+        if marker.starts_with("(@") {
+            return false;
+        }
+
+        // Don't align bullet lists
+        if marker.len() == 1 && (marker == "-" || marker == "*" || marker == "+") {
+            return false;
+        }
+
+        // Align all ordered list styles with letters or Roman numerals:
+        // Period: a., i., A., I.
+        // Right-paren: a), i), A), I)
+        // Parens: (a), (i), (A), (I)
+        if marker.len() < 2 {
+            return false;
+        }
+
+        // Check if the marker contains a letter (handles all three delimiter styles)
+        marker.chars().any(|c| c.is_alphabetic())
+    }
+
+    /// Calculate the maximum marker width for all direct ListItem children of a List
+    /// Returns 0 if markers shouldn't be aligned
+    fn calculate_max_marker_width(list_node: &SyntaxNode) -> usize {
+        let markers: Vec<String> = list_node
+            .children()
+            .filter(|child| child.kind() == SyntaxKind::ListItem)
+            .filter_map(|item| Self::extract_list_marker(&item))
+            .collect();
+
+        // Check if any marker is alignable
+        if !markers.iter().any(|m| Self::is_alignable_marker(m)) {
+            return 0;
+        }
+
+        // Return max width of alignable markers
+        markers
+            .iter()
+            .filter(|m| Self::is_alignable_marker(m))
+            .map(|m| m.len())
+            .max()
+            .unwrap_or(0)
     }
 
     // The large format_node_sync method - keeping it here for now, can extract later
@@ -407,6 +469,10 @@ impl Formatter {
                     self.output.push('\n');
                 }
 
+                // Calculate max marker width for right-alignment
+                let max_marker_width = Self::calculate_max_marker_width(node);
+                self.max_marker_widths.push(max_marker_width);
+
                 let mut prev_was_item = false;
                 let mut prev_was_blank = false;
 
@@ -431,6 +497,10 @@ impl Formatter {
 
                     self.format_node_sync(&child, indent);
                 }
+
+                // Pop the max marker width off the stack
+                self.max_marker_widths.pop();
+
                 if !self.output.ends_with('\n') {
                     self.output.push('\n');
                 }
@@ -695,18 +765,42 @@ impl Formatter {
                     }
                 }
 
-                // Check if this is uppercase letter with period marker (needs 2 spaces)
-                let spaces_after_marker = if marker.len() == 2
-                    && marker.starts_with(|c: char| c.is_ascii_uppercase())
-                    && marker.ends_with('.')
-                {
-                    2
-                } else {
-                    1
-                };
+                // Get max marker width for this list level
+                let max_marker_width = self.max_marker_widths.last().copied().unwrap_or(0);
+
+                // Calculate leading spaces for right-alignment of markers
+                // and standard spacing after marker
+                let (marker_padding, spaces_after_marker) =
+                    if Self::is_alignable_marker(&marker) && max_marker_width > 0 {
+                        // Right-align markers by adding leading spaces
+                        let padding = max_marker_width.saturating_sub(marker.len());
+
+                        // Check if this is uppercase letter with period (needs minimum 2 spaces)
+                        let min_spaces = if marker.len() == 2
+                            && marker.starts_with(|c: char| c.is_ascii_uppercase())
+                            && marker.ends_with('.')
+                        {
+                            2
+                        } else {
+                            1
+                        };
+
+                        (padding, min_spaces)
+                    } else {
+                        // Non-alignable markers: no padding
+                        let spaces = if marker.len() == 2
+                            && marker.starts_with(|c: char| c.is_ascii_uppercase())
+                            && marker.ends_with('.')
+                        {
+                            2
+                        } else {
+                            1
+                        };
+                        (0, spaces)
+                    };
 
                 let total_indent = indent + local_indent;
-                let hanging = marker.len() + spaces_after_marker + total_indent;
+                let hanging = marker_padding + marker.len() + spaces_after_marker + total_indent;
                 let available_width = self.config.line_width.saturating_sub(hanging);
 
                 // Build words from the whole node, then drop the leading marker word
@@ -734,14 +828,14 @@ impl Formatter {
                 for (i, line) in lines.iter().enumerate() {
                     log::trace!("  Line {}: {} words", i, line.len());
                     if i == 0 {
+                        // First line: output indent + marker padding + marker + spaces
                         self.output.push_str(&" ".repeat(total_indent));
+                        self.output.push_str(&" ".repeat(marker_padding));
                         self.output.push_str(&marker);
                         self.output.push_str(&" ".repeat(spaces_after_marker));
                     } else {
-                        // Hanging indent includes marker + spaces
-                        self.output.push_str(
-                            &" ".repeat(total_indent + marker.len() + spaces_after_marker),
-                        );
+                        // Hanging indent includes all leading whitespace
+                        self.output.push_str(&" ".repeat(hanging));
                     }
                     for (j, w) in line.iter().enumerate() {
                         self.output.push_str(w.word);
@@ -757,7 +851,11 @@ impl Formatter {
                 // Format nested lists inside this list item aligned to the content column.
                 for child in node.children() {
                     if child.kind() == SyntaxKind::List {
-                        self.format_node_sync(&child, total_indent + marker.len() + 1);
+                        // Nested list indent includes: total_indent + marker_padding + marker + 1 space
+                        self.format_node_sync(
+                            &child,
+                            total_indent + marker_padding + marker.len() + 1,
+                        );
                     }
                 }
             }
