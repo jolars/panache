@@ -19,6 +19,7 @@ use crate::block_parser::attributes::{
 };
 
 /// Helper to normalize a reference label (lowercase, collapse whitespace)
+#[allow(dead_code)] // TODO: Used for reference link resolution (not yet fully implemented)
 fn normalize_label(label: &str) -> String {
     label
         .split_whitespace()
@@ -342,6 +343,7 @@ pub fn emit_inline_link(builder: &mut GreenNodeBuilder, _text: &str, link_text: 
 ///
 /// Returns Some((length, text_content, label, is_shortcut)) if a valid reference link is found.
 /// The label is what should be looked up in the registry.
+#[allow(dead_code)] // TODO: Will be integrated into main parsing loop
 pub fn try_parse_reference_link(
     text: &str,
     allow_shortcut: bool,
@@ -429,6 +431,7 @@ pub fn try_parse_reference_link(
 /// Emit a reference link node to the builder.
 /// If the reference is found in the registry, use the URL from the definition.
 /// Otherwise, emit as unresolved reference.
+#[allow(dead_code)] // TODO: Will be integrated into main parsing loop
 pub fn emit_reference_link(
     builder: &mut GreenNodeBuilder,
     link_text: &str,
@@ -480,6 +483,7 @@ pub fn emit_reference_link(
 
 /// Try to parse a reference-style image: `![alt][ref]`, `![alt][]`, or `![alt]`
 /// Returns (total_len, alt_text, label, is_shortcut) if successful.
+#[allow(dead_code)] // TODO: Will be integrated into main parsing loop
 pub fn try_parse_reference_image(
     text: &str,
     allow_shortcut: bool,
@@ -558,6 +562,7 @@ pub fn try_parse_reference_image(
 }
 
 /// Emit a reference image node with registry lookup.
+#[allow(dead_code)] // TODO: Will be integrated into main parsing loop
 pub fn emit_reference_image(
     builder: &mut GreenNodeBuilder,
     alt_text: &str,
