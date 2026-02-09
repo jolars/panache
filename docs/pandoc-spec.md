@@ -39,3 +39,7 @@ This specification is split into the following sections:
 - [Footnotes](pandoc-spec/footnotes.md)
 - [Citation syntax](pandoc-spec/citation-syntax.md)
 - [Non-default extensions](pandoc-spec/non-default-extensions.md)
+
+## External extensions (Added by other projects)
+
+- [Bookdown extensions](pandoc-spec/bookdown-extensions.md)
