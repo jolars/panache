@@ -83,6 +83,12 @@ printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/r
 # Expected: Line wrapping at ~80 characters with proper Markdown formatting
 ```
 
+### Parsing the AST for Debugging
+
+```bash
+printf "# Heading\n\nParagraph with *emphasis* and `code`." | ./target/release/panache parse
+```
+
 ### Debugging with Logging
 
 panache has comprehensive logging infrastructure for debugging:
