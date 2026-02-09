@@ -16,6 +16,7 @@ pub enum SyntaxKind {
     BlockQuoteMarker,  // >
     ImageLinkStart,    // ![
     ListMarker,        // - + *
+    TaskCheckbox,      // [ ] or [x] or [X]
     CommentStart,      // <!--
     CommentEnd,        // -->
     Attribute,         // {#label} for headings, math, etc.

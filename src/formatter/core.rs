@@ -738,8 +738,9 @@ impl Formatter {
             }
 
             SyntaxKind::ListItem => {
-                // Compute indent and marker from leading tokens
+                // Compute indent, marker, and checkbox from leading tokens
                 let mut marker = String::new();
+                let mut checkbox = None;
                 let mut local_indent = 0;
                 let mut content_start = false;
 
@@ -754,6 +755,9 @@ impl Formatter {
                             SyntaxKind::ListMarker => {
                                 marker = t.text().to_string();
                                 content_start = true;
+                            }
+                            SyntaxKind::TaskCheckbox => {
+                                checkbox = Some(t.text().to_string());
                             }
                             _ => {
                                 content_start = true;
@@ -800,7 +804,19 @@ impl Formatter {
                     };
 
                 let total_indent = indent + local_indent;
-                let hanging = marker_padding + marker.len() + spaces_after_marker + total_indent;
+
+                // Calculate checkbox width if present (checkbox + space after)
+                let checkbox_width = if let Some(ref cb) = checkbox {
+                    cb.len() + 1 // "[x] " is 4 characters
+                } else {
+                    0
+                };
+
+                let hanging = marker_padding
+                    + marker.len()
+                    + spaces_after_marker
+                    + total_indent
+                    + checkbox_width;
                 let available_width = self.config.line_width.saturating_sub(hanging);
 
                 // Build words from the whole node, then drop the leading marker word
@@ -813,6 +829,16 @@ impl Formatter {
                 {
                     // Remove the marker; we will print it ourselves with a following space
                     words.remove(0);
+                }
+
+                // Remove checkbox from words if present
+                if checkbox.is_some()
+                    && let Some(first) = words.first()
+                {
+                    let trimmed = first.word.trim_start();
+                    if trimmed.starts_with('[') && trimmed.len() >= 3 {
+                        words.remove(0);
+                    }
                 }
 
                 let algo = WrapAlgorithm::new();
@@ -828,11 +854,17 @@ impl Formatter {
                 for (i, line) in lines.iter().enumerate() {
                     log::trace!("  Line {}: {} words", i, line.len());
                     if i == 0 {
-                        // First line: output indent + marker padding + marker + spaces
+                        // First line: output indent + marker padding + marker + spaces + checkbox
                         self.output.push_str(&" ".repeat(total_indent));
                         self.output.push_str(&" ".repeat(marker_padding));
                         self.output.push_str(&marker);
                         self.output.push_str(&" ".repeat(spaces_after_marker));
+
+                        // Output checkbox if present
+                        if let Some(ref cb) = checkbox {
+                            self.output.push_str(cb);
+                            self.output.push(' ');
+                        }
                     } else {
                         // Hanging indent includes all leading whitespace
                         self.output.push_str(&" ".repeat(hanging));
@@ -851,10 +883,10 @@ impl Formatter {
                 // Format nested lists inside this list item aligned to the content column.
                 for child in node.children() {
                     if child.kind() == SyntaxKind::List {
-                        // Nested list indent includes: total_indent + marker_padding + marker + 1 space
+                        // Nested list indent includes: total_indent + marker_padding + marker + 1 space + checkbox
                         self.format_node_sync(
                             &child,
-                            total_indent + marker_padding + marker.len() + 1,
+                            total_indent + marker_padding + marker.len() + 1 + checkbox_width,
                         );
                     }
                 }

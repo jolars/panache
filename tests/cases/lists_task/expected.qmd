@@ -26,8 +26,8 @@ title: Task Lists Test
 ## Nested Task Lists
 
 - [ ] Parent task
-  - [ ] Nested unchecked task
-  - [x] Nested checked task
+      - [ ] Nested unchecked task
+      - [x] Nested checked task
 - [x] Another parent task
 
 ## Mixed Regular and Task Lists

@@ -584,7 +584,32 @@ pub(crate) fn emit_list_item(
     let content_start = indent_bytes + marker_len + spaces_after;
 
     if content_start < content.len() {
-        builder.token(SyntaxKind::TEXT.into(), &content[content_start..]);
+        let remaining = &content[content_start..];
+
+        // Check if this is a task list item (starts with [ ] or [x] or [X])
+        let trimmed = remaining.trim_start();
+        if trimmed.starts_with('[')
+            && trimmed.len() >= 3
+            && matches!(trimmed.chars().nth(1), Some(' ') | Some('x') | Some('X'))
+            && trimmed.chars().nth(2) == Some(']')
+        {
+            // Emit leading whitespace before checkbox if any
+            let leading_ws_len = remaining.len() - trimmed.len();
+            if leading_ws_len > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &remaining[..leading_ws_len]);
+            }
+
+            // Emit the checkbox as a token
+            builder.token(SyntaxKind::TaskCheckbox.into(), &trimmed[..3]);
+
+            // Emit the rest as TEXT
+            if trimmed.len() > 3 {
+                builder.token(SyntaxKind::TEXT.into(), &trimmed[3..]);
+            }
+        } else {
+            // Not a task list, emit as normal TEXT
+            builder.token(SyntaxKind::TEXT.into(), remaining);
+        }
     }
     builder.token(SyntaxKind::NEWLINE.into(), "\n");
 

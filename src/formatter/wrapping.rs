@@ -91,30 +91,27 @@ pub(super) fn build_words<'a>(
                     SyntaxKind::TEXT => {
                         let text = t.text();
 
-                        // If text starts with 4+ spaces, it might be indented code - preserve as-is
-                        if text.starts_with("    ") {
-                            b.push_piece(text);
-                        } else {
-                            // Split TEXT tokens on whitespace to create separate words
+                        // Split TEXT tokens on whitespace to create separate words
+                        // Note: We don't preserve leading spaces here since list item continuations
+                        // will be re-indented by the formatter
 
-                            // Check if text starts with whitespace
-                            if !text.is_empty() && text.starts_with(char::is_whitespace) {
+                        // Check if text starts with whitespace
+                        if !text.is_empty() && text.starts_with(char::is_whitespace) {
+                            b.pending_space = true;
+                        }
+
+                        let words: Vec<&str> = text.split_whitespace().collect();
+
+                        for (i, word) in words.iter().enumerate() {
+                            if i > 0 {
                                 b.pending_space = true;
                             }
+                            b.push_piece(word);
+                        }
 
-                            let words: Vec<&str> = text.split_whitespace().collect();
-
-                            for (i, word) in words.iter().enumerate() {
-                                if i > 0 {
-                                    b.pending_space = true;
-                                }
-                                b.push_piece(word);
-                            }
-
-                            // If text ends with whitespace, mark pending space for next piece
-                            if !words.is_empty() && text.ends_with(char::is_whitespace) {
-                                b.pending_space = true;
-                            }
+                        // If text ends with whitespace, mark pending space for next piece
+                        if !words.is_empty() && text.ends_with(char::is_whitespace) {
+                            b.pending_space = true;
                         }
                     }
                     _ => {
