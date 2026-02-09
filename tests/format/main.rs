@@ -12,6 +12,7 @@ mod math;
 mod paragraphs;
 mod preserve_wrap;
 mod quotes;
+mod spans;
 mod strikeout;
 mod subscript;
 mod superscript;
