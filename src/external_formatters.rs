@@ -1,9 +1,10 @@
 //! External code formatter integration.
 //!
 //! This module handles spawning external formatter processes (like `black`, `air`, `rustfmt`)
-//! and piping code through them via stdin/stdout.
+//! and piping code through them via stdin/stdout or temporary files.
 
 use std::time::Duration;
+use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
@@ -58,8 +59,21 @@ pub async fn format_code_async(
     config: &FormatterConfig,
     timeout: Duration,
 ) -> Result<String, FormatterError> {
+    if config.stdin {
+        format_with_stdin(code, config, timeout).await
+    } else {
+        format_with_file(code, config, timeout).await
+    }
+}
+
+/// Format code by piping through stdin/stdout.
+async fn format_with_stdin(
+    code: &str,
+    config: &FormatterConfig,
+    timeout: Duration,
+) -> Result<String, FormatterError> {
     log::debug!(
-        "Invoking formatter: {} {}",
+        "Invoking formatter (stdin): {} {}",
         config.cmd,
         config.args.join(" ")
     );
@@ -118,6 +132,84 @@ pub async fn format_code_async(
     Ok(formatted)
 }
 
+/// Format code using a temporary file.
+async fn format_with_file(
+    code: &str,
+    config: &FormatterConfig,
+    timeout: Duration,
+) -> Result<String, FormatterError> {
+    log::debug!(
+        "Invoking formatter (file): {} {}",
+        config.cmd,
+        config.args.join(" ")
+    );
+
+    // Create a temporary file
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join(format!("panache-{}.tmp", uuid::Uuid::new_v4()));
+
+    // Write code to temp file
+    fs::write(&temp_path, code)
+        .await
+        .map_err(FormatterError::IoError)?;
+
+    // Build args with temp file path (replace {} placeholder or append)
+    let args: Vec<String> = if config.args.iter().any(|arg| arg.contains("{}")) {
+        config
+            .args
+            .iter()
+            .map(|arg| arg.replace("{}", temp_path.to_str().unwrap()))
+            .collect()
+    } else {
+        let mut args = config.args.clone();
+        args.push(temp_path.to_str().unwrap().to_string());
+        args
+    };
+
+    // Spawn the formatter process
+    let child = Command::new(&config.cmd)
+        .args(&args)
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| FormatterError::SpawnFailed(format!("{}: {}", config.cmd, e)))?;
+
+    // Wait for process with timeout
+    let output = tokio::time::timeout(timeout, child.wait_with_output())
+        .await
+        .map_err(|_| FormatterError::Timeout)?
+        .map_err(FormatterError::IoError)?;
+
+    // Read formatted content from file
+    let formatted = fs::read_to_string(&temp_path)
+        .await
+        .map_err(FormatterError::IoError)?;
+
+    // Clean up temp file
+    let _ = fs::remove_file(&temp_path).await;
+
+    // Check exit status
+    if !output.status.success() {
+        let code = output.status.code().unwrap_or(-1);
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        log::warn!(
+            "Formatter '{}' failed with exit code {}: {}",
+            config.cmd,
+            code,
+            stderr
+        );
+        return Err(FormatterError::NonZeroExit { code, stderr });
+    }
+
+    log::debug!(
+        "Formatter '{}' succeeded ({} bytes -> {} bytes)",
+        config.cmd,
+        code.len(),
+        formatted.len()
+    );
+
+    Ok(formatted)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,6 +221,7 @@ mod tests {
             cmd: "cat".to_string(),
             args: vec![],
             enabled: true,
+            stdin: true,
         };
 
         let code = "hello world\n";
@@ -146,6 +239,7 @@ mod tests {
             cmd: "tr".to_string(),
             args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
             enabled: true,
+            stdin: true,
         };
 
         let code = "hello world";
@@ -162,6 +256,7 @@ mod tests {
             cmd: "nonexistent_formatter_12345".to_string(),
             args: vec![],
             enabled: true,
+            stdin: true,
         };
 
         let code = "test";
@@ -181,6 +276,7 @@ mod tests {
             cmd: "sh".to_string(),
             args: vec!["-c".to_string(), "exit 1".to_string()],
             enabled: true,
+            stdin: true,
         };
 
         let code = "test";
@@ -200,6 +296,7 @@ mod tests {
             cmd: "sleep".to_string(),
             args: vec!["10".to_string()],
             enabled: true,
+            stdin: true,
         };
 
         let code = "test";
@@ -207,5 +304,41 @@ mod tests {
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), FormatterError::Timeout));
+    }
+
+    #[tokio::test]
+    async fn test_file_based_formatter() {
+        // 'cat' reading from file - simulates formatters that don't use stdin
+        let config = FormatterConfig {
+            cmd: "cat".to_string(),
+            args: vec![],
+            enabled: true,
+            stdin: false,
+        };
+
+        let code = "hello from file\n";
+        let result = format_code_async(code, &config, Duration::from_secs(5))
+            .await
+            .unwrap();
+
+        assert_eq!(result, code);
+    }
+
+    #[tokio::test]
+    async fn test_file_formatter_with_placeholder() {
+        // Test {} placeholder replacement in args
+        let config = FormatterConfig {
+            cmd: "sh".to_string(),
+            args: vec!["-c".to_string(), "cat {}".to_string()],
+            enabled: true,
+            stdin: false,
+        };
+
+        let code = "test with placeholder\n";
+        let result = format_code_async(code, &config, Duration::from_secs(5))
+            .await
+            .unwrap();
+
+        assert_eq!(result, code);
     }
 }

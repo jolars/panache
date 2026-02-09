@@ -414,6 +414,9 @@ pub struct FormatterConfig {
     /// Whether this formatter is enabled
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Whether the formatter reads from stdin (true) or requires a file path (false)
+    #[serde(default = "default_true")]
+    pub stdin: bool,
 }
 
 fn default_true() -> bool {
@@ -426,6 +429,7 @@ impl Default for FormatterConfig {
             cmd: String::new(),
             args: Vec::new(),
             enabled: true,
+            stdin: true,
         }
     }
 }

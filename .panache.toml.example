@@ -17,8 +17,8 @@ blank_lines = "collapse"  # Options: "collapse", "preserve"
 # Formatters are invoked with code piped to stdin and expect formatted code on stdout
 
 [formatters.r]
-cmd = "styler"
-args = ["--scope=spaces"]
+cmd = "air"
+args = ["format"]
 enabled = true
 
 [formatters.python]
