@@ -9,6 +9,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ **Implemented** - Feature is fully or mostly implemented
 - 🚧 **Partial** - Feature is partially implemented or needs work
 - ❌ **Not Implemented** - Feature not yet started
+- ⏹️ **Won't Implement** - Feature intentionally not implemented (e.g., format-specific output conventions)
 
 ---
 
@@ -27,7 +28,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Heading identifier attributes (`# Heading {#id}`)
 - ✅ Extension: `blank_before_header` - Require blank line before headings (default behavior)
 - ✅ Extension: `header_attributes` - Full attribute syntax `{#id .class key=value}`
-- N/A Extension: `implicit_header_references` - Auto-generate reference links (conversion feature, not formatting concern)
+- ⏹️ Extension: `implicit_header_references` - Auto-generate reference links (conversion feature, not formatting concern)
 
 ### Block Quotations ✅
 
@@ -125,7 +126,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Nested inline elements in alt text (code, emphasis, math)
 - ❌ Reference images `![alt][ref]`
 - ✅ Image attributes `![alt](url){#id .class key=value}`
-- N/A Extension: `implicit_figures` - Conversion feature, not formatting concern
+- ⏹️ Extension: `implicit_figures` - Conversion feature, not formatting concern
 
 ### Math ✅
 
