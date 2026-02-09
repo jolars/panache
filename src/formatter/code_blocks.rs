@@ -1,17 +1,19 @@
-use crate::config::Config;
+use crate::block_parser::code_blocks::{CodeBlockType, InfoString};
+use crate::config::{AttributeStyle, Config, FenceStyle};
 use crate::external_formatters::format_code_async;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;
 use std::time::Duration;
 
-/// Format a code block, normalizing fence markers to backticks
+/// Format a code block, normalizing fence markers and attributes based on config
 pub(super) fn format_code_block(
     node: &SyntaxNode,
+    config: &Config,
     formatted_code: &HashMap<String, String>,
     output: &mut String,
 ) {
-    let mut info_string = String::new();
+    let mut info_string_raw = String::new();
     let mut content = String::new();
 
     // Extract info string and content from the AST
@@ -24,7 +26,7 @@ pub(super) fn format_code_block(
                         if let NodeOrToken::Token(t) = token
                             && t.kind() == SyntaxKind::CodeInfo
                         {
-                            info_string = t.text().to_string();
+                            info_string_raw = t.text().to_string();
                         }
                     }
                 }
@@ -36,18 +38,192 @@ pub(super) fn format_code_block(
         }
     }
 
+    // Parse the info string
+    let info = InfoString::parse(&info_string_raw);
+
     // Check if we have formatted version from external formatter
     let final_content = formatted_code.get(&content).unwrap_or(&content);
 
-    // Output normalized code block with exactly 3 backticks
-    output.push_str("```");
-    if !info_string.is_empty() {
-        output.push_str(&info_string);
+    // Determine fence character based on config
+    let fence_char = match config.code_blocks.fence_style {
+        FenceStyle::Backtick => '`',
+        FenceStyle::Tilde => '~',
+        FenceStyle::Preserve => {
+            // Try to detect original fence char from context
+            // For now, default to backtick
+            '`'
+        }
+    };
+
+    // Determine fence length (check for nested fences in content)
+    let fence_length = determine_fence_length(
+        final_content,
+        fence_char,
+        config.code_blocks.min_fence_length,
+    );
+
+    // Format the info string based on config and block type
+    let formatted_info = format_info_string(&info, config);
+
+    // Output normalized code block
+    for _ in 0..fence_length {
+        output.push(fence_char);
+    }
+    if !formatted_info.is_empty() {
+        output.push_str(&formatted_info);
     }
     output.push('\n');
     output.push_str(final_content);
-    output.push_str("```");
+    for _ in 0..fence_length {
+        output.push(fence_char);
+    }
     output.push('\n');
+}
+
+/// Determine the minimum fence length needed to avoid conflicts with content
+fn determine_fence_length(content: &str, fence_char: char, min_length: usize) -> usize {
+    let mut max_sequence = 0;
+    let mut current_sequence = 0;
+
+    for ch in content.chars() {
+        if ch == fence_char {
+            current_sequence += 1;
+            max_sequence = max_sequence.max(current_sequence);
+        } else if ch == '\n' || ch == '\r' {
+            // Only count fence sequences at start of line as potential conflicts
+            current_sequence = 0;
+        } else if current_sequence > 0 {
+            // Non-fence char, reset
+            current_sequence = 0;
+        }
+    }
+
+    // Use at least one more than the longest sequence in content
+    (max_sequence + 1).max(min_length)
+}
+
+/// Format the info string based on block type and config preferences
+fn format_info_string(info: &InfoString, config: &Config) -> String {
+    // For Preserve mode, use the raw string as-is
+    if config.code_blocks.attribute_style == AttributeStyle::Preserve {
+        return if info.raw.is_empty() {
+            String::new()
+        } else {
+            info.raw.clone()
+        };
+    }
+
+    match &info.block_type {
+        CodeBlockType::Plain => {
+            // No language, just attributes (if any)
+            if info.attributes.is_empty() {
+                String::new()
+            } else {
+                format!(" {{{}}}", format_attributes(&info.attributes))
+            }
+        }
+        CodeBlockType::DisplayShortcut { language } => {
+            // Display block with shortcut syntax
+            match config.code_blocks.attribute_style {
+                AttributeStyle::Shortcut => {
+                    // Keep shortcut form
+                    if info.attributes.is_empty() {
+                        language.clone()
+                    } else {
+                        format!("{} {{{}}}", language, format_attributes(&info.attributes))
+                    }
+                }
+                AttributeStyle::Explicit => {
+                    // Convert to explicit form: ```python -> ```{.python}
+                    let mut attrs = vec![format!(".{}", language)];
+                    attrs.extend(info.attributes.iter().map(|(k, v)| {
+                        if let Some(val) = v {
+                            format!("{}=\"{}\"", k, val)
+                        } else {
+                            k.clone()
+                        }
+                    }));
+                    format!("{{{}}}", attrs.join(" "))
+                }
+                AttributeStyle::Preserve => unreachable!(), // Handled above
+            }
+        }
+        CodeBlockType::DisplayExplicit { classes } => {
+            // Display block with explicit Pandoc syntax
+            match config.code_blocks.attribute_style {
+                AttributeStyle::Explicit => {
+                    // Keep explicit form - reconstruct from classes + attributes preserving order
+                    // This is tricky - we've lost original order by splitting. Use raw for preserve.
+                    let mut attrs: Vec<String> =
+                        classes.iter().map(|c| format!(".{}", c)).collect();
+                    attrs.extend(info.attributes.iter().map(|(k, v)| {
+                        if let Some(val) = v {
+                            format!("{}=\"{}\"", k, val)
+                        } else {
+                            k.clone()
+                        }
+                    }));
+                    format!("{{{}}}", attrs.join(" "))
+                }
+                AttributeStyle::Shortcut => {
+                    // Convert to shortcut form: ```{.python} -> ```python
+                    if let Some(first_class) = classes.first() {
+                        if info.attributes.is_empty() && classes.len() == 1 {
+                            first_class.clone()
+                        } else {
+                            // Mix shortcut + attributes
+                            let mut attrs: Vec<String> =
+                                classes.iter().skip(1).map(|c| format!(".{}", c)).collect();
+                            attrs.extend(info.attributes.iter().map(|(k, v)| {
+                                if let Some(val) = v {
+                                    format!("{}=\"{}\"", k, val)
+                                } else {
+                                    k.clone()
+                                }
+                            }));
+                            if attrs.is_empty() {
+                                first_class.clone()
+                            } else {
+                                format!("{} {{{}}}", first_class, attrs.join(" "))
+                            }
+                        }
+                    } else {
+                        // No classes, just attributes
+                        if info.attributes.is_empty() {
+                            String::new()
+                        } else {
+                            format!("{{{}}}", format_attributes(&info.attributes))
+                        }
+                    }
+                }
+                AttributeStyle::Preserve => unreachable!(), // Handled above
+            }
+        }
+        CodeBlockType::Executable { language } => {
+            // Executable chunk: NEVER normalize, preserve semantics
+            // Always keep as {language} with attributes
+            if info.attributes.is_empty() {
+                format!("{{{}}}", language)
+            } else {
+                format!("{{{} {}}}", language, format_attributes(&info.attributes))
+            }
+        }
+    }
+}
+
+/// Format attribute key-value pairs
+fn format_attributes(attrs: &[(String, Option<String>)]) -> String {
+    attrs
+        .iter()
+        .map(|(k, v)| {
+            if let Some(val) = v {
+                format!("{}=\"{}\"", k, val)
+            } else {
+                k.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Collect all code blocks and their info strings from the syntax tree.

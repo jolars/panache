@@ -69,7 +69,7 @@ impl Formatter {
 
     // Delegate to code_blocks module
     fn format_code_block(&mut self, node: &SyntaxNode) {
-        code_blocks::format_code_block(node, &self.formatted_code, &mut self.output);
+        code_blocks::format_code_block(node, &self.config, &self.formatted_code, &mut self.output);
     }
 
     // The large format_node_sync method - keeping it here for now, can extract later

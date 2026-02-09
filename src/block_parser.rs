@@ -4,7 +4,7 @@ use rowan::GreenNodeBuilder;
 
 pub mod attributes; // Public for use in inline_parser
 mod blockquotes;
-mod code_blocks;
+pub mod code_blocks; // Public for formatter access to InfoString and CodeBlockType
 mod container_stack;
 mod definition_lists;
 mod display_math;

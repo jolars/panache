@@ -6,6 +6,222 @@ use rowan::GreenNodeBuilder;
 use super::blockquotes::count_blockquote_markers;
 use super::utils::strip_leading_spaces;
 
+/// Represents the type of code block based on its info string syntax.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CodeBlockType {
+    /// Display-only block with shortcut syntax: ```python
+    DisplayShortcut { language: String },
+    /// Display-only block with explicit Pandoc syntax: ```{.python}
+    DisplayExplicit { classes: Vec<String> },
+    /// Executable chunk (Quarto/RMarkdown): ```{python}
+    Executable { language: String },
+    /// No language specified: ```
+    Plain,
+}
+
+/// Parsed attributes from a code block info string.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InfoString {
+    pub raw: String,
+    pub block_type: CodeBlockType,
+    pub attributes: Vec<(String, Option<String>)>, // key-value pairs
+}
+
+impl InfoString {
+    /// Parse an info string into structured attributes.
+    pub fn parse(raw: &str) -> Self {
+        let trimmed = raw.trim();
+
+        if trimmed.is_empty() {
+            return InfoString {
+                raw: raw.to_string(),
+                block_type: CodeBlockType::Plain,
+                attributes: Vec::new(),
+            };
+        }
+
+        // Check if it starts with '{' - explicit attribute block
+        if let Some(stripped) = trimmed.strip_prefix('{')
+            && let Some(content) = stripped.strip_suffix('}')
+        {
+            return Self::parse_explicit(raw, content);
+        }
+
+        // Check for mixed form: python {.numberLines}
+        if let Some(brace_start) = trimmed.find('{') {
+            let language = trimmed[..brace_start].trim();
+            if !language.is_empty() && !language.contains(char::is_whitespace) {
+                let attr_part = &trimmed[brace_start..];
+                if let Some(stripped) = attr_part.strip_prefix('{')
+                    && let Some(content) = stripped.strip_suffix('}')
+                {
+                    let attrs = Self::parse_attributes(content);
+                    return InfoString {
+                        raw: raw.to_string(),
+                        block_type: CodeBlockType::DisplayShortcut {
+                            language: language.to_string(),
+                        },
+                        attributes: attrs,
+                    };
+                }
+            }
+        }
+
+        // Otherwise, it's a shortcut form (just the language name)
+        // Only take the first word as language
+        let language = trimmed.split_whitespace().next().unwrap_or(trimmed);
+        InfoString {
+            raw: raw.to_string(),
+            block_type: CodeBlockType::DisplayShortcut {
+                language: language.to_string(),
+            },
+            attributes: Vec::new(),
+        }
+    }
+
+    fn parse_explicit(raw: &str, content: &str) -> Self {
+        let attrs = Self::parse_attributes(content);
+
+        // First non-ID, non-attribute token determines if it's executable or display
+        let mut first_lang_token = None;
+        for (key, val) in attrs.iter() {
+            if val.is_none() && !key.starts_with('#') {
+                first_lang_token = Some(key.as_str());
+                break;
+            }
+        }
+
+        let first_token = first_lang_token.unwrap_or("");
+
+        if first_token.starts_with('.') {
+            // Display block: {.python} or {.haskell .numberLines}
+            let classes: Vec<String> = attrs
+                .iter()
+                .filter(|(k, v)| k.starts_with('.') && v.is_none())
+                .map(|(k, _)| k[1..].to_string())
+                .collect();
+
+            let non_class_attrs: Vec<(String, Option<String>)> = attrs
+                .into_iter()
+                .filter(|(k, _)| !k.starts_with('.') || k.contains('='))
+                .collect();
+
+            InfoString {
+                raw: raw.to_string(),
+                block_type: CodeBlockType::DisplayExplicit { classes },
+                attributes: non_class_attrs,
+            }
+        } else if !first_token.is_empty() && !first_token.starts_with('#') {
+            // Executable chunk: {python} or {r}
+            // Find the index of the language token
+            let lang_index = attrs.iter().position(|(k, _)| k == first_token).unwrap();
+
+            InfoString {
+                raw: raw.to_string(),
+                block_type: CodeBlockType::Executable {
+                    language: first_token.to_string(),
+                },
+                attributes: attrs
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(i, _)| *i != lang_index)
+                    .map(|(_, attr)| attr)
+                    .collect(),
+            }
+        } else {
+            // Just attributes, no language
+            InfoString {
+                raw: raw.to_string(),
+                block_type: CodeBlockType::Plain,
+                attributes: attrs,
+            }
+        }
+    }
+
+    fn parse_attributes(content: &str) -> Vec<(String, Option<String>)> {
+        let mut attrs = Vec::new();
+        let mut chars = content.chars().peekable();
+
+        while chars.peek().is_some() {
+            // Skip whitespace
+            while chars.peek() == Some(&' ') || chars.peek() == Some(&'\t') {
+                chars.next();
+            }
+
+            if chars.peek().is_none() {
+                break;
+            }
+
+            // Read key
+            let mut key = String::new();
+            while let Some(&ch) = chars.peek() {
+                if ch == '=' || ch == ' ' || ch == '\t' {
+                    break;
+                }
+                key.push(ch);
+                chars.next();
+            }
+
+            if key.is_empty() {
+                break;
+            }
+
+            // Skip whitespace
+            while chars.peek() == Some(&' ') || chars.peek() == Some(&'\t') {
+                chars.next();
+            }
+
+            // Check for value
+            if chars.peek() == Some(&'=') {
+                chars.next(); // consume '='
+
+                // Skip whitespace after '='
+                while chars.peek() == Some(&' ') || chars.peek() == Some(&'\t') {
+                    chars.next();
+                }
+
+                // Read value (might be quoted)
+                let value = if chars.peek() == Some(&'"') {
+                    chars.next(); // consume opening quote
+                    let mut val = String::new();
+                    while let Some(&ch) = chars.peek() {
+                        chars.next();
+                        if ch == '"' {
+                            break;
+                        }
+                        if ch == '\\' {
+                            if let Some(&next_ch) = chars.peek() {
+                                chars.next();
+                                val.push(next_ch);
+                            }
+                        } else {
+                            val.push(ch);
+                        }
+                    }
+                    val
+                } else {
+                    // Unquoted value
+                    let mut val = String::new();
+                    while let Some(&ch) = chars.peek() {
+                        if ch == ' ' || ch == '\t' {
+                            break;
+                        }
+                        val.push(ch);
+                        chars.next();
+                    }
+                    val
+                };
+
+                attrs.push((key, Some(value)));
+            } else {
+                attrs.push((key, None));
+            }
+        }
+
+        attrs
+    }
+}
+
 /// Information about a detected code fence opening.
 pub(crate) struct FenceInfo {
     pub fence_char: char,
@@ -199,5 +415,137 @@ mod tests {
         assert!(is_closing_fence("````", &fence));
         assert!(!is_closing_fence("``", &fence));
         assert!(!is_closing_fence("~~~", &fence));
+    }
+
+    #[test]
+    fn test_info_string_plain() {
+        let info = InfoString::parse("");
+        assert_eq!(info.block_type, CodeBlockType::Plain);
+        assert!(info.attributes.is_empty());
+    }
+
+    #[test]
+    fn test_info_string_shortcut() {
+        let info = InfoString::parse("python");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::DisplayShortcut {
+                language: "python".to_string()
+            }
+        );
+        assert!(info.attributes.is_empty());
+    }
+
+    #[test]
+    fn test_info_string_shortcut_with_trailing() {
+        let info = InfoString::parse("python extra stuff");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::DisplayShortcut {
+                language: "python".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_info_string_display_explicit() {
+        let info = InfoString::parse("{.python}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::DisplayExplicit {
+                classes: vec!["python".to_string()]
+            }
+        );
+    }
+
+    #[test]
+    fn test_info_string_display_explicit_multiple() {
+        let info = InfoString::parse("{.python .numberLines}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::DisplayExplicit {
+                classes: vec!["python".to_string(), "numberLines".to_string()]
+            }
+        );
+    }
+
+    #[test]
+    fn test_info_string_executable() {
+        let info = InfoString::parse("{python}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::Executable {
+                language: "python".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_info_string_executable_with_options() {
+        let info = InfoString::parse("{python echo=false warning=true}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::Executable {
+                language: "python".to_string()
+            }
+        );
+        assert_eq!(info.attributes.len(), 2);
+        assert_eq!(
+            info.attributes[0],
+            ("echo".to_string(), Some("false".to_string()))
+        );
+        assert_eq!(
+            info.attributes[1],
+            ("warning".to_string(), Some("true".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_info_string_mixed_shortcut_and_attrs() {
+        let info = InfoString::parse("python {.numberLines}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::DisplayShortcut {
+                language: "python".to_string()
+            }
+        );
+        assert_eq!(info.attributes.len(), 1);
+        assert_eq!(info.attributes[0], (".numberLines".to_string(), None));
+    }
+
+    #[test]
+    fn test_info_string_mixed_with_key_value() {
+        let info = InfoString::parse("python {.numberLines startFrom=\"100\"}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::DisplayShortcut {
+                language: "python".to_string()
+            }
+        );
+        assert_eq!(info.attributes.len(), 2);
+        assert_eq!(info.attributes[0], (".numberLines".to_string(), None));
+        assert_eq!(
+            info.attributes[1],
+            ("startFrom".to_string(), Some("100".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_info_string_explicit_with_id_and_classes() {
+        let info = InfoString::parse("{#mycode .haskell .numberLines startFrom=\"100\"}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::DisplayExplicit {
+                classes: vec!["haskell".to_string(), "numberLines".to_string()]
+            }
+        );
+        // Non-class attributes
+        let has_id = info.attributes.iter().any(|(k, _)| k == "#mycode");
+        let has_start = info
+            .attributes
+            .iter()
+            .any(|(k, v)| k == "startFrom" && v == &Some("100".to_string()));
+        assert!(has_id);
+        assert!(has_start);
     }
 }
