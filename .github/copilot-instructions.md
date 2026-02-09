@@ -21,7 +21,7 @@ the Quarto-specific syntax extensions.
 **Key Facts:**
 
 - **Language**: Rust (2024 edition), stable toolchain
-- **Size**: ~4k lines across 23 files
+- **Size**: ~15k lines across 62 files
 - **Architecture**: Binary crate with workspace containing WASM crate for web playground
 - **Status**: Early development - expect bugs and breaking changes
 
@@ -117,7 +117,7 @@ RUST_LOG=panache::block_parser=trace,panache::formatter=debug panache document.q
 
 ### Timing Notes
 
-- `cargo test`: ~1 second (238 tests total: 103 lib tests, 110+ inline parser tests, 20 block parser tests, 19 format tests, 1 golden test, 2 doc tests)
+- `cargo test`: ~1 second (603 tests total across lib, inline parser, block parser, format tests, golden tests, and doc tests)
 - `cargo build --release`: ~25 seconds
 - `cargo check`: ~1 second
 
@@ -162,7 +162,20 @@ src/
 ├── main.rs              # CLI entry point with clap argument parsing
 ├── lib.rs               # Public API with format() and parse() functions
 ├── config.rs            # Configuration handling (.panache.toml, flavor, extensions)
-├── formatter.rs         # Main formatting logic and AST traversal
+├── formatter.rs         # Formatter module entry point (public API)
+├── formatter/
+│   ├── core.rs             # Formatter struct + format_node_sync orchestration
+│   ├── wrapping.rs         # Word-breaking and line-wrapping logic
+│   ├── code_blocks.rs      # Code block collection + external formatters
+│   ├── paragraphs.rs       # Paragraph + display math formatting
+│   ├── inline.rs           # Inline element formatting (emphasis, code, links)
+│   ├── headings.rs         # Heading formatting
+│   ├── utils.rs            # Helper functions (is_block_element)
+│   ├── blockquotes.rs      # Placeholder for blockquote extraction
+│   ├── lists.rs            # Placeholder for list extraction
+│   ├── tables.rs           # Placeholder for table extraction
+│   ├── fenced_divs.rs      # Placeholder for fenced div extraction
+│   └── metadata.rs         # Placeholder for metadata extraction
 ├── block_parser.rs      # Block parser module entry point
 ├── block_parser/
 │   ├── blockquotes.rs      # Blockquote parsing and resolution
@@ -183,11 +196,6 @@ src/
 │   ├── emphasis.rs          # Emphasis/strong parsing
 │   ├── escapes.rs           # Escape sequence parsing
 │   ├── inline_footnotes.rs  # Inline footnote parsing (^[...])
-│   ├── inline_math.rs       # Inline math parsing (dollars)
-│   ├── links.rs             # Link and image parsing
-│   ├── future_tests.rs      # Tests for unimplemented features
-│   └── tests.rs             # Integration tests
-└── syntax.rs            # Syntax node definitions and AST types
 │   ├── inline_math.rs       # Inline math parsing (dollars)
 │   ├── links.rs             # Link and image parsing
 │   ├── future_tests.rs      # Tests for unimplemented features
@@ -387,6 +395,11 @@ The `docs/playground/` contains a WASM-based web interface:
   - Recursive parsing for nested inline elements (e.g., code/emphasis in links)
   - Standalone `parse_inline_text()` function enables recursive calls
 - Parser builds rowan CST consumed by formatter
+- Formatter is split into focused modules under `src/formatter/`:
+  - Each module has clear responsibilities (wrapping, inline, paragraphs, headings, code blocks)
+  - Core orchestration in `core.rs` with `format_node_sync` delegating to modules
+  - Placeholder modules exist for future extraction of complex logic (lists, tables, blockquotes)
+  - Public API limited to `format_tree()` and `format_tree_async()`
 - Config system provides extension flags to enable/disable features
   - Config fields marked `#[allow(dead_code)]` until features use them
 - Test helpers abstract Config creation to keep tests clean
