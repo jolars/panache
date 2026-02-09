@@ -1,4 +1,4 @@
-//! Reference definition parsing for Markdown reference links and images.
+//! Reference definition parsing for Markdown reference links/images and footnotes.
 //!
 //! Reference definitions have the form:
 //! ```markdown
@@ -6,6 +6,13 @@
 //! [label]: url 'optional title'
 //! [label]: url (optional title)
 //! [label]: <url> "title"
+//! ```
+//!
+//! Footnote definitions have the form:
+//! ```markdown
+//! [^id]: Footnote content here.
+//!     Can continue on multiple lines
+//!     as long as they're indented.
 //! ```
 
 use std::collections::HashMap;
@@ -18,17 +25,26 @@ pub struct ReferenceDefinition {
     pub title: Option<String>,
 }
 
-/// Registry that stores all reference definitions in a document.
+/// A footnote definition that maps an ID to content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FootnoteDefinition {
+    pub id: String,
+    pub content: String,
+}
+
+/// Registry that stores all reference definitions and footnotes in a document.
 /// Labels are stored in normalized (lowercase) form for case-insensitive lookup.
 #[derive(Debug, Clone, Default)]
 pub struct ReferenceRegistry {
     definitions: HashMap<String, ReferenceDefinition>,
+    footnotes: HashMap<String, FootnoteDefinition>,
 }
 
 impl ReferenceRegistry {
     pub fn new() -> Self {
         Self {
             definitions: HashMap::new(),
+            footnotes: HashMap::new(),
         }
     }
 
@@ -50,6 +66,26 @@ impl ReferenceRegistry {
     pub fn contains(&self, label: &str) -> bool {
         let normalized = normalize_label(label);
         self.definitions.contains_key(&normalized)
+    }
+
+    /// Add a footnote definition to the registry.
+    /// IDs are normalized to lowercase for case-insensitive matching.
+    pub fn add_footnote(&mut self, id: String, content: String) {
+        let normalized_id = normalize_label(&id);
+        self.footnotes
+            .insert(normalized_id, FootnoteDefinition { id, content });
+    }
+
+    /// Look up a footnote definition by ID (case-insensitive).
+    pub fn get_footnote(&self, id: &str) -> Option<&FootnoteDefinition> {
+        let normalized = normalize_label(id);
+        self.footnotes.get(&normalized)
+    }
+
+    /// Check if a footnote ID exists in the registry.
+    pub fn contains_footnote(&self, id: &str) -> bool {
+        let normalized = normalize_label(id);
+        self.footnotes.contains_key(&normalized)
     }
 }
 
@@ -80,6 +116,11 @@ pub fn try_parse_reference_definition(
 
     // Must start at beginning of line with [
     if bytes.is_empty() || bytes[0] != b'[' {
+        return None;
+    }
+
+    // Check if it's a footnote definition [^id]: - not a reference definition
+    if bytes.len() >= 2 && bytes[1] == b'^' {
         return None;
     }
 
@@ -244,6 +285,178 @@ fn parse_title(text: &str, bytes: &[u8], pos: &mut usize) -> Option<Option<Strin
 
     // No closing quote found
     None
+}
+
+/// Try to parse just the footnote marker [^id]: from a line.
+/// Returns Some((id, content_start_col)) if the line starts with a footnote marker.
+///
+/// Syntax:
+/// ```markdown
+/// [^id]: Footnote content.
+/// ```
+pub fn try_parse_footnote_marker(line: &str) -> Option<(String, usize)> {
+    let bytes = line.as_bytes();
+
+    // Must start with [^
+    if bytes.len() < 4 || bytes[0] != b'[' || bytes[1] != b'^' {
+        return None;
+    }
+
+    // Find the closing ] for the ID
+    let mut pos = 2;
+    while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' {
+        pos += 1;
+    }
+
+    if pos >= bytes.len() || bytes[pos] != b']' {
+        return None;
+    }
+
+    let id = &line[2..pos];
+    if id.is_empty() {
+        return None;
+    }
+
+    pos += 1; // Skip ]
+
+    // Must be followed by :
+    if pos >= bytes.len() || bytes[pos] != b':' {
+        return None;
+    }
+    pos += 1;
+
+    // Skip whitespace after colon
+    while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t') {
+        pos += 1;
+    }
+
+    // Return the ID and the column where content starts
+    Some((id.to_string(), pos))
+}
+
+/// Try to parse a footnote definition starting at the current position.
+/// Returns Some((consumed_lines, id, content)) if successful.
+///
+/// Syntax:
+/// ```markdown
+/// [^id]: Footnote content.
+///     Can continue on indented lines.
+/// ```
+pub fn try_parse_footnote_definition(
+    lines: &[&str],
+    start_line: usize,
+) -> Option<(usize, String, String)> {
+    if start_line >= lines.len() {
+        return None;
+    }
+
+    let first_line = lines[start_line];
+    let bytes = first_line.as_bytes();
+
+    // Must start with [^
+    if bytes.len() < 4 || bytes[0] != b'[' || bytes[1] != b'^' {
+        return None;
+    }
+
+    // Find the closing ] for the ID
+    let mut pos = 2;
+    while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' {
+        pos += 1;
+    }
+
+    if pos >= bytes.len() || bytes[pos] != b']' {
+        return None;
+    }
+
+    let id = &first_line[2..pos];
+    if id.is_empty() {
+        return None;
+    }
+
+    pos += 1; // Skip ]
+
+    // Must be followed by :
+    if pos >= bytes.len() || bytes[pos] != b':' {
+        return None;
+    }
+    pos += 1;
+
+    // Skip whitespace after colon
+    while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t') {
+        pos += 1;
+    }
+
+    // Collect content from first line
+    let mut content = if pos < bytes.len() {
+        first_line[pos..].to_string()
+    } else {
+        String::new()
+    };
+
+    // Collect continuation lines (indented by 4 spaces or 1 tab)
+    let mut consumed_lines = 1;
+    let mut previous_was_blank = false;
+
+    for i in (start_line + 1)..lines.len() {
+        let line = lines[i];
+
+        // Blank lines are allowed in footnote content
+        if line.trim().is_empty() {
+            content.push('\n');
+            consumed_lines += 1;
+            previous_was_blank = true;
+            continue;
+        }
+
+        // Check if line is indented (4 spaces or 1 tab)
+        let line_bytes = line.as_bytes();
+        let is_indented = if line_bytes.len() >= 4
+            && line_bytes[0] == b' '
+            && line_bytes[1] == b' '
+            && line_bytes[2] == b' '
+            && line_bytes[3] == b' '
+        {
+            true
+        } else if !line_bytes.is_empty() && line_bytes[0] == b'\t' {
+            true
+        } else {
+            false
+        };
+
+        if !is_indented {
+            // If previous line was blank, this unindented line ends the footnote
+            // Otherwise, it's a lazy continuation of the current paragraph
+            if previous_was_blank {
+                break;
+            }
+            // Lazy continuation: add the line as-is to the current paragraph
+            if !content.is_empty() && !content.ends_with('\n') {
+                content.push('\n');
+            }
+            content.push_str(line);
+            consumed_lines += 1;
+            previous_was_blank = false;
+            continue;
+        }
+
+        // Remove indentation and add to content
+        let dedented = if line_bytes.len() >= 4 && line_bytes[..4] == [b' ', b' ', b' ', b' '] {
+            &line[4..]
+        } else if !line_bytes.is_empty() && line_bytes[0] == b'\t' {
+            &line[1..]
+        } else {
+            line
+        };
+
+        if !content.is_empty() && !content.ends_with('\n') {
+            content.push('\n');
+        }
+        content.push_str(dedented);
+        consumed_lines += 1;
+        previous_was_blank = false;
+    }
+
+    Some((consumed_lines, id.to_string(), content))
 }
 
 #[cfg(test)]

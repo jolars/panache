@@ -287,12 +287,16 @@ pub(crate) fn is_closing_fence(content: &str, fence: &FenceInfo) -> bool {
 
 /// Parse a fenced code block, consuming lines from the parser.
 /// Returns the new position after the code block.
+/// Parse a fenced code block, consuming lines from the parser.
+/// Returns the new position after the code block.
+/// base_indent accounts for container indentation (e.g., footnotes) that should be stripped.
 pub(crate) fn parse_fenced_code_block(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
     fence: FenceInfo,
     bq_depth: usize,
+    base_indent: usize,
 ) -> usize {
     // Start code block
     builder.start_node(SyntaxKind::CodeBlock.into());
@@ -300,7 +304,13 @@ pub(crate) fn parse_fenced_code_block(
     // Opening fence
     let first_line = lines[start_pos];
     let (_, first_inner) = count_blockquote_markers(first_line);
-    let first_trimmed = strip_leading_spaces(first_inner);
+    // Strip base indent (footnote context)
+    let first_stripped = if base_indent > 0 && first_inner.len() >= base_indent {
+        &first_inner[base_indent..]
+    } else {
+        first_inner
+    };
+    let first_trimmed = strip_leading_spaces(first_stripped);
 
     builder.start_node(SyntaxKind::CodeFenceOpen.into());
     builder.token(
@@ -328,14 +338,21 @@ pub(crate) fn parse_fenced_code_block(
             break;
         }
 
+        // Strip base indent (footnote context) from content lines
+        let inner_stripped = if base_indent > 0 && inner.len() >= base_indent {
+            &inner[base_indent..]
+        } else {
+            inner
+        };
+
         // Check for closing fence
-        if is_closing_fence(inner, &fence) {
+        if is_closing_fence(inner_stripped, &fence) {
             found_closing = true;
             current_pos += 1;
             break;
         }
 
-        content_lines.push(inner);
+        content_lines.push(inner_stripped);
         current_pos += 1;
     }
 
@@ -353,7 +370,13 @@ pub(crate) fn parse_fenced_code_block(
     if found_closing {
         let closing_line = lines[current_pos - 1];
         let (_, closing_inner) = count_blockquote_markers(closing_line);
-        let closing_trimmed = strip_leading_spaces(closing_inner);
+        // Strip base indent
+        let closing_stripped = if base_indent > 0 && closing_inner.len() >= base_indent {
+            &closing_inner[base_indent..]
+        } else {
+            closing_inner
+        };
+        let closing_trimmed = strip_leading_spaces(closing_stripped);
         let closing_count = closing_trimmed
             .chars()
             .take_while(|&c| c == fence.fence_char)

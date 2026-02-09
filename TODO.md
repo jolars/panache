@@ -144,8 +144,14 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ### Footnotes ✅
 
 - ✅ Inline footnotes `^[note text]` - Full support with nested inline elements
-- ❌ Reference footnotes `[^1]` with definition block
+- ✅ Reference footnotes `[^1]` with definition block
+  - ✅ Parsing and inline reference support
+  - ✅ Lazy continuation in definitions
+  - ⚠️  **Known limitation**: Footnote content is preserved as-is (not wrapped/formatted)
+    - Content should be parsed as container blocks (like lists/blockquotes)
+    - Requires refactoring to use container stack approach
 - ✅ Extension: `inline_notes` - Inline note syntax
+- ✅ Extension: `footnotes` - Reference-style footnotes
 
 ### Citations ✅
 

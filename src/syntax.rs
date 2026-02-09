@@ -34,6 +34,8 @@ pub enum SyntaxKind {
     AutoLink,            // <http://example.com>
     AutoLinkMarker,      // < and >
     ReferenceDefinition, // [label]: url "title"
+    FootnoteDefinition,  // [^id]: content
+    FootnoteReference,   // [^id]
     ReferenceLabel,      // [label] part
     ReferenceUrl,        // url part
     ReferenceTitle,      // "title" part

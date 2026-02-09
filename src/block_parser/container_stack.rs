@@ -30,6 +30,10 @@ pub(crate) enum Container {
     Paragraph {
         content_col: usize,
     },
+    FootnoteDefinition {
+        id: String,
+        content_col: usize,
+    },
 }
 
 pub(crate) struct ContainerStack {

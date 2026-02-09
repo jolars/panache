@@ -45,11 +45,20 @@ fn strip_code_indent(line: &str) -> &str {
 /// - Blank lines (which don't need indentation)
 ///
 /// The block ends when we hit a non-blank line that isn't indented enough.
+/// Parse an indented code block, consuming lines from the parser.
+/// Returns the new position after the code block.
+///
+/// An indented code block consists of consecutive lines that are either:
+/// - Indented by 4+ spaces or 1+ tab (beyond base_indent)
+/// - Blank lines (which don't need indentation)
+///
+/// The block ends when we hit a non-blank line that isn't indented enough.
 pub(crate) fn parse_indented_code_block(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
     bq_depth: usize,
+    base_indent: usize,
 ) -> usize {
     use super::blockquotes::count_blockquote_markers;
 
@@ -57,6 +66,8 @@ pub(crate) fn parse_indented_code_block(
     builder.start_node(SyntaxKind::CodeContent.into());
 
     let mut current_pos = start_pos;
+    // Total indent needed: base (e.g., footnote) + 4 for code
+    let code_indent = base_indent + 4;
 
     while current_pos < lines.len() {
         let line = lines[current_pos];
@@ -77,13 +88,18 @@ pub(crate) fn parse_indented_code_block(
             continue;
         }
 
-        // Check if line is indented enough (after stripping blockquote markers)
-        if !is_indented_code_line(inner) {
+        // Check if line is indented enough (base_indent + 4 for code)
+        let (indent_cols, _) = leading_indent(inner);
+        if indent_cols < code_indent {
             break;
         }
 
-        // Strip the indentation and add the content
-        let content = strip_code_indent(inner);
+        // Strip the total indentation (base + 4) and add the content
+        let content = if inner.len() > code_indent {
+            &inner[code_indent..]
+        } else {
+            ""
+        };
         builder.token(SyntaxKind::TEXT.into(), content);
         builder.token(SyntaxKind::NEWLINE.into(), "\n");
         current_pos += 1;
@@ -94,6 +110,8 @@ pub(crate) fn parse_indented_code_block(
 
     current_pos
 }
+
+use super::container_stack::leading_indent;
 
 #[cfg(test)]
 mod tests {
@@ -122,7 +140,7 @@ mod tests {
     fn test_parse_simple_code_block() {
         let input = vec!["    code line 1", "    code line 2"];
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_indented_code_block(&mut builder, &input, 0, 0);
+        let new_pos = parse_indented_code_block(&mut builder, &input, 0, 0, 0);
         assert_eq!(new_pos, 2);
     }
 
@@ -130,7 +148,7 @@ mod tests {
     fn test_parse_code_block_with_blank_line() {
         let input = vec!["    code line 1", "", "    code line 2"];
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_indented_code_block(&mut builder, &input, 0, 0);
+        let new_pos = parse_indented_code_block(&mut builder, &input, 0, 0, 0);
         assert_eq!(new_pos, 3);
     }
 
@@ -138,7 +156,7 @@ mod tests {
     fn test_parse_code_block_stops_at_unindented() {
         let input = vec!["    code line 1", "    code line 2", "not code"];
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_indented_code_block(&mut builder, &input, 0, 0);
+        let new_pos = parse_indented_code_block(&mut builder, &input, 0, 0, 0);
         assert_eq!(new_pos, 2);
     }
 
@@ -146,7 +164,7 @@ mod tests {
     fn test_parse_code_block_with_tab() {
         let input = vec!["\tcode with tab", "\tanother line"];
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_indented_code_block(&mut builder, &input, 0, 0);
+        let new_pos = parse_indented_code_block(&mut builder, &input, 0, 0, 0);
         assert_eq!(new_pos, 2);
     }
 }

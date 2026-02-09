@@ -1,6 +1,7 @@
 //! Inline footnote parsing for Pandoc's inline_notes extension.
 //!
-//! Syntax: `^[footnote text]`
+//! Syntax: `^[footnote text]` for inline footnotes
+//! Syntax: `[^id]` for reference footnotes
 
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
@@ -68,6 +69,43 @@ pub(crate) fn emit_inline_footnote(builder: &mut GreenNodeBuilder, content: &str
     // Closing marker
     builder.token(SyntaxKind::InlineFootnoteEnd.into(), "]");
 
+    builder.finish_node();
+}
+
+/// Try to parse a footnote reference: [^id]
+/// Returns Some((length, id)) if successful.
+pub(crate) fn try_parse_footnote_reference(text: &str) -> Option<(usize, String)> {
+    let bytes = text.as_bytes();
+
+    // Must start with [^
+    if bytes.len() < 4 || bytes[0] != b'[' || bytes[1] != b'^' {
+        return None;
+    }
+
+    // Find the closing ]
+    let mut pos = 2;
+    while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' {
+        pos += 1;
+    }
+
+    if pos >= bytes.len() || bytes[pos] != b']' {
+        return None;
+    }
+
+    let id = &text[2..pos];
+    if id.is_empty() {
+        return None;
+    }
+
+    Some((pos + 1, id.to_string()))
+}
+
+/// Emit a footnote reference node to the builder.
+pub(crate) fn emit_footnote_reference(builder: &mut GreenNodeBuilder, id: &str) {
+    builder.start_node(SyntaxKind::FootnoteReference.into());
+    builder.token(SyntaxKind::TEXT.into(), "[^");
+    builder.token(SyntaxKind::TEXT.into(), id);
+    builder.token(SyntaxKind::TEXT.into(), "]");
     builder.finish_node();
 }
 

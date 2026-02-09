@@ -27,7 +27,10 @@ use citations::{
 use code_spans::{emit_code_span, try_parse_code_span};
 use emphasis::{emit_emphasis, try_parse_emphasis};
 use escapes::{emit_escape, try_parse_escape};
-use inline_footnotes::{emit_inline_footnote, try_parse_inline_footnote};
+use inline_footnotes::{
+    emit_footnote_reference, emit_inline_footnote, try_parse_footnote_reference,
+    try_parse_inline_footnote,
+};
 use inline_math::{
     emit_display_math, emit_double_backslash_display_math, emit_double_backslash_inline_math,
     emit_inline_math, emit_single_backslash_display_math, emit_single_backslash_inline_math,
@@ -288,6 +291,21 @@ pub fn parse_inline_text(
                     is_shortcut
                 );
                 emit_reference_image(builder, alt_text, &label, is_shortcut, config);
+                pos += len;
+                continue;
+            }
+        }
+
+        // Try to parse footnote reference [^id] (before inline/reference links)
+        // Only if footnotes extension is enabled
+        if bytes[pos] == b'['
+            && pos + 1 < text.len()
+            && bytes[pos + 1] == b'^'
+            && config.extensions.footnotes
+        {
+            if let Some((len, id)) = try_parse_footnote_reference(&text[pos..]) {
+                log::debug!("Matched footnote reference at pos {}: [^{}]", pos, id);
+                emit_footnote_reference(builder, &id);
                 pos += len;
                 continue;
             }

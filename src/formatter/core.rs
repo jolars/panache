@@ -277,9 +277,164 @@ impl Formatter {
                 if let Some(next) = node.next_sibling()
                     && is_block_element(next.kind())
                     && next.kind() != SyntaxKind::ReferenceDefinition
+                    && next.kind() != SyntaxKind::FootnoteDefinition
                     && !self.output.ends_with("\n\n")
                 {
                     self.output.push('\n');
+                }
+            }
+
+            SyntaxKind::FootnoteDefinition => {
+                // Format footnote definition with proper indentation
+                // Extract marker and children first
+                let mut marker = String::new();
+                let mut child_blocks = Vec::new();
+
+                for element in node.children_with_tokens() {
+                    match element {
+                        NodeOrToken::Token(token)
+                            if token.kind() == SyntaxKind::FootnoteReference =>
+                        {
+                            marker = token.text().to_string();
+                        }
+                        NodeOrToken::Node(child) => {
+                            child_blocks.push(child);
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Output indent and marker
+                self.output.push_str(&" ".repeat(indent));
+                self.output.push_str(marker.trim_end());
+
+                // Format child blocks with 4-space indentation
+                let child_indent = indent + 4;
+                let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+                let mut first = true;
+                let mut prev_was_code_or_list = false;
+
+                for child in &child_blocks {
+                    // Add blank line between blocks (except after BlankLine or at start)
+                    if !first && prev_was_code_or_list && child.kind() != SyntaxKind::BlankLine {
+                        self.output.push('\n');
+                    }
+
+                    if first {
+                        first = false;
+                        // First paragraph - check if it can go on same line
+                        if child.kind() == SyntaxKind::PARAGRAPH {
+                            // Calculate how much space is available on first line
+                            let marker_len = marker.len();
+                            let first_line_space = self
+                                .config
+                                .line_width
+                                .saturating_sub(indent + marker_len + 1);
+
+                            // Try wrapping the paragraph to see if it fits on one line
+                            let lines = self.wrapped_lines_for_paragraph(&child, first_line_space);
+
+                            if lines.len() == 1 {
+                                // Fits on one line - put on same line as marker
+                                self.output.push(' ');
+                                self.output.push_str(&lines[0]);
+                                self.output.push('\n');
+                                continue;
+                            }
+                        }
+                        // Multi-line or non-paragraph first block - indent on next line
+                        self.output.push('\n');
+                    }
+
+                    // Format blocks with indentation
+                    match child.kind() {
+                        SyntaxKind::PARAGRAPH => {
+                            // Handle paragraph with wrapping and indentation
+                            let available_width =
+                                self.config.line_width.saturating_sub(child_indent);
+
+                            match wrap_mode {
+                                WrapMode::Preserve => {
+                                    let text = child.text().to_string();
+                                    for line in text.lines() {
+                                        self.output.push_str(&" ".repeat(child_indent));
+                                        self.output.push_str(line);
+                                        self.output.push('\n');
+                                    }
+                                }
+                                WrapMode::Reflow => {
+                                    let lines =
+                                        self.wrapped_lines_for_paragraph(&child, available_width);
+                                    for line in lines {
+                                        self.output.push_str(&" ".repeat(child_indent));
+                                        self.output.push_str(&line);
+                                        self.output.push('\n');
+                                    }
+                                }
+                            }
+                        }
+                        SyntaxKind::BlankLine => {
+                            self.output.push('\n');
+                        }
+                        SyntaxKind::CodeBlock => {
+                            // Format code blocks as fenced blocks with indentation
+                            // Extract code content and any language/info
+                            let mut code_lines = Vec::new();
+                            for code_child in child.children() {
+                                if code_child.kind() == SyntaxKind::CodeContent {
+                                    let code_text = code_child.text().to_string();
+                                    for line in code_text.lines() {
+                                        code_lines.push(line.to_string());
+                                    }
+                                }
+                            }
+
+                            // Strip trailing blank lines from code content
+                            while code_lines.last().is_some_and(|l| l.is_empty()) {
+                                code_lines.pop();
+                            }
+
+                            // Output fenced code block with footnote indentation
+                            self.output.push_str(&" ".repeat(child_indent));
+                            self.output.push_str("```\n");
+                            for line in code_lines {
+                                if !line.is_empty() {
+                                    self.output.push_str(&" ".repeat(child_indent));
+                                    self.output.push_str(&line);
+                                }
+                                self.output.push('\n');
+                            }
+                            self.output.push_str(&" ".repeat(child_indent));
+                            self.output.push_str("```\n");
+                        }
+                        _ => {
+                            // Other blocks (lists, etc.) - format with indentation
+                            self.format_node_sync(child, child_indent);
+                        }
+                    }
+
+                    // Track if this was a code block or list for spacing
+                    prev_was_code_or_list =
+                        matches!(child.kind(), SyntaxKind::CodeBlock | SyntaxKind::List);
+                }
+
+                // If no child blocks, just end with newline
+                if child_blocks.is_empty() {
+                    self.output.push('\n');
+                }
+
+                // Add blank line after footnote definition (matching Pandoc's behavior)
+                if let Some(next) = node.next_sibling() {
+                    let next_kind = next.kind();
+                    if next_kind == SyntaxKind::FootnoteDefinition && !self.output.ends_with("\n\n")
+                    {
+                        self.output.push('\n');
+                    } else if is_block_element(next_kind)
+                        && next_kind != SyntaxKind::ReferenceDefinition
+                        && !self.output.ends_with("\n\n")
+                    {
+                        self.output.push('\n');
+                    }
                 }
             }
 

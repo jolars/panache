@@ -36,7 +36,10 @@ use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
 use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
-pub use reference_definitions::{ReferenceRegistry, try_parse_reference_definition};
+pub use reference_definitions::{
+    ReferenceRegistry, try_parse_footnote_definition, try_parse_footnote_marker,
+    try_parse_reference_definition,
+};
 use tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
@@ -221,13 +224,26 @@ impl<'a> BlockParser<'a> {
             } else {
                 0
             };
+            log::trace!(
+                "Blank line: depth={}, levels_to_keep={}, next='{}'",
+                self.containers.depth(),
+                levels_to_keep,
+                if peek < self.lines.len() {
+                    self.lines[peek]
+                } else {
+                    "<EOF>"
+                }
+            );
 
             // Close containers down to the level we want to keep
             while self.containers.depth() > levels_to_keep {
                 match self.containers.last() {
-                    Some(Container::ListItem { .. }) | Some(Container::List { .. }) => {
+                    Some(Container::ListItem { .. })
+                    | Some(Container::List { .. })
+                    | Some(Container::FootnoteDefinition { .. })
+                    | Some(Container::Paragraph { .. }) => {
                         log::trace!(
-                            "Closing list container at blank line (depth {})",
+                            "Closing container at blank line (depth {})",
                             self.containers.depth()
                         );
                         self.containers
@@ -391,10 +407,11 @@ impl<'a> BlockParser<'a> {
     /// Compute how many container levels to keep open based on next line content.
     fn compute_levels_to_keep(&self, next_line: &str) -> usize {
         let (next_bq_depth, next_inner) = count_blockquote_markers(next_line);
-        let (next_indent_cols, _) = leading_indent(next_inner);
+        let (raw_indent_cols, _) = leading_indent(next_inner);
         let next_marker = try_parse_list_marker(next_inner, self.config);
 
         let mut keep_level = 0;
+        let mut footnote_indent_so_far = 0usize;
 
         // First, account for blockquotes
         for (i, c) in self.containers.stack.iter().enumerate() {
@@ -409,13 +426,26 @@ impl<'a> BlockParser<'a> {
                         keep_level = i + 1;
                     }
                 }
+                Container::FootnoteDefinition { content_col, .. } => {
+                    // Track footnote indent for nested containers
+                    footnote_indent_so_far += *content_col;
+                    // Footnote continuation: line must be indented at least 4 spaces
+                    // (or at the content column if content started after marker)
+                    let min_indent = (*content_col).max(4);
+                    if raw_indent_cols >= min_indent {
+                        keep_level = i + 1;
+                    }
+                }
                 Container::List {
                     marker,
                     base_indent_cols,
                 } => {
+                    // Adjust indent for footnote context
+                    let effective_indent = raw_indent_cols.saturating_sub(footnote_indent_so_far);
                     let continues_list = if let Some((ref nm, _, _)) = next_marker {
-                        markers_match(marker, nm) && next_indent_cols <= base_indent_cols + 3
+                        markers_match(marker, nm) && effective_indent <= base_indent_cols + 3
                     } else {
+                        // For non-list-marker lines, must be indented past list content
                         let item_content_col = self
                             .containers
                             .stack
@@ -424,8 +454,9 @@ impl<'a> BlockParser<'a> {
                                 Container::ListItem { content_col } => Some(*content_col),
                                 _ => None,
                             })
-                            .unwrap_or(0);
-                        next_indent_cols >= item_content_col
+                            // If no list item, require at least 1 space indent to continue list
+                            .unwrap_or(1);
+                        effective_indent >= item_content_col
                     };
                     if continues_list {
                         keep_level = i + 1;
@@ -438,8 +469,34 @@ impl<'a> BlockParser<'a> {
         keep_level
     }
 
+    /// Get the total indentation to strip from footnote containers in the stack.
+    fn footnote_indent_to_strip(&self) -> usize {
+        self.containers
+            .stack
+            .iter()
+            .filter_map(|c| match c {
+                Container::FootnoteDefinition { content_col, .. } => Some(*content_col),
+                _ => None,
+            })
+            .sum()
+    }
+
     /// Parse content inside blockquotes (or at top level).
     fn parse_inner_content(&mut self, content: &str) -> bool {
+        // Strip footnote indentation from all footnote containers in the stack
+        let footnote_indent = self.footnote_indent_to_strip();
+        let content = if footnote_indent > 0 {
+            let (indent_cols, _) = leading_indent(content);
+            if indent_cols >= footnote_indent {
+                let idx = byte_index_at_column(content, footnote_indent);
+                &content[idx..]
+            } else {
+                content.trim_start()
+            }
+        } else {
+            content
+        };
+
         // Check for heading (needs blank line before, or at start of container)
         let has_blank_before = self.pos == 0
             || self.lines[self.pos - 1].trim().is_empty()
@@ -573,9 +630,65 @@ impl<'a> BlockParser<'a> {
                 self.pos,
                 fence.fence_char
             );
-            let new_pos =
-                parse_fenced_code_block(&mut self.builder, &self.lines, self.pos, fence, bq_depth);
+            let new_pos = parse_fenced_code_block(
+                &mut self.builder,
+                &self.lines,
+                self.pos,
+                fence,
+                bq_depth,
+                footnote_indent,
+            );
             self.pos = new_pos;
+            return true;
+        }
+
+        // Check for footnote definition: [^id]: content
+        // Similar to list items - marker followed by content that can span multiple lines
+        // Must check BEFORE reference definitions since both start with [
+        if let Some((id, content_start)) = try_parse_footnote_marker(content) {
+            log::debug!("Parsed footnote definition at line {}: [^{}]", self.pos, id);
+
+            // Close paragraph if one is open
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            // Close previous footnote if one is open
+            while matches!(
+                self.containers.last(),
+                Some(Container::FootnoteDefinition { .. })
+            ) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            // Start the footnote definition container
+            self.builder
+                .start_node(SyntaxKind::FootnoteDefinition.into());
+
+            // Emit the marker
+            let marker_text = &content[..content_start];
+            self.builder
+                .token(SyntaxKind::FootnoteReference.into(), marker_text);
+
+            // Calculate content column (minimum 4 spaces for continuation)
+            // The first line can start right after the marker, but subsequent lines
+            // need at least 4 spaces of indentation
+            let content_col = 4;
+            self.containers.push(Container::FootnoteDefinition {
+                id: id.clone(),
+                content_col,
+            });
+
+            // Parse the first line content (if any)
+            let first_line_content = &content[content_start..];
+            if !first_line_content.trim().is_empty() {
+                self.start_paragraph_if_needed();
+                self.append_paragraph_line(first_line_content);
+            }
+
+            self.pos += 1;
             return true;
         }
 
@@ -599,11 +712,17 @@ impl<'a> BlockParser<'a> {
         }
 
         // Check for indented code block (must have actual blank line before)
+        // Inside a footnote, content needs 4 spaces for code (8 total in raw line)
         if has_blank_before_strict && is_indented_code_line(content) {
             let bq_depth = self.current_blockquote_depth();
             log::debug!("Parsed indented code block at line {}", self.pos);
-            let new_pos =
-                parse_indented_code_block(&mut self.builder, &self.lines, self.pos, bq_depth);
+            let new_pos = parse_indented_code_block(
+                &mut self.builder,
+                &self.lines,
+                self.pos,
+                bq_depth,
+                footnote_indent,
+            );
             self.pos = new_pos;
             return true;
         }
@@ -1093,6 +1212,7 @@ impl<'a> BlockParser<'a> {
             .rev()
             .find_map(|c| match c {
                 Container::ListItem { content_col } => Some(*content_col),
+                Container::FootnoteDefinition { content_col, .. } => Some(*content_col),
                 _ => None,
             })
             .unwrap_or(0)
