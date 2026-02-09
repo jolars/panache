@@ -76,7 +76,7 @@ pub fn emit_strikeout(builder: &mut GreenNodeBuilder, inner_text: &str, config: 
     builder.finish_node();
 
     // Parse inner content recursively for nested inline elements
-    super::parse_inline_text(builder, inner_text, config);
+    super::parse_inline_text(builder, inner_text, config, None);
 
     // Closing marker
     builder.start_node(SyntaxKind::StrikeoutMarker.into());

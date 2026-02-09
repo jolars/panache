@@ -20,7 +20,6 @@ use crate::block_parser::attributes::{
 };
 
 /// Helper to normalize a reference label (lowercase, collapse whitespace)
-#[allow(dead_code)] // TODO: Used for reference link resolution (not yet fully implemented)
 fn normalize_label(label: &str) -> String {
     label
         .split_whitespace()
@@ -145,7 +144,8 @@ pub fn emit_inline_image(
     // Alt text (recursively parse inline elements)
     builder.start_node(SyntaxKind::ImageAlt.into());
     // Use the standalone parse_inline_text function for recursive parsing
-    crate::inline_parser::parse_inline_text(builder, alt_text, config);
+    // Note: nested contexts don't resolve references
+    crate::inline_parser::parse_inline_text(builder, alt_text, config, None);
     builder.finish_node();
 
     // Closing ] and opening (
@@ -325,7 +325,7 @@ pub fn emit_inline_link(
     // Link text (recursively parse inline elements)
     builder.start_node(SyntaxKind::LinkText.into());
     // Use the standalone parse_inline_text function for recursive parsing
-    crate::inline_parser::parse_inline_text(builder, link_text, config);
+    crate::inline_parser::parse_inline_text(builder, link_text, config, None);
     builder.finish_node();
 
     // Closing ] and opening (
@@ -351,13 +351,23 @@ pub fn emit_inline_link(
 ///
 /// Returns Some((length, text_content, label, is_shortcut)) if a valid reference link is found.
 /// The label is what should be looked up in the registry.
-#[allow(dead_code)] // TODO: Will be integrated into main parsing loop
 pub fn try_parse_reference_link(
     text: &str,
     allow_shortcut: bool,
 ) -> Option<(usize, &str, String, bool)> {
     if !text.starts_with('[') {
         return None;
+    }
+
+    // Don't match citations (which start with [@) or suppress-author citations (which start with [-@)
+    if text.len() > 1 {
+        let bytes = text.as_bytes();
+        if bytes[1] == b'@' {
+            return None;
+        }
+        if bytes[1] == b'-' && text.len() > 2 && bytes[2] == b'@' {
+            return None;
+        }
     }
 
     // Find the closing ] for the text
@@ -393,6 +403,11 @@ pub fn try_parse_reference_link(
 
     // Check if followed by ( - if so, this is an inline link, not a reference link
     if after_bracket < text.len() && text[after_bracket..].starts_with('(') {
+        return None;
+    }
+
+    // Check if followed by { - if so, this is a bracketed span, not a reference link
+    if after_bracket < text.len() && text[after_bracket..].starts_with('{') {
         return None;
     }
 
@@ -437,14 +452,12 @@ pub fn try_parse_reference_link(
 }
 
 /// Emit a reference link node to the builder.
-/// If the reference is found in the registry, use the URL from the definition.
-/// Otherwise, emit as unresolved reference.
-#[allow(dead_code)] // TODO: Will be integrated into main parsing loop
+/// Preserves the original reference syntax (explicit [text][ref], implicit [text][], or shortcut [text]).
 pub fn emit_reference_link(
     builder: &mut GreenNodeBuilder,
     link_text: &str,
     label: &str,
-    registry: &ReferenceRegistry,
+    is_shortcut: bool,
     config: &Config,
 ) {
     builder.start_node(SyntaxKind::Link.into());
@@ -456,43 +469,31 @@ pub fn emit_reference_link(
 
     // Link text (recursively parse inline elements)
     builder.start_node(SyntaxKind::LinkText.into());
-    crate::inline_parser::parse_inline_text(builder, link_text, config);
+    crate::inline_parser::parse_inline_text(builder, link_text, config, None);
     builder.finish_node();
 
-    // Closing ]
+    // Closing ] and reference label
     builder.token(SyntaxKind::TEXT.into(), "]");
 
-    // Try to resolve the reference
-    if let Some(def) = registry.get(label) {
-        // Found definition - emit as resolved link
-        // Format: [text](resolved_url)
-        builder.token(SyntaxKind::TEXT.into(), "(");
-
-        builder.start_node(SyntaxKind::LinkDest.into());
-        builder.token(SyntaxKind::TEXT.into(), &def.url);
-        if let Some(title) = &def.title {
-            builder.token(SyntaxKind::TEXT.into(), " \"");
-            builder.token(SyntaxKind::TEXT.into(), title);
-            builder.token(SyntaxKind::TEXT.into(), "\"");
-        }
-        builder.finish_node();
-
-        builder.token(SyntaxKind::TEXT.into(), ")");
-    } else {
-        // Unresolved reference - emit the reference label
+    if !is_shortcut {
+        // Explicit or implicit reference: [text][label] or [text][]
         builder.token(SyntaxKind::TEXT.into(), "[");
         builder.start_node(SyntaxKind::LinkRef.into());
-        builder.token(SyntaxKind::TEXT.into(), label);
+        // For implicit references (label == text), emit empty label to get [text][]
+        // For explicit references, emit the label to get [text][label]
+        if label != link_text {
+            builder.token(SyntaxKind::TEXT.into(), label);
+        }
         builder.finish_node();
         builder.token(SyntaxKind::TEXT.into(), "]");
     }
+    // For shortcut references, just [text] - no second bracket pair
 
     builder.finish_node();
 }
 
 /// Try to parse a reference-style image: `![alt][ref]`, `![alt][]`, or `![alt]`
 /// Returns (total_len, alt_text, label, is_shortcut) if successful.
-#[allow(dead_code)] // TODO: Will be integrated into main parsing loop
 pub fn try_parse_reference_image(
     text: &str,
     allow_shortcut: bool,
@@ -545,11 +546,12 @@ pub fn try_parse_reference_image(
         let label_text = &text[label_start..pos];
         pos += 1;
 
+        // Return the original label text for formatting preservation
         // Empty label means implicit reference
         let label = if label_text.is_empty() {
-            normalize_label(alt_text)
+            alt_text.to_string() // For implicit references, use alt text as label for equality check
         } else {
-            normalize_label(label_text)
+            label_text.to_string() // Preserve original case
         };
 
         return Some((pos, alt_text, label, false));
@@ -563,7 +565,8 @@ pub fn try_parse_reference_image(
             return None;
         }
 
-        let label = normalize_label(alt_text);
+        // For shortcut references, use alt text as label for equality check
+        let label = alt_text.to_string();
         return Some((pos, alt_text, label, true));
     }
 
@@ -571,63 +574,38 @@ pub fn try_parse_reference_image(
 }
 
 /// Emit a reference image node with registry lookup.
-#[allow(dead_code)] // TODO: Will be integrated into main parsing loop
 pub fn emit_reference_image(
     builder: &mut GreenNodeBuilder,
     alt_text: &str,
     label: &str,
-    registry: &crate::block_parser::ReferenceRegistry,
+    is_shortcut: bool,
     config: &Config,
 ) {
     builder.start_node(SyntaxKind::ImageLink.into());
 
-    // Look up the reference in the registry
-    if let Some(def) = registry.get(label) {
-        log::debug!("Resolved reference image: label={}, url={}", label, def.url);
+    // Emit as reference image (preserve original syntax)
+    builder.start_node(SyntaxKind::ImageLinkStart.into());
+    builder.token(SyntaxKind::ImageLinkStart.into(), "![");
+    builder.finish_node();
 
-        // Emit as a resolved image
-        builder.start_node(SyntaxKind::ImageLinkStart.into());
-        builder.token(SyntaxKind::ImageLinkStart.into(), "![");
-        builder.finish_node();
+    // Alt text (recursively parse inline elements)
+    builder.start_node(SyntaxKind::ImageAlt.into());
+    parse_inline_text(builder, alt_text, config, None);
+    builder.finish_node();
 
-        // Alt text (recursively parse inline elements)
-        builder.start_node(SyntaxKind::ImageAlt.into());
-        parse_inline_text(builder, alt_text, config);
-        builder.finish_node();
+    // Closing ] and reference label
+    builder.token(SyntaxKind::TEXT.into(), "]");
 
-        // Closing ] and opening (
-        builder.token(SyntaxKind::TEXT.into(), "](");
-
-        // Destination
-        builder.start_node(SyntaxKind::LinkDest.into());
-        builder.token(SyntaxKind::TEXT.into(), &def.url);
-        builder.finish_node();
-
-        // Title if present
-        if let Some(title) = &def.title {
-            builder.token(SyntaxKind::TEXT.into(), " \"");
-            builder.token(SyntaxKind::TEXT.into(), title);
-            builder.token(SyntaxKind::TEXT.into(), "\"");
+    if !is_shortcut {
+        // Explicit or implicit reference: ![alt][label] or ![alt][]
+        builder.token(SyntaxKind::TEXT.into(), "[");
+        // For implicit references, emit empty label (label == alt means implicit from parser)
+        if label != alt_text {
+            builder.token(SyntaxKind::TEXT.into(), label);
         }
-
-        // Closing )
-        builder.token(SyntaxKind::TEXT.into(), ")");
-    } else {
-        log::debug!("Unresolved reference image: label={}", label);
-
-        // Emit as unresolved (keep original syntax)
-        builder.start_node(SyntaxKind::ImageLinkStart.into());
-        builder.token(SyntaxKind::ImageLinkStart.into(), "![");
-        builder.finish_node();
-
-        builder.start_node(SyntaxKind::ImageAlt.into());
-        parse_inline_text(builder, alt_text, config);
-        builder.finish_node();
-
-        builder.token(SyntaxKind::TEXT.into(), "][");
-        builder.token(SyntaxKind::TEXT.into(), label);
         builder.token(SyntaxKind::TEXT.into(), "]");
     }
+    // For shortcut references, just ![alt] - no second bracket pair
 
     builder.finish_node();
 }

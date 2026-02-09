@@ -63,7 +63,7 @@ pub(crate) fn emit_inline_footnote(builder: &mut GreenNodeBuilder, content: &str
     builder.token(SyntaxKind::InlineFootnoteStart.into(), "^[");
 
     // Parse the content recursively for nested inline elements
-    parse_inline_text(builder, content, config);
+    parse_inline_text(builder, content, config, None);
 
     // Closing marker
     builder.token(SyntaxKind::InlineFootnoteEnd.into(), "]");

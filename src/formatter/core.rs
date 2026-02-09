@@ -268,6 +268,21 @@ impl Formatter {
                 }
             }
 
+            SyntaxKind::ReferenceDefinition => {
+                // Output reference definition as-is: [label]: url "title"
+                self.output.push_str(&node.text().to_string());
+                self.output.push('\n');
+
+                // Ensure blank line after if followed by non-reference block element
+                if let Some(next) = node.next_sibling()
+                    && is_block_element(next.kind())
+                    && next.kind() != SyntaxKind::ReferenceDefinition
+                    && !self.output.ends_with("\n\n")
+                {
+                    self.output.push('\n');
+                }
+            }
+
             SyntaxKind::LatexEnvironment => {
                 // Output the environment exactly as written
                 let text = node.text().to_string();

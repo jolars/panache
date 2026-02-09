@@ -102,7 +102,7 @@ pub(crate) fn emit_bracketed_span(
 
     // Content (with recursive inline parsing)
     builder.start_node(SyntaxKind::SpanContent.into());
-    parse_inline_text(builder, content, config);
+    parse_inline_text(builder, content, config, None);
     builder.finish_node(); // SpanContent
 
     // Closing bracket

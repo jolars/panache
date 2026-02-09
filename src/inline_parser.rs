@@ -37,8 +37,9 @@ use inline_math::{
 };
 use latex::{parse_latex_command, try_parse_latex_command};
 use links::{
-    emit_autolink, emit_inline_image, emit_inline_link, try_parse_autolink, try_parse_inline_image,
-    try_parse_inline_link,
+    emit_autolink, emit_inline_image, emit_inline_link, emit_reference_image, emit_reference_link,
+    try_parse_autolink, try_parse_inline_image, try_parse_inline_link, try_parse_reference_image,
+    try_parse_reference_link,
 };
 use native_spans::{emit_native_span, try_parse_native_span};
 use strikeout::{emit_strikeout, try_parse_strikeout};
@@ -48,7 +49,15 @@ use superscript::{emit_superscript, try_parse_superscript};
 /// Parse inline elements from text content.
 /// This is a standalone function used by both the main inline parser
 /// and by nested contexts like link text.
-pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str, config: &Config) {
+///
+/// The `reference_registry` parameter is optional - when None, reference links/images
+/// won't be resolved (useful for nested contexts like link text).
+pub fn parse_inline_text(
+    builder: &mut GreenNodeBuilder,
+    text: &str,
+    config: &Config,
+    reference_registry: Option<&crate::block_parser::ReferenceRegistry>,
+) {
     log::trace!(
         "Parsing inline text: {:?} ({} bytes), tex_math_single_backslash={}",
         &text[..text.len().min(40)],
@@ -260,6 +269,30 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str, config: &Co
             continue;
         }
 
+        // Try to parse reference image (after inline image check)
+        // Only if we have a registry and reference_links extension is enabled
+        if pos + 1 < text.len()
+            && bytes[pos] == b'!'
+            && bytes[pos + 1] == b'['
+            && config.extensions.reference_links
+            && let Some(registry) = reference_registry
+        {
+            let allow_shortcut = config.extensions.shortcut_reference_links;
+            if let Some((len, alt_text, label, is_shortcut)) =
+                try_parse_reference_image(&text[pos..], allow_shortcut)
+            {
+                log::debug!(
+                    "Matched reference image at pos {}: label={:?}, shortcut={}",
+                    pos,
+                    label,
+                    is_shortcut
+                );
+                emit_reference_image(builder, alt_text, &label, is_shortcut, config);
+                pos += len;
+                continue;
+            }
+        }
+
         // Try to parse inline link
         if bytes[pos] == b'['
             && let Some((len, link_text, dest)) = try_parse_inline_link(&text[pos..])
@@ -268,6 +301,28 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str, config: &Co
             emit_inline_link(builder, &text[pos..pos + len], link_text, dest, config);
             pos += len;
             continue;
+        }
+
+        // Try to parse reference link (after inline link check)
+        // Only if we have a registry and reference_links extension is enabled
+        if bytes[pos] == b'['
+            && config.extensions.reference_links
+            && let Some(registry) = reference_registry
+        {
+            let allow_shortcut = config.extensions.shortcut_reference_links;
+            if let Some((len, link_text, label, is_shortcut)) =
+                try_parse_reference_link(&text[pos..], allow_shortcut)
+            {
+                log::debug!(
+                    "Matched reference link at pos {}: label={:?}, shortcut={}",
+                    pos,
+                    label,
+                    is_shortcut
+                );
+                emit_reference_link(builder, link_text, &label, is_shortcut, config);
+                pos += len;
+                continue;
+            }
         }
 
         // Try to parse bracketed citation (after link since both start with [)
@@ -421,11 +476,8 @@ impl InlineParser {
 
     /// Parse inline text with reference link/image resolution support.
     fn parse_text_with_refs(&self, builder: &mut GreenNodeBuilder, text: &str) {
-        // For now, just use standard inline parsing
-        // TODO: Integrate reference link/image resolution
-        // The parsing functions exist in links.rs but need proper integration
-        // into the parsing loop to maintain correct precedence
-        parse_inline_text(builder, text, &self.config);
+        // Pass the reference registry for reference link/image resolution
+        parse_inline_text(builder, text, &self.config, Some(&self.reference_registry));
     }
 
     /// Check if a token should be parsed for inline elements.
