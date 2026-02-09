@@ -179,7 +179,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 - ✅ Extension: `raw_tex` - Inline LaTeX commands (`\cite{ref}`, `\textbf{text}`, etc.)
 - ✅ Extension: `raw_tex` - Block LaTeX environments (`\begin{tabular}...\end{tabular}`)
-- ❌ Extension: `latex_macros` - Expand LaTeX macros
+- ⏹️ Extension: `latex_macros` - Expand LaTeX macros (conversion feature, not formatting concern)
 
 ### Other Raw ❌
 
