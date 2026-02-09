@@ -36,11 +36,6 @@ pub fn assert_block_kinds(input: &str, expected: &[SyntaxKind]) {
     );
 }
 
-/// Get text content of first node matching the kind
-pub fn get_text(node: &SyntaxNode, kind: SyntaxKind) -> Option<String> {
-    find_first(node, kind).map(|n| n.text().to_string())
-}
-
 /// Print debug tree for inspection
 #[allow(dead_code)]
 pub fn debug_tree(node: &SyntaxNode) -> String {

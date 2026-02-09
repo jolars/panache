@@ -533,7 +533,7 @@ mod tests {
     fn test_nested_strong_em() {
         // **foo *bar* baz** - strong containing emphasis
         let matches = parse_emphasis("**foo *bar* baz**");
-        assert!(matches.len() >= 1);
+        assert!(!matches.is_empty());
     }
 
     #[test]

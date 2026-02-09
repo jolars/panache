@@ -1,6 +1,5 @@
 use crate::block_parser::BlockParser;
 use crate::config::Config;
-use crate::syntax::SyntaxKind;
 
 fn parse(input: &str) -> String {
     let config = Config::default();

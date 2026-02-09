@@ -525,7 +525,7 @@ mod bracketed_span_tests {
         let node = tree
             .descendants()
             .find(|n| n.kind() == kind)
-            .expect(&format!("Expected to find {:?}", kind));
+            .unwrap_or_else(|| panic!("Expected to find {:?}", kind));
         assert_eq!(node.text().to_string(), expected);
     }
 

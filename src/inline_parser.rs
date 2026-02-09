@@ -8,7 +8,6 @@ mod citations;
 mod code_spans;
 mod emphasis;
 mod escapes;
-mod future_tests;
 mod inline_footnotes;
 mod inline_math;
 mod latex;
@@ -278,7 +277,7 @@ pub fn parse_inline_text(
             && bytes[pos] == b'!'
             && bytes[pos + 1] == b'['
             && config.extensions.reference_links
-            && let Some(registry) = reference_registry
+            && let Some(_registry) = reference_registry
         {
             let allow_shortcut = config.extensions.shortcut_reference_links;
             if let Some((len, alt_text, label, is_shortcut)) =
@@ -324,7 +323,7 @@ pub fn parse_inline_text(
         // Only if we have a registry and reference_links extension is enabled
         if bytes[pos] == b'['
             && config.extensions.reference_links
-            && let Some(registry) = reference_registry
+            && let Some(_registry) = reference_registry
         {
             let allow_shortcut = config.extensions.shortcut_reference_links;
             if let Some((len, link_text, label, is_shortcut)) =

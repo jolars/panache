@@ -18,15 +18,6 @@ use crate::block_parser::attributes::{
     AttributeBlock, emit_attributes, try_parse_trailing_attributes,
 };
 
-/// Helper to normalize a reference label (lowercase, collapse whitespace)
-fn normalize_label(label: &str) -> String {
-    label
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
-}
-
 /// Try to parse an inline image starting at the current position.
 ///
 /// Inline images have the form `![alt](url)` or `![alt](url "title")`.

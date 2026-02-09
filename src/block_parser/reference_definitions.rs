@@ -397,9 +397,7 @@ pub fn try_parse_footnote_definition(
     let mut consumed_lines = 1;
     let mut previous_was_blank = false;
 
-    for i in (start_line + 1)..lines.len() {
-        let line = lines[i];
-
+    for line in lines.iter().skip(start_line + 1) {
         // Blank lines are allowed in footnote content
         if line.trim().is_empty() {
             content.push('\n');

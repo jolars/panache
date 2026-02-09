@@ -26,17 +26,6 @@ pub(crate) fn is_indented_code_line(content: &str) -> bool {
     spaces >= 4
 }
 
-/// Strip exactly 4 spaces or 1 tab from the beginning of a line.
-/// If the line has fewer than 4 spaces and no tab, returns the line unchanged.
-fn strip_code_indent(line: &str) -> &str {
-    if let Some(stripped) = line.strip_prefix('\t') {
-        stripped
-    } else {
-        let spaces = line.chars().take_while(|&c| c == ' ').count();
-        if spaces >= 4 { &line[4..] } else { line }
-    }
-}
-
 /// Parse an indented code block, consuming lines from the parser.
 /// Returns the new position after the code block.
 ///
@@ -125,15 +114,6 @@ mod tests {
         assert!(!is_indented_code_line("   not enough"));
         assert!(!is_indented_code_line(""));
         assert!(!is_indented_code_line("no indent"));
-    }
-
-    #[test]
-    fn test_strip_code_indent() {
-        assert_eq!(strip_code_indent("    code"), "code");
-        assert_eq!(strip_code_indent("        code"), "    code");
-        assert_eq!(strip_code_indent("\tcode"), "code");
-        assert_eq!(strip_code_indent("   not enough"), "   not enough");
-        assert_eq!(strip_code_indent(""), "");
     }
 
     #[test]

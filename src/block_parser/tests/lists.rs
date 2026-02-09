@@ -1,5 +1,5 @@
 use crate::block_parser::tests::helpers::{
-    assert_block_kinds, count_children, find_all, find_first, get_text, parse_blocks,
+    assert_block_kinds, count_children, find_all, find_first, parse_blocks,
 };
 use crate::syntax::SyntaxKind;
 
@@ -160,7 +160,6 @@ fn list_after_blank_line() {
 #[test]
 fn list_after_paragraph() {
     let input = "Not a list.\n\n* Now a list\n";
-    let tree = parse_blocks(input);
     assert_block_kinds(
         input,
         &[

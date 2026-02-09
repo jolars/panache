@@ -429,11 +429,6 @@ impl Formatter {
                     if next_kind == SyntaxKind::FootnoteDefinition && !self.output.ends_with("\n\n")
                     {
                         self.output.push('\n');
-                    } else if is_block_element(next_kind)
-                        && next_kind != SyntaxKind::ReferenceDefinition
-                        && !self.output.ends_with("\n\n")
-                    {
-                        self.output.push('\n');
                     }
                 }
             }

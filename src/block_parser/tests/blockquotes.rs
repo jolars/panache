@@ -1,4 +1,3 @@
-use crate::block_parser::BlockParser;
 use crate::block_parser::tests::helpers::parse_blocks;
 use crate::syntax::SyntaxKind;
 
@@ -209,7 +208,7 @@ fn spec_nested_blockquote() {
     let outer = &blockquotes[0];
 
     // Inner blockquote should be nested inside outer
-    assert!(find_nodes_of_type(outer, SyntaxKind::BlockQuote).len() > 0);
+    assert!(!find_nodes_of_type(outer, SyntaxKind::BlockQuote).is_empty());
 }
 
 #[test]
