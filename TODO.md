@@ -36,8 +36,8 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Nested block quotes (`> > nested`)
 - ✅ Block quotes with paragraphs
 - ✅ Extension: `blank_before_blockquote` - Require blank before quote (default behavior)
-- 🚧 Block quotes containing lists (works but may need polish)
-- 🚧 Block quotes containing code blocks (needs testing)
+- ✅ Block quotes containing lists
+- ✅ Block quotes containing code blocks
 
 ### Lists 🚧
 
