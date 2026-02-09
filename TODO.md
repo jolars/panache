@@ -238,14 +238,22 @@ These extensions are **not enabled by default** in Pandoc and are lower priority
 - ❌ Extension: `ignore_line_breaks` - Ignore single newlines (non-default)
 - ❌ Extension: `east_asian_line_breaks` - Smart line breaks for CJK (non-default)
 
-### Non-Default: GitHub/Quarto-Specific
+### Non-Default: GitHub-specific
 
 - ❌ Extension: `alerts` - GitHub/Quarto alert/callout boxes (non-default)
 - ❌ Extension: `emoji` - `:emoji:` syntax (non-default)
 - ❌ Extension: `wikilinks_title_after_pipe` - `[[link|title]]` (non-default)
+
+### Non-Default: Quarto-Specific
+
 - ❌ Quarto executable code cells with output
 - ❌ Quarto cross-references `@fig-id`, `@tbl-id`
 - ❌ Quarto callout blocks (`.callout-note`, etc.)
+
+### Non-Default: RMarkdown-Specific
+
+- ❌ RMarkdown code chunks with output
+- ❌ Bookdown-style references (`\@ref(fig-id)`, etc.`)
 
 ### Non-Default: Other
 
