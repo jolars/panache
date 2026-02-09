@@ -33,149 +33,147 @@ pub struct Extensions {
     // ===== Block-level extensions =====
 
     // Headings
-    /// ✅ Require blank line before headers (default: enabled)
+    /// Require blank line before headers (default: enabled)
     pub blank_before_header: bool,
-    /// 🚧 Full attribute syntax on headers {#id .class key=value}
+    /// Full attribute syntax on headers {#id .class key=value}
     pub header_attributes: bool,
-    /// ❌ Auto-generate reference links for headers
-    pub implicit_header_references: bool,
 
     // Block quotes
-    /// ✅ Require blank line before blockquotes (default: enabled)
+    /// Require blank line before blockquotes (default: enabled)
     pub blank_before_blockquote: bool,
 
     // Lists
-    /// ❌ Fancy list markers (roman numerals, letters, etc.)
+    /// Fancy list markers (roman numerals, letters, etc.)
     pub fancy_lists: bool,
-    /// ❌ Start ordered lists at arbitrary numbers
+    /// Start ordered lists at arbitrary numbers
     pub startnum: bool,
-    /// ❌ Example lists with (@) markers
+    /// Example lists with (@) markers
     pub example_lists: bool,
-    /// ❌ GitHub-style task lists - [ ] and - [x]
+    /// GitHub-style task lists - [ ] and - [x]
     pub task_lists: bool,
-    /// ❌ Term/definition syntax
+    /// Term/definition syntax
     pub definition_lists: bool,
 
     // Code blocks
-    /// ✅ Fenced code blocks with backticks
+    /// Fenced code blocks with backticks
     pub backtick_code_blocks: bool,
-    /// ✅ Fenced code blocks with tildes
+    /// Fenced code blocks with tildes
     pub fenced_code_blocks: bool,
-    /// ✅ Attributes on fenced code blocks {.language #id}
+    /// Attributes on fenced code blocks {.language #id}
     pub fenced_code_attributes: bool,
-    /// ❌ Attributes on inline code
+    /// Attributes on inline code
     pub inline_code_attributes: bool,
 
     // Tables
-    /// ❌ Simple table syntax
+    /// Simple table syntax
     pub simple_tables: bool,
-    /// ❌ Multiline cell content in tables
+    /// Multiline cell content in tables
     pub multiline_tables: bool,
-    /// ❌ Grid-style tables
+    /// Grid-style tables
     pub grid_tables: bool,
-    /// ❌ Pipe tables (GitHub/PHP Markdown style)
+    /// Pipe tables (GitHub/PHP Markdown style)
     pub pipe_tables: bool,
-    /// ❌ Table captions
+    /// Table captions
     pub table_captions: bool,
 
     // Divs
-    /// ✅ Fenced divs ::: {.class}
+    /// Fenced divs ::: {.class}
     pub fenced_divs: bool,
-    /// ❌ HTML <div> elements
+    /// HTML <div> elements
     pub native_divs: bool,
 
     // Other block elements
-    /// ❌ Line blocks for poetry | prefix
+    /// Line blocks for poetry | prefix
     pub line_blocks: bool,
 
     // ===== Inline elements =====
 
     // Emphasis
-    /// ✅ Underscores don't trigger emphasis in snake_case
+    /// Underscores don't trigger emphasis in snake_case
     pub intraword_underscores: bool,
-    /// ❌ Strikethrough ~~text~~
+    /// Strikethrough ~~text~~
     pub strikeout: bool,
-    /// ❌ Superscript and subscript ^super^ ~sub~
+    /// Superscript and subscript ^super^ ~sub~
     pub superscript: bool,
     pub subscript: bool,
 
     // Links
-    /// ✅ Inline links [text](url)
+    /// Inline links [text](url)
     pub inline_links: bool,
-    /// ❌ Reference links [text][ref]
+    /// Reference links [text][ref]
     pub reference_links: bool,
-    /// ❌ Shortcut reference links [ref] without second []
+    /// Shortcut reference links [ref] without second []
     pub shortcut_reference_links: bool,
-    /// ❌ Attributes on links [text](url){.class}
+    /// Attributes on links [text](url){.class}
     pub link_attributes: bool,
-    /// ✅ Automatic links <http://example.com>
+    /// Automatic links <http://example.com>
     pub autolinks: bool,
 
     // Images
-    /// ✅ Inline images ![alt](url)
+    /// Inline images ![alt](url)
     pub inline_images: bool,
-    /// ❌ Paragraph with just image becomes figure
+    /// Paragraph with just image becomes figure
     pub implicit_figures: bool,
 
     // Math
-    /// ✅ Dollar-delimited math $x$ and $$equation$$
+    /// Dollar-delimited math $x$ and $$equation$$
     pub tex_math_dollars: bool,
-    /// ❌ [NON-DEFAULT] Single backslash math \(...\) and \[...\] (RMarkdown default)
+    /// [NON-DEFAULT] Single backslash math \(...\) and \[...\] (RMarkdown default)
     pub tex_math_single_backslash: bool,
-    /// ❌ [NON-DEFAULT] Double backslash math \\(...\\) and \\[...\\]
+    /// [NON-DEFAULT] Double backslash math \\(...\\) and \\[...\\]
     pub tex_math_double_backslash: bool,
 
     // Footnotes
-    /// ❌ Inline footnotes ^[text]
+    /// Inline footnotes ^[text]
     pub inline_footnotes: bool,
-    /// ❌ Reference footnotes `[^1]` (requires footnote parsing)
+    /// Reference footnotes `[^1]` (requires footnote parsing)
     pub footnotes: bool,
 
     // Citations
-    /// ❌ Citation syntax [@cite]
+    /// Citation syntax [@cite]
     pub citations: bool,
 
     // Spans
-    /// ❌ Bracketed spans [text]{.class}
+    /// Bracketed spans [text]{.class}
     pub bracketed_spans: bool,
-    /// ❌ HTML <span> elements
+    /// HTML <span> elements
     pub native_spans: bool,
 
     // ===== Metadata =====
-    /// ✅ YAML metadata block
+    /// YAML metadata block
     pub yaml_metadata_block: bool,
-    /// ✅ Pandoc title block (Title/Author/Date)
+    /// Pandoc title block (Title/Author/Date)
     pub pandoc_title_block: bool,
 
     // ===== Raw content =====
-    /// ❌ Raw HTML blocks and inline
+    /// Raw HTML blocks and inline
     pub raw_html: bool,
-    /// ❌ Markdown inside HTML blocks
+    /// Markdown inside HTML blocks
     pub markdown_in_html_blocks: bool,
-    /// ❌ LaTeX commands and environments
+    /// LaTeX commands and environments
     pub raw_tex: bool,
 
     // ===== Escapes and special characters =====
-    /// ✅ Backslash escapes any symbol
+    /// Backslash escapes any symbol
     pub all_symbols_escapable: bool,
-    /// ✅ Backslash at line end = hard line break
+    /// Backslash at line end = hard line break
     pub escaped_line_breaks: bool,
 
     // ===== NON-DEFAULT EXTENSIONS =====
     // These are disabled by default in Pandoc
-    /// ❌ [NON-DEFAULT] Bare URLs become links
+    /// [NON-DEFAULT] Bare URLs become links
     pub autolink_bare_uris: bool,
-    /// ❌ [NON-DEFAULT] Newline = <br>
+    /// [NON-DEFAULT] Newline = <br>
     pub hard_line_breaks: bool,
-    /// ❌ [NON-DEFAULT] :emoji: syntax
+    /// [NON-DEFAULT] :emoji: syntax
     pub emoji: bool,
-    /// ❌ [NON-DEFAULT] Highlighted ==text==
+    /// [NON-DEFAULT] Highlighted ==text==
     pub mark: bool,
 
     // ===== Quarto-specific extensions =====
-    /// ❌ Quarto callout blocks (.callout-note, etc.)
+    /// Quarto callout blocks (.callout-note, etc.)
     pub quarto_callouts: bool,
-    /// ❌ Quarto cross-references @fig-id, @tbl-id
+    /// Quarto cross-references @fig-id, @tbl-id
     pub quarto_crossrefs: bool,
 }
 
@@ -204,7 +202,6 @@ impl Extensions {
             blank_before_header: true,
             blank_before_blockquote: true,
             header_attributes: true,
-            implicit_header_references: false,
 
             // Lists
             fancy_lists: true,
@@ -342,7 +339,6 @@ impl Extensions {
             blank_before_header: true,
             blank_before_blockquote: true,
             header_attributes: false,
-            implicit_header_references: false,
 
             fancy_lists: false,
             startnum: false,
