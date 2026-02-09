@@ -337,6 +337,7 @@ dependencies = [
  "regex",
  "rowan",
  "serde",
+ "similar",
  "similar-asserts",
  "textwrap",
  "tokio",

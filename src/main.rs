@@ -3,6 +3,7 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
+use similar::{ChangeTag, TextDiff};
 
 use panache::{format, parse};
 
@@ -61,6 +62,36 @@ fn start_dir_for(input_path: &Option<PathBuf>) -> io::Result<PathBuf> {
     }
 }
 
+fn print_diff(file_path: &str, original: &str, formatted: &str) {
+    let diff = TextDiff::from_lines(original, formatted);
+
+    for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
+        if idx > 0 {
+            println!("---");
+        }
+
+        // Print header similar to rustfmt
+        println!("Diff in {}:{}:", file_path, group[0].old_range().start + 1);
+
+        for op in group {
+            for change in diff.iter_changes(op) {
+                let (sign, style) = match change.tag() {
+                    ChangeTag::Delete => ("-", "\x1b[31m"), // red
+                    ChangeTag::Insert => ("+", "\x1b[32m"), // green
+                    ChangeTag::Equal => (" ", "\x1b[0m"),   // normal
+                };
+
+                print!("{}{}{}", style, sign, change.value());
+
+                // Reset color at end of line if it was colored
+                if change.tag() != ChangeTag::Equal {
+                    print!("\x1b[0m");
+                }
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> io::Result<()> {
     env_logger::init();
@@ -98,10 +129,14 @@ async fn main() -> io::Result<()> {
 
             if check {
                 if input != output {
-                    eprintln!("File is not formatted");
+                    let file_name = file.as_ref().and_then(|p| p.to_str()).unwrap_or("<stdin>");
+                    print_diff(file_name, &input, &output);
                     std::process::exit(1);
                 }
-                println!("File is correctly formatted");
+                // Only print success message if there's a file (not stdin)
+                if file.is_some() {
+                    println!("File is correctly formatted");
+                }
             } else if write {
                 if let Some(file_path) = &file {
                     fs::write(file_path, &output)?;
