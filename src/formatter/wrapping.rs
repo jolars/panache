@@ -125,6 +125,10 @@ pub(super) fn build_words<'a>(
                     SyntaxKind::List => {
                         b.pending_space = true;
                     }
+                    SyntaxKind::PARAGRAPH => {
+                        // Recursively process PARAGRAPH content instead of treating it as a unit
+                        process_node_recursive(&n, b, format_inline_fn);
+                    }
                     SyntaxKind::Emphasis => {
                         b.push_piece("*");
                         process_node_recursive(&n, b, format_inline_fn);

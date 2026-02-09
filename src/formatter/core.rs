@@ -401,19 +401,29 @@ impl Formatter {
                 if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") {
                     self.output.push('\n');
                 }
+
                 let mut prev_was_item = false;
+                let mut prev_was_blank = false;
+
                 for child in node.children() {
                     if child.kind() == SyntaxKind::ListItem {
-                        if prev_was_item {
+                        // Only strip double newlines if there was no explicit blank line before this item
+                        if prev_was_item && !prev_was_blank {
                             while self.output.ends_with("\n\n") {
                                 self.output.pop();
                             }
                         }
                         prev_was_item = true;
+                        prev_was_blank = false;
                     }
+
+                    // Preserve blank lines between list items
                     if child.kind() == SyntaxKind::BlankLine {
+                        self.output.push('\n');
+                        prev_was_blank = true;
                         continue;
                     }
+
                     self.format_node_sync(&child, indent);
                 }
                 if !self.output.ends_with('\n') {
@@ -641,7 +651,14 @@ impl Formatter {
                 let line_widths = [available_width];
                 let lines = algo.wrap(&words, &line_widths);
 
+                log::trace!(
+                    "ListItem wrapping: {} lines, hanging indent={}",
+                    lines.len(),
+                    hanging
+                );
+
                 for (i, line) in lines.iter().enumerate() {
+                    log::trace!("  Line {}: {} words", i, line.len());
                     if i == 0 {
                         self.output.push_str(&" ".repeat(total_indent));
                         self.output.push_str(&marker);
