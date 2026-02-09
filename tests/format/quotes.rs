@@ -23,3 +23,122 @@ async fn quote_multi_line_continuous() {
     assert!(output.contains("multi-line quote"));
     assert!(output.contains("continues on the next line"));
 }
+
+#[tokio::test]
+async fn quote_with_fenced_code_block() {
+    let input = r#"> A blockquote with code:
+>
+> ```python
+> def hello():
+>     print("world")
+> ```
+>
+> Text after code.
+"#;
+
+    let output = format(input, None).await;
+
+    // Should preserve blockquote markers
+    assert!(output.contains("> ```python"));
+    assert!(output.contains("> def hello():"));
+    assert!(output.contains(">     print(\"world\")"));
+    assert!(output.contains("> ```"));
+    assert!(output.contains("> Text after code"));
+}
+
+#[tokio::test]
+async fn quote_with_inline_code() {
+    let input = "> Quote with `inline code` in it.\n";
+    let output = format(input, None).await;
+
+    assert!(output.contains("> Quote with `inline code` in it"));
+}
+
+#[tokio::test]
+async fn quote_with_indented_code_block() {
+    let input = r#"> Blockquote with indented code:
+>
+>     x = 1
+>     y = 2
+"#;
+
+    let output = format(input, None).await;
+
+    // Indented code blocks get normalized to fenced code blocks
+    assert!(output.contains("> ```"));
+    assert!(output.contains("> x = 1"));
+    assert!(output.contains("> y = 2"));
+}
+
+#[tokio::test]
+async fn nested_quote_with_code() {
+    let input = r#"> Outer quote
+>
+> > Nested quote with code:
+> >
+> > ```
+> > code here
+> > ```
+"#;
+
+    let output = format(input, None).await;
+
+    // Should handle nested blockquotes with code
+    assert!(output.contains("> > ```"));
+    assert!(output.contains("> > code here"));
+}
+
+#[tokio::test]
+async fn quote_with_list() {
+    let input = r#"> A list in a blockquote:
+>
+> 1. First item
+> 2. Second item
+"#;
+
+    let output = format(input, None).await;
+
+    assert!(output.contains("> 1. First item"));
+    assert!(output.contains("> 2. Second item"));
+}
+
+#[tokio::test]
+async fn quote_with_multiple_code_blocks() {
+    let input = r#"> Multiple code blocks:
+>
+> ```
+> first
+> ```
+>
+> Some text.
+>
+> ```
+> second
+> ```
+"#;
+
+    let output = format(input, None).await;
+
+    // Should handle multiple code blocks in same blockquote
+    assert!(output.contains("> ```"));
+    assert!(output.contains("> first"));
+    assert!(output.contains("> Some text"));
+    assert!(output.contains("> second"));
+}
+
+#[tokio::test]
+async fn quote_idempotency_with_code() {
+    let input = r#"> Quote with code:
+>
+> ```rust
+> fn main() {
+>     println!("test");
+> }
+> ```
+"#;
+
+    let output1 = format(input, None).await;
+    let output2 = format(&output1, None).await;
+
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
