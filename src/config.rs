@@ -257,8 +257,8 @@ impl Extensions {
             citations: false,
 
             // Spans
-            bracketed_spans: false,
-            native_spans: false,
+            bracketed_spans: true,
+            native_spans: true,
 
             // Metadata
             yaml_metadata_block: true,
