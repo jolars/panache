@@ -227,7 +227,7 @@ impl Extensions {
             native_divs: false,
 
             // Other blocks
-            line_blocks: false,
+            line_blocks: true,
 
             // Inline
             intraword_underscores: true,

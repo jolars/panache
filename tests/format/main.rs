@@ -5,6 +5,7 @@ mod header_attributes;
 mod headings;
 mod image_attributes;
 mod inline_code_attributes;
+mod line_blocks;
 mod links;
 mod lists_unordered;
 mod math;

@@ -26,6 +26,7 @@ fn is_block_element(kind: SyntaxKind) -> bool {
             | SyntaxKind::CodeBlock
             | SyntaxKind::SimpleTable
             | SyntaxKind::PipeTable
+            | SyntaxKind::LineBlock
     )
 }
 
@@ -645,6 +646,49 @@ impl Formatter {
                     self.format_node_sync(&child, indent);
                 }
                 if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
+            }
+
+            SyntaxKind::LineBlock => {
+                log::debug!("Formatting line block");
+                // Add blank line before line blocks if not at start
+                if !self.output.is_empty() && !self.output.ends_with("\n\n") {
+                    self.output.push('\n');
+                }
+
+                // Format each line preserving line breaks and leading spaces
+                for child in node.children() {
+                    if child.kind() == SyntaxKind::LineBlockLine {
+                        // Get the text content, preserving leading spaces
+                        let text = child.text().to_string();
+                        // The text might start with "| " from the marker, or be continuation
+                        // We need to skip the marker if present and output the rest
+                        let content = if let Some(stripped) = text.strip_prefix("| ") {
+                            stripped
+                        } else {
+                            // Continuation line - output as-is but with proper marker
+                            text.trim_start()
+                        };
+
+                        // Output the marker
+                        if content.is_empty() {
+                            // Empty line block line - just output "|"
+                            self.output.push('|');
+                        } else {
+                            // Normal line - output "| " followed by content
+                            self.output.push_str("| ");
+                            self.output.push_str(content.trim_end());
+                        }
+                        self.output.push('\n');
+                    }
+                }
+
+                // Add blank line after if followed by block element
+                if let Some(next) = node.next_sibling()
+                    && is_block_element(next.kind())
+                    && !self.output.ends_with("\n\n")
+                {
                     self.output.push('\n');
                 }
             }

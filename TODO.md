@@ -80,9 +80,9 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Extension: `multiline_tables` - Multiline cell content (parsing complete, formatting deferred)
 - ✅ Extension: `grid_tables` - Grid-style tables (parsing complete, formatting deferred)
 
-### Line Blocks ❌
+### Line Blocks ✅
 
-- ❌ Extension: `line_blocks` - Poetry/verse with `|` prefix
+- ✅ Extension: `line_blocks` - Poetry/verse with `|` prefix
 
 ---
 

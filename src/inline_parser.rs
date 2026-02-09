@@ -33,9 +33,8 @@ use inline_math::{
 };
 use latex::{parse_latex_command, try_parse_latex_command};
 use links::{
-    emit_autolink, emit_inline_image, emit_inline_link, emit_reference_image, emit_reference_link,
-    try_parse_autolink, try_parse_inline_image, try_parse_inline_link, try_parse_reference_image,
-    try_parse_reference_link,
+    emit_autolink, emit_inline_image, emit_inline_link, try_parse_autolink, try_parse_inline_image,
+    try_parse_inline_link,
 };
 use native_spans::{emit_native_span, try_parse_native_span};
 use strikeout::{emit_strikeout, try_parse_strikeout};
@@ -370,6 +369,7 @@ impl InlineParser {
         }
 
         // Check if we're in a verbatim context (code block, math block, LaTeX environment, HTML block)
+        // or line block (where inline parsing is handled differently - preserves line structure)
         if let Some(parent) = token.parent() {
             match parent.kind() {
                 SyntaxKind::CodeBlock
@@ -381,7 +381,8 @@ impl InlineParser {
                 | SyntaxKind::LatexEnvContent
                 | SyntaxKind::HtmlBlock
                 | SyntaxKind::HtmlBlockTag
-                | SyntaxKind::HtmlBlockContent => {
+                | SyntaxKind::HtmlBlockContent
+                | SyntaxKind::LineBlockLine => {
                     return false;
                 }
                 _ => {}

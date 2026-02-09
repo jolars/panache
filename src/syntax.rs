@@ -98,6 +98,9 @@ pub enum SyntaxKind {
     Term,
     Definition,
     DefinitionMarker, // : or ~
+    LineBlock,
+    LineBlockLine,
+    LineBlockMarker, // |
     Comment,
 
     // HTML blocks

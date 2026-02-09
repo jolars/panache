@@ -14,6 +14,7 @@ mod horizontal_rules;
 mod html_blocks;
 mod indented_code;
 mod latex_envs;
+mod line_blocks;
 mod lists;
 mod metadata;
 mod paragraphs;
@@ -32,6 +33,7 @@ use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use html_blocks::{parse_html_block, try_parse_html_block_start};
 use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
+use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 pub use reference_definitions::{ReferenceRegistry, try_parse_reference_definition};
@@ -862,6 +864,20 @@ impl<'a> BlockParser<'a> {
         if is_caption_followed_by_table(&self.lines, self.pos) {
             // Don't parse as paragraph - this will be consumed by table parser
             return false;
+        }
+
+        // Check for line block (if line_blocks extension is enabled)
+        if self.config.extensions.line_blocks && try_parse_line_block_start(content).is_some() {
+            log::debug!("Parsed line block at line {}", self.pos);
+            // Close paragraph before opening line block
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            let new_pos = parse_line_block(&self.lines, self.pos, &mut self.builder);
+            self.pos = new_pos;
+            return true;
         }
 
         // Paragraph
