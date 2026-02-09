@@ -216,10 +216,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_cat_formatter() {
-        // 'cat' is a simple formatter that just echoes input
+        // A simple formatter that just echoes input
+        #[cfg(not(target_os = "windows"))]
         let config = FormatterConfig {
             cmd: "cat".to_string(),
             args: vec![],
+            enabled: true,
+            stdin: true,
+        };
+
+        #[cfg(target_os = "windows")]
+        let config = FormatterConfig {
+            cmd: "cmd".to_string(),
+            args: vec!["/c".to_string(), "more".to_string()],
             enabled: true,
             stdin: true,
         };
@@ -233,8 +242,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
     async fn test_uppercase_formatter() {
-        // 'tr' can convert to uppercase
+        // 'tr' can convert to uppercase (Unix only - no simple Windows equivalent)
         let config = FormatterConfig {
             cmd: "tr".to_string(),
             args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
@@ -271,10 +281,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_nonzero_exit() {
-        // 'false' always exits with code 1
+        // Command that exits with code 1
+        #[cfg(not(target_os = "windows"))]
         let config = FormatterConfig {
             cmd: "sh".to_string(),
             args: vec!["-c".to_string(), "exit 1".to_string()],
+            enabled: true,
+            stdin: true,
+        };
+
+        #[cfg(target_os = "windows")]
+        let config = FormatterConfig {
+            cmd: "cmd".to_string(),
+            args: vec!["/c".to_string(), "exit 1".to_string()],
             enabled: true,
             stdin: true,
         };
@@ -291,10 +310,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_timeout() {
-        // 'sleep 10' should timeout with 1 second limit
+        // Command that sleeps for 10 seconds - should timeout with 100ms limit
+        #[cfg(not(target_os = "windows"))]
         let config = FormatterConfig {
             cmd: "sleep".to_string(),
             args: vec!["10".to_string()],
+            enabled: true,
+            stdin: true,
+        };
+
+        #[cfg(target_os = "windows")]
+        let config = FormatterConfig {
+            cmd: "timeout".to_string(),
+            args: vec!["/t".to_string(), "10".to_string(), "/nobreak".to_string()],
             enabled: true,
             stdin: true,
         };
@@ -308,10 +336,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_file_based_formatter() {
-        // 'cat' reading from file - simulates formatters that don't use stdin
+        // Reading from file - simulates formatters that don't use stdin
+        #[cfg(not(target_os = "windows"))]
         let config = FormatterConfig {
             cmd: "cat".to_string(),
             args: vec![],
+            enabled: true,
+            stdin: false,
+        };
+
+        #[cfg(target_os = "windows")]
+        let config = FormatterConfig {
+            cmd: "cmd".to_string(),
+            args: vec!["/c".to_string(), "type".to_string()],
             enabled: true,
             stdin: false,
         };
@@ -327,9 +364,23 @@ mod tests {
     #[tokio::test]
     async fn test_file_formatter_with_placeholder() {
         // Test {} placeholder replacement in args
+        #[cfg(not(target_os = "windows"))]
         let config = FormatterConfig {
             cmd: "sh".to_string(),
-            args: vec!["-c".to_string(), "cat {}".to_string()],
+            args: vec![
+                "-c".to_string(),
+                "cat \"$1\"".to_string(),
+                "sh".to_string(),
+                "{}".to_string(),
+            ],
+            enabled: true,
+            stdin: false,
+        };
+
+        #[cfg(target_os = "windows")]
+        let config = FormatterConfig {
+            cmd: "cmd".to_string(),
+            args: vec!["/c".to_string(), "type".to_string(), "{}".to_string()],
             enabled: true,
             stdin: false,
         };
