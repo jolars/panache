@@ -45,6 +45,15 @@ pub enum SyntaxKind {
     InlineFootnoteEnd,   // ]
     InlineFootnote,      // ^[text]
 
+    // Citations
+    Citation,           // [@key] or @key
+    CitationMarker,     // @ or -@
+    CitationKey,        // The citation key identifier
+    CitationBraceOpen,  // { for complex keys
+    CitationBraceClose, // } for complex keys
+    CitationContent,    // Text content in bracketed citations
+    CitationSeparator,  // ; between multiple citations
+
     // Spans
     BracketedSpan,    // [text]{.class}
     SpanContent,      // text inside span

@@ -4,6 +4,7 @@ use rowan::{GreenNode, GreenNodeBuilder};
 
 mod architecture_tests;
 mod bracketed_spans;
+mod citations;
 mod code_spans;
 mod emphasis;
 mod escapes;
@@ -18,6 +19,10 @@ mod superscript;
 mod tests;
 
 use bracketed_spans::{emit_bracketed_span, try_parse_bracketed_span};
+use citations::{
+    emit_bare_citation, emit_bracketed_citation, try_parse_bare_citation,
+    try_parse_bracketed_citation,
+};
 use code_spans::{emit_code_span, try_parse_code_span};
 use emphasis::{emit_emphasis, try_parse_emphasis};
 use escapes::{emit_escape, try_parse_escape};
@@ -186,7 +191,17 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             continue;
         }
 
-        // Try to parse bracketed span (after link since both start with [)
+        // Try to parse bracketed citation (after link since both start with [)
+        if bytes[pos] == b'['
+            && let Some((len, content)) = try_parse_bracketed_citation(&text[pos..])
+        {
+            log::debug!("Matched bracketed citation at pos {}", pos);
+            emit_bracketed_citation(builder, content);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse bracketed span (after link and citation since all start with [)
         if bytes[pos] == b'['
             && let Some((len, content, attributes)) = try_parse_bracketed_span(&text[pos..])
         {
@@ -196,6 +211,17 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
                 attributes
             );
             emit_bracketed_span(builder, &content, &attributes);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse bare citation (author-in-text)
+        if (bytes[pos] == b'@'
+            || (bytes[pos] == b'-' && pos + 1 < text.len() && bytes[pos + 1] == b'@'))
+            && let Some((len, key, has_suppress)) = try_parse_bare_citation(&text[pos..])
+        {
+            log::debug!("Matched bare citation at pos {}: key={}", pos, key);
+            emit_bare_citation(builder, key, has_suppress);
             pos += len;
             continue;
         }
@@ -240,7 +266,13 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
 fn find_next_inline_start(text: &str) -> usize {
     for (i, ch) in text.char_indices() {
         match ch {
-            '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' | '^' | '~' => return i.max(1),
+            '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' | '^' | '~' | '@' => return i.max(1),
+            '-' => {
+                // Check if this might be a suppress-author citation -@
+                if i + 1 < text.len() && text.as_bytes()[i + 1] == b'@' {
+                    return i.max(1);
+                }
+            }
             _ => {}
         }
     }
@@ -446,5 +478,77 @@ mod inline_tests {
         let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
         assert_eq!(links.len(), 1);
         assert_eq!(images.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_bare_citation() {
+        let input = "As @doe99 notes, the result is clear.";
+        let inline_tree = parse_inline(input);
+
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0], "@doe99");
+    }
+
+    #[test]
+    fn test_parse_bracketed_citation() {
+        let input = "This is a fact [@doe99].";
+        let inline_tree = parse_inline(input);
+
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0], "[@doe99]");
+    }
+
+    #[test]
+    fn test_parse_multiple_citations() {
+        let input = "Multiple sources [@doe99; @smith2000; @jones2010].";
+        let inline_tree = parse_inline(input);
+
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0], "[@doe99; @smith2000; @jones2010]");
+    }
+
+    #[test]
+    fn test_parse_citation_with_locator() {
+        let input = "See the discussion [@doe99, pp. 33-35].";
+        let inline_tree = parse_inline(input);
+
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0], "[@doe99, pp. 33-35]");
+    }
+
+    #[test]
+    fn test_parse_suppress_author_citation() {
+        let input = "Smith says blah [-@smith04].";
+        let inline_tree = parse_inline(input);
+
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0], "[-@smith04]");
+    }
+
+    #[test]
+    fn test_parse_bare_suppress_citation() {
+        let input = "See -@doe99 for details.";
+        let inline_tree = parse_inline(input);
+
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0], "-@doe99");
+    }
+
+    #[test]
+    fn test_citation_not_conflicting_with_email() {
+        // Email in autolink should not be parsed as citation
+        let input = "Email <user@example.com> for info.";
+        let inline_tree = parse_inline(input);
+
+        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        assert_eq!(autolinks.len(), 1);
+        assert_eq!(citations.len(), 0);
     }
 }

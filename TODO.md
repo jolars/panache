@@ -142,9 +142,9 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ❌ Reference footnotes `[^1]` with definition block
 - ✅ Extension: `inline_notes` - Inline note syntax
 
-### Citations ❌
+### Citations ✅
 
-- ❌ Extension: `citations` - `[@cite]` and `@cite` syntax
+- ✅ Extension: `citations` - `[@cite]` and `@cite` syntax with complex key support
 
 ### Spans ✅
 
