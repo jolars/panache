@@ -207,17 +207,17 @@ impl Extensions {
             implicit_header_references: false,
 
             // Lists
-            fancy_lists: false,
+            fancy_lists: true,
             startnum: true,
-            example_lists: false,
-            task_lists: false,
+            example_lists: true,
+            task_lists: true,
             definition_lists: true,
 
             // Code
             backtick_code_blocks: true,
             fenced_code_blocks: true,
             fenced_code_attributes: true,
-            inline_code_attributes: false,
+            inline_code_attributes: true,
 
             // Tables
             simple_tables: true,
@@ -228,27 +228,27 @@ impl Extensions {
 
             // Divs
             fenced_divs: true,
-            native_divs: false,
+            native_divs: true,
 
             // Other blocks
             line_blocks: true,
 
             // Inline
             intraword_underscores: true,
-            strikeout: false,
-            superscript: false,
-            subscript: false,
+            strikeout: true,
+            superscript: true,
+            subscript: true,
 
             // Links
             inline_links: true,
             reference_links: true,
-            shortcut_reference_links: false,
-            link_attributes: false,
+            shortcut_reference_links: true,
+            link_attributes: true,
             autolinks: true,
 
             // Images
             inline_images: true,
-            implicit_figures: false,
+            implicit_figures: true,
 
             // Math
             tex_math_dollars: true,
@@ -260,7 +260,7 @@ impl Extensions {
             footnotes: true,
 
             // Citations
-            citations: false,
+            citations: true,
 
             // Spans
             bracketed_spans: true,
