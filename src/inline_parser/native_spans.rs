@@ -5,6 +5,7 @@
 //! When the `native_spans` extension is enabled, HTML `<span>` tags are
 //! treated as native Pandoc Span elements instead of raw HTML.
 
+use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -123,7 +124,12 @@ pub(crate) fn parse_span_attributes(html_attrs: &str) -> String {
 }
 
 /// Emit a native span node to the builder.
-pub(crate) fn emit_native_span(builder: &mut GreenNodeBuilder, content: &str, attributes: &str) {
+pub(crate) fn emit_native_span(
+    builder: &mut GreenNodeBuilder,
+    content: &str,
+    attributes: &str,
+    config: &Config,
+) {
     builder.start_node(SyntaxKind::BracketedSpan.into());
 
     // Opening tag
@@ -137,7 +143,7 @@ pub(crate) fn emit_native_span(builder: &mut GreenNodeBuilder, content: &str, at
 
     // Parse the content recursively for inline markdown
     builder.start_node(SyntaxKind::SpanContent.into());
-    parse_inline_text(builder, content);
+    parse_inline_text(builder, content, config);
     builder.finish_node();
 
     // Closing tag

@@ -9,6 +9,7 @@
 //! - Carets cannot have whitespace immediately inside
 //! - Must not be confused with ^[...] (inline footnotes)
 
+use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -66,7 +67,7 @@ pub fn try_parse_superscript(text: &str) -> Option<(usize, &str)> {
 }
 
 /// Emit a superscript node with its content
-pub fn emit_superscript(builder: &mut GreenNodeBuilder, inner_text: &str) {
+pub fn emit_superscript(builder: &mut GreenNodeBuilder, inner_text: &str, config: &Config) {
     builder.start_node(SyntaxKind::Superscript.into());
 
     // Opening marker
@@ -75,7 +76,7 @@ pub fn emit_superscript(builder: &mut GreenNodeBuilder, inner_text: &str) {
     builder.finish_node();
 
     // Parse inner content recursively for nested inline elements
-    super::parse_inline_text(builder, inner_text);
+    super::parse_inline_text(builder, inner_text, config);
 
     // Closing marker
     builder.start_node(SyntaxKind::SuperscriptMarker.into());

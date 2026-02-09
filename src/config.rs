@@ -27,7 +27,7 @@ pub enum Flavor {
 /// Pandoc/Markdown extensions configuration.
 /// Each field represents a specific Pandoc extension.
 /// Extensions marked with a comment indicate implementation status.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Extensions {
     // ===== Block-level extensions =====
@@ -120,6 +120,10 @@ pub struct Extensions {
     // Math
     /// ✅ Dollar-delimited math $x$ and $$equation$$
     pub tex_math_dollars: bool,
+    /// ❌ [NON-DEFAULT] Single backslash math \(...\) and \[...\] (RMarkdown default)
+    pub tex_math_single_backslash: bool,
+    /// ❌ [NON-DEFAULT] Double backslash math \\(...\\) and \\[...\\]
+    pub tex_math_double_backslash: bool,
 
     // Footnotes
     /// ❌ Inline footnotes ^[text]
@@ -248,6 +252,8 @@ impl Extensions {
 
             // Math
             tex_math_dollars: true,
+            tex_math_single_backslash: false,
+            tex_math_double_backslash: false,
 
             // Footnotes
             inline_footnotes: false,
@@ -307,6 +313,7 @@ impl Extensions {
         // RMarkdown specifics
         ext.task_lists = true;
         ext.tex_math_dollars = true;
+        ext.tex_math_single_backslash = true; // RMarkdown enables \(...\) and \[...\] by default
 
         ext
     }
@@ -373,6 +380,8 @@ impl Extensions {
             implicit_figures: false,
 
             tex_math_dollars: false,
+            tex_math_single_backslash: false,
+            tex_math_double_backslash: false,
 
             inline_footnotes: false,
             footnotes: false,
@@ -601,12 +610,24 @@ pub enum BlankLines {
 const CANDIDATE_NAMES: &[&str] = &[".panache.toml", "panache.toml"];
 
 fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
-    toml::from_str::<Config>(s).map_err(|e| {
+    let mut config: Config = toml::from_str(s).map_err(|e| {
         io::Error::new(
             io::ErrorKind::InvalidData,
             format!("invalid config {}: {e}", path.display()),
         )
-    })
+    })?;
+
+    // IMPORTANT: If no extensions were explicitly set in the TOML,
+    // serde will have used Extensions::default() (Pandoc defaults).
+    // We need to apply flavor-specific defaults when the user didn't
+    // explicitly override them. Since we can't detect which fields
+    // were set vs. defaulted by serde, we compare with Extensions::default()
+    // and if they match, replace with flavor-specific defaults.
+    if config.extensions == Extensions::default() {
+        config.extensions = Extensions::for_flavor(config.flavor);
+    }
+
+    Ok(config)
 }
 
 fn read_config(path: &Path) -> io::Result<Config> {

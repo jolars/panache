@@ -8,6 +8,7 @@
 //! - Content cannot be empty
 //! - Tildes cannot have whitespace immediately inside
 
+use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -66,7 +67,7 @@ pub fn try_parse_strikeout(text: &str) -> Option<(usize, &str)> {
 }
 
 /// Emit a strikeout node with its content
-pub fn emit_strikeout(builder: &mut GreenNodeBuilder, inner_text: &str) {
+pub fn emit_strikeout(builder: &mut GreenNodeBuilder, inner_text: &str, config: &Config) {
     builder.start_node(SyntaxKind::Strikeout.into());
 
     // Opening marker
@@ -75,7 +76,7 @@ pub fn emit_strikeout(builder: &mut GreenNodeBuilder, inner_text: &str) {
     builder.finish_node();
 
     // Parse inner content recursively for nested inline elements
-    super::parse_inline_text(builder, inner_text);
+    super::parse_inline_text(builder, inner_text, config);
 
     // Closing marker
     builder.start_node(SyntaxKind::StrikeoutMarker.into());

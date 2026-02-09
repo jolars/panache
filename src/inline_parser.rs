@@ -29,7 +29,11 @@ use emphasis::{emit_emphasis, try_parse_emphasis};
 use escapes::{emit_escape, try_parse_escape};
 use inline_footnotes::{emit_inline_footnote, try_parse_inline_footnote};
 use inline_math::{
-    emit_display_math, emit_inline_math, try_parse_display_math, try_parse_inline_math,
+    emit_display_math, emit_double_backslash_display_math, emit_double_backslash_inline_math,
+    emit_inline_math, emit_single_backslash_display_math, emit_single_backslash_inline_math,
+    try_parse_display_math, try_parse_double_backslash_display_math,
+    try_parse_double_backslash_inline_math, try_parse_inline_math,
+    try_parse_single_backslash_display_math, try_parse_single_backslash_inline_math,
 };
 use latex::{parse_latex_command, try_parse_latex_command};
 use links::{
@@ -44,17 +48,73 @@ use superscript::{emit_superscript, try_parse_superscript};
 /// Parse inline elements from text content.
 /// This is a standalone function used by both the main inline parser
 /// and by nested contexts like link text.
-pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
+pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str, config: &Config) {
     log::trace!(
-        "Parsing inline text: {:?} ({} bytes)",
+        "Parsing inline text: {:?} ({} bytes), tex_math_single_backslash={}",
         &text[..text.len().min(40)],
-        text.len()
+        text.len(),
+        config.extensions.tex_math_single_backslash
     );
     let mut pos = 0;
     let bytes = text.as_bytes();
 
     while pos < text.len() {
-        // Try to parse backslash escape FIRST (highest precedence)
+        // Try to parse backslash math FIRST (when enabled)
+        // These take precedence over escapes per Pandoc spec
+        // Single backslash math: \(...\) and \[...\]
+        if bytes[pos] == b'\\'
+            && pos + 1 < text.len()
+            && config.extensions.tex_math_single_backslash
+        {
+            // Try display math first: \[...\]
+            if bytes[pos + 1] == b'['
+                && let Some((len, content)) = try_parse_single_backslash_display_math(&text[pos..])
+            {
+                log::debug!("Matched single backslash display math at pos {}", pos);
+                emit_single_backslash_display_math(builder, content);
+                pos += len;
+                continue;
+            }
+
+            // Try inline math: \(...\)
+            if bytes[pos + 1] == b'('
+                && let Some((len, content)) = try_parse_single_backslash_inline_math(&text[pos..])
+            {
+                log::debug!("Matched single backslash inline math at pos {}", pos);
+                emit_single_backslash_inline_math(builder, content);
+                pos += len;
+                continue;
+            }
+        }
+
+        // Double backslash math: \\(...\\) and \\[...\\]
+        if bytes[pos] == b'\\'
+            && pos + 2 < text.len()
+            && bytes[pos + 1] == b'\\'
+            && config.extensions.tex_math_double_backslash
+        {
+            // Try display math first: \\[...\\]
+            if bytes[pos + 2] == b'['
+                && let Some((len, content)) = try_parse_double_backslash_display_math(&text[pos..])
+            {
+                log::debug!("Matched double backslash display math at pos {}", pos);
+                emit_double_backslash_display_math(builder, content);
+                pos += len;
+                continue;
+            }
+
+            // Try inline math: \\(...\\)
+            if bytes[pos + 2] == b'('
+                && let Some((len, content)) = try_parse_double_backslash_inline_math(&text[pos..])
+            {
+                log::debug!("Matched double backslash inline math at pos {}", pos);
+                emit_double_backslash_inline_math(builder, content);
+                pos += len;
+                continue;
+            }
+        }
+
+        // Try to parse backslash escape (after math checks when enabled)
         // This prevents escaped delimiters from being parsed
         if bytes[pos] == b'\\'
             && let Some((len, ch, escape_type)) = try_parse_escape(&text[pos..])
@@ -98,7 +158,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && let Some((len, content)) = try_parse_inline_footnote(&text[pos..])
         {
             log::debug!("Matched inline footnote at pos {}", pos);
-            emit_inline_footnote(builder, content);
+            emit_inline_footnote(builder, content, config);
             pos += len;
             continue;
         }
@@ -109,7 +169,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && let Some((len, content)) = try_parse_superscript(&text[pos..])
         {
             log::debug!("Matched superscript at pos {}", pos);
-            emit_superscript(builder, content);
+            emit_superscript(builder, content, config);
             pos += len;
             continue;
         }
@@ -120,7 +180,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && let Some((len, content)) = try_parse_subscript(&text[pos..])
         {
             log::debug!("Matched subscript at pos {}", pos);
-            emit_subscript(builder, content);
+            emit_subscript(builder, content, config);
             pos += len;
             continue;
         }
@@ -132,7 +192,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && let Some((len, content)) = try_parse_strikeout(&text[pos..])
         {
             log::debug!("Matched strikeout at pos {}", pos);
-            emit_strikeout(builder, content);
+            emit_strikeout(builder, content, config);
             pos += len;
             continue;
         }
@@ -176,7 +236,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && let Some((len, content, attributes)) = try_parse_native_span(&text[pos..])
         {
             log::debug!("Matched native span at pos {}", pos);
-            emit_native_span(builder, content, &attributes);
+            emit_native_span(builder, content, &attributes, config);
             pos += len;
             continue;
         }
@@ -188,7 +248,14 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && let Some((len, alt_text, dest, attributes)) = try_parse_inline_image(&text[pos..])
         {
             log::debug!("Matched inline image at pos {}: dest={}", pos, dest);
-            emit_inline_image(builder, &text[pos..pos + len], alt_text, dest, attributes);
+            emit_inline_image(
+                builder,
+                &text[pos..pos + len],
+                alt_text,
+                dest,
+                attributes,
+                config,
+            );
             pos += len;
             continue;
         }
@@ -198,7 +265,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
             && let Some((len, link_text, dest)) = try_parse_inline_link(&text[pos..])
         {
             log::debug!("Matched inline link at pos {}: dest={}", pos, dest);
-            emit_inline_link(builder, &text[pos..pos + len], link_text, dest);
+            emit_inline_link(builder, &text[pos..pos + len], link_text, dest, config);
             pos += len;
             continue;
         }
@@ -222,7 +289,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
                 pos,
                 attributes
             );
-            emit_bracketed_span(builder, &content, &attributes);
+            emit_bracketed_span(builder, &content, &attributes, config);
             pos += len;
             continue;
         }
@@ -248,7 +315,7 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
                 level,
                 delim_char
             );
-            emit_emphasis(builder, inner_text, level, delim_char);
+            emit_emphasis(builder, inner_text, level, delim_char, config);
             pos += len;
             continue;
         }
@@ -358,7 +425,7 @@ impl InlineParser {
         // TODO: Integrate reference link/image resolution
         // The parsing functions exist in links.rs but need proper integration
         // into the parsing loop to maintain correct precedence
-        parse_inline_text(builder, text);
+        parse_inline_text(builder, text, &self.config);
     }
 
     /// Check if a token should be parsed for inline elements.

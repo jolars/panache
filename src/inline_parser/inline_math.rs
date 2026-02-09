@@ -75,6 +75,70 @@ pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
     None
 }
 
+/// Try to parse single backslash inline math: \(...\)
+/// Extension: tex_math_single_backslash
+pub fn try_parse_single_backslash_inline_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with(r"\(") {
+        return None;
+    }
+
+    let rest = &text[2..]; // Skip \(
+
+    // Look for closing \)
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '\\' && rest[pos..].starts_with(r"\)") {
+            // Found closing \)
+            let math_content = &rest[..pos];
+            let total_len = 2 + pos + 2; // \( + content + \)
+            return Some((total_len, math_content));
+        }
+
+        // Can't span multiple lines
+        if ch == '\n' {
+            return None;
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
+/// Try to parse double backslash inline math: \\(...\\)
+/// Extension: tex_math_double_backslash
+pub fn try_parse_double_backslash_inline_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with(r"\\(") {
+        return None;
+    }
+
+    let rest = &text[3..]; // Skip \\(
+
+    // Look for closing \\)
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '\\' && rest[pos..].starts_with(r"\\)") {
+            // Found closing \\)
+            let math_content = &rest[..pos];
+            let total_len = 3 + pos + 3; // \\( + content + \\)
+            return Some((total_len, math_content));
+        }
+
+        // Can't span multiple lines
+        if ch == '\n' {
+            return None;
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
 /// Try to parse display math ($$...$$) starting at the current position.
 /// Returns the number of characters consumed and the math content if successful.
 /// Display math can span multiple lines in inline contexts.
@@ -127,6 +191,60 @@ pub fn try_parse_display_math(text: &str) -> Option<(usize, &str)> {
     None
 }
 
+/// Try to parse single backslash display math: \[...\]
+/// Extension: tex_math_single_backslash
+pub fn try_parse_single_backslash_display_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with(r"\[") {
+        return None;
+    }
+
+    let rest = &text[2..]; // Skip \[
+
+    // Look for closing \]
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '\\' && rest[pos..].starts_with(r"\]") {
+            // Found closing \]
+            let math_content = &rest[..pos];
+            let total_len = 2 + pos + 2; // \[ + content + \]
+            return Some((total_len, math_content));
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
+/// Try to parse double backslash display math: \\[...\\]
+/// Extension: tex_math_double_backslash
+pub fn try_parse_double_backslash_display_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with(r"\\[") {
+        return None;
+    }
+
+    let rest = &text[3..]; // Skip \\[
+
+    // Look for closing \\]
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '\\' && rest[pos..].starts_with(r"\\]") {
+            // Found closing \\]
+            let math_content = &rest[..pos];
+            let total_len = 3 + pos + 3; // \\[ + content + \\]
+            return Some((total_len, math_content));
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
 /// Emit an inline math node to the builder.
 pub fn emit_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
     builder.start_node(SyntaxKind::InlineMath.into());
@@ -139,6 +257,28 @@ pub fn emit_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
 
     // Closing $
     builder.token(SyntaxKind::InlineMathMarker.into(), "$");
+
+    builder.finish_node();
+}
+
+/// Emit a single backslash inline math node: \(...\)
+pub fn emit_single_backslash_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::InlineMath.into());
+
+    builder.token(SyntaxKind::InlineMathMarker.into(), r"\(");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::InlineMathMarker.into(), r"\)");
+
+    builder.finish_node();
+}
+
+/// Emit a double backslash inline math node: \\(...\\)
+pub fn emit_double_backslash_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::InlineMath.into());
+
+    builder.token(SyntaxKind::InlineMathMarker.into(), r"\\(");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::InlineMathMarker.into(), r"\\)");
 
     builder.finish_node();
 }
@@ -156,6 +296,28 @@ pub fn emit_display_math(builder: &mut GreenNodeBuilder, content: &str, dollar_c
 
     // Closing $$
     builder.token(SyntaxKind::BlockMathMarker.into(), &marker);
+
+    builder.finish_node();
+}
+
+/// Emit a single backslash display math node: \[...\]
+pub fn emit_single_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::InlineMath.into());
+
+    builder.token(SyntaxKind::BlockMathMarker.into(), r"\[");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::BlockMathMarker.into(), r"\]");
+
+    builder.finish_node();
+}
+
+/// Emit a double backslash display math node: \\[...\\]
+pub fn emit_double_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::InlineMath.into());
+
+    builder.token(SyntaxKind::BlockMathMarker.into(), r"\\[");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::BlockMathMarker.into(), r"\\]");
 
     builder.finish_node();
 }
@@ -305,5 +467,91 @@ mod tests {
     fn test_display_math_with_trailing_text() {
         let result = try_parse_display_math("$$x = y$$ and more");
         assert_eq!(result, Some((9, "x = y")));
+    }
+
+    // Single backslash math tests
+    #[test]
+    fn test_single_backslash_inline_math() {
+        let result = try_parse_single_backslash_inline_math(r"\(x^2\)");
+        assert_eq!(result, Some((7, "x^2")));
+    }
+
+    #[test]
+    fn test_single_backslash_inline_math_complex() {
+        let result = try_parse_single_backslash_inline_math(r"\(\frac{a}{b}\)");
+        assert_eq!(result, Some((15, r"\frac{a}{b}")));
+    }
+
+    #[test]
+    fn test_single_backslash_inline_math_no_close() {
+        let result = try_parse_single_backslash_inline_math(r"\(no close");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_single_backslash_inline_math_no_multiline() {
+        let result = try_parse_single_backslash_inline_math("\\(x =\ny\\)");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_single_backslash_display_math() {
+        let result = try_parse_single_backslash_display_math(r"\[E = mc^2\]");
+        assert_eq!(result, Some((12, "E = mc^2")));
+    }
+
+    #[test]
+    fn test_single_backslash_display_math_multiline() {
+        let result = try_parse_single_backslash_display_math("\\[\nx = y\n\\]");
+        assert_eq!(result, Some((11, "\nx = y\n")));
+    }
+
+    #[test]
+    fn test_single_backslash_display_math_no_close() {
+        let result = try_parse_single_backslash_display_math(r"\[no close");
+        assert_eq!(result, None);
+    }
+
+    // Double backslash math tests
+    #[test]
+    fn test_double_backslash_inline_math() {
+        let result = try_parse_double_backslash_inline_math(r"\\(x^2\\)");
+        assert_eq!(result, Some((9, "x^2")));
+    }
+
+    #[test]
+    fn test_double_backslash_inline_math_complex() {
+        let result = try_parse_double_backslash_inline_math(r"\\(\alpha + \beta\\)");
+        assert_eq!(result, Some((20, r"\alpha + \beta")));
+    }
+
+    #[test]
+    fn test_double_backslash_inline_math_no_close() {
+        let result = try_parse_double_backslash_inline_math(r"\\(no close");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_double_backslash_inline_math_no_multiline() {
+        let result = try_parse_double_backslash_inline_math("\\\\(x =\ny\\\\)");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_double_backslash_display_math() {
+        let result = try_parse_double_backslash_display_math(r"\\[E = mc^2\\]");
+        assert_eq!(result, Some((14, "E = mc^2")));
+    }
+
+    #[test]
+    fn test_double_backslash_display_math_multiline() {
+        let result = try_parse_double_backslash_display_math("\\\\[\nx = y\n\\\\]");
+        assert_eq!(result, Some((13, "\nx = y\n")));
+    }
+
+    #[test]
+    fn test_double_backslash_display_math_no_close() {
+        let result = try_parse_double_backslash_display_math(r"\\[no close");
+        assert_eq!(result, None);
     }
 }

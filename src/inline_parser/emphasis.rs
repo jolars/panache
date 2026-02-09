@@ -13,6 +13,7 @@
 //! - Strong (2 delims) takes precedence over emphasis (1 delim) when possible
 //! - Delimiters must match by character (* with *, _ with _)
 
+use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -338,6 +339,7 @@ pub fn emit_emphasis(
     inner_text: &str,
     level: u8,
     delim_char: char,
+    _config: &Config,
 ) {
     let delim = match level {
         1 => {

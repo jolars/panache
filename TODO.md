@@ -215,8 +215,8 @@ These extensions are **not enabled by default** in Pandoc and are lower priority
 
 ### Non-Default: Math
 
-- ❌ Extension: `tex_math_single_backslash` - `\( \)` and `\[ \]` (non-default)
-- ❌ Extension: `tex_math_double_backslash` - `\\( \\)` and `\\[ \\]` (non-default)
+- ✅ Extension: `tex_math_single_backslash` - `\( \)` and `\[ \]` (non-default, enabled for RMarkdown)
+- ✅ Extension: `tex_math_double_backslash` - `\\( \\)` and `\\[ \\]` (non-default)
 - ❌ Extension: `tex_math_gfm` - GitHub Flavored Markdown math (non-default)
 
 ### Non-Default: Metadata

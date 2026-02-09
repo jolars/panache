@@ -2,6 +2,7 @@
 //!
 //! Syntax: `[inline content]{.class key="val"}`
 
+use crate::config::Config;
 use crate::inline_parser::parse_inline_text;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
@@ -88,7 +89,12 @@ pub(crate) fn try_parse_bracketed_span(text: &str) -> Option<(usize, String, Str
 }
 
 /// Emit a bracketed span node
-pub(crate) fn emit_bracketed_span(builder: &mut GreenNodeBuilder, content: &str, attributes: &str) {
+pub(crate) fn emit_bracketed_span(
+    builder: &mut GreenNodeBuilder,
+    content: &str,
+    attributes: &str,
+    config: &Config,
+) {
     builder.start_node(SyntaxKind::BracketedSpan.into());
 
     // Opening bracket
@@ -96,7 +102,7 @@ pub(crate) fn emit_bracketed_span(builder: &mut GreenNodeBuilder, content: &str,
 
     // Content (with recursive inline parsing)
     builder.start_node(SyntaxKind::SpanContent.into());
-    parse_inline_text(builder, content);
+    parse_inline_text(builder, content, config);
     builder.finish_node(); // SpanContent
 
     // Closing bracket
