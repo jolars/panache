@@ -77,10 +77,7 @@ async fn multiple_spans_in_line() {
 async fn span_in_heading() {
     let input = "# Heading with [Small Caps]{.smallcaps}\n";
     let output = format(input, None).await;
-    // Note: There's currently a minor whitespace issue in headings (extra space before {)
-    // This doesn't affect functionality but is worth fixing
-    assert!(output.contains("# Heading with [Small Caps]"));
-    assert!(output.contains(".smallcaps}"));
+    assert_eq!(output, "# Heading with [Small Caps]{.smallcaps}\n");
 }
 
 #[tokio::test]

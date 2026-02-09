@@ -99,7 +99,6 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Extension: `superscript` - `^super^`
 - ✅ Extension: `subscript` - `~sub~`
 - ✅ Extension: `bracketed_spans` - Small caps `[text]{.smallcaps}`, underline `[text]{.underline}`, etc.
-- ℹ️ Note: Bracketed spans in headings have minor whitespace formatting issue (extra space before `{`)
 
 ### Code & Verbatim ✅
 

@@ -33,6 +33,14 @@ pub fn try_parse_trailing_attributes(text: &str) -> Option<(AttributeBlock, &str
     // Find matching {
     let open_brace = trimmed.rfind('{')?;
 
+    // Check if this is a bracketed span like [text]{.class} rather than a heading attribute
+    // If the { is immediately after ] (with optional whitespace), this should be parsed as a span
+    let before_brace = &trimmed[..open_brace];
+    if before_brace.trim_end().ends_with(']') {
+        log::debug!("Skipping attribute parsing for bracketed span: {}", text);
+        return None;
+    }
+
     // Parse the content between { and }
     let attr_content = &trimmed[open_brace + 1..trimmed.len() - 1];
     let attr_block = parse_attribute_content(attr_content)?;

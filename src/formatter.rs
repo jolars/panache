@@ -259,6 +259,42 @@ impl Formatter {
                 }
                 format!("**{}**", content)
             }
+            SyntaxKind::BracketedSpan => {
+                // Format bracketed span: [content]{.attributes}
+                // Need to traverse children to avoid extra spaces
+                let mut result = String::new();
+                for child in node.children_with_tokens() {
+                    match child {
+                        NodeOrToken::Token(t) => {
+                            result.push_str(t.text());
+                        }
+                        NodeOrToken::Node(n) => {
+                            // Recursively format nested content
+                            if n.kind() == SyntaxKind::SpanContent {
+                                for elem in n.children_with_tokens() {
+                                    match elem {
+                                        NodeOrToken::Token(t) => result.push_str(t.text()),
+                                        NodeOrToken::Node(nested) => {
+                                            result.push_str(&self.format_inline_node(&nested));
+                                        }
+                                    }
+                                }
+                            } else if n.kind() == SyntaxKind::SpanAttributes {
+                                // Output attributes token by token to avoid spaces
+                                for elem in n.children_with_tokens() {
+                                    match elem {
+                                        NodeOrToken::Token(t) => result.push_str(t.text()),
+                                        NodeOrToken::Node(_) => {} // Shouldn't happen
+                                    }
+                                }
+                            } else {
+                                result.push_str(&n.text().to_string());
+                            }
+                        }
+                    }
+                }
+                result
+            }
             _ => {
                 // For other inline nodes, just return their text
                 node.text().to_string()
@@ -343,10 +379,9 @@ impl Formatter {
                 log::trace!("Formatting heading");
                 // Determine level
                 let mut level = 1;
-                let mut content = String::new();
                 let mut attributes = String::new();
-                let mut saw_content = false;
 
+                // First pass: get level and attributes
                 for child in node.children() {
                     match child.kind() {
                         SyntaxKind::AtxHeadingMarker => {
@@ -361,35 +396,53 @@ impl Formatter {
                                 level = 2;
                             }
                         }
-                        SyntaxKind::HeadingContent => {
-                            let mut t = child.text().to_string();
-                            // Trim trailing spaces and closing hashes in ATX form
-                            t = t.trim_end().to_string();
-                            // Remove trailing " ###" if present
-                            let trimmed_hash = t.trim_end_matches('#').to_string();
-                            if trimmed_hash.len() != t.len() {
-                                t = trimmed_hash.trim_end().to_string();
-                            }
-                            // Normalize internal newlines
-                            content = t.trim().to_string();
-                            saw_content = true;
-                        }
                         SyntaxKind::Attribute => {
                             attributes = child.text().to_string();
                         }
                         _ => {}
                     }
                 }
-                if !saw_content {
-                    content = node.text().to_string();
-                }
+
+                // Output heading marker
                 self.output.push_str(&"#".repeat(level));
                 self.output.push(' ');
-                self.output.push_str(&content);
+
+                // Second pass: format content by traversing tokens/nodes directly
+                // This preserves formatting without adding spaces between inline elements
+                let content_start = self.output.len();
+                for child in node.children() {
+                    if child.kind() == SyntaxKind::HeadingContent {
+                        for element in child.children_with_tokens() {
+                            match element {
+                                NodeOrToken::Token(t) => {
+                                    self.output.push_str(t.text());
+                                }
+                                NodeOrToken::Node(n) => {
+                                    // Format inline nodes (emphasis, code, spans, etc.)
+                                    let formatted = self.format_inline_node(&n);
+                                    self.output.push_str(&formatted);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Trim trailing whitespace and hashes from content
+                let content_end = self.output.len();
+                let content = self.output[content_start..content_end].to_string();
+                let trimmed = content.trim_end_matches(|c: char| c == '#' || c.is_whitespace());
+                self.output.truncate(content_start);
+                self.output.push_str(trimmed);
+
+                // Trim trailing whitespace from content
+                self.output = self.output.trim_end().to_string();
+
+                // Add attributes if present
                 if !attributes.is_empty() {
                     self.output.push(' ');
                     self.output.push_str(&attributes);
                 }
+
                 self.output.push('\n');
 
                 if let Some(next) = node.next_sibling()
