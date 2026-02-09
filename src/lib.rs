@@ -97,16 +97,17 @@ pub async fn format_with_defaults(input: &str) -> String {
 /// use panache::parse;
 ///
 /// let input = "# Heading\n\nParagraph text.";
-/// let tree = parse(input);
+/// let tree = parse(input, None);
 /// println!("{:#?}", tree);
 /// ```
 ///
 /// # Arguments
 ///
 /// * `input` - The Quarto document content to parse
-pub fn parse(input: &str) -> SyntaxNode {
+/// * `config` - Optional configuration. If None, uses default config.
+pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
     let normalized_input = input.replace("\r\n", "\n");
-    let config = Config::default();
+    let config = config.unwrap_or_default();
     let (block_tree, reference_registry) =
         block_parser::BlockParser::new(&normalized_input, &config).parse();
     inline_parser::InlineParser::new(block_tree, config, reference_registry).parse()

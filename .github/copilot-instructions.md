@@ -77,8 +77,8 @@ cargo check && cargo test && cargo clippy -- -D warnings && cargo fmt -- --check
 ### CLI Testing
 
 ```bash
-# Basic functionality test
-printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/release/panache
+# Basic functionality test (format subcommand required)
+printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/release/panache format
 
 # Expected: Line wrapping at ~80 characters with proper Markdown formatting
 ```
@@ -86,7 +86,30 @@ printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/r
 ### Parsing the AST for Debugging
 
 ```bash
+# Parse subcommand shows AST structure
 printf "# Heading\n\nParagraph with *emphasis* and `code`." | ./target/release/panache parse
+
+# Parse with config to respect extension flags
+printf "Math: \\(x^2\\)" | ./target/release/panache parse --config .panache.toml
+```
+
+### CLI Subcommands
+
+panache requires explicit subcommands:
+
+```bash
+# Format (outputs to stdout by default)
+panache format document.qmd
+panache format < document.qmd
+
+# Format with options
+panache format --check document.qmd       # Check if formatted
+panache format --write document.qmd       # Format in place
+panache format --config cfg.toml file.qmd # Custom config
+
+# Parse (show AST for debugging)
+panache parse document.qmd
+panache parse --config cfg.toml file.qmd  # Config affects parsing
 ```
 
 ### Debugging with Logging
@@ -95,19 +118,19 @@ panache has comprehensive logging infrastructure for debugging:
 
 ```bash
 # Production: High-level metrics only (available in release builds)
-RUST_LOG=info panache document.qmd
+RUST_LOG=info panache format document.qmd
 
 # Development: See all parsing decisions (debug builds only)
-RUST_LOG=debug panache document.qmd
+RUST_LOG=debug panache format document.qmd
 
 # Detailed debugging: Every parsing step (debug builds only)
-RUST_LOG=trace panache document.qmd
+RUST_LOG=trace panache format document.qmd
 
 # Module-specific: Only inline parser debug logs
-RUST_LOG=panache::inline_parser=debug panache document.qmd
+RUST_LOG=panache::inline_parser=debug panache format document.qmd
 
 # Multiple modules with different levels
-RUST_LOG=panache::block_parser=trace,panache::formatter=debug panache document.qmd
+RUST_LOG=panache::block_parser=trace,panache::formatter=debug panache format document.qmd
 ```
 
 **Log levels and content:**
@@ -139,7 +162,7 @@ the formatting rules.
 
 ```
 src/
-├── main.rs              # CLI entry point with clap argument parsing
+├── main.rs              # CLI entry point with subcommands (format, parse)
 ├── lib.rs               # Public API with format() and parse() functions
 ├── config.rs            # Configuration handling (.panache.toml, flavor, extensions)
 ├── formatter.rs         # Formatter module entry point (public API)
@@ -314,6 +337,22 @@ Example log output (DEBUG level):
 - Format tests organized by feature (20 tests for specific formatting scenarios)
 - Property: formatting is idempotent
 - Test helpers abstract Config creation (parse_blocks(), parse_inline())
+
+### Public API
+
+The library exposes two main functions in `src/lib.rs`:
+
+**`format(input: &str, config: Option<Config>) -> String`**
+- Formats a Quarto/Markdown document
+- Takes optional config (uses default if None)
+- Returns formatted string
+
+**`parse(input: &str, config: Option<Config>) -> SyntaxNode`**
+- Parses a document into a concrete syntax tree (CST)
+- Takes optional config (affects which extensions are enabled)
+- Returns rowan SyntaxNode for inspection/debugging
+
+Both functions accept optional config to respect flavor-specific extensions and formatting preferences.
 
 ### Formatting Rules
 

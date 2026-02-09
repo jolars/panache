@@ -10,13 +10,10 @@ use panache::{format, parse};
 #[command(name = "panache")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "A formatter for Quarto documents")]
+#[command(arg_required_else_help = true)]
 struct Cli {
     #[command(subcommand)]
-    command: Option<Commands>,
-
-    /// Input file (stdin if not provided)
-    #[arg(global = true)]
-    file: Option<PathBuf>,
+    command: Commands,
 
     /// Path to config file
     #[arg(long, global = true)]
@@ -25,8 +22,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Format a Quarto document (default)
+    /// Format a Quarto document
     Format {
+        /// Input file (stdin if not provided)
+        file: Option<PathBuf>,
+
         /// Check if files are formatted without making changes
         #[arg(long)]
         check: bool,
@@ -36,7 +36,10 @@ enum Commands {
         write: bool,
     },
     /// Parse and display the AST tree for debugging
-    Parse,
+    Parse {
+        /// Input file (stdin if not provided)
+        file: Option<PathBuf>,
+    },
 }
 
 fn read_all(path: Option<&PathBuf>) -> io::Result<String> {
@@ -64,24 +67,33 @@ async fn main() -> io::Result<()> {
 
     let cli = Cli::parse();
 
-    let start_dir = start_dir_for(&cli.file)?;
-    let (cfg, cfg_path) = panache::config::load(cli.config.as_deref(), &start_dir)?;
-
-    if let Some(path) = &cfg_path {
-        log::debug!("Using config from: {}", path.display());
-    } else {
-        log::debug!("Using default config");
-    }
-
-    let input = read_all(cli.file.as_ref())?;
-
     match cli.command {
-        Some(Commands::Parse) => {
-            let tree = parse(&input);
+        Commands::Parse { file } => {
+            let start_dir = start_dir_for(&file)?;
+            let (cfg, cfg_path) = panache::config::load(cli.config.as_deref(), &start_dir)?;
+
+            if let Some(path) = &cfg_path {
+                log::debug!("Using config from: {}", path.display());
+            } else {
+                log::debug!("Using default config");
+            }
+
+            let input = read_all(file.as_ref())?;
+            let tree = parse(&input, Some(cfg));
             println!("{:#?}", tree);
             Ok(())
         }
-        Some(Commands::Format { check, write }) => {
+        Commands::Format { file, check, write } => {
+            let start_dir = start_dir_for(&file)?;
+            let (cfg, cfg_path) = panache::config::load(cli.config.as_deref(), &start_dir)?;
+
+            if let Some(path) = &cfg_path {
+                log::debug!("Using config from: {}", path.display());
+            } else {
+                log::debug!("Using default config");
+            }
+
+            let input = read_all(file.as_ref())?;
             let output = format(&input, Some(cfg)).await;
 
             if check {
@@ -91,7 +103,7 @@ async fn main() -> io::Result<()> {
                 }
                 println!("File is correctly formatted");
             } else if write {
-                if let Some(file_path) = &cli.file {
+                if let Some(file_path) = &file {
                     fs::write(file_path, &output)?;
                     println!("Formatted {}", file_path.display());
                 } else {
@@ -102,12 +114,6 @@ async fn main() -> io::Result<()> {
                 print!("{output}");
             }
 
-            Ok(())
-        }
-        None => {
-            // Default to format when no subcommand specified
-            let output = format(&input, Some(cfg)).await;
-            print!("{output}");
             Ok(())
         }
     }
