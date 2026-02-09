@@ -149,7 +149,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 ### Spans ✅
 
 - ✅ Extension: `bracketed_spans` - `[text]{.class}` inline
-- ❌ Extension: `native_spans` - HTML `<span>` elements
+- ✅ Extension: `native_spans` - HTML `<span>` elements with markdown content
 
 ---
 

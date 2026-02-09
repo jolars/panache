@@ -13,6 +13,7 @@ mod inline_footnotes;
 mod inline_math;
 mod latex;
 mod links;
+mod native_spans;
 mod strikeout;
 mod subscript;
 mod superscript;
@@ -35,6 +36,7 @@ use links::{
     emit_autolink, emit_inline_image, emit_inline_link, try_parse_autolink, try_parse_inline_image,
     try_parse_inline_link,
 };
+use native_spans::{emit_native_span, try_parse_native_span};
 use strikeout::{emit_strikeout, try_parse_strikeout};
 use subscript::{emit_subscript, try_parse_subscript};
 use superscript::{emit_superscript, try_parse_superscript};
@@ -165,6 +167,16 @@ pub fn parse_inline_text(builder: &mut GreenNodeBuilder, text: &str) {
         {
             log::debug!("Matched autolink at pos {}: {}", pos, url);
             emit_autolink(builder, &text[pos..pos + len], url);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse native span (after autolink since both start with <)
+        if bytes[pos] == b'<'
+            && let Some((len, content, attributes)) = try_parse_native_span(&text[pos..])
+        {
+            log::debug!("Matched native span at pos {}", pos);
+            emit_native_span(builder, content, &attributes);
             pos += len;
             continue;
         }
@@ -550,5 +562,51 @@ mod inline_tests {
         let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
         assert_eq!(autolinks.len(), 1);
         assert_eq!(citations.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_native_span_simple() {
+        let input = "Text with <span>highlighted</span> content.";
+        let inline_tree = parse_inline(input);
+
+        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BracketedSpan);
+        assert_eq!(spans.len(), 1);
+        assert!(spans[0].contains("highlighted"));
+    }
+
+    #[test]
+    fn test_parse_native_span_with_class() {
+        let input = r#"Use <span class="important">this</span> wisely."#;
+        let inline_tree = parse_inline(input);
+
+        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BracketedSpan);
+        assert_eq!(spans.len(), 1);
+        assert!(spans[0].contains("this"));
+    }
+
+    #[test]
+    fn test_parse_native_span_with_markdown() {
+        let input = "<span>Contains *emphasis* and `code`</span>.";
+        let inline_tree = parse_inline(input);
+
+        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BracketedSpan);
+        assert_eq!(spans.len(), 1);
+
+        // Should have parsed the emphasis and code inside
+        let emphasis = find_nodes_by_kind(&inline_tree, SyntaxKind::Emphasis);
+        let code = find_nodes_by_kind(&inline_tree, SyntaxKind::CodeSpan);
+        assert_eq!(emphasis.len(), 1);
+        assert_eq!(code.len(), 1);
+    }
+
+    #[test]
+    fn test_native_span_not_confused_with_autolink() {
+        let input = "Link <https://example.com> and <span>text</span>.";
+        let inline_tree = parse_inline(input);
+
+        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
+        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BracketedSpan);
+        assert_eq!(autolinks.len(), 1);
+        assert_eq!(spans.len(), 1);
     }
 }
