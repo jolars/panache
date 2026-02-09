@@ -362,10 +362,18 @@ fn fancy_list_upper_roman_right_paren() {
 }
 
 #[test]
-fn fancy_list_disabled_by_default() {
-    // Without fancy_lists enabled, alphabetic markers should not parse as lists
+fn fancy_list_disabled_when_extension_off() {
+    // With fancy_lists disabled, alphabetic markers should not parse as lists
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: false,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
     let input = "a. first\nb. second\n";
-    let tree = parse_blocks(input);
+    let (tree, _) = crate::block_parser::BlockParser::new(input, &config).parse();
     assert!(find_first(&tree, SyntaxKind::List).is_none());
 }
 
@@ -468,10 +476,18 @@ fn example_list_separated_by_text() {
 }
 
 #[test]
-fn example_list_disabled_by_default() {
-    // Without example_lists enabled, (@) should not parse as a list
+fn example_list_disabled_when_extension_off() {
+    // With example_lists disabled, (@) should not parse as a list
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            example_lists: false,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
     let input = "(@) example\n";
-    let tree = parse_blocks(input);
+    let (tree, _) = crate::block_parser::BlockParser::new(input, &config).parse();
     assert!(find_first(&tree, SyntaxKind::List).is_none());
 }
 

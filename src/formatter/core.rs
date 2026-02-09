@@ -695,8 +695,18 @@ impl Formatter {
                     }
                 }
 
+                // Check if this is uppercase letter with period marker (needs 2 spaces)
+                let spaces_after_marker = if marker.len() == 2
+                    && marker.starts_with(|c: char| c.is_ascii_uppercase())
+                    && marker.ends_with('.')
+                {
+                    2
+                } else {
+                    1
+                };
+
                 let total_indent = indent + local_indent;
-                let hanging = marker.len() + 1 + total_indent; // +1 for the space after marker
+                let hanging = marker.len() + spaces_after_marker + total_indent;
                 let available_width = self.config.line_width.saturating_sub(hanging);
 
                 // Build words from the whole node, then drop the leading marker word
@@ -726,11 +736,12 @@ impl Formatter {
                     if i == 0 {
                         self.output.push_str(&" ".repeat(total_indent));
                         self.output.push_str(&marker);
-                        self.output.push(' ');
+                        self.output.push_str(&" ".repeat(spaces_after_marker));
                     } else {
-                        // Hanging indent includes marker + one space
-                        self.output
-                            .push_str(&" ".repeat(total_indent + marker.len() + 1));
+                        // Hanging indent includes marker + spaces
+                        self.output.push_str(
+                            &" ".repeat(total_indent + marker.len() + spaces_after_marker),
+                        );
                     }
                     for (j, w) in line.iter().enumerate() {
                         self.output.push_str(w.word);

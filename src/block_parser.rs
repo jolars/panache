@@ -920,12 +920,14 @@ impl<'a> BlockParser<'a> {
     }
 
     fn find_matching_list_level(&self, marker: &ListMarker, indent_cols: usize) -> Option<usize> {
-        for (i, c) in self.containers.stack.iter().enumerate() {
+        // Search from deepest (last) to shallowest (first) to prefer nested lists
+        for (i, c) in self.containers.stack.iter().enumerate().rev() {
             if let Container::List {
                 marker: list_marker,
                 base_indent_cols,
             } = c
                 && markers_match(marker, list_marker)
+                && indent_cols >= *base_indent_cols
                 && indent_cols <= base_indent_cols + 3
             {
                 return Some(i);

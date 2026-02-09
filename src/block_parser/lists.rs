@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::syntax::SyntaxKind;
+use log;
 use rowan::GreenNodeBuilder;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -705,6 +706,11 @@ pub(crate) fn try_parse_list(
         list_stack: &mut Vec<ListCtx>,
         item_stack: &mut Vec<ItemCtx>,
     ) {
+        log::trace!(
+            "Closing one level: list_stack.len()={}, item_stack.len()={}",
+            list_stack.len(),
+            item_stack.len()
+        );
         builder.finish_node(); // ListItem
         item_stack.pop();
         builder.finish_node(); // List
@@ -728,6 +734,12 @@ pub(crate) fn try_parse_list(
         info: &MarkerInfo,
         item_stack: &mut Vec<ItemCtx>,
     ) {
+        log::trace!(
+            "Starting new item: indent={}, marker={:?}, line={:?}",
+            info.indent_cols,
+            info.marker,
+            line.trim()
+        );
         builder.start_node(SyntaxKind::ListItem.into());
 
         let marker_text = &line[info.indent_bytes..info.indent_bytes + info.marker_len];
@@ -774,6 +786,8 @@ pub(crate) fn try_parse_list(
     }
 
     builder.start_node(SyntaxKind::List.into());
+
+    log::trace!("Starting list parse at line {}", pos);
 
     let mut list_stack = vec![ListCtx {
         marker: first.marker.clone(),
@@ -829,33 +843,67 @@ pub(crate) fn try_parse_list(
             continue;
         }
 
-        // Close nested list levels if this line is outdented.
+        // Peek ahead to check if this line has a list marker before closing levels
+        let line_marker_info = parse_marker_info(line, config);
         let (line_indent_cols, _) = leading_indent(line);
-        while list_stack.len() > 1 {
-            let cur_item = item_stack.last().expect("list item must exist");
-            if line_indent_cols >= cur_item.content_col {
-                break;
+
+        log::trace!(
+            "Processing line: indent={}, has_marker={}, line={:?}, list_stack.len()={}",
+            line_indent_cols,
+            line_marker_info.is_some(),
+            line.trim(),
+            list_stack.len()
+        );
+
+        // Close nested list levels if this line is outdented AND doesn't have a list marker
+        // that could match at the current or a parent level.
+        if line_marker_info.is_none() {
+            log::trace!("No marker on line, checking if should close levels");
+            while list_stack.len() > 1 {
+                let cur_item = item_stack.last().expect("list item must exist");
+                if line_indent_cols >= cur_item.content_col {
+                    break;
+                }
+                close_one_level(builder, &mut list_stack, &mut item_stack);
             }
-            close_one_level(builder, &mut list_stack, &mut item_stack);
         }
 
         // Try list marker.
-        if let Some(info) = parse_marker_info(line, config) {
+        if let Some(info) = line_marker_info {
+            log::trace!(
+                "Line has marker: indent={}, marker={:?}",
+                info.indent_cols,
+                info.marker
+            );
+
             // First: can this marker start a new item in an existing list level?
             let mut matched_level = None;
             for level in (0..list_stack.len()).rev() {
                 let list_ctx = &list_stack[level];
                 let item_ctx = &item_stack[level];
-                if markers_match(&list_ctx.marker, &info.marker)
-                    && indent_ok(list_ctx.base_indent_cols, info.indent_cols)
-                    && info.indent_cols < item_ctx.content_col
-                {
+                let markers_eq = markers_match(&list_ctx.marker, &info.marker);
+                let indent_is_ok = indent_ok(list_ctx.base_indent_cols, info.indent_cols);
+                let indent_lt_content = info.indent_cols < item_ctx.content_col;
+
+                log::trace!(
+                    "  Checking level {}: base_indent={}, item.content_col={}, markers_match={}, indent_ok={}, indent<content={}",
+                    level,
+                    list_ctx.base_indent_cols,
+                    item_ctx.content_col,
+                    markers_eq,
+                    indent_is_ok,
+                    indent_lt_content
+                );
+
+                if markers_eq && indent_is_ok && indent_lt_content {
                     matched_level = Some(level);
+                    log::trace!("  -> Matched at level {}", level);
                     break;
                 }
             }
 
             if let Some(level) = matched_level {
+                log::trace!("Closing to level {} (keep {} levels)", level + 1, level + 1);
                 close_to_level(builder, &mut list_stack, &mut item_stack, level + 1);
 
                 // Close the current item at this level and start a new one.
@@ -870,6 +918,11 @@ pub(crate) fn try_parse_list(
 
             // Nested list if indented to the content column.
             if info.indent_cols >= cur_item.content_col {
+                log::trace!(
+                    "Creating nested list: marker_indent={} >= content_col={}",
+                    info.indent_cols,
+                    cur_item.content_col
+                );
                 builder.start_node(SyntaxKind::List.into());
                 list_stack.push(ListCtx {
                     marker: info.marker.clone(),
@@ -879,6 +932,8 @@ pub(crate) fn try_parse_list(
                 i += 1;
                 continue;
             }
+
+            log::trace!("Different marker at same/outer level, ending list");
 
             // Different marker at the same/outer level: end this list (let the outer parser handle).
             break;
@@ -1065,10 +1120,16 @@ fn detects_example_list_markers() {
         "(@test-123) should parse"
     );
 
-    // Test disabled by default
-    let default_config = Config::default();
+    // Test with extension disabled
+    let disabled_config = Config {
+        extensions: crate::config::Extensions {
+            example_lists: false,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
     assert!(
-        try_parse_list_marker("(@) item", &default_config).is_none(),
-        "(@) should not parse without extension"
+        try_parse_list_marker("(@) item", &disabled_config).is_none(),
+        "(@) should not parse when extension disabled"
     );
 }
