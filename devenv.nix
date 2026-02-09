@@ -14,6 +14,13 @@
     pkgs.pandoc
     pkgs.air
     pkgs.ruff
+    (pkgs.rWrapper.override {
+      packages = with pkgs.rPackages; [
+        knitr
+        rmarkdown
+        bookdown
+      ];
+    })
   ];
 
   languages.rust = {
