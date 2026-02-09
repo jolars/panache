@@ -129,32 +129,6 @@ represented using the `rowan` crate, which provides a red-green tree structure
 for efficient syntax tree manipulation. The formatter then traverses this tree to apply
 the formatting rules.
 
-**IMPORTANT**: The block parser is currently in active development with support for:
-- ATX headings
-- Fenced code blocks (backtick and tilde)
-- Fenced divs (Quarto/Pandoc)
-- Paragraphs
-- Blockquotes (with nesting support)
-- Lists (ordered and unordered, including task lists)
-- Horizontal rules
-- Metadata/frontmatter (YAML, TOML, Pandoc title blocks)
-- Tables (simple, pipe, grid, multiline)
-- Blank lines
-
-The inline parser has basic inline elements implemented:
-- ✅ Code spans with proper backtick matching
-- ✅ Emphasis and strong emphasis (asterisks and underscores)
-- ✅ Inline math (dollar signs)
-- ✅ Links (automatic `<url>` and inline `[text](url)`)
-- ✅ Images (`![alt](url)`)
-- ✅ Escapes (backslash escaping)
-- ✅ Inline footnotes `^[inline note]`
-- ✅ Proper CommonMark precedence (code > escapes > links > emphasis)
-- ❌ Reference links/images `[text][ref]` (not yet implemented)
-- ❌ Reference footnotes `[^ref]` (not yet implemented)
-- ❌ Citations `[@cite]` (not yet implemented)
-- ❌ Strikethrough, subscript/superscript, other extensions (not yet implemented)
-
 ### Source Structure
 
 ```
@@ -171,11 +145,11 @@ src/
 │   ├── inline.rs           # Inline element formatting (emphasis, code, links)
 │   ├── headings.rs         # Heading formatting
 │   ├── utils.rs            # Helper functions (is_block_element)
-│   ├── blockquotes.rs      # Placeholder for blockquote extraction
-│   ├── lists.rs            # Placeholder for list extraction
-│   ├── tables.rs           # Placeholder for table extraction
-│   ├── fenced_divs.rs      # Placeholder for fenced div extraction
-│   └── metadata.rs         # Placeholder for metadata extraction
+│   ├── blockquotes.rs      # Blockquote formatting logic
+│   ├── lists.rs            # List formatting logic (ordered/unordered/task)
+│   ├── tables.rs           # Table formatting logic (grid tables, pipe tables, simple tables)
+│   ├── fenced_divs.rs      # Fenced div formatting logic (Quarto/Pandoc)
+│   └── metadata.rs         # Frontmatter formatting logic (YAML, TOML, Pandoc)
 ├── block_parser.rs      # Block parser module entry point
 ├── block_parser/
 │   ├── blockquotes.rs      # Blockquote parsing and resolution
