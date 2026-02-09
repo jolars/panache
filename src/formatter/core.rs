@@ -332,7 +332,7 @@ impl Formatter {
                                 .saturating_sub(indent + marker_len + 1);
 
                             // Try wrapping the paragraph to see if it fits on one line
-                            let lines = self.wrapped_lines_for_paragraph(&child, first_line_space);
+                            let lines = self.wrapped_lines_for_paragraph(child, first_line_space);
 
                             if lines.len() == 1 {
                                 // Fits on one line - put on same line as marker
@@ -364,7 +364,7 @@ impl Formatter {
                                 }
                                 WrapMode::Reflow => {
                                     let lines =
-                                        self.wrapped_lines_for_paragraph(&child, available_width);
+                                        self.wrapped_lines_for_paragraph(child, available_width);
                                     for line in lines {
                                         self.output.push_str(&" ".repeat(child_indent));
                                         self.output.push_str(&line);

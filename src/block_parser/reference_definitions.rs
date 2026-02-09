@@ -417,10 +417,8 @@ pub fn try_parse_footnote_definition(
             && line_bytes[3] == b' '
         {
             true
-        } else if !line_bytes.is_empty() && line_bytes[0] == b'\t' {
-            true
         } else {
-            false
+            !line_bytes.is_empty() && line_bytes[0] == b'\t'
         };
 
         if !is_indented {

@@ -8,7 +8,6 @@
 //! - Reference links: `[text][ref]`, `[text][]`, `[text]`
 //! - Reference images: `![alt][ref]`, `![alt][]`, `![alt]`
 
-use crate::block_parser::ReferenceRegistry;
 use crate::config::Config;
 use crate::inline_parser::parse_inline_text;
 use crate::syntax::SyntaxKind;

@@ -302,13 +302,12 @@ pub fn parse_inline_text(
             && pos + 1 < text.len()
             && bytes[pos + 1] == b'^'
             && config.extensions.footnotes
+            && let Some((len, id)) = try_parse_footnote_reference(&text[pos..])
         {
-            if let Some((len, id)) = try_parse_footnote_reference(&text[pos..]) {
-                log::debug!("Matched footnote reference at pos {}: [^{}]", pos, id);
-                emit_footnote_reference(builder, &id);
-                pos += len;
-                continue;
-            }
+            log::debug!("Matched footnote reference at pos {}: [^{}]", pos, id);
+            emit_footnote_reference(builder, &id);
+            pos += len;
+            continue;
         }
 
         // Try to parse inline link
