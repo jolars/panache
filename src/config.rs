@@ -517,6 +517,19 @@ impl Default for FormatterConfig {
     }
 }
 
+/// Style for formatting math delimiters
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum MathDelimiterStyle {
+    /// Preserve original delimiter style (\(...\) stays \(...\), $...$ stays $...$)
+    Preserve,
+    /// Normalize all to dollar syntax ($...$ and $$...$$)
+    #[default]
+    Dollars,
+    /// Normalize all to backslash syntax (\(...\) and \[...\])
+    Backslash,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -525,6 +538,9 @@ pub struct Config {
     pub line_ending: Option<LineEnding>,
     pub line_width: usize,
     pub math_indent: usize,
+    /// Style for math delimiters (preserve, dollars, backslash)
+    #[serde(rename = "math-delimiter-style")]
+    pub math_delimiter_style: MathDelimiterStyle,
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
     /// Code block formatting configuration
@@ -544,6 +560,7 @@ impl Default for Config {
             line_ending: Some(LineEnding::Auto),
             line_width: 80,
             math_indent: 0,
+            math_delimiter_style: MathDelimiterStyle::default(),
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             code_blocks: CodeBlockConfig::for_flavor(flavor),

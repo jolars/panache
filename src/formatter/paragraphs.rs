@@ -1,3 +1,5 @@
+use crate::config::Config;
+use crate::formatter::inline;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -23,6 +25,7 @@ pub(super) fn contains_inline_display_math(node: &SyntaxNode) -> bool {
 pub(super) fn format_paragraph_with_display_math(
     node: &SyntaxNode,
     line_width: usize,
+    config: &Config,
     output: &mut String,
 ) {
     let mut parts: Vec<(bool, String)> = Vec::new(); // (is_display_math, content)
@@ -44,21 +47,15 @@ pub(super) fn format_paragraph_with_display_math(
                             current_text.clear();
                         }
 
-                        // Extract math content
-                        let math_content: String = n
-                            .children_with_tokens()
-                            .filter_map(|c| match c {
-                                NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
-                                    Some(t.text().to_string())
-                                }
-                                _ => None,
-                            })
-                            .collect();
-
-                        parts.push((true, math_content));
+                        // Format display math using the inline formatter
+                        let formatted = inline::format_inline_node(&n, config);
+                        // Display math gets its own part as formatted string
+                        // We'll output it as-is without wrapping
+                        parts.push((true, formatted));
                     } else {
-                        // Regular inline math - keep in text
-                        current_text.push_str(&n.text().to_string());
+                        // Regular inline math - format it using the inline formatter
+                        let formatted = inline::format_inline_node(&n, config);
+                        current_text.push_str(&formatted);
                     }
                 } else {
                     current_text.push_str(&n.text().to_string());
@@ -82,11 +79,13 @@ pub(super) fn format_paragraph_with_display_math(
     // Format each part - display math on separate lines within paragraph
     for (i, (is_display_math, content)) in parts.iter().enumerate() {
         if *is_display_math {
-            // Format as display math on separate lines
+            // Output formatted display math (already formatted with delimiters)
+            // on its own line
+            if i > 0 {
+                output.push('\n');
+            }
+            output.push_str(content);
             output.push('\n');
-            output.push_str("$$\n");
-            output.push_str(content.trim());
-            output.push_str("\n$$\n");
         } else {
             // Add space before if not at start
             if i > 0 && !output.ends_with('\n') {

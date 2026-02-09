@@ -37,7 +37,7 @@ impl Formatter {
 
     // Delegate to extracted wrapping module
     fn format_inline_node(&self, node: &SyntaxNode) -> String {
-        inline::format_inline_node(node)
+        inline::format_inline_node(node, &self.config)
     }
 
     // Delegate to wrapping module
@@ -64,7 +64,12 @@ impl Formatter {
         _indent: usize,
         line_width: usize,
     ) {
-        paragraphs::format_paragraph_with_display_math(node, line_width, &mut self.output);
+        paragraphs::format_paragraph_with_display_math(
+            node,
+            line_width,
+            &self.config,
+            &mut self.output,
+        );
     }
 
     // Delegate to code_blocks module
@@ -586,20 +591,79 @@ impl Formatter {
                     matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BlockMathMarker)
                 });
 
-                if is_display_math {
-                    // Display math - output with space padding
-                    self.output.push_str("$$ ");
-                    for child in node.children() {
-                        if child.kind() == SyntaxKind::TEXT {
-                            self.output.push_str(&child.text().to_string());
+                // Get the actual content (TEXT token, not node)
+                let content = node
+                    .children_with_tokens()
+                    .find_map(|c| match c {
+                        NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
+                            Some(t.text().to_string())
+                        }
+                        _ => None,
+                    })
+                    .unwrap_or_default();
+
+                // Get original marker to determine input format
+                let original_marker = node
+                    .children_with_tokens()
+                    .find_map(|t| match t {
+                        NodeOrToken::Token(tok)
+                            if tok.kind() == SyntaxKind::InlineMathMarker
+                                || tok.kind() == SyntaxKind::BlockMathMarker =>
+                        {
+                            Some(tok.text().to_string())
+                        }
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "$".to_string());
+
+                // Determine output format based on config
+                use crate::config::MathDelimiterStyle;
+                let (open, close) = match self.config.math_delimiter_style {
+                    MathDelimiterStyle::Preserve => {
+                        // Keep original format
+                        if is_display_math {
+                            match original_marker.as_str() {
+                                "\\[" => (r"\[", r"\]"),
+                                "\\\\[" => (r"\\[", r"\\]"),
+                                _ => ("$$", "$$"), // Default to $$
+                            }
+                        } else {
+                            match original_marker.as_str() {
+                                r"\(" => (r"\(", r"\)"),
+                                r"\\(" => (r"\\(", r"\\)"),
+                                _ => ("$", "$"), // Default to $
+                            }
                         }
                     }
-                    self.output.push_str(" $$");
-                } else {
-                    // Regular inline math
-                    for child in node.children() {
-                        self.output.push_str(&child.text().to_string());
+                    MathDelimiterStyle::Dollars => {
+                        // Normalize to dollars
+                        if is_display_math {
+                            ("$$", "$$")
+                        } else {
+                            ("$", "$")
+                        }
                     }
+                    MathDelimiterStyle::Backslash => {
+                        // Normalize to single backslash
+                        if is_display_math {
+                            (r"\[", r"\]")
+                        } else {
+                            (r"\(", r"\)")
+                        }
+                    }
+                };
+
+                // Output formatted math
+                if is_display_math {
+                    self.output.push_str(open);
+                    self.output.push(' ');
+                    self.output.push_str(&content);
+                    self.output.push(' ');
+                    self.output.push_str(close);
+                } else {
+                    self.output.push_str(open);
+                    self.output.push_str(&content);
+                    self.output.push_str(close);
                 }
             }
 
