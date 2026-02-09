@@ -31,6 +31,9 @@ pub(crate) enum OrderedMarker {
         numeral: String,
         style: ListDelimiter,
     },
+    Example {
+        label: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -177,6 +180,43 @@ pub(crate) fn try_parse_list_marker(
             .take_while(|c| c.is_whitespace())
             .count();
         return Some((ListMarker::Ordered(OrderedMarker::Hash), 2, spaces_after));
+    }
+
+    // Try example lists: (@) or (@label)
+    if config.extensions.example_lists
+        && let Some(rest) = trimmed.strip_prefix("(@")
+    {
+        // Check if it has a label or is just (@)
+        let label_end = rest
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+            .count();
+
+        // Must be followed by ')'
+        if rest.len() > label_end && rest.chars().nth(label_end) == Some(')') {
+            let label = if label_end > 0 {
+                Some(rest[..label_end].to_string())
+            } else {
+                None
+            };
+
+            let after_marker = &rest[label_end + 1..];
+            if after_marker.starts_with(' ')
+                || after_marker.starts_with('\t')
+                || after_marker.is_empty()
+            {
+                let spaces_after = after_marker
+                    .chars()
+                    .take_while(|c| c.is_whitespace())
+                    .count();
+                let marker_len = 2 + label_end + 1; // "(@" + label + ")"
+                return Some((
+                    ListMarker::Ordered(OrderedMarker::Example { label }),
+                    marker_len,
+                    spaces_after,
+                ));
+            }
+        }
     }
 
     // Try parenthesized markers: (2), (a), (ii)
@@ -505,6 +545,10 @@ pub(crate) fn markers_match(a: &ListMarker, b: &ListMarker) -> bool {
             ListMarker::Ordered(OrderedMarker::UpperRoman { style: s1, .. }),
             ListMarker::Ordered(OrderedMarker::UpperRoman { style: s2, .. }),
         ) => s1 == s2,
+        (
+            ListMarker::Ordered(OrderedMarker::Example { .. }),
+            ListMarker::Ordered(OrderedMarker::Example { .. }),
+        ) => true, // All example list items match each other
         _ => false,
     }
 }
@@ -993,5 +1037,38 @@ fn detects_complex_roman_numerals() {
     assert!(
         try_parse_list_marker("x. item", &config).is_some(),
         "x. should parse"
+    );
+}
+
+#[test]
+fn detects_example_list_markers() {
+    let mut config = Config::default();
+    config.extensions.example_lists = true;
+
+    // Test unlabeled example
+    assert!(
+        try_parse_list_marker("(@) item", &config).is_some(),
+        "(@) should parse"
+    );
+
+    // Test labeled examples
+    assert!(
+        try_parse_list_marker("(@foo) item", &config).is_some(),
+        "(@foo) should parse"
+    );
+    assert!(
+        try_parse_list_marker("(@my_label) item", &config).is_some(),
+        "(@my_label) should parse"
+    );
+    assert!(
+        try_parse_list_marker("(@test-123) item", &config).is_some(),
+        "(@test-123) should parse"
+    );
+
+    // Test disabled by default
+    let default_config = Config::default();
+    assert!(
+        try_parse_list_marker("(@) item", &default_config).is_none(),
+        "(@) should not parse without extension"
     );
 }

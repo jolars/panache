@@ -387,3 +387,108 @@ fn fancy_list_complex_roman() {
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
     assert_eq!(count_children(&list, SyntaxKind::ListItem), 7);
 }
+
+// Example lists tests - require example_lists extension
+
+#[test]
+fn example_list_basic() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            example_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "(@) First example\n(@) Second example\n(@) Third example\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn example_list_with_labels() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            example_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "(@good) This is a good example\n(@bad) This is a bad example\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+}
+
+#[test]
+fn example_list_mixed_labeled_unlabeled() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            example_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "(@) First example\n(@foo) Labeled example\n(@) Another example\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+}
+
+#[test]
+fn example_list_separated_by_text() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            example_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    // According to spec, example lists can be separated and continue numbering
+    let input = "(@) First example\n\nSome text.\n\n(@) Second example\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let lists = find_all(&tree, SyntaxKind::List);
+    // Should have 2 separate lists
+    assert_eq!(lists.len(), 2);
+    // Each should have 1 item
+    assert_eq!(count_children(&lists[0], SyntaxKind::ListItem), 1);
+    assert_eq!(count_children(&lists[1], SyntaxKind::ListItem), 1);
+}
+
+#[test]
+fn example_list_disabled_by_default() {
+    // Without example_lists enabled, (@) should not parse as a list
+    let input = "(@) example\n";
+    let tree = parse_blocks(input);
+    assert!(find_first(&tree, SyntaxKind::List).is_none());
+}
+
+#[test]
+fn example_list_with_underscores_and_hyphens() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            example_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "(@my_label) Example with underscore\n(@my-label) Example with hyphen\n";
+    let tree = crate::block_parser::BlockParser::new(input, &config)
+        .parse()
+        .0;
+    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+}
