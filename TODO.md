@@ -122,7 +122,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
   - ⏸️ Integration blocked (needs inline parser refactoring)
 - ❌ Extension: `shortcut_reference_links` - `[ref]` without second `[]` (parser ready, not integrated)
 - ❌ Extension: `link_attributes` - `[text](url){.class}`
-- ❌ Extension: `implicit_header_references` - `[Heading Name]` links to header
+- ⏹️ Extension: `implicit_header_references` - `[Heading Name]` links to header (conversion feature, not formatting concern)
 
 ### Images ✅
 
