@@ -10,8 +10,8 @@ mod emphasis_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let block_tree = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config).parse()
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
     }
 
     fn find_emphasis(node: &crate::syntax::SyntaxNode) -> Vec<String> {
@@ -149,8 +149,8 @@ mod code_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let block_tree = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config).parse()
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
     }
 
     fn find_code_spans(node: &crate::syntax::SyntaxNode) -> Vec<String> {
@@ -213,8 +213,8 @@ mod math_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let block_tree = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config).parse()
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
     }
 
     fn find_inline_math(node: &crate::syntax::SyntaxNode) -> Vec<String> {
@@ -287,8 +287,8 @@ mod escape_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let block_tree = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config).parse()
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
     }
 
     fn count_nodes_of_kind(node: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
@@ -423,8 +423,8 @@ mod footnote_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let block_tree = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config).parse()
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
     }
 
     fn find_footnotes(node: &crate::syntax::SyntaxNode) -> Vec<String> {
@@ -509,8 +509,8 @@ mod bracketed_span_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let block_tree = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config).parse()
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
     }
 
     fn assert_has_kind(tree: &crate::syntax::SyntaxNode, kind: SyntaxKind) {
@@ -574,5 +574,112 @@ mod bracketed_span_tests {
         let tree = parse_inline("[[nested]]{.class}");
         assert_has_kind(&tree, SyntaxKind::BracketedSpan);
         assert_has_text(&tree, SyntaxKind::SpanContent, "[nested]");
+    }
+}
+
+// ========================================
+// Reference Images Tests
+// ========================================
+
+#[cfg(test)]
+mod reference_tests {
+    use crate::block_parser::BlockParser;
+    use crate::config::Config;
+    use crate::inline_parser::InlineParser;
+    use crate::syntax::SyntaxKind;
+
+    fn parse_with_refs(input: &str) -> crate::syntax::SyntaxNode {
+        let config = Config::default();
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
+    }
+
+    #[test]
+    #[ignore = "Reference images not yet integrated into inline parser"]
+    fn test_reference_image_explicit() {
+        let input = "Text with ![alt text][img-ref] image.
+
+[img-ref]: image.jpg \"Image Title\"";
+
+        let config = Config::default();
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+
+        eprintln!("Has img-ref: {}", registry.get("img-ref").is_some());
+
+        let para = block_tree.first_child().unwrap().first_child().unwrap();
+        eprintln!("\nParagraph children:");
+        for child in para.children_with_tokens() {
+            match child {
+                rowan::NodeOrToken::Node(n) => {
+                    eprintln!("  Node {:?}: '{}'", n.kind(), n.text());
+                }
+                rowan::NodeOrToken::Token(t) => {
+                    eprintln!("  Token {:?}: '{}'", t.kind(), t.text());
+                }
+            }
+        }
+
+        let parsed = InlineParser::new(block_tree, config, registry).parse();
+
+        let para = parsed.first_child().expect("paragraph");
+
+        let image = para
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::ImageLink)
+            .expect("image node");
+
+        // Should resolve to image.jpg
+        let text = image.text().to_string();
+        assert!(text.contains("image.jpg"));
+    }
+
+    #[test]
+    #[ignore = "Reference images not yet integrated into inline parser"]
+    fn test_reference_image_implicit() {
+        let input = "Text with ![image ref][] image.
+
+[image ref]: /path/to/image.png";
+
+        let parsed = parse_with_refs(input);
+        let para = parsed.first_child().expect("paragraph");
+        let image = para
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::ImageLink)
+            .expect("image node");
+
+        let text = image.text().to_string();
+        assert!(text.contains("/path/to/image.png"));
+    }
+
+    #[test]
+    #[ignore = "Reference images not yet integrated into inline parser"]
+    fn test_reference_image_unresolved() {
+        let input = "Text with ![alt][missing-ref] image.";
+
+        let parsed = parse_with_refs(input);
+        let para = parsed.first_child().expect("paragraph");
+
+        // Should still parse as an image, but keep original reference syntax
+        let text = para.text().to_string();
+        assert!(text.contains("![alt][missing-ref]"));
+    }
+
+    #[test]
+    #[ignore = "Reference images not yet integrated into inline parser"]
+    fn test_reference_image_case_insensitive() {
+        let input = "Image: ![ALT][MyRef]
+
+[myref]: image.jpg";
+
+        let parsed = parse_with_refs(input);
+        let para = parsed.first_child().expect("paragraph");
+        let image = para
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::ImageLink)
+            .expect("image node");
+
+        // Should resolve despite case mismatch
+        let text = image.text().to_string();
+        assert!(text.contains("image.jpg"));
     }
 }

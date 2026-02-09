@@ -17,6 +17,7 @@ mod latex_envs;
 mod lists;
 mod metadata;
 mod paragraphs;
+pub mod reference_definitions; // Public for use in inline_parser
 mod tables;
 mod utils;
 
@@ -33,6 +34,7 @@ use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
+pub use reference_definitions::{ReferenceRegistry, try_parse_reference_definition};
 use tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
@@ -47,6 +49,7 @@ pub struct BlockParser<'a> {
     pos: usize,
     builder: GreenNodeBuilder<'static>,
     containers: ContainerStack,
+    reference_registry: ReferenceRegistry,
     #[allow(dead_code)] // TODO: Will be used for extension configuration
     config: &'a Config,
 }
@@ -59,11 +62,12 @@ impl<'a> BlockParser<'a> {
             pos: 0,
             builder: GreenNodeBuilder::new(),
             containers: ContainerStack::new(),
+            reference_registry: ReferenceRegistry::new(),
             config,
         }
     }
 
-    pub fn parse(mut self) -> SyntaxNode {
+    pub fn parse(mut self) -> (SyntaxNode, ReferenceRegistry) {
         #[cfg(debug_assertions)]
         {
             init_logger();
@@ -73,7 +77,8 @@ impl<'a> BlockParser<'a> {
         self.parse_document_stack();
         self.builder.finish_node(); // ROOT
 
-        SyntaxNode::new_root(self.builder.finish())
+        let tree = SyntaxNode::new_root(self.builder.finish());
+        (tree, self.reference_registry)
     }
 
     fn parse_document_stack(&mut self) {
@@ -567,6 +572,25 @@ impl<'a> BlockParser<'a> {
             let new_pos =
                 parse_fenced_code_block(&mut self.builder, &self.lines, self.pos, fence, bq_depth);
             self.pos = new_pos;
+            return true;
+        }
+
+        // Check for reference definition: [label]: url "title"
+        // These can appear anywhere in the document
+        if let Some((len, label, url, title)) = try_parse_reference_definition(content) {
+            log::debug!(
+                "Parsed reference definition at line {}: [{}]",
+                self.pos,
+                label
+            );
+            // Store in registry
+            self.reference_registry.add(label, url, title);
+            // Emit as a node (optional - could skip emission)
+            self.builder
+                .start_node(SyntaxKind::ReferenceDefinition.into());
+            self.builder.token(SyntaxKind::TEXT.into(), &content[..len]);
+            self.builder.finish_node();
+            self.pos += 1;
             return true;
         }
 

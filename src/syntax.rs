@@ -23,15 +23,19 @@ pub enum SyntaxKind {
     BlankLine,
 
     // Links and images
-    LinkStart,      // [
-    Link,           // [text](url)
-    LinkText,       // text part of link
-    LinkDest,       // (url) or (url "title")
-    LinkRef,        // [ref] in reference links
-    ImageLink,      // ![alt](url)
-    ImageAlt,       // alt text in image
-    AutoLink,       // <http://example.com>
-    AutoLinkMarker, // < and >
+    LinkStart,           // [
+    Link,                // [text](url)
+    LinkText,            // text part of link
+    LinkDest,            // (url) or (url "title")
+    LinkRef,             // [ref] in reference links
+    ImageLink,           // ![alt](url)
+    ImageAlt,            // alt text in image
+    AutoLink,            // <http://example.com>
+    AutoLinkMarker,      // < and >
+    ReferenceDefinition, // [label]: url "title"
+    ReferenceLabel,      // [label] part
+    ReferenceUrl,        // url part
+    ReferenceTitle,      // "title" part
 
     // Math
     InlineMathMarker, // $

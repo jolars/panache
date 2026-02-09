@@ -4,7 +4,7 @@ use crate::syntax::SyntaxKind;
 
 fn parse(input: &str) -> String {
     let config = Config::default();
-    let tree = BlockParser::new(input, &config).parse();
+    let tree = BlockParser::new(input, &config).parse().0;
     format!("{:#?}", tree)
 }
 

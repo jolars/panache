@@ -33,8 +33,9 @@ use inline_math::{
 };
 use latex::{parse_latex_command, try_parse_latex_command};
 use links::{
-    emit_autolink, emit_inline_image, emit_inline_link, try_parse_autolink, try_parse_inline_image,
-    try_parse_inline_link,
+    emit_autolink, emit_inline_image, emit_inline_link, emit_reference_image, emit_reference_link,
+    try_parse_autolink, try_parse_inline_image, try_parse_inline_link, try_parse_reference_image,
+    try_parse_reference_link,
 };
 use native_spans::{emit_native_span, try_parse_native_span};
 use strikeout::{emit_strikeout, try_parse_strikeout};
@@ -296,13 +297,23 @@ fn find_next_inline_start(text: &str) -> usize {
 /// with properly parsed inline elements (emphasis, links, math, etc.).
 pub struct InlineParser {
     root: SyntaxNode,
+    #[allow(dead_code)] // TODO: Will be used for reference link/image resolution
+    reference_registry: crate::block_parser::ReferenceRegistry,
     #[allow(dead_code)] // TODO: Will be used for extension configuration
     config: Config,
 }
 
 impl InlineParser {
-    pub fn new(root: SyntaxNode, config: Config) -> Self {
-        Self { root, config }
+    pub fn new(
+        root: SyntaxNode,
+        config: Config,
+        reference_registry: crate::block_parser::ReferenceRegistry,
+    ) -> Self {
+        Self {
+            root,
+            reference_registry,
+            config,
+        }
     }
 
     /// Parse inline elements within the block-level CST.
@@ -330,7 +341,8 @@ impl InlineParser {
                 }
                 rowan::NodeOrToken::Token(t) => {
                     if self.should_parse_inline(&t) {
-                        parse_inline_text(builder, t.text());
+                        // Parse inline text, passing registry for reference resolution
+                        self.parse_text_with_refs(builder, t.text());
                     } else {
                         builder.token(t.kind().into(), t.text());
                     }
@@ -339,6 +351,15 @@ impl InlineParser {
         }
 
         builder.finish_node();
+    }
+
+    /// Parse inline text with reference link/image resolution support.
+    fn parse_text_with_refs(&self, builder: &mut GreenNodeBuilder, text: &str) {
+        // For now, just use standard inline parsing
+        // TODO: Integrate reference link/image resolution
+        // The parsing functions exist in links.rs but need proper integration
+        // into the parsing loop to maintain correct precedence
+        parse_inline_text(builder, text);
     }
 
     /// Check if a token should be parsed for inline elements.
@@ -389,8 +410,8 @@ mod inline_tests {
 
     fn parse_inline(input: &str) -> SyntaxNode {
         let config = Config::default();
-        let block_tree = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config).parse()
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
     }
 
     #[test]

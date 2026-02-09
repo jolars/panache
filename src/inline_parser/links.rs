@@ -5,7 +5,11 @@
 //! - Inline links: `[text](url)` and `[text](url "title")`
 //! - Inline images: `![alt](url)` and `![alt](url "title")`
 //! - Image attributes: `![alt](url){#id .class key=value}`
+//! - Reference links: `[text][ref]`, `[text][]`, `[text]`
+//! - Reference images: `![alt][ref]`, `![alt][]`, `![alt]`
 
+use crate::block_parser::ReferenceRegistry;
+use crate::inline_parser::parse_inline_text;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -13,6 +17,15 @@ use rowan::GreenNodeBuilder;
 use crate::block_parser::attributes::{
     AttributeBlock, emit_attributes, try_parse_trailing_attributes,
 };
+
+/// Helper to normalize a reference label (lowercase, collapse whitespace)
+fn normalize_label(label: &str) -> String {
+    label
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
 
 /// Try to parse an inline image starting at the current position.
 ///
@@ -320,6 +333,290 @@ pub fn emit_inline_link(builder: &mut GreenNodeBuilder, _text: &str, link_text: 
     builder.finish_node();
 }
 
+/// Try to parse a reference link starting at the current position.
+///
+/// Reference links have three forms:
+/// - Explicit: `[text][label]`
+/// - Implicit: `[text][]` (label = text)
+/// - Shortcut: `[text]` (if shortcut_reference_links enabled)
+///
+/// Returns Some((length, text_content, label, is_shortcut)) if a valid reference link is found.
+/// The label is what should be looked up in the registry.
+pub fn try_parse_reference_link(
+    text: &str,
+    allow_shortcut: bool,
+) -> Option<(usize, &str, String, bool)> {
+    if !text.starts_with('[') {
+        return None;
+    }
+
+    // Find the closing ] for the text
+    let mut bracket_depth = 0;
+    let mut escape_next = false;
+    let mut close_bracket_pos = None;
+
+    for (i, ch) in text[1..].char_indices() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+
+        match ch {
+            '\\' => escape_next = true,
+            '[' => bracket_depth += 1,
+            ']' => {
+                if bracket_depth == 0 {
+                    close_bracket_pos = Some(i + 1);
+                    break;
+                }
+                bracket_depth -= 1;
+            }
+            _ => {}
+        }
+    }
+
+    let close_bracket = close_bracket_pos?;
+    let link_text = &text[1..close_bracket];
+
+    // Check what follows the ]
+    let after_bracket = close_bracket + 1;
+
+    // Check if followed by ( - if so, this is an inline link, not a reference link
+    if after_bracket < text.len() && text[after_bracket..].starts_with('(') {
+        return None;
+    }
+
+    // Check for explicit reference [text][label] or implicit [text][]
+    if after_bracket < text.len() && text[after_bracket..].starts_with('[') {
+        // Find the closing ] for the label
+        let label_start = after_bracket + 1;
+        let mut label_end = None;
+
+        for (i, ch) in text[label_start..].char_indices() {
+            if ch == ']' {
+                label_end = Some(i + label_start);
+                break;
+            }
+            // Labels can't contain newlines
+            if ch == '\n' {
+                return None;
+            }
+        }
+
+        let label_end = label_end?;
+        let label = &text[label_start..label_end];
+
+        // Total length includes both bracket pairs
+        let total_len = label_end + 1;
+
+        // Implicit reference: empty label means use text as label
+        if label.is_empty() {
+            return Some((total_len, link_text, link_text.to_string(), false));
+        }
+
+        // Explicit reference: use the provided label
+        Some((total_len, link_text, label.to_string(), false))
+    } else if allow_shortcut {
+        // Shortcut reference: [text] with no second bracket pair
+        // The text is both the display text and the label
+        Some((after_bracket, link_text, link_text.to_string(), true))
+    } else {
+        // No second bracket pair and shortcut not allowed - not a reference link
+        None
+    }
+}
+
+/// Emit a reference link node to the builder.
+/// If the reference is found in the registry, use the URL from the definition.
+/// Otherwise, emit as unresolved reference.
+pub fn emit_reference_link(
+    builder: &mut GreenNodeBuilder,
+    link_text: &str,
+    label: &str,
+    registry: &ReferenceRegistry,
+) {
+    builder.start_node(SyntaxKind::Link.into());
+
+    // Opening [
+    builder.start_node(SyntaxKind::LinkStart.into());
+    builder.token(SyntaxKind::LinkStart.into(), "[");
+    builder.finish_node();
+
+    // Link text (recursively parse inline elements)
+    builder.start_node(SyntaxKind::LinkText.into());
+    crate::inline_parser::parse_inline_text(builder, link_text);
+    builder.finish_node();
+
+    // Closing ]
+    builder.token(SyntaxKind::TEXT.into(), "]");
+
+    // Try to resolve the reference
+    if let Some(def) = registry.get(label) {
+        // Found definition - emit as resolved link
+        // Format: [text](resolved_url)
+        builder.token(SyntaxKind::TEXT.into(), "(");
+
+        builder.start_node(SyntaxKind::LinkDest.into());
+        builder.token(SyntaxKind::TEXT.into(), &def.url);
+        if let Some(title) = &def.title {
+            builder.token(SyntaxKind::TEXT.into(), " \"");
+            builder.token(SyntaxKind::TEXT.into(), title);
+            builder.token(SyntaxKind::TEXT.into(), "\"");
+        }
+        builder.finish_node();
+
+        builder.token(SyntaxKind::TEXT.into(), ")");
+    } else {
+        // Unresolved reference - emit the reference label
+        builder.token(SyntaxKind::TEXT.into(), "[");
+        builder.start_node(SyntaxKind::LinkRef.into());
+        builder.token(SyntaxKind::TEXT.into(), label);
+        builder.finish_node();
+        builder.token(SyntaxKind::TEXT.into(), "]");
+    }
+
+    builder.finish_node();
+}
+
+/// Try to parse a reference-style image: `![alt][ref]`, `![alt][]`, or `![alt]`
+/// Returns (total_len, alt_text, label, is_shortcut) if successful.
+pub fn try_parse_reference_image(
+    text: &str,
+    allow_shortcut: bool,
+) -> Option<(usize, &str, String, bool)> {
+    let bytes = text.as_bytes();
+    if bytes.len() < 4 || bytes[0] != b'!' || bytes[1] != b'[' {
+        return None;
+    }
+
+    let mut pos = 2;
+    let mut bracket_depth = 1;
+    let alt_start = pos;
+
+    // Find the end of the alt text (allowing nested brackets)
+    while pos < bytes.len() && bracket_depth > 0 {
+        match bytes[pos] {
+            b'[' => bracket_depth += 1,
+            b']' => bracket_depth -= 1,
+            b'\\' if pos + 1 < bytes.len() => pos += 1, // skip escaped char
+            _ => {}
+        }
+        pos += 1;
+    }
+
+    if bracket_depth > 0 {
+        return None; // Unclosed brackets
+    }
+
+    let alt_text = &text[alt_start..pos - 1];
+
+    // Now check for the label part
+    if pos >= bytes.len() {
+        return None;
+    }
+
+    // Explicit reference: `![alt][label]`
+    if bytes[pos] == b'[' {
+        pos += 1;
+        let label_start = pos;
+
+        // Find the end of the label (no nested brackets, no newlines)
+        while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' {
+            pos += 1;
+        }
+
+        if pos >= bytes.len() || bytes[pos] != b']' {
+            return None;
+        }
+
+        let label_text = &text[label_start..pos];
+        pos += 1;
+
+        // Empty label means implicit reference
+        let label = if label_text.is_empty() {
+            normalize_label(alt_text)
+        } else {
+            normalize_label(label_text)
+        };
+
+        return Some((pos, alt_text, label, false));
+    }
+
+    // Shortcut reference: `![alt]` (only if enabled)
+    // BUT not if followed by (url) - that's an inline image
+    if allow_shortcut {
+        // Check if next char is ( - if so, not a reference
+        if pos < bytes.len() && bytes[pos] == b'(' {
+            return None;
+        }
+
+        let label = normalize_label(alt_text);
+        return Some((pos, alt_text, label, true));
+    }
+
+    None
+}
+
+/// Emit a reference image node with registry lookup.
+pub fn emit_reference_image(
+    builder: &mut GreenNodeBuilder,
+    alt_text: &str,
+    label: &str,
+    registry: &crate::block_parser::ReferenceRegistry,
+) {
+    builder.start_node(SyntaxKind::ImageLink.into());
+
+    // Look up the reference in the registry
+    if let Some(def) = registry.get(label) {
+        log::debug!("Resolved reference image: label={}, url={}", label, def.url);
+
+        // Emit as a resolved image
+        builder.start_node(SyntaxKind::ImageLinkStart.into());
+        builder.token(SyntaxKind::ImageLinkStart.into(), "![");
+        builder.finish_node();
+
+        // Alt text (recursively parse inline elements)
+        builder.start_node(SyntaxKind::ImageAlt.into());
+        parse_inline_text(builder, alt_text);
+        builder.finish_node();
+
+        // Closing ] and opening (
+        builder.token(SyntaxKind::TEXT.into(), "](");
+
+        // Destination
+        builder.start_node(SyntaxKind::LinkDest.into());
+        builder.token(SyntaxKind::TEXT.into(), &def.url);
+        builder.finish_node();
+
+        // Title if present
+        if let Some(title) = &def.title {
+            builder.token(SyntaxKind::TEXT.into(), " \"");
+            builder.token(SyntaxKind::TEXT.into(), title);
+            builder.token(SyntaxKind::TEXT.into(), "\"");
+        }
+
+        // Closing )
+        builder.token(SyntaxKind::TEXT.into(), ")");
+    } else {
+        log::debug!("Unresolved reference image: label={}", label);
+
+        // Emit as unresolved (keep original syntax)
+        builder.start_node(SyntaxKind::ImageLinkStart.into());
+        builder.token(SyntaxKind::ImageLinkStart.into(), "![");
+        builder.finish_node();
+
+        builder.start_node(SyntaxKind::ImageAlt.into());
+        parse_inline_text(builder, alt_text);
+        builder.finish_node();
+
+        builder.token(SyntaxKind::TEXT.into(), "][");
+        builder.token(SyntaxKind::TEXT.into(), label);
+        builder.token(SyntaxKind::TEXT.into(), "]");
+    }
+
+    builder.finish_node();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -505,5 +802,115 @@ mod tests {
         let input = "![alt](img.png) {.large}";
         let result = try_parse_inline_image(input);
         assert_eq!(result, Some((15, "alt", "img.png", None)));
+    }
+
+    // Reference link tests
+    #[test]
+    fn test_parse_reference_link_explicit() {
+        let input = "[link text][label]";
+        let result = try_parse_reference_link(input, false);
+        assert_eq!(result, Some((18, "link text", "label".to_string(), false)));
+    }
+
+    #[test]
+    fn test_parse_reference_link_implicit() {
+        let input = "[link text][]";
+        let result = try_parse_reference_link(input, false);
+        assert_eq!(
+            result,
+            Some((13, "link text", "link text".to_string(), false))
+        );
+    }
+
+    #[test]
+    fn test_parse_reference_link_shortcut() {
+        let input = "[link text] rest";
+        let result = try_parse_reference_link(input, true);
+        assert_eq!(
+            result,
+            Some((11, "link text", "link text".to_string(), true))
+        );
+    }
+
+    #[test]
+    fn test_parse_reference_link_shortcut_disabled() {
+        let input = "[link text] rest";
+        let result = try_parse_reference_link(input, false);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_reference_link_not_inline_link() {
+        // Should not match inline links with (url)
+        let input = "[text](url)";
+        let result = try_parse_reference_link(input, true);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_reference_link_with_nested_brackets() {
+        let input = "[outer [inner] text][ref]";
+        let result = try_parse_reference_link(input, false);
+        assert_eq!(
+            result,
+            Some((25, "outer [inner] text", "ref".to_string(), false))
+        );
+    }
+
+    #[test]
+    fn test_parse_reference_link_label_no_newline() {
+        let input = "[text][label\nmore]";
+        let result = try_parse_reference_link(input, false);
+        assert_eq!(result, None);
+    }
+
+    // Reference image tests
+    #[test]
+    fn test_parse_reference_image_explicit() {
+        let input = "![alt text][label]";
+        let result = try_parse_reference_image(input, false);
+        assert_eq!(result, Some((18, "alt text", "label".to_string(), false)));
+    }
+
+    #[test]
+    fn test_parse_reference_image_implicit() {
+        let input = "![alt text][]";
+        let result = try_parse_reference_image(input, false);
+        assert_eq!(
+            result,
+            Some((13, "alt text", "alt text".to_string(), false))
+        );
+    }
+
+    #[test]
+    fn test_parse_reference_image_shortcut() {
+        let input = "![alt text] rest";
+        let result = try_parse_reference_image(input, true);
+        assert_eq!(result, Some((11, "alt text", "alt text".to_string(), true)));
+    }
+
+    #[test]
+    fn test_parse_reference_image_shortcut_disabled() {
+        let input = "![alt text] rest";
+        let result = try_parse_reference_image(input, false);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_reference_image_not_inline() {
+        // Should not match inline images with (url)
+        let input = "![alt](url)";
+        let result = try_parse_reference_image(input, true);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_reference_image_with_nested_brackets() {
+        let input = "![alt [nested] text][ref]";
+        let result = try_parse_reference_image(input, false);
+        assert_eq!(
+            result,
+            Some((25, "alt [nested] text", "ref".to_string(), false))
+        );
     }
 }

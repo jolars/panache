@@ -63,12 +63,14 @@ pub async fn format(input: &str, config: Option<Config>) -> String {
 
     let normalized_input = input.replace("\r\n", "\n");
 
-    // Step 1: Parse blocks to create initial CST
+    // Step 1: Parse blocks to create initial CST and extract reference definitions
     let config = config.unwrap_or_default();
-    let block_tree = block_parser::BlockParser::new(&normalized_input, &config).parse();
+    let (block_tree, reference_registry) =
+        block_parser::BlockParser::new(&normalized_input, &config).parse();
 
     // Step 2: Run inline parser on block content to create final CST
-    let tree = inline_parser::InlineParser::new(block_tree, config.clone()).parse();
+    let tree =
+        inline_parser::InlineParser::new(block_tree, config.clone(), reference_registry).parse();
 
     // Step 3: Format the final CST (with external formatters if configured)
     let out = formatter::format_tree_async(&tree, &config).await;
@@ -105,6 +107,7 @@ pub async fn format_with_defaults(input: &str) -> String {
 pub fn parse(input: &str) -> SyntaxNode {
     let normalized_input = input.replace("\r\n", "\n");
     let config = Config::default();
-    let block_tree = block_parser::BlockParser::new(&normalized_input, &config).parse();
-    inline_parser::InlineParser::new(block_tree, config).parse()
+    let (block_tree, reference_registry) =
+        block_parser::BlockParser::new(&normalized_input, &config).parse();
+    inline_parser::InlineParser::new(block_tree, config, reference_registry).parse()
 }
