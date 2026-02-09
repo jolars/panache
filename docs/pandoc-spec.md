@@ -42,4 +42,4 @@ This specification is split into the following sections:
 
 ## External extensions (Added by other projects)
 
-- [Bookdown extensions](pandoc-spec/bookdown-extensions.md)
+- [Bookdown extensions](pandoc-spec/bookdown-extensions.Rmd)
