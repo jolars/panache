@@ -36,4 +36,3 @@ features = ["release_max_level_info"] # disables debug/trace in release
 [dev-dependencies]
 similar-asserts = "1.7.0"
 tokio = { version = "1", features = ["macros", "rt"] }
-diff = "0.1.13"
