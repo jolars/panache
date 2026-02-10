@@ -292,6 +292,9 @@ cargo clippy -- -D warnings
 cargo fmt -- --check
 ```
 
+You can just run `cargo fmt` directly to fix formatting issues and some clippy
+warnings can be fixed with `cargo clippy --fix` (but review changes carefully).
+
 ### Golden Test System
 
 The project uses snapshot testing via `tests/golden_cases.rs`:
@@ -299,6 +302,8 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 - Each `tests/cases/*` directory contains `input.qmd` and `expected.qmd`
 - Tests verify formatting is idempotent (format twice = format once)
 - Use `UPDATE_EXPECTED=1 cargo test` to update expected outputs (BE CAREFUL)
+- New features should have corresponding test cases added to cover new formatting scenarios.
+- **DO NOT** update expected outputs without verifying that the change is correct and intended. 
 
 ## Key Development Facts
 
@@ -352,12 +357,12 @@ The library exposes two main functions in `src/lib.rs`:
 - Takes optional config (affects which extensions are enabled)
 - Returns rowan SyntaxNode for inspection/debugging
 
-Both functions accept optional config to respect flavor-specific extensions and formatting preferences.
+Both functions accept an optional config to respect flavor-specific extensions and formatting preferences.
 
 ### Formatting Rules
 
 - Default 80 character line width (configurable)
-- **Most formatting behavior will be configurable through .panache.toml**
+- **Most formatting behavior will be configurable through panache.toml**
 - Preserves frontmatter and code blocks
 - Converts setext headings to ATX format
 - Handles Quarto-specific syntax (fenced divs, math blocks)
