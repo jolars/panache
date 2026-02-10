@@ -90,8 +90,8 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ### Emphasis & Formatting ✅
 
-- ✅ `*italic*` and `_italic_` - Full emphasis parsing with proper delimiter rules
-- ✅ `**bold**` and `__bold__` - Strong emphasis with nesting support
+- ✅ `*italic*` and `_italic_`
+- ✅ `**bold**` and `__bold__`
 - ✅ Nested emphasis (e.g., `***bold italic***`)
 - ✅ Overlapping and adjacent emphasis handling
 - ✅ Extension: `intraword_underscores` - `snake_case` handling
@@ -114,9 +114,9 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Inline links `[text](url)`
 - ✅ Automatic links `<http://example.com>`
 - ✅ Nested inline elements in link text (code, emphasis, math)
-- ✅ Reference links `[text][ref]` - **Parsing implemented, integration pending**
-- ✅ Extension: `shortcut_reference_links` - `[ref]` without second `[]` (parser ready, not integrated)
-- ❌ Extension: `link_attributes` - `[text](url){.class}`
+- ✅ Reference links `[text][ref]`
+- ✅ Extension: `shortcut_reference_links` - `[ref]` without second `[]`
+- ✅ Extension: `link_attributes` - `[text](url){.class}`
 - ⏹️ Extension: `implicit_header_references` - `[Heading Name]` links to header (conversion feature, not formatting concern)
 
 ### Images ✅
