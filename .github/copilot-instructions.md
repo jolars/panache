@@ -110,6 +110,9 @@ panache format --config cfg.toml file.qmd # Custom config
 # Parse (show AST for debugging)
 panache parse document.qmd
 panache parse --config cfg.toml file.qmd  # Config affects parsing
+
+# LSP (Language Server Protocol)
+panache lsp  # Starts LSP server on stdin/stdout for editor integration
 ```
 
 ### Debugging with Logging
@@ -162,8 +165,9 @@ the formatting rules.
 
 ```
 src/
-├── main.rs              # CLI entry point with subcommands (format, parse)
+├── main.rs              # CLI entry point with subcommands (format, parse, lsp)
 ├── lib.rs               # Public API with format() and parse() functions
+├── lsp.rs               # Language Server Protocol implementation
 ├── config.rs            # Configuration handling (.panache.toml, flavor, extensions)
 ├── formatter.rs         # Formatter module entry point (public API)
 ├── formatter/
@@ -315,7 +319,43 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 - **textwrap**: Text wrapping functionality
 - **toml**: Configuration file parsing
 - **serde**: Serialization for config structs
+- **tokio**: Async runtime (added `io-std` feature for LSP stdin/stdout)
+- **tower-lsp-server**: Community-maintained LSP framework (v0.23)
 - **log** + **env_logger**: Logging infrastructure (debug builds have DEBUG/TRACE, release builds have INFO only)
+
+### Language Server Protocol (LSP)
+
+panache includes a built-in LSP implementation accessible via `panache lsp`:
+
+**Architecture:**
+- LSP code lives in `src/lsp.rs` (not a separate crate to avoid circular dependencies)
+- Implements `tower_lsp_server::LanguageServer` trait
+- Communicates via stdin/stdout using standard LSP JSON-RPC protocol
+- Uses `tokio::task::spawn_blocking` to handle non-Send `rowan::SyntaxNode` types
+
+**Current Capabilities:**
+- ✅ `textDocument/formatting` - Full document formatting
+- ✅ `textDocument/didOpen/didChange/didClose` - Document tracking (FULL sync mode)
+- ✅ Config discovery from workspace root (`.panache.toml`)
+- ✅ Thread-safe document state management with Arc<Mutex<HashMap>>
+
+**Implementation Details:**
+- Document URIs stored as strings (Uri type doesn't implement Send)
+- Workspace root captured from `InitializeParams.workspace_folders` or deprecated `root_uri`
+- Config loaded per formatting request (no caching yet)
+- Formatting runs in blocking task to avoid Send trait issues
+
+**Future LSP Features** (see TODO.md):
+- Diagnostics, code actions, document symbols, completion, hover, navigation
+- Range formatting, semantic tokens, rename, workspace features
+
+**Testing LSP:**
+```bash
+# Start the server (for manual editor testing)
+./target/release/panache lsp
+
+# Editor configuration examples in README.md (Neovim, VS Code, Helix)
+```
 
 ### Logging Infrastructure
 
@@ -424,6 +464,15 @@ The `docs/playground/` contains a WASM-based web interface:
   - Core orchestration in `core.rs` with `format_node_sync` delegating to modules
   - Placeholder modules exist for future extraction of complex logic (lists, tables, blockquotes)
   - Public API limited to `format_tree()` and `format_tree_async()`
+- LSP implementation in `src/lsp.rs`:
+  - Uses `spawn_blocking` wrapper to handle non-Send rowan types
+  - Document state stored in Arc<Mutex<HashMap<String, String>>>
+  - Config loaded per request from workspace root
+  - Returns to main crate via `io::Result<()>` (no additional error types needed)
+- Config system provides extension flags to enable/disable features
+  - Config fields marked `#[allow(dead_code)]` until features use them
+- Test helpers abstract Config creation to keep tests clean
+- WASM crate depends on main crate - changes affect both
 - Config system provides extension flags to enable/disable features
   - Config fields marked `#[allow(dead_code)]` until features use them
 - Test helpers abstract Config creation to keep tests clean
