@@ -91,7 +91,20 @@ This document tracks implementation status for panache's features.
 
 ---
 
-## Formatter/Parser - Comprehensive Pandoc Feature Coverage
+## Formatter
+
+### Lists
+
+- ❌ **Bullet lists** - Standardize bullet list markers (`-`, `+`, `*`) - How?
+
+### Tables
+
+- ❌ **Simple tables** - Support for formatting tables
+- ❌ **Pipe tables** - Support for formatting GitHub-style tables
+- ❌ **Grid tables** - Support for formatting grid-style tables
+- ❌ **Multiline tables** - Support for formatting tables with multiline cells
+
+Parser - Comprehensive Pandoc Feature Coverage
 
 This section tracks implementation status of Pandoc Markdown features based on the spec files in `docs/pandoc-spec/`.
 
