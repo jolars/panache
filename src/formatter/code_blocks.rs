@@ -208,6 +208,11 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
                 format!("{{{} {}}}", language, format_attributes(&info.attributes))
             }
         }
+        CodeBlockType::Raw { format } => {
+            // Raw block: always preserve exactly as {=format}
+            // No attributes allowed per Pandoc spec
+            format!("{{={}}}", format)
+        }
     }
 }
 
@@ -232,7 +237,7 @@ pub fn collect_code_blocks(tree: &SyntaxNode) -> Vec<(String, String)> {
 
     for node in tree.descendants() {
         if node.kind() == SyntaxKind::CodeBlock {
-            let mut info_string = String::new();
+            let mut info_string_raw = String::new();
             let mut content = String::new();
 
             for child in node.children_with_tokens() {
@@ -243,7 +248,7 @@ pub fn collect_code_blocks(tree: &SyntaxNode) -> Vec<(String, String)> {
                                 if let NodeOrToken::Token(t) = token
                                     && t.kind() == SyntaxKind::CodeInfo
                                 {
-                                    info_string = t.text().to_string().trim().to_lowercase();
+                                    info_string_raw = t.text().to_string();
                                 }
                             }
                         }
@@ -256,6 +261,16 @@ pub fn collect_code_blocks(tree: &SyntaxNode) -> Vec<(String, String)> {
             }
 
             if !content.is_empty() {
+                // Parse info string to check if it's a raw block
+                let info = InfoString::parse(&info_string_raw);
+
+                // Skip raw blocks - they should never be formatted
+                if matches!(info.block_type, CodeBlockType::Raw { .. }) {
+                    continue;
+                }
+
+                // For other blocks, use the info string for language matching
+                let info_string = info_string_raw.trim().to_lowercase();
                 blocks.push((info_string, content));
             }
         }

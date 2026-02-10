@@ -15,6 +15,8 @@ pub enum CodeBlockType {
     DisplayExplicit { classes: Vec<String> },
     /// Executable chunk (Quarto/RMarkdown): ```{python}
     Executable { language: String },
+    /// Raw block for specific output format: ```{=html}
+    Raw { format: String },
     /// No language specified: ```
     Plain,
 }
@@ -80,6 +82,25 @@ impl InfoString {
     }
 
     fn parse_explicit(raw: &str, content: &str) -> Self {
+        // Check for raw attribute FIRST: {=format}
+        // The content should start with '=' and have only alphanumeric chars after
+        let trimmed_content = content.trim();
+        if let Some(format_name) = trimmed_content.strip_prefix('=') {
+            // Validate format name: alphanumeric only, no spaces
+            if !format_name.is_empty()
+                && format_name.chars().all(|c| c.is_alphanumeric())
+                && !format_name.contains(char::is_whitespace)
+            {
+                return InfoString {
+                    raw: raw.to_string(),
+                    block_type: CodeBlockType::Raw {
+                        format: format_name.to_string(),
+                    },
+                    attributes: Vec::new(),
+                };
+            }
+        }
+
         let attrs = Self::parse_attributes(content);
 
         // First non-ID, non-attribute token determines if it's executable or display
@@ -570,5 +591,74 @@ mod tests {
             .any(|(k, v)| k == "startFrom" && v == &Some("100".to_string()));
         assert!(has_id);
         assert!(has_start);
+    }
+
+    #[test]
+    fn test_info_string_raw_html() {
+        let info = InfoString::parse("{=html}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::Raw {
+                format: "html".to_string()
+            }
+        );
+        assert!(info.attributes.is_empty());
+    }
+
+    #[test]
+    fn test_info_string_raw_latex() {
+        let info = InfoString::parse("{=latex}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::Raw {
+                format: "latex".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_info_string_raw_openxml() {
+        let info = InfoString::parse("{=openxml}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::Raw {
+                format: "openxml".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_info_string_raw_ms() {
+        let info = InfoString::parse("{=ms}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::Raw {
+                format: "ms".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_info_string_raw_html5() {
+        let info = InfoString::parse("{=html5}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::Raw {
+                format: "html5".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_info_string_raw_not_combined_with_attrs() {
+        // If there are other attributes with =format, it should not be treated as raw
+        let info = InfoString::parse("{=html .class}");
+        // This should NOT be parsed as raw because there's more than one attribute
+        assert_ne!(
+            info.block_type,
+            CodeBlockType::Raw {
+                format: "html".to_string()
+            }
+        );
     }
 }

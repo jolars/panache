@@ -152,6 +152,8 @@ pub struct Extensions {
     pub markdown_in_html_blocks: bool,
     /// LaTeX commands and environments
     pub raw_tex: bool,
+    /// Generic raw blocks with {=format} syntax
+    pub raw_attribute: bool,
 
     // ===== Escapes and special characters =====
     /// Backslash escapes any symbol
@@ -271,6 +273,7 @@ impl Extensions {
             raw_html: true,
             markdown_in_html_blocks: false,
             raw_tex: true,
+            raw_attribute: true,
 
             // Escapes
             all_symbols_escapable: true,
@@ -392,6 +395,7 @@ impl Extensions {
             raw_html: true,
             markdown_in_html_blocks: false,
             raw_tex: false,
+            raw_attribute: false,
 
             all_symbols_escapable: true,
             escaped_line_breaks: true,

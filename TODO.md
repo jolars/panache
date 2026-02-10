@@ -175,9 +175,9 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Extension: `raw_tex` - Block LaTeX environments (`\begin{tabular}...\end{tabular}`)
 - ⏹️ Extension: `latex_macros` - Expand LaTeX macros (conversion feature, not formatting concern)
 
-### Other Raw ❌
+### Other Raw
 
-- ❌ Extension: `raw_attribute` - Generic raw blocks `{=format}`
+- ⚠️ Extension: `raw_attribute` - Generic raw blocks `{=format}` (blocks ✅, inline spans ❌)
 
 ---
 
