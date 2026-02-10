@@ -114,12 +114,8 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Inline links `[text](url)`
 - ✅ Automatic links `<http://example.com>`
 - ✅ Nested inline elements in link text (code, emphasis, math)
-- 🚧 Reference links `[text][ref]` - **Parsing implemented, integration pending**
-  - ✅ Reference definitions parsed at block level
-  - ✅ Registry threaded through parsers
-  - ✅ Parsing functions and tests complete
-  - ⏸️ Integration blocked (needs inline parser refactoring)
-- ❌ Extension: `shortcut_reference_links` - `[ref]` without second `[]` (parser ready, not integrated)
+- ✅ Reference links `[text][ref]` - **Parsing implemented, integration pending**
+- ✅ Extension: `shortcut_reference_links` - `[ref]` without second `[]` (parser ready, not integrated)
 - ❌ Extension: `link_attributes` - `[text](url){.class}`
 - ⏹️ Extension: `implicit_header_references` - `[Heading Name]` links to header (conversion feature, not formatting concern)
 
