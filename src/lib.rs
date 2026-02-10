@@ -3,6 +3,7 @@ pub mod config;
 pub mod external_formatters;
 pub mod formatter;
 pub mod inline_parser;
+pub mod lsp;
 pub mod syntax;
 
 pub use config::BlankLines;

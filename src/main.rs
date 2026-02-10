@@ -41,6 +41,8 @@ enum Commands {
         /// Input file (stdin if not provided)
         file: Option<PathBuf>,
     },
+    /// Start the Language Server Protocol server
+    Lsp,
 }
 
 fn read_all(path: Option<&PathBuf>) -> io::Result<String> {
@@ -149,6 +151,10 @@ async fn main() -> io::Result<()> {
                 print!("{output}");
             }
 
+            Ok(())
+        }
+        Commands::Lsp => {
+            panache::lsp::run().await?;
             Ok(())
         }
     }

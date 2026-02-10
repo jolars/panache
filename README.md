@@ -16,19 +16,110 @@ cargo install --path .
 
 ## Usage
 
+### CLI Formatting
+
 ```bash
 # Format a file and output to stdout
-panache document.qmd
+panache format document.qmd
 
 # Format a file in place
-panache --write document.qmd
+panache format --write document.qmd
 
 # Check if a file is formatted
-panache --check document.qmd
+panache format --check document.qmd
 
 # Format from stdin
-panache document.qmd | cat
+cat document.qmd | panache format
+
+# Parse and inspect the AST (for debugging)
+panache parse document.qmd
 ```
+
+### Language Server (LSP)
+
+panache includes a built-in Language Server Protocol implementation for editor integration.
+
+**Start the server:**
+```bash
+panache lsp
+```
+
+**Editor Configuration:**
+
+The LSP communicates over stdin/stdout and provides document formatting capabilities.
+
+<details>
+<summary>Neovim (using nvim-lspconfig)</summary>
+
+```lua
+-- Add to your LSP config
+local lspconfig = require('lspconfig')
+local configs = require('lspconfig.configs')
+
+-- Define panache LSP
+if not configs.panache then
+  configs.panache = {
+    default_config = {
+      cmd = { 'panache', 'lsp' },
+      filetypes = { 'quarto', 'markdown', 'rmarkdown' },
+      root_dir = lspconfig.util.root_pattern('.panache.toml', 'panache.toml', '.git'),
+      settings = {},
+    },
+  }
+end
+
+-- Enable it
+lspconfig.panache.setup{}
+```
+
+Format on save:
+```lua
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = { '*.qmd', '*.md', '*.rmd' },
+  callback = function()
+    vim.lsp.buf.format({ async = false })
+  end,
+})
+```
+</details>
+
+<details>
+<summary>VS Code</summary>
+
+Install a generic LSP client extension like [vscode-languageserver-node](https://marketplace.visualstudio.com/items?itemName=Microsoft.vscode-languageserver-node), then configure in `settings.json`:
+
+```json
+{
+  "languageServerExample.server": {
+    "command": "panache",
+    "args": ["lsp"],
+    "filetypes": ["quarto", "markdown", "rmarkdown"]
+  },
+  "editor.formatOnSave": true
+}
+```
+
+Or use the [Custom LSP](https://marketplace.visualstudio.com/items?itemName=josa.custom-lsp) extension.
+</details>
+
+<details>
+<summary>Helix</summary>
+
+Add to `~/.config/helix/languages.toml`:
+
+```toml
+[[language]]
+name = "markdown"
+language-servers = ["panache-lsp"]
+auto-format = true
+
+[language-server.panache-lsp]
+command = "panache"
+args = ["lsp"]
+```
+</details>
+
+**Configuration:** The LSP automatically discovers `.panache.toml` from your workspace root.
 
 ## Configuration
 
