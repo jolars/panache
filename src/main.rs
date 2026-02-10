@@ -2,48 +2,13 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use similar::{ChangeTag, TextDiff};
 
 use panache::{format, parse};
 
-#[derive(Parser)]
-#[command(name = "panache")]
-#[command(version = env!("CARGO_PKG_VERSION"))]
-#[command(about = "A formatter for Quarto documents")]
-#[command(arg_required_else_help = true)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-
-    /// Path to config file
-    #[arg(long, global = true)]
-    config: Option<PathBuf>,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// Format a Quarto document
-    Format {
-        /// Input file (stdin if not provided)
-        file: Option<PathBuf>,
-
-        /// Check if files are formatted without making changes
-        #[arg(long)]
-        check: bool,
-
-        /// Format files in place
-        #[arg(long)]
-        write: bool,
-    },
-    /// Parse and display the AST tree for debugging
-    Parse {
-        /// Input file (stdin if not provided)
-        file: Option<PathBuf>,
-    },
-    /// Start the Language Server Protocol server
-    Lsp,
-}
+mod cli;
+use cli::{Cli, Commands};
 
 fn read_all(path: Option<&PathBuf>) -> io::Result<String> {
     match path {
