@@ -241,7 +241,10 @@ impl<'a> BlockParser<'a> {
                     Some(Container::ListItem { .. })
                     | Some(Container::List { .. })
                     | Some(Container::FootnoteDefinition { .. })
-                    | Some(Container::Paragraph { .. }) => {
+                    | Some(Container::Paragraph { .. })
+                    | Some(Container::Definition { .. })
+                    | Some(Container::DefinitionItem { .. })
+                    | Some(Container::DefinitionList { .. }) => {
                         log::trace!(
                             "Closing container at blank line (depth {})",
                             self.containers.depth()
@@ -411,7 +414,7 @@ impl<'a> BlockParser<'a> {
         let next_marker = try_parse_list_marker(next_inner, self.config);
 
         let mut keep_level = 0;
-        let mut footnote_indent_so_far = 0usize;
+        let mut content_indent_so_far = 0usize;
 
         // First, account for blockquotes
         for (i, c) in self.containers.stack.iter().enumerate() {
@@ -428,9 +431,16 @@ impl<'a> BlockParser<'a> {
                 }
                 Container::FootnoteDefinition { content_col, .. } => {
                     // Track footnote indent for nested containers
-                    footnote_indent_so_far += *content_col;
+                    content_indent_so_far += *content_col;
                     // Footnote continuation: line must be indented at least 4 spaces
                     // (or at the content column if content started after marker)
+                    let min_indent = (*content_col).max(4);
+                    if raw_indent_cols >= min_indent {
+                        keep_level = i + 1;
+                    }
+                }
+                Container::Definition { content_col } => {
+                    // Definition continuation: line must be indented at least 4 spaces
                     let min_indent = (*content_col).max(4);
                     if raw_indent_cols >= min_indent {
                         keep_level = i + 1;
@@ -441,7 +451,7 @@ impl<'a> BlockParser<'a> {
                     base_indent_cols,
                 } => {
                     // Adjust indent for footnote context
-                    let effective_indent = raw_indent_cols.saturating_sub(footnote_indent_so_far);
+                    let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
                     let continues_list = if let Some((ref nm, _, _)) = next_marker {
                         markers_match(marker, nm) && effective_indent <= base_indent_cols + 3
                     } else {
@@ -469,13 +479,14 @@ impl<'a> BlockParser<'a> {
         keep_level
     }
 
-    /// Get the total indentation to strip from footnote containers in the stack.
-    fn footnote_indent_to_strip(&self) -> usize {
+    /// Get the total indentation to strip from content containers (footnotes + definitions).
+    fn content_container_indent_to_strip(&self) -> usize {
         self.containers
             .stack
             .iter()
             .filter_map(|c| match c {
                 Container::FootnoteDefinition { content_col, .. } => Some(*content_col),
+                Container::Definition { content_col } => Some(*content_col),
                 _ => None,
             })
             .sum()
@@ -484,11 +495,11 @@ impl<'a> BlockParser<'a> {
     /// Parse content inside blockquotes (or at top level).
     fn parse_inner_content(&mut self, content: &str) -> bool {
         // Strip footnote indentation from all footnote containers in the stack
-        let footnote_indent = self.footnote_indent_to_strip();
-        let content = if footnote_indent > 0 {
+        let content_indent = self.content_container_indent_to_strip();
+        let content = if content_indent > 0 {
             let (indent_cols, _) = leading_indent(content);
-            if indent_cols >= footnote_indent {
-                let idx = byte_index_at_column(content, footnote_indent);
+            if indent_cols >= content_indent {
+                let idx = byte_index_at_column(content, content_indent);
                 &content[idx..]
             } else {
                 content.trim_start()
@@ -636,7 +647,7 @@ impl<'a> BlockParser<'a> {
                 self.pos,
                 fence,
                 bq_depth,
-                footnote_indent,
+                content_indent,
             );
             self.pos = new_pos;
             return true;
@@ -721,7 +732,7 @@ impl<'a> BlockParser<'a> {
                 &self.lines,
                 self.pos,
                 bq_depth,
-                footnote_indent,
+                content_indent,
             );
             self.pos = new_pos;
             return true;

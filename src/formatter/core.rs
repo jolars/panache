@@ -177,6 +177,68 @@ impl Formatter {
         marker_padding + marker.len() + spaces_after + checkbox_width
     }
 
+    /// Format a code block that is a continuation of a definition or list item.
+    /// Adds indentation prefix to each line of the fenced code block.
+    fn format_indented_code_block(&mut self, node: &SyntaxNode, indent: usize) {
+        let indent_str = " ".repeat(indent);
+
+        // Collect code block parts
+        let mut info_string_raw = String::new();
+        let mut content = String::new();
+
+        for child in node.children_with_tokens() {
+            if let NodeOrToken::Node(n) = child {
+                match n.kind() {
+                    SyntaxKind::CodeFenceOpen => {
+                        for token in n.children_with_tokens() {
+                            if let NodeOrToken::Token(t) = token
+                                && t.kind() == SyntaxKind::CodeInfo
+                            {
+                                info_string_raw = t.text().to_string();
+                            }
+                        }
+                    }
+                    SyntaxKind::CodeContent => {
+                        content = n.text().to_string();
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Determine fence style
+        let fence_char = match self.config.code_blocks.fence_style {
+            crate::config::FenceStyle::Backtick => '`',
+            crate::config::FenceStyle::Tilde => '~',
+            crate::config::FenceStyle::Preserve => '`',
+        };
+        let fence_length = 3.max(self.config.code_blocks.min_fence_length);
+
+        // Output opening fence with indent
+        self.output.push_str(&indent_str);
+        for _ in 0..fence_length {
+            self.output.push(fence_char);
+        }
+        if !info_string_raw.is_empty() {
+            self.output.push_str(&info_string_raw);
+        }
+        self.output.push('\n');
+
+        // Output content lines with indent
+        for line in content.lines() {
+            self.output.push_str(&indent_str);
+            self.output.push_str(line);
+            self.output.push('\n');
+        }
+
+        // Output closing fence with indent
+        self.output.push_str(&indent_str);
+        for _ in 0..fence_length {
+            self.output.push(fence_char);
+        }
+        self.output.push('\n');
+    }
+
     /// Format a paragraph that is a continuation of a list item.
     /// Strips existing indentation from the text and applies the correct list item indentation.
     fn format_list_continuation_paragraph(&mut self, node: &SyntaxNode, indent: usize) {
@@ -837,7 +899,10 @@ impl Formatter {
 
             SyntaxKind::Definition => {
                 // Format definition with marker and content
+                // Definition content is indented 4 spaces from the margin
+                let def_indent = indent + 4;
                 self.output.push_str(":   ");
+
                 for child in node.children_with_tokens() {
                     match child {
                         NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::TEXT => {
@@ -853,7 +918,29 @@ impl Formatter {
                             // Skip - we normalize spacing
                         }
                         NodeOrToken::Node(n) => {
-                            self.format_node_sync(&n, indent + 4);
+                            // Handle continuation content with proper indentation
+                            match n.kind() {
+                                SyntaxKind::CodeBlock => {
+                                    // Add blank line before code block if needed
+                                    if !self.output.ends_with("\n\n") {
+                                        self.output.push('\n');
+                                    }
+                                    self.format_indented_code_block(&n, def_indent);
+                                }
+                                SyntaxKind::PARAGRAPH => {
+                                    // Add blank line before continuation paragraph if needed
+                                    if !self.output.ends_with("\n\n") {
+                                        self.output.push('\n');
+                                    }
+                                    self.format_list_continuation_paragraph(&n, def_indent);
+                                }
+                                SyntaxKind::BlankLine => {
+                                    // Blank lines are handled by the newline logic above
+                                }
+                                _ => {
+                                    self.format_node_sync(&n, def_indent);
+                                }
+                            }
                         }
                         _ => {}
                     }
