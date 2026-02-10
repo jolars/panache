@@ -6,7 +6,7 @@ use std::path::PathBuf;
 #[command(author, version)]
 #[command(about = "A formatter for Quarto, Pandoc, and Markdown documents")]
 #[command(
-    long_about = "Panache is a CLI formatter for Quarto (.qmd), Pandoc, and Markdown files \
+    long_about = "Panache is a CLI formatter and LSP for Quarto (.qmd), Pandoc, and Markdown files \
     written in Rust. It understands Quarto/Pandoc-specific syntax that other formatters like \
     Prettier and mdformat struggle with, including fenced divs, tables, and math formatting."
 )]
