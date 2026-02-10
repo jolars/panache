@@ -64,6 +64,32 @@ This document tracks implementation status for panache's features.
 
 ---
 
+## Configuration System
+
+### Current Features
+- ✅ Hierarchical config loading (explicit → local → XDG → defaults)
+- ✅ Auto-detect flavor from file extension (.qmd → Quarto, .Rmd → RMarkdown)
+- ✅ `flavor` config field affects .md files and stdin
+- ✅ Global `[extensions]` overrides for all flavors
+- ✅ `[formatters]` configuration for external code formatters
+
+### Future Enhancements
+
+#### Per-Flavor Extension Configuration
+- ❌ **Per-flavor extension overrides** - `[extensions.gfm]`, `[extensions.quarto]`, `[extensions.rmarkdown]`, etc.
+  - Allow fine-grained control of extensions for specific flavors
+  - Example: Enable `task_lists` only for GFM, disable `citations` for CommonMark
+  - Falls back to global `[extensions]` settings when not specified
+
+#### Per-File Pattern Overrides
+- ❌ **Glob pattern flavor overrides** - `[flavor_overrides]` with file patterns
+  - Override flavor for specific files or patterns
+  - Example: `"README.md" = "gfm"` or `"docs/**/*.md" = "gfm"`
+  - Useful for projects with mixed Markdown files (e.g., README.md as GFM, docs as Pandoc)
+  - Could potentially extend to per-pattern extension overrides: `[pattern_overrides."docs/**/*.md".extensions]`
+
+---
+
 ## Formatter/Parser - Comprehensive Pandoc Feature Coverage
 
 This section tracks implementation status of Pandoc Markdown features based on the spec files in `docs/pandoc-spec/`.
