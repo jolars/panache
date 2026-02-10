@@ -8,6 +8,7 @@ use super::code_blocks;
 use super::headings;
 use super::inline;
 use super::paragraphs;
+use super::tables;
 use super::utils::is_block_element;
 use super::wrapping;
 
@@ -1018,20 +1019,9 @@ impl Formatter {
             }
 
             SyntaxKind::PipeTable => {
-                // Handle pipe table with proper caption formatting
-                for child in node.children() {
-                    match child.kind() {
-                        SyntaxKind::TableCaption => {
-                            // Re-add the "Table:" prefix
-                            self.output.push_str("Table: ");
-                            self.output.push_str(&child.text().to_string());
-                        }
-                        _ => {
-                            // For other table parts, preserve as-is
-                            self.output.push_str(&child.text().to_string());
-                        }
-                    }
-                }
+                // Format pipe table with proper alignment
+                let formatted = tables::format_pipe_table(node, &self.config);
+                self.output.push_str(&formatted);
             }
 
             SyntaxKind::InlineMath => {

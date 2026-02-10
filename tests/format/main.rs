@@ -17,4 +17,5 @@ mod spans;
 mod strikeout;
 mod subscript;
 mod superscript;
+mod tables;
 mod tex;

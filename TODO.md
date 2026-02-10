@@ -105,7 +105,7 @@ This document tracks implementation status for panache's features.
 ### Tables
 
 - ❌ **Simple tables** - Support for formatting tables
-- ❌ **Pipe tables** - Support for formatting GitHub-style tables
+- ✅ **Pipe tables** - Support for formatting GitHub-style tables
 - ❌ **Grid tables** - Support for formatting grid-style tables
 - ❌ **Multiline tables** - Support for formatting tables with multiline cells
 
