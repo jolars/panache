@@ -50,3 +50,8 @@ Term 2 with *inline markup*
 
     Third paragraph of definition 2, quite long so that it wraps multiple lines
     and should be wrapped and indented properly.
+
+Term 3
+:   Definition with lazy continuation.
+
+    Second paragraph of the definition.
