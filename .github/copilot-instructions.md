@@ -268,6 +268,46 @@ crates/
 - `Taskfile.yml`: Task runner commands (go-task) - NOT available in CI
 - `devenv.nix`: Nix development environment setup
 
+### Documentation Site
+
+The project has a Quarto-based documentation site in the `docs/` directory:
+
+```
+docs/
+├── _quarto.yml          # Quarto configuration (site metadata, navigation)
+├── index.qmd            # Homepage with project overview
+├── getting-started.qmd  # Installation and basic usage
+├── cli-reference.qmd    # CLI subcommands and options
+├── lsp-setup.qmd        # Language Server setup for editors
+├── configuration.qmd    # .panache.toml reference
+├── features.qmd         # Supported syntax and formatting rules
+├── playground/          # WASM-based web playground for live formatting
+│   └── index.html       # Uses TypeScript bindings from panache-wasm
+├── pandoc-spec.md       # Index of Pandoc syntax specification
+└── pandoc-spec/         # Individual spec files for each syntax element
+    ├── paragraphs.md
+    ├── headings.md
+    ├── lists.md
+    ├── tables.md
+    └── ...
+```
+
+**Structure:**
+- **User guides**: Installation, CLI usage, LSP setup, configuration, feature showcase
+- **pandoc-spec/**: Reference docs for Pandoc syntax (used during development)
+- **playground/**: Interactive WASM-based formatter demo
+- **Published**: GitHub Pages via `docs.yml` workflow at https://jolars.github.io/panache/
+
+**Building the docs:**
+```bash
+# Requires Quarto installed
+cd docs
+quarto preview  # Live preview
+quarto render   # Build to _site/
+```
+
+**Note:** The README.md in the repo root contains the canonical documentation content.
+
 ## CI/CD and Validation Pipeline
 
 ### GitHub Actions Workflows
