@@ -269,9 +269,24 @@ pub fn collect_code_blocks(tree: &SyntaxNode) -> Vec<(String, String)> {
                     continue;
                 }
 
-                // For other blocks, use the info string for language matching
-                let info_string = info_string_raw.trim().to_lowercase();
-                blocks.push((info_string, content));
+                // Extract language from the parsed info string for matching with formatters
+                let lang_key = match &info.block_type {
+                    CodeBlockType::Executable { language } => language.to_lowercase(),
+                    CodeBlockType::DisplayShortcut { language } => language.to_lowercase(),
+                    CodeBlockType::DisplayExplicit { classes } => {
+                        // Use first class as language (e.g., {.python})
+                        classes
+                            .first()
+                            .map(|c| c.to_lowercase())
+                            .unwrap_or_default()
+                    }
+                    CodeBlockType::Plain => String::new(),
+                    CodeBlockType::Raw { .. } => unreachable!(), // Already filtered above
+                };
+
+                if !lang_key.is_empty() {
+                    blocks.push((lang_key, content));
+                }
             }
         }
     }
