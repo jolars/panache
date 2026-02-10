@@ -27,13 +27,14 @@ This document tracks implementation status for panache's features.
 - ❌ **Lint warnings** - Configurable linting rules (e.g., heading levels, list consistency)
 - ❌ **Link validation** - Check for broken internal links/references
 - ❌ **Citation validation** - Validate citation keys against bibliography
+- ❌ **Footnote validation** - Check for undefined footnotes
 
 #### Code Actions
 - ❌ **Convert heading styles** - Convert between ATX/Setext headings
 - ❌ **Fix list formatting** - Convert between bullet/ordered lists
-- ❌ **Normalize table** - Reformat table with proper alignment
-- ❌ **Add missing alt text** - Quick fix for images without alt text
+- ❌ **Convert table** - Convert between table styles (simple, pipe, grid)
 - ❌ **Convert link styles** - Convert between inline/reference links
+- ❌ **Convert footnote styles** - Convert between inline/reference footnotes
 
 #### Navigation & Symbols
 - ❌ **Document outline** - `textDocument/documentSymbol` for headings tree
