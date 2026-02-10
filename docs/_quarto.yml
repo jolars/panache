@@ -1,5 +1,8 @@
 project:
   type: website
+  pre-render: filters/pre-render.lua
+  preview:
+    port: 4200
 
 website:
   title: "panache"
@@ -8,6 +11,17 @@ website:
   repo-url: "https://github.com/jolars/panache"
   repo-actions: [edit, issue]
   search: true
+
+  open-graph:
+    title: "panache - A code formatter and LSP server for Pandoc, Quarto, and RMarkdown documents"
+    locale: en_US
+
+  page-footer:
+    left: "panache v{{< meta version >}} | Copyright 2026, Johan Larsson"
+    right:
+      - icon: github
+        href: "https://github.com/jolars/panache"
+        aria-label: "Source for this webpage"
 
   navbar:
     left:
@@ -19,9 +33,20 @@ website:
 resources:
   - "playground/**"
 
+highlight-style: breeze
+
 format:
   html:
     toc: true
     theme: cosmo
+    css: styles.css
+    html-math-method: katex
+    pagetitle: "{{< meta title >}}"
+    include-in-header:
+      file: header.html
 
-date-format: long
+toc: true
+date-format: "D MMMM YYYY"
+
+filters:
+  - filters/pre-render.lua
