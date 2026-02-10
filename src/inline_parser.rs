@@ -311,10 +311,17 @@ pub fn parse_inline_text(
 
         // Try to parse inline link
         if bytes[pos] == b'['
-            && let Some((len, link_text, dest)) = try_parse_inline_link(&text[pos..])
+            && let Some((len, link_text, dest, attributes)) = try_parse_inline_link(&text[pos..])
         {
             log::debug!("Matched inline link at pos {}: dest={}", pos, dest);
-            emit_inline_link(builder, &text[pos..pos + len], link_text, dest, config);
+            emit_inline_link(
+                builder,
+                &text[pos..pos + len],
+                link_text,
+                dest,
+                attributes,
+                config,
+            );
             pos += len;
             continue;
         }

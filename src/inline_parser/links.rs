@@ -3,6 +3,7 @@
 //! Implements:
 //! - Automatic links: `<http://example.com>` and `<user@example.com>`
 //! - Inline links: `[text](url)` and `[text](url "title")`
+//! - Link attributes: `[text](url){#id .class key=value}`
 //! - Inline images: `![alt](url)` and `![alt](url "title")`
 //! - Image attributes: `![alt](url){#id .class key=value}`
 //! - Reference links: `[text][ref]`, `[text][]`, `[text]`
@@ -217,8 +218,9 @@ pub fn emit_autolink(builder: &mut GreenNodeBuilder, _text: &str, url: &str) {
 /// Try to parse an inline link starting at the current position.
 ///
 /// Inline links have the form `[text](url)` or `[text](url "title")`.
-/// Returns Some((length, text_content, dest_content)) if a valid link is found.
-pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str)> {
+/// Can also have trailing attributes: `[text](url){#id .class}`.
+/// Returns Some((length, text_content, dest_content, attributes)) if a valid link is found.
+pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str, Option<AttributeBlock>)> {
     if !text.starts_with('[') {
         return None;
     }
@@ -290,10 +292,23 @@ pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str)> {
     let close_paren = close_paren_pos?;
     let dest_content = &remaining[..close_paren];
 
-    // Total length: [ + text + ] + ( + dest + )
-    let total_len = dest_start + close_paren + 1;
+    // Check for trailing attributes {#id .class key=value}
+    let after_paren = dest_start + close_paren + 1;
+    let after_close = &text[after_paren..];
 
-    Some((total_len, link_text, dest_content))
+    if let Some((attrs, _)) = try_parse_trailing_attributes(after_close) {
+        // Attributes must start immediately after closing paren (no space)
+        if after_close.starts_with('{') {
+            // Calculate total length including attributes
+            let attr_len = after_close.find('}').map(|i| i + 1).unwrap_or(0);
+            let total_len = after_paren + attr_len;
+            return Some((total_len, link_text, dest_content, Some(attrs)));
+        }
+    }
+
+    // No attributes, just return the link
+    let total_len = after_paren;
+    Some((total_len, link_text, dest_content, None))
 }
 
 /// Emit an inline link node to the builder.
@@ -303,6 +318,7 @@ pub fn emit_inline_link(
     _text: &str,
     link_text: &str,
     dest: &str,
+    attributes: Option<AttributeBlock>,
     config: &Config,
 ) {
     builder.start_node(SyntaxKind::Link.into());
@@ -328,6 +344,11 @@ pub fn emit_inline_link(
 
     // Closing )
     builder.token(SyntaxKind::TEXT.into(), ")");
+
+    // Emit attributes if present
+    if let Some(attrs) = attributes {
+        emit_attributes(builder, &attrs);
+    }
 
     builder.finish_node();
 }
@@ -643,21 +664,21 @@ mod tests {
     fn test_parse_inline_link_simple() {
         let input = "[text](url)";
         let result = try_parse_inline_link(input);
-        assert_eq!(result, Some((11, "text", "url")));
+        assert_eq!(result, Some((11, "text", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_with_title() {
         let input = r#"[text](url "title")"#;
         let result = try_parse_inline_link(input);
-        assert_eq!(result, Some((19, "text", r#"url "title""#)));
+        assert_eq!(result, Some((19, "text", r#"url "title""#, None)));
     }
 
     #[test]
     fn test_parse_inline_link_with_nested_brackets() {
         let input = "[outer [inner] text](url)";
         let result = try_parse_inline_link(input);
-        assert_eq!(result, Some((25, "outer [inner] text", "url")));
+        assert_eq!(result, Some((25, "outer [inner] text", "url", None)));
     }
 
     #[test]
@@ -685,14 +706,14 @@ mod tests {
     fn test_parse_inline_link_escaped_bracket() {
         let input = r"[text\]more](url)";
         let result = try_parse_inline_link(input);
-        assert_eq!(result, Some((17, r"text\]more", "url")));
+        assert_eq!(result, Some((17, r"text\]more", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_parens_in_url() {
         let input = "[text](url(with)parens)";
         let result = try_parse_inline_link(input);
-        assert_eq!(result, Some((23, "text", "url(with)parens")));
+        assert_eq!(result, Some((23, "text", "url(with)parens", None)));
     }
 
     #[test]
@@ -785,6 +806,57 @@ mod tests {
         let input = "![alt](img.png) {.large}";
         let result = try_parse_inline_image(input);
         assert_eq!(result, Some((15, "alt", "img.png", None)));
+    }
+
+    // Link attribute tests
+    #[test]
+    fn test_parse_inline_link_with_id() {
+        let input = "[text](url){#link-1}";
+        let result = try_parse_inline_link(input);
+        let (len, text, dest, attrs) = result.unwrap();
+        assert_eq!(len, 20);
+        assert_eq!(text, "text");
+        assert_eq!(dest, "url");
+        assert!(attrs.is_some());
+        let attrs = attrs.unwrap();
+        assert_eq!(attrs.identifier, Some("link-1".to_string()));
+    }
+
+    #[test]
+    fn test_parse_inline_link_with_full_attributes() {
+        let input = "[text](url){#link .external target=\"_blank\"}";
+        let result = try_parse_inline_link(input);
+        let (len, text, dest, attrs) = result.unwrap();
+        assert_eq!(len, 44);
+        assert_eq!(text, "text");
+        assert_eq!(dest, "url");
+        assert!(attrs.is_some());
+        let attrs = attrs.unwrap();
+        assert_eq!(attrs.identifier, Some("link".to_string()));
+        assert_eq!(attrs.classes, vec!["external"]);
+        assert_eq!(attrs.key_values.len(), 1);
+        assert_eq!(attrs.key_values[0].0, "target");
+    }
+
+    #[test]
+    fn test_parse_inline_link_attributes_must_be_adjacent() {
+        // Space between ) and { should not parse as attributes
+        let input = "[text](url) {.class}";
+        let result = try_parse_inline_link(input);
+        assert_eq!(result, Some((11, "text", "url", None)));
+    }
+
+    #[test]
+    fn test_parse_inline_link_with_title_and_attributes() {
+        let input = r#"[text](url "title"){.external}"#;
+        let result = try_parse_inline_link(input);
+        let (len, text, dest, attrs) = result.unwrap();
+        assert_eq!(len, 30);
+        assert_eq!(text, "text");
+        assert_eq!(dest, r#"url "title""#);
+        assert!(attrs.is_some());
+        let attrs = attrs.unwrap();
+        assert_eq!(attrs.classes, vec!["external"]);
     }
 
     // Reference link tests
