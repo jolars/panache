@@ -102,12 +102,12 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ### Code & Verbatim ✅
 
-- ✅ **Inline code** (`` `code` ``) - Full implementation with delimiter matching
+- ✅ Inline code (`` `code` ``)
 - ✅ Multi-backtick code spans (``` `` ` `` ```)
 - ✅ Code spans containing backticks
 - ✅ Proper whitespace preservation in code spans
-- ✅ **Fenced code blocks** (``` and ~~~) - Full implementation
-- ✅ **Indented code blocks** (4 spaces or 1 tab) - Full implementation with blockquote support
+- ✅ Fenced code blocks (``` and ~~~)
+- ✅ Indented code blocks\*\* (4 spaces or 1 tab)
 
 ### Links ✅
 
@@ -123,23 +123,21 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 - ✅ Inline images `![alt](url)`
 - ✅ Nested inline elements in alt text (code, emphasis, math)
-- 🚧 Reference images `![alt][ref]` - **Parsing implemented, integration pending**
-  - ✅ Parsing functions complete with 7 tests
-  - ⏸️ Same integration blocker as reference links
+- ✅ Reference images `![alt][ref]`
 - ✅ Image attributes `![alt](url){#id .class key=value}`
 - ⏹️ Extension: `implicit_figures` - Conversion feature, not formatting concern
 
 ### Math ✅
 
-- ✅ Inline math `$x = y$` - Full implementation with proper escaping
-- ✅ Display math `$$equation$$` - Block and inline contexts, with proper formatting
+- ✅ Inline math `$x = y$`
+- ✅ Display math `$$equation$$`
 - ✅ Multi-dollar math spans (e.g., `$$$ $$ $$$`)
 - ✅ Math containing special characters
 - ✅ Extension: `tex_math_dollars` - Dollar-delimited math
 
 ### Footnotes ✅
 
-- ✅ Inline footnotes `^[note text]` - Full support with nested inline elements
+- ✅ Inline footnotes `^[note text]`
 - ✅ Reference footnotes `[^1]` with definition block
 - ✅ Extension: `inline_notes` - Inline note syntax
 - ✅ Extension: `footnotes` - Reference-style footnotes
