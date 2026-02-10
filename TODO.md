@@ -1,19 +1,76 @@
-# panache TODO - Comprehensive Pandoc Feature Coverage
+# panache TODO
 
-This document tracks implementation status of Pandoc Markdown features based on the spec files in `docs/pandoc-spec/`.
+This document tracks implementation status for panache's features.
 
-**Focus**: Initial development prioritizes **default Pandoc extensions**. Non-default extensions are tracked separately for future consideration.
-
-## Status Legend
-
+**Status Legend**
 - ✅ **Implemented** - Feature is fully or mostly implemented
 - 🚧 **Partial** - Feature is partially implemented or needs work
 - ❌ **Not Implemented** - Feature not yet started
-- ⏹️ **Won't Implement** - Feature intentionally not implemented (e.g., format-specific output conventions)
+- ⏹️ **Won't Implement** - Feature intentionally not implemented
 
 ---
 
-## Block-Level Elements
+## Language Server Protocol (LSP)
+
+### Core LSP Capabilities
+
+- ✅ `textDocument/formatting` - Full document formatting
+- ✅ `textDocument/didOpen` - Track document opens
+- ✅ `textDocument/didChange` - Track document changes (full sync)
+- ✅ `textDocument/didClose` - Track document closes
+- ✅ Configuration discovery from workspace root (`.panache.toml`)
+
+### Future LSP Features
+
+#### Diagnostics
+- ❌ **Syntax error diagnostics** - Report parsing errors as diagnostics
+- ❌ **Lint warnings** - Configurable linting rules (e.g., heading levels, list consistency)
+- ❌ **Link validation** - Check for broken internal links/references
+- ❌ **Citation validation** - Validate citation keys against bibliography
+
+#### Code Actions
+- ❌ **Convert heading styles** - Convert between ATX/Setext headings
+- ❌ **Fix list formatting** - Convert between bullet/ordered lists
+- ❌ **Normalize table** - Reformat table with proper alignment
+- ❌ **Add missing alt text** - Quick fix for images without alt text
+- ❌ **Convert link styles** - Convert between inline/reference links
+
+#### Navigation & Symbols
+- ❌ **Document outline** - `textDocument/documentSymbol` for headings tree
+- ❌ **Folding ranges** - `textDocument/foldingRange` for headings, lists, code blocks
+- ❌ **Go to definition** - Jump to reference link/footnote/citation definitions
+- ❌ **Find references** - Find all uses of a reference link/footnote/citation
+
+#### Completion
+- ❌ **Citation completion** - `textDocument/completion` for `@cite` keys from bibliography
+- ❌ **Reference link completion** - Complete `[text][ref]` from defined references
+- ❌ **Heading link completion** - Complete internal links to headings
+- ❌ **Attribute completion** - Complete class names and attributes in `{.class #id}`
+
+#### Hover Information
+- ❌ **Link preview** - `textDocument/hover` to show link target
+- ❌ **Reference preview** - Show reference definition on hover
+- ❌ **Citation preview** - Show bibliography entry for citation
+- ❌ **Footnote preview** - Show footnote content inline
+
+#### Advanced
+- ❌ **Range formatting** - `textDocument/rangeFormatting` for selected text only
+- ❌ **On-type formatting** - `textDocument/onTypeFormatting` for auto-formatting triggers
+- ❌ **Document links** - `textDocument/documentLink` for clickable links
+- ❌ **Semantic tokens** - Syntax highlighting via LSP
+- ❌ **Rename** - Rename reference links/footnotes/citations across document
+- ❌ **Workspace symbols** - Search for headings across all workspace documents
+- ❌ **Configuration via LSP** - `workspace/didChangeConfiguration` to reload config
+
+---
+
+## Formatter/Parser - Comprehensive Pandoc Feature Coverage
+
+This section tracks implementation status of Pandoc Markdown features based on the spec files in `docs/pandoc-spec/`.
+
+**Focus**: Initial development prioritizes **default Pandoc extensions**. Non-default extensions are tracked separately for future consideration.
+
+### Block-Level Elements
 
 ### Paragraphs ✅
 
