@@ -13,6 +13,7 @@ mod inline_math;
 mod latex;
 mod links;
 mod native_spans;
+mod raw_inline;
 mod strikeout;
 mod subscript;
 mod superscript;
@@ -44,6 +45,7 @@ use links::{
     try_parse_reference_link,
 };
 use native_spans::{emit_native_span, try_parse_native_span};
+use raw_inline::{emit_raw_inline, is_raw_inline};
 use strikeout::{emit_strikeout, try_parse_strikeout};
 use subscript::{emit_subscript, try_parse_subscript};
 use superscript::{emit_superscript, try_parse_superscript};
@@ -147,16 +149,30 @@ pub fn parse_inline_text(
             continue;
         }
 
-        // Try to parse code span
+        // Try to parse code span or raw inline span
         if bytes[pos] == b'`'
             && let Some((len, content, backtick_count, attributes)) =
                 try_parse_code_span(&text[pos..])
         {
             log::debug!(
-                "Matched code span at pos {}: {} backticks",
+                "Matched code span at pos {}: {} backticks, attributes={:?}",
                 pos,
-                backtick_count
+                backtick_count,
+                attributes
             );
+
+            // Check if this is a raw inline span (has {=format} attribute)
+            if let Some(ref attrs) = attributes
+                && config.extensions.raw_attribute
+                && let Some(format) = is_raw_inline(attrs)
+            {
+                log::debug!("Matched raw inline span at pos {}: format={}", pos, format);
+                emit_raw_inline(builder, content, backtick_count, format);
+                pos += len;
+                continue;
+            }
+
+            // Regular code span
             emit_code_span(builder, content, backtick_count, attributes);
             pos += len;
             continue;

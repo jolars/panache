@@ -177,7 +177,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 
 ### Other Raw
 
-- ⚠️ Extension: `raw_attribute` - Generic raw blocks `{=format}` (blocks ✅, inline spans ❌)
+- ✅ Extension: `raw_attribute` - Generic raw blocks `{=format}` (blocks ✅, inline spans ✅)
 
 ---
 

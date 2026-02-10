@@ -35,6 +35,36 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 attributes
             )
         }
+        SyntaxKind::RawInline => {
+            // Format raw inline span: `content`{=format}
+            let mut content = String::new();
+            let mut backtick_count = 1;
+            let mut format_attr = String::new();
+
+            for child in node.children_with_tokens() {
+                match child {
+                    NodeOrToken::Node(n) if n.kind() == SyntaxKind::Attribute => {
+                        format_attr = n.text().to_string();
+                    }
+                    NodeOrToken::Token(t) => {
+                        if t.kind() == SyntaxKind::RawInlineMarker {
+                            backtick_count = t.text().len();
+                        } else if t.kind() == SyntaxKind::RawInlineContent {
+                            content.push_str(t.text());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            format!(
+                "{}{}{}{}",
+                "`".repeat(backtick_count),
+                content,
+                "`".repeat(backtick_count),
+                format_attr
+            )
+        }
         SyntaxKind::Emphasis => {
             let mut content = String::new();
             for child in node.children_with_tokens() {

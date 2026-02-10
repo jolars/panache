@@ -74,6 +74,12 @@ pub enum SyntaxKind {
     CodeFenceMarker, // ``` or ~~~
     CodeBlock,
 
+    // Raw inline spans
+    RawInline,        // `content`{=format}
+    RawInlineMarker,  // ` markers
+    RawInlineFormat,  // format name (html, latex, etc.)
+    RawInlineContent, // raw content
+
     // Inline emphasis and formatting
     Emphasis,          // *text* or _text_
     Strong,            // **text** or __text__

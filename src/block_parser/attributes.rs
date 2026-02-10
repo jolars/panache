@@ -76,7 +76,19 @@ fn parse_attribute_content(content: &str) -> Option<AttributeBlock> {
         }
 
         // Check what kind of attribute this is
-        if bytes[pos] == b'#' {
+        if bytes[pos] == b'=' {
+            // Special case: {=format} for raw attributes
+            // This is treated as a class ".=format" for compatibility
+            pos += 1; // Skip =
+            let start = pos;
+            while pos < bytes.len() && !bytes[pos].is_ascii_whitespace() && bytes[pos] != b'}' {
+                pos += 1;
+            }
+            if pos > start {
+                // Store as "=format" class (with the = prefix)
+                classes.push(format!("={}", &content[start..pos]));
+            }
+        } else if bytes[pos] == b'#' {
             // Identifier (only take first one)
             if identifier.is_none() {
                 pos += 1; // Skip #
@@ -178,8 +190,14 @@ pub fn emit_attributes(builder: &mut GreenNodeBuilder, attrs: &AttributeBlock) {
         if attr_str.len() > 1 {
             attr_str.push(' ');
         }
-        attr_str.push('.');
-        attr_str.push_str(class);
+        // Special case: if class starts with =, it's a raw format specifier
+        // Emit as {=format} not {.=format}
+        if class.starts_with('=') {
+            attr_str.push_str(class);
+        } else {
+            attr_str.push('.');
+            attr_str.push_str(class);
+        }
     }
 
     for (key, value) in &attrs.key_values {

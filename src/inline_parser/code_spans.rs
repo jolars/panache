@@ -31,13 +31,15 @@ pub fn try_parse_code_span(text: &str) -> Option<(usize, &str, usize, Option<Att
 
                 // Check for trailing attributes {#id .class key=value}
                 let remaining = &text[after_close..];
-                if let Some((attrs, _)) = try_parse_trailing_attributes(remaining) {
-                    // Attributes must start immediately after closing backticks (no space)
-                    if remaining.starts_with('{') {
-                        // Calculate total length including attributes
-                        let attr_len = remaining.find('}').map(|i| i + 1).unwrap_or(0);
-                        let total_len = after_close + attr_len;
-                        return Some((total_len, code_content, opening_backticks, Some(attrs)));
+                if remaining.starts_with('{') {
+                    // Find the closing brace
+                    if let Some(close_brace_pos) = remaining.find('}') {
+                        let attr_text = &remaining[..=close_brace_pos];
+                        // Try to parse as attributes
+                        if let Some((attrs, _)) = try_parse_trailing_attributes(attr_text) {
+                            let total_len = after_close + close_brace_pos + 1;
+                            return Some((total_len, code_content, opening_backticks, Some(attrs)));
+                        }
                     }
                 }
 

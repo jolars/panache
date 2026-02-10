@@ -680,3 +680,166 @@ mod reference_tests {
         assert!(text.contains("![ALT][MyRef]"));
     }
 }
+
+#[cfg(test)]
+mod raw_inline_tests {
+    use crate::block_parser::BlockParser;
+    use crate::config::Config;
+    use crate::inline_parser::InlineParser;
+    use crate::syntax::SyntaxKind;
+
+    fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
+        let config = Config::default();
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
+    }
+
+    fn parse_inline_with_config(input: &str, config: Config) -> crate::syntax::SyntaxNode {
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config, registry).parse()
+    }
+
+    fn find_raw_inline(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut raw_inlines = Vec::new();
+        for child in node.descendants() {
+            if child.kind() == SyntaxKind::RawInline {
+                raw_inlines.push(child.to_string());
+            }
+        }
+        raw_inlines
+    }
+
+    fn find_code_spans(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut code_spans = Vec::new();
+        for child in node.descendants() {
+            if child.kind() == SyntaxKind::CodeSpan {
+                code_spans.push(child.to_string());
+            }
+        }
+        code_spans
+    }
+
+    #[test]
+    fn test_raw_inline_html() {
+        let input = "This is `<a>html</a>`{=html} text.";
+        let inline_tree = parse_inline(input);
+
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 1);
+        assert_eq!(raw_inlines[0], "`<a>html</a>`{=html}");
+    }
+
+    #[test]
+    fn test_raw_inline_latex() {
+        let input = r"This is `\LaTeX`{=latex} formatted.";
+        let inline_tree = parse_inline(input);
+
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 1);
+        assert_eq!(raw_inlines[0], r"`\LaTeX`{=latex}");
+    }
+
+    #[test]
+    fn test_raw_inline_openxml() {
+        let input = "This is `<w:br/>`{=openxml} a pagebreak.";
+        let inline_tree = parse_inline(input);
+
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 1);
+        assert_eq!(raw_inlines[0], "`<w:br/>`{=openxml}");
+    }
+
+    #[test]
+    fn test_raw_inline_with_double_backticks() {
+        let input = "This is `` `backtick` ``{=html} text.";
+        let inline_tree = parse_inline(input);
+
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 1);
+        assert_eq!(raw_inlines[0], "`` `backtick` ``{=html}");
+    }
+
+    #[test]
+    fn test_raw_inline_disabled() {
+        let input = "This is `<a>html</a>`{=html} text.";
+        let mut config = Config::default();
+        config.extensions.raw_attribute = false;
+
+        let inline_tree = parse_inline_with_config(input, config);
+
+        // Should be treated as regular code span with attributes
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 0);
+
+        let code_spans = find_code_spans(&inline_tree);
+        assert_eq!(code_spans.len(), 1);
+        assert_eq!(code_spans[0], "`<a>html</a>`{=html}");
+    }
+
+    #[test]
+    fn test_code_span_with_regular_class() {
+        // Regular code span with .class should not be treated as raw inline
+        let input = "This is `code`{.python} text.";
+        let inline_tree = parse_inline(input);
+
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 0);
+
+        let code_spans = find_code_spans(&inline_tree);
+        assert_eq!(code_spans.len(), 1);
+        assert_eq!(code_spans[0], "`code`{.python}");
+    }
+
+    #[test]
+    fn test_raw_inline_mixed_with_code_spans() {
+        let input = "Regular `code` and raw `<html>`{=html} in one sentence.";
+        let inline_tree = parse_inline(input);
+
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 1);
+        assert_eq!(raw_inlines[0], "`<html>`{=html}");
+
+        let code_spans = find_code_spans(&inline_tree);
+        assert_eq!(code_spans.len(), 1);
+        assert_eq!(code_spans[0], "`code`");
+    }
+
+    #[test]
+    fn test_raw_inline_multiple_formats() {
+        let input = "HTML `<a>`{=html} and LaTeX `\\cmd`{=latex} together.";
+        let inline_tree = parse_inline(input);
+
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 2);
+        assert_eq!(raw_inlines[0], "`<a>`{=html}");
+        assert_eq!(raw_inlines[1], r"`\cmd`{=latex}");
+    }
+
+    #[test]
+    fn test_raw_inline_with_id_not_raw() {
+        // If attributes include ID, it's not a raw inline
+        let input = "This is `code`{#myid =html} text.";
+        let inline_tree = parse_inline(input);
+
+        // Should be code span, not raw inline (because it has an ID)
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 0);
+
+        let code_spans = find_code_spans(&inline_tree);
+        assert_eq!(code_spans.len(), 1);
+    }
+
+    #[test]
+    fn test_raw_inline_with_key_value_not_raw() {
+        // If attributes include key=value, it's not a raw inline
+        let input = "This is `code`{=html key=val} text.";
+        let inline_tree = parse_inline(input);
+
+        // Should be code span, not raw inline
+        let raw_inlines = find_raw_inline(&inline_tree);
+        assert_eq!(raw_inlines.len(), 0);
+
+        let code_spans = find_code_spans(&inline_tree);
+        assert_eq!(code_spans.len(), 1);
+    }
+}
