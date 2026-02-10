@@ -17,6 +17,7 @@ pub enum Flavor {
     /// Quarto-flavored Markdown (Pandoc + Quarto-specific extensions)
     Quarto,
     /// R Markdown (Pandoc + R-specific extensions)
+    #[serde(rename = "rmarkdown")]
     RMarkdown,
     /// GitHub Flavored Markdown
     Gfm,
