@@ -44,7 +44,7 @@ This document tracks implementation status of Pandoc Markdown features based on 
 - ✅ Bullet lists (`-`, `+`, `*`)
 - ✅ Ordered lists (`1.`, `2.`, etc.)
 - ✅ Nested lists
-- 🚧 List item continuation (works but formatter needs improvement)
+- ✅ List item continuation
 - 🚧 Complex nested mixed lists (fragile, needs parser structure improvement)
 - ✅ Extension: `fancy_lists` - Roman numerals, letters `(a)`, `A)`, etc.
 - ❌ Extension: `startnum` - Start ordered lists at arbitrary number (low priority)

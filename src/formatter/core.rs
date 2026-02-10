@@ -139,6 +139,72 @@ impl Formatter {
             .unwrap_or(0)
     }
 
+    /// Calculate the content indentation offset for a list item (marker + padding + space)
+    /// This is the column where the list item's content starts relative to the list's base indent
+    fn calculate_list_item_content_indent(
+        item_node: &SyntaxNode,
+        max_marker_width: usize,
+    ) -> usize {
+        let marker = Self::extract_list_marker(item_node).unwrap_or_default();
+
+        // Calculate marker padding (for right-alignment)
+        let marker_padding = if Self::is_alignable_marker(&marker) && max_marker_width > 0 {
+            max_marker_width.saturating_sub(marker.len())
+        } else {
+            0
+        };
+
+        // Spaces after marker (minimum 1, or 2 for uppercase letter markers)
+        let spaces_after = if marker.len() == 2
+            && marker.starts_with(|c: char| c.is_ascii_uppercase())
+            && marker.ends_with('.')
+        {
+            2
+        } else {
+            1
+        };
+
+        // Check for task checkbox (adds 4 more characters: "[x] ")
+        let has_checkbox = item_node.children_with_tokens().any(|el| {
+            if let NodeOrToken::Token(t) = el {
+                t.kind() == SyntaxKind::TaskCheckbox
+            } else {
+                false
+            }
+        });
+        let checkbox_width = if has_checkbox { 4 } else { 0 };
+
+        marker_padding + marker.len() + spaces_after + checkbox_width
+    }
+
+    /// Format a paragraph that is a continuation of a list item.
+    /// Strips existing indentation from the text and applies the correct list item indentation.
+    fn format_list_continuation_paragraph(&mut self, node: &SyntaxNode, indent: usize) {
+        let text = node.text().to_string();
+        let line_width = self.config.line_width.saturating_sub(indent);
+        let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+
+        match wrap_mode {
+            WrapMode::Preserve => {
+                // Strip existing indentation and apply list item indentation
+                for line in text.lines() {
+                    self.output.push_str(&" ".repeat(indent));
+                    self.output.push_str(line.trim_start());
+                    self.output.push('\n');
+                }
+            }
+            WrapMode::Reflow => {
+                // Wrap with list item indentation
+                let lines = self.wrapped_lines_for_paragraph(node, line_width);
+                for line in lines {
+                    self.output.push_str(&" ".repeat(indent));
+                    self.output.push_str(&line);
+                    self.output.push('\n');
+                }
+            }
+        }
+    }
+
     // The large format_node_sync method - keeping it here for now, can extract later
     #[allow(clippy::too_many_lines)]
     fn format_node_sync(&mut self, node: &SyntaxNode, indent: usize) {
@@ -640,6 +706,7 @@ impl Formatter {
 
                 let mut prev_was_item = false;
                 let mut prev_was_blank = false;
+                let mut last_item_content_indent = 0;
 
                 for child in node.children() {
                     if child.kind() == SyntaxKind::ListItem {
@@ -651,6 +718,10 @@ impl Formatter {
                         }
                         prev_was_item = true;
                         prev_was_blank = false;
+
+                        // Calculate content indent for this list item (marker + space)
+                        last_item_content_indent = indent
+                            + Self::calculate_list_item_content_indent(&child, max_marker_width);
                     }
 
                     // Preserve blank lines between list items
@@ -660,7 +731,13 @@ impl Formatter {
                         continue;
                     }
 
-                    self.format_node_sync(&child, indent);
+                    // Paragraphs that are siblings of ListItems are continuation content
+                    // Format them with the last list item's content indentation
+                    if child.kind() == SyntaxKind::PARAGRAPH && prev_was_item {
+                        self.format_list_continuation_paragraph(&child, last_item_content_indent);
+                    } else {
+                        self.format_node_sync(&child, indent);
+                    }
                 }
 
                 // Pop the max marker width off the stack
