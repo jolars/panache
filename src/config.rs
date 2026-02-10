@@ -692,26 +692,65 @@ fn xdg_config_path() -> Option<PathBuf> {
 /// 2) walk up from start_dir: .panache.toml, panache.toml
 /// 3) XDG: $XDG_CONFIG_HOME/panache/config.toml or ~/.config/panache/config.toml
 /// 4) default config
-pub fn load(explicit: Option<&Path>, start_dir: &Path) -> io::Result<(Config, Option<PathBuf>)> {
-    if let Some(path) = explicit {
+///
+/// Flavor detection logic (when input_file is provided):
+/// - .qmd files: Always use Quarto flavor
+/// - .Rmd files: Always use RMarkdown flavor
+/// - .md files: Use `flavor` from config (defaults to Pandoc)
+/// - Other extensions: Use `flavor` from config
+///
+/// The `flavor` config field determines the default flavor for .md files and stdin.
+pub fn load(
+    explicit: Option<&Path>,
+    start_dir: &Path,
+    input_file: Option<&Path>,
+) -> io::Result<(Config, Option<PathBuf>)> {
+    let (mut cfg, cfg_path) = if let Some(path) = explicit {
         let cfg = read_config(path)?;
-        return Ok((cfg, Some(path.to_path_buf())));
-    }
-
-    if let Some(p) = find_in_tree(start_dir)
+        (cfg, Some(path.to_path_buf()))
+    } else if let Some(p) = find_in_tree(start_dir)
         && let Ok(cfg) = read_config(&p)
     {
-        return Ok((cfg, Some(p)));
-    }
-
-    if let Some(p) = xdg_config_path()
+        (cfg, Some(p))
+    } else if let Some(p) = xdg_config_path()
         && let Ok(cfg) = read_config(&p)
     {
-        return Ok((cfg, Some(p)));
+        (cfg, Some(p))
+    } else {
+        log::debug!("No config file found, using defaults");
+        (Config::default(), None)
+    };
+
+    // Detect flavor from file extension
+    if let Some(input_path) = input_file
+        && let Some(ext) = input_path.extension().and_then(|e| e.to_str())
+    {
+        let detected_flavor = match ext.to_lowercase().as_str() {
+            "qmd" => {
+                log::debug!("Using Quarto flavor for .qmd file");
+                Some(Flavor::Quarto)
+            }
+            "rmd" => {
+                log::debug!("Using RMarkdown flavor for .Rmd file");
+                Some(Flavor::RMarkdown)
+            }
+            "md" => {
+                // For .md files, use the flavor from config
+                log::debug!("Using {:?} flavor for .md file (from config)", cfg.flavor);
+                Some(cfg.flavor)
+            }
+            _ => None,
+        };
+
+        if let Some(flavor) = detected_flavor {
+            cfg.flavor = flavor;
+            // Update extensions to match the detected flavor
+            cfg.extensions = Extensions::for_flavor(flavor);
+            cfg.code_blocks = CodeBlockConfig::for_flavor(flavor);
+        }
     }
 
-    log::debug!("No config file found, using defaults");
-    Ok((Config::default(), None))
+    Ok((cfg, cfg_path))
 }
 
 #[cfg(test)]

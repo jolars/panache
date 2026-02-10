@@ -68,7 +68,8 @@ async fn main() -> io::Result<()> {
     match cli.command {
         Commands::Parse { file } => {
             let start_dir = start_dir_for(&file)?;
-            let (cfg, cfg_path) = panache::config::load(cli.config.as_deref(), &start_dir)?;
+            let (cfg, cfg_path) =
+                panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
 
             if let Some(path) = &cfg_path {
                 log::debug!("Using config from: {}", path.display());
@@ -83,7 +84,8 @@ async fn main() -> io::Result<()> {
         }
         Commands::Format { file, check, write } => {
             let start_dir = start_dir_for(&file)?;
-            let (cfg, cfg_path) = panache::config::load(cli.config.as_deref(), &start_dir)?;
+            let (cfg, cfg_path) =
+                panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
 
             if let Some(path) = &cfg_path {
                 log::debug!("Using config from: {}", path.display());

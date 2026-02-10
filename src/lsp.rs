@@ -25,7 +25,7 @@ impl PanacheLsp {
     async fn load_config(&self) -> crate::Config {
         let workspace_root = self.workspace_root.lock().await;
         if let Some(root) = workspace_root.as_ref() {
-            match crate::config::load(None, root) {
+            match crate::config::load(None, root, None) {
                 Ok((config, path)) => {
                     if let Some(p) = path {
                         self.client
