@@ -903,13 +903,52 @@ impl Formatter {
                 let def_indent = indent + 4;
                 self.output.push_str(":   ");
 
-                for child in node.children_with_tokens() {
+                // Collect children to determine lazy continuation
+                let children: Vec<_> = node.children_with_tokens().collect();
+                let mut first_para_idx = None;
+
+                // Find first paragraph immediately after initial text (lazy continuation)
+                // It's only lazy if there's no BlankLine before it
+                let mut text_idx = None;
+                for (i, child) in children.iter().enumerate() {
+                    if let NodeOrToken::Token(tok) = child
+                        && tok.kind() == SyntaxKind::TEXT
+                    {
+                        text_idx = Some(i);
+                    }
+                }
+
+                // Check if there's a paragraph immediately after TEXT+NEWLINE (no BlankLine)
+                if let Some(tidx) = text_idx {
+                    for (i, child) in children.iter().enumerate().skip(tidx + 1) {
+                        if let NodeOrToken::Node(n) = child {
+                            match n.kind() {
+                                SyntaxKind::PARAGRAPH => {
+                                    first_para_idx = Some(i);
+                                    break;
+                                }
+                                SyntaxKind::BlankLine => {
+                                    // BlankLine before paragraph - not lazy
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
+                for (i, child) in children.iter().enumerate() {
                     match child {
                         NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::TEXT => {
                             self.output.push_str(tok.text());
                         }
                         NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::NEWLINE => {
-                            self.output.push('\n');
+                            // If next child is the first lazy paragraph, add space instead
+                            if first_para_idx.is_some_and(|idx| i + 1 == idx) {
+                                self.output.push(' ');
+                            } else {
+                                self.output.push('\n');
+                            }
                         }
                         NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DefinitionMarker => {
                             // Skip - we already added `:   `
@@ -925,20 +964,31 @@ impl Formatter {
                                     if !self.output.ends_with("\n\n") {
                                         self.output.push('\n');
                                     }
-                                    self.format_indented_code_block(&n, def_indent);
+                                    self.format_indented_code_block(n, def_indent);
                                 }
                                 SyntaxKind::PARAGRAPH => {
-                                    // Add blank line before continuation paragraph if needed
-                                    if !self.output.ends_with("\n\n") {
-                                        self.output.push('\n');
+                                    if first_para_idx == Some(i) {
+                                        // First paragraph - lazy continuation (inline)
+                                        let text = n.text().to_string();
+                                        self.output.push_str(text.trim());
+                                    } else {
+                                        // Subsequent paragraphs - indented continuation
+                                        if !self.output.ends_with("\n\n") {
+                                            self.output.push('\n');
+                                        }
+                                        self.format_list_continuation_paragraph(n, def_indent);
                                     }
-                                    self.format_list_continuation_paragraph(&n, def_indent);
                                 }
                                 SyntaxKind::BlankLine => {
-                                    // Blank lines are handled by the newline logic above
+                                    // Output blank line if we've passed the first paragraph
+                                    if first_para_idx.is_some_and(|idx| i > idx)
+                                        && !self.output.ends_with("\n\n")
+                                    {
+                                        self.output.push('\n');
+                                    }
                                 }
                                 _ => {
-                                    self.format_node_sync(&n, def_indent);
+                                    self.format_node_sync(n, def_indent);
                                 }
                             }
                         }
