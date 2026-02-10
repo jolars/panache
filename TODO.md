@@ -91,6 +91,11 @@ This document tracks implementation status for panache's features.
 
 ---
 
+## Linter
+
+- Do we want a linter? How does it fit into the LSP architecture? Should it be
+  a separate command-line tool or integrated into the LSP server?
+
 ## Formatter
 
 ### Lists
