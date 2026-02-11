@@ -8,4 +8,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-panache = { path = "../.." }
+panache = { path = "../..", default-features = false }

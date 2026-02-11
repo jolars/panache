@@ -59,8 +59,7 @@ fn print_diff(file_path: &str, original: &str, formatted: &str) {
     }
 }
 
-#[tokio::main]
-async fn main() -> io::Result<()> {
+fn main() -> io::Result<()> {
     env_logger::init();
 
     let cli = Cli::parse();
@@ -94,7 +93,7 @@ async fn main() -> io::Result<()> {
             }
 
             let input = read_all(file.as_ref())?;
-            let output = format(&input, Some(cfg)).await;
+            let output = format(&input, Some(cfg));
 
             if check {
                 if input != output {
@@ -120,8 +119,11 @@ async fn main() -> io::Result<()> {
 
             Ok(())
         }
+        #[cfg(feature = "lsp")]
         Commands::Lsp => {
-            panache::lsp::run().await?;
+            // LSP needs tokio runtime
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(async { panache::lsp::run().await })?;
             Ok(())
         }
     }

@@ -19,6 +19,7 @@ mod wrapping;
 pub use core::Formatter;
 
 // Public API functions
+#[cfg(feature = "lsp")]
 pub async fn format_tree_async(tree: &SyntaxNode, config: &Config) -> String {
     log::info!(
         "Formatting document with config: line_width={}, wrap={:?}",
@@ -71,7 +72,34 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config) -> String {
         config.line_width,
         config.wrap
     );
-    let result = Formatter::new(config.clone(), HashMap::new()).format(tree);
-    log::info!("Formatting complete: {} bytes output", result.len());
-    result
+
+    // Step 1: Run external formatters synchronously if configured
+    let formatted_code = if !config.formatters.is_empty() {
+        let code_blocks = code_blocks::collect_code_blocks(tree);
+        if !code_blocks.is_empty() {
+            log::debug!(
+                "Found {} code blocks, spawning formatters...",
+                code_blocks.len()
+            );
+            code_blocks::spawn_and_await_formatters_sync(code_blocks, config)
+        } else {
+            HashMap::new()
+        }
+    } else {
+        HashMap::new()
+    };
+
+    // Step 2: Format markdown with formatted code blocks
+    let mut output = Formatter::new(config.clone(), formatted_code.clone()).format(tree);
+
+    // Step 3: Apply formatted code blocks if any
+    if !formatted_code.is_empty() {
+        log::debug!("Applying {} formatted code blocks", formatted_code.len());
+        for (original, formatted) in &formatted_code {
+            output = output.replace(original, formatted);
+        }
+    }
+
+    log::info!("Formatting complete: {} bytes output", output.len());
+    output
 }

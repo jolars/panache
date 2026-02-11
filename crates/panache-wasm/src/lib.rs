@@ -12,6 +12,6 @@ pub fn format_qmd(input: &str, line_width: Option<usize>) -> String {
 #[wasm_bindgen]
 pub fn tokenize_debug(input: &str) -> String {
     // return a simple debug string; or serialize to JSON if you add serde
-    let tree = panache::parse(input);
+    let tree = panache::parse(input, None);
     format!("{tree:#?}")
 }

@@ -1,9 +1,9 @@
 use panache::format;
 
-#[tokio::test]
-async fn front_matter_and_paragraph() {
+#[test]
+fn front_matter_and_paragraph() {
     let input = "---\ntitle: hi\n---\n\nHello world\n";
-    let output = format(input, None).await;
+    let output = format(input, None);
 
     // Basic roundtrip test - the exact formatting might change
     assert!(output.contains("title: hi"));

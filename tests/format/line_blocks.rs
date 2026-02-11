@@ -1,7 +1,7 @@
 use panache::format;
 
-#[tokio::test]
-async fn test_simple_line_block() {
+#[test]
+fn test_simple_line_block() {
     let input = r#"| Line one
 | Line two
 | Line three"#;
@@ -12,12 +12,12 @@ async fn test_simple_line_block() {
 | Line three
 "#;
 
-    let result = format(input, None).await;
+    let result = format(input, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
-#[tokio::test]
-async fn test_line_block_with_indentation() {
+#[test]
+fn test_line_block_with_indentation() {
     let input = r#"| The limerick packs laughs anatomical
 | In space that is quite economical.
 |    But the good ones I've seen
@@ -32,12 +32,12 @@ async fn test_line_block_with_indentation() {
 | And the clean ones so seldom are comical
 "#;
 
-    let result = format(input, None).await;
+    let result = format(input, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
-#[tokio::test]
-async fn test_line_block_with_address() {
+#[test]
+fn test_line_block_with_address() {
     let input = r#"| 200 Main St.
 | Berkeley, CA 94718"#;
 
@@ -46,12 +46,12 @@ async fn test_line_block_with_address() {
 | Berkeley, CA 94718
 "#;
 
-    let result = format(input, None).await;
+    let result = format(input, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
-#[tokio::test]
-async fn test_line_block_preserves_empty_lines() {
+#[test]
+fn test_line_block_preserves_empty_lines() {
     let input = r#"| First stanza
 | Second line
 |
@@ -64,12 +64,12 @@ async fn test_line_block_preserves_empty_lines() {
 | After blank line
 "#;
 
-    let result = format(input, None).await;
+    let result = format(input, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
-#[tokio::test]
-async fn test_line_block_followed_by_paragraph() {
+#[test]
+fn test_line_block_followed_by_paragraph() {
     let input = r#"| Line one
 | Line two
 
@@ -82,12 +82,12 @@ This is a paragraph."#;
 This is a paragraph.
 "#;
 
-    let result = format(input, None).await;
+    let result = format(input, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
-#[tokio::test]
-async fn test_multiple_line_blocks() {
+#[test]
+fn test_multiple_line_blocks() {
     let input = r#"| First block
 | Line two
 
@@ -102,18 +102,18 @@ async fn test_multiple_line_blocks() {
 | Another line
 "#;
 
-    let result = format(input, None).await;
+    let result = format(input, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
-#[tokio::test]
-async fn test_line_block_idempotency() {
+#[test]
+fn test_line_block_idempotency() {
     let input = r#"| Line one
 | Line two
 | Line three"#;
 
-    let result1 = format(input, None).await;
-    let result2 = format(&result1, None).await;
+    let result1 = format(input, None);
+    let result2 = format(&result1, None);
 
     assert_eq!(result1, result2, "Formatting should be idempotent");
 }

@@ -1,9 +1,11 @@
 use crate::block_parser::code_blocks::{CodeBlockType, InfoString};
 use crate::config::{AttributeStyle, Config, FenceStyle};
+#[cfg(feature = "lsp")]
 use crate::external_formatters::format_code_async;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;
+#[cfg(feature = "lsp")]
 use std::time::Duration;
 
 /// Format a code block, normalizing fence markers and attributes based on config
@@ -296,6 +298,7 @@ pub fn collect_code_blocks(tree: &SyntaxNode) -> Vec<(String, String)> {
 
 /// Spawn external formatters for code blocks and await results.
 /// Returns a HashMap of original code -> formatted code (only successful formats).
+#[cfg(feature = "lsp")]
 pub async fn spawn_and_await_formatters(
     blocks: Vec<(String, String)>,
     config: &Config,
@@ -350,4 +353,16 @@ pub async fn spawn_and_await_formatters(
     }
 
     formatted
+}
+
+/// Run external formatters for code blocks synchronously using threads.
+/// Returns a HashMap of original code -> formatted code (only successful formats).
+pub fn spawn_and_await_formatters_sync(
+    blocks: Vec<(String, String)>,
+    config: &Config,
+) -> HashMap<String, String> {
+    use std::time::Duration;
+    let timeout = Duration::from_secs(30);
+
+    crate::external_formatters_sync::run_formatters_parallel(blocks, &config.formatters, timeout)
 }

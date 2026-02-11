@@ -1,14 +1,19 @@
 pub mod block_parser;
 pub mod config;
+#[cfg(feature = "lsp")]
 pub mod external_formatters;
+pub mod external_formatters_sync;
 pub mod formatter;
 pub mod inline_parser;
+#[cfg(feature = "lsp")]
 pub mod lsp;
 pub mod syntax;
 
 pub use config::BlankLines;
 pub use config::Config;
 pub use config::ConfigBuilder;
+pub use formatter::format_tree;
+#[cfg(feature = "lsp")]
 pub use formatter::format_tree_async;
 pub use syntax::SyntaxNode;
 
@@ -32,29 +37,76 @@ fn detect_line_ending(input: &str) -> &str {
     "\n"
 }
 
-/// Formats a Quarto document string with the specified line width.
+/// Formats a Quarto document string with the specified configuration.
 ///
-/// This function normalizes line endings, preserves code blocks and frontmatter,
-/// and applies consistent paragraph wrapping.
+/// This is the primary formatting function. It runs synchronously and includes
+/// external formatter support via threads.
 ///
 /// # Examples
 ///
-/// ```no_run
-/// # async {
+/// ```rust
 /// use panache::format;
 ///
 /// let cfg = panache::ConfigBuilder::default().line_width(80).build();
 ///
 /// let input = "This is a very long line that should be wrapped.";
-/// let formatted = format(input, Some(cfg)).await;
-/// # };
+/// let formatted = format(input, Some(cfg));
 /// ```
 ///
 /// # Arguments
 ///
 /// * `input` - The Quarto document content to format
 /// * `config` - Optional configuration (defaults to default config)
-pub async fn format(input: &str, config: Option<Config>) -> String {
+pub fn format(input: &str, config: Option<Config>) -> String {
+    #[cfg(debug_assertions)]
+    {
+        init_logger();
+    }
+
+    let line_ending = detect_line_ending(input);
+
+    let normalized_input = input.replace("\r\n", "\n");
+
+    // Step 1: Parse blocks to create initial CST and extract reference definitions
+    let config = config.unwrap_or_default();
+    let (block_tree, reference_registry) =
+        block_parser::BlockParser::new(&normalized_input, &config).parse();
+
+    // Step 2: Run inline parser on block content to create final CST
+    let tree =
+        inline_parser::InlineParser::new(block_tree, config.clone(), reference_registry).parse();
+
+    // Step 3: Format the final CST (synchronously, no external formatters)
+    let out = formatter::format_tree(&tree, &config);
+
+    if line_ending == "\r\n" {
+        out.replace("\n", "\r\n")
+    } else {
+        out
+    }
+}
+
+/// Formats a Quarto document string using default configuration.
+pub fn format_with_defaults(input: &str) -> String {
+    format(input, None)
+}
+
+/// Async version for LSP contexts. Uses tokio for non-blocking formatter execution.
+///
+/// # Examples
+///
+/// ```no_run
+/// # async {
+/// use panache::format_async;
+///
+/// let cfg = panache::ConfigBuilder::default().line_width(80).build();
+///
+/// let input = "This is a very long line that should be wrapped.";
+/// let formatted = format_async(input, Some(cfg)).await;
+/// # };
+/// ```
+#[cfg(feature = "lsp")]
+pub async fn format_async(input: &str, config: Option<Config>) -> String {
     #[cfg(debug_assertions)]
     {
         init_logger();
@@ -83,8 +135,9 @@ pub async fn format(input: &str, config: Option<Config>) -> String {
     }
 }
 
-pub async fn format_with_defaults(input: &str) -> String {
-    format(input, None).await
+#[cfg(feature = "lsp")]
+pub async fn format_async_with_defaults(input: &str) -> String {
+    format_async(input, None).await
 }
 
 /// Parses a Quarto document string into a syntax tree.

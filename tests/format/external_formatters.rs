@@ -1,8 +1,8 @@
 use panache::{Config, format};
 use std::collections::HashMap;
 
-#[tokio::test]
-async fn code_block_with_external_formatter() {
+#[test]
+fn code_block_with_external_formatter() {
     // Use 'tr' to uppercase as a simple mock formatter
     let mut formatters = HashMap::new();
     formatters.insert(
@@ -27,7 +27,7 @@ hello world
 "#
     .trim_start();
 
-    let output = format(input, Some(config)).await;
+    let output = format(input, Some(config));
 
     // Code should be uppercased by the formatter
     assert!(output.contains("HELLO WORLD"));
@@ -35,8 +35,8 @@ hello world
     assert!(output.contains("```\n"));
 }
 
-#[tokio::test]
-async fn code_block_without_formatter_unchanged() {
+#[test]
+fn code_block_without_formatter_unchanged() {
     let config = Config::default();
 
     let input = r#"
@@ -46,15 +46,15 @@ hello world
 "#
     .trim_start();
 
-    let output = format(input, Some(config)).await;
+    let output = format(input, Some(config));
 
     // Code should be unchanged (no formatter configured)
     assert!(output.contains("hello world"));
     assert!(!output.contains("HELLO WORLD"));
 }
 
-#[tokio::test]
-async fn code_block_with_disabled_formatter() {
+#[test]
+fn code_block_with_disabled_formatter() {
     let mut formatters = HashMap::new();
     formatters.insert(
         "test".to_string(),
@@ -78,15 +78,15 @@ hello world
 "#
     .trim_start();
 
-    let output = format(input, Some(config)).await;
+    let output = format(input, Some(config));
 
     // Code should be unchanged (formatter disabled)
     assert!(output.contains("hello world"));
     assert!(!output.contains("HELLO WORLD"));
 }
 
-#[tokio::test]
-async fn code_block_with_failing_formatter() {
+#[test]
+fn code_block_with_failing_formatter() {
     let mut formatters = HashMap::new();
     formatters.insert(
         "test".to_string(),
@@ -110,7 +110,7 @@ hello world
 "#
     .trim_start();
 
-    let output = format(input, Some(config)).await;
+    let output = format(input, Some(config));
 
     // Code should be unchanged on formatter failure
     assert!(output.contains("hello world"));

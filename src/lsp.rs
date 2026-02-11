@@ -152,8 +152,8 @@ impl LanguageServer for PanacheLsp {
         let config = self.load_config().await;
         let text_clone = text.clone();
         let formatted = tokio::task::spawn_blocking(move || {
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(crate::format(&text_clone, Some(config)))
+            // Use sync formatter with external formatters
+            crate::format(&text_clone, Some(config))
         })
         .await
         .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
