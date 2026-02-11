@@ -1,0 +1,60 @@
+ROOT@0..247
+  DOCUMENT@0..247
+    Heading@0..16
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      HeadingContent@1..16
+        TEXT@1..16 "HTML Block Test"
+    BlankLine@16..16
+      BlankLine@16..16 ""
+    PARAGRAPH@16..56
+      TEXT@16..55 "This document tests H ..."
+      NEWLINE@55..56 "\n"
+    BlankLine@56..56
+      BlankLine@56..56 ""
+    HtmlBlock@56..78
+      HtmlBlockTag@56..78
+        TEXT@56..77 "<!-- HTML comment -->"
+        NEWLINE@77..78 "\n"
+    BlankLine@78..78
+      BlankLine@78..78 ""
+    PARAGRAPH@78..103
+      TEXT@78..102 "Some text after comment."
+      NEWLINE@102..103 "\n"
+    BlankLine@103..103
+      BlankLine@103..103 ""
+    HtmlBlock@103..153
+      HtmlBlockTag@103..127
+        TEXT@103..126 "<div class=\"container\">"
+        NEWLINE@126..127 "\n"
+      HtmlBlockContent@127..146
+        TEXT@127..145 "Content inside div"
+        NEWLINE@145..146 "\n"
+      HtmlBlockTag@146..153
+        TEXT@146..152 "</div>"
+        NEWLINE@152..153 "\n"
+    BlankLine@153..153
+      BlankLine@153..153 ""
+    PARAGRAPH@153..174
+      TEXT@153..173 "Paragraph after div."
+      NEWLINE@173..174 "\n"
+    BlankLine@174..174
+      BlankLine@174..174 ""
+    HtmlBlock@174..230
+      HtmlBlockTag@174..183
+        TEXT@174..182 "<script>"
+        NEWLINE@182..183 "\n"
+      HtmlBlockContent@183..220
+        TEXT@183..198 "alert('Hello');"
+        NEWLINE@198..199 "\n"
+        TEXT@199..219 "console.log('test');"
+        NEWLINE@219..220 "\n"
+      HtmlBlockTag@220..230
+        TEXT@220..229 "</script>"
+        NEWLINE@229..230 "\n"
+    BlankLine@230..230
+      BlankLine@230..230 ""
+    PARAGRAPH@230..247
+      TEXT@230..246 "Final paragraph."
+      NEWLINE@246..247 "\n"
+

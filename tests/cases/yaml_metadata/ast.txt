@@ -1,0 +1,65 @@
+ROOT@0..337
+  DOCUMENT@0..337
+    YamlMetadata@0..99
+      YamlMetadataDelim@0..3 "---"
+      NEWLINE@3..4 "\n"
+      TEXT@4..26 "title: \"Test Document\""
+      NEWLINE@26..27 "\n"
+      TEXT@27..43 "author: John Doe"
+      NEWLINE@43..44 "\n"
+      TEXT@44..60 "date: 2024-01-01"
+      NEWLINE@60..61 "\n"
+      TEXT@61..70 "keywords:"
+      NEWLINE@70..71 "\n"
+      TEXT@71..83 "  - markdown"
+      NEWLINE@83..84 "\n"
+      TEXT@84..94 "  - quarto"
+      NEWLINE@94..95 "\n"
+      YamlMetadataDelim@95..98 "---"
+      NEWLINE@98..99 "\n"
+    BlankLine@99..99
+      BlankLine@99..99 ""
+    Heading@99..112
+      AtxHeadingMarker@99..100
+        AtxHeadingMarker@99..100 "#"
+      HeadingContent@100..112
+        TEXT@100..112 "Introduction"
+    BlankLine@112..112
+      BlankLine@112..112 ""
+    PARAGRAPH@112..159
+      TEXT@112..158 "This is a test docume ..."
+      NEWLINE@158..159 "\n"
+    BlankLine@159..159
+      BlankLine@159..159 ""
+    PARAGRAPH@159..194
+      TEXT@159..193 "First paragraph with  ..."
+      NEWLINE@193..194 "\n"
+    BlankLine@194..194
+      BlankLine@194..194 ""
+    YamlMetadata@194..237
+      YamlMetadataDelim@194..197 "---"
+      NEWLINE@197..198 "\n"
+      TEXT@198..232 "subtitle: \"A subtitle ..."
+      NEWLINE@232..233 "\n"
+      YamlMetadataDelim@233..236 "---"
+      NEWLINE@236..237 "\n"
+    BlankLine@237..237
+      BlankLine@237..237 ""
+    PARAGRAPH@237..279
+      TEXT@237..278 "Second section after  ..."
+      NEWLINE@278..279 "\n"
+    BlankLine@279..279
+      BlankLine@279..279 ""
+    PARAGRAPH@279..307
+      TEXT@279..306 "Para before horizonta ..."
+      NEWLINE@306..307 "\n"
+    BlankLine@307..307
+      BlankLine@307..307 ""
+    HorizontalRule@307..310
+      HorizontalRule@307..310 "---"
+    BlankLine@310..310
+      BlankLine@310..310 ""
+    PARAGRAPH@310..337
+      TEXT@310..336 "Para after horizontal ..."
+      NEWLINE@336..337 "\n"
+

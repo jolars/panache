@@ -1,0 +1,140 @@
+ROOT@0..1644
+  DOCUMENT@0..1644
+    YamlMetadata@0..37
+      YamlMetadataDelim@0..3 "---"
+      NEWLINE@3..4 "\n"
+      TEXT@4..32 "title: \"List Wrapping ..."
+      NEWLINE@32..33 "\n"
+      YamlMetadataDelim@33..36 "---"
+      NEWLINE@36..37 "\n"
+    BlankLine@37..37
+      BlankLine@37..37 ""
+    Heading@37..67
+      AtxHeadingMarker@37..39
+        AtxHeadingMarker@37..39 "##"
+      HeadingContent@39..67
+        TEXT@39..67 "Bullet Lists with Lon ..."
+    BlankLine@67..67
+      BlankLine@67..67 ""
+    List@67..469
+      ListItem@67..177
+        ListMarker@67..68 "-"
+        WHITESPACE@68..69 " "
+        TEXT@69..176 "This is a very long l ..."
+        NEWLINE@176..177 "\n"
+      ListItem@177..190
+        ListMarker@177..178 "-"
+        WHITESPACE@178..179 " "
+        TEXT@179..189 "Short item"
+        NEWLINE@189..190 "\n"
+      ListItem@190..343
+        ListMarker@190..191 "-"
+        WHITESPACE@191..192 " "
+        TEXT@192..342 "Another extremely lon ..."
+        NEWLINE@342..343 "\n"
+      ListItem@343..469
+        ListMarker@343..344 "-"
+        WHITESPACE@344..345 " "
+        TEXT@345..361 "Final item with "
+        CodeSpan@361..374
+          CodeSpanMarker@361..362 "`"
+          TEXT@362..373 "inline code"
+          CodeSpanMarker@373..374 "`"
+        TEXT@374..468 " that should be prese ..."
+        NEWLINE@468..469 "\n"
+    BlankLine@469..469
+      BlankLine@469..469 ""
+    Heading@469..500
+      AtxHeadingMarker@469..471
+        AtxHeadingMarker@469..471 "##"
+      HeadingContent@471..500
+        TEXT@471..500 "Ordered Lists with Lo ..."
+    BlankLine@500..500
+      BlankLine@500..500 ""
+    List@500..840
+      ListItem@500..616
+        ListMarker@500..502 "1."
+        WHITESPACE@502..503 " "
+        TEXT@503..615 "This is the first ite ..."
+        NEWLINE@615..616 "\n"
+      ListItem@616..631
+        ListMarker@616..618 "2."
+        WHITESPACE@618..619 " "
+        TEXT@619..630 "Second item"
+        NEWLINE@630..631 "\n"
+      ListItem@631..840
+        ListMarker@631..633 "3."
+        WHITESPACE@633..634 " "
+        TEXT@634..839 "The third item has an ..."
+        NEWLINE@839..840 "\n"
+    BlankLine@840..840
+      BlankLine@840..840 ""
+    Heading@840..868
+      AtxHeadingMarker@840..842
+        AtxHeadingMarker@840..842 "##"
+      HeadingContent@842..868
+        TEXT@842..868 "Task Lists with Long  ..."
+    BlankLine@868..868
+      BlankLine@868..868 ""
+    List@868..1211
+      ListItem@868..987
+        ListMarker@868..869 "-"
+        WHITESPACE@869..870 " "
+        TaskCheckbox@870..873 "[ ]"
+        TEXT@873..986 " This unchecked task  ..."
+        NEWLINE@986..987 "\n"
+      ListItem@987..1008
+        ListMarker@987..988 "-"
+        WHITESPACE@988..989 " "
+        TaskCheckbox@989..992 "[x]"
+        TEXT@992..1007 " Completed task"
+        NEWLINE@1007..1008 "\n"
+      ListItem@1008..1211
+        ListMarker@1008..1009 "-"
+        WHITESPACE@1009..1010 " "
+        TaskCheckbox@1010..1013 "[ ]"
+        TEXT@1013..1210 " Another unchecked ta ..."
+        NEWLINE@1210..1211 "\n"
+    BlankLine@1211..1211
+      BlankLine@1211..1211 ""
+    Heading@1211..1229
+      AtxHeadingMarker@1211..1213
+        AtxHeadingMarker@1211..1213 "##"
+      HeadingContent@1213..1229
+        TEXT@1213..1229 "Mixed List Types"
+    BlankLine@1229..1229
+      BlankLine@1229..1229 ""
+    List@1229..1644
+      ListItem@1229..1405
+        ListMarker@1229..1230 "-"
+        WHITESPACE@1230..1231 " "
+        TEXT@1231..1266 "Bullet point with rea ..."
+        NEWLINE@1266..1267 "\n"
+        List@1267..1405
+          ListItem@1267..1304
+            ListMarker@1267..1269 "1."
+            WHITESPACE@1269..1270 " "
+            TEXT@1270..1303 "Nested ordered item t ..."
+            NEWLINE@1303..1304 "\n"
+          ListItem@1304..1405
+            ListMarker@1304..1306 "2."
+            WHITESPACE@1306..1307 " "
+            TEXT@1307..1404 "Nested ordered item w ..."
+            NEWLINE@1404..1405 "\n"
+      ListItem@1405..1644
+        ListMarker@1405..1406 "-"
+        WHITESPACE@1406..1407 " "
+        TEXT@1407..1536 "Another bullet with a ..."
+        NEWLINE@1536..1537 "\n"
+        List@1537..1644
+          ListItem@1537..1557
+            ListMarker@1537..1538 "-"
+            WHITESPACE@1538..1539 " "
+            TEXT@1539..1556 "Nested bullet one"
+            NEWLINE@1556..1557 "\n"
+          ListItem@1557..1644
+            ListMarker@1557..1558 "-"
+            WHITESPACE@1558..1559 " "
+            TEXT@1559..1643 "Nested bullet two wit ..."
+            NEWLINE@1643..1644 "\n"
+

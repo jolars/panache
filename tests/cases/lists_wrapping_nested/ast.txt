@@ -1,0 +1,157 @@
+ROOT@0..2210
+  DOCUMENT@0..2210
+    YamlMetadata@0..44
+      YamlMetadataDelim@0..3 "---"
+      NEWLINE@3..4 "\n"
+      TEXT@4..39 "title: \"Nested List W ..."
+      NEWLINE@39..40 "\n"
+      YamlMetadataDelim@40..43 "---"
+      NEWLINE@43..44 "\n"
+    BlankLine@44..44
+      BlankLine@44..44 ""
+    Heading@44..74
+      AtxHeadingMarker@44..46
+        AtxHeadingMarker@44..46 "##"
+      HeadingContent@46..74
+        TEXT@46..74 "Deep Nesting with Lon ..."
+    BlankLine@74..74
+      BlankLine@74..74 ""
+    List@74..1195
+      ListItem@74..816
+        ListMarker@74..75 "-"
+        WHITESPACE@75..76 " "
+        TEXT@76..243 "Top level item with a ..."
+        NEWLINE@243..244 "\n"
+        List@244..816
+          ListItem@244..610
+            ListMarker@244..245 "-"
+            WHITESPACE@245..246 " "
+            TEXT@246..403 "Second level nested i ..."
+            NEWLINE@403..404 "\n"
+            List@404..610
+              ListItem@404..610
+                ListMarker@404..405 "-"
+                WHITESPACE@405..406 " "
+                TEXT@406..535 "Third level item with ..."
+                NEWLINE@535..536 "\n"
+                List@536..610
+                  ListItem@536..610
+                    ListMarker@536..537 "-"
+                    WHITESPACE@537..538 " "
+                    TEXT@538..609 "Fourth level with mor ..."
+                    NEWLINE@609..610 "\n"
+          ListItem@610..816
+            ListMarker@610..611 "-"
+            WHITESPACE@611..612 " "
+            TEXT@612..815 "Back to second level  ..."
+            NEWLINE@815..816 "\n"
+      ListItem@816..1195
+        ListMarker@816..817 "-"
+        WHITESPACE@817..818 " "
+        TEXT@818..840 "Another top level item"
+        NEWLINE@840..841 "\n"
+        List@841..1195
+          ListItem@841..933
+            ListMarker@841..843 "1."
+            WHITESPACE@843..844 " "
+            TEXT@844..932 "Nested ordered list w ..."
+            NEWLINE@932..933 "\n"
+          ListItem@933..1144
+            ListMarker@933..935 "2."
+            WHITESPACE@935..936 " "
+            TEXT@936..969 "Second ordered item a ..."
+            NEWLINE@969..970 "\n"
+            List@970..1144
+              ListItem@970..1043
+                ListMarker@970..971 "-"
+                WHITESPACE@971..972 " "
+                TEXT@972..1042 "Bullet inside ordered ..."
+                NEWLINE@1042..1043 "\n"
+              ListItem@1043..1144
+                ListMarker@1043..1044 "-"
+                WHITESPACE@1044..1045 " "
+                TEXT@1045..1143 "Another bullet with e ..."
+                NEWLINE@1143..1144 "\n"
+          ListItem@1144..1195
+            ListMarker@1144..1146 "3."
+            WHITESPACE@1146..1147 " "
+            TEXT@1147..1194 "Third ordered item re ..."
+            NEWLINE@1194..1195 "\n"
+    BlankLine@1195..1195
+      BlankLine@1195..1195 ""
+    Heading@1195..1225
+      AtxHeadingMarker@1195..1197
+        AtxHeadingMarker@1195..1197 "##"
+      HeadingContent@1197..1225
+        TEXT@1197..1225 "Task Lists with Deep  ..."
+    BlankLine@1225..1225
+      BlankLine@1225..1225 ""
+    List@1225..1746
+      ListItem@1225..1707
+        ListMarker@1225..1226 "-"
+        WHITESPACE@1226..1227 " "
+        TaskCheckbox@1227..1230 "[ ]"
+        TEXT@1230..1373 " Top level unchecked  ..."
+        NEWLINE@1373..1374 "\n"
+        List@1374..1707
+          ListItem@1374..1565
+            ListMarker@1374..1375 "-"
+            WHITESPACE@1375..1376 " "
+            TaskCheckbox@1376..1379 "[ ]"
+            TEXT@1379..1453 " Nested unchecked tas ..."
+            NEWLINE@1453..1454 "\n"
+            List@1454..1565
+              ListItem@1454..1565
+                ListMarker@1454..1455 "-"
+                WHITESPACE@1455..1456 " "
+                TaskCheckbox@1456..1459 "[x]"
+                TEXT@1459..1564 " Deeply nested comple ..."
+                NEWLINE@1564..1565 "\n"
+          ListItem@1565..1707
+            ListMarker@1565..1566 "-"
+            WHITESPACE@1566..1567 " "
+            TaskCheckbox@1567..1570 "[x]"
+            TEXT@1570..1706 " Back to second level ..."
+            NEWLINE@1706..1707 "\n"
+      ListItem@1707..1746
+        ListMarker@1707..1708 "-"
+        WHITESPACE@1708..1709 " "
+        TaskCheckbox@1709..1712 "[x]"
+        TEXT@1712..1745 " Another top level co ..."
+        NEWLINE@1745..1746 "\n"
+    BlankLine@1746..1746
+      BlankLine@1746..1746 ""
+    Heading@1746..1776
+      AtxHeadingMarker@1746..1748
+        AtxHeadingMarker@1746..1748 "##"
+      HeadingContent@1748..1776
+        TEXT@1748..1776 "Roman Numerals with W ..."
+    BlankLine@1776..1776
+      BlankLine@1776..1776 ""
+    List@1776..2210
+      ListItem@1776..1882
+        ListMarker@1776..1778 "i."
+        WHITESPACE@1778..1779 " "
+        TEXT@1779..1881 "First Roman numeral i ..."
+        NEWLINE@1881..1882 "\n"
+      ListItem@1882..1898
+        ListMarker@1882..1885 "ii."
+        WHITESPACE@1885..1886 " "
+        TEXT@1886..1897 "Second item"
+        NEWLINE@1897..1898 "\n"
+      ListItem@1898..2031
+        ListMarker@1898..1902 "iii."
+        WHITESPACE@1902..1903 " "
+        TEXT@1903..2030 "Third item with anoth ..."
+        NEWLINE@2030..2031 "\n"
+      ListItem@2031..2082
+        ListMarker@2031..2034 "iv."
+        WHITESPACE@2034..2035 " "
+        TEXT@2035..2081 "Fourth item with a mo ..."
+        NEWLINE@2081..2082 "\n"
+      ListItem@2082..2210
+        ListMarker@2082..2084 "v."
+        WHITESPACE@2084..2085 " "
+        TEXT@2085..2209 "Fifth item with the l ..."
+        NEWLINE@2209..2210 "\n"
+

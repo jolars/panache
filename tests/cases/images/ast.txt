@@ -1,0 +1,78 @@
+ROOT@0..212
+  DOCUMENT@0..212
+    Heading@0..7
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      HeadingContent@1..7
+        TEXT@1..7 "Images"
+    BlankLine@7..7
+      BlankLine@7..7 ""
+    PARAGRAPH@7..44
+      TEXT@7..21 "Simple image: "
+      ImageLink@21..43
+        ImageLinkStart@21..23
+          ImageLinkStart@21..23 "!["
+        ImageAlt@23..31
+          TEXT@23..31 "alt text"
+        TEXT@31..33 "]("
+        LinkDest@33..42
+          TEXT@33..42 "image.png"
+        TEXT@42..43 ")"
+      NEWLINE@43..44 "\n"
+    BlankLine@44..44
+      BlankLine@44..44 ""
+    PARAGRAPH@44..87
+      TEXT@44..56 "With title: "
+      ImageLink@56..86
+        ImageLinkStart@56..58
+          ImageLinkStart@56..58 "!["
+        ImageAlt@58..66
+          TEXT@58..66 "alt text"
+        TEXT@66..68 "]("
+        LinkDest@68..85
+          TEXT@68..85 "image.png \"Title\""
+        TEXT@85..86 ")"
+      NEWLINE@86..87 "\n"
+    BlankLine@87..87
+      BlankLine@87..87 ""
+    PARAGRAPH@87..113
+      TEXT@87..98 "Empty alt: "
+      ImageLink@98..112
+        ImageLinkStart@98..100
+          ImageLinkStart@98..100 "!["
+        ImageAlt@100..100
+        TEXT@100..102 "]("
+        LinkDest@102..111
+          TEXT@102..111 "image.png"
+        TEXT@111..112 ")"
+      NEWLINE@112..113 "\n"
+    BlankLine@113..113
+      BlankLine@113..113 ""
+    PARAGRAPH@113..158
+      TEXT@113..126 "Complex alt: "
+      ImageLink@126..157
+        ImageLinkStart@126..128
+          ImageLinkStart@126..128 "!["
+        ImageAlt@128..145
+          Strong@128..136
+            StrongMarker@128..130 "**"
+            TEXT@130..134 "bold"
+            StrongMarker@134..136 "**"
+          TEXT@136..145 " alt text"
+        TEXT@145..147 "]("
+        LinkDest@147..156
+          TEXT@147..156 "image.png"
+        TEXT@156..157 ")"
+      NEWLINE@157..158 "\n"
+    BlankLine@158..158
+      BlankLine@158..158 ""
+    PARAGRAPH@158..212
+      TEXT@158..180 "Automatic link style: "
+      AutoLink@180..211
+        AutoLinkMarker@180..181
+          AutoLinkMarker@180..181 "<"
+        TEXT@181..210 "https://example.com/i ..."
+        AutoLinkMarker@210..211
+          AutoLinkMarker@210..211 ">"
+      NEWLINE@211..212 "\n"
+

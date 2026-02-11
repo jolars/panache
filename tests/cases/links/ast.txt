@@ -1,0 +1,23 @@
+ROOT@0..122
+  DOCUMENT@0..122
+    PARAGRAPH@0..122
+      Link@0..114
+        LinkStart@0..1
+          LinkStart@0..1 "["
+        LinkText@1..76
+          TEXT@1..72 "A network graph. Diff ..."
+          InlineMath@72..75
+            InlineMathMarker@72..73 "$"
+            TEXT@73..74 "p"
+            InlineMathMarker@74..75 "$"
+          TEXT@75..76 "."
+        TEXT@76..78 "]("
+        LinkDest@78..102
+          TEXT@78..102 "../images/networkfig.png"
+        TEXT@102..103 ")"
+        Attribute@103..114
+          Attribute@103..114 "{width=70%}"
+      NEWLINE@114..115 "\n"
+      TEXT@115..121 "A word"
+      NEWLINE@121..122 "\n"
+

@@ -1,0 +1,63 @@
+ROOT@0..414
+  DOCUMENT@0..414
+    PandocTitleBlock@0..89
+      TEXT@0..19 "% My Document Title"
+      NEWLINE@19..20 "\n"
+      TEXT@20..47 "  That Spans Multiple ..."
+      NEWLINE@47..48 "\n"
+      TEXT@48..72 "% Author One; Author Two"
+      NEWLINE@72..73 "\n"
+      TEXT@73..88 "% June 15, 2006"
+      NEWLINE@88..89 "\n"
+    BlankLine@89..89
+      BlankLine@89..89 ""
+    Heading@89..102
+      AtxHeadingMarker@89..90
+        AtxHeadingMarker@89..90 "#"
+      HeadingContent@90..102
+        TEXT@90..102 "Introduction"
+    BlankLine@102..102
+      BlankLine@102..102 ""
+    PARAGRAPH@102..182
+      TEXT@102..181 "This document demonst ..."
+      NEWLINE@181..182 "\n"
+    BlankLine@182..182
+      BlankLine@182..182 ""
+    PARAGRAPH@182..212
+      TEXT@182..211 "First paragraph with  ..."
+      NEWLINE@211..212 "\n"
+    BlankLine@212..212
+      BlankLine@212..212 ""
+    Heading@212..229
+      AtxHeadingMarker@212..214
+        AtxHeadingMarker@212..214 "##"
+      HeadingContent@214..229
+        TEXT@214..229 "Another Section"
+    BlankLine@229..229
+      BlankLine@229..229 ""
+    PARAGRAPH@229..248
+      TEXT@229..247 "More content here."
+      NEWLINE@247..248 "\n"
+    BlankLine@248..248
+      BlankLine@248..248 ""
+    Heading@248..270
+      AtxHeadingMarker@248..250
+        AtxHeadingMarker@248..250 "##"
+      HeadingContent@250..270
+        TEXT@250..270 "Blank Author Example"
+    BlankLine@270..270
+      BlankLine@270..270 ""
+    PARAGRAPH@270..320
+      TEXT@270..319 "In this example, we s ..."
+      NEWLINE@319..320 "\n"
+    BlankLine@320..320
+      BlankLine@320..320 ""
+    PARAGRAPH@320..397
+      TEXT@320..396 "% Signs in text (like ..."
+      NEWLINE@396..397 "\n"
+    BlankLine@397..397
+      BlankLine@397..397 ""
+    PARAGRAPH@397..414
+      TEXT@397..413 "Final paragraph."
+      NEWLINE@413..414 "\n"
+

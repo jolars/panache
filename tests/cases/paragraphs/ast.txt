@@ -1,0 +1,15 @@
+ROOT@0..282
+  DOCUMENT@0..282
+    PARAGRAPH@0..224
+      TEXT@0..73 "A test paragraph that ..."
+      NEWLINE@73..74 "\n"
+      TEXT@74..149 "paragraph is intended ..."
+      NEWLINE@149..150 "\n"
+      TEXT@150..223 "breaks when the lines ..."
+      NEWLINE@223..224 "\n"
+    BlankLine@224..224
+      BlankLine@224..224 ""
+    PARAGRAPH@224..282
+      TEXT@224..281 "Here is a new paragra ..."
+      NEWLINE@281..282 "\n"
+

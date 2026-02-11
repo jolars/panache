@@ -1,0 +1,378 @@
+ROOT@0..1141
+  DOCUMENT@0..1141
+    YamlMetadata@0..32
+      YamlMetadataDelim@0..3 "---"
+      NEWLINE@3..4 "\n"
+      TEXT@4..27 "title: Fancy Lists Test"
+      NEWLINE@27..28 "\n"
+      YamlMetadataDelim@28..31 "---"
+      NEWLINE@31..32 "\n"
+    BlankLine@32..32
+      BlankLine@32..32 ""
+    Heading@32..60
+      AtxHeadingMarker@32..34
+        AtxHeadingMarker@32..34 "##"
+      HeadingContent@34..60
+        TEXT@34..60 "Lowercase Alphabetic  ..."
+    BlankLine@60..60
+      BlankLine@60..60 ""
+    List@60..103
+      ListItem@60..74
+        ListMarker@60..62 "a."
+        WHITESPACE@62..63 " "
+        TEXT@63..73 "First item"
+        NEWLINE@73..74 "\n"
+      ListItem@74..89
+        ListMarker@74..76 "b."
+        WHITESPACE@76..77 " "
+        TEXT@77..88 "Second item"
+        NEWLINE@88..89 "\n"
+      ListItem@89..103
+        ListMarker@89..91 "c."
+        WHITESPACE@91..92 " "
+        TEXT@92..102 "Third item"
+        NEWLINE@102..103 "\n"
+    BlankLine@103..103
+      BlankLine@103..103 ""
+    PARAGRAPH@103..131
+      TEXT@103..130 "Different delimiter s ..."
+      NEWLINE@130..131 "\n"
+    BlankLine@131..131
+      BlankLine@131..131 ""
+    List@131..181
+      ListItem@131..152
+        ListMarker@131..133 "a)"
+        WHITESPACE@133..134 " "
+        TEXT@134..151 "Using right paren"
+        NEWLINE@151..152 "\n"
+      ListItem@152..167
+        ListMarker@152..154 "b)"
+        WHITESPACE@154..155 " "
+        TEXT@155..166 "Second item"
+        NEWLINE@166..167 "\n"
+      ListItem@167..181
+        ListMarker@167..169 "c)"
+        WHITESPACE@169..170 " "
+        TEXT@170..180 "Third item"
+        NEWLINE@180..181 "\n"
+    BlankLine@181..181
+      BlankLine@181..181 ""
+    List@181..229
+      ListItem@181..198
+        ListMarker@181..184 "(a)"
+        WHITESPACE@184..185 " "
+        TEXT@185..197 "Using parens"
+        NEWLINE@197..198 "\n"
+      ListItem@198..214
+        ListMarker@198..201 "(b)"
+        WHITESPACE@201..202 " "
+        TEXT@202..213 "Second item"
+        NEWLINE@213..214 "\n"
+      ListItem@214..229
+        ListMarker@214..217 "(c)"
+        WHITESPACE@217..218 " "
+        TEXT@218..228 "Third item"
+        NEWLINE@228..229 "\n"
+    BlankLine@229..229
+      BlankLine@229..229 ""
+    Heading@229..257
+      AtxHeadingMarker@229..231
+        AtxHeadingMarker@229..231 "##"
+      HeadingContent@231..257
+        TEXT@231..257 "Uppercase Alphabetic  ..."
+    BlankLine@257..257
+      BlankLine@257..257 ""
+    List@257..331
+      ListItem@257..300
+        ListMarker@257..259 "A."
+        WHITESPACE@259..261 "  "
+        TEXT@261..299 "First item (note: two ..."
+        NEWLINE@299..300 "\n"
+      ListItem@300..316
+        ListMarker@300..302 "B."
+        WHITESPACE@302..304 "  "
+        TEXT@304..315 "Second item"
+        NEWLINE@315..316 "\n"
+      ListItem@316..331
+        ListMarker@316..318 "C."
+        WHITESPACE@318..320 "  "
+        TEXT@320..330 "Third item"
+        NEWLINE@330..331 "\n"
+    BlankLine@331..331
+      BlankLine@331..331 ""
+    List@331..381
+      ListItem@331..352
+        ListMarker@331..333 "A)"
+        WHITESPACE@333..334 " "
+        TEXT@334..351 "Right paren style"
+        NEWLINE@351..352 "\n"
+      ListItem@352..367
+        ListMarker@352..354 "B)"
+        WHITESPACE@354..355 " "
+        TEXT@355..366 "Second item"
+        NEWLINE@366..367 "\n"
+      ListItem@367..381
+        ListMarker@367..369 "C)"
+        WHITESPACE@369..370 " "
+        TEXT@370..380 "Third item"
+        NEWLINE@380..381 "\n"
+    BlankLine@381..381
+      BlankLine@381..381 ""
+    List@381..429
+      ListItem@381..398
+        ListMarker@381..384 "(A)"
+        WHITESPACE@384..385 " "
+        TEXT@385..397 "Parens style"
+        NEWLINE@397..398 "\n"
+      ListItem@398..414
+        ListMarker@398..401 "(B)"
+        WHITESPACE@401..402 " "
+        TEXT@402..413 "Second item"
+        NEWLINE@413..414 "\n"
+      ListItem@414..429
+        ListMarker@414..417 "(C)"
+        WHITESPACE@417..418 " "
+        TEXT@418..428 "Third item"
+        NEWLINE@428..429 "\n"
+    BlankLine@429..429
+      BlankLine@429..429 ""
+    Heading@429..455
+      AtxHeadingMarker@429..431
+        AtxHeadingMarker@429..431 "##"
+      HeadingContent@431..455
+        TEXT@431..455 "Lowercase Roman Numerals"
+    BlankLine@455..455
+      BlankLine@455..455 ""
+    List@455..531
+      ListItem@455..469
+        ListMarker@455..457 "i."
+        WHITESPACE@457..458 " "
+        TEXT@458..468 "First item"
+        NEWLINE@468..469 "\n"
+      ListItem@469..485
+        ListMarker@469..472 "ii."
+        WHITESPACE@472..473 " "
+        TEXT@473..484 "Second item"
+        NEWLINE@484..485 "\n"
+      ListItem@485..501
+        ListMarker@485..489 "iii."
+        WHITESPACE@489..490 " "
+        TEXT@490..500 "Third item"
+        NEWLINE@500..501 "\n"
+      ListItem@501..517
+        ListMarker@501..504 "iv."
+        WHITESPACE@504..505 " "
+        TEXT@505..516 "Fourth item"
+        NEWLINE@516..517 "\n"
+      ListItem@517..531
+        ListMarker@517..519 "v."
+        WHITESPACE@519..520 " "
+        TEXT@520..530 "Fifth item"
+        NEWLINE@530..531 "\n"
+    BlankLine@531..531
+      BlankLine@531..531 ""
+    List@531..584
+      ListItem@531..552
+        ListMarker@531..533 "i)"
+        WHITESPACE@533..534 " "
+        TEXT@534..551 "Right paren style"
+        NEWLINE@551..552 "\n"
+      ListItem@552..568
+        ListMarker@552..555 "ii)"
+        WHITESPACE@555..556 " "
+        TEXT@556..567 "Second item"
+        NEWLINE@567..568 "\n"
+      ListItem@568..584
+        ListMarker@568..572 "iii)"
+        WHITESPACE@572..573 " "
+        TEXT@573..583 "Third item"
+        NEWLINE@583..584 "\n"
+    BlankLine@584..584
+      BlankLine@584..584 ""
+    List@584..635
+      ListItem@584..601
+        ListMarker@584..587 "(i)"
+        WHITESPACE@587..588 " "
+        TEXT@588..600 "Parens style"
+        NEWLINE@600..601 "\n"
+      ListItem@601..618
+        ListMarker@601..605 "(ii)"
+        WHITESPACE@605..606 " "
+        TEXT@606..617 "Second item"
+        NEWLINE@617..618 "\n"
+      ListItem@618..635
+        ListMarker@618..623 "(iii)"
+        WHITESPACE@623..624 " "
+        TEXT@624..634 "Third item"
+        NEWLINE@634..635 "\n"
+    BlankLine@635..635
+      BlankLine@635..635 ""
+    Heading@635..661
+      AtxHeadingMarker@635..637
+        AtxHeadingMarker@635..637 "##"
+      HeadingContent@637..661
+        TEXT@637..661 "Uppercase Roman Numerals"
+    BlankLine@661..661
+      BlankLine@661..661 ""
+    List@661..770
+      ListItem@661..675
+        ListMarker@661..663 "I."
+        WHITESPACE@663..664 " "
+        TEXT@664..674 "First item"
+        NEWLINE@674..675 "\n"
+      ListItem@675..691
+        ListMarker@675..678 "II."
+        WHITESPACE@678..679 " "
+        TEXT@679..690 "Second item"
+        NEWLINE@690..691 "\n"
+      ListItem@691..707
+        ListMarker@691..695 "III."
+        WHITESPACE@695..696 " "
+        TEXT@696..706 "Third item"
+        NEWLINE@706..707 "\n"
+      ListItem@707..723
+        ListMarker@707..710 "IV."
+        WHITESPACE@710..711 " "
+        TEXT@711..722 "Fourth item"
+        NEWLINE@722..723 "\n"
+      ListItem@723..737
+        ListMarker@723..725 "V."
+        WHITESPACE@725..726 " "
+        TEXT@726..736 "Fifth item"
+        NEWLINE@736..737 "\n"
+      ListItem@737..752
+        ListMarker@737..740 "VI."
+        WHITESPACE@740..741 " "
+        TEXT@741..751 "Sixth item"
+        NEWLINE@751..752 "\n"
+      ListItem@752..770
+        ListMarker@752..756 "VII."
+        WHITESPACE@756..757 " "
+        TEXT@757..769 "Seventh item"
+        NEWLINE@769..770 "\n"
+    BlankLine@770..770
+      BlankLine@770..770 ""
+    List@770..823
+      ListItem@770..791
+        ListMarker@770..772 "I)"
+        WHITESPACE@772..773 " "
+        TEXT@773..790 "Right paren style"
+        NEWLINE@790..791 "\n"
+      ListItem@791..807
+        ListMarker@791..794 "II)"
+        WHITESPACE@794..795 " "
+        TEXT@795..806 "Second item"
+        NEWLINE@806..807 "\n"
+      ListItem@807..823
+        ListMarker@807..811 "III)"
+        WHITESPACE@811..812 " "
+        TEXT@812..822 "Third item"
+        NEWLINE@822..823 "\n"
+    BlankLine@823..823
+      BlankLine@823..823 ""
+    List@823..874
+      ListItem@823..840
+        ListMarker@823..826 "(I)"
+        WHITESPACE@826..827 " "
+        TEXT@827..839 "Parens style"
+        NEWLINE@839..840 "\n"
+      ListItem@840..857
+        ListMarker@840..844 "(II)"
+        WHITESPACE@844..845 " "
+        TEXT@845..856 "Second item"
+        NEWLINE@856..857 "\n"
+      ListItem@857..874
+        ListMarker@857..862 "(III)"
+        WHITESPACE@862..863 " "
+        TEXT@863..873 "Third item"
+        NEWLINE@873..874 "\n"
+    BlankLine@874..874
+      BlankLine@874..874 ""
+    Heading@874..898
+      AtxHeadingMarker@874..876
+        AtxHeadingMarker@874..876 "##"
+      HeadingContent@876..898
+        TEXT@876..898 "Complex Roman Numerals"
+    BlankLine@898..898
+      BlankLine@898..898 ""
+    List@898..974
+      ListItem@898..919
+        ListMarker@898..901 "iv."
+        WHITESPACE@901..902 " "
+        TEXT@902..918 "Starting at four"
+        NEWLINE@918..919 "\n"
+      ListItem@919..927
+        ListMarker@919..921 "v."
+        WHITESPACE@921..922 " "
+        TEXT@922..926 "Five"
+        NEWLINE@926..927 "\n"
+      ListItem@927..935
+        ListMarker@927..930 "vi."
+        WHITESPACE@930..931 " "
+        TEXT@931..934 "Six"
+        NEWLINE@934..935 "\n"
+      ListItem@935..946
+        ListMarker@935..939 "vii."
+        WHITESPACE@939..940 " "
+        TEXT@940..945 "Seven"
+        NEWLINE@945..946 "\n"
+      ListItem@946..958
+        ListMarker@946..951 "viii."
+        WHITESPACE@951..952 " "
+        TEXT@952..957 "Eight"
+        NEWLINE@957..958 "\n"
+      ListItem@958..967
+        ListMarker@958..961 "ix."
+        WHITESPACE@961..962 " "
+        TEXT@962..966 "Nine"
+        NEWLINE@966..967 "\n"
+      ListItem@967..974
+        ListMarker@967..969 "x."
+        WHITESPACE@969..970 " "
+        TEXT@970..973 "Ten"
+        NEWLINE@973..974 "\n"
+    BlankLine@974..974
+      BlankLine@974..974 ""
+    Heading@974..1006
+      AtxHeadingMarker@974..976
+        AtxHeadingMarker@974..976 "##"
+      HeadingContent@976..1006
+        TEXT@976..1006 "Mixed Content with Fa ..."
+    BlankLine@1006..1006
+      BlankLine@1006..1006 ""
+    PARAGRAPH@1006..1033
+      TEXT@1006..1032 "Some text before the  ..."
+      NEWLINE@1032..1033 "\n"
+    BlankLine@1033..1033
+      BlankLine@1033..1033 ""
+    List@1033..1124
+      ListItem@1033..1061
+        ListMarker@1033..1035 "i."
+        WHITESPACE@1035..1036 " "
+        TEXT@1036..1060 "First roman numeral item"
+        NEWLINE@1060..1061 "\n"
+      ListItem@1061..1096
+        ListMarker@1061..1064 "ii."
+        WHITESPACE@1064..1065 " "
+        TEXT@1065..1082 "Second item with "
+        Strong@1082..1090
+          StrongMarker@1082..1084 "**"
+          TEXT@1084..1088 "bold"
+          StrongMarker@1088..1090 "**"
+        TEXT@1090..1095 " text"
+        NEWLINE@1095..1096 "\n"
+      ListItem@1096..1124
+        ListMarker@1096..1100 "iii."
+        WHITESPACE@1100..1101 " "
+        TEXT@1101..1117 "Third item with "
+        CodeSpan@1117..1123
+          CodeSpanMarker@1117..1118 "`"
+          TEXT@1118..1122 "code"
+          CodeSpanMarker@1122..1123 "`"
+        NEWLINE@1123..1124 "\n"
+    BlankLine@1124..1124
+      BlankLine@1124..1124 ""
+    PARAGRAPH@1124..1141
+      TEXT@1124..1140 "More text after."
+      NEWLINE@1140..1141 "\n"
+

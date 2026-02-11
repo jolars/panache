@@ -1,0 +1,19 @@
+ROOT@0..38
+  DOCUMENT@0..38
+    PARAGRAPH@0..38
+      TEXT@0..10 "Some text:"
+      NEWLINE@10..11 "\n"
+      TEXT@11..12 "`"
+      TEXT@12..13 "`"
+      TEXT@13..14 "`"
+      TEXT@14..26 "{r backbone}"
+      NEWLINE@26..27 "\n"
+      TEXT@27..29 "a "
+      TEXT@29..30 "<"
+      TEXT@30..33 "- 1"
+      NEWLINE@33..34 "\n"
+      TEXT@34..35 "`"
+      TEXT@35..36 "`"
+      TEXT@36..37 "`"
+      NEWLINE@37..38 "\n"
+

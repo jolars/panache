@@ -1,0 +1,36 @@
+ROOT@0..244
+  DOCUMENT@0..244
+    Heading@0..23
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      HeadingContent@1..23
+        TEXT@1..23 "LaTeX Environment Test"
+    BlankLine@23..23
+      BlankLine@23..23 ""
+    PARAGRAPH@23..70
+      TEXT@23..69 "This document tests L ..."
+      NEWLINE@69..70 "\n"
+    BlankLine@70..70
+      BlankLine@70..70 ""
+    LatexEnvironment@70..194
+      LatexEnvBegin@70..99
+        TEXT@70..98 "\\begin{tabular}{|l|l| ..."
+        NEWLINE@98..99 "\n"
+      LatexEnvContent@99..180
+        TEXT@99..124 "Age & Frequency \\\\ \\h ..."
+        NEWLINE@124..125 "\n"
+        TEXT@125..140 "18--25  & 15 \\\\"
+        NEWLINE@140..141 "\n"
+        TEXT@141..156 "26--35  & 33 \\\\"
+        NEWLINE@156..157 "\n"
+        TEXT@157..179 "36--45  & 22 \\\\ \\hline"
+        NEWLINE@179..180 "\n"
+      LatexEnvEnd@180..194
+        TEXT@180..193 "\\end{tabular}"
+        NEWLINE@193..194 "\n"
+    BlankLine@194..194
+      BlankLine@194..194 ""
+    PARAGRAPH@194..244
+      TEXT@194..243 "The table above shoul ..."
+      NEWLINE@243..244 "\n"
+

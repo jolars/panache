@@ -1,0 +1,220 @@
+ROOT@0..704
+  DOCUMENT@0..704
+    YamlMetadata@0..31
+      YamlMetadataDelim@0..3 "---"
+      NEWLINE@3..4 "\n"
+      TEXT@4..26 "title: Task Lists Test"
+      NEWLINE@26..27 "\n"
+      YamlMetadataDelim@27..30 "---"
+      NEWLINE@30..31 "\n"
+    BlankLine@31..31
+      BlankLine@31..31 ""
+    Heading@31..49
+      AtxHeadingMarker@31..33
+        AtxHeadingMarker@31..33 "##"
+      HeadingContent@33..49
+        TEXT@33..49 "Basic Task Lists"
+    BlankLine@49..49
+      BlankLine@49..49 ""
+    List@49..147
+      ListItem@49..70
+        ListMarker@49..50 "-"
+        WHITESPACE@50..51 " "
+        TaskCheckbox@51..54 "[ ]"
+        TEXT@54..69 " Unchecked task"
+        NEWLINE@69..70 "\n"
+      ListItem@70..89
+        ListMarker@70..71 "-"
+        WHITESPACE@71..72 " "
+        TaskCheckbox@72..75 "[x]"
+        TEXT@75..88 " Checked task"
+        NEWLINE@88..89 "\n"
+      ListItem@89..118
+        ListMarker@89..90 "-"
+        WHITESPACE@90..91 " "
+        TaskCheckbox@91..94 "[ ]"
+        TEXT@94..117 " Another unchecked task"
+        NEWLINE@117..118 "\n"
+      ListItem@118..147
+        ListMarker@118..119 "-"
+        WHITESPACE@119..120 " "
+        TaskCheckbox@120..123 "[X]"
+        TEXT@123..146 " Checked with capital X"
+        NEWLINE@146..147 "\n"
+    BlankLine@147..147
+      BlankLine@147..147 ""
+    Heading@147..182
+      AtxHeadingMarker@147..149
+        AtxHeadingMarker@147..149 "##"
+      HeadingContent@149..182
+        TEXT@149..182 "Task Lists with Diffe ..."
+    BlankLine@182..182
+      BlankLine@182..182 ""
+    List@182..228
+      ListItem@182..207
+        ListMarker@182..183 "*"
+        WHITESPACE@183..184 " "
+        TaskCheckbox@184..187 "[ ]"
+        TEXT@187..206 " Task with asterisk"
+        NEWLINE@206..207 "\n"
+      ListItem@207..228
+        ListMarker@207..208 "*"
+        WHITESPACE@208..209 " "
+        TaskCheckbox@209..212 "[x]"
+        TEXT@212..227 " Completed task"
+        NEWLINE@227..228 "\n"
+    BlankLine@228..228
+      BlankLine@228..228 ""
+    List@228..270
+      ListItem@228..249
+        ListMarker@228..229 "+"
+        WHITESPACE@229..230 " "
+        TaskCheckbox@230..233 "[ ]"
+        TEXT@233..248 " Task with plus"
+        NEWLINE@248..249 "\n"
+      ListItem@249..270
+        ListMarker@249..250 "+"
+        WHITESPACE@250..251 " "
+        TaskCheckbox@251..254 "[x]"
+        TEXT@254..269 " Completed task"
+        NEWLINE@269..270 "\n"
+    BlankLine@270..270
+      BlankLine@270..270 ""
+    Heading@270..295
+      AtxHeadingMarker@270..272
+        AtxHeadingMarker@270..272 "##"
+      HeadingContent@272..295
+        TEXT@272..295 "Task Lists with Content"
+    BlankLine@295..295
+      BlankLine@295..295 ""
+    List@295..404
+      ListItem@295..325
+        ListMarker@295..296 "-"
+        WHITESPACE@296..297 " "
+        TaskCheckbox@297..300 "[ ]"
+        TEXT@300..311 " Task with "
+        Strong@311..319
+          StrongMarker@311..313 "**"
+          TEXT@313..317 "bold"
+          StrongMarker@317..319 "**"
+        TEXT@319..324 " text"
+        NEWLINE@324..325 "\n"
+      ListItem@325..358
+        ListMarker@325..326 "-"
+        WHITESPACE@326..327 " "
+        TaskCheckbox@327..330 "[x]"
+        TEXT@330..351 " Completed task with "
+        CodeSpan@351..357
+          CodeSpanMarker@351..352 "`"
+          TEXT@352..356 "code"
+          CodeSpanMarker@356..357 "`"
+        NEWLINE@357..358 "\n"
+      ListItem@358..404
+        ListMarker@358..359 "-"
+        WHITESPACE@359..360 " "
+        TaskCheckbox@360..363 "[ ]"
+        TEXT@363..374 " Task with "
+        Link@374..403
+          LinkStart@374..375
+            LinkStart@374..375 "["
+          LinkText@375..381
+            TEXT@375..381 "a link"
+          TEXT@381..383 "]("
+          LinkDest@383..402
+            TEXT@383..402 "https://example.com"
+          TEXT@402..403 ")"
+        NEWLINE@403..404 "\n"
+    BlankLine@404..404
+      BlankLine@404..404 ""
+    Heading@404..423
+      AtxHeadingMarker@404..406
+        AtxHeadingMarker@404..406 "##"
+      HeadingContent@406..423
+        TEXT@406..423 "Nested Task Lists"
+    BlankLine@423..423
+      BlankLine@423..423 ""
+    List@423..521
+      ListItem@423..495
+        ListMarker@423..424 "-"
+        WHITESPACE@424..425 " "
+        TaskCheckbox@425..428 "[ ]"
+        TEXT@428..440 " Parent task"
+        NEWLINE@440..441 "\n"
+        List@441..495
+          ListItem@441..469
+            ListMarker@441..442 "-"
+            WHITESPACE@442..443 " "
+            TaskCheckbox@443..446 "[ ]"
+            TEXT@446..468 " Nested unchecked task"
+            NEWLINE@468..469 "\n"
+          ListItem@469..495
+            ListMarker@469..470 "-"
+            WHITESPACE@470..471 " "
+            TaskCheckbox@471..474 "[x]"
+            TEXT@474..494 " Nested checked task"
+            NEWLINE@494..495 "\n"
+      ListItem@495..521
+        ListMarker@495..496 "-"
+        WHITESPACE@496..497 " "
+        TaskCheckbox@497..500 "[x]"
+        TEXT@500..520 " Another parent task"
+        NEWLINE@520..521 "\n"
+    BlankLine@521..521
+      BlankLine@521..521 ""
+    Heading@521..551
+      AtxHeadingMarker@521..523
+        AtxHeadingMarker@521..523 "##"
+      HeadingContent@523..551
+        TEXT@523..551 "Mixed Regular and Tas ..."
+    BlankLine@551..551
+      BlankLine@551..551 ""
+    PARAGRAPH@551..571
+      TEXT@551..570 "Regular list items:"
+      NEWLINE@570..571 "\n"
+    BlankLine@571..571
+      BlankLine@571..571 ""
+    List@571..609
+      ListItem@571..590
+        ListMarker@571..572 "-"
+        WHITESPACE@572..573 " "
+        TEXT@573..589 "Regular item one"
+        NEWLINE@589..590 "\n"
+      ListItem@590..609
+        ListMarker@590..591 "-"
+        WHITESPACE@591..592 " "
+        TEXT@592..608 "Regular item two"
+        NEWLINE@608..609 "\n"
+    BlankLine@609..609
+      BlankLine@609..609 ""
+    PARAGRAPH@609..626
+      TEXT@609..625 "Task list items:"
+      NEWLINE@625..626 "\n"
+    BlankLine@626..626
+      BlankLine@626..626 ""
+    List@626..666
+      ListItem@626..646
+        ListMarker@626..627 "-"
+        WHITESPACE@627..628 " "
+        TaskCheckbox@628..631 "[ ]"
+        TEXT@631..645 " Task item one"
+        NEWLINE@645..646 "\n"
+      ListItem@646..666
+        ListMarker@646..647 "-"
+        WHITESPACE@647..648 " "
+        TaskCheckbox@648..651 "[x]"
+        TEXT@651..665 " Task item two"
+        NEWLINE@665..666 "\n"
+    BlankLine@666..666
+      BlankLine@666..666 ""
+    PARAGRAPH@666..683
+      TEXT@666..682 "Back to regular:"
+      NEWLINE@682..683 "\n"
+    BlankLine@683..683
+      BlankLine@683..683 ""
+    List@683..704
+      ListItem@683..704
+        ListMarker@683..684 "-"
+        WHITESPACE@684..685 " "
+        TEXT@685..703 "Regular item three"
+        NEWLINE@703..704 "\n"
+

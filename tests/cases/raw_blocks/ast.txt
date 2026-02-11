@@ -1,0 +1,137 @@
+ROOT@0..473
+  DOCUMENT@0..473
+    Heading@0..16
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      HeadingContent@1..16
+        TEXT@1..16 "Raw Blocks Test"
+    BlankLine@16..16
+      BlankLine@16..16 ""
+    PARAGRAPH@16..56
+      TEXT@16..34 "This tests the raw"
+      TEXT@34..35 "_"
+      TEXT@35..55 "attribute extension."
+      NEWLINE@55..56 "\n"
+    BlankLine@56..56
+      BlankLine@56..56 ""
+    Heading@56..72
+      AtxHeadingMarker@56..58
+        AtxHeadingMarker@56..58 "##"
+      HeadingContent@58..72
+        TEXT@58..72 "HTML Raw Block"
+    BlankLine@72..72
+      BlankLine@72..72 ""
+    CodeBlock@72..155
+      CodeFenceOpen@72..83
+        CodeFenceMarker@72..75 "```"
+        CodeInfo@75..82 "{=html}"
+        NEWLINE@82..83 "\n"
+      CodeContent@83..151
+        TEXT@83..103 "<div class=\"custom\">"
+        NEWLINE@103..104 "\n"
+        TEXT@104..143 "  <p>This should stay ..."
+        NEWLINE@143..144 "\n"
+        TEXT@144..150 "</div>"
+        NEWLINE@150..151 "\n"
+      CodeFenceClose@151..155
+        CodeFenceMarker@151..154 "```"
+        NEWLINE@154..155 "\n"
+    BlankLine@155..155
+      BlankLine@155..155 ""
+    Heading@155..172
+      AtxHeadingMarker@155..157
+        AtxHeadingMarker@155..157 "##"
+      HeadingContent@157..172
+        TEXT@157..172 "LaTeX Raw Block"
+    BlankLine@172..172
+      BlankLine@172..172 ""
+    CodeBlock@172..231
+      CodeFenceOpen@172..184
+        CodeFenceMarker@172..175 "```"
+        CodeInfo@175..183 "{=latex}"
+        NEWLINE@183..184 "\n"
+      CodeContent@184..227
+        TEXT@184..200 "\\begin{equation}"
+        NEWLINE@200..201 "\n"
+        TEXT@201..211 "  E = mc^2"
+        NEWLINE@211..212 "\n"
+        TEXT@212..226 "\\end{equation}"
+        NEWLINE@226..227 "\n"
+      CodeFenceClose@227..231
+        CodeFenceMarker@227..230 "```"
+        NEWLINE@230..231 "\n"
+    BlankLine@231..231
+      BlankLine@231..231 ""
+    Heading@231..250
+      AtxHeadingMarker@231..233
+        AtxHeadingMarker@231..233 "##"
+      HeadingContent@233..250
+        TEXT@233..250 "OpenXML Raw Block"
+    BlankLine@250..250
+      BlankLine@250..250 ""
+    CodeBlock@250..324
+      CodeFenceOpen@250..264
+        CodeFenceMarker@250..253 "```"
+        CodeInfo@253..263 "{=openxml}"
+        NEWLINE@263..264 "\n"
+      CodeContent@264..320
+        TEXT@264..269 "<w:p>"
+        NEWLINE@269..270 "\n"
+        TEXT@270..277 "  <w:r>"
+        NEWLINE@277..278 "\n"
+        TEXT@278..303 "    <w:br w:type=\"pag ..."
+        NEWLINE@303..304 "\n"
+        TEXT@304..312 "  </w:r>"
+        NEWLINE@312..313 "\n"
+        TEXT@313..319 "</w:p>"
+        NEWLINE@319..320 "\n"
+      CodeFenceClose@320..324
+        CodeFenceMarker@320..323 "```"
+        NEWLINE@323..324 "\n"
+    BlankLine@324..324
+      BlankLine@324..324 ""
+    Heading@324..344
+      AtxHeadingMarker@324..326
+        AtxHeadingMarker@324..326 "##"
+      HeadingContent@326..344
+        TEXT@326..344 "Groff MS Raw Block"
+    BlankLine@344..344
+      BlankLine@344..344 ""
+    CodeBlock@344..392
+      CodeFenceOpen@344..353
+        CodeFenceMarker@344..347 "```"
+        CodeInfo@347..352 "{=ms}"
+        NEWLINE@352..353 "\n"
+      CodeContent@353..388
+        TEXT@353..361 ".MYMACRO"
+        NEWLINE@361..362 "\n"
+        TEXT@362..371 "blah blah"
+        NEWLINE@371..372 "\n"
+        TEXT@372..377 ".NH 1"
+        NEWLINE@377..378 "\n"
+        TEXT@378..387 "A Section"
+        NEWLINE@387..388 "\n"
+      CodeFenceClose@388..392
+        CodeFenceMarker@388..391 "```"
+        NEWLINE@391..392 "\n"
+    BlankLine@392..392
+      BlankLine@392..392 ""
+    PARAGRAPH@392..427
+      TEXT@392..426 "Regular code block fo ..."
+      NEWLINE@426..427 "\n"
+    BlankLine@427..427
+      BlankLine@427..427 ""
+    CodeBlock@427..473
+      CodeFenceOpen@427..437
+        CodeFenceMarker@427..430 "```"
+        CodeInfo@430..436 "python"
+        NEWLINE@436..437 "\n"
+      CodeContent@437..469
+        TEXT@437..449 "def hello():"
+        NEWLINE@449..450 "\n"
+        TEXT@450..468 "    print(\"world\")"
+        NEWLINE@468..469 "\n"
+      CodeFenceClose@469..473
+        CodeFenceMarker@469..472 "```"
+        NEWLINE@472..473 "\n"
+

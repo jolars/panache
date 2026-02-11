@@ -1,0 +1,47 @@
+ROOT@0..205
+  DOCUMENT@0..205
+    PARAGRAPH@0..31
+      TEXT@0..30 "Some text before the  ..."
+      NEWLINE@30..31 "\n"
+    BlankLine@31..31
+      BlankLine@31..31 ""
+    MathBlock@31..46
+      BlockMathMarker@31..33 "$$"
+      MathContent@33..44
+        TEXT@33..44 "  x = y + z"
+      BlockMathMarker@44..46 "$$"
+    BlankLine@46..46
+      BlankLine@46..46 ""
+    PARAGRAPH@46..63
+      TEXT@46..62 "Some text after."
+      NEWLINE@62..63 "\n"
+    BlankLine@63..63
+      BlankLine@63..63 ""
+    PARAGRAPH@63..143
+      TEXT@63..91 "Here's inline display ..."
+      InlineMath@91..100
+        BlockMathMarker@91..93 "$$"
+        TEXT@93..98 "a = b"
+        BlockMathMarker@98..100 "$$"
+      TEXT@100..142 " that should be conve ..."
+      NEWLINE@142..143 "\n"
+    BlankLine@143..143
+      BlankLine@143..143 ""
+    PARAGRAPH@143..169
+      TEXT@143..168 "Another standalone bl ..."
+      NEWLINE@168..169 "\n"
+    BlankLine@169..169
+      BlankLine@169..169 ""
+    MathBlock@169..188
+      BlockMathMarker@169..171 "$$"
+      MathContent@171..186
+        LatexCommand@171..182
+          TEXT@171..182 "\\frac{a}{b}"
+        TEXT@182..186 " = c"
+      BlockMathMarker@186..188 "$$"
+    BlankLine@188..188
+      BlankLine@188..188 ""
+    PARAGRAPH@188..205
+      TEXT@188..204 "End of document."
+      NEWLINE@204..205 "\n"
+

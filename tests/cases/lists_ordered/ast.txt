@@ -1,0 +1,42 @@
+ROOT@0..122
+  DOCUMENT@0..122
+    PARAGRAPH@0..17
+      TEXT@0..16 "An ordered list:"
+      NEWLINE@16..17 "\n"
+    BlankLine@17..17
+      BlankLine@17..17 ""
+    List@17..60
+      ListItem@17..31
+        ListMarker@17..19 "1."
+        WHITESPACE@19..20 " "
+        TEXT@20..30 "First item"
+        NEWLINE@30..31 "\n"
+      ListItem@31..46
+        ListMarker@31..33 "2."
+        WHITESPACE@33..34 " "
+        TEXT@34..45 "Second item"
+        NEWLINE@45..46 "\n"
+      ListItem@46..60
+        ListMarker@46..48 "3."
+        WHITESPACE@48..49 " "
+        TEXT@49..59 "Third item"
+        NEWLINE@59..60 "\n"
+    BlankLine@60..60
+      BlankLine@60..60 ""
+    PARAGRAPH@60..80
+      TEXT@60..79 "Using hash markers:"
+      NEWLINE@79..80 "\n"
+    BlankLine@80..80
+      BlankLine@80..80 ""
+    List@80..122
+      ListItem@80..101
+        ListMarker@80..82 "#."
+        WHITESPACE@82..83 " "
+        TEXT@83..100 "Auto-numbered one"
+        NEWLINE@100..101 "\n"
+      ListItem@101..122
+        ListMarker@101..103 "#."
+        WHITESPACE@103..104 " "
+        TEXT@104..121 "Auto-numbered two"
+        NEWLINE@121..122 "\n"
+
