@@ -2,12 +2,14 @@
 name = "panache"
 version = "0.1.0"
 edition = "2024"
+readme = "README.md"
 description = "A formatter for Pandoc, Quarto, and RMarkdown documents"
 license = "MIT"
 repository = "https://github.com/jolars/panache"
 homepage = "https://github.com/jolars/panache"
 keywords = ["quarto", "pandoc", "markdown", "formatter"]
 categories = ["command-line-utilities", "text-processing"]
+authors = ["Johan Larsson <johan@jolars.co>"]
 
 [workspace]
 members = ["crates/panache-wasm"]
