@@ -15,7 +15,7 @@ use cli::Cli;
 fn generate_completions(outdir: &std::ffi::OsString) -> Result<()> {
     let mut cmd = Cli::command();
 
-    // Generate shell completions
+    // Generate shell completions to OUT_DIR (for cargo build)
     for shell in [
         Shell::Bash,
         Shell::Fish,
@@ -24,6 +24,27 @@ fn generate_completions(outdir: &std::ffi::OsString) -> Result<()> {
         Shell::Elvish,
     ] {
         generate_to(shell, &mut cmd, "panache", outdir)?;
+    }
+
+    // Also copy completions to target/completions for packaging
+    let completions_dir = PathBuf::from("target/completions");
+    fs::create_dir_all(&completions_dir)?;
+
+    let outdir_path = PathBuf::from(outdir);
+
+    // Copy bash, fish, and zsh completions for packaging
+    let bash_src = outdir_path.join("panache.bash");
+    let fish_src = outdir_path.join("panache.fish");
+    let zsh_src = outdir_path.join("_panache");
+
+    if bash_src.exists() {
+        fs::copy(&bash_src, completions_dir.join("panache.bash"))?;
+    }
+    if fish_src.exists() {
+        fs::copy(&fish_src, completions_dir.join("panache.fish"))?;
+    }
+    if zsh_src.exists() {
+        fs::copy(&zsh_src, completions_dir.join("_panache"))?;
     }
 
     Ok(())

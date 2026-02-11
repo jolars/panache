@@ -28,13 +28,13 @@ serde = { version = "1.0.226", features = ["derive"] }
 similar = { version = "2.6.0", features = ["text"] }
 textwrap = "0.16.2"
 tokio = { version = "1", features = [
-  "process",
-  "rt-multi-thread",
-  "io-util",
-  "io-std",
-  "time",
-  "macros",
-  "fs",
+    "process",
+    "rt-multi-thread",
+    "io-util",
+    "io-std",
+    "time",
+    "macros",
+    "fs",
 ], optional = true }
 toml = "0.9.6"
 tower-lsp-server = { version = "0.23", optional = true }
@@ -58,3 +58,64 @@ clap = { version = "4.5.48", features = ["derive"] }
 clap_complete = "4.5.65"
 clap_mangen = "0.2.31"
 clap-markdown = "0.1.5"
+
+[package.metadata.deb]
+maintainer = "Johan Larsson <johan@jolars.co>"
+copyright = "2026, Johan Larsson <johan@jolars.co>"
+license-file = ["LICENSE", "4"]
+extended-description = """\
+A CLI formatter for Quarto, Pandoc, and Markdown files. Supports Quarto-specific \
+syntax like fenced divs, tables, and math formatting that other formatters struggle \
+with. Provides intelligent line wrapping, consistent formatting, and an integrated \
+language server for editor support."""
+depends = "$auto"
+section = "text"
+priority = "optional"
+assets = [
+    [
+        "target/release/panache",
+        "usr/bin/",
+        "755",
+    ],
+    [
+        "README.md",
+        "usr/share/doc/panache/",
+        "644",
+    ],
+    [
+        "LICENSE",
+        "usr/share/doc/panache/",
+        "644",
+    ],
+    [
+        "target/man/*.1",
+        "usr/share/man/man1/",
+        "644",
+    ],
+    [
+        "target/completions/panache.bash",
+        "usr/share/bash-completion/completions/panache",
+        "644",
+    ],
+    [
+        "target/completions/panache.fish",
+        "usr/share/fish/vendor_completions.d/panache.fish",
+        "644",
+    ],
+    [
+        "target/completions/_panache",
+        "usr/share/zsh/vendor-completions/_panache",
+        "644",
+    ],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/panache", dest = "/usr/bin/panache", mode = "755" },
+    { source = "README.md", dest = "/usr/share/doc/panache/README.md", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/doc/panache/LICENSE", mode = "644", doc = true },
+    { source = "target/man/*.1", dest = "/usr/share/man/man1/", mode = "644" },
+    { source = "target/completions/panache.bash", dest = "/usr/share/bash-completion/completions/panache", mode = "644" },
+    { source = "target/completions/panache.fish", dest = "/usr/share/fish/vendor_completions.d/panache.fish", mode = "644" },
+    { source = "target/completions/_panache", dest = "/usr/share/zsh/vendor-completions/_panache", mode = "644" },
+]

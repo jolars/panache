@@ -10,9 +10,41 @@ This project is in **very** early development. Expect bugs, missing features, an
 
 ## Installation
 
+### From Source
+
 ```bash
 cargo install --path .
 ```
+
+### Pre-built Binaries
+
+Download pre-built binaries from the [releases page](https://github.com/jolars/panache/releases). Available for:
+- Linux (x86_64, ARM64)
+- macOS (Intel, Apple Silicon)
+- Windows (x86_64)
+
+Each archive includes the binary, man pages, and shell completions.
+
+### Linux Packages
+
+For Debian/Ubuntu systems:
+
+```bash
+# Download the .deb from releases
+sudo dpkg -i panache_*.deb
+```
+
+For Fedora/RHEL/openSUSE systems:
+
+```bash
+# Download the .rpm from releases
+sudo rpm -i panache-*.rpm
+```
+
+Packages include:
+- Binary at `/usr/bin/panache`
+- Man pages for all subcommands
+- Shell completions (bash, fish, zsh)
 
 ## Usage
 
