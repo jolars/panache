@@ -2,6 +2,7 @@ pub mod block_parser;
 pub mod config;
 #[cfg(feature = "lsp")]
 pub mod external_formatters;
+mod external_formatters_common;
 pub mod external_formatters_sync;
 pub mod formatter;
 pub mod inline_parser;
