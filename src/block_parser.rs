@@ -654,23 +654,32 @@ impl<'a> BlockParser<'a> {
         }
 
         // Check for fenced code block
-        // When inside a list, strip typical list indentation before checking
+        // When inside a list, strip list indentation before checking
         let list_indent_stripped = if self.in_list() {
-            // Strip up to 4 spaces (typical list indentation)
-            if content.starts_with("    ") {
-                4
-            } else if content.starts_with("   ") {
-                3
-            } else if content.starts_with("  ") {
-                2
+            let content_col = self.current_content_col();
+            if content_col > 0 {
+                // We're inside a list item - strip up to content column
+                let (indent_cols, _) = leading_indent(content);
+                indent_cols.min(content_col)
             } else {
-                0
+                // Inside list but not in item (shouldn't happen normally)
+                // Strip up to 4 spaces (typical list indentation)
+                if content.starts_with("    ") {
+                    4
+                } else if content.starts_with("   ") {
+                    3
+                } else if content.starts_with("  ") {
+                    2
+                } else {
+                    0
+                }
             }
         } else {
             0
         };
         let content_for_fence_check = if list_indent_stripped > 0 {
-            &content[list_indent_stripped..]
+            let idx = byte_index_at_column(content, list_indent_stripped);
+            &content[idx..]
         } else {
             content
         };
@@ -767,7 +776,11 @@ impl<'a> BlockParser<'a> {
 
         // Check for indented code block (must have actual blank line before)
         // Inside a footnote, content needs 4 spaces for code (8 total in raw line)
-        if has_blank_before_strict && is_indented_code_line(content) {
+        // BUT: Don't treat as code if it's a list marker (list takes precedence)
+        if has_blank_before_strict
+            && is_indented_code_line(content)
+            && try_parse_list_marker(content, self.config).is_none()
+        {
             let bq_depth = self.current_blockquote_depth();
             log::debug!("Parsed indented code block at line {}", self.pos);
             let new_pos = parse_indented_code_block(
