@@ -21,14 +21,15 @@
         "changelogTitle": "# Changelog"
       }
     ],
-    "@semantic-release-cargo/semantic-release-cargo",
+    "semantic-release-cargo",
     [
       "@semantic-release/git",
       {
         "message": "chore(release): release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
         "assets": [
-          "version.txt",
-          "CHANGELOG.md"
+          "CHANGELOG.md",
+          "Cargo.toml",
+          "Cargo.lock"
         ]
       }
     ],
