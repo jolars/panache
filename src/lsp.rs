@@ -147,13 +147,17 @@ impl LanguageServer for PanacheLsp {
             }
         };
 
-        // Run formatting in a blocking task to avoid Send issues with rowan::SyntaxNode
-        // Load config first
+        // Load config
         let config = self.load_config().await;
+
+        // Run formatting in a blocking task (because rowan::SyntaxNode isn't Send)
+        // but use format_async inside to support external formatters
         let text_clone = text.clone();
         let formatted = tokio::task::spawn_blocking(move || {
-            // Use sync formatter with external formatters
-            crate::format(&text_clone, Some(config))
+            // Create a new tokio runtime for async external formatters
+            tokio::runtime::Runtime::new()
+                .expect("Failed to create runtime")
+                .block_on(crate::format_async(&text_clone, Some(config)))
         })
         .await
         .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
