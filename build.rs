@@ -72,7 +72,6 @@ fn generate_cli_markdown() -> Result<()> {
 
     let opts = clap_markdown::MarkdownOptions::default()
         .show_footer(false)
-        .title(String::from(""))
         .show_table_of_contents(false);
 
     // Generate markdown documentation

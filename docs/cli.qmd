@@ -2,7 +2,7 @@
 title: CLI Reference
 ---
 
-#
+# Command-Line Help for `panache`
 
 This document contains the help content for the `panache` command-line program.
 
