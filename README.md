@@ -20,6 +20,7 @@ cargo install panache
 ### Pre-built Binaries
 
 Download pre-built binaries from the [releases page](https://github.com/jolars/panache/releases). Available for:
+
 - Linux (x86_64, ARM64)
 - macOS (Intel, Apple Silicon)
 - Windows (x86_64)
@@ -43,6 +44,7 @@ sudo rpm -i panache-*.rpm
 ```
 
 Packages include:
+
 - Binary at `/usr/bin/panache`
 - Man pages for all subcommands
 - Shell completions (bash, fish, zsh)
@@ -73,6 +75,7 @@ panache parse document.qmd
 panache includes a built-in Language Server Protocol implementation for editor integration.
 
 **Start the server:**
+
 ```bash
 panache lsp
 ```
@@ -86,34 +89,36 @@ The LSP communicates over stdin/stdout and provides document formatting capabili
 
 ```lua
 -- Add to your LSP config
-local lspconfig = require('lspconfig')
-local configs = require('lspconfig.configs')
+local lspconfig = require("lspconfig")
+local configs = require("lspconfig.configs")
 
 -- Define panache LSP
 if not configs.panache then
-  configs.panache = {
-    default_config = {
-      cmd = { 'panache', 'lsp' },
-      filetypes = { 'quarto', 'markdown', 'rmarkdown' },
-      root_dir = lspconfig.util.root_pattern('.panache.toml', 'panache.toml', '.git'),
-      settings = {},
-    },
-  }
+	configs.panache = {
+		default_config = {
+			cmd = { "panache", "lsp" },
+			filetypes = { "quarto", "markdown", "rmarkdown" },
+			root_dir = lspconfig.util.root_pattern(".panache.toml", "panache.toml", ".git"),
+			settings = {},
+		},
+	}
 end
 
 -- Enable it
-lspconfig.panache.setup{}
+lspconfig.panache.setup({})
 ```
 
 Format on save:
+
 ```lua
-vim.api.nvim_create_autocmd('BufWritePre', {
-  pattern = { '*.qmd', '*.md', '*.rmd' },
-  callback = function()
-    vim.lsp.buf.format({ async = false })
-  end,
+vim.api.nvim_create_autocmd("BufWritePre", {
+	pattern = { "*.qmd", "*.md", "*.rmd" },
+	callback = function()
+		vim.lsp.buf.format({ async = false })
+	end,
 })
 ```
+
 </details>
 
 <details>
@@ -133,6 +138,7 @@ Install a generic LSP client extension like [vscode-languageserver-node](https:/
 ```
 
 Or use the [Custom LSP](https://marketplace.visualstudio.com/items?itemName=josa.custom-lsp) extension.
+
 </details>
 
 <details>
@@ -150,6 +156,7 @@ auto-format = true
 command = "panache"
 args = ["lsp"]
 ```
+
 </details>
 
 **Configuration:** The LSP automatically discovers `.panache.toml` from your workspace root.
@@ -190,13 +197,10 @@ See `.panache.toml.example` for a complete configuration reference.
 
 panache can invoke external formatters for code blocks:
 
-- **Formatters run in true parallel**: External formatters execute simultaneously with panache's markdown formatting for maximum performance
-- Each formatter must accept code via stdin and output to stdout
+- External formatters execute in parallel with panache's markdown formatting
+- Formatters can either read from stdin/write to stdout or read/write files
 - Formatters respect their own config files (`.prettierrc`, `pyproject.toml`, etc.)
 - On error, original code is preserved with a warning logged
-- 30-second timeout per formatter invocation
-
-**Performance**: If your document has 3 code blocks and each formatter takes 1 second, all 3 will complete in ~1 second (not 3 seconds sequentially).
 
 **Example**: Format R code with `styler` and Python with `black`:
 
@@ -209,14 +213,6 @@ args = ["--scope=spaces"]
 cmd = "black"
 args = ["-"]
 ```
-
-**Supported formatters** (any CLI tool that reads stdin/writes stdout):
-- R: `styler`, `formatR`
-- Python: `black`, `ruff format`, `autopep8`
-- Rust: `rustfmt`
-- JavaScript/TypeScript: `prettier`, `deno fmt`
-- JSON: `jq`
-- And any other stdin/stdout formatter!
 
 ## Motivation
 
@@ -233,4 +229,3 @@ some of the table syntax.
   agree on)
 - Format math
 - ✅ Hook into external formatters for code blocks (e.g. `styler` for R, `black` for Python)
-
