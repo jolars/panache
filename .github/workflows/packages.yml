@@ -40,12 +40,12 @@ jobs:
 
           # macOS x86_64
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-15-intel
             build_packages: false
 
           # macOS ARM64 (Apple Silicon)
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-latest
             build_packages: false
 
           # Windows x86_64
@@ -70,8 +70,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key:
-            ${{ runner.os }}-${{ matrix.target }}-cargo-${{
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{
             hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-cargo-
@@ -116,8 +115,7 @@ jobs:
             panache-${{ matrix.target }}.zip
 
       - name: Upload binary to release
-        if:
-          github.event_name == 'release' || (github.event_name ==
+        if: github.event_name == 'release' || (github.event_name ==
           'workflow_dispatch' && inputs.upload == 'true')
         shell: bash
         run: |
@@ -150,8 +148,7 @@ jobs:
           cargo generate-rpm --target ${{ matrix.target }}
 
       - name: Upload DEB artifact (for testing)
-        if:
-          matrix.build_packages == true && github.event_name ==
+        if: matrix.build_packages == true && github.event_name ==
           'workflow_dispatch'
         run: |
           DEB_FILE=$(ls target/${{ matrix.target }}/debian/*.deb)
@@ -159,8 +156,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload RPM artifact (for testing)
-        if:
-          matrix.build_packages == true && github.event_name ==
+        if: matrix.build_packages == true && github.event_name ==
           'workflow_dispatch'
         run: |
           RPM_FILE=$(ls target/${{ matrix.target }}/generate-rpm/*.rpm)
@@ -168,8 +164,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload package artifacts
-        if:
-          matrix.build_packages == true && github.event_name ==
+        if: matrix.build_packages == true && github.event_name ==
           'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
@@ -179,8 +174,7 @@ jobs:
             *.rpm
 
       - name: Upload DEB package
-        if:
-          matrix.build_packages == true && (github.event_name == 'release' ||
+        if: matrix.build_packages == true && (github.event_name == 'release' ||
           (github.event_name == 'workflow_dispatch' && inputs.upload == 'true'))
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
@@ -190,8 +184,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload RPM package
-        if:
-          matrix.build_packages == true && (github.event_name == 'release' ||
+        if: matrix.build_packages == true && (github.event_name == 'release' ||
           (github.event_name == 'workflow_dispatch' && inputs.upload == 'true'))
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
