@@ -1,0 +1,314 @@
+---
+title: Language Server Protocol
+---
+
+## Overview
+
+panache includes a built-in Language Server Protocol (LSP) implementation that
+provides document formatting capabilities for editors and IDEs.
+
+## Features
+
+- Document formatting (`textDocument/formatting`)
+- Document tracking (`textDocument/didOpen/didChange/didClose`)
+- Configuration discovery from workspace root
+- Format on save support
+
+## Starting the Server
+
+Start the LSP server:
+
+```bash
+panache lsp
+```
+
+The server communicates over stdin/stdout using the standard LSP JSON-RPC
+protocol.
+
+## Editor Configuration
+
+### Neovim
+
+Using `nvim-lspconfig`:
+
+```lua
+-- Add to your LSP configuration file
+local lspconfig = require('lspconfig')
+local configs = require('lspconfig.configs')
+
+-- Define panache LSP
+if not configs.panache then
+  configs.panache = {
+    default_config = {
+      cmd = { 'panache', 'lsp' },
+      filetypes = { 'quarto', 'markdown', 'rmarkdown' },
+      root_dir = lspconfig.util.root_pattern('.panache.toml', 'panache.toml', '.git'),
+      settings = {},
+    },
+  }
+end
+
+-- Enable the server
+lspconfig.panache.setup{}
+```
+
+#### Format on Save
+
+Add this to enable automatic formatting when saving:
+
+```lua
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = { '*.qmd', '*.md', '*.rmd' },
+  callback = function()
+    vim.lsp.buf.format({ async = false })
+  end,
+})
+```
+
+#### Manual Formatting
+
+Format the current buffer with:
+
+```vim
+:lua vim.lsp.buf.format()
+```
+
+Or map it to a key:
+
+```lua
+vim.keymap.set('n', '<leader>f', vim.lsp.buf.format, { desc = 'Format buffer' })
+```
+
+### VS Code
+
+#### Option 1: Custom LSP Extension
+
+Install the
+[Custom LSP](https://marketplace.visualstudio.com/items?itemName=josa.custom-lsp)
+extension, then configure in `settings.json`:
+
+```json
+{
+  "customLsp.servers": {
+    "panache": {
+      "command": "panache",
+      "args": ["lsp"],
+      "filetypes": ["quarto", "markdown", "rmarkdown"]
+    }
+  },
+  "editor.formatOnSave": true
+}
+```
+
+#### Option 2: Generic LSP Client
+
+Install a generic LSP client extension, then configure:
+
+```json
+{
+  "languageServerExample.server": {
+    "command": "panache",
+    "args": ["lsp"],
+    "filetypes": ["quarto", "markdown", "rmarkdown"]
+  },
+  "editor.formatOnSave": true,
+  "[quarto]": {
+    "editor.defaultFormatter": "languageServerExample"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "languageServerExample"
+  }
+}
+```
+
+### Helix
+
+Add to `~/.config/helix/languages.toml`:
+
+```toml
+[[language]]
+name = "markdown"
+language-servers = ["panache-lsp"]
+auto-format = true
+
+[[language]]
+name = "quarto"
+language-servers = ["panache-lsp"]
+auto-format = true
+
+[language-server.panache-lsp]
+command = "panache"
+args = ["lsp"]
+```
+
+Format the current file with `:format` or `<space>f`.
+
+### Emacs
+
+Using `lsp-mode`:
+
+```elisp
+(require 'lsp-mode)
+
+;; Define panache LSP client
+(lsp-register-client
+ (make-lsp-client
+  :new-connection (lsp-stdio-connection '("panache" "lsp"))
+  :activation-fn (lsp-activate-on "quarto" "markdown" "rmarkdown")
+  :server-id 'panache))
+
+;; Enable for specific modes
+(add-hook 'markdown-mode-hook #'lsp-deferred)
+(add-hook 'quarto-mode-hook #'lsp-deferred)
+
+;; Format on save
+(add-hook 'before-save-hook #'lsp-format-buffer nil t)
+```
+
+### Sublime Text
+
+Using LSP package:
+
+1. Install [LSP](https://packagecontrol.io/packages/LSP) package
+2. Add to LSP settings:
+
+```json
+{
+  "clients": {
+    "panache": {
+      "enabled": true,
+      "command": ["panache", "lsp"],
+      "selector": "text.html.markdown | source.quarto"
+    }
+  }
+}
+```
+
+### Kate
+
+Kate supports LSP servers via its LSP client plugin:
+
+1. Enable the LSP Client plugin
+2. Add to LSP client configuration:
+
+```json
+{
+  "servers": {
+    "markdown": {
+      "command": ["panache", "lsp"],
+      "highlightingModeRegex": "^Markdown$"
+    }
+  }
+}
+```
+
+## Configuration Discovery
+
+The LSP automatically discovers configuration files from your workspace:
+
+1. Searches for `.panache.toml` or `panache.toml` from workspace root
+2. Falls back to `~/.config/panache/config.toml`
+3. Uses built-in defaults if no config found
+
+### Workspace Root Detection
+
+The LSP determines the workspace root by looking for:
+
+- `.panache.toml` or `panache.toml`
+- `.git` directory
+- Project-specific files (`.quarto.yml`, `_quarto.yml`, etc.)
+
+## Capabilities
+
+### Document Formatting
+
+The LSP provides full document formatting via the `textDocument/formatting`
+request. This is the same formatting as the `panache format` CLI command.
+
+### Document Synchronization
+
+The LSP tracks document changes using **full synchronization mode**:
+
+- `textDocument/didOpen`: Document opened in editor
+- `textDocument/didChange`: Document content changed (full sync)
+- `textDocument/didClose`: Document closed
+
+This ensures the LSP always has the current document state for formatting.
+
+## Troubleshooting
+
+### LSP Not Starting
+
+Check that panache is in your PATH:
+
+```bash
+which panache
+```
+
+Test the LSP manually:
+
+```bash
+panache lsp
+# Should start and wait for JSON-RPC input
+```
+
+### Formatting Not Working
+
+Enable LSP logging in your editor to see error messages:
+
+**Neovim:**
+
+```lua
+vim.lsp.set_log_level("debug")
+-- View logs: :lua vim.cmd('e'..vim.lsp.get_log_path())
+```
+
+**VS Code:**
+
+Set `"customLsp.trace.server": "verbose"` in settings.
+
+### Configuration Not Loading
+
+Verify your config file is valid:
+
+```bash
+# Test with CLI first
+panache format --config panache.toml test.qmd
+```
+
+The LSP searches for config from the workspace root, not the file's directory.
+
+### Performance Issues
+
+For large documents:
+
+1. Reduce `line_width` in config
+2. Disable external formatters temporarily
+3. Use `wrap = "preserve"` instead of `"reflow"`
+
+## Comparison with CLI
+
+| Feature              | LSP                           | CLI                     |
+|----------------------|-------------------------------|-------------------------|
+| Formatting           | ✅ Same engine                | ✅ Direct               |
+| Config discovery     | ✅ From workspace root        | ✅ From file directory  |
+| Format on save       | ✅ Automatic                  | ❌ Manual               |
+| Multiple files       | ✅ Per-editor-tab             | ✅ Shell scripting      |
+| Error reporting      | ✅ In-editor diagnostics      | ✅ stderr output        |
+| External formatters  | ✅ Supported                  | ✅ Supported            |
+
+## Best Practices
+
+1. **Place config at project root**: Put `panache.toml` at your project root for
+   consistent behavior
+2. **Use format on save**: Enable format-on-save for automatic formatting
+3. **Test CLI first**: Verify formatting with CLI before relying on LSP
+4. **Check logs**: Enable LSP logging when debugging issues
+5. **Restart after config changes**: Restart LSP server after changing
+   `.panache.toml`
+
+## See Also
+
+- [Configuration](configuration.qmd) - Configure formatting behavior
+- [CLI Reference](cli.qmd) - Command-line alternative
+- [Getting Started](getting-started.qmd) - Installation and basic usage

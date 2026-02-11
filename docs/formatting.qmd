@@ -1,0 +1,537 @@
+---
+title: Formatting
+---
+
+## Formatting Philosophy
+
+panache follows these principles:
+
+1. **Preserve semantic meaning**: Never change what your document means
+2. **Consistent style**: Apply uniform formatting rules throughout
+3. **Readability first**: Optimize for human readers, not machines
+4. **Pandoc compatibility**: Respect Pandoc's parsing rules and extensions
+
+## Text Wrapping
+
+### Paragraphs
+
+panache wraps paragraphs to fit within the configured line width (default 80
+characters):
+
+**Input:**
+
+```markdown
+This is a very long paragraph that exceeds the line width and needs to be wrapped across multiple lines for better readability.
+```
+
+**Output:**
+
+```markdown
+This is a very long paragraph that exceeds the line width and needs to be
+wrapped across multiple lines for better readability.
+```
+
+### Preserving Hard Breaks
+
+Hard line breaks are preserved:
+
+```markdown
+First line\
+Second line (forced break)
+```
+
+### Wrapping Mode
+
+Configure wrapping behavior:
+
+```toml
+wrap = "reflow"    # Reformat paragraphs (default)
+# wrap = "preserve"  # Keep existing line breaks
+```
+
+## Headings
+
+### ATX Headings
+
+Headings are normalized with consistent spacing:
+
+**Input:**
+
+```markdown
+#Heading 1
+##  Heading 2
+###   Heading 3
+```
+
+**Output:**
+
+```markdown
+# Heading 1
+
+## Heading 2
+
+### Heading 3
+```
+
+### Heading Attributes
+
+Attributes are preserved and formatted:
+
+```markdown
+## Heading {#custom-id .my-class key="value"}
+```
+
+## Emphasis and Strong
+
+### Basic Formatting
+
+Emphasis markers are normalized:
+
+**Input:**
+
+```markdown
+*italic* _also italic_
+**bold** __also bold__
+***bold italic***
+```
+
+**Output:**
+
+```markdown
+*italic* *also italic*
+**bold** **also bold**
+***bold italic***
+```
+
+### Nested Emphasis
+
+Nested emphasis is handled correctly:
+
+```markdown
+**bold with *nested italic* inside**
+*italic with **nested bold** inside*
+```
+
+## Code
+
+### Inline Code
+
+Inline code is preserved with minimal backticks needed:
+
+```markdown
+Use `code` for inline code.
+Use ``code with ` backtick`` for code containing backticks.
+```
+
+### Code Blocks
+
+Fenced code blocks are formatted consistently:
+
+**Input:**
+
+````markdown
+```python
+def hello():
+print("Hello")
+```
+````
+
+**Output:**
+
+````markdown
+```python
+def hello():
+    print("Hello")
+```
+````
+
+### External Formatters
+
+When configured, code blocks are formatted by external tools:
+
+**.panache.toml:**
+
+```toml
+[formatters.python]
+cmd = "black"
+args = ["-"]
+```
+
+**Result:** Python code in code blocks is automatically formatted by Black.
+
+## Lists
+
+### Unordered Lists
+
+Lists are formatted with consistent indentation:
+
+**Input:**
+
+```markdown
+* Item 1
+  * Nested item
+    * Deeply nested
+* Item 2
+```
+
+**Output:**
+
+```markdown
+- Item 1
+  - Nested item
+    - Deeply nested
+- Item 2
+```
+
+### Ordered Lists
+
+Ordered lists maintain proper numbering:
+
+```markdown
+1. First item
+2. Second item
+   1. Nested item
+   2. Another nested
+3. Third item
+```
+
+### Task Lists
+
+GitHub-style task lists are supported:
+
+```markdown
+- [ ] Unchecked task
+- [x] Checked task
+- [ ] Another task
+```
+
+### Definition Lists
+
+Definition lists are formatted with proper spacing:
+
+```markdown
+Term 1
+: Definition 1
+
+Term 2
+: Definition 2a
+: Definition 2b
+```
+
+## Blockquotes
+
+Blockquotes are formatted with consistent `>` markers:
+
+**Input:**
+
+```markdown
+This is a blockquote
+that spans multiple lines
+```
+
+**Output:**
+
+```markdown
+This is a blockquote that spans multiple lines
+```
+
+### Nested Blockquotes
+
+```markdown
+Outer quote
+
+Nested quote
+```
+
+## Tables
+
+panache supports all Pandoc table types.
+
+### Pipe Tables
+
+```markdown
+| Header 1 | Header 2 | Header 3 |
+|----------|----------|----------|
+| Cell 1   | Cell 2   | Cell 3   |
+| Cell 4   | Cell 5   | Cell 6   |
+```
+
+### Grid Tables
+
+```markdown
++----------+----------+----------+
+| Header 1 | Header 2 | Header 3 |
++==========+==========+==========+
+| Cell 1   | Cell 2   | Cell 3   |
++----------+----------+----------+
+| Cell 4   | Cell 5   | Cell 6   |
++----------+----------+----------+
+```
+
+### Simple Tables
+
+```markdown
+  Header 1   Header 2   Header 3
+  ---------- ---------- ----------
+  Cell 1     Cell 2     Cell 3
+  Cell 4     Cell 5     Cell 6
+```
+
+## Math
+
+### Inline Math
+
+Inline math is formatted with proper spacing:
+
+```markdown
+The equation $E = mc^2$ is famous.
+```
+
+### Display Math
+
+Display math is formatted on its own lines:
+
+**Input:**
+
+```markdown
+$$E = mc^2$$
+```
+
+**Output:**
+
+```markdown
+$$
+E = mc^2
+$$
+```
+
+### Complex Math
+
+panache preserves math formatting:
+
+```markdown
+$$
+\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
+$$
+```
+
+## Links
+
+### Inline Links
+
+```markdown
+[Link text](https://example.com)
+[Link with title](https://example.com "Title")
+```
+
+### Reference Links
+
+```markdown
+[Link text][ref]
+
+[ref]: https://example.com
+```
+
+### Automatic Links
+
+```markdown
+<https://example.com>
+<email@example.com>
+```
+
+## Images
+
+### Inline Images
+
+```markdown
+![Alt text](image.png)
+![Alt with title](image.png "Title")
+```
+
+### Images with Attributes
+
+```markdown
+![Caption](image.png){#fig-id width=50%}
+```
+
+## Fenced Divs
+
+Quarto/Pandoc fenced divs are formatted correctly:
+
+```markdown
+::: {.callout-note}
+This is a note callout.
+:::
+
+::: {#custom-id .my-class}
+Content with custom attributes.
+:::
+```
+
+### Nested Divs
+
+```markdown
+::: {.outer}
+Outer content
+
+::: {.inner}
+Inner content
+:::
+
+More outer content
+:::
+```
+
+## Footnotes
+
+### Inline Footnotes
+
+```markdown
+Text with footnote^[This is the footnote content].
+```
+
+### Reference Footnotes
+
+```markdown
+Text with reference footnote[^1].
+
+[^1]: This is the footnote content.
+```
+
+## Citations
+
+Pandoc citation syntax is preserved:
+
+```markdown
+See @smith2020 for more details.
+Multiple citations [@smith2020; @jones2021].
+Citation with prefix [see @smith2020, pp. 10-15].
+```
+
+## Raw Blocks
+
+### HTML
+
+````markdown
+```{=html}
+<div class="custom">
+  <p>Raw HTML content</p>
+</div>
+```
+````
+
+### LaTeX
+
+````markdown
+```{=latex}
+\begin{equation}
+E = mc^2
+\end{equation}
+```
+````
+
+## Horizontal Rules
+
+Horizontal rules are normalized:
+
+**Input:**
+
+```markdown
+---
+***
+___
+```
+
+**Output:**
+
+```markdown
+---
+
+---
+
+---
+```
+
+## Blank Lines
+
+### Collapsing
+
+By default, multiple blank lines are collapsed to one:
+
+**Input:**
+
+```markdown
+Paragraph 1
+
+
+Paragraph 2
+```
+
+**Output:**
+
+```markdown
+Paragraph 1
+
+Paragraph 2
+```
+
+### Preserving
+
+Configure to preserve blank lines:
+
+```toml
+blank_lines = "preserve"
+```
+
+## Frontmatter
+
+### YAML
+
+YAML frontmatter is preserved:
+
+```markdown
+---
+title: "My Document"
+author: "Author Name"
+date: "2026-02-11"
+---
+```
+
+### Pandoc Title Block
+
+Pandoc-style title blocks are also supported:
+
+```markdown
+% My Document Title
+% Author Name
+% 2026-02-11
+
+Document content starts here.
+```
+
+## Best Practices
+
+1. **Use consistent line width**: Set `line_width` based on your editor width
+2. **Enable external formatters**: Let language-specific tools format code
+   blocks
+3. **Choose appropriate flavor**: Match your document type (`quarto`,
+   `rmarkdown`, etc.)
+4. **Test incrementally**: Format small sections first to understand behavior
+5. **Use version control**: Always commit before formatting large documents
+
+## Formatting Preservation
+
+panache preserves:
+
+- Semantic meaning of all elements
+- Math expressions exactly as written
+- Code block content (unless external formatter configured)
+- Link URLs and reference definitions
+- Attribute syntax and values
+- Raw HTML/LaTeX blocks
+
+## See Also
+
+- [Configuration](configuration.qmd) - Control formatting behavior
+- [CLI Reference](cli.qmd) - Format command options
+- [Getting Started](getting-started.qmd) - Basic usage examples

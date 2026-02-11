@@ -1,0 +1,329 @@
+---
+title: Configuration
+---
+
+## Configuration Files
+
+panache searches for configuration in this order:
+
+1. **Explicit path**: `--config <path>` (errors if invalid)
+2. **Project config**: `.panache.toml` or `panache.toml` in current or parent
+   directories
+3. **User config**: `~/.config/panache/config.toml` (XDG)
+4. **Built-in defaults**: 80 char width, auto line endings, reflow wrap
+
+## Basic Options
+
+### Flavor
+
+Choose the Markdown flavor, which determines default extension settings:
+
+```toml
+flavor = "quarto"
+```
+
+**Available flavors:**
+
+- `pandoc` - Standard Pandoc Markdown (default)
+- `quarto` - Quarto-flavored Markdown (Pandoc + Quarto extensions)
+- `rmarkdown` - R Markdown (Pandoc + R-specific extensions)
+- `gfm` - GitHub Flavored Markdown
+- `commonmark` - CommonMark (minimal extensions)
+
+### Line Width
+
+Set the maximum line width for wrapping:
+
+```toml
+line_width = 80  # Default: 80
+```
+
+### Wrapping Mode
+
+Control how text is wrapped:
+
+```toml
+wrap = "reflow"  # Options: "reflow", "preserve"
+```
+
+- `reflow` (default): Reformat paragraphs to fit within line width
+- `preserve`: Keep existing line breaks
+
+### Blank Lines
+
+Control blank line handling:
+
+```toml
+blank_lines = "collapse"  # Options: "collapse", "preserve"
+```
+
+- `collapse` (default): Collapse multiple blank lines into one
+- `preserve`: Keep all existing blank lines
+
+## Extensions
+
+panache supports 60+ Pandoc extensions. Each flavor has sensible defaults, but
+you can override any extension:
+
+```toml
+flavor = "quarto"
+
+[extensions]
+# Override flavor defaults
+hard_line_breaks = false
+citations = true
+task_lists = true
+```
+
+### Block-Level Extensions
+
+#### Headings
+
+```toml
+[extensions]
+blank_before_header = true       # Require blank line before headers
+header_attributes = true         # {#id .class key=value} syntax
+```
+
+#### Block Quotes
+
+```toml
+[extensions]
+blank_before_blockquote = true   # Require blank line before blockquotes
+```
+
+#### Lists
+
+```toml
+[extensions]
+fancy_lists = true               # Roman numerals, letters
+startnum = true                  # Start at arbitrary numbers
+example_lists = true             # (@) example markers
+task_lists = true                # - [ ] and - [x]
+definition_lists = true          # Term/definition syntax
+```
+
+#### Code Blocks
+
+````toml
+[extensions]
+backtick_code_blocks = true      # ``` fences
+fenced_code_blocks = true        # ~~~ fences
+fenced_code_attributes = true    # {.language #id}
+inline_code_attributes = true    # `code`{.class}
+````
+
+#### Tables
+
+```toml
+[extensions]
+simple_tables = true             # Simple table syntax
+multiline_tables = true          # Multiline cells
+grid_tables = true               # Grid-style tables
+pipe_tables = true               # GitHub-style | tables
+table_captions = true            # Table captions
+```
+
+#### Divs
+
+```toml
+[extensions]
+fenced_divs = true               # ::: {.class} divs
+native_divs = true               # HTML <div> elements
+```
+
+### Inline Extensions
+
+#### Emphasis
+
+```toml
+[extensions]
+intraword_underscores = true     # Don't trigger emphasis in snake_case
+strikeout = true                 # ~~strikethrough~~
+superscript = true               # ^super^
+subscript = true                 # ~sub~
+```
+
+#### Links
+
+```toml
+[extensions]
+inline_links = true              # [text](url)
+reference_links = true           # [text][ref]
+shortcut_reference_links = true  # [ref]
+link_attributes = true           # [text](url){.class}
+autolinks = true                 # <http://example.com>
+autolink_bare_uris = false       # Bare URLs → links (non-default)
+```
+
+#### Images
+
+```toml
+[extensions]
+inline_images = true             # ![alt](url)
+implicit_figures = true          # Single image → figure
+```
+
+#### Math
+
+```toml
+[extensions]
+tex_math_dollars = true          # $x$ and $$equation$$
+tex_math_single_backslash = false  # \(...\) and \[...\] (RMarkdown)
+tex_math_double_backslash = false  # \\(...\\) and \\[...\\]
+```
+
+#### Footnotes
+
+```toml
+[extensions]
+inline_footnotes = true          # ^[text]
+footnotes = true                 # [^1] references
+```
+
+#### Citations
+
+```toml
+[extensions]
+citations = true                 # [@cite] syntax
+```
+
+#### Spans
+
+```toml
+[extensions]
+bracketed_spans = true           # [text]{.class}
+native_spans = true              # HTML <span> elements
+```
+
+### Metadata Extensions
+
+```toml
+[extensions]
+yaml_metadata_block = true       # --- YAML frontmatter
+pandoc_title_block = true        # % Title / % Author / % Date
+```
+
+### Raw Content Extensions
+
+```toml
+[extensions]
+raw_html = true                  # HTML blocks and inline
+markdown_in_html_blocks = true   # Markdown inside HTML
+raw_tex = true                   # LaTeX commands
+raw_attribute = true             # {=format} raw blocks
+```
+
+### Special Character Extensions
+
+```toml
+[extensions]
+all_symbols_escapable = true     # Backslash escapes any symbol
+escaped_line_breaks = true       # Backslash at line end = <br>
+hard_line_breaks = false         # Newline = <br> (non-default)
+emoji = false                    # :emoji: syntax (non-default)
+mark = false                     # ==highlighted== (non-default)
+```
+
+### Quarto-Specific Extensions
+
+```toml
+[extensions]
+quarto_callouts = true           # .callout-note, etc.
+quarto_crossrefs = true          # @fig-id, @tbl-id
+```
+
+## External Code Formatters
+
+panache can invoke external formatters for code blocks. Formatters run in
+parallel for maximum performance.
+
+### Configuration
+
+```toml
+[formatters.python]
+cmd = "black"
+args = ["-", "--line-length=88"]
+enabled = true  # Optional, defaults to true
+
+[formatters.r]
+cmd = "styler"
+args = ["--scope=spaces"]
+
+[formatters.rust]
+cmd = "rustfmt"
+args = []
+
+[formatters.javascript]
+cmd = "prettier"
+args = ["--parser=babel", "--stdin-filepath=file.js"]
+```
+
+### Requirements
+
+- Formatters must **read from stdin** and **write to stdout**
+- Failed formatters preserve original code with a warning
+- 30-second timeout per formatter invocation
+- Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
+  etc.)
+
+### Supported Formatters
+
+Any CLI tool that reads stdin and writes stdout works:
+
+- **R**: `styler`, `formatR`
+- **Python**: `black`, `ruff format`, `autopep8`
+- **Rust**: `rustfmt`
+- **JavaScript/TypeScript**: `prettier`, `deno fmt`
+- **JSON**: `jq`
+- **YAML**: `yamlfmt`
+- **Go**: `gofmt`
+- **SQL**: `sqlformat`, `pg_format`
+
+### Performance
+
+Formatters run in **true parallel**. If you have 3 code blocks and each
+formatter takes 1 second, all 3 complete in ~1 second (not 3 seconds
+sequentially).
+
+## Example Configuration
+
+Complete example with all common options:
+
+```toml
+# Markdown flavor and basic settings
+flavor = "quarto"
+line_width = 80
+wrap = "reflow"
+blank_lines = "collapse"
+
+# Extension overrides
+[extensions]
+hard_line_breaks = false
+citations = true
+task_lists = true
+emoji = false
+
+# External formatters
+[formatters.r]
+cmd = "styler"
+args = ["--scope=spaces"]
+
+[formatters.python]
+cmd = "black"
+args = ["-", "--line-length=88"]
+
+[formatters.rust]
+cmd = "rustfmt"
+args = []
+
+[formatters.javascript]
+cmd = "prettier"
+args = ["--parser=babel", "--stdin-filepath=file.js"]
+```
+
+## See Also
+
+- [CLI Reference](cli.qmd) - Using `--config` flag
+- [Formatting](formatting.qmd) - How configuration affects output
+- [Getting Started](getting-started.qmd) - Basic configuration examples

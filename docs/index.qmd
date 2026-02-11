@@ -2,6 +2,63 @@
 title: panache
 ---
 
-This is the documentation for `panache` package, which is a command line tool
-for formatting Pandoc, Quarto, and RMarkdown documents.
+## Overview
+
+**panache** is a CLI formatter and Language Server for Quarto (`.qmd`),
+Pandoc, and Markdown files written in Rust. It's designed to understand
+Quarto/Pandoc-specific syntax that other formatters like Prettier and mdformat
+struggle with.
+
+## Key Features
+
+- **Full Pandoc syntax support**: Handles fenced divs, grid tables, definition
+  lists, inline footnotes, and more
+- **Math formatting**: Intelligent formatting for inline and display math
+- **External formatter integration**: Hook into language-specific formatters (R,
+  Python, Rust, etc.) for code blocks
+- **Language Server Protocol**: Built-in LSP for editor integration with
+  format-on-save
+- **Fast and configurable**: Written in Rust with sensible defaults
+
+## Quick Start
+
+Install panache:
+
+```bash
+cargo install --path .
+```
+
+Format a document:
+
+```bash
+panache format document.qmd
+```
+
+## Why panache?
+
+Existing formatters like Prettier and mdformat don't fully support Pandoc's
+extended Markdown syntax used in Quarto and R Markdown documents. panache is
+built specifically to handle:
+
+- Fenced divs (`::: {.class}`)
+- All table types (grid, pipe, simple, multiline)
+- Inline footnotes (`^[text]`)
+- Citations (`[@ref]`)
+- Raw blocks and attributes
+- And much more
+
+## Status
+
+::: {.callout-warning}
+This project is in **early development**. Expect bugs, missing features, and
+breaking changes.
+:::
+
+## Learn More
+
+- [Getting Started](getting-started.qmd) - Installation and first steps
+- [Configuration](configuration.qmd) - Customize panache behavior
+- [Formatting](formatting.qmd) - Formatting rules and examples
+- [LSP](lsp.qmd) - Editor integration guide
+- [CLI Reference](cli.qmd) - Command-line options
 
