@@ -114,11 +114,12 @@ pub(crate) fn parse_indented_code_block(
         };
 
         // Split off trailing newline if present (from split_inclusive)
-        let (content_without_newline, has_newline) = if content.ends_with('\n') {
-            (&content[..content.len() - 1], true)
-        } else {
-            (content, false)
-        };
+        let (content_without_newline, has_newline) =
+            if let Some(stripped) = content.strip_suffix('\n') {
+                (stripped, true)
+            } else {
+                (content, false)
+            };
 
         if !content_without_newline.is_empty() {
             builder.token(SyntaxKind::TEXT.into(), content_without_newline);

@@ -219,8 +219,9 @@ pub(crate) fn parse_html_block(
     builder.start_node(SyntaxKind::HtmlBlockTag.into());
 
     // Split off trailing newline if present
-    let (line_without_newline, has_newline) = if first_line.ends_with('\n') {
-        (&first_line[..first_line.len() - 1], true)
+    let (line_without_newline, has_newline) = if let Some(stripped) = first_line.strip_suffix('\n')
+    {
+        (stripped, true)
     } else {
         (first_line, false)
     };
@@ -271,11 +272,12 @@ pub(crate) fn parse_html_block(
                 builder.start_node(SyntaxKind::HtmlBlockContent.into());
                 for content_line in &content_lines {
                     // Split off trailing newline if present
-                    let (line_without_newline, has_newline) = if content_line.ends_with('\n') {
-                        (&content_line[..content_line.len() - 1], true)
-                    } else {
-                        (*content_line, false)
-                    };
+                    let (line_without_newline, has_newline) =
+                        if let Some(stripped) = content_line.strip_suffix('\n') {
+                            (stripped, true)
+                        } else {
+                            (*content_line, false)
+                        };
 
                     if !line_without_newline.is_empty() {
                         builder.token(SyntaxKind::TEXT.into(), line_without_newline);
@@ -292,11 +294,12 @@ pub(crate) fn parse_html_block(
             builder.start_node(SyntaxKind::HtmlBlockTag.into());
 
             // Split off trailing newline if present
-            let (line_without_newline, has_newline) = if line.ends_with('\n') {
-                (&line[..line.len() - 1], true)
-            } else {
-                (line, false)
-            };
+            let (line_without_newline, has_newline) =
+                if let Some(stripped) = line.strip_suffix('\n') {
+                    (stripped, true)
+                } else {
+                    (line, false)
+                };
 
             if !line_without_newline.is_empty() {
                 builder.token(SyntaxKind::TEXT.into(), line_without_newline);
@@ -324,11 +327,12 @@ pub(crate) fn parse_html_block(
             builder.start_node(SyntaxKind::HtmlBlockContent.into());
             for content_line in &content_lines {
                 // Split off trailing newline if present
-                let (line_without_newline, has_newline) = if content_line.ends_with('\n') {
-                    (&content_line[..content_line.len() - 1], true)
-                } else {
-                    (*content_line, false)
-                };
+                let (line_without_newline, has_newline) =
+                    if let Some(stripped) = content_line.strip_suffix('\n') {
+                        (stripped, true)
+                    } else {
+                        (*content_line, false)
+                    };
 
                 if !line_without_newline.is_empty() {
                     builder.token(SyntaxKind::TEXT.into(), line_without_newline);

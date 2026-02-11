@@ -40,8 +40,9 @@ pub(crate) fn emit_atx_heading(
     builder.start_node(SyntaxKind::Heading.into());
 
     // Strip trailing newline for processing but remember to emit it later
-    let (content_without_newline, has_newline) = if content.ends_with('\n') {
-        (&content[..content.len() - 1], true)
+    let (content_without_newline, has_newline) = if let Some(stripped) = content.strip_suffix('\n')
+    {
+        (stripped, true)
     } else {
         (content, false)
     };

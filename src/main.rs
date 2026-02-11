@@ -152,11 +152,7 @@ fn main() -> io::Result<()> {
 
             if fix {
                 let fixed_output = apply_fixes(&normalized_input, &diagnostics);
-                if file.is_some() {
-                    print!("{}", fixed_output);
-                } else {
-                    print!("{}", fixed_output);
-                }
+                print!("{}", fixed_output);
             } else {
                 print_diagnostics(&diagnostics, file.as_ref());
             }

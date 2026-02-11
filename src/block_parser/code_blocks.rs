@@ -383,11 +383,12 @@ pub(crate) fn parse_fenced_code_block(
         builder.start_node(SyntaxKind::CodeContent.into());
         for content_line in content_lines.iter() {
             // Split off trailing newline if present (from split_inclusive)
-            let (line_without_newline, has_newline) = if content_line.ends_with('\n') {
-                (&content_line[..content_line.len() - 1], true)
-            } else {
-                (*content_line, false)
-            };
+            let (line_without_newline, has_newline) =
+                if let Some(stripped) = content_line.strip_suffix('\n') {
+                    (stripped, true)
+                } else {
+                    (*content_line, false)
+                };
 
             if !line_without_newline.is_empty() {
                 builder.token(SyntaxKind::TEXT.into(), line_without_newline);

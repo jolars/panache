@@ -40,11 +40,12 @@ pub fn parse_line_block(
             let content = &line[content_start..];
 
             // Split off trailing newline if present
-            let (content_without_newline, has_newline) = if content.ends_with('\n') {
-                (&content[..content.len() - 1], true)
-            } else {
-                (content, false)
-            };
+            let (content_without_newline, has_newline) =
+                if let Some(stripped) = content.strip_suffix('\n') {
+                    (stripped, true)
+                } else {
+                    (content, false)
+                };
 
             if !content_without_newline.is_empty() {
                 builder.token(SyntaxKind::TEXT.into(), content_without_newline);
@@ -67,11 +68,12 @@ pub fn parse_line_block(
                     builder.start_node(SyntaxKind::LineBlockLine.into());
 
                     // Split off trailing newline if present
-                    let (line_without_newline, has_newline) = if next_line.ends_with('\n') {
-                        (&next_line[..next_line.len() - 1], true)
-                    } else {
-                        (next_line, false)
-                    };
+                    let (line_without_newline, has_newline) =
+                        if let Some(stripped) = next_line.strip_suffix('\n') {
+                            (stripped, true)
+                        } else {
+                            (next_line, false)
+                        };
 
                     if !line_without_newline.is_empty() {
                         builder.token(SyntaxKind::TEXT.into(), line_without_newline);

@@ -1219,8 +1219,8 @@ impl<'a> BlockParser<'a> {
         let text = self.strip_to_content_col(line);
 
         // Split off trailing newline if present
-        let (text_without_newline, has_newline) = if text.ends_with('\n') {
-            (&text[..text.len() - 1], true)
+        let (text_without_newline, has_newline) = if let Some(stripped) = text.strip_suffix('\n') {
+            (stripped, true)
         } else {
             (text, false)
         };
