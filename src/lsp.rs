@@ -424,6 +424,130 @@ pub async fn run() -> std::io::Result<()> {
 mod tests {
     use super::*;
 
+    // Test helper functions directly (no mocking needed)
+
+    #[test]
+    fn test_offset_to_position_simple() {
+        let text = "hello\nworld\n";
+
+        let pos = offset_to_position(text, 0);
+        assert_eq!(pos.line, 0);
+        assert_eq!(pos.character, 0);
+
+        let pos = offset_to_position(text, 3);
+        assert_eq!(pos.line, 0);
+        assert_eq!(pos.character, 3);
+
+        let pos = offset_to_position(text, 6);
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.character, 0);
+
+        let pos = offset_to_position(text, 9);
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.character, 3);
+    }
+
+    #[test]
+    fn test_offset_to_position_utf16() {
+        // "café" = 5 UTF-8 bytes, 4 UTF-16 code units
+        let text = "café\n";
+
+        let pos = offset_to_position(text, 0);
+        assert_eq!(pos.character, 0);
+
+        let pos = offset_to_position(text, 3);
+        assert_eq!(pos.character, 3);
+
+        // After é (2 UTF-8 bytes, but 1 UTF-16 code unit)
+        let pos = offset_to_position(text, 5);
+        assert_eq!(pos.character, 4);
+    }
+
+    #[test]
+    fn test_offset_to_position_emoji() {
+        // "👋" = 4 UTF-8 bytes, 2 UTF-16 code units (surrogate pair)
+        let text = "hi👋\n";
+
+        let pos = offset_to_position(text, 2);
+        assert_eq!(pos.character, 2);
+
+        // After emoji (6 bytes total, 4 UTF-16 code units)
+        let pos = offset_to_position(text, 6);
+        assert_eq!(pos.character, 4);
+    }
+
+    #[test]
+    fn test_convert_diagnostic_basic() {
+        use crate::linter::diagnostics::{Diagnostic as PanacheDiagnostic, Location, Severity};
+        use rowan::TextRange;
+
+        let text = "# H1\n\n### H3\n";
+
+        let diag = PanacheDiagnostic {
+            severity: Severity::Warning,
+            location: Location {
+                line: 3,
+                column: 1,
+                range: TextRange::new(7.into(), 14.into()),
+            },
+            message: "Heading level skipped from h1 to h3".to_string(),
+            code: "heading-hierarchy".to_string(),
+            fix: None,
+        };
+
+        let lsp_diag = convert_diagnostic(&diag, text);
+
+        assert_eq!(lsp_diag.severity, Some(DiagnosticSeverity::WARNING));
+        assert_eq!(
+            lsp_diag.code,
+            Some(NumberOrString::String("heading-hierarchy".to_string()))
+        );
+        assert_eq!(lsp_diag.source, Some("panache".to_string()));
+        assert!(lsp_diag.message.contains("h1 to h3"));
+
+        // Verify range conversion
+        assert_eq!(lsp_diag.range.start.line, 2); // Line 3 in text becomes line 2 (0-indexed)
+    }
+
+    #[test]
+    fn test_convert_diagnostic_severity() {
+        use crate::linter::diagnostics::{Diagnostic as PanacheDiagnostic, Location, Severity};
+        use rowan::TextRange;
+
+        let text = "test\n";
+
+        let error_diag = PanacheDiagnostic {
+            severity: Severity::Error,
+            location: Location {
+                line: 1,
+                column: 1,
+                range: TextRange::new(0.into(), 4.into()),
+            },
+            message: "Error".to_string(),
+            code: "test-error".to_string(),
+            fix: None,
+        };
+
+        let lsp_diag = convert_diagnostic(&error_diag, text);
+        assert_eq!(lsp_diag.severity, Some(DiagnosticSeverity::ERROR));
+
+        let info_diag = PanacheDiagnostic {
+            severity: Severity::Info,
+            location: Location {
+                line: 1,
+                column: 1,
+                range: TextRange::new(0.into(), 4.into()),
+            },
+            message: "Info".to_string(),
+            code: "test-info".to_string(),
+            fix: None,
+        };
+
+        let lsp_diag = convert_diagnostic(&info_diag, text);
+        assert_eq!(lsp_diag.severity, Some(DiagnosticSeverity::INFORMATION));
+    }
+
+    // Original position_to_offset tests
     #[test]
     fn test_position_to_offset_simple() {
         let text = "hello\nworld\n";
