@@ -7,10 +7,10 @@ files written in Rust. It's designed to understand Quarto/Pandoc-specific
 syntax that other formatters like Prettier and mdformat struggle with,
 including fenced divs, tables, and math formatting.
 
-**Syntax Reference**: See [`docs/pandoc-spec.md`](docs/pandoc-spec.md) for
+**Syntax Reference**: See [`assets/pandoc-spec.md`](assets/pandoc-spec.md) for
 comprehensive Pandoc syntax specification. This index document links to
 individual specification files organized by syntax element type (paragraphs,
-headings, lists, tables, etc.) in the [`docs/pandoc-spec/`](docs/pandoc-spec/)
+headings, lists, tables, etc.) in the [`assets/pandoc-spec/`](assets/pandoc-spec/)
 directory. These documents represent the definitive reference for elements
 that the parser should understand and handle correctly. This specification
 is essential for understanding formatting requirements, implementing parser
