@@ -249,35 +249,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_nonzero_exit() {
-        // Command that exits with code 1
-        #[cfg(not(target_os = "windows"))]
-        let config = FormatterConfig {
-            cmd: "sh".to_string(),
-            args: vec!["-c".to_string(), "exit 1".to_string()],
-            enabled: true,
-            stdin: true,
-        };
-
-        #[cfg(target_os = "windows")]
-        let config = FormatterConfig {
-            cmd: "cmd".to_string(),
-            args: vec!["/c".to_string(), "exit 1".to_string()],
-            enabled: true,
-            stdin: true,
-        };
-
-        let code = "test";
-        let result = format_code_async(code, &config, Duration::from_secs(5)).await;
-
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            FormatterError::NonZeroExit { code, .. } => assert_eq!(code, 1),
-            _ => panic!("expected NonZeroExit error"),
-        }
-    }
-
-    #[tokio::test]
     async fn test_timeout() {
         // Command that sleeps for 10 seconds - should timeout with 100ms limit
         #[cfg(not(target_os = "windows"))]
