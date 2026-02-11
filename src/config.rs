@@ -4,7 +4,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 /// The flavor of Markdown to parse and format.
 /// Each flavor has a different set of default extensions enabled.
@@ -531,8 +531,7 @@ pub enum MathDelimiterStyle {
     Backslash,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(default)]
+#[derive(Debug, Clone)]
 pub struct Config {
     pub flavor: Flavor,
     pub extensions: Extensions,
@@ -540,16 +539,92 @@ pub struct Config {
     pub line_width: usize,
     pub math_indent: usize,
     /// Style for math delimiters (preserve, dollars, backslash)
-    #[serde(rename = "math-delimiter-style")]
     pub math_delimiter_style: MathDelimiterStyle,
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
     /// Code block formatting configuration
-    #[serde(rename = "code-blocks")]
     pub code_blocks: CodeBlockConfig,
     /// External code formatters keyed by language name (e.g., "r", "python")
-    #[serde(default)]
     pub formatters: HashMap<String, FormatterConfig>,
+}
+
+// Helper struct for deserialization
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct ConfigHelper {
+    #[serde(default)]
+    flavor: Flavor,
+    #[serde(default)]
+    extensions: Option<Extensions>,
+    #[serde(default)]
+    line_ending: Option<LineEnding>,
+    #[serde(default = "default_line_width")]
+    line_width: usize,
+    #[serde(default)]
+    math_indent: usize,
+    #[serde(rename = "math-delimiter-style", default)]
+    math_delimiter_style: MathDelimiterStyle,
+    #[serde(default)]
+    wrap: Option<WrapMode>,
+    #[serde(default = "default_blank_lines")]
+    blank_lines: BlankLines,
+    #[serde(rename = "code-blocks", default)]
+    code_blocks: Option<CodeBlockConfig>,
+    #[serde(default)]
+    formatters: HashMap<String, FormatterConfig>,
+}
+
+fn default_line_width() -> usize {
+    80
+}
+
+fn default_blank_lines() -> BlankLines {
+    BlankLines::Collapse
+}
+
+impl<'de> Deserialize<'de> for Config {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let helper = ConfigHelper::deserialize(deserializer)?;
+
+        // If extensions not specified, derive from flavor
+        let extensions = helper
+            .extensions
+            .unwrap_or_else(|| Extensions::for_flavor(helper.flavor));
+
+        // If code_blocks not specified, derive from flavor
+        let code_blocks = helper
+            .code_blocks
+            .unwrap_or_else(|| CodeBlockConfig::for_flavor(helper.flavor));
+
+        // Set line_ending and wrap defaults if not specified
+        let line_ending = if helper.line_ending.is_none() {
+            Some(LineEnding::Auto)
+        } else {
+            helper.line_ending
+        };
+
+        let wrap = if helper.wrap.is_none() {
+            Some(WrapMode::Reflow)
+        } else {
+            helper.wrap
+        };
+
+        Ok(Config {
+            flavor: helper.flavor,
+            extensions,
+            line_ending,
+            line_width: helper.line_width,
+            math_indent: helper.math_indent,
+            math_delimiter_style: helper.math_delimiter_style,
+            wrap,
+            blank_lines: helper.blank_lines,
+            code_blocks,
+            formatters: helper.formatters,
+        })
+    }
 }
 
 impl Default for Config {
