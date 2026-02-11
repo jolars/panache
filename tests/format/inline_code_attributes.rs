@@ -25,7 +25,7 @@ fn inline_code_with_multiple_classes() {
 fn inline_code_with_full_attributes() {
     let input = "Use `func()`{#fn .haskell key=val}.\n";
     let output = format(input, None);
-    assert!(output.contains("`func()`{#fn .haskell key=val}"));
+    assert!(output.contains("`func()`{#fn .haskell key=\"val\"}"));
 }
 
 #[test]

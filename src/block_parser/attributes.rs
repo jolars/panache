@@ -207,14 +207,10 @@ pub fn emit_attributes(builder: &mut GreenNodeBuilder, attrs: &AttributeBlock) {
         attr_str.push_str(key);
         attr_str.push('=');
 
-        // Quote the value if it contains spaces or special chars
-        if value.contains(' ') || value.contains('"') || value.contains('\'') {
-            attr_str.push('"');
-            attr_str.push_str(&value.replace('"', "\\\""));
-            attr_str.push('"');
-        } else {
-            attr_str.push_str(value);
-        }
+        // Always quote attribute values to match Pandoc's behavior
+        attr_str.push('"');
+        attr_str.push_str(&value.replace('"', "\\\""));
+        attr_str.push('"');
     }
 
     attr_str.push('}');

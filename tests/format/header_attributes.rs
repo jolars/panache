@@ -25,7 +25,7 @@ fn heading_with_multiple_classes() {
 fn heading_with_key_value() {
     let input = "# Title {key=value}\n";
     let output = format(input, None);
-    assert!(output.contains("# Title {key=value}"));
+    assert!(output.contains("# Title {key=\"value\"}"));
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn heading_with_quoted_value() {
 fn heading_with_full_attributes() {
     let input = "# Heading {#id .class1 .class2 key1=val1 key2=\"val 2\"}\n";
     let output = format(input, None);
-    assert!(output.contains("# Heading {#id .class1 .class2 key1=val1 key2=\"val 2\"}"));
+    assert!(output.contains("# Heading {#id .class1 .class2 key1=\"val1\" key2=\"val 2\"}"));
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn heading_preserves_whitespace_in_attributes() {
     let input = "# Title {  #id   .class   key=val  }\n";
     let output = format(input, None);
     // Should normalize whitespace
-    assert!(output.contains("# Title {#id .class key=val}"));
+    assert!(output.contains("# Title {#id .class key=\"val\"}"));
 }
 
 #[test]
