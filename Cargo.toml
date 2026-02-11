@@ -20,7 +20,7 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [dependencies]
-clap = { version = "4.5.48", features = ["derive"], optional = true }
+clap = { version = "4.5.57", features = ["derive"], optional = true }
 env_logger = "0.11.8"
 regex = "1.12.2"
 rowan = "0.16.1"
@@ -54,7 +54,7 @@ cli = ["dep:clap"]
 lsp = ["dep:tokio", "dep:tower-lsp-server", "dep:uuid"]
 
 [build-dependencies]
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.5.57", features = ["derive"] }
 clap_complete = "4.5.65"
 clap_mangen = "0.2.31"
 clap-markdown = "0.1.5"
