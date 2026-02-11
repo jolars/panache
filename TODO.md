@@ -93,27 +93,31 @@ This document tracks implementation status for panache's features.
 
 ## Linter
 
-### Rationale
+### Current Status
 
-A linter is a natural complement to the formatter:
-- **Formatter**: Canonical style (wrapping, spacing, consistency)
-- **Linter**: Correctness, best practices, custom rules
-- **Use cases**: 
-  - CI/CD pipelines need `panache lint --check` (LSP not suitable)
-  - Editor integration via LSP diagnostics (`textDocument/publishDiagnostics`)
-  - Unique value: Catch malformed Pandoc/Quarto syntax that other linters miss
+**✅ Implemented** - Basic linter with CLI and one rule.
+
+**Current features:**
+- ✅ `panache lint` CLI subcommand
+- ✅ `--check` mode for CI (exit 1 if violations found)
+- ✅ `--fix` mode for auto-fixing violations
+- ✅ Diagnostic output with file locations
+- ✅ Pluggable rule system with `RuleRegistry`
+- ✅ **Implemented rule:** `heading-hierarchy` - Warns when heading levels are skipped (e.g., h1 → h3)
 
 ### Architecture
 
-Follow the ruff/clippy pattern: separate concerns, shared infrastructure
+Follows the ruff/clippy pattern: separate concerns, shared infrastructure
 
 ```
 src/linter/           # Core linting logic
   ├── rules/          # Individual lint rules
-  ├── diagnostics.rs  # Diagnostic types
+  │   └── heading_hierarchy.rs  # Heading level checking
+  ├── diagnostics.rs  # Diagnostic types (Diagnostic, Severity, Fix, Edit)
+  ├── rules.rs        # Rule trait and registry
   └── runner.rs       # Rule execution
 src/main.rs           # CLI: `panache lint` subcommand  
-src/lsp.rs            # LSP: Publishes diagnostics
+src/lsp.rs            # LSP: TODO - integrate diagnostics
 ```
 
 Both linter and formatter:
@@ -121,7 +125,7 @@ Both linter and formatter:
 - ✅ Use the same config system
 - ✅ Benefit from rowan's CST
 
-### CLI Design
+### CLI Commands
 
 ```bash
 panache lint document.qmd           # Report violations
@@ -130,34 +134,34 @@ panache lint --check document.qmd   # CI mode: exit non-zero if violations
 panache lint --config cfg.toml      # Custom config
 ```
 
-### Potential Lint Rules
+### Future Lint Rules
 
 **Syntax correctness:**
-- Malformed fenced divs (unclosed, invalid attributes)
-- Broken table structures
-- Invalid citation syntax (`@citekey` malformations)
-- Unclosed inline math/code spans
-- Invalid shortcode syntax (Quarto-specific)
+- ❌ Malformed fenced divs (unclosed, invalid attributes)
+- ❌ Broken table structures
+- ❌ Invalid citation syntax (`@citekey` malformations)
+- ❌ Unclosed inline math/code spans
+- ❌ Invalid shortcode syntax (Quarto-specific)
 
 **Style/Best practices:**
-- Inconsistent heading hierarchy (skip levels)
-- Multiple top-level headings
-- Empty links/images
-- Duplicate reference labels
-- Unused reference definitions
-- Hard-wrapped text in code blocks
+- ✅ Inconsistent heading hierarchy (skip levels) - **IMPLEMENTED**
+- ❌ Multiple top-level headings
+- ❌ Empty links/images
+- ❌ Duplicate reference labels
+- ❌ Unused reference definitions
+- ❌ Hard-wrapped text in code blocks
 
-**Configurability:**
-- Per-rule enable/disable in `.panache.toml`
-- Severity levels (error, warning, info)
-- Auto-fix capability per rule
+**Configuration:**
+- ❌ Per-rule enable/disable in `.panache.toml` `[lint]` section
+- ❌ Severity levels (error, warning, info)
+- ❌ Auto-fix capability per rule (infrastructure exists, rules need implementation)
 
-### Implementation Priority
+### Next Steps
 
-1. **Phase 1** (minimal): Emit diagnostics for syntax errors already detected by parser
-2. **Phase 2**: Add `panache lint` CLI subcommand with basic rules
-3. **Phase 3**: Expand rule set, make configurable
-4. **Phase 4**: LSP integration with `textDocument/publishDiagnostics`
+- [ ] Add more lint rules (empty links, duplicate refs, etc.)
+- [ ] Make rules configurable via `[lint]` section in config
+- [ ] LSP integration with `textDocument/publishDiagnostics`
+- [ ] Add auto-fix implementations for fixable rules
 
 ### Open Questions
 
