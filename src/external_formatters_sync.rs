@@ -27,8 +27,21 @@ pub fn format_code_sync(
     config: &FormatterConfig,
     timeout: Duration,
 ) -> Result<String, FormatterError> {
+    if config.stdin {
+        format_with_stdin(code, config, timeout)
+    } else {
+        format_with_file(code, config, timeout)
+    }
+}
+
+/// Format code by piping through stdin/stdout (synchronous).
+fn format_with_stdin(
+    code: &str,
+    config: &FormatterConfig,
+    timeout: Duration,
+) -> Result<String, FormatterError> {
     log::debug!(
-        "Invoking formatter (sync): {} {}",
+        "Invoking formatter (stdin): {} {}",
         config.cmd,
         config.args.join(" ")
     );
@@ -98,6 +111,105 @@ pub fn format_code_sync(
             Err(FormatterError::Timeout)
         }
     }
+}
+
+/// Format code using a temporary file (synchronous).
+fn format_with_file(
+    code: &str,
+    config: &FormatterConfig,
+    timeout: Duration,
+) -> Result<String, FormatterError> {
+    use std::fs;
+
+    log::debug!(
+        "Invoking formatter (file): {} {}",
+        config.cmd,
+        config.args.join(" ")
+    );
+
+    // Create a temporary file
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join(format!("panache-{}.tmp", uuid::Uuid::new_v4()));
+
+    // Write code to temp file
+    fs::write(&temp_path, code).map_err(FormatterError::IoError)?;
+
+    // Build args with temp file path (replace {} placeholder or append)
+    let args: Vec<String> = if config.args.iter().any(|arg| arg.contains("{}")) {
+        config
+            .args
+            .iter()
+            .map(|arg| arg.replace("{}", temp_path.to_str().unwrap()))
+            .collect()
+    } else {
+        let mut args = config.args.clone();
+        args.push(temp_path.to_str().unwrap().to_string());
+        args
+    };
+
+    // Spawn the formatter process
+    let mut cmd = Command::new(&config.cmd);
+    cmd.args(&args).stderr(Stdio::piped());
+
+    let mut child = cmd.spawn().map_err(|e| {
+        log::error!("Failed to spawn formatter '{}': {}", config.cmd, e);
+        FormatterError::SpawnFailed(format!("{}: {}", config.cmd, e))
+    })?;
+
+    // Use std::sync::mpsc for timeout handling
+    use std::sync::mpsc;
+    use std::time::Instant;
+
+    let (tx, rx) = mpsc::channel();
+
+    // Spawn thread to wait for process
+    thread::spawn(move || {
+        let output = child.wait_with_output();
+        let _ = tx.send(output);
+    });
+
+    // Wait with timeout
+    let start = Instant::now();
+    let result = match rx.recv_timeout(timeout) {
+        Ok(Ok(output)) => {
+            // Read formatted content from file
+            let formatted = fs::read_to_string(&temp_path).map_err(FormatterError::IoError)?;
+
+            // Check exit status
+            if output.status.success() {
+                log::debug!(
+                    "Formatter succeeded: {} bytes output in {:?}",
+                    formatted.len(),
+                    start.elapsed()
+                );
+                Ok(formatted)
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                log::warn!(
+                    "Formatter exited with code {:?}: {}",
+                    output.status.code(),
+                    stderr
+                );
+                Err(FormatterError::NonZeroExit {
+                    code: output.status.code().unwrap_or(-1),
+                    stderr,
+                })
+            }
+        }
+        Ok(Err(e)) => {
+            log::error!("Formatter I/O error: {}", e);
+            Err(FormatterError::IoError(e))
+        }
+        Err(_) => {
+            log::warn!("Formatter timed out after {:?}", timeout);
+            Err(FormatterError::Timeout)
+        }
+    };
+
+    // Clean up temp file
+    let _ = fs::remove_file(&temp_path);
+
+    result
 }
 
 /// Run external formatters in parallel using threads.
