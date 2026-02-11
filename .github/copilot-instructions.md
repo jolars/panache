@@ -2,15 +2,15 @@
 
 ## Repository Overview
 
-**panache** is a CLI formatter for Quarto (`.qmd`), Pandoc, and Markdown
+**panache** is a CLI formatter and linter for Quarto (`.qmd`), Pandoc, and Markdown
 files written in Rust. It's designed to understand Quarto/Pandoc-specific
 syntax that other formatters like Prettier and mdformat struggle with,
 including fenced divs, tables, and math formatting.
 
-**Syntax Reference**: See [`assets/pandoc-spec.md`](../assets/pandoc-spec.md) for
+**Syntax Reference**: See <a>`docs/pandoc-spec.md`</a> for
 comprehensive Pandoc syntax specification. This index document links to
 individual specification files organized by syntax element type (paragraphs,
-headings, lists, tables, etc.) in the [`assets/pandoc-spec/`](../assets/pandoc-spec/)
+headings, lists, tables, etc.) in the <a>`docs/pandoc-spec/`</a>
 directory. These documents represent the definitive reference for elements
 that the parser should understand and handle correctly. This specification
 is essential for understanding formatting requirements, implementing parser
@@ -21,7 +21,7 @@ the Quarto-specific syntax extensions.
 **Key Facts:**
 
 - **Language**: Rust (2024 edition), stable toolchain
-- **Size**: ~15k lines across 62 files
+- **Size**: ~20k lines across 72 files
 - **Architecture**: Binary crate with workspace containing WASM crate for web playground
 - **Status**: Early development - expect bugs and breaking changes
 
@@ -111,6 +111,11 @@ panache format --config cfg.toml file.qmd # Custom config
 panache parse document.qmd
 panache parse --config cfg.toml file.qmd  # Config affects parsing
 
+# Lint (check for issues)
+panache lint document.qmd
+panache lint --check document.qmd         # Exit code 1 if issues found (CI mode)
+panache lint --fix document.qmd           # Apply auto-fixes
+
 # LSP (Language Server Protocol)
 panache lsp  # Starts LSP server on stdin/stdout for editor integration
 ```
@@ -151,7 +156,7 @@ RUST_LOG=panache::block_parser=trace,panache::formatter=debug panache format doc
 
 ### Timing Notes
 
-- `cargo test`: ~1 second (708 tests total across lib, inline parser, block parser, format tests, golden tests, and doc tests)
+- `cargo test`: ~1 second (591 lib tests + integration + doc tests = 616 total)
 - `cargo build --release`: ~25 seconds
 - `cargo check`: ~1 second
 
@@ -167,10 +172,11 @@ the formatting rules.
 
 ```
 src/
-├── main.rs              # CLI entry point with subcommands (format, parse, lsp)
+├── main.rs              # CLI entry point with subcommands (format, parse, lint, lsp)
 ├── lib.rs               # Public API with format() and parse() functions
-├── lsp.rs               # Language Server Protocol implementation
+├── cli.rs               # CLI argument definitions with clap
 ├── config.rs            # Configuration handling (.panache.toml, flavor, extensions)
+├── syntax.rs            # Syntax node definitions and AST types (rowan-based)
 ├── formatter.rs         # Formatter module entry point (public API)
 ├── formatter/
 │   ├── core.rs             # Formatter struct + format_node_sync orchestration
@@ -187,29 +193,57 @@ src/
 │   └── metadata.rs         # Frontmatter formatting logic (YAML, TOML, Pandoc)
 ├── block_parser.rs      # Block parser module entry point
 ├── block_parser/
-│   ├── blockquotes.rs      # Blockquote parsing and resolution
-│   ├── code_blocks.rs      # Fenced code block parsing
-│   ├── container_stack.rs  # Container block stack management
-│   ├── fenced_divs.rs      # Quarto/Pandoc fenced div parsing
-│   ├── headings.rs         # ATX heading parsing
-│   ├── horizontal_rules.rs # Horizontal rule parsing
-│   ├── lists.rs            # List parsing (ordered/unordered/task)
-│   ├── metadata.rs         # Frontmatter parsing (YAML, TOML, Pandoc)
-│   ├── paragraphs.rs       # Paragraph parsing
-│   ├── utils.rs            # Helper functions (strip_leading_spaces, etc.)
-│   └── tests/              # Block parser unit tests
+│   ├── attributes.rs        # Attribute parsing ({#id .class key=value})
+│   ├── blockquotes.rs       # Blockquote parsing and resolution
+│   ├── code_blocks.rs       # Fenced code block parsing
+│   ├── container_stack.rs   # Container block stack management
+│   ├── definition_lists.rs  # Definition list parsing
+│   ├── display_math.rs      # Display math block parsing ($$)
+│   ├── fenced_divs.rs       # Quarto/Pandoc fenced div parsing (:::)
+│   ├── headings.rs          # ATX heading parsing (#)
+│   ├── horizontal_rules.rs  # Horizontal rule parsing (---)
+│   ├── html_blocks.rs       # HTML block parsing
+│   ├── indented_code.rs     # Indented code block parsing
+│   ├── latex_envs.rs        # LaTeX environment parsing (\begin{} \end{})
+│   ├── line_blocks.rs       # Line block parsing (|)
+│   ├── lists.rs             # List parsing (ordered/unordered/task/definition)
+│   ├── metadata.rs          # Frontmatter parsing (YAML, TOML, Pandoc title block)
+│   ├── paragraphs.rs        # Paragraph parsing
+│   ├── reference_definitions.rs # Reference link/footnote definition parsing
+│   ├── tables.rs            # Table parsing (grid, pipe, simple)
+│   ├── utils.rs             # Helper functions (strip_leading_spaces, etc.)
+│   └── tests/               # Block parser unit tests
 ├── inline_parser.rs     # Inline parser module entry point
 ├── inline_parser/
 │   ├── architecture_tests.rs # Tests for nested inline structures
-│   ├── code_spans.rs        # Code span parsing (backticks)
-│   ├── emphasis.rs          # Emphasis/strong parsing
-│   ├── escapes.rs           # Escape sequence parsing
-│   ├── inline_footnotes.rs  # Inline footnote parsing (^[...])
-│   ├── inline_math.rs       # Inline math parsing (dollars)
-│   ├── links.rs             # Link and image parsing
-│   ├── future_tests.rs      # Tests for unimplemented features
-│   └── tests.rs             # Integration tests
-└── syntax.rs            # Syntax node definitions and AST types
+│   ├── bracketed_spans.rs    # Bracketed span parsing ([text]{.class})
+│   ├── citations.rs          # Citation parsing (@key, [@key])
+│   ├── code_spans.rs         # Code span parsing (`code`)
+│   ├── emphasis.rs           # Emphasis/strong parsing (*em* **strong**)
+│   ├── escapes.rs            # Escape sequence parsing (\*)
+│   ├── inline_footnotes.rs   # Inline footnote parsing (^[text])
+│   ├── inline_math.rs        # Inline math parsing ($x^2$)
+│   ├── latex.rs              # Inline LaTeX command parsing (\command)
+│   ├── links.rs              # Link and image parsing ([text](url))
+│   ├── native_spans.rs       # Native span parsing
+│   ├── raw_inline.rs         # Raw inline parsing (`code`{=format})
+│   ├── strikeout.rs          # Strikeout parsing (~~text~~)
+│   ├── subscript.rs          # Subscript parsing (~text~)
+│   ├── superscript.rs        # Superscript parsing (^text^)
+│   ├── tests/                # Inline parser test modules
+│   └── tests.rs              # Integration tests
+├── linter.rs            # Linter module entry point (public API)
+├── linter/
+│   ├── diagnostics.rs       # Diagnostic types (Location, Severity, Fix, Edit)
+│   ├── runner.rs            # LintRunner orchestration
+│   ├── rules.rs             # Rule trait and RuleRegistry
+│   └── rules/
+│       └── heading_hierarchy.rs # Heading hierarchy rule (h1 → h3 warns)
+├── lsp.rs               # LSP module entry point
+├── lsp/                 # (empty - LSP code in lsp.rs for now)
+├── external_formatters.rs       # Async external formatter integration
+├── external_formatters_sync.rs  # Sync external formatter integration
+└── external_formatters_common.rs # Shared formatter utilities
 ```
 
 ### Configuration System
@@ -278,19 +312,21 @@ The project has a Quarto-based documentation site in the `docs/` directory:
 
 ```
 docs/
-├── filters/              # Custom Quarto filters (if needed)
 ├── _quarto.yml          # Quarto configuration (site metadata, navigation)
 ├── index.qmd            # Homepage with project overview
 ├── getting-started.qmd  # Installation and basic usage
-├── cli.qmd              # CLI reference
-├── lsp.qmd              # Language Server Protocol docs
-├── formatting.qmd       # Detailed formatting rules and examples
-├── configuration.qmd    # panache.toml reference
+├── cli.qmd              # CLI subcommands reference (format, parse, lint, lsp)
+├── lsp.qmd              # Language Server setup for editors
+├── configuration.qmd    # .panache.toml reference
+├── formatting.qmd       # Supported syntax and formatting rules
 └── playground/          # WASM-based web playground for live formatting
     └── index.html       # Uses TypeScript bindings from panache-wasm
 ```
 
-**Published**: GitHub Pages via `docs.yml` workflow at https://jolars.github.io/panache/
+**Structure:**
+- **User guides**: Installation, CLI usage, LSP setup, configuration, feature showcase
+- **playground/**: Interactive WASM-based formatter demo
+- **Published**: GitHub Pages via `docs.yml` workflow at https://jolars.github.io/panache/
 
 **Building the docs:**
 
@@ -358,6 +394,53 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 - **tower-lsp-server**: Community-maintained LSP framework (v0.23)
 - **log** + **env_logger**: Logging infrastructure (debug builds have DEBUG/TRACE, release builds have INFO only)
 
+### Linter
+
+panache includes a built-in linter accessible via `panache lint`:
+
+**Architecture:**
+
+- Linter code lives in `src/linter.rs` with submodules for diagnostics, rules, and runner
+- Provides diagnostic detection and auto-fixes
+- Uses modern Rust module structure (`linter.rs` instead of `linter/mod.rs`)
+
+**Components:**
+
+- **diagnostics.rs**: Core types (`Diagnostic`, `Location`, `Severity`, `Fix`, `Edit`)
+- **runner.rs**: `LintRunner` that orchestrates rule execution
+- **rules.rs**: `Rule` trait and `RuleRegistry` for managing lint rules
+- **rules/**: Individual rule implementations
+
+**Current Rules:**
+
+- ✅ **heading-hierarchy**: Warns on skipped heading levels (e.g., h1 → h3), provides auto-fix to correct level
+
+**Usage:**
+
+```bash
+# Lint a document
+panache lint document.qmd
+
+# Check mode for CI (exit code 1 if violations)
+panache lint --check document.qmd
+
+# Apply auto-fixes
+panache lint --fix document.qmd
+```
+
+**Adding New Rules:**
+
+1. Create rule file in `src/linter/rules/` implementing `Rule` trait
+2. Register in `linter.rs` `default_registry()` function
+3. Add tests in rule module
+
+**Diagnostic Structure:**
+
+- **Severity**: Error, Warning, Info
+- **Location**: Line, column, text range
+- **Code**: Rule identifier (e.g., "heading-hierarchy")
+- **Fix**: Optional auto-fix with one or more `Edit` operations
+
 ### Language Server Protocol (LSP)
 
 panache includes a built-in LSP implementation accessible via `panache lsp`:
@@ -373,9 +456,18 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 
 - ✅ `textDocument/formatting` - Full document formatting
 - ✅ `textDocument/didOpen/didChange/didClose` - Document tracking (INCREMENTAL sync mode)
+- ✅ `textDocument/publishDiagnostics` - Live linting with diagnostics
+- ✅ `textDocument/codeAction` - Quick fixes for lint issues (heading hierarchy)
 - ✅ Config discovery from workspace root (`.panache.toml`)
 - ✅ Thread-safe document state management with Arc
 - ✅ UTF-16 to UTF-8 position conversion for proper incremental edits
+
+**Linting Integration:**
+
+- Diagnostics published on document open/change
+- Auto-fix suggestions via code actions (QUICKFIX kind)
+- Diagnostics cleared on document close
+- Uses same linter infrastructure as CLI `lint` subcommand
 
 **Implementation Details:**
 
@@ -383,15 +475,17 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 - Workspace root captured from `InitializeParams.workspace_folders` or deprecated `root_uri`
 - Config loaded per formatting request (no caching yet)
 - Formatting runs in blocking task to avoid Send trait issues
+- Linting runs in blocking task (SyntaxNode isn't Send)
 - INCREMENTAL sync mode with proper UTF-16/UTF-8 position conversion
 - Full document reparsing (incremental parsing deferred for performance need)
 
-**Future LSP Features** (see TODO.md):
+**Testing:**
 
-- Diagnostics, code actions, document symbols, completion, hover, navigation
-- Range formatting, semantic tokens, rename, workspace features
+- 13 unit tests for conversion functions (offset_to_position, convert_diagnostic, etc.)
+- Tests cover UTF-16 edge cases (emoji, accented characters)
+- Manual testing via editor integration (see README.md for editor configs)
 
-**Testing LSP:**
+**Testing LSP Manually:**
 
 ```bash
 # Start the server (for manual editor testing)
