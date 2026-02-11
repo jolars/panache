@@ -17,23 +17,23 @@ impl Rule for HeadingHierarchyRule {
         let mut prev_level: Option<usize> = None;
 
         for (node, level) in headings {
-            if let Some(prev) = prev_level {
-                if level > prev + 1 {
-                    let location = Location::from_node(&node, input);
-                    let expected_level = prev + 1;
+            if let Some(prev) = prev_level
+                && level > prev + 1
+            {
+                let location = Location::from_node(&node, input);
+                let expected_level = prev + 1;
 
-                    let diagnostic = Diagnostic::warning(
-                        location,
-                        "heading-hierarchy",
-                        format!(
-                            "Heading level skipped from h{} to h{}; expected h{}",
-                            prev, level, expected_level
-                        ),
-                    )
-                    .with_fix(create_fix(&node, level, expected_level));
+                let diagnostic = Diagnostic::warning(
+                    location,
+                    "heading-hierarchy",
+                    format!(
+                        "Heading level skipped from h{} to h{}; expected h{}",
+                        prev, level, expected_level
+                    ),
+                )
+                .with_fix(create_fix(&node, level, expected_level));
 
-                    diagnostics.push(diagnostic);
-                }
+                diagnostics.push(diagnostic);
             }
 
             prev_level = Some(level);
@@ -47,10 +47,10 @@ fn collect_headings(tree: &SyntaxNode) -> Vec<(SyntaxNode, usize)> {
     let mut headings = Vec::new();
 
     fn walk(node: &SyntaxNode, headings: &mut Vec<(SyntaxNode, usize)>) {
-        if node.kind() == SyntaxKind::Heading {
-            if let Some(level) = extract_heading_level(node) {
-                headings.push((node.clone(), level));
-            }
+        if node.kind() == SyntaxKind::Heading
+            && let Some(level) = extract_heading_level(node)
+        {
+            headings.push((node.clone(), level));
         }
 
         for child in node.children() {
