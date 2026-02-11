@@ -49,7 +49,6 @@ format:
   html:
     toc: true
     theme: cosmo
-    css: styles.css
     html-math-method: katex
     pagetitle: "{{< meta title >}}"
 
