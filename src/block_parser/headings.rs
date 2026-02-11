@@ -39,7 +39,23 @@ pub(crate) fn emit_atx_heading(
 ) {
     builder.start_node(SyntaxKind::Heading.into());
 
-    let trimmed = content.trim_start();
+    // Strip trailing newline for processing but remember to emit it later
+    let (content_without_newline, has_newline) = if content.ends_with('\n') {
+        (&content[..content.len() - 1], true)
+    } else {
+        (content, false)
+    };
+
+    let trimmed = content_without_newline.trim_start();
+    let leading_spaces = content_without_newline.len() - trimmed.len();
+
+    // Emit leading spaces if present
+    if leading_spaces > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &content_without_newline[..leading_spaces],
+        );
+    }
 
     // Marker node for the hashes (must be a node containing a token, not just a token)
     builder.start_node(SyntaxKind::AtxHeadingMarker.into());
@@ -48,13 +64,23 @@ pub(crate) fn emit_atx_heading(
 
     // Get content after marker
     let after_marker = &trimmed[level..];
-    let content_start = after_marker
+    let spaces_after_marker_count = after_marker
         .find(|c: char| !c.is_whitespace())
         .unwrap_or(after_marker.len());
 
+    // Emit spaces after marker
+    if spaces_after_marker_count > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &after_marker[..spaces_after_marker_count],
+        );
+    }
+
+    // Get actual heading text
+    let heading_text = &after_marker[spaces_after_marker_count..];
+
     // Strip trailing hashes
-    let heading_content = after_marker[content_start..].trim_end();
-    let heading_content = heading_content.trim_end_matches(|c: char| c == '#' || c.is_whitespace());
+    let heading_content = heading_text.trim_end_matches(|c: char| c == '#' || c.is_whitespace());
 
     // Try to parse trailing attributes
     let (text_content, attributes) =
@@ -74,6 +100,11 @@ pub(crate) fn emit_atx_heading(
     // Emit attributes if present
     if let Some(attrs) = attributes {
         emit_attributes(builder, &attrs);
+    }
+
+    // Emit trailing newline if present
+    if has_newline {
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
     }
 
     builder.finish_node(); // Heading

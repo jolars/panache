@@ -1,36 +1,38 @@
-ROOT@0..244
-  DOCUMENT@0..244
-    Heading@0..23
+ROOT@0..249
+  DOCUMENT@0..249
+    Heading@0..25
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
-      HeadingContent@1..23
-        TEXT@1..23 "LaTeX Environment Test"
-    BlankLine@23..23
-      BlankLine@23..23 ""
-    PARAGRAPH@23..70
-      TEXT@23..69 "This document tests L ..."
-      NEWLINE@69..70 "\n"
-    BlankLine@70..70
-      BlankLine@70..70 ""
-    LatexEnvironment@70..194
-      LatexEnvBegin@70..99
-        TEXT@70..98 "\\begin{tabular}{|l|l| ..."
-        NEWLINE@98..99 "\n"
-      LatexEnvContent@99..180
-        TEXT@99..124 "Age & Frequency \\\\ \\h ..."
-        NEWLINE@124..125 "\n"
-        TEXT@125..140 "18--25  & 15 \\\\"
-        NEWLINE@140..141 "\n"
-        TEXT@141..156 "26--35  & 33 \\\\"
-        NEWLINE@156..157 "\n"
-        TEXT@157..179 "36--45  & 22 \\\\ \\hline"
-        NEWLINE@179..180 "\n"
-      LatexEnvEnd@180..194
-        TEXT@180..193 "\\end{tabular}"
-        NEWLINE@193..194 "\n"
-    BlankLine@194..194
-      BlankLine@194..194 ""
-    PARAGRAPH@194..244
-      TEXT@194..243 "The table above shoul ..."
-      NEWLINE@243..244 "\n"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..24
+        TEXT@2..24 "LaTeX Environment Test"
+      NEWLINE@24..25 "\n"
+    BlankLine@25..26
+      BlankLine@25..26 "\n"
+    PARAGRAPH@26..73
+      TEXT@26..72 "This document tests L ..."
+      NEWLINE@72..73 "\n"
+    BlankLine@73..74
+      BlankLine@73..74 "\n"
+    LatexEnvironment@74..198
+      LatexEnvBegin@74..103
+        TEXT@74..102 "\\begin{tabular}{|l|l| ..."
+        NEWLINE@102..103 "\n"
+      LatexEnvContent@103..184
+        TEXT@103..128 "Age & Frequency \\\\ \\h ..."
+        NEWLINE@128..129 "\n"
+        TEXT@129..144 "18--25  & 15 \\\\"
+        NEWLINE@144..145 "\n"
+        TEXT@145..160 "26--35  & 33 \\\\"
+        NEWLINE@160..161 "\n"
+        TEXT@161..183 "36--45  & 22 \\\\ \\hline"
+        NEWLINE@183..184 "\n"
+      LatexEnvEnd@184..198
+        TEXT@184..197 "\\end{tabular}"
+        NEWLINE@197..198 "\n"
+    BlankLine@198..199
+      BlankLine@198..199 "\n"
+    PARAGRAPH@199..249
+      TEXT@199..248 "The table above shoul ..."
+      NEWLINE@248..249 "\n"
 

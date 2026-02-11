@@ -4,7 +4,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::blockquotes::count_blockquote_markers;
-use super::utils::strip_leading_spaces;
+use super::utils::{emit_line_tokens, strip_leading_spaces};
 
 /// Information about a detected LaTeX environment opening.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,8 +74,7 @@ pub(crate) fn parse_latex_environment(
     // Opening \begin{name}
     let first_line = lines[start_pos];
     builder.start_node(SyntaxKind::LatexEnvBegin.into());
-    builder.token(SyntaxKind::TEXT.into(), first_line);
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    emit_line_tokens(builder, first_line);
     builder.finish_node(); // LatexEnvBegin
 
     let mut current_pos = start_pos + 1;
@@ -134,16 +133,14 @@ pub(crate) fn parse_latex_environment(
                     if !content_lines.is_empty() {
                         builder.start_node(SyntaxKind::LatexEnvContent.into());
                         for content_line in &content_lines {
-                            builder.token(SyntaxKind::TEXT.into(), content_line);
-                            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                            emit_line_tokens(builder, content_line);
                         }
                         builder.finish_node(); // LatexEnvContent
                     }
 
                     // Emit closing \end{name}
                     builder.start_node(SyntaxKind::LatexEnvEnd.into());
-                    builder.token(SyntaxKind::TEXT.into(), line);
-                    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    emit_line_tokens(builder, line);
                     builder.finish_node(); // LatexEnvEnd
 
                     current_pos += 1;
@@ -177,8 +174,7 @@ pub(crate) fn parse_latex_environment(
         if !content_lines.is_empty() {
             builder.start_node(SyntaxKind::LatexEnvContent.into());
             for content_line in &content_lines {
-                builder.token(SyntaxKind::TEXT.into(), content_line);
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                emit_line_tokens(builder, content_line);
             }
             builder.finish_node(); // LatexEnvContent
         }

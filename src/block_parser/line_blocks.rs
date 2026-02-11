@@ -38,8 +38,20 @@ pub fn parse_line_block(
 
             // Emit the content (preserving leading spaces)
             let content = &line[content_start..];
-            if !content.is_empty() {
-                builder.token(SyntaxKind::TEXT.into(), content);
+
+            // Split off trailing newline if present
+            let (content_without_newline, has_newline) = if content.ends_with('\n') {
+                (&content[..content.len() - 1], true)
+            } else {
+                (content, false)
+            };
+
+            if !content_without_newline.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), content_without_newline);
+            }
+
+            if has_newline {
+                builder.token(SyntaxKind::NEWLINE.into(), "\n");
             }
 
             builder.finish_node(); // LineBlockLine
@@ -53,7 +65,22 @@ pub fn parse_line_block(
                 if next_line.starts_with(' ') && !next_line.trim_start().starts_with("| ") {
                     // This is a continuation of the previous line
                     builder.start_node(SyntaxKind::LineBlockLine.into());
-                    builder.token(SyntaxKind::TEXT.into(), next_line);
+
+                    // Split off trailing newline if present
+                    let (line_without_newline, has_newline) = if next_line.ends_with('\n') {
+                        (&next_line[..next_line.len() - 1], true)
+                    } else {
+                        (next_line, false)
+                    };
+
+                    if !line_without_newline.is_empty() {
+                        builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+                    }
+
+                    if has_newline {
+                        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    }
+
                     builder.finish_node(); // LineBlockLine
                     pos += 1;
                 } else {
@@ -83,7 +110,7 @@ fn parse_line_block_line_marker(line: &str) -> Option<usize> {
 
     if after_indent.starts_with("| ") {
         Some(trimmed_start + 2) // Skip "| "
-    } else if after_indent == "|" {
+    } else if after_indent == "|" || after_indent == "|\n" {
         Some(trimmed_start + 1) // Just "|", no space
     } else {
         None

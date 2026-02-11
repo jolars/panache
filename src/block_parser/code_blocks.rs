@@ -271,11 +271,12 @@ pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
     }
 
     let info_string_raw = &trimmed[fence_count..];
-    // Trim at most one leading space, preserve everything else
-    let info_string = if let Some(stripped) = info_string_raw.strip_prefix(' ') {
+    // Trim trailing newline and at most one leading space
+    let info_string_trimmed = info_string_raw.trim_end_matches('\n');
+    let info_string = if let Some(stripped) = info_string_trimmed.strip_prefix(' ') {
         stripped.to_string()
     } else {
-        info_string_raw.to_string()
+        info_string_trimmed.to_string()
     };
 
     Some(FenceInfo {
@@ -381,8 +382,20 @@ pub(crate) fn parse_fenced_code_block(
     if !content_lines.is_empty() {
         builder.start_node(SyntaxKind::CodeContent.into());
         for content_line in content_lines.iter() {
-            builder.token(SyntaxKind::TEXT.into(), content_line);
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            // Split off trailing newline if present (from split_inclusive)
+            let (line_without_newline, has_newline) = if content_line.ends_with('\n') {
+                (&content_line[..content_line.len() - 1], true)
+            } else {
+                (*content_line, false)
+            };
+
+            if !line_without_newline.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+            }
+
+            if has_newline {
+                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            }
         }
         builder.finish_node(); // CodeContent
     }

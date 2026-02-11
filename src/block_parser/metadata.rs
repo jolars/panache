@@ -79,8 +79,7 @@ pub(crate) fn try_parse_yaml_block(
         }
 
         // Add content line
-        builder.token(SyntaxKind::TEXT.into(), content_line);
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        super::utils::emit_line_tokens(builder, content_line);
         current_pos += 1;
     }
 
@@ -129,8 +128,7 @@ pub(crate) fn try_parse_pandoc_title_block(
 
         // Check if this line starts a field (begins with %)
         if line.trim_start().starts_with('%') {
-            builder.token(SyntaxKind::TEXT.into(), line);
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            super::utils::emit_line_tokens(builder, line);
             field_count += 1;
             current_pos += 1;
 
@@ -147,8 +145,7 @@ pub(crate) fn try_parse_pandoc_title_block(
                 }
                 if cont_line.starts_with(' ') || cont_line.starts_with('\t') {
                     // Continuation line
-                    builder.token(SyntaxKind::TEXT.into(), cont_line);
-                    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    super::utils::emit_line_tokens(builder, cont_line);
                     current_pos += 1;
                 } else {
                     // Non-continuation, non-% line ends title block

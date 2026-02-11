@@ -80,7 +80,7 @@ pub(crate) fn parse_indented_code_block(
                     if look_bq_depth < bq_depth {
                         break;
                     }
-                    if look_inner.trim().is_empty() {
+                    if look_inner.trim_end_matches('\n').trim().is_empty() {
                         look_pos += 1;
                         continue;
                     }
@@ -112,8 +112,22 @@ pub(crate) fn parse_indented_code_block(
         } else {
             ""
         };
-        builder.token(SyntaxKind::TEXT.into(), content);
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+
+        // Split off trailing newline if present (from split_inclusive)
+        let (content_without_newline, has_newline) = if content.ends_with('\n') {
+            (&content[..content.len() - 1], true)
+        } else {
+            (content, false)
+        };
+
+        if !content_without_newline.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), content_without_newline);
+        }
+
+        if has_newline {
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        }
+
         current_pos += 1;
     }
 

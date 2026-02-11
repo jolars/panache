@@ -61,7 +61,8 @@ pub struct BlockParser<'a> {
 
 impl<'a> BlockParser<'a> {
     pub fn new(input: &'a str, config: &'a Config) -> Self {
-        let lines: Vec<&str> = input.lines().collect();
+        // Use split_inclusive to preserve newlines for lossless CST
+        let lines: Vec<&str> = input.split_inclusive('\n').collect();
         Self {
             lines,
             pos: 0,
@@ -183,7 +184,9 @@ impl<'a> BlockParser<'a> {
 
         // Handle blank lines specially (including blank lines inside blockquotes)
         // A line like ">" with nothing after is a blank line inside a blockquote
-        let is_blank = line.trim().is_empty() || (bq_depth > 0 && inner_content.trim().is_empty());
+        // Note: lines may end with \n from split_inclusive
+        let is_blank = line.trim_end_matches('\n').trim().is_empty()
+            || (bq_depth > 0 && inner_content.trim_end_matches('\n').trim().is_empty());
 
         if is_blank {
             // Close paragraph if open
@@ -1214,8 +1217,22 @@ impl<'a> BlockParser<'a> {
 
     fn append_paragraph_line(&mut self, line: &str) {
         let text = self.strip_to_content_col(line);
-        self.builder.token(SyntaxKind::TEXT.into(), text);
-        self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+
+        // Split off trailing newline if present
+        let (text_without_newline, has_newline) = if text.ends_with('\n') {
+            (&text[..text.len() - 1], true)
+        } else {
+            (text, false)
+        };
+
+        if !text_without_newline.is_empty() {
+            self.builder
+                .token(SyntaxKind::TEXT.into(), text_without_newline);
+        }
+
+        if has_newline {
+            self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        }
     }
 
     fn current_content_col(&self) -> usize {
@@ -1255,4 +1272,5 @@ mod tests {
     mod headings;
     mod helpers;
     mod lists;
+    mod losslessness;
 }

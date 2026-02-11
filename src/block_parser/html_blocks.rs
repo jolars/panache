@@ -217,8 +217,22 @@ pub(crate) fn parse_html_block(
 
     // Emit opening line
     builder.start_node(SyntaxKind::HtmlBlockTag.into());
-    builder.token(SyntaxKind::TEXT.into(), first_line);
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+
+    // Split off trailing newline if present
+    let (line_without_newline, has_newline) = if first_line.ends_with('\n') {
+        (&first_line[..first_line.len() - 1], true)
+    } else {
+        (first_line, false)
+    };
+
+    if !line_without_newline.is_empty() {
+        builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+    }
+
+    if has_newline {
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    }
+
     builder.finish_node(); // HtmlBlockTag
 
     // Check if opening line also contains closing marker
@@ -256,16 +270,42 @@ pub(crate) fn parse_html_block(
             if !content_lines.is_empty() {
                 builder.start_node(SyntaxKind::HtmlBlockContent.into());
                 for content_line in &content_lines {
-                    builder.token(SyntaxKind::TEXT.into(), content_line);
-                    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    // Split off trailing newline if present
+                    let (line_without_newline, has_newline) = if content_line.ends_with('\n') {
+                        (&content_line[..content_line.len() - 1], true)
+                    } else {
+                        (*content_line, false)
+                    };
+
+                    if !line_without_newline.is_empty() {
+                        builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+                    }
+
+                    if has_newline {
+                        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    }
                 }
                 builder.finish_node(); // HtmlBlockContent
             }
 
             // Emit closing line
             builder.start_node(SyntaxKind::HtmlBlockTag.into());
-            builder.token(SyntaxKind::TEXT.into(), line);
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+
+            // Split off trailing newline if present
+            let (line_without_newline, has_newline) = if line.ends_with('\n') {
+                (&line[..line.len() - 1], true)
+            } else {
+                (line, false)
+            };
+
+            if !line_without_newline.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+            }
+
+            if has_newline {
+                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            }
+
             builder.finish_node(); // HtmlBlockTag
 
             current_pos += 1;
@@ -283,8 +323,20 @@ pub(crate) fn parse_html_block(
         if !content_lines.is_empty() {
             builder.start_node(SyntaxKind::HtmlBlockContent.into());
             for content_line in &content_lines {
-                builder.token(SyntaxKind::TEXT.into(), content_line);
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                // Split off trailing newline if present
+                let (line_without_newline, has_newline) = if content_line.ends_with('\n') {
+                    (&content_line[..content_line.len() - 1], true)
+                } else {
+                    (*content_line, false)
+                };
+
+                if !line_without_newline.is_empty() {
+                    builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+                }
+
+                if has_newline {
+                    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                }
             }
             builder.finish_node(); // HtmlBlockContent
         }

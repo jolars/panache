@@ -1,48 +1,48 @@
-ROOT@0..169
-  DOCUMENT@0..169
+ROOT@0..178
+  DOCUMENT@0..178
     PARAGRAPH@0..28
       TEXT@0..27 "First section with co ..."
       NEWLINE@27..28 "\n"
-    BlankLine@28..28
-      BlankLine@28..28 ""
-    HorizontalRule@28..31
-      HorizontalRule@28..31 "***"
-    BlankLine@31..31
-      BlankLine@31..31 ""
-    PARAGRAPH@31..68
-      TEXT@31..67 "Second section with d ..."
-      NEWLINE@67..68 "\n"
-    BlankLine@68..68
-      BlankLine@68..68 ""
-    HorizontalRule@68..77
-      HorizontalRule@68..77 "- - - - -"
-    BlankLine@77..77
-      BlankLine@77..77 ""
-    PARAGRAPH@77..109
-      TEXT@77..108 "Third section with un ..."
-      NEWLINE@108..109 "\n"
-    BlankLine@109..109
-      BlankLine@109..109 ""
-    HorizontalRule@109..114
-      HorizontalRule@109..114 "_____"
-    BlankLine@114..114
-      BlankLine@114..114 ""
-    BlockQuote@114..152
-      PARAGRAPH@114..132
-        TEXT@114..131 "Quote before rule"
-        NEWLINE@131..132 "\n"
-      BlankLine@132..132
-        BlankLine@132..132 ""
-      HorizontalRule@132..135
-        HorizontalRule@132..135 "***"
-      BlankLine@135..135
-        BlankLine@135..135 ""
-      PARAGRAPH@135..152
-        TEXT@135..151 "Quote after rule"
-        NEWLINE@151..152 "\n"
-    BlankLine@152..152
-      BlankLine@152..152 ""
-    PARAGRAPH@152..169
-      TEXT@152..168 "Final paragraph."
-      NEWLINE@168..169 "\n"
+    BlankLine@28..29
+      BlankLine@28..29 "\n"
+    HorizontalRule@29..32
+      HorizontalRule@29..32 "***"
+    BlankLine@32..33
+      BlankLine@32..33 "\n"
+    PARAGRAPH@33..70
+      TEXT@33..69 "Second section with d ..."
+      NEWLINE@69..70 "\n"
+    BlankLine@70..71
+      BlankLine@70..71 "\n"
+    HorizontalRule@71..80
+      HorizontalRule@71..80 "- - - - -"
+    BlankLine@80..81
+      BlankLine@80..81 "\n"
+    PARAGRAPH@81..113
+      TEXT@81..112 "Third section with un ..."
+      NEWLINE@112..113 "\n"
+    BlankLine@113..114
+      BlankLine@113..114 "\n"
+    HorizontalRule@114..119
+      HorizontalRule@114..119 "_____"
+    BlankLine@119..120
+      BlankLine@119..120 "\n"
+    BlockQuote@120..160
+      PARAGRAPH@120..138
+        TEXT@120..137 "Quote before rule"
+        NEWLINE@137..138 "\n"
+      BlankLine@138..139
+        BlankLine@138..139 "\n"
+      HorizontalRule@139..142
+        HorizontalRule@139..142 "***"
+      BlankLine@142..143
+        BlankLine@142..143 "\n"
+      PARAGRAPH@143..160
+        TEXT@143..159 "Quote after rule"
+        NEWLINE@159..160 "\n"
+    BlankLine@160..161
+      BlankLine@160..161 "\n"
+    PARAGRAPH@161..178
+      TEXT@161..177 "Final paragraph."
+      NEWLINE@177..178 "\n"
 

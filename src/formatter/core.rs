@@ -399,8 +399,11 @@ impl Formatter {
 
             SyntaxKind::ReferenceDefinition => {
                 // Output reference definition as-is: [label]: url "title"
-                self.output.push_str(&node.text().to_string());
-                self.output.push('\n');
+                let text = node.text().to_string();
+                self.output.push_str(text.trim_end());
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
 
                 // Ensure blank line after if followed by non-reference block element
                 if let Some(next) = node.next_sibling()
@@ -849,7 +852,9 @@ impl Formatter {
                         };
 
                         // Output the marker
-                        if content.is_empty() {
+                        // Check if content is empty or just whitespace/newline
+                        let content_trimmed = content.trim();
+                        if content_trimmed.is_empty() {
                             // Empty line block line - just output "|"
                             self.output.push('|');
                         } else {
@@ -1001,7 +1006,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::SimpleTable => {
+            SyntaxKind::SimpleTable | SyntaxKind::MultilineTable => {
                 // Handle table with proper caption formatting
                 for child in node.children() {
                     match child.kind() {

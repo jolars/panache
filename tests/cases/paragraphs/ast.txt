@@ -1,5 +1,5 @@
-ROOT@0..282
-  DOCUMENT@0..282
+ROOT@0..283
+  DOCUMENT@0..283
     PARAGRAPH@0..224
       TEXT@0..73 "A test paragraph that ..."
       NEWLINE@73..74 "\n"
@@ -7,9 +7,9 @@ ROOT@0..282
       NEWLINE@149..150 "\n"
       TEXT@150..223 "breaks when the lines ..."
       NEWLINE@223..224 "\n"
-    BlankLine@224..224
-      BlankLine@224..224 ""
-    PARAGRAPH@224..282
-      TEXT@224..281 "Here is a new paragra ..."
-      NEWLINE@281..282 "\n"
+    BlankLine@224..225
+      BlankLine@224..225 "\n"
+    PARAGRAPH@225..283
+      TEXT@225..282 "Here is a new paragra ..."
+      NEWLINE@282..283 "\n"
 

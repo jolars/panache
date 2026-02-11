@@ -1,5 +1,5 @@
-ROOT@0..414
-  DOCUMENT@0..414
+ROOT@0..429
+  DOCUMENT@0..429
     PandocTitleBlock@0..89
       TEXT@0..19 "% My Document Title"
       NEWLINE@19..20 "\n"
@@ -9,55 +9,61 @@ ROOT@0..414
       NEWLINE@72..73 "\n"
       TEXT@73..88 "% June 15, 2006"
       NEWLINE@88..89 "\n"
-    BlankLine@89..89
-      BlankLine@89..89 ""
-    Heading@89..102
-      AtxHeadingMarker@89..90
-        AtxHeadingMarker@89..90 "#"
-      HeadingContent@90..102
-        TEXT@90..102 "Introduction"
-    BlankLine@102..102
-      BlankLine@102..102 ""
-    PARAGRAPH@102..182
-      TEXT@102..181 "This document demonst ..."
-      NEWLINE@181..182 "\n"
-    BlankLine@182..182
-      BlankLine@182..182 ""
-    PARAGRAPH@182..212
-      TEXT@182..211 "First paragraph with  ..."
-      NEWLINE@211..212 "\n"
-    BlankLine@212..212
-      BlankLine@212..212 ""
-    Heading@212..229
-      AtxHeadingMarker@212..214
-        AtxHeadingMarker@212..214 "##"
-      HeadingContent@214..229
-        TEXT@214..229 "Another Section"
-    BlankLine@229..229
-      BlankLine@229..229 ""
-    PARAGRAPH@229..248
-      TEXT@229..247 "More content here."
-      NEWLINE@247..248 "\n"
-    BlankLine@248..248
-      BlankLine@248..248 ""
-    Heading@248..270
-      AtxHeadingMarker@248..250
-        AtxHeadingMarker@248..250 "##"
-      HeadingContent@250..270
-        TEXT@250..270 "Blank Author Example"
-    BlankLine@270..270
-      BlankLine@270..270 ""
-    PARAGRAPH@270..320
-      TEXT@270..319 "In this example, we s ..."
-      NEWLINE@319..320 "\n"
-    BlankLine@320..320
-      BlankLine@320..320 ""
-    PARAGRAPH@320..397
-      TEXT@320..396 "% Signs in text (like ..."
-      NEWLINE@396..397 "\n"
-    BlankLine@397..397
-      BlankLine@397..397 ""
-    PARAGRAPH@397..414
-      TEXT@397..413 "Final paragraph."
-      NEWLINE@413..414 "\n"
+    BlankLine@89..90
+      BlankLine@89..90 "\n"
+    Heading@90..105
+      AtxHeadingMarker@90..91
+        AtxHeadingMarker@90..91 "#"
+      WHITESPACE@91..92 " "
+      HeadingContent@92..104
+        TEXT@92..104 "Introduction"
+      NEWLINE@104..105 "\n"
+    BlankLine@105..106
+      BlankLine@105..106 "\n"
+    PARAGRAPH@106..186
+      TEXT@106..185 "This document demonst ..."
+      NEWLINE@185..186 "\n"
+    BlankLine@186..187
+      BlankLine@186..187 "\n"
+    PARAGRAPH@187..217
+      TEXT@187..216 "First paragraph with  ..."
+      NEWLINE@216..217 "\n"
+    BlankLine@217..218
+      BlankLine@217..218 "\n"
+    Heading@218..237
+      AtxHeadingMarker@218..220
+        AtxHeadingMarker@218..220 "##"
+      WHITESPACE@220..221 " "
+      HeadingContent@221..236
+        TEXT@221..236 "Another Section"
+      NEWLINE@236..237 "\n"
+    BlankLine@237..238
+      BlankLine@237..238 "\n"
+    PARAGRAPH@238..257
+      TEXT@238..256 "More content here."
+      NEWLINE@256..257 "\n"
+    BlankLine@257..258
+      BlankLine@257..258 "\n"
+    Heading@258..282
+      AtxHeadingMarker@258..260
+        AtxHeadingMarker@258..260 "##"
+      WHITESPACE@260..261 " "
+      HeadingContent@261..281
+        TEXT@261..281 "Blank Author Example"
+      NEWLINE@281..282 "\n"
+    BlankLine@282..283
+      BlankLine@282..283 "\n"
+    PARAGRAPH@283..333
+      TEXT@283..332 "In this example, we s ..."
+      NEWLINE@332..333 "\n"
+    BlankLine@333..334
+      BlankLine@333..334 "\n"
+    PARAGRAPH@334..411
+      TEXT@334..410 "% Signs in text (like ..."
+      NEWLINE@410..411 "\n"
+    BlankLine@411..412
+      BlankLine@411..412 "\n"
+    PARAGRAPH@412..429
+      TEXT@412..428 "Final paragraph."
+      NEWLINE@428..429 "\n"
 

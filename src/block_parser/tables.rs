@@ -3,6 +3,8 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::utils::emit_line_tokens;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Alignment {
     Left,
@@ -26,7 +28,9 @@ pub(crate) struct Column {
 /// Returns Some(column positions) if it's a valid separator.
 pub(crate) fn try_parse_table_separator(line: &str) -> Option<Vec<Column>> {
     let trimmed = line.trim_start();
-    let leading_spaces = line.len() - trimmed.len();
+    // Strip trailing newline if present (from split_inclusive)
+    let trimmed = trimmed.trim_end_matches('\n');
+    let leading_spaces = line.len() - trimmed.len() - if line.ends_with('\n') { 1 } else { 0 };
 
     // Must have leading spaces <= 3 to not be a code block
     if leading_spaces > 3 {
@@ -335,12 +339,16 @@ pub(crate) fn try_parse_simple_table(
     start_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
 ) -> Option<usize> {
+    log::debug!("try_parse_simple_table at line {}", start_pos + 1);
+
     if start_pos >= lines.len() {
         return None;
     }
 
     // Look for a separator line
     let separator_pos = find_separator_line(lines, start_pos)?;
+    log::debug!("  found separator at line {}", separator_pos + 1);
+
     let separator_line = lines[separator_pos];
     let mut columns = try_parse_table_separator(separator_line)?;
 
@@ -391,8 +399,7 @@ pub(crate) fn try_parse_simple_table(
 
     // Emit separator
     builder.start_node(SyntaxKind::TableSeparator.into());
-    builder.token(SyntaxKind::TEXT.into(), separator_line);
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    emit_line_tokens(builder, separator_line);
     builder.finish_node();
 
     // Emit data rows
@@ -434,8 +441,12 @@ pub(crate) fn try_parse_simple_table(
 
 /// Find the position of a separator line starting from pos.
 fn find_separator_line(lines: &[&str], start_pos: usize) -> Option<usize> {
+    log::debug!("  find_separator_line from line {}", start_pos + 1);
+
     // Check first line
+    log::debug!("    checking first line: {:?}", lines[start_pos]);
     if try_parse_table_separator(lines[start_pos]).is_some() {
+        log::debug!("    separator found at first line");
         return Some(start_pos);
     }
 
@@ -476,10 +487,15 @@ fn emit_table_row(
 ) {
     builder.start_node(row_kind.into());
 
-    // For now, just emit the whole line as text since formatting is deferred
-    // In the future, we can parse individual cells here
-    builder.token(SyntaxKind::TEXT.into(), line);
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    // Lines from split_inclusive already contain trailing newline
+    // Split the text from the newline
+    if let Some(text) = line.strip_suffix('\n') {
+        builder.token(SyntaxKind::TEXT.into(), text);
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    } else {
+        // No trailing newline (last line of input)
+        builder.token(SyntaxKind::TEXT.into(), line);
+    }
 
     builder.finish_node();
 }
@@ -643,15 +659,13 @@ pub(crate) fn try_parse_pipe_table(
 
     // Emit separator
     builder.start_node(SyntaxKind::TableSeparator.into());
-    builder.token(SyntaxKind::TEXT.into(), separator_line);
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    emit_line_tokens(builder, separator_line);
     builder.finish_node();
 
     // Emit data rows
     for line in lines.iter().take(end_pos).skip(start_pos + 2) {
         builder.start_node(SyntaxKind::TableRow.into());
-        builder.token(SyntaxKind::TEXT.into(), line);
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        emit_line_tokens(builder, line);
         builder.finish_node();
     }
 

@@ -1,177 +1,179 @@
-ROOT@0..504
-  DOCUMENT@0..504
-    Heading@0..17
+ROOT@0..519
+  DOCUMENT@0..519
+    Heading@0..19
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
-      HeadingContent@1..17
-        TEXT@1..17 "Reference Images"
-    BlankLine@17..17
-      BlankLine@17..17 ""
-    PARAGRAPH@17..69
-      TEXT@17..37 "Explicit reference: "
-      ImageLink@37..54
-        ImageLinkStart@37..39
-          ImageLinkStart@37..39 "!["
-        ImageAlt@39..47
-          TEXT@39..47 "alt text"
-        TEXT@47..48 "]"
-        TEXT@48..49 "["
-        TEXT@49..53 "img1"
-        TEXT@53..54 "]"
-      TEXT@54..68 " in paragraph."
-      NEWLINE@68..69 "\n"
-    BlankLine@69..69
-      BlankLine@69..69 ""
-    PARAGRAPH@69..112
-      TEXT@69..89 "Implicit reference: "
-      ImageLink@89..98
-        ImageLinkStart@89..91
-          ImageLinkStart@89..91 "!["
-        ImageAlt@91..95
-          TEXT@91..95 "Logo"
-        TEXT@95..96 "]"
-        TEXT@96..97 "["
-        TEXT@97..98 "]"
-      TEXT@98..111 " shows brand."
-      NEWLINE@111..112 "\n"
-    BlankLine@112..112
-      BlankLine@112..112 ""
-    PARAGRAPH@112..151
-      TEXT@112..132 "Shortcut reference: "
-      ImageLink@132..139
-        ImageLinkStart@132..134
-          ImageLinkStart@132..134 "!["
-        ImageAlt@134..138
-          TEXT@134..138 "Icon"
-        TEXT@138..139 "]"
-      TEXT@139..150 " works too."
-      NEWLINE@150..151 "\n"
-    BlankLine@151..151
-      BlankLine@151..151 ""
-    PARAGRAPH@151..209
-      TEXT@151..168 "Multiple images: "
-      ImageLink@168..180
-        ImageLinkStart@168..170
-          ImageLinkStart@168..170 "!["
-        ImageAlt@170..175
-          TEXT@170..175 "first"
-        TEXT@175..176 "]"
-        TEXT@176..177 "["
-        TEXT@177..179 "i1"
-        TEXT@179..180 "]"
-      TEXT@180..185 " and "
-      ImageLink@185..198
-        ImageLinkStart@185..187
-          ImageLinkStart@185..187 "!["
-        ImageAlt@187..193
-          TEXT@187..193 "second"
-        TEXT@193..194 "]"
-        TEXT@194..195 "["
-        TEXT@195..197 "i2"
-        TEXT@197..198 "]"
-      TEXT@198..208 " together."
-      NEWLINE@208..209 "\n"
-    BlankLine@209..209
-      BlankLine@209..209 ""
-    PARAGRAPH@209..258
-      TEXT@209..221 "Unresolved: "
-      ImageLink@221..244
-        ImageLinkStart@221..223
-          ImageLinkStart@221..223 "!["
-        ImageAlt@223..230
-          TEXT@223..230 "missing"
-        TEXT@230..231 "]"
-        TEXT@231..232 "["
-        TEXT@232..243 "nonexistent"
-        TEXT@243..244 "]"
-      TEXT@244..257 " stays as-is."
-      NEWLINE@257..258 "\n"
-    BlankLine@258..258
-      BlankLine@258..258 ""
-    PARAGRAPH@258..320
-      TEXT@258..276 "Case insensitive: "
-      ImageLink@276..289
-        ImageLinkStart@276..278
-          ImageLinkStart@276..278 "!["
-        ImageAlt@278..281
-          TEXT@278..281 "ALT"
-        TEXT@281..282 "]"
-        TEXT@282..283 "["
-        TEXT@283..288 "myimg"
-        TEXT@288..289 "]"
-      TEXT@289..319 " matches lowercase de ..."
-      NEWLINE@319..320 "\n"
-    BlankLine@320..320
-      BlankLine@320..320 ""
-    PARAGRAPH@320..379
-      TEXT@320..333 "Complex alt: "
-      ImageLink@333..361
-        ImageLinkStart@333..335
-          ImageLinkStart@333..335 "!["
-        ImageAlt@335..354
-          Strong@335..343
-            StrongMarker@335..337 "**"
-            TEXT@337..341 "bold"
-            StrongMarker@341..343 "**"
-          TEXT@343..348 " and "
-          CodeSpan@348..354
-            CodeSpanMarker@348..349 "`"
-            TEXT@349..353 "code"
-            CodeSpanMarker@353..354 "`"
-        TEXT@354..355 "]"
-        TEXT@355..356 "["
-        TEXT@356..360 "img1"
-        TEXT@360..361 "]"
-      TEXT@361..378 " with formatting."
-      NEWLINE@378..379 "\n"
-    BlankLine@379..379
-      BlankLine@379..379 ""
-    ReferenceDefinition@379..419
-      Link@379..385
-        LinkStart@379..380
-          LinkStart@379..380 "["
-        LinkText@380..384
-          TEXT@380..384 "img1"
-        TEXT@384..385 "]"
-      TEXT@385..419 ": /path/to/image.png  ..."
-    ReferenceDefinition@419..436
-      Link@419..425
-        LinkStart@419..420
-          LinkStart@419..420 "["
-        LinkText@420..424
-          TEXT@420..424 "logo"
-        TEXT@424..425 "]"
-      TEXT@425..436 ": /logo.svg"
-    ReferenceDefinition@436..453
-      Link@436..442
-        LinkStart@436..437
-          LinkStart@436..437 "["
-        LinkText@437..441
-          TEXT@437..441 "Icon"
-        TEXT@441..442 "]"
-      TEXT@442..453 ": /icon.png"
-    ReferenceDefinition@453..468
-      Link@453..457
-        LinkStart@453..454
-          LinkStart@453..454 "["
-        LinkText@454..456
-          TEXT@454..456 "i1"
-        TEXT@456..457 "]"
-      TEXT@457..468 ": /img1.jpg"
-    ReferenceDefinition@468..483
-      Link@468..472
-        LinkStart@468..469
-          LinkStart@468..469 "["
-        LinkText@469..471
-          TEXT@469..471 "i2"
-        TEXT@471..472 "]"
-      TEXT@472..483 ": /img2.jpg"
-    ReferenceDefinition@483..504
-      Link@483..490
-        LinkStart@483..484
-          LinkStart@483..484 "["
-        LinkText@484..489
-          TEXT@484..489 "myimg"
-        TEXT@489..490 "]"
-      TEXT@490..504 ": /matched.png"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..18
+        TEXT@2..18 "Reference Images"
+      NEWLINE@18..19 "\n"
+    BlankLine@19..20
+      BlankLine@19..20 "\n"
+    PARAGRAPH@20..72
+      TEXT@20..40 "Explicit reference: "
+      ImageLink@40..57
+        ImageLinkStart@40..42
+          ImageLinkStart@40..42 "!["
+        ImageAlt@42..50
+          TEXT@42..50 "alt text"
+        TEXT@50..51 "]"
+        TEXT@51..52 "["
+        TEXT@52..56 "img1"
+        TEXT@56..57 "]"
+      TEXT@57..71 " in paragraph."
+      NEWLINE@71..72 "\n"
+    BlankLine@72..73
+      BlankLine@72..73 "\n"
+    PARAGRAPH@73..116
+      TEXT@73..93 "Implicit reference: "
+      ImageLink@93..102
+        ImageLinkStart@93..95
+          ImageLinkStart@93..95 "!["
+        ImageAlt@95..99
+          TEXT@95..99 "Logo"
+        TEXT@99..100 "]"
+        TEXT@100..101 "["
+        TEXT@101..102 "]"
+      TEXT@102..115 " shows brand."
+      NEWLINE@115..116 "\n"
+    BlankLine@116..117
+      BlankLine@116..117 "\n"
+    PARAGRAPH@117..156
+      TEXT@117..137 "Shortcut reference: "
+      ImageLink@137..144
+        ImageLinkStart@137..139
+          ImageLinkStart@137..139 "!["
+        ImageAlt@139..143
+          TEXT@139..143 "Icon"
+        TEXT@143..144 "]"
+      TEXT@144..155 " works too."
+      NEWLINE@155..156 "\n"
+    BlankLine@156..157
+      BlankLine@156..157 "\n"
+    PARAGRAPH@157..215
+      TEXT@157..174 "Multiple images: "
+      ImageLink@174..186
+        ImageLinkStart@174..176
+          ImageLinkStart@174..176 "!["
+        ImageAlt@176..181
+          TEXT@176..181 "first"
+        TEXT@181..182 "]"
+        TEXT@182..183 "["
+        TEXT@183..185 "i1"
+        TEXT@185..186 "]"
+      TEXT@186..191 " and "
+      ImageLink@191..204
+        ImageLinkStart@191..193
+          ImageLinkStart@191..193 "!["
+        ImageAlt@193..199
+          TEXT@193..199 "second"
+        TEXT@199..200 "]"
+        TEXT@200..201 "["
+        TEXT@201..203 "i2"
+        TEXT@203..204 "]"
+      TEXT@204..214 " together."
+      NEWLINE@214..215 "\n"
+    BlankLine@215..216
+      BlankLine@215..216 "\n"
+    PARAGRAPH@216..265
+      TEXT@216..228 "Unresolved: "
+      ImageLink@228..251
+        ImageLinkStart@228..230
+          ImageLinkStart@228..230 "!["
+        ImageAlt@230..237
+          TEXT@230..237 "missing"
+        TEXT@237..238 "]"
+        TEXT@238..239 "["
+        TEXT@239..250 "nonexistent"
+        TEXT@250..251 "]"
+      TEXT@251..264 " stays as-is."
+      NEWLINE@264..265 "\n"
+    BlankLine@265..266
+      BlankLine@265..266 "\n"
+    PARAGRAPH@266..328
+      TEXT@266..284 "Case insensitive: "
+      ImageLink@284..297
+        ImageLinkStart@284..286
+          ImageLinkStart@284..286 "!["
+        ImageAlt@286..289
+          TEXT@286..289 "ALT"
+        TEXT@289..290 "]"
+        TEXT@290..291 "["
+        TEXT@291..296 "myimg"
+        TEXT@296..297 "]"
+      TEXT@297..327 " matches lowercase de ..."
+      NEWLINE@327..328 "\n"
+    BlankLine@328..329
+      BlankLine@328..329 "\n"
+    PARAGRAPH@329..388
+      TEXT@329..342 "Complex alt: "
+      ImageLink@342..370
+        ImageLinkStart@342..344
+          ImageLinkStart@342..344 "!["
+        ImageAlt@344..363
+          Strong@344..352
+            StrongMarker@344..346 "**"
+            TEXT@346..350 "bold"
+            StrongMarker@350..352 "**"
+          TEXT@352..357 " and "
+          CodeSpan@357..363
+            CodeSpanMarker@357..358 "`"
+            TEXT@358..362 "code"
+            CodeSpanMarker@362..363 "`"
+        TEXT@363..364 "]"
+        TEXT@364..365 "["
+        TEXT@365..369 "img1"
+        TEXT@369..370 "]"
+      TEXT@370..387 " with formatting."
+      NEWLINE@387..388 "\n"
+    BlankLine@388..389
+      BlankLine@388..389 "\n"
+    ReferenceDefinition@389..429
+      Link@389..395
+        LinkStart@389..390
+          LinkStart@389..390 "["
+        LinkText@390..394
+          TEXT@390..394 "img1"
+        TEXT@394..395 "]"
+      TEXT@395..429 ": /path/to/image.png  ..."
+    ReferenceDefinition@429..447
+      Link@429..435
+        LinkStart@429..430
+          LinkStart@429..430 "["
+        LinkText@430..434
+          TEXT@430..434 "logo"
+        TEXT@434..435 "]"
+      TEXT@435..447 ": /logo.svg\n"
+    ReferenceDefinition@447..465
+      Link@447..453
+        LinkStart@447..448
+          LinkStart@447..448 "["
+        LinkText@448..452
+          TEXT@448..452 "Icon"
+        TEXT@452..453 "]"
+      TEXT@453..465 ": /icon.png\n"
+    ReferenceDefinition@465..481
+      Link@465..469
+        LinkStart@465..466
+          LinkStart@465..466 "["
+        LinkText@466..468
+          TEXT@466..468 "i1"
+        TEXT@468..469 "]"
+      TEXT@469..481 ": /img1.jpg\n"
+    ReferenceDefinition@481..497
+      Link@481..485
+        LinkStart@481..482
+          LinkStart@481..482 "["
+        LinkText@482..484
+          TEXT@482..484 "i2"
+        TEXT@484..485 "]"
+      TEXT@485..497 ": /img2.jpg\n"
+    ReferenceDefinition@497..519
+      Link@497..504
+        LinkStart@497..498
+          LinkStart@497..498 "["
+        LinkText@498..503
+          TEXT@498..503 "myimg"
+        TEXT@503..504 "]"
+      TEXT@504..519 ": /matched.png\n"
 

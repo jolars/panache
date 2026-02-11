@@ -979,8 +979,7 @@ pub(crate) fn try_parse_list(
                 line.trim_start()
             };
 
-            builder.token(SyntaxKind::TEXT.into(), text);
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            super::utils::emit_line_tokens(builder, text);
 
             if let Some(item) = item_stack.last_mut() {
                 item.after_blank_line = false;

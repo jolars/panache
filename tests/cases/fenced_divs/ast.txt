@@ -1,111 +1,111 @@
-ROOT@0..494
-  DOCUMENT@0..494
-    FencedDiv@0..87
-      DivFenceOpen@0..19
-        TEXT@0..18 ":::{.callout-note}"
-        NEWLINE@18..19 "\n"
-      DivInfo@19..34
-        TEXT@19..34 "{.callout-note}"
-      PARAGRAPH@34..83
-        TEXT@34..82 "This is a simple fenc ..."
-        NEWLINE@82..83 "\n"
-      DivFenceClose@83..87
-        TEXT@83..86 ":::"
-        NEWLINE@86..87 "\n"
-    BlankLine@87..87
-      BlankLine@87..87 ""
-    FencedDiv@87..203
-      DivFenceOpen@87..113
-        TEXT@87..112 "::::: {#special .side ..."
-        NEWLINE@112..113 "\n"
-      DivInfo@113..132
-        TEXT@113..132 "{#special .sidebar}"
-      PARAGRAPH@132..164
-        TEXT@132..163 "This div has an ID an ..."
-        NEWLINE@163..164 "\n"
-      BlankLine@164..164
-        BlankLine@164..164 ""
-      PARAGRAPH@164..197
-        TEXT@164..196 "It contains multiple  ..."
-        NEWLINE@196..197 "\n"
-      DivFenceClose@197..203
-        TEXT@197..202 ":::::"
-        NEWLINE@202..203 "\n"
-    BlankLine@203..203
-      BlankLine@203..203 ""
-    FencedDiv@203..275
-      DivFenceOpen@203..215
-        TEXT@203..214 "::: Warning"
-        NEWLINE@214..215 "\n"
-      DivInfo@215..222
-        TEXT@215..222 "Warning"
-      PARAGRAPH@222..271
-        TEXT@222..270 "This is a warning div ..."
-        NEWLINE@270..271 "\n"
-      DivFenceClose@271..275
-        TEXT@271..274 ":::"
-        NEWLINE@274..275 "\n"
-    BlankLine@275..275
-      BlankLine@275..275 ""
-    FencedDiv@275..373
-      DivFenceOpen@275..286
-        TEXT@275..285 "::: Nested"
-        NEWLINE@285..286 "\n"
-      DivInfo@286..292
-        TEXT@286..292 "Nested"
-      PARAGRAPH@292..311
-        TEXT@292..310 "Outer div content."
-        NEWLINE@310..311 "\n"
-      BlankLine@311..311
-        BlankLine@311..311 ""
-      FencedDiv@311..350
-        DivFenceOpen@311..321
-          TEXT@311..320 "::: Inner"
-          NEWLINE@320..321 "\n"
-        DivInfo@321..326
-          TEXT@321..326 "Inner"
-        PARAGRAPH@326..346
-          TEXT@326..345 "Nested div content."
-          NEWLINE@345..346 "\n"
-        DivFenceClose@346..350
-          TEXT@346..349 ":::"
-          NEWLINE@349..350 "\n"
-      BlankLine@350..350
-        BlankLine@350..350 ""
-      PARAGRAPH@350..369
-        TEXT@350..368 "Back to outer div."
-        NEWLINE@368..369 "\n"
-      DivFenceClose@369..373
-        TEXT@369..372 ":::"
-        NEWLINE@372..373 "\n"
-    BlankLine@373..373
-      BlankLine@373..373 ""
-    FencedDiv@373..494
-      DivFenceOpen@373..392
-        TEXT@373..391 "::: Warning ::::::"
-        NEWLINE@391..392 "\n"
-      DivInfo@392..399
-        TEXT@392..399 "Warning"
-      PARAGRAPH@399..418
-        TEXT@399..417 "This is a warning."
-        NEWLINE@417..418 "\n"
-      BlankLine@418..418
-        BlankLine@418..418 ""
-      FencedDiv@418..475
-        DivFenceOpen@418..429
-          TEXT@418..428 "::: Danger"
-          NEWLINE@428..429 "\n"
-        DivInfo@429..435
-          TEXT@429..435 "Danger"
-        PARAGRAPH@435..471
-          TEXT@435..470 "This is a warning wit ..."
-          NEWLINE@470..471 "\n"
-        DivFenceClose@471..475
-          TEXT@471..474 ":::"
-          NEWLINE@474..475 "\n"
-      DivFenceClose@475..494
-        TEXT@475..493 "::::::::::::::::::"
-        NEWLINE@493..494 "\n"
-    BlankLine@494..494
-      BlankLine@494..494 ""
+ROOT@0..517
+  DOCUMENT@0..517
+    FencedDiv@0..89
+      DivFenceOpen@0..20
+        TEXT@0..19 ":::{.callout-note}\n"
+        NEWLINE@19..20 "\n"
+      DivInfo@20..35
+        TEXT@20..35 "{.callout-note}"
+      PARAGRAPH@35..84
+        TEXT@35..83 "This is a simple fenc ..."
+        NEWLINE@83..84 "\n"
+      DivFenceClose@84..89
+        TEXT@84..88 ":::\n"
+        NEWLINE@88..89 "\n"
+    BlankLine@89..90
+      BlankLine@89..90 "\n"
+    FencedDiv@90..209
+      DivFenceOpen@90..117
+        TEXT@90..116 "::::: {#special .side ..."
+        NEWLINE@116..117 "\n"
+      DivInfo@117..136
+        TEXT@117..136 "{#special .sidebar}"
+      PARAGRAPH@136..168
+        TEXT@136..167 "This div has an ID an ..."
+        NEWLINE@167..168 "\n"
+      BlankLine@168..169
+        BlankLine@168..169 "\n"
+      PARAGRAPH@169..202
+        TEXT@169..201 "It contains multiple  ..."
+        NEWLINE@201..202 "\n"
+      DivFenceClose@202..209
+        TEXT@202..208 ":::::\n"
+        NEWLINE@208..209 "\n"
+    BlankLine@209..210
+      BlankLine@209..210 "\n"
+    FencedDiv@210..284
+      DivFenceOpen@210..223
+        TEXT@210..222 "::: Warning\n"
+        NEWLINE@222..223 "\n"
+      DivInfo@223..230
+        TEXT@223..230 "Warning"
+      PARAGRAPH@230..279
+        TEXT@230..278 "This is a warning div ..."
+        NEWLINE@278..279 "\n"
+      DivFenceClose@279..284
+        TEXT@279..283 ":::\n"
+        NEWLINE@283..284 "\n"
+    BlankLine@284..285
+      BlankLine@284..285 "\n"
+    FencedDiv@285..389
+      DivFenceOpen@285..297
+        TEXT@285..296 "::: Nested\n"
+        NEWLINE@296..297 "\n"
+      DivInfo@297..303
+        TEXT@297..303 "Nested"
+      PARAGRAPH@303..322
+        TEXT@303..321 "Outer div content."
+        NEWLINE@321..322 "\n"
+      BlankLine@322..323
+        BlankLine@322..323 "\n"
+      FencedDiv@323..364
+        DivFenceOpen@323..334
+          TEXT@323..333 "::: Inner\n"
+          NEWLINE@333..334 "\n"
+        DivInfo@334..339
+          TEXT@334..339 "Inner"
+        PARAGRAPH@339..359
+          TEXT@339..358 "Nested div content."
+          NEWLINE@358..359 "\n"
+        DivFenceClose@359..364
+          TEXT@359..363 ":::\n"
+          NEWLINE@363..364 "\n"
+      BlankLine@364..365
+        BlankLine@364..365 "\n"
+      PARAGRAPH@365..384
+        TEXT@365..383 "Back to outer div."
+        NEWLINE@383..384 "\n"
+      DivFenceClose@384..389
+        TEXT@384..388 ":::\n"
+        NEWLINE@388..389 "\n"
+    BlankLine@389..390
+      BlankLine@389..390 "\n"
+    FencedDiv@390..516
+      DivFenceOpen@390..410
+        TEXT@390..409 "::: Warning ::::::\n"
+        NEWLINE@409..410 "\n"
+      DivInfo@410..417
+        TEXT@410..417 "Warning"
+      PARAGRAPH@417..436
+        TEXT@417..435 "This is a warning."
+        NEWLINE@435..436 "\n"
+      BlankLine@436..437
+        BlankLine@436..437 "\n"
+      FencedDiv@437..496
+        DivFenceOpen@437..449
+          TEXT@437..448 "::: Danger\n"
+          NEWLINE@448..449 "\n"
+        DivInfo@449..455
+          TEXT@449..455 "Danger"
+        PARAGRAPH@455..491
+          TEXT@455..490 "This is a warning wit ..."
+          NEWLINE@490..491 "\n"
+        DivFenceClose@491..496
+          TEXT@491..495 ":::\n"
+          NEWLINE@495..496 "\n"
+      DivFenceClose@496..516
+        TEXT@496..515 "::::::::::::::::::\n"
+        NEWLINE@515..516 "\n"
+    BlankLine@516..517
+      BlankLine@516..517 "\n"
 

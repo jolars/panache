@@ -1,78 +1,80 @@
-ROOT@0..212
-  DOCUMENT@0..212
-    Heading@0..7
+ROOT@0..219
+  DOCUMENT@0..219
+    Heading@0..9
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
-      HeadingContent@1..7
-        TEXT@1..7 "Images"
-    BlankLine@7..7
-      BlankLine@7..7 ""
-    PARAGRAPH@7..44
-      TEXT@7..21 "Simple image: "
-      ImageLink@21..43
-        ImageLinkStart@21..23
-          ImageLinkStart@21..23 "!["
-        ImageAlt@23..31
-          TEXT@23..31 "alt text"
-        TEXT@31..33 "]("
-        LinkDest@33..42
-          TEXT@33..42 "image.png"
-        TEXT@42..43 ")"
-      NEWLINE@43..44 "\n"
-    BlankLine@44..44
-      BlankLine@44..44 ""
-    PARAGRAPH@44..87
-      TEXT@44..56 "With title: "
-      ImageLink@56..86
-        ImageLinkStart@56..58
-          ImageLinkStart@56..58 "!["
-        ImageAlt@58..66
-          TEXT@58..66 "alt text"
-        TEXT@66..68 "]("
-        LinkDest@68..85
-          TEXT@68..85 "image.png \"Title\""
-        TEXT@85..86 ")"
-      NEWLINE@86..87 "\n"
-    BlankLine@87..87
-      BlankLine@87..87 ""
-    PARAGRAPH@87..113
-      TEXT@87..98 "Empty alt: "
-      ImageLink@98..112
-        ImageLinkStart@98..100
-          ImageLinkStart@98..100 "!["
-        ImageAlt@100..100
-        TEXT@100..102 "]("
-        LinkDest@102..111
-          TEXT@102..111 "image.png"
-        TEXT@111..112 ")"
-      NEWLINE@112..113 "\n"
-    BlankLine@113..113
-      BlankLine@113..113 ""
-    PARAGRAPH@113..158
-      TEXT@113..126 "Complex alt: "
-      ImageLink@126..157
-        ImageLinkStart@126..128
-          ImageLinkStart@126..128 "!["
-        ImageAlt@128..145
-          Strong@128..136
-            StrongMarker@128..130 "**"
-            TEXT@130..134 "bold"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..8
+        TEXT@2..8 "Images"
+      NEWLINE@8..9 "\n"
+    BlankLine@9..10
+      BlankLine@9..10 "\n"
+    PARAGRAPH@10..47
+      TEXT@10..24 "Simple image: "
+      ImageLink@24..46
+        ImageLinkStart@24..26
+          ImageLinkStart@24..26 "!["
+        ImageAlt@26..34
+          TEXT@26..34 "alt text"
+        TEXT@34..36 "]("
+        LinkDest@36..45
+          TEXT@36..45 "image.png"
+        TEXT@45..46 ")"
+      NEWLINE@46..47 "\n"
+    BlankLine@47..48
+      BlankLine@47..48 "\n"
+    PARAGRAPH@48..91
+      TEXT@48..60 "With title: "
+      ImageLink@60..90
+        ImageLinkStart@60..62
+          ImageLinkStart@60..62 "!["
+        ImageAlt@62..70
+          TEXT@62..70 "alt text"
+        TEXT@70..72 "]("
+        LinkDest@72..89
+          TEXT@72..89 "image.png \"Title\""
+        TEXT@89..90 ")"
+      NEWLINE@90..91 "\n"
+    BlankLine@91..92
+      BlankLine@91..92 "\n"
+    PARAGRAPH@92..118
+      TEXT@92..103 "Empty alt: "
+      ImageLink@103..117
+        ImageLinkStart@103..105
+          ImageLinkStart@103..105 "!["
+        ImageAlt@105..105
+        TEXT@105..107 "]("
+        LinkDest@107..116
+          TEXT@107..116 "image.png"
+        TEXT@116..117 ")"
+      NEWLINE@117..118 "\n"
+    BlankLine@118..119
+      BlankLine@118..119 "\n"
+    PARAGRAPH@119..164
+      TEXT@119..132 "Complex alt: "
+      ImageLink@132..163
+        ImageLinkStart@132..134
+          ImageLinkStart@132..134 "!["
+        ImageAlt@134..151
+          Strong@134..142
             StrongMarker@134..136 "**"
-          TEXT@136..145 " alt text"
-        TEXT@145..147 "]("
-        LinkDest@147..156
-          TEXT@147..156 "image.png"
-        TEXT@156..157 ")"
-      NEWLINE@157..158 "\n"
-    BlankLine@158..158
-      BlankLine@158..158 ""
-    PARAGRAPH@158..212
-      TEXT@158..180 "Automatic link style: "
-      AutoLink@180..211
-        AutoLinkMarker@180..181
-          AutoLinkMarker@180..181 "<"
-        TEXT@181..210 "https://example.com/i ..."
-        AutoLinkMarker@210..211
-          AutoLinkMarker@210..211 ">"
-      NEWLINE@211..212 "\n"
+            TEXT@136..140 "bold"
+            StrongMarker@140..142 "**"
+          TEXT@142..151 " alt text"
+        TEXT@151..153 "]("
+        LinkDest@153..162
+          TEXT@153..162 "image.png"
+        TEXT@162..163 ")"
+      NEWLINE@163..164 "\n"
+    BlankLine@164..165
+      BlankLine@164..165 "\n"
+    PARAGRAPH@165..219
+      TEXT@165..187 "Automatic link style: "
+      AutoLink@187..218
+        AutoLinkMarker@187..188
+          AutoLinkMarker@187..188 "<"
+        TEXT@188..217 "https://example.com/i ..."
+        AutoLinkMarker@217..218
+          AutoLinkMarker@217..218 ">"
+      NEWLINE@218..219 "\n"
 
