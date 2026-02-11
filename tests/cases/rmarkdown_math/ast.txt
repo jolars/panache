@@ -1,0 +1,66 @@
+ROOT@0..240
+  DOCUMENT@0..240
+    Heading@0..20
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      HeadingContent@1..20
+        TEXT@1..20 "RMarkdown Math Test"
+    BlankLine@20..20
+      BlankLine@20..20 ""
+    PARAGRAPH@20..67
+      TEXT@20..66 "RMarkdown supports do ..."
+      NEWLINE@66..67 "\n"
+    BlankLine@67..67
+      BlankLine@67..67 ""
+    PARAGRAPH@67..107
+      TEXT@67..80 "Inline math: "
+      InlineMath@80..97
+        InlineMathMarker@80..81 "$"
+        TEXT@81..96 "x^2 + y^2 = z^2"
+        InlineMathMarker@96..97 "$"
+      TEXT@97..106 " in text."
+      NEWLINE@106..107 "\n"
+    BlankLine@107..107
+      BlankLine@107..107 ""
+    PARAGRAPH@107..121
+      TEXT@107..120 "Display math:"
+      NEWLINE@120..121 "\n"
+    BlankLine@121..121
+      BlankLine@121..121 ""
+    MathBlock@121..173
+      BlockMathMarker@121..123 "$$"
+      MathContent@123..171
+        LatexCommand@123..127
+          TEXT@123..127 "\\int"
+        TEXT@127..128 "_"
+        TEXT@128..129 "0"
+        Superscript@129..139
+          SuperscriptMarker@129..130
+            SuperscriptMarker@129..130 "^"
+          LatexCommand@130..136
+            TEXT@130..136 "\\infty"
+          TEXT@136..138 " e"
+          SuperscriptMarker@138..139
+            SuperscriptMarker@138..139 "^"
+        TEXT@139..142 "{-x"
+        TEXT@142..143 "^"
+        TEXT@143..151 "2} dx = "
+        LatexCommand@151..171
+          TEXT@151..171 "\\frac{\\sqrt{\\pi}}{2}"
+      BlockMathMarker@171..173 "$$"
+    BlankLine@173..173
+      BlankLine@173..173 ""
+    PARAGRAPH@173..240
+      TEXT@173..186 "More inline: "
+      InlineMath@186..211
+        InlineMathMarker@186..187 "$"
+        TEXT@187..210 "\\alpha + \\beta = \\gamma"
+        InlineMathMarker@210..211 "$"
+      TEXT@211..216 " and "
+      InlineMath@216..238
+        InlineMathMarker@216..217 "$"
+        TEXT@217..237 "f(x) = ax^2 + bx + c"
+        InlineMathMarker@237..238 "$"
+      TEXT@238..239 "."
+      NEWLINE@239..240 "\n"
+

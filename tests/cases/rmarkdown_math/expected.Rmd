@@ -1,0 +1,13 @@
+# RMarkdown Math Test
+
+RMarkdown uses backslash delimiters for math by default.
+
+Inline math with backslash-parentheses: $x^2 + y^2 = z^2$ in text.
+
+Display math with backslash-brackets:
+
+$$
+\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
+$$
+
+More inline math: $\alpha + \beta = \gamma$ and another $f(x) = ax^2 + bx + c$.
