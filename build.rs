@@ -5,6 +5,7 @@ use std::env;
 use std::fs;
 use std::io::Result;
 use std::path::PathBuf;
+use std::process::Command;
 
 #[path = "src/cli.rs"]
 mod cli;
@@ -23,6 +24,77 @@ fn generate_completions(outdir: &std::ffi::OsString) -> Result<()> {
         Shell::Elvish,
     ] {
         generate_to(shell, &mut cmd, "panache", outdir)?;
+    }
+
+    Ok(())
+}
+
+fn generate_cli_markdown() -> Result<()> {
+    // Skip during cargo package/publish - file should be committed to git
+    // During packaging, cargo runs build in a temporary directory
+    let is_packaging = std::env::current_dir()
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.contains("/target/package/")))
+        .unwrap_or(false);
+
+    if is_packaging {
+        return Ok(());
+    }
+
+    let cmd = Cli::command();
+    let docs_dir = PathBuf::from("docs");
+
+    // Only proceed if docs directory exists
+    if !docs_dir.exists() {
+        return Ok(());
+    }
+
+    let opts = clap_markdown::MarkdownOptions::default()
+        .show_footer(false)
+        .title(String::from(""))
+        .show_table_of_contents(false);
+
+    // Generate markdown documentation
+    let markdown = clap_markdown::help_markdown_command_custom(&cmd, &opts);
+
+    // // Build the complete document with frontmatter
+    let mut document = String::new();
+    document.push_str("---\n");
+    document.push_str("title: CLI Reference\n");
+    document.push_str("---\n\n");
+    document.push_str(&markdown);
+
+    // Write unformatted version first
+    let output_path = docs_dir.join("cli.qmd");
+    fs::write(&output_path, &document)?;
+
+    // Try to format with panache if the binary exists
+    // Check if panache binary exists in target/release or is in PATH
+    let panache_bin = PathBuf::from("target/release/panache");
+    if panache_bin.exists() {
+        // Format the file in place using the panache binary
+        let status = Command::new(&panache_bin)
+            .arg("format")
+            .arg("--write")
+            .arg(&output_path)
+            .status();
+
+        match status {
+            Ok(exit_status) if exit_status.success() => {
+                println!("Generated and formatted CLI markdown: {:?}", output_path);
+            }
+            _ => {
+                println!(
+                    "Generated CLI markdown (formatting skipped): {:?}",
+                    output_path
+                );
+            }
+        }
+    } else {
+        println!(
+            "Generated CLI markdown (panache binary not found, skipping format): {:?}",
+            output_path
+        );
     }
 
     Ok(())
@@ -108,6 +180,9 @@ fn main() -> Result<()> {
 
     // Generate man pages
     generate_man_pages()?;
+
+    // Generate CLI markdown documentation
+    generate_cli_markdown()?;
 
     println!("cargo:rerun-if-changed=src/cli.rs");
     println!("cargo:rerun-if-changed=build.rs");

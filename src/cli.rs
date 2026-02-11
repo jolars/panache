@@ -35,7 +35,7 @@ CONFIGURATION:
 
 Panache looks for configuration files in this order:
   1. Explicit --config path
-  2. .panache.toml or panache.toml in current/parent directories
+  2. panache.toml or .panache.toml in current/parent directories
   3. ~/.config/panache/config.toml (XDG)
   4. Built-in defaults
 

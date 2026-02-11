@@ -55,3 +55,4 @@ lsp = ["dep:tokio", "dep:tower-lsp-server", "dep:uuid"]
 clap = { version = "4.5.48", features = ["derive"] }
 clap_complete = "4.5.65"
 clap_mangen = "0.2.31"
+clap-markdown = "0.1.5"

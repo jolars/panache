@@ -1,0 +1,170 @@
+---
+title: CLI Reference
+---
+
+#
+
+This document contains the help content for the `panache` command-line program.
+
+## `panache`
+
+Panache is a CLI formatter and LSP for Quarto (.qmd), Pandoc, and Markdown
+files written in Rust. It understands Quarto/Pandoc-specific syntax that other
+formatters like Prettier and mdformat struggle with, including fenced divs,
+tables, and math formatting.
+
+**Usage:** `panache [OPTIONS] <COMMAND>`
+
+EXAMPLES:
+
+```
+# Format a file to stdout
+panache format document.qmd
+
+# Format from stdin
+cat document.qmd | panache format
+
+# Check if a file is formatted
+panache format --check document.qmd
+
+# Format in place
+panache format --write document.qmd
+
+# Use custom config
+panache format --config custom.toml document.qmd
+
+# Parse and inspect AST
+panache parse document.qmd
+
+```
+CONFIGURATION:
+
+Panache looks for configuration files in this order:
+
+1. Explicit --config path
+2. panache.toml or .panache.toml in current/parent directories
+3. ~/.config/panache/config.toml (XDG)
+4. Built-in defaults
+
+Example .panache.toml:
+
+```
+flavor = "quarto"
+line_width = 80
+
+[extensions]
+hard_line_breaks = false
+citations = true
+
+```
+For more information, visit: https://github.com/jolars/panache
+
+###### **Subcommands:**
+
+* `format` — Format a Quarto, Pandoc, or Markdown document
+* `parse` — Parse and display the AST tree for debugging
+* `lsp` — Start the Language Server Protocol server
+
+###### **Options:**
+
+* `--config <CONFIG>` — Path to a custom configuration file. If not specified,
+  panache will search for .panache.toml or panache.toml in the current directory
+  and its parents, then fall back to ~/.config/panache/config.toml.
+
+## `panache format`
+
+Format a Quarto, Pandoc, or Markdown document according to panache's formatting
+rules. By default, outputs the formatted content to stdout. Use --write to
+format in place or --check to verify formatting without making changes.
+
+**Usage:** `panache format [OPTIONS] [FILE]`
+
+EXAMPLES:
+
+```
+# Format to stdout
+panache format document.qmd
+
+# Format from stdin
+echo '# Heading' | panache format
+
+# Check formatting (exit code 1 if not formatted)
+panache format --check document.qmd
+
+# Format in place
+panache format --write document.qmd
+
+```
+FORMATTING RULES:
+
+- Default 80 character line width (configurable)
+- Wraps paragraphs while preserving inline code/math whitespace
+- Converts setext headings to ATX format
+- Preserves frontmatter and code blocks
+- Handles Quarto-specific syntax (fenced divs, math blocks)
+- Auto-formats tables for consistency
+- Formatting is idempotent (format twice = format once)
+
+###### **Arguments:**
+
+* `<FILE>` — Path to the input file to format. If not provided, reads from
+  stdin. Supports .qmd, .md, .Rmd, and other Markdown-based formats.
+
+###### **Options:**
+
+* `--check` — Check if the file is already formatted according to panache's
+  rules without making any changes. If the file is not formatted, displays a
+  diff and exits with code 1. If formatted, exits with code 0. Useful for CI/CD
+  pipelines.
+* `--write` — Write the formatted output back to the input file, modifying it
+  in place. Cannot be used with stdin input. It's recommended to use version
+  control before using this option.
+
+## `panache parse`
+
+Parse a document and display its Abstract Syntax Tree (AST) for debugging and
+understanding how panache interprets the document structure. The AST shows all
+block and inline elements detected by the parser.
+
+**Usage:** `panache parse [FILE]`
+
+EXAMPLES:
+
+```
+# Parse a file and show AST
+panache parse document.qmd
+
+# Parse from stdin
+echo '# Heading' | panache parse
+
+# Parse with custom config (affects extension parsing)
+panache parse --config .panache.toml document.qmd
+
+```
+The AST output shows the concrete syntax tree built by the parser, including:
+
+- Block elements (headings, paragraphs, code blocks, lists, tables)
+- Inline elements (emphasis, code, math, links, footnotes)
+- Container blocks (blockquotes, fenced divs)
+- Metadata (YAML/TOML frontmatter)
+
+###### **Arguments:**
+
+* `<FILE>` — Path to the input file to parse. If not provided, reads from stdin.
+  The parser respects extension flags from the configuration file.
+
+## `panache lsp`
+
+Start the panache Language Server Protocol (LSP) server for editor integration.
+The LSP server provides formatting capabilities to editors like VS Code, Neovim,
+and others that support LSP.
+
+**Usage:** `panache lsp`
+
+The LSP server communicates via stdin/stdout and is typically launched
+automatically by your editor's LSP client. You generally don't need to run this
+command manually.
+
+For editor configuration examples, see:
+https://github.com/jolars/panache#editor-integration
+
