@@ -78,10 +78,10 @@ fn golden_cases() {
         let input = normalize(&fs::read_to_string(&input_path).unwrap());
 
         // Test formatting
-        let output = format(&input, config.clone());
+        let output = format(&input, config.clone(), None);
 
         // Idempotency: formatting twice should equal once
-        let output_twice = format(&output, config.clone());
+        let output_twice = format(&output, config.clone(), None);
         similar_asserts::assert_eq!(output, output_twice, "idempotency: {}", case_name);
 
         // Test AST parsing (if ast.txt exists or we're updating)

@@ -20,7 +20,11 @@ pub use core::Formatter;
 
 // Public API functions
 #[cfg(feature = "lsp")]
-pub async fn format_tree_async(tree: &SyntaxNode, config: &Config) -> String {
+pub async fn format_tree_async(
+    tree: &SyntaxNode,
+    config: &Config,
+    range: Option<(usize, usize)>,
+) -> String {
     log::info!(
         "Formatting document with config: line_width={}, wrap={:?}",
         config.line_width,
@@ -47,7 +51,7 @@ pub async fn format_tree_async(tree: &SyntaxNode, config: &Config) -> String {
     };
 
     // Step 2: Format markdown (runs while formatters are working in background)
-    let formatter_with_empty_map = Formatter::new(config.clone(), HashMap::new());
+    let formatter_with_empty_map = Formatter::new(config.clone(), HashMap::new(), range);
     let mut output = formatter_with_empty_map.format(tree);
 
     // Step 3: Await formatter results and apply if available
@@ -66,7 +70,7 @@ pub async fn format_tree_async(tree: &SyntaxNode, config: &Config) -> String {
     output
 }
 
-pub fn format_tree(tree: &SyntaxNode, config: &Config) -> String {
+pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usize)>) -> String {
     log::info!(
         "Formatting document with config: line_width={}, wrap={:?}",
         config.line_width,
@@ -90,7 +94,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config) -> String {
     };
 
     // Step 2: Format markdown with formatted code blocks
-    let mut output = Formatter::new(config.clone(), formatted_code.clone()).format(tree);
+    let mut output = Formatter::new(config.clone(), formatted_code.clone(), range).format(tree);
 
     // Step 3: Apply formatted code blocks if any
     if !formatted_code.is_empty() {

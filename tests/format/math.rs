@@ -9,7 +9,7 @@ fn math_no_wrap() {
     // Should be treated like CodeBlock - verbatim context where escapes don't work
     let cfg = ConfigBuilder::default().line_width(10).build();
     let input = "$$\n\\begin{matrix}\nA & B\\\\\nC & D\n\\end{matrix}\n$$\n";
-    let output = format(input, Some(cfg));
+    let output = format(input, Some(cfg), None);
 
     // Math blocks should not be wrapped
     similar_asserts::assert_eq!(output, input);

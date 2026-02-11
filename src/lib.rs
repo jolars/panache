@@ -9,6 +9,7 @@ pub mod inline_parser;
 pub mod linter;
 #[cfg(feature = "lsp")]
 pub mod lsp;
+pub mod range_utils;
 pub mod syntax;
 
 pub use config::BlankLines;
@@ -52,14 +53,16 @@ fn detect_line_ending(input: &str) -> &str {
 /// let cfg = panache::ConfigBuilder::default().line_width(80).build();
 ///
 /// let input = "This is a very long line that should be wrapped.";
-/// let formatted = format(input, Some(cfg));
+/// let formatted = format(input, Some(cfg), None);
 /// ```
 ///
 /// # Arguments
 ///
 /// * `input` - The Quarto document content to format
 /// * `config` - Optional configuration (defaults to default config)
-pub fn format(input: &str, config: Option<Config>) -> String {
+/// * `range` - Optional line range (start_line, end_line) to format, 1-indexed and inclusive.
+///   If None, formats entire document. Range will be expanded to complete block boundaries.
+pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>) -> String {
     #[cfg(debug_assertions)]
     {
         init_logger();
@@ -78,8 +81,30 @@ pub fn format(input: &str, config: Option<Config>) -> String {
     let tree =
         inline_parser::InlineParser::new(block_tree, config.clone(), reference_registry).parse();
 
-    // Step 3: Format the final CST (synchronously, no external formatters)
-    let out = formatter::format_tree(&tree, &config);
+    // Step 3: Expand line range to byte offsets and block boundaries if specified
+    let expanded_range = range.and_then(|(start_line, end_line)| {
+        let result = range_utils::expand_line_range_to_blocks(
+            &tree,
+            &normalized_input,
+            start_line,
+            end_line,
+        );
+        if let Some((start, end)) = result {
+            log::info!(
+                "Range lines {}:{} expanded to byte range {}:{} (text: {:?}...{:?})",
+                start_line,
+                end_line,
+                start,
+                end,
+                &normalized_input[start..start.min(start + 20)],
+                &normalized_input[end.saturating_sub(20).max(start)..end]
+            );
+        }
+        result
+    });
+
+    // Step 4: Format the final CST (synchronously, no external formatters)
+    let out = formatter::format_tree(&tree, &config, expanded_range);
 
     if line_ending == "\r\n" {
         out.replace("\n", "\r\n")
@@ -90,7 +115,7 @@ pub fn format(input: &str, config: Option<Config>) -> String {
 
 /// Formats a Quarto document string using default configuration.
 pub fn format_with_defaults(input: &str) -> String {
-    format(input, None)
+    format(input, None, None)
 }
 
 /// Async version for LSP contexts. Uses tokio for non-blocking formatter execution.
@@ -104,11 +129,22 @@ pub fn format_with_defaults(input: &str) -> String {
 /// let cfg = panache::ConfigBuilder::default().line_width(80).build();
 ///
 /// let input = "This is a very long line that should be wrapped.";
-/// let formatted = format_async(input, Some(cfg)).await;
+/// let formatted = format_async(input, Some(cfg), None).await;
 /// # };
 /// ```
+///
+/// # Arguments
+///
+/// * `input` - The Quarto document content to format
+/// * `config` - Optional configuration (defaults to default config)
+/// * `range` - Optional line range (start_line, end_line) to format, 1-indexed and inclusive.
+///   If None, formats entire document. Range will be expanded to complete block boundaries.
 #[cfg(feature = "lsp")]
-pub async fn format_async(input: &str, config: Option<Config>) -> String {
+pub async fn format_async(
+    input: &str,
+    config: Option<Config>,
+    range: Option<(usize, usize)>,
+) -> String {
     #[cfg(debug_assertions)]
     {
         init_logger();
@@ -127,8 +163,13 @@ pub async fn format_async(input: &str, config: Option<Config>) -> String {
     let tree =
         inline_parser::InlineParser::new(block_tree, config.clone(), reference_registry).parse();
 
-    // Step 3: Format the final CST (with external formatters if configured)
-    let out = formatter::format_tree_async(&tree, &config).await;
+    // Step 3: Expand line range to byte offsets and block boundaries if specified
+    let expanded_range = range.and_then(|(start_line, end_line)| {
+        range_utils::expand_line_range_to_blocks(&tree, &normalized_input, start_line, end_line)
+    });
+
+    // Step 4: Format the final CST (with external formatters if configured)
+    let out = formatter::format_tree_async(&tree, &config, expanded_range).await;
 
     if line_ending == "\r\n" {
         out.replace("\n", "\r\n")
@@ -139,7 +180,7 @@ pub async fn format_async(input: &str, config: Option<Config>) -> String {
 
 #[cfg(feature = "lsp")]
 pub async fn format_async_with_defaults(input: &str) -> String {
-    format_async(input, None).await
+    format_async(input, None, None).await
 }
 
 /// Parses a Quarto document string into a syntax tree.

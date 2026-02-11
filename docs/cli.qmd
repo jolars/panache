@@ -120,6 +120,14 @@ FORMATTING RULES:
 * `--write` — Write the formatted output back to the input file, modifying it
   in place. Cannot be used with stdin input. It's recommended to use version
   control before using this option.
+* `--range <START:END>` — Format only the specified line range. Lines are
+  1-indexed and inclusive. The range will be expanded to complete block
+  boundaries to ensure well-formed output. For example, if you select part of
+  a list, the entire list will be formatted. Format: --range START:END (e.g.,
+  --range 5:10 formats lines 5 through 10).
+
+  Note: This feature is experimental. Range filtering may not work correctly in
+  all cases.
 
 ## `panache parse`
 

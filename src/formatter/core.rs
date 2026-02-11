@@ -9,7 +9,7 @@ use super::headings;
 use super::inline;
 use super::paragraphs;
 use super::tables;
-use super::utils::is_block_element;
+use super::utils::{is_block_element, is_structural_block};
 use super::wrapping;
 
 pub struct Formatter {
@@ -20,10 +20,16 @@ pub struct Formatter {
     pub(super) formatted_code: HashMap<String, String>,
     /// Stack of max marker widths for nested lists (for right-aligning markers)
     max_marker_widths: Vec<usize>,
+    /// Optional byte range to format (start, end). If None, format entire document.
+    range: Option<(usize, usize)>,
 }
 
 impl Formatter {
-    pub fn new(config: Config, formatted_code: HashMap<String, String>) -> Self {
+    pub fn new(
+        config: Config,
+        formatted_code: HashMap<String, String>,
+        range: Option<(usize, usize)>,
+    ) -> Self {
         Self {
             output: String::with_capacity(8192),
             config,
@@ -31,12 +37,48 @@ impl Formatter {
             fenced_div_depth: 0,
             formatted_code,
             max_marker_widths: Vec::new(),
+            range,
         }
     }
-
     pub fn format(mut self, node: &SyntaxNode) -> String {
         self.format_node_sync(node, 0);
         self.output
+    }
+
+    /// Check if a node overlaps with the formatting range
+    fn is_in_range(&self, node: &SyntaxNode) -> bool {
+        if let Some((range_start, range_end)) = self.range {
+            let node_start: usize = node.text_range().start().into();
+            let node_end: usize = node.text_range().end().into();
+
+            // Node overlaps with range if it starts before range ends and ends after range starts
+            node_start < range_end && node_end > range_start
+        } else {
+            // No range specified, format everything
+            true
+        }
+    }
+
+    /// Check if we should process a direct child of ROOT/DOCUMENT
+    /// When range filtering is active, only process nodes that overlap with the range
+    fn should_process_top_level_node(&self, node: &SyntaxNode) -> bool {
+        // If no range specified, process everything
+        if self.range.is_none() {
+            return true;
+        }
+
+        // Always process ROOT and DOCUMENT nodes (containers)
+        if node.kind() == SyntaxKind::ROOT || node.kind() == SyntaxKind::DOCUMENT {
+            return true;
+        }
+
+        // For structural block elements, check if they overlap with the range
+        if is_structural_block(node.kind()) {
+            return self.is_in_range(node);
+        }
+
+        // For non-block elements (tokens), don't include them
+        false
     }
 
     // Delegate to extracted wrapping module
@@ -282,7 +324,12 @@ impl Formatter {
             SyntaxKind::ROOT | SyntaxKind::DOCUMENT => {
                 for el in node.children_with_tokens() {
                     match el {
-                        rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
+                        rowan::NodeOrToken::Node(n) => {
+                            // When range filtering is active, only process nodes that overlap
+                            if self.should_process_top_level_node(&n) {
+                                self.format_node_sync(&n, indent);
+                            }
+                        }
                         rowan::NodeOrToken::Token(t) => match t.kind() {
                             SyntaxKind::WHITESPACE => {}
                             SyntaxKind::NEWLINE => {}

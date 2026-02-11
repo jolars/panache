@@ -212,6 +212,7 @@ impl LanguageServer for PanacheLsp {
                     },
                 )),
                 document_formatting_provider: Some(OneOf::Left(true)),
+                document_range_formatting_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 ..Default::default()
             },
@@ -317,7 +318,7 @@ impl LanguageServer for PanacheLsp {
             // Create a new tokio runtime for async external formatters
             tokio::runtime::Runtime::new()
                 .expect("Failed to create runtime")
-                .block_on(crate::format_async(&text_clone, Some(config)))
+                .block_on(crate::format_async(&text_clone, Some(config), None))
         })
         .await
         .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
@@ -345,6 +346,103 @@ impl LanguageServer for PanacheLsp {
 
         Ok(Some(vec![TextEdit {
             range,
+            new_text: formatted,
+        }]))
+    }
+
+    async fn range_formatting(
+        &self,
+        params: DocumentRangeFormattingParams,
+    ) -> Result<Option<Vec<TextEdit>>> {
+        let uri = params.text_document.uri;
+        let uri_string = uri.to_string();
+        let range = params.range;
+
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "Range formatting request for {} (lines {}-{})",
+                    uri_string,
+                    range.start.line + 1,
+                    range.end.line + 1
+                ),
+            )
+            .await;
+
+        // Get document content (clone to avoid holding lock across await)
+        let text = {
+            let document_map = self.document_map.lock().await;
+            match document_map.get(&uri_string) {
+                Some(t) => t.clone(),
+                None => {
+                    self.client
+                        .log_message(
+                            MessageType::ERROR,
+                            format!("Document not found: {}", uri_string),
+                        )
+                        .await;
+                    return Ok(None);
+                }
+            }
+        };
+
+        // Convert LSP range (0-indexed lines) to panache range (1-indexed lines)
+        let start_line = (range.start.line + 1) as usize;
+        let end_line = (range.end.line + 1) as usize;
+
+        // Load config
+        let config = self.load_config().await;
+
+        // Run range formatting in a blocking task
+        let text_clone = text.clone();
+        let formatted = tokio::task::spawn_blocking(move || {
+            tokio::runtime::Runtime::new()
+                .expect("Failed to create runtime")
+                .block_on(crate::format_async(
+                    &text_clone,
+                    Some(config),
+                    Some((start_line, end_line)),
+                ))
+        })
+        .await
+        .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
+
+        // If the formatted range is empty or unchanged, return None
+        if formatted.is_empty() || formatted == text {
+            return Ok(None);
+        }
+
+        // Calculate the actual range that was formatted (expanded to block boundaries)
+        // For simplicity, we'll replace the entire selected range with the formatted output
+        // The range expansion is already handled by panache's range_utils
+
+        // Find where the formatted text should be placed
+        // Since range formatting returns only the formatted blocks, we need to determine
+        // the byte offsets in the original text to replace
+
+        // Convert line range to byte offsets in original text
+        let start_offset = text
+            .lines()
+            .take(start_line.saturating_sub(1))
+            .map(|l| l.len() + 1) // +1 for newline
+            .sum::<usize>();
+
+        let end_offset = text
+            .lines()
+            .take(end_line)
+            .map(|l| l.len() + 1)
+            .sum::<usize>()
+            .min(text.len());
+
+        // Create the edit range
+        let edit_range = Range {
+            start: offset_to_position(&text, start_offset),
+            end: offset_to_position(&text, end_offset),
+        };
+
+        Ok(Some(vec![TextEdit {
+            range: edit_range,
             new_text: formatted,
         }]))
     }

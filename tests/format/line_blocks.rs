@@ -12,7 +12,7 @@ fn test_simple_line_block() {
 | Line three
 "#;
 
-    let result = format(input, None);
+    let result = format(input, None, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
@@ -32,7 +32,7 @@ fn test_line_block_with_indentation() {
 | And the clean ones so seldom are comical
 "#;
 
-    let result = format(input, None);
+    let result = format(input, None, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
@@ -46,7 +46,7 @@ fn test_line_block_with_address() {
 | Berkeley, CA 94718
 "#;
 
-    let result = format(input, None);
+    let result = format(input, None, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
@@ -64,7 +64,7 @@ fn test_line_block_preserves_empty_lines() {
 | After blank line
 "#;
 
-    let result = format(input, None);
+    let result = format(input, None, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
@@ -82,7 +82,7 @@ This is a paragraph."#;
 This is a paragraph.
 "#;
 
-    let result = format(input, None);
+    let result = format(input, None, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
@@ -102,7 +102,7 @@ fn test_multiple_line_blocks() {
 | Another line
 "#;
 
-    let result = format(input, None);
+    let result = format(input, None, None);
     assert_eq!(result.trim(), expected.trim());
 }
 
@@ -112,8 +112,8 @@ fn test_line_block_idempotency() {
 | Line two
 | Line three"#;
 
-    let result1 = format(input, None);
-    let result2 = format(&result1, None);
+    let result1 = format(input, None, None);
+    let result2 = format(&result1, None, None);
 
     assert_eq!(result1, result2, "Formatting should be idempotent");
 }

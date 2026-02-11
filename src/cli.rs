@@ -125,6 +125,18 @@ FORMATTING RULES:
             this option."
         )]
         write: bool,
+
+        /// Format only a specific line range (1-indexed, inclusive)
+        #[arg(long, value_name = "START:END")]
+        #[arg(help = "Format only lines START:END (e.g., --range 5:10) [Experimental]")]
+        #[arg(
+            long_help = "Format only the specified line range. Lines are 1-indexed and inclusive. \
+            The range will be expanded to complete block boundaries to ensure well-formed output. \
+            For example, if you select part of a list, the entire list will be formatted. \
+            Format: --range START:END (e.g., --range 5:10 formats lines 5 through 10). \
+            \n\nNote: This feature is experimental. Range filtering may not work correctly in all cases."
+        )]
+        range: Option<String>,
     },
     /// Parse and display the AST tree for debugging
     #[command(

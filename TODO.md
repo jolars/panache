@@ -61,7 +61,7 @@ This document tracks implementation status for panache's features.
 
 #### Advanced
 
-- ❌ **Range formatting** - `textDocument/rangeFormatting` for selected text only
+- ✅ **Range formatting** - `textDocument/rangeFormatting` for selected text only
 - ❌ **On-type formatting** - `textDocument/onTypeFormatting` for auto-formatting triggers
 - ❌ **Document links** - `textDocument/documentLink` for clickable links
 - ❌ **Semantic tokens** - Syntax highlighting via LSP

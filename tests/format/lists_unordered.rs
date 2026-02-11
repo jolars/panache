@@ -4,7 +4,7 @@ use panache::format;
 fn list_item_link_no_break() {
     let cfg = panache::ConfigBuilder::default().line_width(30).build();
     let input = "- A list item with a link ![some link that is very long](./example.com/very/long/path/to/file) in it\n";
-    let output = format(input, Some(cfg));
+    let output = format(input, Some(cfg), None);
 
     // The link should not be broken at the ]( boundary
     assert!(
@@ -19,7 +19,7 @@ fn list_item_link_no_break() {
 #[test]
 fn list_items_separate_properly() {
     let input = "- In R, objects are passed by reference, but when an object is modified a copy\n  is created.\n- For instance, when subsetting a matrix, a copy is created. It's not possible\n  to access for instance a column by reference.\n";
-    let output = format(input, None);
+    let output = format(input, None, None);
 
     // Should have two distinct list items
     let lines: Vec<&str> = output.lines().collect();

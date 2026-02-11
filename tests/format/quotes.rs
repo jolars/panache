@@ -3,7 +3,7 @@ use panache::format;
 #[test]
 fn quote_single_line() {
     let input = "> This is a single line quote.\n";
-    let output = format(input, None);
+    let output = format(input, None, None);
 
     assert!(output.starts_with("> "));
     assert!(output.contains("single line quote"));
@@ -12,7 +12,7 @@ fn quote_single_line() {
 #[test]
 fn quote_multi_line_continuous() {
     let input = "> This is a multi-line quote\n> that continues on the next line.\n";
-    let output = format(input, None);
+    let output = format(input, None, None);
 
     for line in output.lines() {
         assert!(
@@ -36,7 +36,7 @@ fn quote_with_fenced_code_block() {
 > Text after code.
 "#;
 
-    let output = format(input, None);
+    let output = format(input, None, None);
 
     // Should preserve blockquote markers
     assert!(output.contains("> ```python"));
@@ -49,7 +49,7 @@ fn quote_with_fenced_code_block() {
 #[test]
 fn quote_with_inline_code() {
     let input = "> Quote with `inline code` in it.\n";
-    let output = format(input, None);
+    let output = format(input, None, None);
 
     assert!(output.contains("> Quote with `inline code` in it"));
 }
@@ -62,7 +62,7 @@ fn quote_with_indented_code_block() {
 >     y = 2
 "#;
 
-    let output = format(input, None);
+    let output = format(input, None, None);
 
     // Indented code blocks get normalized to fenced code blocks
     assert!(output.contains("> ```"));
@@ -81,7 +81,7 @@ fn nested_quote_with_code() {
 > > ```
 "#;
 
-    let output = format(input, None);
+    let output = format(input, None, None);
 
     // Should handle nested blockquotes with code
     assert!(output.contains("> > ```"));
@@ -96,7 +96,7 @@ fn quote_with_list() {
 > 2. Second item
 "#;
 
-    let output = format(input, None);
+    let output = format(input, None, None);
 
     assert!(output.contains("> 1. First item"));
     assert!(output.contains("> 2. Second item"));
@@ -117,7 +117,7 @@ fn quote_with_multiple_code_blocks() {
 > ```
 "#;
 
-    let output = format(input, None);
+    let output = format(input, None, None);
 
     // Should handle multiple code blocks in same blockquote
     assert!(output.contains("> ```"));
@@ -137,8 +137,8 @@ fn quote_idempotency_with_code() {
 > ```
 "#;
 
-    let output1 = format(input, None);
-    let output2 = format(&output1, None);
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
 
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }

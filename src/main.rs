@@ -10,6 +10,37 @@ use panache::{format, parse};
 mod cli;
 use cli::{Cli, Commands};
 
+/// Parse a range string like "5:10" into (start_line, end_line)
+fn parse_range(range_str: &str) -> Result<(usize, usize), String> {
+    let parts: Vec<&str> = range_str.split(':').collect();
+    if parts.len() != 2 {
+        return Err(format!(
+            "Invalid range format '{}'. Expected START:END (e.g., 5:10)",
+            range_str
+        ));
+    }
+
+    let start = parts[0]
+        .parse::<usize>()
+        .map_err(|_| format!("Invalid start line '{}'", parts[0]))?;
+    let end = parts[1]
+        .parse::<usize>()
+        .map_err(|_| format!("Invalid end line '{}'", parts[1]))?;
+
+    if start == 0 || end == 0 {
+        return Err("Line numbers must be 1-indexed (start from 1)".to_string());
+    }
+
+    if start > end {
+        return Err(format!(
+            "Start line ({}) must be less than or equal to end line ({})",
+            start, end
+        ));
+    }
+
+    Ok((start, end))
+}
+
 fn read_all(path: Option<&PathBuf>) -> io::Result<String> {
     match path {
         Some(p) => fs::read_to_string(p),
@@ -81,7 +112,12 @@ fn main() -> io::Result<()> {
             println!("{:#?}", tree);
             Ok(())
         }
-        Commands::Format { file, check, write } => {
+        Commands::Format {
+            file,
+            check,
+            write,
+            range,
+        } => {
             let start_dir = start_dir_for(&file)?;
             let (cfg, cfg_path) =
                 panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
@@ -92,8 +128,21 @@ fn main() -> io::Result<()> {
                 log::debug!("Using default config");
             }
 
+            // Parse range if provided
+            let parsed_range = if let Some(range_str) = range {
+                match parse_range(&range_str) {
+                    Ok(r) => Some(r),
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                None
+            };
+
             let input = read_all(file.as_ref())?;
-            let output = format(&input, Some(cfg));
+            let output = format(&input, Some(cfg), parsed_range);
 
             if check {
                 if input != output {

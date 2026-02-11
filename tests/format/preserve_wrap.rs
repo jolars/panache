@@ -16,9 +16,9 @@ breaks that should
 stay the same.
 ";
 
-    let out = format(input, Some(cfg_preserve()));
+    let out = format(input, Some(cfg_preserve()), None);
     // Idempotency
-    let out2 = format(&out, Some(cfg_preserve()));
+    let out2 = format(&out, Some(cfg_preserve()), None);
     assert_eq!(out, out2);
 
     // Preserve mode should keep paragraph line breaks exactly
@@ -33,9 +33,9 @@ fn block_quote_preserve_keeps_line_breaks() {
 > stay the same.
 ";
 
-    let out = format(input, Some(cfg_preserve()));
+    let out = format(input, Some(cfg_preserve()), None);
     // Idempotency
-    let out2 = format(&out, Some(cfg_preserve()));
+    let out2 = format(&out, Some(cfg_preserve()), None);
     assert_eq!(out, out2);
 
     // Preserve mode should keep quoted line breaks exactly

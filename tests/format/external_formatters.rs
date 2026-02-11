@@ -27,7 +27,7 @@ hello world
 "#
     .trim_start();
 
-    let output = format(input, Some(config));
+    let output = format(input, Some(config), None);
 
     // Code should be uppercased by the formatter
     assert!(output.contains("HELLO WORLD"));
@@ -46,7 +46,7 @@ hello world
 "#
     .trim_start();
 
-    let output = format(input, Some(config));
+    let output = format(input, Some(config), None);
 
     // Code should be unchanged (no formatter configured)
     assert!(output.contains("hello world"));
@@ -78,7 +78,7 @@ hello world
 "#
     .trim_start();
 
-    let output = format(input, Some(config));
+    let output = format(input, Some(config), None);
 
     // Code should be unchanged (formatter disabled)
     assert!(output.contains("hello world"));
@@ -110,7 +110,7 @@ hello world
 "#
     .trim_start();
 
-    let output = format(input, Some(config));
+    let output = format(input, Some(config), None);
 
     // Code should be unchanged on formatter failure
     assert!(output.contains("hello world"));
