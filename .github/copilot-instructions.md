@@ -7,10 +7,10 @@ files written in Rust. It's designed to understand Quarto/Pandoc-specific
 syntax that other formatters like Prettier and mdformat struggle with,
 including fenced divs, tables, and math formatting.
 
-**Syntax Reference**: See [`assets/pandoc-spec.md`](assets/pandoc-spec.md) for
+**Syntax Reference**: See [`assets/pandoc-spec.md`](../assets/pandoc-spec.md) for
 comprehensive Pandoc syntax specification. This index document links to
 individual specification files organized by syntax element type (paragraphs,
-headings, lists, tables, etc.) in the [`assets/pandoc-spec/`](assets/pandoc-spec/)
+headings, lists, tables, etc.) in the [`assets/pandoc-spec/`](../assets/pandoc-spec/)
 directory. These documents represent the definitive reference for elements
 that the parser should understand and handle correctly. This specification
 is essential for understanding formatting requirements, implementing parser
@@ -151,7 +151,7 @@ RUST_LOG=panache::block_parser=trace,panache::formatter=debug panache format doc
 
 ### Timing Notes
 
-- `cargo test`: ~1 second (603 tests total across lib, inline parser, block parser, format tests, golden tests, and doc tests)
+- `cargo test`: ~1 second (708 tests total across lib, inline parser, block parser, format tests, golden tests, and doc tests)
 - `cargo build --release`: ~25 seconds
 - `cargo check`: ~1 second
 
@@ -287,7 +287,7 @@ docs/
 ├── formatting.qmd       # Detailed formatting rules and examples
 ├── configuration.qmd    # panache.toml reference
 └── playground/          # WASM-based web playground for live formatting
-│   └── index.html       # Uses TypeScript bindings from panache-wasm
+    └── index.html       # Uses TypeScript bindings from panache-wasm
 ```
 
 **Published**: GitHub Pages via `docs.yml` workflow at https://jolars.github.io/panache/
@@ -374,7 +374,7 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 - ✅ `textDocument/formatting` - Full document formatting
 - ✅ `textDocument/didOpen/didChange/didClose` - Document tracking (FULL sync mode)
 - ✅ Config discovery from workspace root (`.panache.toml`)
-- ✅ Thread-safe document state management with Arc<Mutex<HashMap>>
+- ✅ Thread-safe document state management with Arc
 
 **Implementation Details:**
 
