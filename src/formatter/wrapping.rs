@@ -136,6 +136,93 @@ pub(super) fn build_words<'a>(
                         process_node_recursive(&n, b, format_inline_fn);
                         b.push_piece("**");
                     }
+                    SyntaxKind::Link => {
+                        // Links can wrap at whitespace boundaries in link text
+                        // Two types: inline [text](url) and reference [text][ref]
+                        b.push_piece("[");
+
+                        // Process link text recursively to allow wrapping
+                        for child in n.children_with_tokens() {
+                            if let NodeOrToken::Node(link_child) = child
+                                && link_child.kind() == SyntaxKind::LinkText
+                            {
+                                process_node_recursive(&link_child, b, format_inline_fn);
+                            }
+                        }
+
+                        // Collect closing parts: depends on link type
+                        // Inline: "](" + LinkDest + ")" + Attribute
+                        // Reference: "][" + LinkRef + "]" or shortcut "]"
+                        let mut closing = String::new();
+                        let mut past_link_text = false;
+
+                        // Collect closing syntax
+                        for child in n.children_with_tokens() {
+                            match child {
+                                NodeOrToken::Node(link_child) => match link_child.kind() {
+                                    SyntaxKind::LinkText => {
+                                        past_link_text = true;
+                                    }
+                                    SyntaxKind::LinkDest
+                                    | SyntaxKind::LinkRef
+                                    | SyntaxKind::Attribute => {
+                                        if past_link_text {
+                                            closing.push_str(&link_child.text().to_string());
+                                        }
+                                    }
+                                    _ => {}
+                                },
+                                NodeOrToken::Token(t) => {
+                                    if past_link_text && t.kind() == SyntaxKind::TEXT {
+                                        closing.push_str(t.text());
+                                    }
+                                }
+                            }
+                        }
+
+                        b.attach_to_previous(&closing);
+                    }
+                    SyntaxKind::ImageLink => {
+                        // Image links work similarly to links but with "![" prefix
+                        // Structure: ImageLinkStart "![" + ImageAlt (wrappable) + "](" + LinkDest + ")" + Attribute
+                        b.push_piece("![");
+
+                        // Process image alt text recursively to allow wrapping
+                        for child in n.children_with_tokens() {
+                            if let NodeOrToken::Node(img_child) = child
+                                && img_child.kind() == SyntaxKind::ImageAlt
+                            {
+                                process_node_recursive(&img_child, b, format_inline_fn);
+                            }
+                        }
+
+                        // Collect closing parts: "](" + destination + ")" + attributes
+                        let mut closing = String::new();
+                        let mut past_image_alt = false;
+
+                        for child in n.children_with_tokens() {
+                            match child {
+                                NodeOrToken::Node(img_child) => match img_child.kind() {
+                                    SyntaxKind::ImageAlt => {
+                                        past_image_alt = true;
+                                    }
+                                    SyntaxKind::LinkDest | SyntaxKind::Attribute => {
+                                        if past_image_alt {
+                                            closing.push_str(&img_child.text().to_string());
+                                        }
+                                    }
+                                    _ => {}
+                                },
+                                NodeOrToken::Token(t) => {
+                                    if past_image_alt && t.kind() == SyntaxKind::TEXT {
+                                        closing.push_str(t.text());
+                                    }
+                                }
+                            }
+                        }
+
+                        b.attach_to_previous(&closing);
+                    }
                     _ => {
                         // For other inline nodes, format and push as single piece
                         let text = format_inline_fn(&n);
