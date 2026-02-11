@@ -2,7 +2,6 @@
 
 [![Build and Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
 [![Crates.io](https://img.shields.io/crates/v/panache.svg)](https://crates.io/crates/panache)
-[![Downloads](https://img.shields.io/crates/d/panache.svg)](https://crates.io/crates/panache)
 
 A CLI formatter for Quarto (`.qmd`), Pandoc, and Markdown files.
 
