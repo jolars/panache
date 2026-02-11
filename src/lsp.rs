@@ -6,6 +6,9 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 use tower_lsp_server::{Client, LanguageServer, LspService, Server};
 
+use crate::linter;
+use crate::linter::Severity as PanacheSeverity;
+
 /// Helper to convert LSP UTF-16 position to byte offset in UTF-8 string
 fn position_to_offset(text: &str, position: Position) -> Option<usize> {
     let mut offset = 0;
@@ -36,6 +39,51 @@ fn position_to_offset(text: &str, position: Position) -> Option<usize> {
     }
 
     None
+}
+
+/// Convert byte offset to LSP Position (line/character in UTF-16)
+fn offset_to_position(text: &str, offset: usize) -> Position {
+    let mut line = 0;
+    let mut character = 0;
+    let mut current_offset = 0;
+
+    for text_line in text.lines() {
+        if current_offset + text_line.len() >= offset {
+            // Offset is in this line
+            let line_offset = offset - current_offset;
+            let line_slice = &text_line[..line_offset];
+            character = line_slice.chars().map(|c| c.len_utf16()).sum::<usize>() as u32;
+            break;
+        }
+        current_offset += text_line.len() + 1; // +1 for newline
+        line += 1;
+    }
+
+    Position {
+        line: line as u32,
+        character,
+    }
+}
+
+/// Convert panache Diagnostic to LSP Diagnostic
+fn convert_diagnostic(diag: &linter::Diagnostic, text: &str) -> Diagnostic {
+    let start = offset_to_position(text, diag.location.range.start().into());
+    let end = offset_to_position(text, diag.location.range.end().into());
+
+    let severity = match diag.severity {
+        PanacheSeverity::Error => DiagnosticSeverity::ERROR,
+        PanacheSeverity::Warning => DiagnosticSeverity::WARNING,
+        PanacheSeverity::Info => DiagnosticSeverity::INFORMATION,
+    };
+
+    Diagnostic {
+        range: Range { start, end },
+        severity: Some(severity),
+        code: Some(NumberOrString::String(diag.code.clone())),
+        source: Some("panache".to_string()),
+        message: diag.message.clone(),
+        ..Default::default()
+    }
 }
 
 /// Apply a single content change to text
@@ -103,6 +151,37 @@ impl PanacheLsp {
         }
         crate::Config::default()
     }
+
+    /// Parse document and run linter, then publish diagnostics
+    async fn lint_and_publish(&self, uri: Uri, text: String) {
+        let config = self.load_config().await;
+
+        // Parse and lint in blocking task
+        let text_clone = text.clone();
+        let diagnostics = tokio::task::spawn_blocking(move || {
+            let tree = crate::parse(&text_clone, Some(config.clone()));
+            linter::lint(&tree, &text_clone, &config)
+        })
+        .await;
+
+        match diagnostics {
+            Ok(panache_diagnostics) => {
+                let lsp_diagnostics: Vec<Diagnostic> = panache_diagnostics
+                    .iter()
+                    .map(|d| convert_diagnostic(d, &text))
+                    .collect();
+
+                self.client
+                    .publish_diagnostics(uri, lsp_diagnostics, None)
+                    .await;
+            }
+            Err(e) => {
+                self.client
+                    .log_message(MessageType::ERROR, format!("Linting task failed: {}", e))
+                    .await;
+            }
+        }
+    }
 }
 
 impl LanguageServer for PanacheLsp {
@@ -133,6 +212,7 @@ impl LanguageServer for PanacheLsp {
                     },
                 )),
                 document_formatting_provider: Some(OneOf::Left(true)),
+                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -156,28 +236,47 @@ impl LanguageServer for PanacheLsp {
         let uri = params.text_document.uri.to_string();
         let text = params.text_document.text;
 
-        self.document_map.lock().await.insert(uri.clone(), text);
+        self.document_map
+            .lock()
+            .await
+            .insert(uri.clone(), text.clone());
 
         self.client
             .log_message(MessageType::INFO, format!("Opened document: {}", uri))
             .await;
+
+        // Run linting and publish diagnostics
+        self.lint_and_publish(params.text_document.uri, text).await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri.to_string();
 
         // Apply incremental changes sequentially
-        let mut document_map = self.document_map.lock().await;
-        if let Some(text) = document_map.get_mut(&uri) {
-            for change in params.content_changes {
-                *text = apply_content_change(text, &change);
+        let text = {
+            let mut document_map = self.document_map.lock().await;
+            if let Some(text) = document_map.get_mut(&uri) {
+                for change in params.content_changes {
+                    *text = apply_content_change(text, &change);
+                }
+                text.clone()
+            } else {
+                return;
             }
-        }
+        };
+
+        // Run linting and publish diagnostics
+        self.lint_and_publish(params.text_document.uri, text).await;
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let uri = params.text_document.uri.to_string();
         self.document_map.lock().await.remove(&uri);
+
+        // Clear diagnostics
+        self.client
+            .publish_diagnostics(params.text_document.uri, vec![], None)
+            .await;
     }
 
     async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
@@ -248,6 +347,66 @@ impl LanguageServer for PanacheLsp {
             range,
             new_text: formatted,
         }]))
+    }
+
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+        let uri_string = params.text_document.uri.to_string();
+
+        // Get document content
+        let text = {
+            let document_map = self.document_map.lock().await;
+            match document_map.get(&uri_string) {
+                Some(t) => t.clone(),
+                None => return Ok(None),
+            }
+        };
+
+        // Load config and run linter
+        let config = self.load_config().await;
+        let text_clone = text.clone();
+        let diagnostics = tokio::task::spawn_blocking(move || {
+            let tree = crate::parse(&text_clone, Some(config.clone()));
+            linter::lint(&tree, &text_clone, &config)
+        })
+        .await
+        .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
+
+        // Convert fixes to code actions
+        let mut actions = Vec::new();
+        for diag in diagnostics {
+            if let Some(ref fix) = diag.fix {
+                let mut changes = HashMap::new();
+                let text_edits: Vec<TextEdit> = fix
+                    .edits
+                    .iter()
+                    .map(|edit| {
+                        let start = offset_to_position(&text, edit.range.start().into());
+                        let end = offset_to_position(&text, edit.range.end().into());
+                        TextEdit {
+                            range: Range { start, end },
+                            new_text: edit.replacement.clone(),
+                        }
+                    })
+                    .collect();
+
+                changes.insert(params.text_document.uri.clone(), text_edits);
+
+                let action = CodeAction {
+                    title: fix.message.clone(),
+                    kind: Some(CodeActionKind::QUICKFIX),
+                    diagnostics: Some(vec![convert_diagnostic(&diag, &text)]),
+                    edit: Some(WorkspaceEdit {
+                        changes: Some(changes),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                actions.push(CodeActionOrCommand::CodeAction(action));
+            }
+        }
+
+        Ok(Some(actions))
     }
 }
 

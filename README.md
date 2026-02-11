@@ -3,11 +3,11 @@
 [![Build and Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
 [![Crates.io](https://img.shields.io/crates/v/panache.svg)](https://crates.io/crates/panache)
 
-A CLI formatter for Quarto (`.qmd`), Pandoc, and Markdown files.
+A formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and Markdown files.
 
 ## Work in Progress
 
-This project is in **very** early development. Expect bugs, missing features, and breaking changes.
+This project is in early development. Expect bugs, missing features, and breaking changes.
 
 ## Installation
 
