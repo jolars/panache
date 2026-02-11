@@ -4,9 +4,39 @@ title: Getting Started
 
 ## Installation
 
+### From crates.io (Recommended)
+
+Install panache with Cargo:
+
+```bash
+cargo install panache
+```
+
+### Pre-built Binaries
+
+Download platform-specific binaries from the [releases page](https://github.com/jolars/panache/releases):
+
+- **Linux**: x86_64 and ARM64 (available as `.deb`, `.rpm`, or `.tar.gz`)
+- **macOS**: Intel and Apple Silicon (`.tar.gz`)
+- **Windows**: x86_64 (`.zip`)
+
+#### Debian/Ubuntu
+
+```bash
+wget https://github.com/jolars/panache/releases/latest/download/panache_<VERSION>_amd64.deb
+sudo dpkg -i panache_*.deb
+```
+
+#### Fedora/RHEL/openSUSE
+
+```bash
+wget https://github.com/jolars/panache/releases/latest/download/panache-<VERSION>.x86_64.rpm
+sudo rpm -i panache-*.rpm
+```
+
 ### From Source
 
-Clone the repository and install with Cargo:
+Clone the repository and build:
 
 ```bash
 git clone https://github.com/jolars/panache.git

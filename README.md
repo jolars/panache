@@ -1,6 +1,8 @@
 # panache <img src='https://raw.githubusercontent.com/jolars/panache/refs/heads/main/images/logo.png' align="right" width="139" />
 
 [![Build and Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
+[![Crates.io](https://img.shields.io/crates/v/panache.svg)](https://crates.io/crates/panache)
+[![Downloads](https://img.shields.io/crates/d/panache.svg)](https://crates.io/crates/panache)
 
 A CLI formatter for Quarto (`.qmd`), Pandoc, and Markdown files.
 
@@ -10,10 +12,10 @@ This project is in **very** early development. Expect bugs, missing features, an
 
 ## Installation
 
-### From Source
+### From crates.io (Recommended)
 
 ```bash
-cargo install --path .
+cargo install panache
 ```
 
 ### Pre-built Binaries
