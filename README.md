@@ -173,11 +173,11 @@ panache looks for a configuration in:
 ```toml
 # Markdown flavor and line width
 flavor = "quarto"
-line_width = 80
+line-width = 80
 line-ending = "auto"
 wrap = "reflow"
 
-# External code formatters (new!)
+# External code formatters
 [formatters.r]
 cmd = "styler"
 args = ["--scope=spaces"]
