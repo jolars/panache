@@ -64,6 +64,7 @@ For more information, visit: https://github.com/jolars/panache
 * `format` — Format a Quarto, Pandoc, or Markdown document
 * `parse` — Parse and display the AST tree for debugging
 * `lsp` — Start the Language Server Protocol server
+* `lint` — Lint a Quarto, Pandoc, or Markdown document
 
 ###### **Options:**
 
@@ -167,4 +168,44 @@ command manually.
 
 For editor configuration examples, see:
 https://github.com/jolars/panache#editor-integration
+
+## `panache lint`
+
+Lint a document to check for correctness issues and best practice violations.
+Unlike the formatter which handles style, the linter catches semantic problems
+like syntax errors, heading hierarchy issues, and broken references.
+
+**Usage:** `panache lint [OPTIONS] [FILE]`
+
+EXAMPLES:
+
+```
+# Lint a file and show diagnostics
+panache lint document.qmd
+
+# Lint from stdin
+echo '# H1\n### H3' | panache lint
+
+# Check mode for CI (exit code 1 if violations found)
+panache lint --check document.qmd
+
+# Apply auto-fixes
+panache lint --fix document.qmd
+
+```
+LINT RULES:
+
+- Parser errors: Syntax errors detected during parsing
+- Heading hierarchy: Warns on skipped heading levels (e.g., h1 → h3)
+
+Configure rules in .panache.toml with [lint] section.
+
+###### **Arguments:**
+
+* `<FILE>` — Input file path
+
+###### **Options:**
+
+* `--check` — Exit with code 1 if violations found (CI mode)
+* `--fix` — Automatically fix violations where possible
 

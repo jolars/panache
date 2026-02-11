@@ -170,4 +170,46 @@ editor's LSP client. You generally don't need to run this command manually.
 
 For editor configuration examples, see: https://github.com/jolars/panache#editor-integration")]
     Lsp,
+    /// Lint a Quarto, Pandoc, or Markdown document
+    #[command(
+        long_about = "Lint a document to check for correctness issues and best practice \
+        violations. Unlike the formatter which handles style, the linter catches semantic \
+        problems like syntax errors, heading hierarchy issues, and broken references."
+    )]
+    #[command(after_help = "\
+EXAMPLES:
+
+    # Lint a file and show diagnostics
+    panache lint document.qmd
+
+    # Lint from stdin
+    echo '# H1\\n### H3' | panache lint
+
+    # Check mode for CI (exit code 1 if violations found)
+    panache lint --check document.qmd
+
+    # Apply auto-fixes
+    panache lint --fix document.qmd
+
+LINT RULES:
+
+  - Parser errors: Syntax errors detected during parsing
+  - Heading hierarchy: Warns on skipped heading levels (e.g., h1 → h3)
+  
+Configure rules in .panache.toml with [lint] section.")]
+    Lint {
+        /// Input file (stdin if not provided)
+        #[arg(help = "Input file path")]
+        file: Option<PathBuf>,
+
+        /// Check mode: exit with code 1 if violations found
+        #[arg(long)]
+        #[arg(help = "Exit with code 1 if violations found (CI mode)")]
+        check: bool,
+
+        /// Apply auto-fixes
+        #[arg(long)]
+        #[arg(help = "Automatically fix violations where possible")]
+        fix: bool,
+    },
 }

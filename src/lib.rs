@@ -6,6 +6,7 @@ mod external_formatters_common;
 pub mod external_formatters_sync;
 pub mod formatter;
 pub mod inline_parser;
+pub mod linter;
 #[cfg(feature = "lsp")]
 pub mod lsp;
 pub mod syntax;

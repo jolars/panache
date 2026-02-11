@@ -126,5 +126,98 @@ fn main() -> io::Result<()> {
             rt.block_on(async { panache::lsp::run().await })?;
             Ok(())
         }
+        Commands::Lint { file, check, fix } => {
+            let start_dir = start_dir_for(&file)?;
+            let (cfg, cfg_path) =
+                panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
+
+            if let Some(path) = &cfg_path {
+                log::debug!("Using config from: {}", path.display());
+            } else {
+                log::debug!("Using default config");
+            }
+
+            let input = read_all(file.as_ref())?;
+            // Normalize line endings for consistent AST positions
+            let normalized_input = input.replace("\r\n", "\n");
+            let tree = parse(&normalized_input, Some(cfg.clone()));
+            let diagnostics = panache::linter::lint(&tree, &normalized_input, &cfg);
+
+            if diagnostics.is_empty() {
+                if !check {
+                    println!("No issues found");
+                }
+                return Ok(());
+            }
+
+            if fix {
+                let fixed_output = apply_fixes(&normalized_input, &diagnostics);
+                if file.is_some() {
+                    print!("{}", fixed_output);
+                } else {
+                    print!("{}", fixed_output);
+                }
+            } else {
+                print_diagnostics(&diagnostics, file.as_ref());
+            }
+
+            if check {
+                std::process::exit(1);
+            }
+
+            Ok(())
+        }
     }
+}
+
+fn print_diagnostics(diagnostics: &[panache::linter::Diagnostic], file: Option<&PathBuf>) {
+    use panache::linter::Severity;
+
+    let file_name = file.and_then(|p| p.to_str()).unwrap_or("<stdin>");
+
+    for diag in diagnostics {
+        let severity_str = match diag.severity {
+            Severity::Error => "\x1b[31merror\x1b[0m",     // red
+            Severity::Warning => "\x1b[33mwarning\x1b[0m", // yellow
+            Severity::Info => "\x1b[34minfo\x1b[0m",       // blue
+        };
+
+        println!(
+            "{severity_str}[{}]: {} at {}:{}:{}",
+            diag.code, diag.message, file_name, diag.location.line, diag.location.column
+        );
+
+        if let Some(fix) = &diag.fix {
+            println!("  \x1b[36mhelp\x1b[0m: {}", fix.message); // cyan
+        }
+    }
+
+    println!("\nFound {} issue(s)", diagnostics.len());
+}
+
+fn apply_fixes(input: &str, diagnostics: &[panache::linter::Diagnostic]) -> String {
+    use panache::linter::diagnostics::Edit;
+
+    let mut edits: Vec<&Edit> = diagnostics
+        .iter()
+        .filter_map(|d| d.fix.as_ref())
+        .flat_map(|f| &f.edits)
+        .collect();
+
+    edits.sort_by_key(|e| e.range.start());
+
+    let mut output = String::new();
+    let mut last_end = 0;
+
+    for edit in edits {
+        let start: usize = edit.range.start().into();
+        let end: usize = edit.range.end().into();
+
+        output.push_str(&input[last_end..start]);
+        output.push_str(&edit.replacement);
+        last_end = end;
+    }
+
+    output.push_str(&input[last_end..]);
+    output
 }
