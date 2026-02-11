@@ -206,8 +206,9 @@ panache can invoke external formatters for code blocks:
 
 ```toml
 [formatters.r]
-cmd = "styler"
-args = ["--scope=spaces"]
+cmd = "air"
+args = ["format"]
+stdin = false
 
 [formatters.python]
 cmd = "black"
