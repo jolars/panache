@@ -152,16 +152,27 @@ impl Formatter {
 
         let mut prev_was_item = false;
         let mut prev_was_blank = false;
+        let mut prev_item_had_trailing_blank = false;
         let mut last_item_content_indent = 0;
 
         for child in node.children() {
             if child.kind() == SyntaxKind::ListItem {
-                // Only strip double newlines if there was no explicit blank line before this item
-                if prev_was_item && !prev_was_blank {
+                // Only strip double newlines if:
+                // 1. There was no explicit blank line before this item (at List level)
+                // 2. The previous ListItem didn't have a trailing BlankLine child
+                if prev_was_item && !prev_was_blank && !prev_item_had_trailing_blank {
                     while self.output.ends_with("\n\n") {
                         self.output.pop();
                     }
                 }
+
+                // Check if this list item has a trailing BlankLine child
+                prev_item_had_trailing_blank = child
+                    .children()
+                    .last()
+                    .map(|last_child| last_child.kind() == SyntaxKind::BlankLine)
+                    .unwrap_or(false);
+
                 prev_was_item = true;
                 prev_was_blank = false;
 

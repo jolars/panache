@@ -1,0 +1,45 @@
+ROOT@0..91
+  DOCUMENT@0..91
+    DefinitionList@0..21
+      DefinitionItem@0..21
+        Term@0..5
+          TEXT@0..4 "Term"
+          NEWLINE@4..5 "\n"
+        Definition@5..21
+          DefinitionMarker@5..6 ":"
+          WHITESPACE@6..8 "  "
+          TEXT@8..20 "Definition 2"
+          NEWLINE@20..21 "\n"
+    BlankLine@21..22
+      BlankLine@21..22 "\n"
+    PARAGRAPH@22..39
+      TEXT@22..38 "   Another list:"
+      NEWLINE@38..39 "\n"
+    BlankLine@39..40
+      BlankLine@39..40 "\n"
+    List@40..91
+      ListItem@40..71
+        ListMarker@40..41 "-"
+        WHITESPACE@41..43 "  "
+        TEXT@43..50 "Bullet\n"
+        NEWLINE@50..51 "\n"
+        BlankLine@51..58
+          BlankLine@51..58 "      \n"
+        CodeBlock@58..71
+          CodeFenceOpen@58..62
+            CodeFenceMarker@58..61 "```"
+            NEWLINE@61..62 "\n"
+          CodeContent@62..67
+            TEXT@62..66 "code"
+            NEWLINE@66..67 "\n"
+          CodeFenceClose@67..71
+            CodeFenceMarker@67..70 "```"
+            NEWLINE@70..71 "\n"
+      BlankLine@71..72
+        BlankLine@71..72 "\n"
+      ListItem@72..91
+        ListMarker@72..73 "-"
+        WHITESPACE@73..75 "  "
+        TEXT@75..90 "Another bullet\n"
+        NEWLINE@90..91 "\n"
+

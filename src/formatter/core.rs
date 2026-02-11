@@ -827,10 +827,12 @@ impl Formatter {
                                     }
                                 }
                                 SyntaxKind::BlankLine => {
-                                    // Output blank line if we've passed the first paragraph
-                                    if first_para_idx.is_some_and(|idx| i > idx)
-                                        && !self.output.ends_with("\n\n")
-                                    {
+                                    // Preserve blank lines in definition content
+                                    // Only skip blank lines before the first paragraph if it's lazy
+                                    let is_before_first_para =
+                                        first_para_idx.is_some_and(|idx| i < idx);
+
+                                    if !is_before_first_para && !self.output.ends_with("\n\n") {
                                         self.output.push('\n');
                                     }
                                 }
