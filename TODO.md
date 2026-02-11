@@ -3,6 +3,7 @@
 This document tracks implementation status for panache's features.
 
 **Status Legend**
+
 - ✅ **Implemented** - Feature is fully or mostly implemented
 - 🚧 **Partial** - Feature is partially implemented or needs work
 - ❌ **Not Implemented** - Feature not yet started
@@ -23,6 +24,7 @@ This document tracks implementation status for panache's features.
 ### Future LSP Features
 
 #### Diagnostics
+
 - ❌ **Syntax error diagnostics** - Report parsing errors as diagnostics
 - ❌ **Lint warnings** - Configurable linting rules (e.g., heading levels, list consistency)
 - ❌ **Link validation** - Check for broken internal links/references
@@ -30,31 +32,35 @@ This document tracks implementation status for panache's features.
 - ❌ **Footnote validation** - Check for undefined footnotes
 
 #### Code Actions
-- ❌ **Convert heading styles** - Convert between ATX/Setext headings
-- ❌ **Fix list formatting** - Convert between bullet/ordered lists
+
+- ❌ **Convert lists** - Convert between bullet/ordered lists
 - ❌ **Convert table** - Convert between table styles (simple, pipe, grid)
 - ❌ **Convert link styles** - Convert between inline/reference links
 - ❌ **Convert footnote styles** - Convert between inline/reference footnotes
 
 #### Navigation & Symbols
-- ❌ **Document outline** - `textDocument/documentSymbol` for headings tree
+
+- ❌ **Document outline** - `textDocument/documentSymbol` for headings, tables, figures, etc.
 - ❌ **Folding ranges** - `textDocument/foldingRange` for headings, lists, code blocks
 - ❌ **Go to definition** - Jump to reference link/footnote/citation definitions
 - ❌ **Find references** - Find all uses of a reference link/footnote/citation
 
 #### Completion
+
 - ❌ **Citation completion** - `textDocument/completion` for `@cite` keys from bibliography
 - ❌ **Reference link completion** - Complete `[text][ref]` from defined references
 - ❌ **Heading link completion** - Complete internal links to headings
 - ❌ **Attribute completion** - Complete class names and attributes in `{.class #id}`
 
 #### Hover Information
+
 - ❌ **Link preview** - `textDocument/hover` to show link target
 - ❌ **Reference preview** - Show reference definition on hover
 - ❌ **Citation preview** - Show bibliography entry for citation
 - ❌ **Footnote preview** - Show footnote content inline
 
 #### Advanced
+
 - ❌ **Range formatting** - `textDocument/rangeFormatting` for selected text only
 - ❌ **On-type formatting** - `textDocument/onTypeFormatting` for auto-formatting triggers
 - ❌ **Document links** - `textDocument/documentLink` for clickable links
@@ -68,6 +74,7 @@ This document tracks implementation status for panache's features.
 ## Configuration System
 
 ### Current Features
+
 - ✅ Hierarchical config loading (explicit → local → XDG → defaults)
 - ✅ Auto-detect flavor from file extension (.qmd → Quarto, .Rmd → RMarkdown)
 - ✅ `flavor` config field affects .md files and stdin
@@ -77,12 +84,14 @@ This document tracks implementation status for panache's features.
 ### Future Enhancements
 
 #### Per-Flavor Extension Configuration
+
 - ❌ **Per-flavor extension overrides** - `[extensions.gfm]`, `[extensions.quarto]`, `[extensions.rmarkdown]`, etc.
   - Allow fine-grained control of extensions for specific flavors
   - Example: Enable `task_lists` only for GFM, disable `citations` for CommonMark
   - Falls back to global `[extensions]` settings when not specified
 
 #### Per-File Pattern Overrides
+
 - ❌ **Glob pattern flavor overrides** - `[flavor_overrides]` with file patterns
   - Override flavor for specific files or patterns
   - Example: `"README.md" = "gfm"` or `"docs/**/*.md" = "gfm"`
@@ -98,6 +107,7 @@ This document tracks implementation status for panache's features.
 **✅ Implemented** - Basic linter with CLI and one rule.
 
 **Current features:**
+
 - ✅ `panache lint` CLI subcommand
 - ✅ `--check` mode for CI (exit 1 if violations found)
 - ✅ `--fix` mode for auto-fixing violations
@@ -116,11 +126,12 @@ src/linter/           # Core linting logic
   ├── diagnostics.rs  # Diagnostic types (Diagnostic, Severity, Fix, Edit)
   ├── rules.rs        # Rule trait and registry
   └── runner.rs       # Rule execution
-src/main.rs           # CLI: `panache lint` subcommand  
+src/main.rs           # CLI: `panache lint` subcommand
 src/lsp.rs            # LSP: TODO - integrate diagnostics
 ```
 
 Both linter and formatter:
+
 - ✅ Share the same parser and AST
 - ✅ Use the same config system
 - ✅ Benefit from rowan's CST
@@ -137,6 +148,7 @@ panache lint --config cfg.toml      # Custom config
 ### Future Lint Rules
 
 **Syntax correctness:**
+
 - ❌ Malformed fenced divs (unclosed, invalid attributes)
 - ❌ Broken table structures
 - ❌ Invalid citation syntax (`@citekey` malformations)
@@ -144,7 +156,8 @@ panache lint --config cfg.toml      # Custom config
 - ❌ Invalid shortcode syntax (Quarto-specific)
 
 **Style/Best practices:**
-- ✅ Inconsistent heading hierarchy (skip levels) - **IMPLEMENTED**
+
+- ✅ Inconsistent heading hierarchy (skip levels)
 - ❌ Multiple top-level headings
 - ❌ Empty links/images
 - ❌ Duplicate reference labels
@@ -152,6 +165,7 @@ panache lint --config cfg.toml      # Custom config
 - ❌ Hard-wrapped text in code blocks
 
 **Configuration:**
+
 - ❌ Per-rule enable/disable in `.panache.toml` `[lint]` section
 - ❌ Severity levels (error, warning, info)
 - ❌ Auto-fix capability per rule (infrastructure exists, rules need implementation)
