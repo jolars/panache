@@ -122,6 +122,26 @@ pub(super) fn build_words<'a>(
                     SyntaxKind::List => {
                         b.pending_space = true;
                     }
+                    SyntaxKind::CodeBlock | SyntaxKind::BlankLine => {
+                        // Skip code blocks and blank lines - they'll be handled separately
+                        // Don't recurse into them
+                    }
+                    SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::ListItem) => {
+                        // For PARAGRAPH children of ListItem, check if there's a BlankLine before it
+                        // If yes, it's a true continuation paragraph (skip in wrapping)
+                        // If no, it's a lazy continuation (include in wrapping)
+                        let has_blank_before = n
+                            .prev_sibling()
+                            .map(|prev| prev.kind() == SyntaxKind::BlankLine)
+                            .unwrap_or(false);
+
+                        if has_blank_before {
+                            // True continuation paragraph - skip in wrapping, format separately
+                        } else {
+                            // Lazy continuation - include in wrapping
+                            process_node_recursive(&n, b, format_inline_fn);
+                        }
+                    }
                     SyntaxKind::PARAGRAPH => {
                         // Recursively process PARAGRAPH content instead of treating it as a unit
                         process_node_recursive(&n, b, format_inline_fn);

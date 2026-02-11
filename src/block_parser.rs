@@ -475,6 +475,22 @@ impl<'a> BlockParser<'a> {
                         keep_level = i + 1;
                     }
                 }
+                Container::ListItem { content_col } => {
+                    // Keep list item if next line is indented to content column
+                    // BUT NOT if it's a new list item marker at an outer level
+                    let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
+                    let is_new_item_at_outer_level = if let Some((ref _nm, _, _)) = next_marker {
+                        // Check if this marker would start a sibling item (at parent list level)
+                        // by checking if it's at or before the current item's start
+                        effective_indent < *content_col
+                    } else {
+                        false
+                    };
+
+                    if !is_new_item_at_outer_level && effective_indent >= *content_col {
+                        keep_level = i + 1;
+                    }
+                }
                 _ => {}
             }
         }
@@ -514,7 +530,8 @@ impl<'a> BlockParser<'a> {
         // Check for heading (needs blank line before, or at start of container)
         let has_blank_before = self.pos == 0
             || self.lines[self.pos - 1].trim().is_empty()
-            || matches!(self.containers.last(), Some(Container::BlockQuote { .. }));
+            || matches!(self.containers.last(), Some(Container::BlockQuote { .. }))
+            || matches!(self.containers.last(), Some(Container::List { .. }));
 
         // For indented code blocks, we need a stricter condition - only actual blank lines count
         // Being at document start (pos == 0) is OK only if we're not inside a blockquote
@@ -637,20 +654,43 @@ impl<'a> BlockParser<'a> {
         }
 
         // Check for fenced code block
-        if has_blank_before && let Some(fence) = try_parse_fence_open(content) {
+        // When inside a list, strip typical list indentation before checking
+        let list_indent_stripped = if self.in_list() {
+            // Strip up to 4 spaces (typical list indentation)
+            if content.starts_with("    ") {
+                4
+            } else if content.starts_with("   ") {
+                3
+            } else if content.starts_with("  ") {
+                2
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+        let content_for_fence_check = if list_indent_stripped > 0 {
+            &content[list_indent_stripped..]
+        } else {
+            content
+        };
+
+        if has_blank_before && let Some(fence) = try_parse_fence_open(content_for_fence_check) {
             let bq_depth = self.current_blockquote_depth();
             log::debug!(
                 "Parsed fenced code block at line {}: {} fence",
                 self.pos,
                 fence.fence_char
             );
+            // Pass total indent (footnote + list) to the parser
+            let total_indent = content_indent + list_indent_stripped;
             let new_pos = parse_fenced_code_block(
                 &mut self.builder,
                 &self.lines,
                 self.pos,
                 fence,
                 bq_depth,
-                content_indent,
+                total_indent,
             );
             self.pos = new_pos;
             return true;

@@ -231,61 +231,28 @@ impl Formatter {
     fn format_indented_code_block(&mut self, node: &SyntaxNode, indent: usize) {
         let indent_str = " ".repeat(indent);
 
-        // Collect code block parts
-        let mut info_string_raw = String::new();
-        let mut content = String::new();
+        // Save current output and format code block to temp buffer
+        let saved_output = self.output.clone();
+        self.output.clear();
 
-        for child in node.children_with_tokens() {
-            if let NodeOrToken::Node(n) = child {
-                match n.kind() {
-                    SyntaxKind::CodeFenceOpen => {
-                        for token in n.children_with_tokens() {
-                            if let NodeOrToken::Token(t) = token
-                                && t.kind() == SyntaxKind::CodeInfo
-                            {
-                                info_string_raw = t.text().to_string();
-                            }
-                        }
-                    }
-                    SyntaxKind::CodeContent => {
-                        content = n.text().to_string();
-                    }
-                    _ => {}
-                }
-            }
-        }
+        // Use the standard code block formatter
+        self.format_code_block(node);
 
-        // Determine fence style
-        let fence_char = match self.config.code_blocks.fence_style {
-            crate::config::FenceStyle::Backtick => '`',
-            crate::config::FenceStyle::Tilde => '~',
-            crate::config::FenceStyle::Preserve => '`',
-        };
-        let fence_length = 3.max(self.config.code_blocks.min_fence_length);
+        // Get the formatted output and restore original
+        let code_output = self.output.clone();
+        self.output = saved_output;
 
-        // Output opening fence with indent
-        self.output.push_str(&indent_str);
-        for _ in 0..fence_length {
-            self.output.push(fence_char);
-        }
-        if !info_string_raw.is_empty() {
-            self.output.push_str(&info_string_raw);
-        }
-        self.output.push('\n');
-
-        // Output content lines with indent
-        for line in content.lines() {
+        // Add indentation to each line
+        for line in code_output.lines() {
             self.output.push_str(&indent_str);
             self.output.push_str(line);
             self.output.push('\n');
         }
 
-        // Output closing fence with indent
-        self.output.push_str(&indent_str);
-        for _ in 0..fence_length {
-            self.output.push(fence_char);
+        // Ensure we end with exactly one newline
+        if !self.output.ends_with('\n') {
+            self.output.push('\n');
         }
-        self.output.push('\n');
     }
 
     /// Format a paragraph that is a continuation of a list item.
@@ -854,6 +821,10 @@ impl Formatter {
                     // Format them with the last list item's content indentation
                     if child.kind() == SyntaxKind::PARAGRAPH && prev_was_item {
                         self.format_list_continuation_paragraph(&child, last_item_content_indent);
+                    } else if child.kind() == SyntaxKind::CodeBlock && prev_was_item {
+                        // Code blocks that are siblings of ListItems are also continuation content
+                        // Format them with indentation
+                        self.format_indented_code_block(&child, last_item_content_indent);
                     } else {
                         self.format_node_sync(&child, indent);
                     }
@@ -1318,14 +1289,49 @@ impl Formatter {
                     self.output.push('\n');
                 }
 
-                // Format nested lists inside this list item aligned to the content column.
+                // Format nested blocks inside this list item aligned to the content column.
                 for child in node.children() {
-                    if child.kind() == SyntaxKind::List {
-                        // Nested list indent includes: total_indent + marker_padding + marker + 1 space + checkbox
-                        self.format_node_sync(
-                            &child,
-                            total_indent + marker_padding + marker.len() + 1 + checkbox_width,
-                        );
+                    match child.kind() {
+                        SyntaxKind::List => {
+                            // Nested list indent includes: total_indent + marker_padding + marker + 1 space + checkbox
+                            self.format_node_sync(
+                                &child,
+                                total_indent + marker_padding + marker.len() + 1 + checkbox_width,
+                            );
+                        }
+                        SyntaxKind::CodeBlock => {
+                            // Code blocks in list items need indentation
+                            let content_indent = total_indent
+                                + marker_padding
+                                + marker.len()
+                                + spaces_after_marker
+                                + checkbox_width;
+                            self.format_indented_code_block(&child, content_indent);
+                        }
+                        SyntaxKind::PARAGRAPH => {
+                            // Only format PARAGRAPH if it comes after a BlankLine (true continuation)
+                            // Otherwise it's a lazy continuation already handled by wrapping
+                            let has_blank_before = child
+                                .prev_sibling()
+                                .map(|prev| prev.kind() == SyntaxKind::BlankLine)
+                                .unwrap_or(false);
+
+                            if has_blank_before {
+                                let content_indent = total_indent
+                                    + marker_padding
+                                    + marker.len()
+                                    + spaces_after_marker
+                                    + checkbox_width;
+                                self.format_list_continuation_paragraph(&child, content_indent);
+                            }
+                        }
+                        SyntaxKind::BlankLine => {
+                            // Blank lines within list items
+                            self.output.push('\n');
+                        }
+                        _ => {
+                            // Other block elements
+                        }
                     }
                 }
             }
