@@ -240,30 +240,65 @@ parallel for maximum performance.
 
 ### Configuration
 
+External formatters support two modes: **stdin/stdout** or **file-based**.
+
+#### Stdin Mode (Default)
+
+For formatters that read from stdin and write to stdout:
+
 ```toml
 [formatters.python]
 cmd = "black"
 args = ["-", "--line-length=88"]
-enabled = true  # Optional, defaults to true
-
-[formatters.r]
-cmd = "styler"
-args = ["--scope=spaces"]
+stdin = true  # Default
 
 [formatters.rust]
 cmd = "rustfmt"
-args = []
+stdin = true
 
 [formatters.javascript]
 cmd = "prettier"
-args = ["--parser=babel", "--stdin-filepath=file.js"]
+args = ["--parser=babel"]
+stdin = true
 ```
 
-### Requirements
+#### File-Based Mode
 
-- Formatters must **read from stdin** and **write to stdout**
-- Failed formatters preserve original code with a warning
-- 30-second timeout per formatter invocation
+For formatters that modify files in place:
+
+```toml
+[formatters.r]
+cmd = "air"
+args = ["format"]
+stdin = false  # File-based mode
+
+[formatters.go]
+cmd = "gofmt"
+args = ["-w"]  # -w writes to file
+stdin = false
+```
+
+**File path placeholder:** Use `{}` in args to control where the file path is inserted. If omitted, it's appended at the end.
+
+```toml
+[formatters.r]
+cmd = "air"
+args = ["format", "{}"]  # Explicit: air format /tmp/file.tmp
+stdin = false
+
+[formatters.custom]
+cmd = "myformatter"
+args = ["--input", "{}", "--output", "{}"]  # Multiple uses
+stdin = false
+```
+
+### Behavior
+
+- **Language matching:** Code block language (e.g., `` ```python ``) is matched to formatter key (case-insensitive)
+- **Parallel execution:** All formatters run concurrently for speed
+- **Error handling:** Failed formatters preserve original code with a warning
+- **Timeout:** 30 seconds per formatter invocation
+- **Optional:** Set `enabled = false` to disable a formatter
 - Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
   etc.)
 
