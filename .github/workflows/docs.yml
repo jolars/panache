@@ -1,10 +1,10 @@
+name: Documentation
+
 on:
   workflow_dispatch:
   release:
     types:
       - published
-
-name: Quarto Publish
 
 permissions:
   contents: read
