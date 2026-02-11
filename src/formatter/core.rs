@@ -124,12 +124,18 @@ impl Formatter {
     }
 
     /// Extract the marker text from a ListItem node
+    /// Standardizes bullet list markers to "-" for consistency
     fn extract_list_marker(node: &SyntaxNode) -> Option<String> {
         for el in node.children_with_tokens() {
             if let NodeOrToken::Token(t) = el
                 && t.kind() == SyntaxKind::ListMarker
             {
-                return Some(t.text().to_string());
+                let marker = t.text().to_string();
+                // Standardize bullet list markers: convert *, +, - to "-"
+                if marker.len() == 1 && matches!(marker.as_str(), "-" | "*" | "+") {
+                    return Some("-".to_string());
+                }
+                return Some(marker);
             }
         }
         None
@@ -1161,6 +1167,7 @@ impl Formatter {
             SyntaxKind::ListItem => {
                 // Compute indent, marker, and checkbox from leading tokens
                 let mut marker = String::new();
+                let mut original_marker = String::new(); // Track original for word removal
                 let mut checkbox = None;
                 let mut local_indent = 0;
                 let mut content_start = false;
@@ -1174,7 +1181,16 @@ impl Formatter {
                                 }
                             }
                             SyntaxKind::ListMarker => {
-                                marker = t.text().to_string();
+                                let raw_marker = t.text().to_string();
+                                original_marker = raw_marker.clone();
+                                // Standardize bullet list markers to "-"
+                                marker = if raw_marker.len() == 1
+                                    && matches!(raw_marker.as_str(), "-" | "*" | "+")
+                                {
+                                    "-".to_string()
+                                } else {
+                                    raw_marker
+                                };
                                 content_start = true;
                             }
                             SyntaxKind::TaskCheckbox => {
@@ -1245,8 +1261,9 @@ impl Formatter {
                 let mut words = wrapping::build_words(&self.config, node, &mut arena, |n| {
                     self.format_inline_node(n)
                 });
+                // Remove the original marker from words (not the standardized one)
                 if let Some(first) = words.first()
-                    && first.word == marker
+                    && first.word == original_marker
                 {
                     // Remove the marker; we will print it ourselves with a following space
                     words.remove(0);

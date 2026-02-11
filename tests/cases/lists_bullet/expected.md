@@ -1,8 +1,8 @@
 A simple bullet list:
 
-* First item
-* Second item with a longer line that might need wrapping if it gets too long
-* Third item
+- First item
+- Second item with a longer line that might need wrapping if it gets too long
+- Third item
 
 Another list with different marker:
 

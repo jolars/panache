@@ -187,7 +187,7 @@ panache lint --config cfg.toml      # Custom config
 
 ### Lists
 
-- ❌ **Bullet lists** - Standardize bullet list markers (`-`, `+`, `*`) - How?
+- ✅ **Bullet lists** - Standardize bullet list markers to `-` (all `*`, `+`, `-` converted to `-`)
 
 ### Tables
 

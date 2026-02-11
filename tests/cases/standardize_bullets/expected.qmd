@@ -1,0 +1,74 @@
+# Bullet List Standardization Test
+
+This document tests bullet list marker standardization.
+
+## Single-Level Lists
+
+Different markers:
+
+- Asterisk item 1
+- Asterisk item 2
+
+- Plus item 1
+- Plus item 2
+
+- Hyphen item 1
+- Hyphen item 2
+
+## Nested Lists
+
+Mixed markers at different levels:
+
+- Top level with asterisk
+  - Second level with plus
+    - Third level with hyphen
+      - Fourth level back to asterisk
+
+## Task Lists
+
+Task lists with different markers:
+
+- [ ] Unchecked with asterisk
+- [x] Checked with asterisk
+
+- [ ] Unchecked with plus
+- [X] Checked with plus (capital X)
+
+- [ ] Unchecked with hyphen
+- [x] Checked with hyphen
+
+## Mixed Content
+
+Lists with code blocks and other elements:
+
+- List item with `inline code`
+- List item with more text that wraps over multiple lines when the formatter
+  processes it
+
+  Continuation paragraph in list item
+
+```python
+  def example():
+      pass
+```
+
+- Another list with different marker
+
+## Combination with Ordered Lists
+
+Bullet lists and ordered lists together:
+
+- Bullet item 1
+- Bullet item 2
+
+1. Ordered item 1
+2. Ordered item 2
+
+- More bullet items
+- With plus markers
+
+a. Lower alpha ordered
+b. Another alpha
+
+- Back to bullets
+- With asterisk markers

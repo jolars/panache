@@ -163,15 +163,16 @@ args = ["-"]
 
 ### Unordered Lists
 
-Lists are formatted with consistent indentation:
+Bullet list markers are standardized to `-` for consistency. All bullet markers
+(`*`, `+`, `-`) are converted to `-` at all nesting levels:
 
 **Input:**
 
 ```markdown
 * Item 1
-  * Nested item
+  + Nested item
     * Deeply nested
-* Item 2
++ Item 2
 ```
 
 **Output:**
@@ -182,6 +183,12 @@ Lists are formatted with consistent indentation:
     - Deeply nested
 - Item 2
 ```
+
+::: {.callout-note}
+panache standardizes all bullet list markers to `-` (hyphen) for consistency,
+regardless of the original marker used. This applies to all nesting levels and
+task lists as well.
+:::
 
 ### Ordered Lists
 
@@ -197,7 +204,17 @@ Ordered lists maintain proper numbering:
 
 ### Task Lists
 
-GitHub-style task lists are supported:
+GitHub-style task lists use the standardized `-` marker:
+
+**Input:**
+
+```markdown
+* [ ] Unchecked task
++ [x] Checked task
+- [ ] Another task
+```
+
+**Output:**
 
 ```markdown
 - [ ] Unchecked task

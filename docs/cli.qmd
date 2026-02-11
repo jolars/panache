@@ -61,14 +61,14 @@ For more information, visit: https://github.com/jolars/panache
 
 ###### **Subcommands:**
 
-* `format` — Format a Quarto, Pandoc, or Markdown document
-* `parse` — Parse and display the AST tree for debugging
-* `lsp` — Start the Language Server Protocol server
-* `lint` — Lint a Quarto, Pandoc, or Markdown document
+- `format` — Format a Quarto, Pandoc, or Markdown document
+- `parse` — Parse and display the AST tree for debugging
+- `lsp` — Start the Language Server Protocol server
+- `lint` — Lint a Quarto, Pandoc, or Markdown document
 
 ###### **Options:**
 
-* `--config <CONFIG>` — Path to a custom configuration file. If not specified,
+- `--config <CONFIG>` — Path to a custom configuration file. If not specified,
   panache will search for .panache.toml or panache.toml in the current directory
   and its parents, then fall back to ~/.config/panache/config.toml.
 
@@ -108,19 +108,19 @@ FORMATTING RULES:
 
 ###### **Arguments:**
 
-* `<FILE>` — Path to the input file to format. If not provided, reads from
+- `<FILE>` — Path to the input file to format. If not provided, reads from
   stdin. Supports .qmd, .md, .Rmd, and other Markdown-based formats.
 
 ###### **Options:**
 
-* `--check` — Check if the file is already formatted according to panache's
+- `--check` — Check if the file is already formatted according to panache's
   rules without making any changes. If the file is not formatted, displays a
   diff and exits with code 1. If formatted, exits with code 0. Useful for CI/CD
   pipelines.
-* `--write` — Write the formatted output back to the input file, modifying it
+- `--write` — Write the formatted output back to the input file, modifying it
   in place. Cannot be used with stdin input. It's recommended to use version
   control before using this option.
-* `--range <START:END>` — Format only the specified line range. Lines are
+- `--range <START:END>` — Format only the specified line range. Lines are
   1-indexed and inclusive. The range will be expanded to complete block
   boundaries to ensure well-formed output. For example, if you select part of
   a list, the entire list will be formatted. Format: --range START:END (e.g.,
@@ -159,7 +159,7 @@ The AST output shows the concrete syntax tree built by the parser, including:
 
 ###### **Arguments:**
 
-* `<FILE>` — Path to the input file to parse. If not provided, reads from stdin.
+- `<FILE>` — Path to the input file to parse. If not provided, reads from stdin.
   The parser respects extension flags from the configuration file.
 
 ## `panache lsp`
@@ -210,10 +210,10 @@ Configure rules in .panache.toml with [lint] section.
 
 ###### **Arguments:**
 
-* `<FILE>` — Input file path
+- `<FILE>` — Input file path
 
 ###### **Options:**
 
-* `--check` — Exit with code 1 if violations found (CI mode)
-* `--fix` — Automatically fix violations where possible
+- `--check` — Exit with code 1 if violations found (CI mode)
+- `--fix` — Automatically fix violations where possible
 

@@ -1,3 +1,4 @@
+mod bullet_standardization;
 mod comments;
 mod external_formatters;
 mod frontmatter;
