@@ -27,6 +27,16 @@ website:
     left:
       - href: index.qmd
         text: Home
+      - href: getting-started.qmd
+        text: Getting Started
+      - href: configuration.qmd
+        text: Configuration
+      - href: formatting.qmd
+        text: Formatting
+      - href: lsp.qmd
+        text: LSP
+      - href: cli.qmd
+        text: CLI
       - href: playground
         text: Playground
 

@@ -137,11 +137,13 @@ RUST_LOG=panache::block_parser=trace,panache::formatter=debug panache format doc
 ```
 
 **Log levels and content:**
+
 - **INFO**: Formatting lifecycle, config loading (available in release)
 - **DEBUG**: All parsing decisions, element matches, table detection
 - **TRACE**: Text previews, container operations, detailed steps
 
 **Modules with logging:**
+
 - `panache::block_parser` - Block element detection (headings, tables, code blocks, etc.)
 - `panache::inline_parser` - Inline element matching (emphasis, code, math, links, footnotes)
 - `panache::formatter` - Formatting decisions and node traversal
@@ -220,11 +222,13 @@ panache uses a hierarchical config lookup:
 4. Built-in defaults (80 char width, auto line endings, reflow wrap)
 
 **Extension Configuration**: The config system includes:
+
 - `flavor` field: Choose Markdown flavor (Pandoc, Quarto, RMarkdown, GFM, CommonMark)
 - `extensions` section: 60+ bool flags for individual Pandoc extensions
 - Each flavor has sensible defaults that can be overridden
 
 Example `.panache.toml`:
+
 ```toml
 flavor = "quarto"
 line_width = 80
@@ -274,31 +278,22 @@ The project has a Quarto-based documentation site in the `docs/` directory:
 
 ```
 docs/
+├── filters/              # Custom Quarto filters (if needed)
 ├── _quarto.yml          # Quarto configuration (site metadata, navigation)
 ├── index.qmd            # Homepage with project overview
 ├── getting-started.qmd  # Installation and basic usage
-├── cli-reference.qmd    # CLI subcommands and options
-├── lsp-setup.qmd        # Language Server setup for editors
-├── configuration.qmd    # .panache.toml reference
-├── features.qmd         # Supported syntax and formatting rules
-├── playground/          # WASM-based web playground for live formatting
+├── cli.qmd              # CLI reference
+├── lsp.qmd              # Language Server Protocol docs
+├── formatting.qmd       # Detailed formatting rules and examples
+├── configuration.qmd    # panache.toml reference
+└── playground/          # WASM-based web playground for live formatting
 │   └── index.html       # Uses TypeScript bindings from panache-wasm
-├── pandoc-spec.md       # Index of Pandoc syntax specification
-└── pandoc-spec/         # Individual spec files for each syntax element
-    ├── paragraphs.md
-    ├── headings.md
-    ├── lists.md
-    ├── tables.md
-    └── ...
 ```
 
-**Structure:**
-- **User guides**: Installation, CLI usage, LSP setup, configuration, feature showcase
-- **pandoc-spec/**: Reference docs for Pandoc syntax (used during development)
-- **playground/**: Interactive WASM-based formatter demo
-- **Published**: GitHub Pages via `docs.yml` workflow at https://jolars.github.io/panache/
+**Published**: GitHub Pages via `docs.yml` workflow at https://jolars.github.io/panache/
 
 **Building the docs:**
+
 ```bash
 # Requires Quarto installed
 cd docs
@@ -347,7 +342,7 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 - Tests verify formatting is idempotent (format twice = format once)
 - Use `UPDATE_EXPECTED=1 cargo test` to update expected outputs (BE CAREFUL)
 - New features should have corresponding test cases added to cover new formatting scenarios.
-- **DO NOT** update expected outputs without verifying that the change is correct and intended. 
+- **DO NOT** update expected outputs without verifying that the change is correct and intended.
 
 ## Key Development Facts
 
@@ -368,28 +363,33 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 panache includes a built-in LSP implementation accessible via `panache lsp`:
 
 **Architecture:**
+
 - LSP code lives in `src/lsp.rs` (not a separate crate to avoid circular dependencies)
 - Implements `tower_lsp_server::LanguageServer` trait
 - Communicates via stdin/stdout using standard LSP JSON-RPC protocol
 - Uses `tokio::task::spawn_blocking` to handle non-Send `rowan::SyntaxNode` types
 
 **Current Capabilities:**
+
 - ✅ `textDocument/formatting` - Full document formatting
 - ✅ `textDocument/didOpen/didChange/didClose` - Document tracking (FULL sync mode)
 - ✅ Config discovery from workspace root (`.panache.toml`)
 - ✅ Thread-safe document state management with Arc<Mutex<HashMap>>
 
 **Implementation Details:**
+
 - Document URIs stored as strings (Uri type doesn't implement Send)
 - Workspace root captured from `InitializeParams.workspace_folders` or deprecated `root_uri`
 - Config loaded per formatting request (no caching yet)
 - Formatting runs in blocking task to avoid Send trait issues
 
 **Future LSP Features** (see TODO.md):
+
 - Diagnostics, code actions, document symbols, completion, hover, navigation
 - Range formatting, semantic tokens, rename, workspace features
 
 **Testing LSP:**
+
 ```bash
 # Start the server (for manual editor testing)
 ./target/release/panache lsp
@@ -400,6 +400,7 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 ### Logging Infrastructure
 
 panache has comprehensive logging (~50 strategic log statements):
+
 - **Release builds**: INFO logs only (formatting metrics, config loading) - zero overhead for DEBUG/TRACE
 - **Debug builds**: Full DEBUG and TRACE logging available
 - **Modules logged**: block_parser, inline_parser, formatter, config
@@ -407,6 +408,7 @@ panache has comprehensive logging (~50 strategic log statements):
 - **Purpose**: Debug parsing decisions, understand element matching, trace formatter behavior
 
 Example log output (DEBUG level):
+
 ```
 [DEBUG] Parsed ATX heading at line 0: level 1
 [DEBUG] Matched emphasis at pos 10: level=2, delim=*
@@ -428,11 +430,13 @@ Example log output (DEBUG level):
 The library exposes two main functions in `src/lib.rs`:
 
 **`format(input: &str, config: Option<Config>) -> String`**
+
 - Formats a Quarto/Markdown document
 - Takes optional config (uses default if None)
 - Returns formatted string
 
 **`parse(input: &str, config: Option<Config>) -> SyntaxNode`**
+
 - Parses a document into a concrete syntax tree (CST)
 - Takes optional config (affects which extensions are enabled)
 - Returns rowan SyntaxNode for inspection/debugging
@@ -459,6 +463,7 @@ Both functions accept an optional config to respect flavor-specific extensions a
 - `devenv.nix`: Development environment with go-task, quarto, wasm-pack
 
 **Config is threaded through parsers**:
+
 - `BlockParser::new(input, &Config)` - borrows config
 - `InlineParser::new(block_tree, Config)` - owns config
 - Test helpers use `Config::default()` to simplify test code
