@@ -740,11 +740,13 @@ impl<'a> BlockParser<'a> {
 
         // Check for display math block
         // Close paragraph first if one is open, then parse as MathBlock
-        if let Some(math_fence) = try_parse_math_fence_open(content) {
+        if let Some(math_fence) =
+            try_parse_math_fence_open(content, self.config.extensions.tex_math_single_backslash)
+        {
             log::debug!(
-                "Parsed display math block at line {}: {} dollars",
+                "Parsed display math block at line {}: {:?}",
                 self.pos,
-                math_fence.fence_count
+                math_fence.fence_type
             );
             // Close paragraph before opening display math block
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
