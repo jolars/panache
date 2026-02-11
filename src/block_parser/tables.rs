@@ -412,8 +412,7 @@ pub(crate) fn try_parse_simple_table(
         // Emit blank line before caption if needed
         if cap_start > end_pos {
             builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "");
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.token(SyntaxKind::BlankLine.into(), "\n");
             builder.finish_node();
         }
         emit_table_caption(builder, lines, cap_start, cap_end);
@@ -674,8 +673,7 @@ pub(crate) fn try_parse_pipe_table(
         // Emit blank line before caption if needed
         if cap_start > end_pos {
             builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "");
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.token(SyntaxKind::BlankLine.into(), "\n");
             builder.finish_node();
         }
         emit_table_caption(builder, lines, cap_start, cap_end);
@@ -1165,8 +1163,7 @@ pub(crate) fn try_parse_grid_table(
     if let Some((cap_start, cap_end)) = caption_after {
         if cap_start > end_pos {
             builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "");
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.token(SyntaxKind::BlankLine.into(), "\n");
             builder.finish_node();
         }
         emit_table_caption(builder, lines, cap_start, cap_end);
@@ -1587,8 +1584,7 @@ pub(crate) fn try_parse_multiline_table(
             }
 
             builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "");
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.token(SyntaxKind::BlankLine.into(), "\n");
             builder.finish_node();
             continue;
         }
@@ -1611,8 +1607,7 @@ pub(crate) fn try_parse_multiline_table(
     if let Some((cap_start, cap_end)) = caption_after {
         if cap_start > end_pos {
             builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "");
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.token(SyntaxKind::BlankLine.into(), "\n");
             builder.finish_node();
         }
         emit_table_caption(builder, lines, cap_start, cap_end);

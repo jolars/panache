@@ -17,8 +17,7 @@ ROOT@0..218
         TEXT@145..180 "|    1  |    1 |      ..."
         NEWLINE@180..181 "\n"
       BlankLine@181..182
-        BlankLine@181..181 ""
-        NEWLINE@181..182 "\n"
+        BlankLine@181..182 "\n"
       TableCaption@182..218
         TEXT@182..217 "Demonstration of pipe ..."
         NEWLINE@217..218 "\n"

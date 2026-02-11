@@ -17,8 +17,7 @@ ROOT@0..236
         TEXT@158..196 "      1     1         ..."
         NEWLINE@196..197 "\n"
       BlankLine@197..198
-        BlankLine@197..197 ""
-        NEWLINE@197..198 "\n"
+        BlankLine@197..198 "\n"
       TableCaption@198..236
         TEXT@198..235 "Demonstration of simp ..."
         NEWLINE@235..236 "\n"
