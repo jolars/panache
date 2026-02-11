@@ -2,7 +2,7 @@
 
 ## Repository Overview
 
-**panache** is a CLI formatter and linter for Quarto (`.qmd`), Pandoc, and Markdown
+**panache** is a formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and Markdown
 files written in Rust. It's designed to understand Quarto/Pandoc-specific
 syntax that other formatters like Prettier and mdformat struggle with,
 including fenced divs, tables, and math formatting.
@@ -324,6 +324,7 @@ docs/
 ```
 
 **Structure:**
+
 - **User guides**: Installation, CLI usage, LSP setup, configuration, feature showcase
 - **playground/**: Interactive WASM-based formatter demo
 - **Published**: GitHub Pages via `docs.yml` workflow at https://jolars.github.io/panache/
