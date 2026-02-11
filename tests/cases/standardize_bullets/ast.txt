@@ -1,0 +1,305 @@
+ROOT@0..1231
+  DOCUMENT@0..1231
+    Heading@0..35
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..34
+        TEXT@2..34 "Bullet List Standardi ..."
+      NEWLINE@34..35 "\n"
+    BlankLine@35..36
+      BlankLine@35..36 "\n"
+    PARAGRAPH@36..92
+      TEXT@36..91 "This document tests b ..."
+      NEWLINE@91..92 "\n"
+    BlankLine@92..93
+      BlankLine@92..93 "\n"
+    Heading@93..115
+      AtxHeadingMarker@93..95
+        AtxHeadingMarker@93..95 "##"
+      WHITESPACE@95..96 " "
+      HeadingContent@96..114
+        TEXT@96..114 "Single-Level Lists"
+      NEWLINE@114..115 "\n"
+    BlankLine@115..116
+      BlankLine@115..116 "\n"
+    PARAGRAPH@116..135
+      TEXT@116..134 "Different markers:"
+      NEWLINE@134..135 "\n"
+    BlankLine@135..136
+      BlankLine@135..136 "\n"
+    List@136..174
+      ListItem@136..155
+        ListMarker@136..137 "*"
+        WHITESPACE@137..138 " "
+        TEXT@138..154 "Asterisk item 1\n"
+        NEWLINE@154..155 "\n"
+      ListItem@155..174
+        ListMarker@155..156 "*"
+        WHITESPACE@156..157 " "
+        TEXT@157..173 "Asterisk item 2\n"
+        NEWLINE@173..174 "\n"
+    BlankLine@174..175
+      BlankLine@174..175 "\n"
+    List@175..205
+      ListItem@175..190
+        ListMarker@175..176 "+"
+        WHITESPACE@176..177 " "
+        TEXT@177..189 "Plus item 1\n"
+        NEWLINE@189..190 "\n"
+      ListItem@190..205
+        ListMarker@190..191 "+"
+        WHITESPACE@191..192 " "
+        TEXT@192..204 "Plus item 2\n"
+        NEWLINE@204..205 "\n"
+    BlankLine@205..206
+      BlankLine@205..206 "\n"
+    List@206..240
+      ListItem@206..223
+        ListMarker@206..207 "-"
+        WHITESPACE@207..208 " "
+        TEXT@208..222 "Hyphen item 1\n"
+        NEWLINE@222..223 "\n"
+      ListItem@223..240
+        ListMarker@223..224 "-"
+        WHITESPACE@224..225 " "
+        TEXT@225..239 "Hyphen item 2\n"
+        NEWLINE@239..240 "\n"
+    BlankLine@240..241
+      BlankLine@240..241 "\n"
+    Heading@241..257
+      AtxHeadingMarker@241..243
+        AtxHeadingMarker@241..243 "##"
+      WHITESPACE@243..244 " "
+      HeadingContent@244..256
+        TEXT@244..256 "Nested Lists"
+      NEWLINE@256..257 "\n"
+    BlankLine@257..258
+      BlankLine@257..258 "\n"
+    PARAGRAPH@258..293
+      TEXT@258..292 "Mixed markers at diff ..."
+      NEWLINE@292..293 "\n"
+    BlankLine@293..294
+      BlankLine@293..294 "\n"
+    List@294..407
+      ListItem@294..407
+        ListMarker@294..295 "*"
+        WHITESPACE@295..296 " "
+        TEXT@296..320 "Top level with asterisk\n"
+        NEWLINE@320..321 "\n"
+        List@321..407
+          ListItem@321..407
+            ListMarker@321..322 "+"
+            WHITESPACE@322..323 " "
+            TEXT@323..346 "Second level with plus\n"
+            NEWLINE@346..347 "\n"
+            List@347..407
+              ListItem@347..407
+                ListMarker@347..348 "-"
+                WHITESPACE@348..349 " "
+                TEXT@349..373 "Third level with hyphen\n"
+                NEWLINE@373..374 "\n"
+                List@374..407
+                  ListItem@374..407
+                    ListMarker@374..375 "*"
+                    WHITESPACE@375..376 " "
+                    TEXT@376..406 "Fourth level back to  ..."
+                    NEWLINE@406..407 "\n"
+    BlankLine@407..408
+      BlankLine@407..408 "\n"
+    Heading@408..422
+      AtxHeadingMarker@408..410
+        AtxHeadingMarker@408..410 "##"
+      WHITESPACE@410..411 " "
+      HeadingContent@411..421
+        TEXT@411..421 "Task Lists"
+      NEWLINE@421..422 "\n"
+    BlankLine@422..423
+      BlankLine@422..423 "\n"
+    PARAGRAPH@423..458
+      TEXT@423..457 "Task lists with diffe ..."
+      NEWLINE@457..458 "\n"
+    BlankLine@458..459
+      BlankLine@458..459 "\n"
+    List@459..519
+      ListItem@459..490
+        ListMarker@459..460 "*"
+        WHITESPACE@460..461 " "
+        TaskCheckbox@461..464 "[ ]"
+        TEXT@464..489 " Unchecked with aster ..."
+        NEWLINE@489..490 "\n"
+      ListItem@490..519
+        ListMarker@490..491 "*"
+        WHITESPACE@491..492 " "
+        TaskCheckbox@492..495 "[x]"
+        TEXT@495..518 " Checked with asterisk\n"
+        NEWLINE@518..519 "\n"
+    List@519..583
+      ListItem@519..546
+        ListMarker@519..520 "+"
+        WHITESPACE@520..521 " "
+        TaskCheckbox@521..524 "[ ]"
+        TEXT@524..545 " Unchecked with plus\n"
+        NEWLINE@545..546 "\n"
+      ListItem@546..583
+        ListMarker@546..547 "+"
+        WHITESPACE@547..548 " "
+        TaskCheckbox@548..551 "[X]"
+        TEXT@551..582 " Checked with plus (c ..."
+        NEWLINE@582..583 "\n"
+    List@583..639
+      ListItem@583..612
+        ListMarker@583..584 "-"
+        WHITESPACE@584..585 " "
+        TaskCheckbox@585..588 "[ ]"
+        TEXT@588..611 " Unchecked with hyphen\n"
+        NEWLINE@611..612 "\n"
+      ListItem@612..639
+        ListMarker@612..613 "-"
+        WHITESPACE@613..614 " "
+        TaskCheckbox@614..617 "[x]"
+        TEXT@617..638 " Checked with hyphen\n"
+        NEWLINE@638..639 "\n"
+    BlankLine@639..640
+      BlankLine@639..640 "\n"
+    Heading@640..657
+      AtxHeadingMarker@640..642
+        AtxHeadingMarker@640..642 "##"
+      WHITESPACE@642..643 " "
+      HeadingContent@643..656
+        TEXT@643..656 "Mixed Content"
+      NEWLINE@656..657 "\n"
+    BlankLine@657..658
+      BlankLine@657..658 "\n"
+    PARAGRAPH@658..701
+      TEXT@658..700 "Lists with code block ..."
+      NEWLINE@700..701 "\n"
+    BlankLine@701..702
+      BlankLine@701..702 "\n"
+    List@702..905
+      ListItem@702..734
+        ListMarker@702..703 "*"
+        WHITESPACE@703..704 " "
+        TEXT@704..719 "List item with "
+        CodeSpan@719..732
+          CodeSpanMarker@719..720 "`"
+          TEXT@720..731 "inline code"
+          CodeSpanMarker@731..732 "`"
+        TEXT@732..733 "\n"
+        NEWLINE@733..734 "\n"
+      ListItem@734..905
+        ListMarker@734..735 "*"
+        WHITESPACE@735..736 " "
+        TEXT@736..811 "List item with more t ..."
+        NEWLINE@811..812 "\n"
+        PARAGRAPH@812..825
+          TEXT@812..824 "processes it"
+          NEWLINE@824..825 "\n"
+        BlankLine@825..828
+          BlankLine@825..828 "  \n"
+        PARAGRAPH@828..864
+          TEXT@828..863 "Continuation paragrap ..."
+          NEWLINE@863..864 "\n"
+        BlankLine@864..867
+          BlankLine@864..867 "  \n"
+        CodeBlock@867..905
+          CodeFenceOpen@867..877
+            CodeFenceMarker@867..870 "```"
+            CodeInfo@870..876 "python"
+            NEWLINE@876..877 "\n"
+          CodeContent@877..901
+            TEXT@877..891 "def example():"
+            NEWLINE@891..892 "\n"
+            TEXT@892..900 "    pass"
+            NEWLINE@900..901 "\n"
+          CodeFenceClose@901..905
+            CodeFenceMarker@901..904 "```"
+            NEWLINE@904..905 "\n"
+    BlankLine@905..906
+      BlankLine@905..906 "\n"
+    List@906..949
+      ListItem@906..949
+        ListMarker@906..907 "+"
+        WHITESPACE@907..908 " "
+        TEXT@908..948 "Another list item wit ..."
+        NEWLINE@948..949 "\n"
+    BlankLine@949..950
+      BlankLine@949..950 "\n"
+    Heading@950..984
+      AtxHeadingMarker@950..952
+        AtxHeadingMarker@950..952 "##"
+      WHITESPACE@952..953 " "
+      HeadingContent@953..983
+        TEXT@953..983 "Combination with Orde ..."
+      NEWLINE@983..984 "\n"
+    BlankLine@984..985
+      BlankLine@984..985 "\n"
+    PARAGRAPH@985..1026
+      TEXT@985..1025 "Bullet lists and orde ..."
+      NEWLINE@1025..1026 "\n"
+    BlankLine@1026..1027
+      BlankLine@1026..1027 "\n"
+    List@1027..1061
+      ListItem@1027..1044
+        ListMarker@1027..1028 "*"
+        WHITESPACE@1028..1029 " "
+        TEXT@1029..1043 "Bullet item 1\n"
+        NEWLINE@1043..1044 "\n"
+      ListItem@1044..1061
+        ListMarker@1044..1045 "*"
+        WHITESPACE@1045..1046 " "
+        TEXT@1046..1060 "Bullet item 2\n"
+        NEWLINE@1060..1061 "\n"
+    BlankLine@1061..1062
+      BlankLine@1061..1062 "\n"
+    List@1062..1100
+      ListItem@1062..1081
+        ListMarker@1062..1064 "1."
+        WHITESPACE@1064..1065 " "
+        TEXT@1065..1080 "Ordered item 1\n"
+        NEWLINE@1080..1081 "\n"
+      ListItem@1081..1100
+        ListMarker@1081..1083 "2."
+        WHITESPACE@1083..1084 " "
+        TEXT@1084..1099 "Ordered item 2\n"
+        NEWLINE@1099..1100 "\n"
+    BlankLine@1100..1101
+      BlankLine@1100..1101 "\n"
+    List@1101..1143
+      ListItem@1101..1122
+        ListMarker@1101..1102 "+"
+        WHITESPACE@1102..1103 " "
+        TEXT@1103..1121 "More bullet items\n"
+        NEWLINE@1121..1122 "\n"
+      ListItem@1122..1143
+        ListMarker@1122..1123 "+"
+        WHITESPACE@1123..1124 " "
+        TEXT@1124..1142 "With plus markers\n"
+        NEWLINE@1142..1143 "\n"
+    BlankLine@1143..1144
+      BlankLine@1143..1144 "\n"
+    List@1144..1186
+      ListItem@1144..1168
+        ListMarker@1144..1146 "a."
+        WHITESPACE@1146..1147 " "
+        TEXT@1147..1167 "Lower alpha ordered\n"
+        NEWLINE@1167..1168 "\n"
+      ListItem@1168..1186
+        ListMarker@1168..1170 "b."
+        WHITESPACE@1170..1171 " "
+        TEXT@1171..1185 "Another alpha\n"
+        NEWLINE@1185..1186 "\n"
+    BlankLine@1186..1187
+      BlankLine@1186..1187 "\n"
+    List@1187..1231
+      ListItem@1187..1206
+        ListMarker@1187..1188 "*"
+        WHITESPACE@1188..1189 " "
+        TEXT@1189..1205 "Back to bullets\n"
+        NEWLINE@1205..1206 "\n"
+      ListItem@1206..1231
+        ListMarker@1206..1207 "*"
+        WHITESPACE@1207..1208 " "
+        TEXT@1208..1230 "With asterisk markers\n"
+        NEWLINE@1230..1231 "\n"
+
