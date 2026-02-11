@@ -471,8 +471,8 @@ impl CodeBlockConfig {
                 normalize_indented: false,
             },
             Flavor::Pandoc => Self {
-                fence_style: FenceStyle::Backtick, // Changed from Preserve to be consistent
-                attribute_style: AttributeStyle::Preserve, // Changed from Explicit to Preserve
+                fence_style: FenceStyle::Backtick,
+                attribute_style: AttributeStyle::Preserve,
                 min_fence_length: 3,
                 normalize_indented: false,
             },
@@ -531,27 +531,10 @@ pub enum MathDelimiterStyle {
     Backslash,
 }
 
-#[derive(Debug, Clone)]
-pub struct Config {
-    pub flavor: Flavor,
-    pub extensions: Extensions,
-    pub line_ending: Option<LineEnding>,
-    pub line_width: usize,
-    pub math_indent: usize,
-    /// Style for math delimiters (preserve, dollars, backslash)
-    pub math_delimiter_style: MathDelimiterStyle,
-    pub wrap: Option<WrapMode>,
-    pub blank_lines: BlankLines,
-    /// Code block formatting configuration
-    pub code_blocks: CodeBlockConfig,
-    /// External code formatters keyed by language name (e.g., "r", "python")
-    pub formatters: HashMap<String, FormatterConfig>,
-}
-
-// Helper struct for deserialization
-#[derive(Deserialize)]
+/// Internal deserialization struct that allows for optional fields
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-struct ConfigHelper {
+struct RawConfig {
     #[serde(default)]
     flavor: Flavor,
     #[serde(default)]
@@ -582,48 +565,48 @@ fn default_blank_lines() -> BlankLines {
     BlankLines::Collapse
 }
 
+impl RawConfig {
+    /// Finalize into Config, applying flavor-based defaults where needed
+    fn finalize(self) -> Config {
+        Config {
+            extensions: self
+                .extensions
+                .unwrap_or_else(|| Extensions::for_flavor(self.flavor)),
+            code_blocks: self
+                .code_blocks
+                .unwrap_or_else(|| CodeBlockConfig::for_flavor(self.flavor)),
+            line_ending: self.line_ending.or(Some(LineEnding::Auto)),
+            wrap: self.wrap.or(Some(WrapMode::Reflow)),
+            flavor: self.flavor,
+            line_width: self.line_width,
+            math_indent: self.math_indent,
+            math_delimiter_style: self.math_delimiter_style,
+            blank_lines: self.blank_lines,
+            formatters: self.formatters,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub flavor: Flavor,
+    pub extensions: Extensions,
+    pub line_ending: Option<LineEnding>,
+    pub line_width: usize,
+    pub math_indent: usize,
+    pub math_delimiter_style: MathDelimiterStyle,
+    pub wrap: Option<WrapMode>,
+    pub blank_lines: BlankLines,
+    pub code_blocks: CodeBlockConfig,
+    pub formatters: HashMap<String, FormatterConfig>,
+}
+
 impl<'de> Deserialize<'de> for Config {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let helper = ConfigHelper::deserialize(deserializer)?;
-
-        // If extensions not specified, derive from flavor
-        let extensions = helper
-            .extensions
-            .unwrap_or_else(|| Extensions::for_flavor(helper.flavor));
-
-        // If code_blocks not specified, derive from flavor
-        let code_blocks = helper
-            .code_blocks
-            .unwrap_or_else(|| CodeBlockConfig::for_flavor(helper.flavor));
-
-        // Set line_ending and wrap defaults if not specified
-        let line_ending = if helper.line_ending.is_none() {
-            Some(LineEnding::Auto)
-        } else {
-            helper.line_ending
-        };
-
-        let wrap = if helper.wrap.is_none() {
-            Some(WrapMode::Reflow)
-        } else {
-            helper.wrap
-        };
-
-        Ok(Config {
-            flavor: helper.flavor,
-            extensions,
-            line_ending,
-            line_width: helper.line_width,
-            math_indent: helper.math_indent,
-            math_delimiter_style: helper.math_delimiter_style,
-            wrap,
-            blank_lines: helper.blank_lines,
-            code_blocks,
-            formatters: helper.formatters,
-        })
+        RawConfig::deserialize(deserializer).map(|raw| raw.finalize())
     }
 }
 
