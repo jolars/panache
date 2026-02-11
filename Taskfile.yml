@@ -54,3 +54,8 @@ tasks:
     desc: Serve playground locally
     cmds:
       - cd docs/playground && python3 -m http.server
+
+  update-golden:
+    desc: Update expected golden test outputs and AST files
+    cmds:
+      - UPDATE_EXPECTED=1 cargo test golden_cases
