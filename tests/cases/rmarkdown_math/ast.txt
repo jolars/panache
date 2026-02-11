@@ -1,0 +1,66 @@
+ROOT@0..320
+  DOCUMENT@0..320
+    Heading@0..20
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      HeadingContent@1..20
+        TEXT@1..20 "RMarkdown Math Test"
+    BlankLine@20..20
+      BlankLine@20..20 ""
+    PARAGRAPH@20..77
+      TEXT@20..76 "RMarkdown uses backsl ..."
+      NEWLINE@76..77 "\n"
+    BlankLine@77..77
+      BlankLine@77..77 ""
+    PARAGRAPH@77..146
+      TEXT@77..117 "Inline math with back ..."
+      InlineMath@117..136
+        InlineMathMarker@117..119 "\\("
+        TEXT@119..134 "x^2 + y^2 = z^2"
+        InlineMathMarker@134..136 "\\)"
+      TEXT@136..145 " in text."
+      NEWLINE@145..146 "\n"
+    BlankLine@146..146
+      BlankLine@146..146 ""
+    PARAGRAPH@146..184
+      TEXT@146..183 "Display math with bac ..."
+      NEWLINE@183..184 "\n"
+    BlankLine@184..184
+      BlankLine@184..184 ""
+    MathBlock@184..236
+      BlockMathMarker@184..186 "\\["
+      MathContent@186..234
+        LatexCommand@186..190
+          TEXT@186..190 "\\int"
+        TEXT@190..191 "_"
+        TEXT@191..192 "0"
+        Superscript@192..202
+          SuperscriptMarker@192..193
+            SuperscriptMarker@192..193 "^"
+          LatexCommand@193..199
+            TEXT@193..199 "\\infty"
+          TEXT@199..201 " e"
+          SuperscriptMarker@201..202
+            SuperscriptMarker@201..202 "^"
+        TEXT@202..205 "{-x"
+        TEXT@205..206 "^"
+        TEXT@206..214 "2} dx = "
+        LatexCommand@214..234
+          TEXT@214..234 "\\frac{\\sqrt{\\pi}}{2}"
+      BlockMathMarker@234..236 "\\]"
+    BlankLine@236..236
+      BlankLine@236..236 ""
+    PARAGRAPH@236..320
+      TEXT@236..254 "More inline math: "
+      InlineMath@254..281
+        InlineMathMarker@254..256 "\\("
+        TEXT@256..279 "\\alpha + \\beta = \\gamma"
+        InlineMathMarker@279..281 "\\)"
+      TEXT@281..294 " and another "
+      InlineMath@294..318
+        InlineMathMarker@294..296 "\\("
+        TEXT@296..316 "f(x) = ax^2 + bx + c"
+        InlineMathMarker@316..318 "\\)"
+      TEXT@318..319 "."
+      NEWLINE@319..320 "\n"
+
