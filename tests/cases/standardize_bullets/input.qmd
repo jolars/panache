@@ -50,7 +50,7 @@ Lists with code blocks and other elements:
       pass
   ```
 
-+ Another list with different marker
++ Another list item with different marker
 
 ## Combination with Ordered Lists
 

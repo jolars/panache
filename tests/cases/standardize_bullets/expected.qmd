@@ -47,12 +47,12 @@ Lists with code blocks and other elements:
 
   Continuation paragraph in list item
 
-```python
+  ```python
   def example():
       pass
-```
+  ```
 
-- Another list with different marker
+- Another list item with different marker
 
 ## Combination with Ordered Lists
 
