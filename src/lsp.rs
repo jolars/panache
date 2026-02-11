@@ -6,6 +6,60 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 use tower_lsp_server::{Client, LanguageServer, LspService, Server};
 
+/// Helper to convert LSP UTF-16 position to byte offset in UTF-8 string
+fn position_to_offset(text: &str, position: Position) -> Option<usize> {
+    let mut offset = 0;
+    let mut current_line = 0;
+
+    for line in text.lines() {
+        if current_line == position.line {
+            // LSP uses UTF-16 code units, Rust uses UTF-8 bytes
+            let mut utf16_offset = 0;
+            for (byte_idx, ch) in line.char_indices() {
+                if utf16_offset >= position.character as usize {
+                    return Some(offset + byte_idx);
+                }
+                utf16_offset += ch.len_utf16();
+            }
+            // Position is at or past end of line
+            return Some(offset + line.len());
+        }
+        // +1 for newline character
+        offset += line.len() + 1;
+        current_line += 1;
+    }
+
+    // Position is beyond document end
+    if current_line == position.line {
+        // Empty last line or position at very end
+        return Some(offset);
+    }
+
+    None
+}
+
+/// Apply a single content change to text
+fn apply_content_change(text: &str, change: &TextDocumentContentChangeEvent) -> String {
+    match &change.range {
+        Some(range) => {
+            // Incremental edit with range
+            let start_offset = position_to_offset(text, range.start).unwrap_or(0);
+            let end_offset = position_to_offset(text, range.end).unwrap_or(text.len());
+
+            let mut result =
+                String::with_capacity(text.len() - (end_offset - start_offset) + change.text.len());
+            result.push_str(&text[..start_offset]);
+            result.push_str(&change.text);
+            result.push_str(&text[end_offset..]);
+            result
+        }
+        None => {
+            // Full document update (fallback)
+            change.text.clone()
+        }
+    }
+}
+
 pub struct PanacheLsp {
     client: Client,
     // Use String keys since Uri doesn't implement Send
@@ -71,8 +125,12 @@ impl LanguageServer for PanacheLsp {
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                    TextDocumentSyncKind::FULL,
+                text_document_sync: Some(TextDocumentSyncCapability::Options(
+                    TextDocumentSyncOptions {
+                        open_close: Some(true),
+                        change: Some(TextDocumentSyncKind::INCREMENTAL),
+                        ..Default::default()
+                    },
                 )),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 ..Default::default()
@@ -108,9 +166,12 @@ impl LanguageServer for PanacheLsp {
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri.to_string();
 
-        // Since we use FULL sync, there's only one content change with the full document
-        if let Some(change) = params.content_changes.into_iter().next() {
-            self.document_map.lock().await.insert(uri, change.text);
+        // Apply incremental changes sequentially
+        let mut document_map = self.document_map.lock().await;
+        if let Some(text) = document_map.get_mut(&uri) {
+            for change in params.content_changes {
+                *text = apply_content_change(text, &change);
+            }
         }
     }
 
@@ -198,4 +259,266 @@ pub async fn run() -> std::io::Result<()> {
     Server::new(stdin, stdout, socket).serve(service).await;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_position_to_offset_simple() {
+        let text = "hello\nworld\n";
+
+        // Start of first line
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 0
+                }
+            ),
+            Some(0)
+        );
+
+        // Middle of first line
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 3
+                }
+            ),
+            Some(3)
+        );
+
+        // End of first line
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 5
+                }
+            ),
+            Some(5)
+        );
+
+        // Start of second line
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 1,
+                    character: 0
+                }
+            ),
+            Some(6)
+        );
+
+        // Middle of second line
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 1,
+                    character: 3
+                }
+            ),
+            Some(9)
+        );
+    }
+
+    #[test]
+    fn test_position_to_offset_utf8() {
+        // "café" = 5 UTF-8 bytes, 4 UTF-16 code units (é = 2 bytes, 1 code unit)
+        let text = "café\nworld\n";
+
+        // Start of line
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 0
+                }
+            ),
+            Some(0)
+        );
+
+        // After 'c' (1 byte, 1 UTF-16)
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 1
+                }
+            ),
+            Some(1)
+        );
+
+        // After 'ca' (2 bytes, 2 UTF-16)
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 2
+                }
+            ),
+            Some(2)
+        );
+
+        // After 'caf' (3 bytes, 3 UTF-16)
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 3
+                }
+            ),
+            Some(3)
+        );
+
+        // After 'café' (5 bytes, 4 UTF-16)
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 4
+                }
+            ),
+            Some(5)
+        );
+    }
+
+    #[test]
+    fn test_position_to_offset_emoji() {
+        // "👋" = 4 UTF-8 bytes, 2 UTF-16 code units (surrogate pair)
+        let text = "hi👋\n";
+
+        // After "hi" (2 bytes, 2 UTF-16)
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 2
+                }
+            ),
+            Some(2)
+        );
+
+        // After "hi👋" (6 bytes, 4 UTF-16)
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 4
+                }
+            ),
+            Some(6)
+        );
+    }
+
+    #[test]
+    fn test_apply_content_change_insert() {
+        let text = "hello world";
+        let change = TextDocumentContentChangeEvent {
+            range: Some(Range {
+                start: Position {
+                    line: 0,
+                    character: 6,
+                },
+                end: Position {
+                    line: 0,
+                    character: 6,
+                },
+            }),
+            range_length: None,
+            text: "beautiful ".to_string(),
+        };
+
+        assert_eq!(apply_content_change(text, &change), "hello beautiful world");
+    }
+
+    #[test]
+    fn test_apply_content_change_delete() {
+        let text = "hello beautiful world";
+        let change = TextDocumentContentChangeEvent {
+            range: Some(Range {
+                start: Position {
+                    line: 0,
+                    character: 5,
+                },
+                end: Position {
+                    line: 0,
+                    character: 15,
+                },
+            }),
+            range_length: None,
+            text: String::new(),
+        };
+
+        assert_eq!(apply_content_change(text, &change), "hello world");
+    }
+
+    #[test]
+    fn test_apply_content_change_replace() {
+        let text = "hello world";
+        let change = TextDocumentContentChangeEvent {
+            range: Some(Range {
+                start: Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: Position {
+                    line: 0,
+                    character: 5,
+                },
+            }),
+            range_length: None,
+            text: "goodbye".to_string(),
+        };
+
+        assert_eq!(apply_content_change(text, &change), "goodbye world");
+    }
+
+    #[test]
+    fn test_apply_content_change_full_document() {
+        let text = "old content";
+        let change = TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: "new content".to_string(),
+        };
+
+        assert_eq!(apply_content_change(text, &change), "new content");
+    }
+
+    #[test]
+    fn test_apply_content_change_multiline() {
+        let text = "line1\nline2\nline3";
+        let change = TextDocumentContentChangeEvent {
+            range: Some(Range {
+                start: Position {
+                    line: 1,
+                    character: 2,
+                },
+                end: Position {
+                    line: 2,
+                    character: 2,
+                },
+            }),
+            range_length: None,
+            text: "NEW\nLINE".to_string(),
+        };
+
+        assert_eq!(apply_content_change(text, &change), "line1\nliNEW\nLINEne3");
+    }
 }

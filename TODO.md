@@ -16,7 +16,7 @@ This document tracks implementation status for panache's features.
 
 - ✅ `textDocument/formatting` - Full document formatting
 - ✅ `textDocument/didOpen` - Track document opens
-- ✅ `textDocument/didChange` - Track document changes (full sync)
+- ✅ `textDocument/didChange` - Track document changes (incremental sync)
 - ✅ `textDocument/didClose` - Track document closes
 - ✅ Configuration discovery from workspace root (`.panache.toml`)
 

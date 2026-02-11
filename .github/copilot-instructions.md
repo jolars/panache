@@ -372,9 +372,10 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 **Current Capabilities:**
 
 - ✅ `textDocument/formatting` - Full document formatting
-- ✅ `textDocument/didOpen/didChange/didClose` - Document tracking (FULL sync mode)
+- ✅ `textDocument/didOpen/didChange/didClose` - Document tracking (INCREMENTAL sync mode)
 - ✅ Config discovery from workspace root (`.panache.toml`)
 - ✅ Thread-safe document state management with Arc
+- ✅ UTF-16 to UTF-8 position conversion for proper incremental edits
 
 **Implementation Details:**
 
@@ -382,6 +383,8 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 - Workspace root captured from `InitializeParams.workspace_folders` or deprecated `root_uri`
 - Config loaded per formatting request (no caching yet)
 - Formatting runs in blocking task to avoid Send trait issues
+- INCREMENTAL sync mode with proper UTF-16/UTF-8 position conversion
+- Full document reparsing (incremental parsing deferred for performance need)
 
 **Future LSP Features** (see TODO.md):
 

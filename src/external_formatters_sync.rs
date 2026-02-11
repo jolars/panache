@@ -151,7 +151,7 @@ fn format_with_file(
     let mut cmd = Command::new(&config.cmd);
     cmd.args(&args).stderr(Stdio::piped());
 
-    let mut child = cmd.spawn().map_err(|e| {
+    let child = cmd.spawn().map_err(|e| {
         log::error!("Failed to spawn formatter '{}': {}", config.cmd, e);
         FormatterError::SpawnFailed(format!("{}: {}", config.cmd, e))
     })?;
