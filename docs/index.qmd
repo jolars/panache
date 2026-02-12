@@ -22,11 +22,18 @@ struggle with.
 
 ## Quick Start
 
-Install panache:
+### Installation
+
+Install panache from crates.io:
 
 ```bash
-cargo install --path .
+cargo install panache
 ```
+
+Or download and install pre-built binaries from the [releases
+page](https://github.com/jolars/panache/releases). Available for:
+
+### Basic Usage
 
 Format a document:
 
@@ -61,4 +68,3 @@ breaking changes.
 - [Formatting](formatting.qmd) - Formatting rules and examples
 - [LSP](lsp.qmd) - Editor integration guide
 - [CLI Reference](cli.qmd) - Command-line options
-
