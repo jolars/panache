@@ -136,6 +136,12 @@ pub(crate) fn parse_display_math_block(
             break;
         }
 
+        // Check for blank line - per Pandoc spec, no blank lines allowed in display math
+        if inner.trim().is_empty() {
+            // Blank line terminates the math block without a closing fence
+            break;
+        }
+
         // Check for closing fence
         if is_closing_math_fence(inner, &fence) {
             found_closing = true;
