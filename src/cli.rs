@@ -76,6 +76,16 @@ EXAMPLES:
     # Format file in place (default)
     panache format document.qmd
 
+    # Format multiple files
+    panache format file1.md file2.md file3.qmd
+
+    # Use glob patterns (expanded by shell)
+    panache format *.md docs/*.qmd
+
+    # Format entire directory recursively
+    panache format .
+    panache format docs/
+
     # Format from stdin to stdout
     echo '# Heading' | panache format
 
@@ -92,15 +102,16 @@ FORMATTING RULES:
   - Auto-formats tables for consistency
   - Formatting is idempotent (format twice = format once)")]
     Format {
-        /// Input file (stdin if not provided)
-        #[arg(help = "Input file path")]
+        /// Input file(s) (stdin if not provided)
+        #[arg(help = "Input file path(s) or directories")]
         #[arg(
-            long_help = "Path to the input file to format. If not provided, reads from stdin. \
-            Supports .qmd, .md, .Rmd, and other Markdown-based formats. When a file path is \
-            provided, the file is formatted in place by default. Stdin input always outputs \
-            to stdout."
+            long_help = "Path(s) to the input file(s) or directories to format. If not provided, reads from stdin. \
+            Supports .qmd, .md, .Rmd, and other Markdown-based formats. When file paths are \
+            provided, the files are formatted in place by default. Stdin input always outputs \
+            to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). \
+            Directories are traversed recursively, respecting .gitignore files."
         )]
-        file: Option<PathBuf>,
+        files: Vec<PathBuf>,
 
         /// Check if files are formatted without making changes
         #[arg(long)]
@@ -180,6 +191,12 @@ EXAMPLES:
     # Lint a file and show diagnostics
     panache lint document.qmd
 
+    # Lint multiple files
+    panache lint file1.md file2.qmd
+
+    # Lint entire directory
+    panache lint .
+
     # Lint from stdin
     echo '# H1\\n### H3' | panache lint
 
@@ -196,9 +213,9 @@ LINT RULES:
   
 Configure rules in .panache.toml with [lint] section.")]
     Lint {
-        /// Input file (stdin if not provided)
-        #[arg(help = "Input file path")]
-        file: Option<PathBuf>,
+        /// Input file(s) or directories (stdin if not provided)
+        #[arg(help = "Input file path(s) or directories")]
+        files: Vec<PathBuf>,
 
         /// Check mode: exit with code 1 if violations found
         #[arg(long)]

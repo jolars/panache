@@ -12,6 +12,7 @@
     pkgs.bashInteractive
     pkgs.cmark
     pkgs.pandoc
+    pkgs.jarl
     pkgs.air
     pkgs.ruff
     (pkgs.rWrapper.override {

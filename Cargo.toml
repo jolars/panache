@@ -22,6 +22,7 @@ required-features = ["cli"]
 [dependencies]
 clap = { version = "4.5.57", features = ["derive"], optional = true }
 env_logger = "0.11.8"
+ignore = { version = "0.4", optional = true }
 log = { version = "0.4.28", features = ["release_max_level_info"] }
 regex = "1.12.2"
 rowan = "0.16.1"
@@ -47,7 +48,7 @@ tokio = { version = "1", features = ["macros", "rt"] }
 
 [features]
 default = ["cli", "lsp"]
-cli = ["dep:clap"]
+cli = ["dep:clap", "dep:ignore"]
 lsp = ["dep:tokio", "dep:tower-lsp-server", "dep:uuid"]
 
 [build-dependencies]

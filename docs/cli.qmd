@@ -75,13 +75,23 @@ Format a Quarto, Pandoc, or Markdown document according to panache's formatting
 rules. By default, formats files in place. Use --check to verify formatting
 without making changes. Stdin input always outputs to stdout.
 
-**Usage:** `panache format [OPTIONS] [FILE]`
+**Usage:** `panache format [OPTIONS] [FILES]...`
 
 EXAMPLES:
 
 ```
 # Format file in place (default)
 panache format document.qmd
+
+# Format multiple files
+panache format file1.md file2.md file3.qmd
+
+# Use glob patterns (expanded by shell)
+panache format *.md docs/*.qmd
+
+# Format entire directory recursively
+panache format .
+panache format docs/
 
 # Format from stdin to stdout
 echo '# Heading' | panache format
@@ -102,10 +112,12 @@ FORMATTING RULES:
 
 ###### **Arguments:**
 
-- `<FILE>` — Path to the input file to format. If not provided, reads from
-  stdin. Supports .qmd, .md, .Rmd, and other Markdown-based formats. When a
-  file path is provided, the file is formatted in place by default. Stdin input
-  always outputs to stdout.
+- `<FILES>` — Path(s) to the input file(s) or directories to format. If not
+  provided, reads from stdin. Supports .qmd, .md, .Rmd, and other Markdown-based
+  formats. When file paths are provided, the files are formatted in place
+  by default. Stdin input always outputs to stdout. Supports glob patterns
+  (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed
+  recursively, respecting .gitignore files.
 
 ###### **Options:**
 
@@ -176,13 +188,19 @@ Lint a document to check for correctness issues and best practice violations.
 Unlike the formatter which handles style, the linter catches semantic problems
 like syntax errors, heading hierarchy issues, and broken references.
 
-**Usage:** `panache lint [OPTIONS] [FILE]`
+**Usage:** `panache lint [OPTIONS] [FILES]...`
 
 EXAMPLES:
 
 ```
 # Lint a file and show diagnostics
 panache lint document.qmd
+
+# Lint multiple files
+panache lint file1.md file2.qmd
+
+# Lint entire directory
+panache lint .
 
 # Lint from stdin
 echo '# H1\n### H3' | panache lint
@@ -203,7 +221,7 @@ Configure rules in .panache.toml with [lint] section.
 
 ###### **Arguments:**
 
-- `<FILE>` — Input file path
+- `<FILES>` — Input file path(s) or directories
 
 ###### **Options:**
 
