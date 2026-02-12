@@ -1,5 +1,38 @@
 # Changelog
 
+## [2.0.0](https://github.com/jolars/panache/compare/v1.0.0...v2.0.0) (2026-02-12)
+
+### ⚠ BREAKING CHANGES
+
+* change external formatting to be opt-in
+
+### Features
+
+* add presets for external formatters ([70b297a](https://github.com/jolars/panache/commit/70b297a70afa8a503984c130384df4a2e2b6ac1c))
+* add range formatting ([902cb95](https://github.com/jolars/panache/commit/902cb95924bd2be53da403726ca5418e67da34dd))
+* change external formatting to be opt-in ([8d91753](https://github.com/jolars/panache/commit/8d917536de3d8454ab68e4b53bdbdea643a6650c))
+* **formatter:** standardize unordered lists to `-` marker ([33ae608](https://github.com/jolars/panache/commit/33ae60838e4fbe26b4877aba492981ec17e7b578))
+* implement a linter ([4af0d5e](https://github.com/jolars/panache/commit/4af0d5ecb104da94841073967653e1e36740f6c3))
+* implement wrapping for links and images ([929f993](https://github.com/jolars/panache/commit/929f9931e468891b08e9d05c3d387bd807bc501a))
+* **lsp:** integrate linter with LSP server ([f0ae3e9](https://github.com/jolars/panache/commit/f0ae3e90778dfe9b8b6e495655ef0ab721089887))
+
+### Bug Fixes
+
+* correctly deal with nested lists in definitions ([5f00893](https://github.com/jolars/panache/commit/5f008930aa4459c0db20cb813509c5daf021c251))
+* correctly delegate non-stdin formatters ([869d473](https://github.com/jolars/panache/commit/869d47316ffe49e98f891e462f82a83fe59cfc3d))
+* correctly praser backslash-escaped math ([c28cdc5](https://github.com/jolars/panache/commit/c28cdc5cfa05fcacd6c851f3686d96e1c7166ab3))
+* don't use defunct `--write` flag ([bbe3291](https://github.com/jolars/panache/commit/bbe32915c8325e13e9d812b88137ee4a9c3dbb25))
+* fix bug in flavor deserialization ([3e40177](https://github.com/jolars/panache/commit/3e401771ab01825ff088f666b3ce64828a540510))
+* fix clippy problems ([5996d90](https://github.com/jolars/panache/commit/5996d90533ab8cad1d4db7f40e7cb32f5c6d5a8f))
+* fix erroneous handling of blanklines in indented code ([d058b61](https://github.com/jolars/panache/commit/d058b61572a359774fdda3f4604e1939378d2f49))
+* fix some linting issues ([11fc9a7](https://github.com/jolars/panache/commit/11fc9a758c78c0f719c6ebd08334fe616150e9e9))
+* handle code blocks nested in lists ([761737d](https://github.com/jolars/panache/commit/761737dbc119b98aaf4f2fae74c9599e1fea3f78))
+* **lsp:** correctly compute range to replace ([056f5cc](https://github.com/jolars/panache/commit/056f5cca2475a1a37d5d733c5f25b6e6fcdb7a49))
+* properly emit table blanklines into AST ([c48fc9e](https://github.com/jolars/panache/commit/c48fc9e9b99a3971cf390472bfa3beb7ff2d2fe3))
+* properly handle code blocks in lists ([42930e0](https://github.com/jolars/panache/commit/42930e0f2947e7c90590da9bb9d38d33faa81b51))
+* refactor parser to capture lossless tree ([9bbfd9f](https://github.com/jolars/panache/commit/9bbfd9f35c1ed8e5dd892cd9bce3a5541993fb96))
+* use async formatter in LSP formatting ([8efbb1a](https://github.com/jolars/panache/commit/8efbb1ac465fddb3bdbd731e23a4e3febc8d4c07))
+
 ## 1.0.0 (2026-02-11)
 
 ### ⚠ BREAKING CHANGES
