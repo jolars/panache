@@ -1,5 +1,5 @@
-ROOT@0..460
-  DOCUMENT@0..460
+ROOT@0..463
+  DOCUMENT@0..463
     CodeBlock@0..32
       CodeFenceOpen@0..8
         CodeFenceMarker@0..3 "```"
@@ -29,71 +29,74 @@ ROOT@0..460
         NEWLINE@94..95 "\n"
     BlankLine@95..96
       BlankLine@95..96 "\n"
-    CodeBlock@96..306
-      CodeFenceOpen@96..148
+    CodeBlock@96..307
+      CodeFenceOpen@96..149
         CodeFenceMarker@96..100 "~~~~"
-        CodeInfo@100..147 "{#mycode .haskell .nu ..."
-        NEWLINE@147..148 "\n"
-      CodeContent@148..256
-        TEXT@148..165 "qsort []     = []"
-        NEWLINE@165..166 "\n"
-        TEXT@166..214 "qsort (x:xs) = qsort  ..."
-        NEWLINE@214..215 "\n"
-        TEXT@215..255 "                qsort ..."
-        NEWLINE@255..256 "\n"
-      CodeFenceClose@256..306
-        CodeFenceMarker@256..305 "~~~~~~~~~~~~~~~~~~~~~ ..."
-        NEWLINE@305..306 "\n"
-    BlankLine@306..307
-      BlankLine@306..307 "\n"
-    CodeBlock@307..336
-      CodeFenceOpen@307..318
-        CodeFenceMarker@307..310 "```"
-        CodeInfo@310..317 "haskell"
-        NEWLINE@317..318 "\n"
-      CodeContent@318..332
-        TEXT@318..331 "qsort [] = []"
-        NEWLINE@331..332 "\n"
-      CodeFenceClose@332..336
-        CodeFenceMarker@332..335 "```"
-        NEWLINE@335..336 "\n"
-    BlankLine@336..337
-      BlankLine@336..337 "\n"
-    CodeBlock@337..369
-      CodeFenceOpen@337..351
-        CodeFenceMarker@337..340 "```"
-        CodeInfo@340..350 "{.haskell}"
-        NEWLINE@350..351 "\n"
-      CodeContent@351..365
-        TEXT@351..364 "qsort [] = []"
-        NEWLINE@364..365 "\n"
-      CodeFenceClose@365..369
-        CodeFenceMarker@365..368 "```"
-        NEWLINE@368..369 "\n"
-    BlankLine@369..370
-      BlankLine@369..370 "\n"
-    CodeBlock@370..414
-      CodeFenceOpen@370..396
-        CodeFenceMarker@370..373 "```"
-        CodeInfo@373..395 "haskell {.numberLines}"
-        NEWLINE@395..396 "\n"
-      CodeContent@396..410
-        TEXT@396..409 "qsort [] = []"
-        NEWLINE@409..410 "\n"
-      CodeFenceClose@410..414
-        CodeFenceMarker@410..413 "```"
-        NEWLINE@413..414 "\n"
-    BlankLine@414..415
-      BlankLine@414..415 "\n"
-    CodeBlock@415..460
-      CodeFenceOpen@415..442
-        CodeFenceMarker@415..418 "```"
-        CodeInfo@418..441 "{.haskell .numberLines}"
-        NEWLINE@441..442 "\n"
-      CodeContent@442..456
-        TEXT@442..455 "qsort [] = []"
-        NEWLINE@455..456 "\n"
-      CodeFenceClose@456..460
-        CodeFenceMarker@456..459 "```"
-        NEWLINE@459..460 "\n"
+        WHITESPACE@100..101 " "
+        CodeInfo@101..148 "{#mycode .haskell .nu ..."
+        NEWLINE@148..149 "\n"
+      CodeContent@149..257
+        TEXT@149..166 "qsort []     = []"
+        NEWLINE@166..167 "\n"
+        TEXT@167..215 "qsort (x:xs) = qsort  ..."
+        NEWLINE@215..216 "\n"
+        TEXT@216..256 "                qsort ..."
+        NEWLINE@256..257 "\n"
+      CodeFenceClose@257..307
+        CodeFenceMarker@257..306 "~~~~~~~~~~~~~~~~~~~~~ ..."
+        NEWLINE@306..307 "\n"
+    BlankLine@307..308
+      BlankLine@307..308 "\n"
+    CodeBlock@308..337
+      CodeFenceOpen@308..319
+        CodeFenceMarker@308..311 "```"
+        CodeInfo@311..318 "haskell"
+        NEWLINE@318..319 "\n"
+      CodeContent@319..333
+        TEXT@319..332 "qsort [] = []"
+        NEWLINE@332..333 "\n"
+      CodeFenceClose@333..337
+        CodeFenceMarker@333..336 "```"
+        NEWLINE@336..337 "\n"
+    BlankLine@337..338
+      BlankLine@337..338 "\n"
+    CodeBlock@338..371
+      CodeFenceOpen@338..353
+        CodeFenceMarker@338..341 "```"
+        WHITESPACE@341..342 " "
+        CodeInfo@342..352 "{.haskell}"
+        NEWLINE@352..353 "\n"
+      CodeContent@353..367
+        TEXT@353..366 "qsort [] = []"
+        NEWLINE@366..367 "\n"
+      CodeFenceClose@367..371
+        CodeFenceMarker@367..370 "```"
+        NEWLINE@370..371 "\n"
+    BlankLine@371..372
+      BlankLine@371..372 "\n"
+    CodeBlock@372..416
+      CodeFenceOpen@372..398
+        CodeFenceMarker@372..375 "```"
+        CodeInfo@375..397 "haskell {.numberLines}"
+        NEWLINE@397..398 "\n"
+      CodeContent@398..412
+        TEXT@398..411 "qsort [] = []"
+        NEWLINE@411..412 "\n"
+      CodeFenceClose@412..416
+        CodeFenceMarker@412..415 "```"
+        NEWLINE@415..416 "\n"
+    BlankLine@416..417
+      BlankLine@416..417 "\n"
+    CodeBlock@417..463
+      CodeFenceOpen@417..445
+        CodeFenceMarker@417..420 "```"
+        WHITESPACE@420..421 " "
+        CodeInfo@421..444 "{.haskell .numberLines}"
+        NEWLINE@444..445 "\n"
+      CodeContent@445..459
+        TEXT@445..458 "qsort [] = []"
+        NEWLINE@458..459 "\n"
+      CodeFenceClose@459..463
+        CodeFenceMarker@459..462 "```"
+        NEWLINE@462..463 "\n"
 

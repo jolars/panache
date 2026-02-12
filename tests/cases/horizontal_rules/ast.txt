@@ -1,48 +1,60 @@
-ROOT@0..178
-  DOCUMENT@0..178
+ROOT@0..190
+  DOCUMENT@0..190
     PARAGRAPH@0..28
       TEXT@0..27 "First section with co ..."
       NEWLINE@27..28 "\n"
     BlankLine@28..29
       BlankLine@28..29 "\n"
-    HorizontalRule@29..32
+    HorizontalRule@29..33
       HorizontalRule@29..32 "***"
-    BlankLine@32..33
-      BlankLine@32..33 "\n"
-    PARAGRAPH@33..70
-      TEXT@33..69 "Second section with d ..."
-      NEWLINE@69..70 "\n"
-    BlankLine@70..71
-      BlankLine@70..71 "\n"
-    HorizontalRule@71..80
-      HorizontalRule@71..80 "- - - - -"
-    BlankLine@80..81
-      BlankLine@80..81 "\n"
-    PARAGRAPH@81..113
-      TEXT@81..112 "Third section with un ..."
-      NEWLINE@112..113 "\n"
-    BlankLine@113..114
-      BlankLine@113..114 "\n"
-    HorizontalRule@114..119
-      HorizontalRule@114..119 "_____"
-    BlankLine@119..120
-      BlankLine@119..120 "\n"
-    BlockQuote@120..160
-      PARAGRAPH@120..138
-        TEXT@120..137 "Quote before rule"
-        NEWLINE@137..138 "\n"
-      BlankLine@138..139
-        BlankLine@138..139 "\n"
-      HorizontalRule@139..142
-        HorizontalRule@139..142 "***"
-      BlankLine@142..143
-        BlankLine@142..143 "\n"
-      PARAGRAPH@143..160
-        TEXT@143..159 "Quote after rule"
-        NEWLINE@159..160 "\n"
-    BlankLine@160..161
-      BlankLine@160..161 "\n"
-    PARAGRAPH@161..178
-      TEXT@161..177 "Final paragraph."
-      NEWLINE@177..178 "\n"
+      NEWLINE@32..33 "\n"
+    BlankLine@33..34
+      BlankLine@33..34 "\n"
+    PARAGRAPH@34..71
+      TEXT@34..70 "Second section with d ..."
+      NEWLINE@70..71 "\n"
+    BlankLine@71..72
+      BlankLine@71..72 "\n"
+    HorizontalRule@72..82
+      HorizontalRule@72..81 "- - - - -"
+      NEWLINE@81..82 "\n"
+    BlankLine@82..83
+      BlankLine@82..83 "\n"
+    PARAGRAPH@83..115
+      TEXT@83..114 "Third section with un ..."
+      NEWLINE@114..115 "\n"
+    BlankLine@115..116
+      BlankLine@115..116 "\n"
+    HorizontalRule@116..122
+      HorizontalRule@116..121 "_____"
+      NEWLINE@121..122 "\n"
+    BlankLine@122..123
+      BlankLine@122..123 "\n"
+    BlockQuote@123..172
+      BlockQuoteMarker@123..124 ">"
+      WHITESPACE@124..125 " "
+      PARAGRAPH@125..143
+        TEXT@125..142 "Quote before rule"
+        NEWLINE@142..143 "\n"
+      BlockQuoteMarker@143..144 ">"
+      BlankLine@144..145
+        BlankLine@144..145 "\n"
+      BlockQuoteMarker@145..146 ">"
+      WHITESPACE@146..147 " "
+      HorizontalRule@147..151
+        HorizontalRule@147..150 "***"
+        NEWLINE@150..151 "\n"
+      BlockQuoteMarker@151..152 ">"
+      BlankLine@152..153
+        BlankLine@152..153 "\n"
+      BlockQuoteMarker@153..154 ">"
+      WHITESPACE@154..155 " "
+      PARAGRAPH@155..172
+        TEXT@155..171 "Quote after rule"
+        NEWLINE@171..172 "\n"
+    BlankLine@172..173
+      BlankLine@172..173 "\n"
+    PARAGRAPH@173..190
+      TEXT@173..189 "Final paragraph."
+      NEWLINE@189..190 "\n"
 

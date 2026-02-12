@@ -108,11 +108,31 @@ pub(crate) fn emit_bracketed_span(
     // Closing bracket
     builder.token(SyntaxKind::SpanBracketClose.into(), "]");
 
-    // Attributes (normalized - collapse whitespace)
-    let normalized = attributes.split_whitespace().collect::<Vec<_>>().join(" ");
+    // Attributes (preserve all whitespace - formatter will normalize)
     builder.start_node(SyntaxKind::SpanAttributes.into());
     builder.token(SyntaxKind::TEXT.into(), "{");
-    builder.token(SyntaxKind::TEXT.into(), &normalized);
+
+    // Parse attributes byte-by-byte to preserve whitespace
+    let mut pos = 0;
+    let bytes = attributes.as_bytes();
+    while pos < bytes.len() {
+        if bytes[pos].is_ascii_whitespace() {
+            // Emit whitespace run
+            let start = pos;
+            while pos < bytes.len() && bytes[pos].is_ascii_whitespace() {
+                pos += 1;
+            }
+            builder.token(SyntaxKind::WHITESPACE.into(), &attributes[start..pos]);
+        } else {
+            // Emit non-whitespace run
+            let start = pos;
+            while pos < bytes.len() && !bytes[pos].is_ascii_whitespace() {
+                pos += 1;
+            }
+            builder.token(SyntaxKind::TEXT.into(), &attributes[start..pos]);
+        }
+    }
+
     builder.token(SyntaxKind::TEXT.into(), "}");
     builder.finish_node(); // SpanAttributes
 

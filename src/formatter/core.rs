@@ -182,8 +182,7 @@ impl Formatter {
                                 self.output.push('\n');
                             }
                             SyntaxKind::EscapedChar => {
-                                // Re-add the backslash for escaped characters
-                                self.output.push('\\');
+                                // Token already includes backslash (e.g., "\*")
                                 self.output.push_str(t.text());
                             }
                             SyntaxKind::ImageLinkStart
@@ -402,13 +401,33 @@ impl Formatter {
                         }
                         SyntaxKind::CodeBlock => {
                             // Format code blocks as fenced blocks with indentation
-                            // Extract code content and any language/info
+                            // Extract code content, stripping WHITESPACE tokens (indentation)
                             let mut code_lines = Vec::new();
                             for code_child in child.children() {
                                 if code_child.kind() == SyntaxKind::CodeContent {
-                                    let code_text = code_child.text().to_string();
-                                    for line in code_text.lines() {
-                                        code_lines.push(line.to_string());
+                                    // Build content line by line, skipping WHITESPACE tokens
+                                    let mut line_content = String::new();
+                                    for token in code_child.children_with_tokens() {
+                                        if let NodeOrToken::Token(t) = token {
+                                            match t.kind() {
+                                                SyntaxKind::WHITESPACE => {
+                                                    // Skip WHITESPACE (indentation preserved for losslessness)
+                                                }
+                                                SyntaxKind::TEXT => {
+                                                    line_content.push_str(t.text());
+                                                }
+                                                SyntaxKind::NEWLINE => {
+                                                    // End of line - save it and start new line
+                                                    code_lines.push(line_content.clone());
+                                                    line_content.clear();
+                                                }
+                                                _ => {}
+                                            }
+                                        }
+                                    }
+                                    // Don't forget last line if it doesn't end with newline
+                                    if !line_content.is_empty() {
+                                        code_lines.push(line_content);
                                     }
                                 }
                             }
@@ -507,14 +526,49 @@ impl Formatter {
                 let blank_prefix = content_prefix.trim_end(); // no trailing space
 
                 // Format children (paragraphs, blank lines) with proper > prefix per depth
+                // NOTE: BlockQuoteMarker tokens are in the tree for losslessness, but we ignore
+                // them during formatting and add prefixes dynamically instead.
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
 
                 for child in node.children() {
                     match child.kind() {
+                        // Skip BlockQuoteMarker tokens - we add prefixes dynamically
+                        SyntaxKind::BlockQuoteMarker => continue,
+
                         SyntaxKind::PARAGRAPH => match wrap_mode {
                             WrapMode::Preserve => {
-                                let text = child.text().to_string();
-                                for line in text.lines() {
+                                // Build paragraph text while skipping BlockQuoteMarker tokens
+                                // (they're in the tree for losslessness but we add prefixes dynamically)
+                                let mut lines_text = String::new();
+                                let mut skip_next_whitespace = false;
+                                for item in child.children_with_tokens() {
+                                    match item {
+                                        NodeOrToken::Token(t)
+                                            if t.kind() == SyntaxKind::BlockQuoteMarker =>
+                                        {
+                                            // Skip marker - we add these dynamically
+                                            // Also skip the following whitespace (part of marker syntax)
+                                            skip_next_whitespace = true;
+                                        }
+                                        NodeOrToken::Token(t)
+                                            if t.kind() == SyntaxKind::WHITESPACE
+                                                && skip_next_whitespace =>
+                                        {
+                                            // Skip whitespace after marker
+                                            skip_next_whitespace = false;
+                                        }
+                                        NodeOrToken::Token(t) => {
+                                            skip_next_whitespace = false;
+                                            lines_text.push_str(t.text());
+                                        }
+                                        NodeOrToken::Node(n) => {
+                                            skip_next_whitespace = false;
+                                            lines_text.push_str(&n.text().to_string());
+                                        }
+                                    }
+                                }
+
+                                for line in lines_text.lines() {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(line);
                                     self.output.push('\n');
@@ -854,9 +908,23 @@ impl Formatter {
                 for child in node.children() {
                     match child.kind() {
                         SyntaxKind::TableCaption => {
-                            // Re-add the "Table:" prefix
-                            self.output.push_str("Table: ");
-                            self.output.push_str(&child.text().to_string());
+                            // Normalize caption prefix to "Table: "
+                            for caption_child in child.children_with_tokens() {
+                                match caption_child {
+                                    rowan::NodeOrToken::Token(token)
+                                        if token.kind() == SyntaxKind::TableCaptionPrefix =>
+                                    {
+                                        // Always emit normalized "Table: " prefix
+                                        self.output.push_str("Table: ");
+                                    }
+                                    rowan::NodeOrToken::Token(token) => {
+                                        self.output.push_str(token.text());
+                                    }
+                                    rowan::NodeOrToken::Node(node) => {
+                                        self.output.push_str(&node.text().to_string());
+                                    }
+                                }
+                            }
                         }
                         _ => {
                             // For other table parts, preserve as-is
@@ -968,11 +1036,13 @@ impl Formatter {
                 for child in node.children() {
                     match child.kind() {
                         SyntaxKind::DivFenceOpen => {
-                            // Extract and store attributes for later
-                        }
-
-                        SyntaxKind::DivInfo => {
-                            attributes = Some(child.text().to_string());
+                            // Extract attributes from DivInfo child node
+                            for fence_child in child.children() {
+                                if fence_child.kind() == SyntaxKind::DivInfo {
+                                    attributes = Some(fence_child.text().to_string());
+                                    break;
+                                }
+                            }
                         }
 
                         SyntaxKind::DivFenceClose => {
@@ -1008,7 +1078,10 @@ impl Formatter {
                 // Decrement depth after processing content
                 self.fenced_div_depth -= 1;
 
-                // Emit normalized closing fence
+                // Emit normalized closing fence (ensure it's on its own line)
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
                 self.output.push_str(&colons);
                 self.output.push('\n');
             }

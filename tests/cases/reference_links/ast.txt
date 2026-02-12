@@ -1,5 +1,5 @@
-ROOT@0..609
-  DOCUMENT@0..609
+ROOT@0..610
+  DOCUMENT@0..610
     Heading@0..18
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
@@ -146,7 +146,7 @@ ROOT@0..609
       NEWLINE@425..426 "\n"
     BlankLine@426..427
       BlankLine@426..427 "\n"
-    ReferenceDefinition@427..469
+    ReferenceDefinition@427..470
       Link@427..433
         LinkStart@427..428
           LinkStart@427..428 "["
@@ -154,44 +154,50 @@ ROOT@0..609
           TEXT@428..432 "ref1"
         TEXT@432..433 "]"
       TEXT@433..469 ": https://example.com ..."
-    ReferenceDefinition@469..498
-      Link@469..477
-        LinkStart@469..470
-          LinkStart@469..470 "["
-        LinkText@470..476
-          TEXT@470..476 "github"
-        TEXT@476..477 "]"
-      TEXT@477..498 ": https://github.com\n"
-    ReferenceDefinition@498..533
-      Link@498..509
-        LinkStart@498..499
-          LinkStart@498..499 "["
-        LinkText@499..508
-          TEXT@499..508 "Wikipedia"
-        TEXT@508..509 "]"
-      TEXT@509..533 ": https://wikipedia.org\n"
-    ReferenceDefinition@533..556
-      Link@533..536
-        LinkStart@533..534
-          LinkStart@533..534 "["
-        LinkText@534..535
-          TEXT@534..535 "1"
-        TEXT@535..536 "]"
-      TEXT@536..556 ": https://first.com\n"
-    ReferenceDefinition@556..580
-      Link@556..559
-        LinkStart@556..557
-          LinkStart@556..557 "["
-        LinkText@557..558
-          TEXT@557..558 "2"
-        TEXT@558..559 "]"
-      TEXT@559..580 ": https://second.com\n"
-    ReferenceDefinition@580..609
-      Link@580..587
-        LinkStart@580..581
-          LinkStart@580..581 "["
-        LinkText@581..586
-          TEXT@581..586 "myref"
-        TEXT@586..587 "]"
-      TEXT@587..609 ": https://matched.com\n"
+      NEWLINE@469..470 "\n"
+    ReferenceDefinition@470..499
+      Link@470..478
+        LinkStart@470..471
+          LinkStart@470..471 "["
+        LinkText@471..477
+          TEXT@471..477 "github"
+        TEXT@477..478 "]"
+      TEXT@478..498 ": https://github.com"
+      NEWLINE@498..499 "\n"
+    ReferenceDefinition@499..534
+      Link@499..510
+        LinkStart@499..500
+          LinkStart@499..500 "["
+        LinkText@500..509
+          TEXT@500..509 "Wikipedia"
+        TEXT@509..510 "]"
+      TEXT@510..533 ": https://wikipedia.org"
+      NEWLINE@533..534 "\n"
+    ReferenceDefinition@534..557
+      Link@534..537
+        LinkStart@534..535
+          LinkStart@534..535 "["
+        LinkText@535..536
+          TEXT@535..536 "1"
+        TEXT@536..537 "]"
+      TEXT@537..556 ": https://first.com"
+      NEWLINE@556..557 "\n"
+    ReferenceDefinition@557..581
+      Link@557..560
+        LinkStart@557..558
+          LinkStart@557..558 "["
+        LinkText@558..559
+          TEXT@558..559 "2"
+        TEXT@559..560 "]"
+      TEXT@560..580 ": https://second.com"
+      NEWLINE@580..581 "\n"
+    ReferenceDefinition@581..610
+      Link@581..588
+        LinkStart@581..582
+          LinkStart@581..582 "["
+        LinkText@582..587
+          TEXT@582..587 "myref"
+        TEXT@587..588 "]"
+      TEXT@588..609 ": https://matched.com"
+      NEWLINE@609..610 "\n"
 

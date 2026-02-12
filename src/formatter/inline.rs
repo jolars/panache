@@ -114,13 +114,25 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                                 }
                             }
                         } else if n.kind() == SyntaxKind::SpanAttributes {
-                            // Output attributes token by token to avoid spaces
+                            // Normalize attributes: skip WHITESPACE, join with single space
+                            result.push('{');
+                            let mut attr_parts = Vec::new();
                             for elem in n.children_with_tokens() {
                                 match elem {
-                                    NodeOrToken::Token(t) => result.push_str(t.text()),
+                                    NodeOrToken::Token(t) => {
+                                        // Skip braces and whitespace
+                                        if t.kind() == SyntaxKind::TEXT {
+                                            let text = t.text();
+                                            if text != "{" && text != "}" {
+                                                attr_parts.push(text.to_string());
+                                            }
+                                        }
+                                    }
                                     NodeOrToken::Node(_) => {} // Shouldn't happen
                                 }
                             }
+                            result.push_str(&attr_parts.join(" "));
+                            result.push('}');
                         } else {
                             result.push_str(&n.text().to_string());
                         }

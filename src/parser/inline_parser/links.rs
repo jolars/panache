@@ -15,16 +15,14 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 // Import attribute parsing
-use crate::parser::block_parser::attributes::{
-    AttributeBlock, emit_attributes, try_parse_trailing_attributes,
-};
+use crate::parser::block_parser::attributes::try_parse_trailing_attributes;
 
 /// Try to parse an inline image starting at the current position.
 ///
 /// Inline images have the form `![alt](url)` or `![alt](url "title")`.
 /// Can also have trailing attributes: `![alt](url){#id .class}`.
-/// Returns Some((length, alt_text, dest_content, attributes)) if a valid image is found.
-pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str, Option<AttributeBlock>)> {
+/// Returns Some((length, alt_text, dest_content, raw_attributes)) if a valid image is found.
+pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str, Option<&str>)> {
     if !text.starts_with("![") {
         return None;
     }
@@ -100,13 +98,15 @@ pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str, Option<A
     let after_paren = dest_start + close_paren + 1;
     let after_close = &text[after_paren..];
 
-    if let Some((attrs, _)) = try_parse_trailing_attributes(after_close) {
+    if let Some((_attrs, _)) = try_parse_trailing_attributes(after_close) {
         // Attributes must start immediately after closing paren (no space)
         if after_close.starts_with('{') {
             // Calculate total length including attributes
             let attr_len = after_close.find('}').map(|i| i + 1).unwrap_or(0);
             let total_len = after_paren + attr_len;
-            return Some((total_len, alt_text, dest_content, Some(attrs)));
+            // Return raw attribute string for lossless parsing
+            let raw_attrs = &after_close[..attr_len];
+            return Some((total_len, alt_text, dest_content, Some(raw_attrs)));
         }
     }
 
@@ -122,7 +122,7 @@ pub fn emit_inline_image(
     _text: &str,
     alt_text: &str,
     dest: &str,
-    attributes: Option<AttributeBlock>,
+    raw_attributes: Option<&str>,
     config: &Config,
 ) {
     builder.start_node(SyntaxKind::ImageLink.into());
@@ -150,9 +150,11 @@ pub fn emit_inline_image(
     // Closing )
     builder.token(SyntaxKind::TEXT.into(), ")");
 
-    // Emit attributes if present
-    if let Some(attrs) = attributes {
-        emit_attributes(builder, &attrs);
+    // Emit raw attributes if present (preserve original formatting)
+    if let Some(raw_attrs) = raw_attributes {
+        builder.start_node(SyntaxKind::Attribute.into());
+        builder.token(SyntaxKind::Attribute.into(), raw_attrs);
+        builder.finish_node();
     }
 
     builder.finish_node();
@@ -219,8 +221,8 @@ pub fn emit_autolink(builder: &mut GreenNodeBuilder, _text: &str, url: &str) {
 ///
 /// Inline links have the form `[text](url)` or `[text](url "title")`.
 /// Can also have trailing attributes: `[text](url){#id .class}`.
-/// Returns Some((length, text_content, dest_content, attributes)) if a valid link is found.
-pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str, Option<AttributeBlock>)> {
+/// Returns Some((length, text_content, dest_content, raw_attributes)) if a valid link is found.
+pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str, Option<&str>)> {
     if !text.starts_with('[') {
         return None;
     }
@@ -296,13 +298,15 @@ pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str, Option<At
     let after_paren = dest_start + close_paren + 1;
     let after_close = &text[after_paren..];
 
-    if let Some((attrs, _)) = try_parse_trailing_attributes(after_close) {
+    if let Some((_attrs, _)) = try_parse_trailing_attributes(after_close) {
         // Attributes must start immediately after closing paren (no space)
         if after_close.starts_with('{') {
             // Calculate total length including attributes
             let attr_len = after_close.find('}').map(|i| i + 1).unwrap_or(0);
             let total_len = after_paren + attr_len;
-            return Some((total_len, link_text, dest_content, Some(attrs)));
+            // Return raw attribute string for lossless parsing
+            let raw_attrs = &after_close[..attr_len];
+            return Some((total_len, link_text, dest_content, Some(raw_attrs)));
         }
     }
 
@@ -318,7 +322,7 @@ pub fn emit_inline_link(
     _text: &str,
     link_text: &str,
     dest: &str,
-    attributes: Option<AttributeBlock>,
+    raw_attributes: Option<&str>,
     config: &Config,
 ) {
     builder.start_node(SyntaxKind::Link.into());
@@ -345,9 +349,11 @@ pub fn emit_inline_link(
     // Closing )
     builder.token(SyntaxKind::TEXT.into(), ")");
 
-    // Emit attributes if present
-    if let Some(attrs) = attributes {
-        emit_attributes(builder, &attrs);
+    // Emit raw attributes if present (preserve original formatting)
+    if let Some(raw_attrs) = raw_attributes {
+        builder.start_node(SyntaxKind::Attribute.into());
+        builder.token(SyntaxKind::Attribute.into(), raw_attrs);
+        builder.finish_node();
     }
 
     builder.finish_node();
@@ -768,7 +774,7 @@ mod tests {
         assert_eq!(dest, "img.png");
         assert!(attrs.is_some());
         let attrs = attrs.unwrap();
-        assert_eq!(attrs.classes, vec!["large"]);
+        assert_eq!(attrs, "{.large}");
     }
 
     #[test]
@@ -781,7 +787,7 @@ mod tests {
         assert_eq!(dest, "fig1.png");
         assert!(attrs.is_some());
         let attrs = attrs.unwrap();
-        assert_eq!(attrs.identifier, Some("fig-1".to_string()));
+        assert_eq!(attrs, "{#fig-1}");
     }
 
     #[test]
@@ -794,10 +800,7 @@ mod tests {
         assert_eq!(dest, "img.png");
         assert!(attrs.is_some());
         let attrs = attrs.unwrap();
-        assert_eq!(attrs.identifier, Some("fig".to_string()));
-        assert_eq!(attrs.classes, vec!["large"]);
-        assert_eq!(attrs.key_values.len(), 1);
-        assert_eq!(attrs.key_values[0].0, "width");
+        assert_eq!(attrs, "{#fig .large width=\"80%\"}");
     }
 
     #[test]
@@ -819,7 +822,7 @@ mod tests {
         assert_eq!(dest, "url");
         assert!(attrs.is_some());
         let attrs = attrs.unwrap();
-        assert_eq!(attrs.identifier, Some("link-1".to_string()));
+        assert_eq!(attrs, "{#link-1}");
     }
 
     #[test]
@@ -832,10 +835,7 @@ mod tests {
         assert_eq!(dest, "url");
         assert!(attrs.is_some());
         let attrs = attrs.unwrap();
-        assert_eq!(attrs.identifier, Some("link".to_string()));
-        assert_eq!(attrs.classes, vec!["external"]);
-        assert_eq!(attrs.key_values.len(), 1);
-        assert_eq!(attrs.key_values[0].0, "target");
+        assert_eq!(attrs, "{#link .external target=\"_blank\"}");
     }
 
     #[test]
@@ -856,7 +856,7 @@ mod tests {
         assert_eq!(dest, r#"url "title""#);
         assert!(attrs.is_some());
         let attrs = attrs.unwrap();
-        assert_eq!(attrs.classes, vec!["external"]);
+        assert_eq!(attrs, "{.external}");
     }
 
     // Reference link tests

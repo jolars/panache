@@ -35,7 +35,23 @@ pub(super) fn format_code_block(
                     }
                 }
                 SyntaxKind::CodeContent => {
-                    content = n.text().to_string();
+                    // Extract content, stripping leading WHITESPACE tokens on each line
+                    // (for lossless parsing, indented code blocks preserve indentation as WHITESPACE)
+                    for token in n.children_with_tokens() {
+                        if let NodeOrToken::Token(t) = token {
+                            match t.kind() {
+                                SyntaxKind::WHITESPACE => {
+                                    // Skip leading whitespace tokens (indentation)
+                                    // They're preserved in the AST for losslessness, but
+                                    // formatter strips them when converting to fenced code
+                                }
+                                SyntaxKind::TEXT | SyntaxKind::NEWLINE => {
+                                    content.push_str(t.text());
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
                 }
                 _ => {}
             }

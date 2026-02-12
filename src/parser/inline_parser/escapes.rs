@@ -62,8 +62,9 @@ pub fn emit_escape(builder: &mut GreenNodeBuilder, ch: char, escape_type: Escape
             builder.token(SyntaxKind::HardLineBreak.into(), "\n");
         }
         EscapeType::Literal => {
-            // Emit the escaped character as TEXT (without backslash)
+            // Emit the full escape sequence (backslash + character) for losslessness
             let mut s = String::new();
+            s.push('\\');
             s.push(ch);
             builder.token(SyntaxKind::EscapedChar.into(), &s);
         }

@@ -99,17 +99,20 @@ pub(crate) fn parse_indented_code_block(
         }
 
         // Check if line is indented enough (base_indent + 4 for code)
-        let (indent_cols, _) = leading_indent(inner);
+        let (indent_cols, indent_bytes) = leading_indent(inner);
         if indent_cols < code_indent {
             break;
         }
 
-        // Strip the total indentation (base + 4) and add the content
-        let content = if inner.len() > code_indent {
-            &inner[code_indent..]
-        } else {
-            ""
-        };
+        // For losslessness: emit ALL indentation as WHITESPACE, then emit remaining content
+        // The formatter can decide how to handle the indentation
+        if indent_bytes > 0 {
+            let indent_str = &inner[..indent_bytes];
+            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
+
+        // Get the content after the indentation
+        let content = &inner[indent_bytes..];
 
         // Split off trailing newline if present (from split_inclusive)
         let (content_without_newline, has_newline) =

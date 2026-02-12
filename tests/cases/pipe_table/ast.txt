@@ -1,24 +1,25 @@
-ROOT@0..218
-  DOCUMENT@0..218
-    PipeTable@0..218
-      TableHeader@0..37
-        TEXT@0..36 "| Right | Left | Defa ..."
-        NEWLINE@36..37 "\n"
-      TableSeparator@37..73
-        TEXT@37..72 "|------:|:-----|----- ..."
-        NEWLINE@72..73 "\n"
-      TableRow@73..109
-        TEXT@73..108 "|   12  |  12  |    1 ..."
-        NEWLINE@108..109 "\n"
-      TableRow@109..145
-        TEXT@109..144 "|  123  |  123 |   12 ..."
-        NEWLINE@144..145 "\n"
-      TableRow@145..181
-        TEXT@145..180 "|    1  |    1 |      ..."
-        NEWLINE@180..181 "\n"
-      BlankLine@181..182
-        BlankLine@181..182 "\n"
-      TableCaption@182..218
-        TEXT@182..217 "Demonstration of pipe ..."
-        NEWLINE@217..218 "\n"
+ROOT@0..219
+  DOCUMENT@0..219
+    PipeTable@0..219
+      TableHeader@0..36
+        TEXT@0..35 "| Right | Left | Defa ..."
+        NEWLINE@35..36 "\n"
+      TableSeparator@36..72
+        TEXT@36..71 "|------:|:-----|----- ..."
+        NEWLINE@71..72 "\n"
+      TableRow@72..108
+        TEXT@72..107 "|   12  |  12  |    1 ..."
+        NEWLINE@107..108 "\n"
+      TableRow@108..144
+        TEXT@108..143 "|  123  |  123 |   12 ..."
+        NEWLINE@143..144 "\n"
+      TableRow@144..180
+        TEXT@144..179 "|    1  |    1 |      ..."
+        NEWLINE@179..180 "\n"
+      BlankLine@180..181
+        BlankLine@180..181 "\n"
+      TableCaption@181..219
+        TableCaptionPrefix@181..183 ": "
+        TEXT@183..218 "Demonstration of pipe ..."
+        NEWLINE@218..219 "\n"
 

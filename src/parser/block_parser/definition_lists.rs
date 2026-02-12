@@ -39,9 +39,14 @@ pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, us
 /// Emit a term line into the syntax tree
 pub(crate) fn emit_term(builder: &mut GreenNodeBuilder<'static>, line: &str) {
     builder.start_node(SyntaxKind::Term.into());
-    // Just emit the text content - inline parsing will happen later
-    builder.token(SyntaxKind::TEXT.into(), line.trim_end());
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    // Strip trailing newline from line (it will be emitted separately)
+    if let Some(text) = line.strip_suffix('\n') {
+        builder.token(SyntaxKind::TEXT.into(), text.trim_end());
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    } else {
+        // No trailing newline (last line of input)
+        builder.token(SyntaxKind::TEXT.into(), line.trim_end());
+    }
     builder.finish_node(); // Term
 }
 

@@ -1,65 +1,73 @@
-ROOT@0..145
-  DOCUMENT@0..145
-    List@0..145
-      ListItem@0..34
+ROOT@0..184
+  DOCUMENT@0..184
+    List@0..184
+      ListItem@0..45
         ListMarker@0..1 "*"
         WHITESPACE@1..4 "   "
-        TEXT@4..12 "Bullet.\n"
-        NEWLINE@12..13 "\n"
-        BlankLine@13..14
-          BlankLine@13..14 "\n"
-        CodeBlock@14..34
-          CodeFenceOpen@14..21
-            CodeFenceMarker@14..17 "```"
-            CodeInfo@17..20 "c++"
-            NEWLINE@20..21 "\n"
-          CodeContent@21..30
-            TEXT@21..29 "int foo;"
-            NEWLINE@29..30 "\n"
-          CodeFenceClose@30..34
-            CodeFenceMarker@30..33 "```"
-            NEWLINE@33..34 "\n"
-      BlankLine@34..35
-        BlankLine@34..35 "\n"
-      ListItem@35..53
-        ListMarker@35..36 "*"
-        WHITESPACE@36..39 "   "
-        TEXT@39..52 "Next bullet.\n"
-        NEWLINE@52..53 "\n"
-      BlankLine@53..54
-        BlankLine@53..54 "\n"
-      ListItem@54..145
-        ListMarker@54..55 "*"
-        WHITESPACE@55..58 "   "
-        TEXT@58..79 "Here's another list:\n"
-        NEWLINE@79..80 "\n"
-        BlankLine@80..81
-          BlankLine@80..81 "\n"
-        List@81..145
-          ListItem@81..119
-            ListMarker@81..82 "*"
-            WHITESPACE@82..85 "   "
-            TEXT@85..97 "Sub-bullet.\n"
-            NEWLINE@97..98 "\n"
-            BlankLine@98..99
-              BlankLine@98..99 "\n"
-            CodeBlock@99..119
-              CodeFenceOpen@99..106
-                CodeFenceMarker@99..102 "```"
-                CodeInfo@102..105 "c++"
-                NEWLINE@105..106 "\n"
-              CodeContent@106..115
-                TEXT@106..114 "int bar;"
-                NEWLINE@114..115 "\n"
-              CodeFenceClose@115..119
-                CodeFenceMarker@115..118 "```"
-                NEWLINE@118..119 "\n"
-          BlankLine@119..120
-            BlankLine@119..120 "\n"
-          List@120..145
-            ListItem@120..145
-              ListMarker@120..121 "*"
-              WHITESPACE@121..124 "   "
-              TEXT@124..144 "Another sub-bullet.\n"
-              NEWLINE@144..145 "\n"
+        TEXT@4..11 "Bullet."
+        NEWLINE@11..12 "\n"
+        BlankLine@12..13
+          BlankLine@12..13 "\n"
+        CodeBlock@13..45
+          WHITESPACE@13..17 "    "
+          CodeFenceOpen@17..24
+            CodeFenceMarker@17..20 "```"
+            CodeInfo@20..23 "c++"
+            NEWLINE@23..24 "\n"
+          CodeContent@24..37
+            WHITESPACE@24..28 "    "
+            TEXT@28..36 "int foo;"
+            NEWLINE@36..37 "\n"
+          WHITESPACE@37..41 "    "
+          CodeFenceClose@41..45
+            CodeFenceMarker@41..44 "```"
+            NEWLINE@44..45 "\n"
+      BlankLine@45..46
+        BlankLine@45..46 "\n"
+      ListItem@46..63
+        ListMarker@46..47 "*"
+        WHITESPACE@47..50 "   "
+        TEXT@50..62 "Next bullet."
+        NEWLINE@62..63 "\n"
+      BlankLine@63..64
+        BlankLine@63..64 "\n"
+      ListItem@64..184
+        ListMarker@64..65 "*"
+        WHITESPACE@65..68 "   "
+        TEXT@68..88 "Here's another list:"
+        NEWLINE@88..89 "\n"
+        BlankLine@89..90
+          BlankLine@89..90 "\n"
+        List@90..184
+          ListItem@90..155
+            WHITESPACE@90..94 "    "
+            ListMarker@94..95 "*"
+            WHITESPACE@95..98 "   "
+            TEXT@98..109 "Sub-bullet."
+            NEWLINE@109..110 "\n"
+            BlankLine@110..111
+              BlankLine@110..111 "\n"
+            CodeBlock@111..155
+              WHITESPACE@111..119 "        "
+              CodeFenceOpen@119..126
+                CodeFenceMarker@119..122 "```"
+                CodeInfo@122..125 "c++"
+                NEWLINE@125..126 "\n"
+              CodeContent@126..143
+                WHITESPACE@126..134 "        "
+                TEXT@134..142 "int bar;"
+                NEWLINE@142..143 "\n"
+              WHITESPACE@143..151 "        "
+              CodeFenceClose@151..155
+                CodeFenceMarker@151..154 "```"
+                NEWLINE@154..155 "\n"
+          BlankLine@155..156
+            BlankLine@155..156 "\n"
+          List@156..184
+            ListItem@156..184
+              WHITESPACE@156..160 "    "
+              ListMarker@160..161 "*"
+              WHITESPACE@161..164 "   "
+              TEXT@164..183 "Another sub-bullet."
+              NEWLINE@183..184 "\n"
 

@@ -1,75 +1,82 @@
-ROOT@0..182
-  DOCUMENT@0..182
+ROOT@0..187
+  DOCUMENT@0..187
     PARAGRAPH@0..14
       TEXT@0..13 "Nested lists:"
       NEWLINE@13..14 "\n"
     BlankLine@14..15
       BlankLine@14..15 "\n"
-    List@15..90
-      ListItem@15..55
+    List@15..93
+      ListItem@15..57
         ListMarker@15..16 "*"
         WHITESPACE@16..17 " "
-        TEXT@17..24 "Fruits\n"
-        NEWLINE@24..25 "\n"
-        List@25..55
-          ListItem@25..35
-            ListMarker@25..26 "+"
-            WHITESPACE@26..27 " "
-            TEXT@27..34 "Apples\n"
+        TEXT@17..23 "Fruits"
+        NEWLINE@23..24 "\n"
+        List@24..57
+          ListItem@24..35
+            WHITESPACE@24..26 "  "
+            ListMarker@26..27 "+"
+            WHITESPACE@27..28 " "
+            TEXT@28..34 "Apples"
             NEWLINE@34..35 "\n"
-          ListItem@35..44
-            ListMarker@35..36 "+"
-            WHITESPACE@36..37 " "
-            TEXT@37..43 "Pears\n"
-            NEWLINE@43..44 "\n"
-          ListItem@44..55
-            ListMarker@44..45 "+"
-            WHITESPACE@45..46 " "
-            TEXT@46..54 "Peaches\n"
-            NEWLINE@54..55 "\n"
-      ListItem@55..90
-        ListMarker@55..56 "*"
-        WHITESPACE@56..57 " "
-        TEXT@57..68 "Vegetables\n"
-        NEWLINE@68..69 "\n"
-        List@69..90
-          ListItem@69..81
-            ListMarker@69..70 "+"
-            WHITESPACE@70..71 " "
-            TEXT@71..80 "Broccoli\n"
-            NEWLINE@80..81 "\n"
-          ListItem@81..90
-            ListMarker@81..82 "+"
-            WHITESPACE@82..83 " "
-            TEXT@83..89 "Chard\n"
-            NEWLINE@89..90 "\n"
-    BlankLine@90..91
-      BlankLine@90..91 "\n"
-    PARAGRAPH@91..106
-      TEXT@91..105 "Mixed nesting:"
-      NEWLINE@105..106 "\n"
-    BlankLine@106..107
-      BlankLine@106..107 "\n"
-    List@107..182
-      ListItem@107..158
-        ListMarker@107..109 "1."
-        WHITESPACE@109..110 " "
-        TEXT@110..122 "First level\n"
-        NEWLINE@122..123 "\n"
-        List@123..158
-          ListItem@123..140
-            ListMarker@123..124 "*"
-            WHITESPACE@124..125 " "
-            TEXT@125..139 "Nested bullet\n"
-            NEWLINE@139..140 "\n"
-          ListItem@140..158
-            ListMarker@140..141 "*"
-            WHITESPACE@141..142 " "
-            TEXT@142..157 "Another nested\n"
-            NEWLINE@157..158 "\n"
-      ListItem@158..182
-        ListMarker@158..160 "2."
-        WHITESPACE@160..161 " "
-        TEXT@161..181 "Back to first level\n"
-        NEWLINE@181..182 "\n"
+          ListItem@35..45
+            WHITESPACE@35..37 "  "
+            ListMarker@37..38 "+"
+            WHITESPACE@38..39 " "
+            TEXT@39..44 "Pears"
+            NEWLINE@44..45 "\n"
+          ListItem@45..57
+            WHITESPACE@45..47 "  "
+            ListMarker@47..48 "+"
+            WHITESPACE@48..49 " "
+            TEXT@49..56 "Peaches"
+            NEWLINE@56..57 "\n"
+      ListItem@57..93
+        ListMarker@57..58 "*"
+        WHITESPACE@58..59 " "
+        TEXT@59..69 "Vegetables"
+        NEWLINE@69..70 "\n"
+        List@70..93
+          ListItem@70..83
+            WHITESPACE@70..72 "  "
+            ListMarker@72..73 "+"
+            WHITESPACE@73..74 " "
+            TEXT@74..82 "Broccoli"
+            NEWLINE@82..83 "\n"
+          ListItem@83..93
+            WHITESPACE@83..85 "  "
+            ListMarker@85..86 "+"
+            WHITESPACE@86..87 " "
+            TEXT@87..92 "Chard"
+            NEWLINE@92..93 "\n"
+    BlankLine@93..94
+      BlankLine@93..94 "\n"
+    PARAGRAPH@94..109
+      TEXT@94..108 "Mixed nesting:"
+      NEWLINE@108..109 "\n"
+    BlankLine@109..110
+      BlankLine@109..110 "\n"
+    List@110..187
+      ListItem@110..164
+        ListMarker@110..112 "1."
+        WHITESPACE@112..113 " "
+        TEXT@113..124 "First level"
+        NEWLINE@124..125 "\n"
+        List@125..164
+          ListItem@125..144
+            WHITESPACE@125..128 "   "
+            ListMarker@128..129 "*"
+            WHITESPACE@129..130 " "
+            TEXT@130..143 "Nested bullet"
+            NEWLINE@143..144 "\n"
+          ListItem@144..164
+            WHITESPACE@144..147 "   "
+            ListMarker@147..148 "*"
+            WHITESPACE@148..149 " "
+            TEXT@149..163 "Another nested"
+            NEWLINE@163..164 "\n"
+      ListItem@164..187
+        ListMarker@164..166 "2."
+        WHITESPACE@166..167 " "
+        TEXT@167..186 "Back to first level"
+        NEWLINE@186..187 "\n"
 

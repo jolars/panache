@@ -1,5 +1,5 @@
-ROOT@0..519
-  DOCUMENT@0..519
+ROOT@0..520
+  DOCUMENT@0..520
     Heading@0..19
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
@@ -128,7 +128,7 @@ ROOT@0..519
       NEWLINE@387..388 "\n"
     BlankLine@388..389
       BlankLine@388..389 "\n"
-    ReferenceDefinition@389..429
+    ReferenceDefinition@389..430
       Link@389..395
         LinkStart@389..390
           LinkStart@389..390 "["
@@ -136,44 +136,50 @@ ROOT@0..519
           TEXT@390..394 "img1"
         TEXT@394..395 "]"
       TEXT@395..429 ": /path/to/image.png  ..."
-    ReferenceDefinition@429..447
-      Link@429..435
-        LinkStart@429..430
-          LinkStart@429..430 "["
-        LinkText@430..434
-          TEXT@430..434 "logo"
-        TEXT@434..435 "]"
-      TEXT@435..447 ": /logo.svg\n"
-    ReferenceDefinition@447..465
-      Link@447..453
-        LinkStart@447..448
-          LinkStart@447..448 "["
-        LinkText@448..452
-          TEXT@448..452 "Icon"
-        TEXT@452..453 "]"
-      TEXT@453..465 ": /icon.png\n"
-    ReferenceDefinition@465..481
-      Link@465..469
-        LinkStart@465..466
-          LinkStart@465..466 "["
-        LinkText@466..468
-          TEXT@466..468 "i1"
-        TEXT@468..469 "]"
-      TEXT@469..481 ": /img1.jpg\n"
-    ReferenceDefinition@481..497
-      Link@481..485
-        LinkStart@481..482
-          LinkStart@481..482 "["
-        LinkText@482..484
-          TEXT@482..484 "i2"
-        TEXT@484..485 "]"
-      TEXT@485..497 ": /img2.jpg\n"
-    ReferenceDefinition@497..519
-      Link@497..504
-        LinkStart@497..498
-          LinkStart@497..498 "["
-        LinkText@498..503
-          TEXT@498..503 "myimg"
-        TEXT@503..504 "]"
-      TEXT@504..519 ": /matched.png\n"
+      NEWLINE@429..430 "\n"
+    ReferenceDefinition@430..448
+      Link@430..436
+        LinkStart@430..431
+          LinkStart@430..431 "["
+        LinkText@431..435
+          TEXT@431..435 "logo"
+        TEXT@435..436 "]"
+      TEXT@436..447 ": /logo.svg"
+      NEWLINE@447..448 "\n"
+    ReferenceDefinition@448..466
+      Link@448..454
+        LinkStart@448..449
+          LinkStart@448..449 "["
+        LinkText@449..453
+          TEXT@449..453 "Icon"
+        TEXT@453..454 "]"
+      TEXT@454..465 ": /icon.png"
+      NEWLINE@465..466 "\n"
+    ReferenceDefinition@466..482
+      Link@466..470
+        LinkStart@466..467
+          LinkStart@466..467 "["
+        LinkText@467..469
+          TEXT@467..469 "i1"
+        TEXT@469..470 "]"
+      TEXT@470..481 ": /img1.jpg"
+      NEWLINE@481..482 "\n"
+    ReferenceDefinition@482..498
+      Link@482..486
+        LinkStart@482..483
+          LinkStart@482..483 "["
+        LinkText@483..485
+          TEXT@483..485 "i2"
+        TEXT@485..486 "]"
+      TEXT@486..497 ": /img2.jpg"
+      NEWLINE@497..498 "\n"
+    ReferenceDefinition@498..520
+      Link@498..505
+        LinkStart@498..499
+          LinkStart@498..499 "["
+        LinkText@499..504
+          TEXT@499..504 "myimg"
+        TEXT@504..505 "]"
+      TEXT@505..519 ": /matched.png"
+      NEWLINE@519..520 "\n"
 

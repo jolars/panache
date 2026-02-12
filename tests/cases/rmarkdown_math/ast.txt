@@ -1,5 +1,5 @@
-ROOT@0..395
-  DOCUMENT@0..395
+ROOT@0..398
+  DOCUMENT@0..398
     Heading@0..22
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
@@ -29,55 +29,59 @@ ROOT@0..395
       NEWLINE@188..189 "\n"
     BlankLine@189..190
       BlankLine@189..190 "\n"
-    MathBlock@190..243
+    MathBlock@190..245
       BlockMathMarker@190..192 "\\["
-      MathContent@192..241
-        LatexCommand@192..196
-          TEXT@192..196 "\\int"
-        TEXT@196..197 "_"
-        TEXT@197..198 "0"
-        Superscript@198..208
-          SuperscriptMarker@198..199
-            SuperscriptMarker@198..199 "^"
-          LatexCommand@199..205
-            TEXT@199..205 "\\infty"
-          TEXT@205..207 " e"
-          SuperscriptMarker@207..208
-            SuperscriptMarker@207..208 "^"
-        TEXT@208..211 "{-x"
-        TEXT@211..212 "^"
-        TEXT@212..220 "2} dx = "
-        LatexCommand@220..240
-          TEXT@220..240 "\\frac{\\sqrt{\\pi}}{2}"
-        TEXT@240..241 "\n"
-      BlockMathMarker@241..243 "\\]"
-    BlankLine@243..244
-      BlankLine@243..244 "\n"
-    PARAGRAPH@244..328
-      TEXT@244..262 "More inline math: "
-      InlineMath@262..289
-        InlineMathMarker@262..264 "\\("
-        TEXT@264..287 "\\alpha + \\beta = \\gamma"
-        InlineMathMarker@287..289 "\\)"
-      TEXT@289..302 " and another "
-      InlineMath@302..326
-        InlineMathMarker@302..304 "\\("
-        TEXT@304..324 "f(x) = ax^2 + bx + c"
-        InlineMathMarker@324..326 "\\)"
-      TEXT@326..327 "."
-      NEWLINE@327..328 "\n"
-    BlankLine@328..329
-      BlankLine@328..329 "\n"
-    PARAGRAPH@329..380
-      TEXT@329..379 "Here's one that start ..."
-      NEWLINE@379..380 "\n"
-    BlankLine@380..381
-      BlankLine@380..381 "\n"
-    MathBlock@381..395
-      BlockMathMarker@381..383 "\\["
-      MathContent@383..393
-        TEXT@383..390 " e = mc"
-        TEXT@390..391 "^"
-        TEXT@391..393 "2\n"
-      BlockMathMarker@393..395 "\\]"
+      NEWLINE@192..193 "\n"
+      MathContent@193..242
+        LatexCommand@193..197
+          TEXT@193..197 "\\int"
+        TEXT@197..198 "_"
+        TEXT@198..199 "0"
+        Superscript@199..209
+          SuperscriptMarker@199..200
+            SuperscriptMarker@199..200 "^"
+          LatexCommand@200..206
+            TEXT@200..206 "\\infty"
+          TEXT@206..208 " e"
+          SuperscriptMarker@208..209
+            SuperscriptMarker@208..209 "^"
+        TEXT@209..212 "{-x"
+        TEXT@212..213 "^"
+        TEXT@213..221 "2} dx = "
+        LatexCommand@221..241
+          TEXT@221..241 "\\frac{\\sqrt{\\pi}}{2}"
+        NEWLINE@241..242 "\n"
+      BlockMathMarker@242..244 "\\]"
+      NEWLINE@244..245 "\n"
+    BlankLine@245..246
+      BlankLine@245..246 "\n"
+    PARAGRAPH@246..330
+      TEXT@246..264 "More inline math: "
+      InlineMath@264..291
+        InlineMathMarker@264..266 "\\("
+        TEXT@266..289 "\\alpha + \\beta = \\gamma"
+        InlineMathMarker@289..291 "\\)"
+      TEXT@291..304 " and another "
+      InlineMath@304..328
+        InlineMathMarker@304..306 "\\("
+        TEXT@306..326 "f(x) = ax^2 + bx + c"
+        InlineMathMarker@326..328 "\\)"
+      TEXT@328..329 "."
+      NEWLINE@329..330 "\n"
+    BlankLine@330..331
+      BlankLine@330..331 "\n"
+    PARAGRAPH@331..382
+      TEXT@331..381 "Here's one that start ..."
+      NEWLINE@381..382 "\n"
+    BlankLine@382..383
+      BlankLine@382..383 "\n"
+    MathBlock@383..398
+      BlockMathMarker@383..385 "\\["
+      MathContent@385..395
+        TEXT@385..392 " e = mc"
+        TEXT@392..393 "^"
+        TEXT@393..394 "2"
+        NEWLINE@394..395 "\n"
+      BlockMathMarker@395..397 "\\]"
+      NEWLINE@397..398 "\n"
 

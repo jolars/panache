@@ -1,5 +1,5 @@
-ROOT@0..335
-  DOCUMENT@0..335
+ROOT@0..338
+  DOCUMENT@0..338
     Heading@0..18
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
@@ -23,9 +23,9 @@ ROOT@0..335
       NEWLINE@62..63 "\n"
     BlankLine@63..64
       BlankLine@63..64 "\n"
-    PARAGRAPH@64..120
+    PARAGRAPH@64..121
       TEXT@64..79 "With emphasis: "
-      BracketedSpan@79..119
+      BracketedSpan@79..120
         SpanBracketOpen@79..80 "["
         SpanContent@80..109
           TEXT@80..88 "This is "
@@ -39,82 +39,90 @@ ROOT@0..335
             TEXT@102..108 "italic"
             EmphasisMarker@108..109 "*"
         SpanBracketClose@109..110 "]"
-        SpanAttributes@110..119
+        SpanAttributes@110..120
           TEXT@110..111 "{"
-          TEXT@111..118 ".styled"
-          TEXT@118..119 "}"
-      NEWLINE@119..120 "\n"
-    BlankLine@120..121
-      BlankLine@120..121 "\n"
-    PARAGRAPH@121..167
-      TEXT@121..132 "With code: "
-      BracketedSpan@132..166
-        SpanBracketOpen@132..133 "["
-        SpanContent@133..154
-          TEXT@133..137 "The "
-          CodeSpan@137..149
-            CodeSpanMarker@137..138 "`"
-            TEXT@138..148 "function()"
-            CodeSpanMarker@148..149 "`"
-          TEXT@149..154 " call"
-        SpanBracketClose@154..155 "]"
-        SpanAttributes@155..166
-          TEXT@155..156 "{"
-          TEXT@156..165 ".code-ref"
-          TEXT@165..166 "}"
-      NEWLINE@166..167 "\n"
-    BlankLine@167..168
-      BlankLine@167..168 "\n"
-    PARAGRAPH@168..223
-      TEXT@168..184 "Multiple spans: "
-      BracketedSpan@184..195
-        SpanBracketOpen@184..185 "["
-        SpanContent@185..190
-          TEXT@185..190 "first"
-        SpanBracketClose@190..191 "]"
-        SpanAttributes@191..195
-          TEXT@191..192 "{"
-          TEXT@192..194 ".a"
-          TEXT@194..195 "}"
-      TEXT@195..200 " and "
-      BracketedSpan@200..212
-        SpanBracketOpen@200..201 "["
-        SpanContent@201..207
-          TEXT@201..207 "second"
-        SpanBracketClose@207..208 "]"
-        SpanAttributes@208..212
-          TEXT@208..209 "{"
-          TEXT@209..211 ".b"
-          TEXT@211..212 "}"
-      TEXT@212..222 " together."
-      NEWLINE@222..223 "\n"
-    BlankLine@223..224
-      BlankLine@223..224 "\n"
-    PARAGRAPH@224..272
-      TEXT@224..241 "Nested brackets: "
-      BracketedSpan@241..271
-        SpanBracketOpen@241..242 "["
-        SpanContent@242..260
-          TEXT@242..243 "["
-          TEXT@243..260 "literal brackets]"
-        SpanBracketClose@260..261 "]"
-        SpanAttributes@261..271
-          TEXT@261..262 "{"
-          TEXT@262..270 ".example"
-          TEXT@270..271 "}"
-      NEWLINE@271..272 "\n"
-    BlankLine@272..273
-      BlankLine@272..273 "\n"
-    PARAGRAPH@273..335
-      TEXT@273..293 "Complex attributes: "
-      BracketedSpan@293..334
-        SpanBracketOpen@293..294 "["
-        SpanContent@294..298
-          TEXT@294..298 "text"
-        SpanBracketClose@298..299 "]"
-        SpanAttributes@299..334
-          TEXT@299..300 "{"
-          TEXT@300..333 "#myid .class1 .class2 ..."
-          TEXT@333..334 "}"
-      NEWLINE@334..335 "\n"
+          WHITESPACE@111..112 " "
+          TEXT@112..119 ".styled"
+          TEXT@119..120 "}"
+      NEWLINE@120..121 "\n"
+    BlankLine@121..122
+      BlankLine@121..122 "\n"
+    PARAGRAPH@122..169
+      TEXT@122..133 "With code: "
+      BracketedSpan@133..168
+        SpanBracketOpen@133..134 "["
+        SpanContent@134..155
+          TEXT@134..138 "The "
+          CodeSpan@138..150
+            CodeSpanMarker@138..139 "`"
+            TEXT@139..149 "function()"
+            CodeSpanMarker@149..150 "`"
+          TEXT@150..155 " call"
+        SpanBracketClose@155..156 "]"
+        SpanAttributes@156..168
+          TEXT@156..157 "{"
+          TEXT@157..166 ".code-ref"
+          WHITESPACE@166..167 " "
+          TEXT@167..168 "}"
+      NEWLINE@168..169 "\n"
+    BlankLine@169..170
+      BlankLine@169..170 "\n"
+    PARAGRAPH@170..225
+      TEXT@170..186 "Multiple spans: "
+      BracketedSpan@186..197
+        SpanBracketOpen@186..187 "["
+        SpanContent@187..192
+          TEXT@187..192 "first"
+        SpanBracketClose@192..193 "]"
+        SpanAttributes@193..197
+          TEXT@193..194 "{"
+          TEXT@194..196 ".a"
+          TEXT@196..197 "}"
+      TEXT@197..202 " and "
+      BracketedSpan@202..214
+        SpanBracketOpen@202..203 "["
+        SpanContent@203..209
+          TEXT@203..209 "second"
+        SpanBracketClose@209..210 "]"
+        SpanAttributes@210..214
+          TEXT@210..211 "{"
+          TEXT@211..213 ".b"
+          TEXT@213..214 "}"
+      TEXT@214..224 " together."
+      NEWLINE@224..225 "\n"
+    BlankLine@225..226
+      BlankLine@225..226 "\n"
+    PARAGRAPH@226..274
+      TEXT@226..243 "Nested brackets: "
+      BracketedSpan@243..273
+        SpanBracketOpen@243..244 "["
+        SpanContent@244..262
+          TEXT@244..245 "["
+          TEXT@245..262 "literal brackets]"
+        SpanBracketClose@262..263 "]"
+        SpanAttributes@263..273
+          TEXT@263..264 "{"
+          TEXT@264..272 ".example"
+          TEXT@272..273 "}"
+      NEWLINE@273..274 "\n"
+    BlankLine@274..275
+      BlankLine@274..275 "\n"
+    PARAGRAPH@275..338
+      TEXT@275..295 "Complex attributes: "
+      BracketedSpan@295..337
+        SpanBracketOpen@295..296 "["
+        SpanContent@296..300
+          TEXT@296..300 "text"
+        SpanBracketClose@300..301 "]"
+        SpanAttributes@301..337
+          TEXT@301..302 "{"
+          TEXT@302..307 "#myid"
+          WHITESPACE@307..309 "  "
+          TEXT@309..316 ".class1"
+          WHITESPACE@316..317 " "
+          TEXT@317..324 ".class2"
+          WHITESPACE@324..325 " "
+          TEXT@325..336 "key=\"value\""
+          TEXT@336..337 "}"
+      NEWLINE@337..338 "\n"
 

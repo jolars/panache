@@ -1,5 +1,5 @@
-ROOT@0..228
-  DOCUMENT@0..228
+ROOT@0..243
+  DOCUMENT@0..243
     Heading@0..10
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
@@ -9,60 +9,60 @@ ROOT@0..228
       NEWLINE@9..10 "\n"
     BlankLine@10..11
       BlankLine@10..11 "\n"
-    PARAGRAPH@11..45
+    PARAGRAPH@11..47
       TEXT@11..30 "Escaped asterisks: "
-      EscapedChar@30..31 "*"
-      TEXT@31..43 "not emphasis"
-      EscapedChar@43..44 "*"
-      NEWLINE@44..45 "\n"
-    BlankLine@45..46
-      BlankLine@45..46 "\n"
-    PARAGRAPH@46..82
-      TEXT@46..67 "Escaped underscores: "
-      EscapedChar@67..68 "_"
-      TEXT@68..80 "not emphasis"
-      EscapedChar@80..81 "_"
-      NEWLINE@81..82 "\n"
-    BlankLine@82..83
-      BlankLine@82..83 "\n"
-    PARAGRAPH@83..113
-      TEXT@83..102 "Escaped backticks: "
-      EscapedChar@102..103 "`"
-      TEXT@103..111 "not code"
-      EscapedChar@111..112 "`"
-      NEWLINE@112..113 "\n"
-    BlankLine@113..114
-      BlankLine@113..114 "\n"
-    PARAGRAPH@114..150
-      TEXT@114..132 "Escaped brackets: "
-      EscapedChar@132..133 "["
-      TEXT@133..143 "not a link"
-      EscapedChar@143..144 "]"
-      TEXT@144..149 "(url)"
-      NEWLINE@149..150 "\n"
-    BlankLine@150..151
-      BlankLine@150..151 "\n"
-    PARAGRAPH@151..179
-      TEXT@151..168 "Escaped dollars: "
-      EscapedChar@168..169 "$"
-      TEXT@169..177 "not math"
-      EscapedChar@177..178 "$"
-      NEWLINE@178..179 "\n"
-    BlankLine@179..180
-      BlankLine@179..180 "\n"
-    PARAGRAPH@180..204
-      TEXT@180..198 "Backslash itself: "
-      EscapedChar@198..199 "\\"
-      TEXT@199..203 "text"
-      NEWLINE@203..204 "\n"
-    BlankLine@204..205
-      BlankLine@204..205 "\n"
-    PARAGRAPH@205..228
-      TEXT@205..215 "Multiple: "
-      EscapedChar@215..216 "*"
-      EscapedChar@216..217 "*"
-      TEXT@217..225 "not bold"
-      EscapedChar@225..226 "*"
-      EscapedChar@226..227 "*"
-      NEWLINE@227..228 "\n"
+      EscapedChar@30..32 "\\*"
+      TEXT@32..44 "not emphasis"
+      EscapedChar@44..46 "\\*"
+      NEWLINE@46..47 "\n"
+    BlankLine@47..48
+      BlankLine@47..48 "\n"
+    PARAGRAPH@48..86
+      TEXT@48..69 "Escaped underscores: "
+      EscapedChar@69..71 "\\_"
+      TEXT@71..83 "not emphasis"
+      EscapedChar@83..85 "\\_"
+      NEWLINE@85..86 "\n"
+    BlankLine@86..87
+      BlankLine@86..87 "\n"
+    PARAGRAPH@87..119
+      TEXT@87..106 "Escaped backticks: "
+      EscapedChar@106..108 "\\`"
+      TEXT@108..116 "not code"
+      EscapedChar@116..118 "\\`"
+      NEWLINE@118..119 "\n"
+    BlankLine@119..120
+      BlankLine@119..120 "\n"
+    PARAGRAPH@120..158
+      TEXT@120..138 "Escaped brackets: "
+      EscapedChar@138..140 "\\["
+      TEXT@140..150 "not a link"
+      EscapedChar@150..152 "\\]"
+      TEXT@152..157 "(url)"
+      NEWLINE@157..158 "\n"
+    BlankLine@158..159
+      BlankLine@158..159 "\n"
+    PARAGRAPH@159..189
+      TEXT@159..176 "Escaped dollars: "
+      EscapedChar@176..178 "\\$"
+      TEXT@178..186 "not math"
+      EscapedChar@186..188 "\\$"
+      NEWLINE@188..189 "\n"
+    BlankLine@189..190
+      BlankLine@189..190 "\n"
+    PARAGRAPH@190..215
+      TEXT@190..208 "Backslash itself: "
+      EscapedChar@208..210 "\\\\"
+      TEXT@210..214 "text"
+      NEWLINE@214..215 "\n"
+    BlankLine@215..216
+      BlankLine@215..216 "\n"
+    PARAGRAPH@216..243
+      TEXT@216..226 "Multiple: "
+      EscapedChar@226..228 "\\*"
+      EscapedChar@228..230 "\\*"
+      TEXT@230..238 "not bold"
+      EscapedChar@238..240 "\\*"
+      EscapedChar@240..242 "\\*"
+      NEWLINE@242..243 "\n"
 

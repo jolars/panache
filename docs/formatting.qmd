@@ -132,7 +132,7 @@ Fenced code blocks are formatted consistently:
 ````markdown
 ```python
 def hello():
-print("Hello")
+    print("Hello")
 ```
 ````
 

@@ -1,75 +1,75 @@
-ROOT@0..702
-  DOCUMENT@0..702
+ROOT@0..693
+  DOCUMENT@0..693
     PARAGRAPH@0..22
       TEXT@0..21 "A simple bullet list:"
       NEWLINE@21..22 "\n"
     BlankLine@22..23
       BlankLine@22..23 "\n"
-    List@23..130
-      ListItem@23..37
+    List@23..127
+      ListItem@23..36
         ListMarker@23..24 "*"
         WHITESPACE@24..25 " "
-        TEXT@25..36 "First item\n"
-        NEWLINE@36..37 "\n"
-      ListItem@37..116
-        ListMarker@37..38 "*"
-        WHITESPACE@38..39 " "
-        TEXT@39..115 "Second item with a lo ..."
-        NEWLINE@115..116 "\n"
-      ListItem@116..130
-        ListMarker@116..117 "*"
-        WHITESPACE@117..118 " "
-        TEXT@118..129 "Third item\n"
-        NEWLINE@129..130 "\n"
-    BlankLine@130..131
-      BlankLine@130..131 "\n"
-    PARAGRAPH@131..167
-      TEXT@131..166 "Another list with dif ..."
-      NEWLINE@166..167 "\n"
-    BlankLine@167..168
-      BlankLine@167..168 "\n"
-    List@168..702
-      ListItem@168..180
-        ListMarker@168..169 "-"
-        WHITESPACE@169..170 " "
-        TEXT@170..179 "Item one\n"
-        NEWLINE@179..180 "\n"
-      ListItem@180..192
-        ListMarker@180..181 "-"
-        WHITESPACE@181..182 " "
-        TEXT@182..191 "Item two\n"
-        NEWLINE@191..192 "\n"
-      BlankLine@192..193
-        BlankLine@192..193 "\n"
-      ListItem@193..329
-        ListMarker@193..194 "-"
-        WHITESPACE@194..197 "   "
-        TEXT@197..269 "A function has a name ..."
-        NEWLINE@269..270 "\n"
-        PARAGRAPH@270..329
-          TEXT@270..328 "and when called it ev ..."
-          NEWLINE@328..329 "\n"
-      ListItem@329..461
-        ListMarker@329..330 "-"
-        WHITESPACE@330..333 "   "
-        TEXT@333..407 "The function returns  ..."
-        NEWLINE@407..408 "\n"
-        PARAGRAPH@408..461
-          TEXT@408..460 "when the body contain ..."
-          NEWLINE@460..461 "\n"
-      ListItem@461..623
-        ListMarker@461..462 "-"
-        WHITESPACE@462..465 "   "
-        TEXT@465..532 "Formal arguments can  ..."
-        NEWLINE@532..533 "\n"
-        PARAGRAPH@533..623
-          TEXT@533..610 "implemented, and argu ..."
-          NEWLINE@610..611 "\n"
-          TEXT@611..622 "as by name."
-          NEWLINE@622..623 "\n"
-      ListItem@623..702
-        ListMarker@623..624 "-"
-        WHITESPACE@624..627 "   "
-        TEXT@627..701 "Functions should do a ..."
-        NEWLINE@701..702 "\n"
+        TEXT@25..35 "First item"
+        NEWLINE@35..36 "\n"
+      ListItem@36..114
+        ListMarker@36..37 "*"
+        WHITESPACE@37..38 " "
+        TEXT@38..113 "Second item with a lo ..."
+        NEWLINE@113..114 "\n"
+      ListItem@114..127
+        ListMarker@114..115 "*"
+        WHITESPACE@115..116 " "
+        TEXT@116..126 "Third item"
+        NEWLINE@126..127 "\n"
+    BlankLine@127..128
+      BlankLine@127..128 "\n"
+    PARAGRAPH@128..164
+      TEXT@128..163 "Another list with dif ..."
+      NEWLINE@163..164 "\n"
+    BlankLine@164..165
+      BlankLine@164..165 "\n"
+    List@165..693
+      ListItem@165..176
+        ListMarker@165..166 "-"
+        WHITESPACE@166..167 " "
+        TEXT@167..175 "Item one"
+        NEWLINE@175..176 "\n"
+      ListItem@176..187
+        ListMarker@176..177 "-"
+        WHITESPACE@177..178 " "
+        TEXT@178..186 "Item two"
+        NEWLINE@186..187 "\n"
+      BlankLine@187..188
+        BlankLine@187..188 "\n"
+      ListItem@188..323
+        ListMarker@188..189 "-"
+        WHITESPACE@189..192 "   "
+        TEXT@192..263 "A function has a name ..."
+        NEWLINE@263..264 "\n"
+        PARAGRAPH@264..323
+          TEXT@264..322 "and when called it ev ..."
+          NEWLINE@322..323 "\n"
+      ListItem@323..454
+        ListMarker@323..324 "-"
+        WHITESPACE@324..327 "   "
+        TEXT@327..400 "The function returns  ..."
+        NEWLINE@400..401 "\n"
+        PARAGRAPH@401..454
+          TEXT@401..453 "when the body contain ..."
+          NEWLINE@453..454 "\n"
+      ListItem@454..615
+        ListMarker@454..455 "-"
+        WHITESPACE@455..458 "   "
+        TEXT@458..524 "Formal arguments can  ..."
+        NEWLINE@524..525 "\n"
+        PARAGRAPH@525..615
+          TEXT@525..602 "implemented, and argu ..."
+          NEWLINE@602..603 "\n"
+          TEXT@603..614 "as by name."
+          NEWLINE@614..615 "\n"
+      ListItem@615..693
+        ListMarker@615..616 "-"
+        WHITESPACE@616..619 "   "
+        TEXT@619..692 "Functions should do a ..."
+        NEWLINE@692..693 "\n"
 

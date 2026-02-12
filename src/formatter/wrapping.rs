@@ -81,9 +81,12 @@ pub(super) fn build_words<'a>(
                     SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BlankLine => {
                         b.pending_space = true;
                     }
+                    // Skip blockquote markers - they're in the tree for losslessness but
+                    // the formatter adds them dynamically when formatting BlockQuote nodes
+                    SyntaxKind::BlockQuoteMarker => {}
                     SyntaxKind::EscapedChar => {
-                        let escaped = format!("\\{}", t.text());
-                        b.push_piece(&escaped);
+                        // Token already includes backslash (e.g., "\*")
+                        b.push_piece(t.text());
                     }
                     SyntaxKind::EmphasisMarker | SyntaxKind::StrongMarker => {
                         // Skip original markers - we'll add normalized ones

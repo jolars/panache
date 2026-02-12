@@ -1,6 +1,6 @@
-ROOT@0..236
-  DOCUMENT@0..236
-    SimpleTable@0..236
+ROOT@0..243
+  DOCUMENT@0..243
+    SimpleTable@0..243
       TableHeader@0..40
         TEXT@0..39 "  Right     Left      ..."
         NEWLINE@39..40 "\n"
@@ -18,7 +18,8 @@ ROOT@0..236
         NEWLINE@196..197 "\n"
       BlankLine@197..198
         BlankLine@197..198 "\n"
-      TableCaption@198..236
-        TEXT@198..235 "Demonstration of simp ..."
-        NEWLINE@235..236 "\n"
+      TableCaption@198..243
+        TableCaptionPrefix@198..205 "Table: "
+        TEXT@205..242 "Demonstration of simp ..."
+        NEWLINE@242..243 "\n"
 

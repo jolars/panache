@@ -459,8 +459,13 @@ pub(crate) fn parse_fenced_code_block(
     // Opening fence
     let first_line = lines[start_pos];
     let (_, first_inner) = count_blockquote_markers(first_line);
-    // Strip base indent (footnote context)
+
+    // For lossless parsing: emit the base indent before stripping it
     let first_stripped = if base_indent > 0 && first_inner.len() >= base_indent {
+        let indent_str = &first_inner[..base_indent];
+        if !indent_str.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
         &first_inner[base_indent..]
     } else {
         first_inner
@@ -472,14 +477,26 @@ pub(crate) fn parse_fenced_code_block(
         SyntaxKind::CodeFenceMarker.into(),
         &first_trimmed[..fence.fence_count],
     );
-    if !fence.info_string.is_empty() {
+
+    // Emit any space between fence and info string (for losslessness)
+    let after_fence = &first_trimmed[fence.fence_count..];
+    if let Some(_space_stripped) = after_fence.strip_prefix(' ') {
+        // There was a space - emit it as WHITESPACE
+        builder.token(SyntaxKind::WHITESPACE.into(), " ");
+        // The info_string should match what comes after the space
+        if !fence.info_string.is_empty() {
+            builder.token(SyntaxKind::CodeInfo.into(), &fence.info_string);
+        }
+    } else if !fence.info_string.is_empty() {
+        // No space - emit info_string directly
         builder.token(SyntaxKind::CodeInfo.into(), &fence.info_string);
     }
+
     builder.token(SyntaxKind::NEWLINE.into(), "\n");
     builder.finish_node(); // CodeFenceOpen
 
     let mut current_pos = start_pos + 1;
-    let mut content_lines: Vec<&str> = Vec::new();
+    let mut content_lines: Vec<&str> = Vec::new(); // Store original lines for lossless parsing
     let mut found_closing = false;
 
     while current_pos < lines.len() {
@@ -493,7 +510,7 @@ pub(crate) fn parse_fenced_code_block(
             break;
         }
 
-        // Strip base indent (footnote context) from content lines
+        // Strip base indent (footnote context) from content lines for fence detection
         let inner_stripped = if base_indent > 0 && inner.len() >= base_indent {
             &inner[base_indent..]
         } else {
@@ -507,7 +524,8 @@ pub(crate) fn parse_fenced_code_block(
             break;
         }
 
-        content_lines.push(inner_stripped);
+        // Store the ORIGINAL inner line (after blockquote strip only) for lossless parsing
+        content_lines.push(inner);
         current_pos += 1;
     }
 
@@ -515,12 +533,27 @@ pub(crate) fn parse_fenced_code_block(
     if !content_lines.is_empty() {
         builder.start_node(SyntaxKind::CodeContent.into());
         for content_line in content_lines.iter() {
+            // Emit base indent for lossless parsing (if present in original line)
+            if base_indent > 0 && content_line.len() >= base_indent {
+                let indent_str = &content_line[..base_indent];
+                if !indent_str.is_empty() {
+                    builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+                }
+            }
+
+            // Get the content after base indent
+            let after_indent = if base_indent > 0 && content_line.len() >= base_indent {
+                &content_line[base_indent..]
+            } else {
+                content_line
+            };
+
             // Split off trailing newline if present (from split_inclusive)
             let (line_without_newline, has_newline) =
-                if let Some(stripped) = content_line.strip_suffix('\n') {
+                if let Some(stripped) = after_indent.strip_suffix('\n') {
                     (stripped, true)
                 } else {
-                    (*content_line, false)
+                    (after_indent, false)
                 };
 
             if !line_without_newline.is_empty() {
@@ -538,7 +571,16 @@ pub(crate) fn parse_fenced_code_block(
     if found_closing {
         let closing_line = lines[current_pos - 1];
         let (_, closing_inner) = count_blockquote_markers(closing_line);
-        // Strip base indent
+
+        // Emit base indent for lossless parsing
+        if base_indent > 0 && closing_inner.len() >= base_indent {
+            let indent_str = &closing_inner[..base_indent];
+            if !indent_str.is_empty() {
+                builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+            }
+        }
+
+        // Strip base indent to get fence
         let closing_stripped = if base_indent > 0 && closing_inner.len() >= base_indent {
             &closing_inner[base_indent..]
         } else {

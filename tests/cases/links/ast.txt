@@ -1,7 +1,7 @@
-ROOT@0..124
-  DOCUMENT@0..124
-    PARAGRAPH@0..124
-      Link@0..116
+ROOT@0..122
+  DOCUMENT@0..122
+    PARAGRAPH@0..122
+      Link@0..114
         LinkStart@0..1
           LinkStart@0..1 "["
         LinkText@1..76
@@ -15,9 +15,9 @@ ROOT@0..124
         LinkDest@78..102
           TEXT@78..102 "../images/networkfig.png"
         TEXT@102..103 ")"
-        Attribute@103..116
-          Attribute@103..116 "{width=\"70%\"}"
-      NEWLINE@116..117 "\n"
-      TEXT@117..123 "A word"
-      NEWLINE@123..124 "\n"
+        Attribute@103..114
+          Attribute@103..114 "{width=70%}"
+      NEWLINE@114..115 "\n"
+      TEXT@115..121 "A word"
+      NEWLINE@121..122 "\n"
 

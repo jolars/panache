@@ -264,26 +264,53 @@ fn emit_table_caption(
 
     for (i, line) in lines[start..end].iter().enumerate() {
         if i == 0 {
-            // First line - strip the caption prefix
-            if let Some((_prefix_len, caption_text)) = try_parse_caption_prefix(line) {
-                let content = caption_text.trim();
-                if !content.is_empty() {
-                    builder.token(SyntaxKind::TEXT.into(), content);
+            // First line - parse and emit prefix separately
+            let trimmed = line.trim_start();
+            let leading_ws_len = line.len() - trimmed.len();
+
+            // Emit leading whitespace if present
+            if leading_ws_len > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &line[..leading_ws_len]);
+            }
+
+            // Check for caption prefix and emit separately
+            // Calculate where the prefix ends (after trimmed content)
+            let prefix_and_rest = if line.ends_with('\n') {
+                &line[leading_ws_len..line.len() - 1] // Exclude newline
+            } else {
+                &line[leading_ws_len..]
+            };
+
+            let (prefix_len, prefix_text) = if prefix_and_rest.starts_with("Table: ") {
+                (7, "Table: ")
+            } else if prefix_and_rest.starts_with("table: ") {
+                (7, "table: ")
+            } else if prefix_and_rest.starts_with(": ") {
+                (2, ": ")
+            } else if prefix_and_rest.starts_with(':') {
+                (1, ":")
+            } else {
+                (0, "")
+            };
+
+            if prefix_len > 0 {
+                builder.token(SyntaxKind::TableCaptionPrefix.into(), prefix_text);
+
+                // Emit rest of line after prefix
+                let rest_start = leading_ws_len + prefix_len;
+                if rest_start < line.len() {
+                    emit_line_tokens(builder, &line[rest_start..]);
                 }
+            } else {
+                // No recognized prefix, emit whole trimmed line
+                emit_line_tokens(builder, &line[leading_ws_len..]);
             }
         } else {
             // Continuation lines
-            let content = line.trim();
-            if !content.is_empty() {
-                if i > 0 {
-                    builder.token(SyntaxKind::TEXT.into(), " ");
-                }
-                builder.token(SyntaxKind::TEXT.into(), content);
-            }
+            emit_line_tokens(builder, line);
         }
     }
 
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
     builder.finish_node();
 }
 
@@ -652,8 +679,7 @@ pub(crate) fn try_parse_pipe_table(
 
     // Emit header row
     builder.start_node(SyntaxKind::TableHeader.into());
-    builder.token(SyntaxKind::TEXT.into(), header_line);
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    emit_line_tokens(builder, header_line);
     builder.finish_node();
 
     // Emit separator
@@ -1121,8 +1147,7 @@ pub(crate) fn try_parse_grid_table(
                 if !past_header_sep {
                     // This is the header/body separator
                     builder.start_node(SyntaxKind::TableSeparator.into());
-                    builder.token(SyntaxKind::TEXT.into(), line);
-                    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    emit_line_tokens(builder, line);
                     builder.finish_node();
                     past_header_sep = true;
                 } else {
@@ -1131,15 +1156,13 @@ pub(crate) fn try_parse_grid_table(
                         in_footer_section = true;
                     }
                     builder.start_node(SyntaxKind::TableSeparator.into());
-                    builder.token(SyntaxKind::TEXT.into(), line);
-                    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    emit_line_tokens(builder, line);
                     builder.finish_node();
                 }
             } else {
                 // Regular separator
                 builder.start_node(SyntaxKind::TableSeparator.into());
-                builder.token(SyntaxKind::TEXT.into(), line);
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                emit_line_tokens(builder, line);
                 builder.finish_node();
             }
         } else if is_grid_content_row(line) {
@@ -1153,8 +1176,7 @@ pub(crate) fn try_parse_grid_table(
             };
 
             builder.start_node(row_kind.into());
-            builder.token(SyntaxKind::TEXT.into(), line);
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            emit_line_tokens(builder, line);
             builder.finish_node();
         }
     }
@@ -1525,8 +1547,7 @@ pub(crate) fn try_parse_multiline_table(
 
     // Emit opening separator
     builder.start_node(SyntaxKind::TableSeparator.into());
-    builder.token(SyntaxKind::TEXT.into(), lines[start_pos]);
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    emit_line_tokens(builder, lines[start_pos]);
     builder.finish_node();
 
     // Track state for emitting
@@ -1543,8 +1564,7 @@ pub(crate) fn try_parse_multiline_table(
             }
 
             builder.start_node(SyntaxKind::TableSeparator.into());
-            builder.token(SyntaxKind::TEXT.into(), line);
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            emit_line_tokens(builder, line);
             builder.finish_node();
             in_header = false;
             continue;
@@ -1564,8 +1584,7 @@ pub(crate) fn try_parse_multiline_table(
             }
 
             builder.start_node(SyntaxKind::TableSeparator.into());
-            builder.token(SyntaxKind::TEXT.into(), line);
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            emit_line_tokens(builder, line);
             builder.finish_node();
             continue;
         }
@@ -1630,8 +1649,7 @@ pub(crate) fn try_parse_multiline_table(
 fn emit_multiline_row(builder: &mut GreenNodeBuilder<'static>, lines: &[&str], kind: SyntaxKind) {
     builder.start_node(kind.into());
     for line in lines {
-        builder.token(SyntaxKind::TEXT.into(), line);
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        emit_line_tokens(builder, line);
     }
     builder.finish_node();
 }

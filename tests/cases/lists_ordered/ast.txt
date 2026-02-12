@@ -1,42 +1,42 @@
-ROOT@0..130
-  DOCUMENT@0..130
+ROOT@0..125
+  DOCUMENT@0..125
     PARAGRAPH@0..17
       TEXT@0..16 "An ordered list:"
       NEWLINE@16..17 "\n"
     BlankLine@17..18
       BlankLine@17..18 "\n"
-    List@18..64
-      ListItem@18..33
+    List@18..61
+      ListItem@18..32
         ListMarker@18..20 "1."
         WHITESPACE@20..21 " "
-        TEXT@21..32 "First item\n"
-        NEWLINE@32..33 "\n"
-      ListItem@33..49
-        ListMarker@33..35 "2."
-        WHITESPACE@35..36 " "
-        TEXT@36..48 "Second item\n"
-        NEWLINE@48..49 "\n"
-      ListItem@49..64
-        ListMarker@49..51 "3."
-        WHITESPACE@51..52 " "
-        TEXT@52..63 "Third item\n"
-        NEWLINE@63..64 "\n"
-    BlankLine@64..65
-      BlankLine@64..65 "\n"
-    PARAGRAPH@65..85
-      TEXT@65..84 "Using hash markers:"
-      NEWLINE@84..85 "\n"
-    BlankLine@85..86
-      BlankLine@85..86 "\n"
-    List@86..130
-      ListItem@86..108
-        ListMarker@86..88 "#."
-        WHITESPACE@88..89 " "
-        TEXT@89..107 "Auto-numbered one\n"
-        NEWLINE@107..108 "\n"
-      ListItem@108..130
-        ListMarker@108..110 "#."
-        WHITESPACE@110..111 " "
-        TEXT@111..129 "Auto-numbered two\n"
-        NEWLINE@129..130 "\n"
+        TEXT@21..31 "First item"
+        NEWLINE@31..32 "\n"
+      ListItem@32..47
+        ListMarker@32..34 "2."
+        WHITESPACE@34..35 " "
+        TEXT@35..46 "Second item"
+        NEWLINE@46..47 "\n"
+      ListItem@47..61
+        ListMarker@47..49 "3."
+        WHITESPACE@49..50 " "
+        TEXT@50..60 "Third item"
+        NEWLINE@60..61 "\n"
+    BlankLine@61..62
+      BlankLine@61..62 "\n"
+    PARAGRAPH@62..82
+      TEXT@62..81 "Using hash markers:"
+      NEWLINE@81..82 "\n"
+    BlankLine@82..83
+      BlankLine@82..83 "\n"
+    List@83..125
+      ListItem@83..104
+        ListMarker@83..85 "#."
+        WHITESPACE@85..86 " "
+        TEXT@86..103 "Auto-numbered one"
+        NEWLINE@103..104 "\n"
+      ListItem@104..125
+        ListMarker@104..106 "#."
+        WHITESPACE@106..107 " "
+        TEXT@107..124 "Auto-numbered two"
+        NEWLINE@124..125 "\n"
 

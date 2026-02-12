@@ -14,7 +14,8 @@ cargo install panache
 
 ### Pre-built Binaries
 
-Download platform-specific binaries from the [releases page](https://github.com/jolars/panache/releases):
+Download platform-specific binaries from the [releases
+page](https://github.com/jolars/panache/releases):
 
 - **Linux**: x86_64 and ARM64 (available as `.deb`, `.rpm`, or `.tar.gz`)
 - **macOS**: Intel and Apple Silicon (`.tar.gz`)
@@ -84,7 +85,8 @@ panache format < document.qmd
 
 ### Check Formatting
 
-Check if a file is already formatted (exits with non-zero code if changes needed):
+Check if a file is already formatted (exits with non-zero code if changes
+needed):
 
 ```bash
 panache format --check document.qmd
@@ -130,12 +132,15 @@ See the [Configuration](configuration.qmd) guide for all options.
 
 ## Next Steps
 
-- **Configure panache**: See [Configuration](configuration.qmd) for detailed options
+- **Configure panache**: See [Configuration](configuration.qmd) for detailed
+  options
 - **Set up editor integration**: See [LSP](lsp.qmd) for Language Server setup
 - **Learn formatting rules**: See [Formatting](formatting.qmd) for examples
 - **Explore CLI options**: See [CLI Reference](cli.qmd) for all commands
 
 ## Getting Help
 
-- **GitHub Issues**: [github.com/jolars/panache/issues](https://github.com/jolars/panache/issues)
-- **Discussions**: [github.com/jolars/panache/discussions](https://github.com/jolars/panache/discussions)
+- **GitHub Issues**:
+  [github.com/jolars/panache/issues](https://github.com/jolars/panache/issues)
+- **Discussions**:
+  [github.com/jolars/panache/discussions](https://github.com/jolars/panache/discussions)

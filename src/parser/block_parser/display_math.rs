@@ -115,11 +115,20 @@ pub(crate) fn parse_display_math_block(
 
     builder.token(SyntaxKind::BlockMathMarker.into(), opening_marker);
 
+    // For lossless parsing: check if there's content on the same line as the marker
+    // Content is anything after the marker that's not just whitespace
+    let content_on_same_line = !first_line_content.trim().is_empty();
+
+    // If content is NOT on the same line, emit newline (if present in original)
+    if !content_on_same_line && first_line_content.ends_with('\n') {
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    }
+
     let mut current_pos = start_pos + 1;
     let mut content_lines: Vec<&str> = Vec::new();
 
-    // Add first line content if present (for \[ with content on same line)
-    if !first_line_content.trim().is_empty() {
+    // Add first line content if present (for content on same line as opening)
+    if content_on_same_line {
         content_lines.push(first_line_content);
     }
 
@@ -153,14 +162,25 @@ pub(crate) fn parse_display_math_block(
         current_pos += 1;
     }
 
-    // Add content
+    // Add content - preserve original structure with newlines
     if !content_lines.is_empty() {
         builder.start_node(SyntaxKind::MathContent.into());
-        for (i, content_line) in content_lines.iter().enumerate() {
-            if i > 0 {
+        for content_line in content_lines.iter() {
+            // Split off trailing newline if present (from split_inclusive)
+            let (text_without_newline, has_newline) =
+                if let Some(stripped) = content_line.strip_suffix('\n') {
+                    (stripped, true)
+                } else {
+                    (*content_line, false)
+                };
+
+            if !text_without_newline.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), text_without_newline);
+            }
+
+            if has_newline {
                 builder.token(SyntaxKind::NEWLINE.into(), "\n");
             }
-            builder.token(SyntaxKind::TEXT.into(), content_line);
         }
         builder.finish_node(); // MathContent
     }
@@ -180,6 +200,11 @@ pub(crate) fn parse_display_math_block(
         };
 
         builder.token(SyntaxKind::BlockMathMarker.into(), closing_marker);
+
+        // Emit newline after closing marker if present
+        if closing_line.ends_with('\n') {
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        }
     }
 
     builder.finish_node(); // MathBlock

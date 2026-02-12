@@ -58,9 +58,13 @@ pub(crate) fn try_parse_yaml_block(
     // Start metadata node
     builder.start_node(SyntaxKind::YamlMetadata.into());
 
-    // Opening delimiter
-    builder.token(SyntaxKind::YamlMetadataDelim.into(), line.trim());
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    // Opening delimiter - strip newline before emitting
+    if let Some(text) = line.strip_suffix('\n') {
+        builder.token(SyntaxKind::YamlMetadataDelim.into(), text.trim());
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    } else {
+        builder.token(SyntaxKind::YamlMetadataDelim.into(), line.trim());
+    }
 
     let mut current_pos = pos + 1;
     let mut found_closing = false;
@@ -72,8 +76,12 @@ pub(crate) fn try_parse_yaml_block(
         // Check for closing delimiter
         if content_line.trim() == "---" || content_line.trim() == "..." {
             found_closing = true;
-            builder.token(SyntaxKind::YamlMetadataDelim.into(), content_line.trim());
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            if let Some(text) = content_line.strip_suffix('\n') {
+                builder.token(SyntaxKind::YamlMetadataDelim.into(), text.trim());
+                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            } else {
+                builder.token(SyntaxKind::YamlMetadataDelim.into(), content_line.trim());
+            }
             current_pos += 1;
             break;
         }

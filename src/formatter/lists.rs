@@ -215,16 +215,17 @@ impl Formatter {
         let mut marker = String::new();
         let mut original_marker = String::new(); // Track original for word removal
         let mut checkbox = None;
-        let mut local_indent = 0;
-        let mut content_start = false;
+        // NOTE: We ignore WHITESPACE tokens for list indentation calculation.
+        // The WHITESPACE tokens are emitted by the parser for losslessness, but the
+        // formatter should use the `indent` parameter (which represents nesting level)
+        // to determine output indentation, not the source indentation from WHITESPACE tokens.
 
         for el in node.children_with_tokens() {
-            match el {
-                NodeOrToken::Token(t) => match t.kind() {
+            if let NodeOrToken::Token(t) = el {
+                match t.kind() {
                     SyntaxKind::WHITESPACE => {
-                        if !content_start {
-                            local_indent += t.text().len();
-                        }
+                        // Skip - we don't accumulate source indentation
+                        // The `indent` parameter determines output indentation
                     }
                     SyntaxKind::ListMarker => {
                         let raw_marker = t.text().to_string();
@@ -237,17 +238,11 @@ impl Formatter {
                         } else {
                             raw_marker
                         };
-                        content_start = true;
                     }
                     SyntaxKind::TaskCheckbox => {
                         checkbox = Some(t.text().to_string());
                     }
-                    _ => {
-                        content_start = true;
-                    }
-                },
-                _ => {
-                    content_start = true;
+                    _ => {}
                 }
             }
         }
@@ -286,7 +281,7 @@ impl Formatter {
                 (0, spaces)
             };
 
-        let total_indent = indent + local_indent;
+        let total_indent = indent;
 
         // Calculate checkbox width if present (checkbox + space after)
         let checkbox_width = if let Some(ref cb) = checkbox {

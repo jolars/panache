@@ -141,6 +141,7 @@ pub enum SyntaxKind {
     TableRow,
     TableCell,
     TableCaption,
+    TableCaptionPrefix, // "Table: ", "table: ", or ": "
 
     // Code block parts
     CodeFenceOpen,

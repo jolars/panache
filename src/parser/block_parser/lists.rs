@@ -566,6 +566,11 @@ pub(crate) fn emit_list_item(
 ) -> usize {
     builder.start_node(SyntaxKind::ListItem.into());
 
+    // Emit leading indentation for lossless parsing
+    if indent_bytes > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &content[..indent_bytes]);
+    }
+
     let marker_text = &content[indent_bytes..indent_bytes + marker_len];
     builder.token(SyntaxKind::ListMarker.into(), marker_text);
 
@@ -586,32 +591,50 @@ pub(crate) fn emit_list_item(
     if content_start < content.len() {
         let remaining = &content[content_start..];
 
-        // Check if this is a task list item (starts with [ ] or [x] or [X])
-        let trimmed = remaining.trim_start();
-        if trimmed.starts_with('[')
-            && trimmed.len() >= 3
-            && matches!(trimmed.chars().nth(1), Some(' ') | Some('x') | Some('X'))
-            && trimmed.chars().nth(2) == Some(']')
-        {
-            // Emit leading whitespace before checkbox if any
-            let leading_ws_len = remaining.len() - trimmed.len();
-            if leading_ws_len > 0 {
-                builder.token(SyntaxKind::WHITESPACE.into(), &remaining[..leading_ws_len]);
-            }
-
-            // Emit the checkbox as a token
-            builder.token(SyntaxKind::TaskCheckbox.into(), &trimmed[..3]);
-
-            // Emit the rest as TEXT
-            if trimmed.len() > 3 {
-                builder.token(SyntaxKind::TEXT.into(), &trimmed[3..]);
-            }
+        // Strip trailing newline from remaining text (it will be emitted separately)
+        let (text_part, has_newline) = if let Some(text) = remaining.strip_suffix('\n') {
+            (text, true)
         } else {
-            // Not a task list, emit as normal TEXT
-            builder.token(SyntaxKind::TEXT.into(), remaining);
+            (remaining, false)
+        };
+
+        if !text_part.is_empty() {
+            // Check if this is a task list item (starts with [ ] or [x] or [X])
+            let trimmed = text_part.trim_start();
+            if trimmed.starts_with('[')
+                && trimmed.len() >= 3
+                && matches!(trimmed.chars().nth(1), Some(' ') | Some('x') | Some('X'))
+                && trimmed.chars().nth(2) == Some(']')
+            {
+                // Emit leading whitespace before checkbox if any
+                let leading_ws_len = text_part.len() - trimmed.len();
+                if leading_ws_len > 0 {
+                    builder.token(SyntaxKind::WHITESPACE.into(), &text_part[..leading_ws_len]);
+                }
+
+                // Emit the checkbox as a token
+                builder.token(SyntaxKind::TaskCheckbox.into(), &trimmed[..3]);
+
+                // Emit the rest as TEXT
+                if trimmed.len() > 3 {
+                    builder.token(SyntaxKind::TEXT.into(), &trimmed[3..]);
+                }
+            } else {
+                // Not a task list, emit as normal TEXT
+                builder.token(SyntaxKind::TEXT.into(), text_part);
+            }
+        }
+
+        // Emit newline token separately if present
+        if has_newline {
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        }
+    } else {
+        // Empty content but line has newline
+        if content.ends_with('\n') {
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
         }
     }
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
 
     content_col
 }
@@ -788,9 +811,21 @@ pub(crate) fn try_parse_list(
         let content_col = info.indent_cols + info.marker_len + ws_cols;
         let content_start = info.indent_bytes + info.marker_len + info.spaces_after;
         if content_start < line.len() {
-            builder.token(SyntaxKind::TEXT.into(), &line[content_start..]);
+            let remaining = &line[content_start..];
+            // Strip trailing newline from remaining text (it will be emitted separately)
+            if let Some(text) = remaining.strip_suffix('\n') {
+                if !text.is_empty() {
+                    builder.token(SyntaxKind::TEXT.into(), text);
+                }
+                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            } else {
+                // No trailing newline (last line of input)
+                builder.token(SyntaxKind::TEXT.into(), remaining);
+            }
+        } else if line.ends_with('\n') {
+            // Empty content but line has newline
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
         }
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
 
         item_stack.push(ItemCtx {
             content_col,

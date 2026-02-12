@@ -1,5 +1,5 @@
-ROOT@0..253
-  DOCUMENT@0..253
+ROOT@0..255
+  DOCUMENT@0..255
     Heading@0..13
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
@@ -60,10 +60,10 @@ ROOT@0..253
       NEWLINE@214..215 "\n"
     BlankLine@215..216
       BlankLine@215..216 "\n"
-    PARAGRAPH@216..253
+    PARAGRAPH@216..255
       TEXT@216..242 "Escaped backtick outs ..."
-      EscapedChar@242..243 "`"
-      TEXT@243..251 "not code"
-      EscapedChar@251..252 "`"
-      NEWLINE@252..253 "\n"
+      EscapedChar@242..244 "\\`"
+      TEXT@244..252 "not code"
+      EscapedChar@252..254 "\\`"
+      NEWLINE@254..255 "\n"
 

@@ -1,5 +1,5 @@
-ROOT@0..347
-  DOCUMENT@0..347
+ROOT@0..348
+  DOCUMENT@0..348
     YamlMetadata@0..99
       YamlMetadataDelim@0..3 "---"
       NEWLINE@3..4 "\n"
@@ -57,11 +57,12 @@ ROOT@0..347
       NEWLINE@314..315 "\n"
     BlankLine@315..316
       BlankLine@315..316 "\n"
-    HorizontalRule@316..319
+    HorizontalRule@316..320
       HorizontalRule@316..319 "---"
-    BlankLine@319..320
-      BlankLine@319..320 "\n"
-    PARAGRAPH@320..347
-      TEXT@320..346 "Para after horizontal ..."
-      NEWLINE@346..347 "\n"
+      NEWLINE@319..320 "\n"
+    BlankLine@320..321
+      BlankLine@320..321 "\n"
+    PARAGRAPH@321..348
+      TEXT@321..347 "Para after horizontal ..."
+      NEWLINE@347..348 "\n"
 

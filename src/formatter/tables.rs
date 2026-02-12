@@ -101,7 +101,26 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TableCaption => {
-                caption = Some(child.text().to_string().trim().to_string());
+                // Build normalized caption: "Table: " + caption text (without prefix)
+                let mut caption_text = String::from("Table: ");
+
+                for caption_child in child.children_with_tokens() {
+                    match caption_child {
+                        rowan::NodeOrToken::Token(token)
+                            if token.kind() == SyntaxKind::TableCaptionPrefix =>
+                        {
+                            // Skip the original prefix - we're adding normalized "Table: " above
+                        }
+                        rowan::NodeOrToken::Token(token) => {
+                            caption_text.push_str(token.text());
+                        }
+                        rowan::NodeOrToken::Node(node) => {
+                            caption_text.push_str(&node.text().to_string());
+                        }
+                    }
+                }
+
+                caption = Some(caption_text.trim().to_string());
                 caption_after = seen_separator; // After if we've seen separator/rows
             }
             SyntaxKind::TableSeparator => {
@@ -162,10 +181,10 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
     if let Some(ref caption_text) = table_data.caption
         && !table_data.caption_after
     {
-        output.push_str("Table: ");
+        // Caption text now includes the prefix (e.g., "Table: " or ": "),
+        // so just output it as-is
         output.push_str(caption_text);
-        output.push('\n');
-        output.push('\n');
+        output.push_str("\n\n"); // Blank line between caption and table
     }
 
     // Format rows
@@ -250,7 +269,7 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
         && table_data.caption_after
     {
         output.push('\n');
-        output.push_str("Table: ");
+        // Caption text now includes the prefix, so output as-is
         output.push_str(caption_text);
         output.push('\n');
     }

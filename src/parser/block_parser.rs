@@ -155,6 +155,54 @@ impl<'a> BlockParser<'a> {
         remaining
     }
 
+    /// Parse blockquote markers and return their positions.
+    /// Returns Vec of (leading_spaces, has_trailing_space) for each marker found.
+    fn parse_blockquote_marker_info(line: &str) -> Vec<(usize, bool)> {
+        let mut markers = Vec::new();
+        let mut remaining = line;
+
+        loop {
+            let bytes = remaining.as_bytes();
+            let mut i = 0;
+
+            // Count leading whitespace (up to 3 spaces before >)
+            let mut spaces = 0;
+            while i < bytes.len() && bytes[i] == b' ' && spaces < 3 {
+                spaces += 1;
+                i += 1;
+            }
+
+            // Check if there's a > marker
+            if i >= bytes.len() || bytes[i] != b'>' {
+                break;
+            }
+            i += 1; // skip '>'
+
+            // Check for optional space after >
+            let has_trailing_space = i < bytes.len() && bytes[i] == b' ';
+            if has_trailing_space {
+                i += 1;
+            }
+
+            markers.push((spaces, has_trailing_space));
+            remaining = &remaining[i..];
+        }
+
+        markers
+    }
+
+    /// Emit one blockquote marker with its whitespace.
+    fn emit_one_blockquote_marker(&mut self, leading_spaces: usize, has_trailing_space: bool) {
+        if leading_spaces > 0 {
+            self.builder
+                .token(SyntaxKind::WHITESPACE.into(), &" ".repeat(leading_spaces));
+        }
+        self.builder.token(SyntaxKind::BlockQuoteMarker.into(), ">");
+        if has_trailing_space {
+            self.builder.token(SyntaxKind::WHITESPACE.into(), " ");
+        }
+    }
+
     /// Close blockquotes down to a target depth.
     fn close_blockquotes_to_depth(&mut self, target_depth: usize) {
         let mut current = self.current_blockquote_depth();
@@ -196,11 +244,8 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
-            // Skip blank lines between terms and definitions in definition lists
-            if self.in_definition_item() && self.next_line_is_definition_marker() {
-                self.pos += 1;
-                return true;
-            }
+            // Note: Blank lines between terms and definitions are now preserved
+            // and emitted as part of the term parsing logic
 
             // For blank lines inside blockquotes, we need to handle them at the right depth
             // First, adjust blockquote depth if needed
@@ -260,6 +305,16 @@ impl<'a> BlockParser<'a> {
                 }
             }
 
+            // Emit blockquote markers for this blank line if inside blockquotes
+            if bq_depth > 0 {
+                let marker_info = Self::parse_blockquote_marker_info(line);
+                for i in 0..bq_depth {
+                    if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(i) {
+                        self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                    }
+                }
+            }
+
             self.builder.start_node(SyntaxKind::BlankLine.into());
             self.builder
                 .token(SyntaxKind::BlankLine.into(), inner_content);
@@ -300,6 +355,14 @@ impl<'a> BlockParser<'a> {
                 let content_at_current_depth =
                     self.strip_n_blockquote_markers(line, current_bq_depth);
 
+                // Emit blockquote markers for current depth (for losslessness)
+                let marker_info = Self::parse_blockquote_marker_info(line);
+                for i in 0..current_bq_depth {
+                    if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(i) {
+                        self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                    }
+                }
+
                 if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                     // Lazy continuation with the extra > as content
                     self.append_paragraph_line(content_at_current_depth);
@@ -320,15 +383,32 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
-            // Open blockquotes up to the required depth
-            for _ in current_bq_depth..bq_depth {
+            // Parse marker information for all levels
+            let marker_info = Self::parse_blockquote_marker_info(line);
+
+            // First, emit markers for existing blockquote levels (before opening new ones)
+            for level in 0..current_bq_depth {
+                if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(level) {
+                    self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                }
+            }
+
+            // Then open new blockquotes and emit their markers
+            for level in current_bq_depth..bq_depth {
                 self.builder.start_node(SyntaxKind::BlockQuote.into());
+
+                // Emit the marker for this new level
+                if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(level) {
+                    self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                }
+
                 self.containers
                     .push(Container::BlockQuote { content_col: 0 });
             }
 
             // Now parse the inner content
-            return self.parse_inner_content(inner_content);
+            // Pass inner_content as line_to_append since markers are already stripped
+            return self.parse_inner_content(inner_content, Some(inner_content));
         } else if bq_depth < current_bq_depth {
             // Need to close some blockquotes, but first check for lazy continuation
             // Lazy continuation: line without > continues content in a blockquote
@@ -374,13 +454,37 @@ impl<'a> BlockParser<'a> {
 
             // Parse the inner content at the new depth
             if bq_depth > 0 {
-                return self.parse_inner_content(inner_content);
+                // Emit markers at current depth before parsing content
+                let marker_info = Self::parse_blockquote_marker_info(line);
+                for i in 0..bq_depth {
+                    if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(i) {
+                        self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                    }
+                }
+                // Content with markers stripped - use inner_content for paragraph appending
+                return self.parse_inner_content(inner_content, Some(inner_content));
             } else {
-                return self.parse_inner_content(line);
+                // Not inside blockquotes - use original line
+                return self.parse_inner_content(line, None);
             }
         } else if bq_depth > 0 {
-            // Same blockquote depth - continue parsing inner content
-            return self.parse_inner_content(inner_content);
+            // Same blockquote depth - emit markers and continue parsing inner content
+
+            // Before emitting markers for a new line, close any line-level containers
+            // (ListItems should be closed when we see the next line)
+            if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                self.containers
+                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            }
+
+            let marker_info = Self::parse_blockquote_marker_info(line);
+            for i in 0..bq_depth {
+                if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(i) {
+                    self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                }
+            }
+            // Same blockquote depth - markers stripped, use inner_content for appending
+            return self.parse_inner_content(inner_content, Some(inner_content));
         }
 
         // No blockquote markers - parse as regular content
@@ -408,7 +512,8 @@ impl<'a> BlockParser<'a> {
             }
         }
 
-        self.parse_inner_content(line)
+        // No blockquote markers - use original line
+        self.parse_inner_content(line, None)
     }
 
     /// Compute how many container levels to keep open based on next line content.
@@ -513,20 +618,37 @@ impl<'a> BlockParser<'a> {
     }
 
     /// Parse content inside blockquotes (or at top level).
-    fn parse_inner_content(&mut self, content: &str) -> bool {
-        // Strip footnote indentation from all footnote containers in the stack
+    ///
+    /// `content` - The content to parse (may have indent/markers stripped)
+    /// `line_to_append` - Optional line to use when appending to paragraphs.
+    ///                    If None, uses self.lines[self.pos]
+    fn parse_inner_content(&mut self, content: &str, line_to_append: Option<&str>) -> bool {
+        // Calculate how much indentation should be stripped for content containers
+        // (definitions, footnotes), but don't strip it yet - we need to handle it
+        // carefully to preserve losslessness
         let content_indent = self.content_container_indent_to_strip();
-        let content = if content_indent > 0 {
+        let (stripped_content, indent_to_emit) = if content_indent > 0 {
             let (indent_cols, _) = leading_indent(content);
             if indent_cols >= content_indent {
                 let idx = byte_index_at_column(content, content_indent);
-                &content[idx..]
+                (&content[idx..], Some(&content[..idx]))
             } else {
-                content.trim_start()
+                // Line has less indent than required - preserve leading whitespace
+                let trimmed_start = content.trim_start();
+                let ws_len = content.len() - trimmed_start.len();
+                if ws_len > 0 {
+                    (trimmed_start, Some(&content[..ws_len]))
+                } else {
+                    (content, None)
+                }
             }
         } else {
-            content
+            (content, None)
         };
+
+        // Store the indent for later emission when starting new blocks
+        // (emitted for block elements like lists, not paragraph continuations)
+        let content = stripped_content;
 
         // Check for heading (needs blank line before, or at start of container)
         let has_blank_before = self.pos == 0
@@ -758,7 +880,7 @@ impl<'a> BlockParser<'a> {
 
         // Check for reference definition: [label]: url "title"
         // These can appear anywhere in the document
-        if let Some((len, label, url, title)) = try_parse_reference_definition(content) {
+        if let Some((_len, label, url, title)) = try_parse_reference_definition(content) {
             log::debug!(
                 "Parsed reference definition at line {}: [{}]",
                 self.pos,
@@ -766,10 +888,24 @@ impl<'a> BlockParser<'a> {
             );
             // Store in registry
             self.reference_registry.add(label, url, title);
-            // Emit as a node (optional - could skip emission)
+
+            // Emit as a node - preserve original text including newline
             self.builder
                 .start_node(SyntaxKind::ReferenceDefinition.into());
-            self.builder.token(SyntaxKind::TEXT.into(), &content[..len]);
+
+            // Get the full original line to preserve losslessness
+            let full_line = self.lines[self.pos];
+            let content_without_newline = full_line.trim_end_matches('\n');
+
+            // Emit the reference definition content
+            self.builder
+                .token(SyntaxKind::TEXT.into(), content_without_newline);
+
+            // Emit newline separately if present
+            if full_line.ends_with('\n') {
+                self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            }
+
             self.builder.finish_node();
             self.pos += 1;
             return true;
@@ -839,17 +975,92 @@ impl<'a> BlockParser<'a> {
             // Start FencedDiv node
             self.builder.start_node(SyntaxKind::FencedDiv.into());
 
-            // Emit opening fence
+            // Emit opening fence with attributes as child node to avoid duplication
             self.builder.start_node(SyntaxKind::DivFenceOpen.into());
-            self.builder.token(SyntaxKind::TEXT.into(), content);
-            self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
-            self.builder.finish_node(); // DivFenceOpen
 
-            // Store attributes as DivInfo
+            // Get original full line
+            let full_line = self.lines[self.pos];
+            let trimmed = full_line.trim_start();
+
+            // Emit leading whitespace if present
+            let leading_ws_len = full_line.len() - trimmed.len();
+            if leading_ws_len > 0 {
+                self.builder
+                    .token(SyntaxKind::WHITESPACE.into(), &full_line[..leading_ws_len]);
+            }
+
+            // Emit fence colons
+            let fence_str: String = ":".repeat(div_fence.fence_count);
+            self.builder.token(SyntaxKind::TEXT.into(), &fence_str);
+
+            // Parse everything after colons
+            let after_colons = &trimmed[div_fence.fence_count..];
+            let content_before_newline = after_colons.trim_end_matches('\n');
+
+            // Emit optional space before attributes
+            let has_leading_space = content_before_newline.starts_with(' ');
+            if has_leading_space {
+                self.builder.token(SyntaxKind::WHITESPACE.into(), " ");
+            }
+
+            // Get content after the leading space (if any)
+            let content_after_space = if has_leading_space {
+                &content_before_newline[1..]
+            } else {
+                content_before_newline
+            };
+
+            // Emit attributes as DivInfo child node (avoids duplication)
             self.builder.start_node(SyntaxKind::DivInfo.into());
             self.builder
                 .token(SyntaxKind::TEXT.into(), &div_fence.attributes);
             self.builder.finish_node(); // DivInfo
+
+            // Check for trailing colons after attributes (symmetric fences)
+            let (trailing_space, trailing_colons) = if div_fence.attributes.starts_with('{') {
+                // For bracketed attributes like {.class}, find what's after the closing brace
+                if let Some(close_idx) = content_after_space.find('}') {
+                    let after_attrs = &content_after_space[close_idx + 1..];
+                    let trailing = after_attrs.trim_start();
+                    let space_count = after_attrs.len() - trailing.len();
+                    if !trailing.is_empty() && trailing.chars().all(|c| c == ':') {
+                        (space_count > 0, trailing)
+                    } else {
+                        (false, "")
+                    }
+                } else {
+                    (false, "")
+                }
+            } else {
+                // For simple class names like "Warning", check after first word
+                // content_after_space starts with the attribute (e.g., "Warning ::::::")
+                let after_attrs = &content_after_space[div_fence.attributes.len()..];
+                if let Some(after_space) = after_attrs.strip_prefix(' ') {
+                    if !after_space.is_empty() && after_space.chars().all(|c| c == ':') {
+                        (true, after_space)
+                    } else {
+                        (false, "")
+                    }
+                } else {
+                    (false, "")
+                }
+            };
+
+            // Emit space before trailing colons if present
+            if trailing_space {
+                self.builder.token(SyntaxKind::WHITESPACE.into(), " ");
+            }
+
+            // Emit trailing colons if present
+            if !trailing_colons.is_empty() {
+                self.builder.token(SyntaxKind::TEXT.into(), trailing_colons);
+            }
+
+            // Emit newline
+            if full_line.ends_with('\n') {
+                self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            }
+            self.builder.finish_node(); // DivFenceOpen
 
             // Push FencedDiv container
             self.containers.push(Container::FencedDiv {});
@@ -866,10 +1077,29 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
-            // Emit closing fence
+            // Emit closing fence - parse to avoid newline duplication
             self.builder.start_node(SyntaxKind::DivFenceClose.into());
-            self.builder.token(SyntaxKind::TEXT.into(), content);
-            self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+
+            // Get original full line
+            let full_line = self.lines[self.pos];
+            let trimmed = full_line.trim_start();
+
+            // Emit leading whitespace if present
+            let leading_ws_len = full_line.len() - trimmed.len();
+            if leading_ws_len > 0 {
+                self.builder
+                    .token(SyntaxKind::WHITESPACE.into(), &full_line[..leading_ws_len]);
+            }
+
+            // Emit fence content without newline
+            let content_without_newline = trimmed.trim_end_matches('\n');
+            self.builder
+                .token(SyntaxKind::TEXT.into(), content_without_newline);
+
+            // Emit newline separately
+            if full_line.ends_with('\n') {
+                self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            }
             self.builder.finish_node(); // DivFenceClose
 
             // Pop the FencedDiv container (this will finish the FencedDiv node)
@@ -936,6 +1166,7 @@ impl<'a> BlockParser<'a> {
                     spaces_after,
                     indent_cols,
                     indent_bytes,
+                    indent_to_emit,
                 );
                 self.pos += 1;
                 return true;
@@ -946,8 +1177,13 @@ impl<'a> BlockParser<'a> {
 
             if let Some(level) = matched_level {
                 self.continue_list_at_level(level);
+                // Emit footnote/definition indent before list item (for losslessness)
+                if let Some(indent_str) = indent_to_emit {
+                    self.builder
+                        .token(SyntaxKind::WHITESPACE.into(), indent_str);
+                }
             } else {
-                self.start_new_list(&marker, indent_cols);
+                self.start_new_list(&marker, indent_cols, indent_to_emit);
             }
 
             // Start list item
@@ -1018,7 +1254,9 @@ impl<'a> BlockParser<'a> {
         }
 
         // Term line (if next line has definition marker)?
-        if !content.trim().is_empty() && self.next_line_is_definition_marker() {
+        if let Some(blank_count) = self.next_line_is_definition_marker()
+            && !content.trim().is_empty()
+        {
             // Close any open structures
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.containers
@@ -1049,6 +1287,18 @@ impl<'a> BlockParser<'a> {
             // Emit term
             emit_term(&mut self.builder, content);
             self.pos += 1;
+
+            // Emit blank lines between term and definition marker
+            for _ in 0..blank_count {
+                if self.pos < self.lines.len() {
+                    let blank_line = self.lines[self.pos];
+                    self.builder.start_node(SyntaxKind::BlankLine.into());
+                    self.builder.token(SyntaxKind::BlankLine.into(), blank_line);
+                    self.builder.finish_node();
+                    self.pos += 1;
+                }
+            }
+
             return true;
         }
 
@@ -1075,7 +1325,10 @@ impl<'a> BlockParser<'a> {
 
         // Paragraph
         self.start_paragraph_if_needed();
-        self.append_paragraph_line(content);
+        // For lossless parsing: use line_to_append if provided (e.g., for blockquotes
+        // where markers have been stripped), otherwise use the original line
+        let line = line_to_append.unwrap_or(self.lines[self.pos]);
+        self.append_paragraph_line(line);
         self.pos += 1;
         true
     }
@@ -1160,25 +1413,25 @@ impl<'a> BlockParser<'a> {
             .any(|c| matches!(c, Container::DefinitionList { .. }))
     }
 
-    fn in_definition_item(&self) -> bool {
-        self.containers
-            .stack
-            .iter()
-            .any(|c| matches!(c, Container::DefinitionItem { .. }))
-    }
-
-    fn next_line_is_definition_marker(&self) -> bool {
+    fn next_line_is_definition_marker(&self) -> Option<usize> {
         // Look ahead past blank lines to find a definition marker
+        // Returns Some(blank_line_count) if found, None otherwise
         let mut check_pos = self.pos + 1;
+        let mut blank_count = 0;
         while check_pos < self.lines.len() {
             let line = self.lines[check_pos];
             if line.trim().is_empty() {
+                blank_count += 1;
                 check_pos += 1;
                 continue;
             }
-            return try_parse_definition_marker(line).is_some();
+            if try_parse_definition_marker(line).is_some() {
+                return Some(blank_count);
+            } else {
+                return None;
+            }
         }
-        false
+        None
     }
 
     fn continue_list_at_level(&mut self, level: usize) {
@@ -1193,7 +1446,12 @@ impl<'a> BlockParser<'a> {
         }
     }
 
-    fn start_new_list(&mut self, marker: &ListMarker, indent_cols: usize) {
+    fn start_new_list(
+        &mut self,
+        marker: &ListMarker,
+        indent_cols: usize,
+        indent_to_emit: Option<&str>,
+    ) {
         if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
             self.containers
                 .close_to(self.containers.depth() - 1, &mut self.builder);
@@ -1207,12 +1465,18 @@ impl<'a> BlockParser<'a> {
                 .close_to(self.containers.depth() - 1, &mut self.builder);
         }
         self.builder.start_node(SyntaxKind::List.into());
+        // Emit footnote/definition indent for losslessness
+        if let Some(indent_str) = indent_to_emit {
+            self.builder
+                .token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
         self.containers.push(Container::List {
             marker: marker.clone(),
             base_indent_cols: indent_cols,
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn start_nested_list(
         &mut self,
         content: &str,
@@ -1221,12 +1485,18 @@ impl<'a> BlockParser<'a> {
         spaces_after: usize,
         indent_cols: usize,
         indent_bytes: usize,
+        indent_to_emit: Option<&str>,
     ) {
         if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
             self.containers
                 .close_to(self.containers.depth() - 1, &mut self.builder);
         }
         self.builder.start_node(SyntaxKind::List.into());
+        // Emit footnote/definition indent for losslessness
+        if let Some(indent_str) = indent_to_emit {
+            self.builder
+                .token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
         self.containers.push(Container::List {
             marker: marker.clone(),
             base_indent_cols: indent_cols,
@@ -1270,13 +1540,14 @@ impl<'a> BlockParser<'a> {
     }
 
     fn append_paragraph_line(&mut self, line: &str) {
-        let text = self.strip_to_content_col(line);
+        // For lossless parsing, preserve the line exactly as-is
+        // Don't strip to content column in the parser - that's the formatter's job
 
         // Split off trailing newline if present
-        let (text_without_newline, has_newline) = if let Some(stripped) = text.strip_suffix('\n') {
+        let (text_without_newline, has_newline) = if let Some(stripped) = line.strip_suffix('\n') {
             (stripped, true)
         } else {
-            (text, false)
+            (line, false)
         };
 
         if !text_without_newline.is_empty() {
@@ -1300,20 +1571,6 @@ impl<'a> BlockParser<'a> {
                 _ => None,
             })
             .unwrap_or(0)
-    }
-
-    fn strip_to_content_col<'b>(&self, line: &'b str) -> &'b str {
-        let target = self.current_content_col();
-        if target == 0 {
-            return line;
-        }
-        let (indent_cols, _) = leading_indent(line);
-        if indent_cols >= target {
-            let idx = byte_index_at_column(line, target);
-            &line[idx..]
-        } else {
-            line.trim_start()
-        }
     }
 }
 
