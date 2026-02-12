@@ -103,7 +103,6 @@ fn generate_cli_markdown() -> Result<()> {
         // Format the file in place using the panache binary
         match std::process::Command::new(&bin_path)
             .arg("format")
-            .arg("--write")
             .arg(&output_path)
             .status()
         {
