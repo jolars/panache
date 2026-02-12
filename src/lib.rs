@@ -11,6 +11,7 @@ pub mod linter;
 pub mod lsp;
 pub mod range_utils;
 pub mod syntax;
+mod utils;
 
 pub use config::BlankLines;
 pub use config::Config;

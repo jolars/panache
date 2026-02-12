@@ -1,4 +1,5 @@
 use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::utils::is_block_element;
 
 /// Convert 1-indexed line range to byte offsets
 pub fn line_range_to_byte_offsets(
@@ -37,33 +38,6 @@ pub fn line_range_to_byte_offsets(
 
     // end_line is beyond document
     None
-}
-
-/// Check if a syntax kind represents a block-level element
-fn is_block_element(kind: SyntaxKind) -> bool {
-    matches!(
-        kind,
-        SyntaxKind::PARAGRAPH
-            | SyntaxKind::Heading
-            | SyntaxKind::CodeBlock
-            | SyntaxKind::BlockQuote
-            | SyntaxKind::List
-            | SyntaxKind::ListItem
-            | SyntaxKind::DefinitionList
-            | SyntaxKind::DefinitionItem
-            | SyntaxKind::LineBlock
-            | SyntaxKind::SimpleTable
-            | SyntaxKind::MultilineTable
-            | SyntaxKind::PipeTable
-            | SyntaxKind::GridTable
-            | SyntaxKind::FencedDiv
-            | SyntaxKind::HorizontalRule
-            | SyntaxKind::YamlMetadata
-            | SyntaxKind::PandocTitleBlock
-            | SyntaxKind::HtmlBlock
-            | SyntaxKind::MathBlock
-            | SyntaxKind::BlankLine
-    )
 }
 
 /// Find the smallest block-level node containing the given offset
