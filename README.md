@@ -54,11 +54,8 @@ Packages include:
 ### CLI Formatting
 
 ```bash
-# Format a file and output to stdout
-panache format document.qmd
-
 # Format a file in place
-panache format --write document.qmd
+panache format document.qmd
 
 # Check if a file is formatted
 panache format --check document.qmd
