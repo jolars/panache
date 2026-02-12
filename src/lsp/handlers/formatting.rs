@@ -43,9 +43,9 @@ pub(crate) async fn format_document(
         }
     };
 
-    // Load config
+    // Load config (pass URI for file type detection)
     let workspace_root = workspace_root.lock().await.clone();
-    let config = load_config(client, &workspace_root).await;
+    let config = load_config(client, &workspace_root, Some(&uri)).await;
 
     // Run formatting in a blocking task (because rowan::SyntaxNode isn't Send)
     // but use format_async inside to support external formatters
@@ -126,9 +126,9 @@ pub(crate) async fn format_range(
     let start_line = (range.start.line + 1) as usize;
     let end_line = (range.end.line + 1) as usize;
 
-    // Load config
+    // Load config (pass URI for file type detection)
     let workspace_root = workspace_root.lock().await.clone();
-    let config = load_config(client, &workspace_root).await;
+    let config = load_config(client, &workspace_root, Some(&uri)).await;
 
     // Run range formatting in a blocking task
     let text_clone = text.clone();

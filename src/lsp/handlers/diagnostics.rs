@@ -17,7 +17,7 @@ pub(crate) async fn lint_and_publish(
     text: String,
 ) {
     let workspace_root = workspace_root.lock().await.clone();
-    let config = load_config(client, &workspace_root).await;
+    let config = load_config(client, &workspace_root, Some(&uri)).await;
 
     // Parse and lint in blocking task
     let text_clone = text.clone();

@@ -31,7 +31,7 @@ pub(crate) async fn code_action(
 
     // Load config and run linter
     let workspace_root = workspace_root.lock().await.clone();
-    let config = load_config(client, &workspace_root).await;
+    let config = load_config(client, &workspace_root, Some(&params.text_document.uri)).await;
     let text_clone = text.clone();
     let diagnostics = tokio::task::spawn_blocking(move || {
         let tree = crate::parse(&text_clone, Some(config.clone()));
