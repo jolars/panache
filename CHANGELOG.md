@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.0](https://github.com/jolars/panache/compare/v2.0.0...v2.1.0) (2026-02-12)
+
+### Features
+
+* **lsp:** add initial support for document symbols ([81a7ef9](https://github.com/jolars/panache/commit/81a7ef9b1bab9adf336924856b5451a89b05ccaa))
+
+### Bug Fixes
+
+* don't wrap quarto/rmd code chunk args in quotes ([48ebd68](https://github.com/jolars/panache/commit/48ebd68669f474b9ce334eaedcb2936d078449c9)), closes [#22](https://github.com/jolars/panache/issues/22)
+
 ## [2.0.0](https://github.com/jolars/panache/compare/v1.0.0...v2.0.0) (2026-02-12)
 
 ### ⚠ BREAKING CHANGES
