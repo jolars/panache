@@ -32,8 +32,8 @@ panache format --config custom.toml document.qmd
 
 # Parse and inspect AST
 panache parse document.qmd
-
 ```
+
 CONFIGURATION:
 
 Panache looks for configuration files in this order:
@@ -52,8 +52,8 @@ line_width = 80
 [extensions]
 hard_line_breaks = false
 citations = true
-
 ```
+
 For more information, visit: https://github.com/jolars/panache
 
 ###### **Subcommands:**
@@ -88,8 +88,8 @@ echo '# Heading' | panache format
 
 # Check formatting (exit code 1 if not formatted)
 panache format --check document.qmd
-
 ```
+
 FORMATTING RULES:
 
 - Default 80 character line width (configurable)
@@ -141,8 +141,8 @@ echo '# Heading' | panache parse
 
 # Parse with custom config (affects extension parsing)
 panache parse --config .panache.toml document.qmd
-
 ```
+
 The AST output shows the concrete syntax tree built by the parser, including:
 
 - Block elements (headings, paragraphs, code blocks, lists, tables)
@@ -192,8 +192,8 @@ panache lint --check document.qmd
 
 # Apply auto-fixes
 panache lint --fix document.qmd
-
 ```
+
 LINT RULES:
 
 - Parser errors: Syntax errors detected during parsing

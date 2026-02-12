@@ -71,28 +71,26 @@ pub(crate) fn parse_indented_code_block(
 
         // Blank lines need look-ahead: only include if next non-blank line continues the code
         if inner.trim().is_empty() {
-            if base_indent > 0 {
-                // Inside a container (definition/footnote) - check if code continues
-                let mut look_pos = current_pos + 1;
-                let mut continues = false;
-                while look_pos < lines.len() {
-                    let (look_bq_depth, look_inner) = count_blockquote_markers(lines[look_pos]);
-                    if look_bq_depth < bq_depth {
-                        break;
-                    }
-                    if look_inner.trim_end_matches('\n').trim().is_empty() {
-                        look_pos += 1;
-                        continue;
-                    }
-                    let (look_indent, _) = leading_indent(look_inner);
-                    if look_indent >= code_indent {
-                        continues = true;
-                    }
+            // Check if code continues after this blank line
+            let mut look_pos = current_pos + 1;
+            let mut continues = false;
+            while look_pos < lines.len() {
+                let (look_bq_depth, look_inner) = count_blockquote_markers(lines[look_pos]);
+                if look_bq_depth < bq_depth {
                     break;
                 }
-                if !continues {
-                    break;
+                if look_inner.trim_end_matches('\n').trim().is_empty() {
+                    look_pos += 1;
+                    continue;
                 }
+                let (look_indent, _) = leading_indent(look_inner);
+                if look_indent >= code_indent {
+                    continues = true;
+                }
+                break;
+            }
+            if !continues {
+                break;
             }
             builder.token(SyntaxKind::TEXT.into(), "");
             builder.token(SyntaxKind::NEWLINE.into(), "\n");

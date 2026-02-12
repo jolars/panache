@@ -1,0 +1,17 @@
+ROOT@0..89
+  DOCUMENT@0..89
+    PARAGRAPH@0..5
+      TEXT@0..4 "Test"
+      NEWLINE@4..5 "\n"
+    BlankLine@5..6
+      BlankLine@5..6 "\n"
+    CodeBlock@6..11
+      CodeContent@6..11
+        TEXT@6..10 "code"
+        NEWLINE@10..11 "\n"
+    BlankLine@11..12
+      BlankLine@11..12 "\n"
+    PARAGRAPH@12..89
+      TEXT@12..88 "Again, I want to than ..."
+      NEWLINE@88..89 "\n"
+
