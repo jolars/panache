@@ -235,45 +235,36 @@ quarto_crossrefs = true          # @fig-id, @tbl-id
 
 ## External Code Formatters
 
-panache can invoke external formatters for code blocks. Formatters run in
-parallel for maximum performance.
+panache can invoke external formatters for code blocks—**but they're opt-in**.
+You choose what gets formatted.
 
-### Built-in Presets
+### Quick Start with Presets
 
-panache ships with sensible defaults for common languages—**zero configuration
-required!**
-
-**Default formatters (automatically enabled):**
-
-- **R**: `air format` - [air](https://github.com/etiennebacher/air) R formatter
-- **Python**: `ruff format` - [Ruff](https://github.com/astral-sh/ruff) Python
-  formatter
-
-If these tools are installed, your R and Python code blocks will be
-automatically formatted. If not, the original code is preserved with no errors.
-
-**Using preset formatters:**
+Enable formatters using convenient presets:
 
 ```toml
-# Option 1: Use a different preset for R
+# Enable R formatting with air (fast)
 [formatters.r]
-preset = "styler"  # Available: "air" (default), "styler"
+preset = "air"
 
-# Option 2: Switch Python formatter
+# Enable Python formatting with ruff (fast)
 [formatters.python]
-preset = "black"   # Available: "ruff" (default), "black"
+preset = "ruff"
 ```
 
 **Available presets:**
 
 | Language | Preset   | Command                    | Notes                     |
 | -------- | -------- | -------------------------- | ------------------------- |
-| `r`      | `air`    | `air format {}`            | Default, fast             |
+| `r`      | `air`    | `air format {}`            | Fast, modern              |
 | `r`      | `styler` | `Rscript -e "styler::..."` | Requires styler R package |
-| `python` | `ruff`   | `ruff format`              | Default, fast             |
+| `python` | `ruff`   | `ruff format`              | Fast, modern              |
 | `python` | `black`  | `black -`                  | Popular alternative       |
 
-**Disabling built-in defaults:**
+Formatters execute in parallel with panache's markdown formatting. If the tool
+isn't installed, code is preserved unchanged (no errors).
+
+**Disabling formatters:**
 
 ```toml
 [formatters.r]
@@ -393,12 +384,12 @@ citations = true
 task_lists = true
 emoji = false
 
-# External formatters
+# External formatters (opt-in)
 # Option 1: Use presets
 [formatters.r]
-preset = "styler"  # Switch from default "air"
+preset = "air"
 
-# Option 2: Full custom configuration (overrides default)
+# Option 2: Full custom configuration
 [formatters.python]
 cmd = "black"
 args = ["-", "--line-length=88"]

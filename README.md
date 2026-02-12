@@ -177,12 +177,10 @@ line-width = 80
 line-ending = "auto"
 wrap = "reflow"
 
-# External code formatters
-# Note: R (air) and Python (ruff) are enabled by default - no config needed!
-
-# Switch to a different preset
+# External code formatters (opt-in)
+# Enable R formatting with preset
 [formatters.r]
-preset = "styler"
+preset = "air"  # Quick setup
 
 # Or use full custom configuration
 [formatters.python]
@@ -198,26 +196,34 @@ See `.panache.toml.example` for a complete configuration reference.
 
 ### External Code Formatters
 
-panache includes **zero-config support** for formatting R and Python code blocks:
-
-- **R**: Uses `air format` by default (if installed)
-- **Python**: Uses `ruff format` by default (if installed)
-- Formatters execute in parallel with panache's markdown formatting
-- On error, original code is preserved (no warnings needed)
-
-**No configuration needed!** If `air` or `ruff` are in your PATH, they just work.
-
-**Switch presets or add more formatters:**
+panache supports external formatters for code blocks—**opt-in and easy to enable**:
 
 ```toml
-# Use different preset
+# Enable R formatting with preset
 [formatters.r]
-preset = "styler"  # Available: "air" (default), "styler"
+preset = "air"  # Available: "air", "styler"
 
-# Full custom config (overrides default)
+# Enable Python formatting with preset
+[formatters.python]
+preset = "ruff"  # Available: "ruff", "black"
+```
+
+**Key features:**
+
+- **Opt-in by design** - No surprises, explicit configuration
+- **Preset shortcuts** - Quick setup with sensible defaults
+- **Parallel execution** - Formatters run concurrently with markdown formatting
+- **Graceful fallback** - Missing tools preserve original code (no errors)
+- **Custom config** - Full control with `cmd`, `args`, `stdin` fields
+
+**Full custom configuration:**
+
+```toml
+# Custom Python formatter
 [formatters.python]
 cmd = "black"
 args = ["-", "--line-length=88"]
+stdin = true
 
 # Add formatters for other languages
 [formatters.rust]

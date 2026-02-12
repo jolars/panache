@@ -684,12 +684,6 @@ fn default_blank_lines() -> BlankLines {
 impl RawConfig {
     /// Finalize into Config, applying flavor-based defaults where needed
     fn finalize(self) -> Config {
-        // Merge user formatters with built-in defaults (user config takes precedence)
-        let mut formatters = default_formatters();
-        for (lang, config) in self.formatters {
-            formatters.insert(lang, config);
-        }
-
         Config {
             extensions: self
                 .extensions
@@ -704,7 +698,7 @@ impl RawConfig {
             math_indent: self.math_indent,
             math_delimiter_style: self.math_delimiter_style,
             blank_lines: self.blank_lines,
-            formatters,
+            formatters: self.formatters, // Use user config as-is (no defaults merged)
         }
     }
 }
@@ -745,7 +739,7 @@ impl Default for Config {
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             code_blocks: CodeBlockConfig::for_flavor(flavor),
-            formatters: default_formatters(),
+            formatters: HashMap::new(), // Opt-in: empty by default
         }
     }
 }
@@ -944,10 +938,8 @@ mod tests {
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
         assert_eq!(cfg.line_width, 80);
-        // With built-in defaults, formatters should have R and Python
-        assert_eq!(cfg.formatters.len(), 2);
-        assert!(cfg.formatters.contains_key("r"));
-        assert!(cfg.formatters.contains_key("python"));
+        // Formatters are opt-in, so empty by default
+        assert!(cfg.formatters.is_empty());
     }
 
     #[test]
@@ -1094,19 +1086,12 @@ mod tests {
     #[test]
     fn builtin_defaults_when_no_config() {
         let cfg = Config::default();
-        // Should have R and Python with default presets
-        assert!(cfg.formatters.contains_key("r"));
-        assert!(cfg.formatters.contains_key("python"));
-
-        let r_fmt = cfg.formatters.get("r").unwrap();
-        assert_eq!(r_fmt.cmd, "air");
-
-        let py_fmt = cfg.formatters.get("python").unwrap();
-        assert_eq!(py_fmt.cmd, "ruff");
+        // Formatters are opt-in, so empty by default
+        assert!(cfg.formatters.is_empty());
     }
 
     #[test]
-    fn user_config_overrides_defaults() {
+    fn user_config_adds_formatters() {
         let toml_str = r#"
             [formatters.r]
             cmd = "custom"
@@ -1114,28 +1099,22 @@ mod tests {
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
-        // R should have custom config
+        // Only R should be configured
+        assert_eq!(cfg.formatters.len(), 1);
         let r_fmt = cfg.formatters.get("r").unwrap();
         assert_eq!(r_fmt.cmd, "custom");
         assert_eq!(r_fmt.args, vec!["--flag"]);
-
-        // Python should still have default
-        assert!(cfg.formatters.contains_key("python"));
-        let py_fmt = cfg.formatters.get("python").unwrap();
-        assert_eq!(py_fmt.cmd, "ruff");
     }
 
     #[test]
-    fn empty_formatters_section_gets_defaults() {
+    fn empty_formatters_section_stays_empty() {
         let toml_str = r#"
             line_width = 100
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
-        // Should still have default formatters
-        assert_eq!(cfg.formatters.len(), 2);
-        assert!(cfg.formatters.contains_key("r"));
-        assert!(cfg.formatters.contains_key("python"));
+        // Formatters are opt-in, should be empty
+        assert!(cfg.formatters.is_empty());
     }
 
     #[test]
