@@ -112,12 +112,7 @@ fn main() -> io::Result<()> {
             println!("{:#?}", tree);
             Ok(())
         }
-        Commands::Format {
-            file,
-            check,
-            write,
-            range,
-        } => {
+        Commands::Format { file, check, range } => {
             let start_dir = start_dir_for(&file)?;
             let (cfg, cfg_path) =
                 panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
@@ -154,15 +149,12 @@ fn main() -> io::Result<()> {
                 if file.is_some() {
                     println!("File is correctly formatted");
                 }
-            } else if write {
-                if let Some(file_path) = &file {
-                    fs::write(file_path, &output)?;
-                    println!("Formatted {}", file_path.display());
-                } else {
-                    eprintln!("Cannot use --write with stdin input");
-                    std::process::exit(1);
-                }
+            } else if let Some(file_path) = &file {
+                // Format in place (default for file paths)
+                fs::write(file_path, &output)?;
+                println!("Formatted {}", file_path.display());
             } else {
+                // Stdin: output to stdout
                 print!("{output}");
             }
 

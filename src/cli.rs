@@ -13,17 +13,14 @@ use std::path::PathBuf;
 #[command(after_help = "\
 EXAMPLES:
 
-    # Format a file to stdout
+    # Format a file in place
     panache format document.qmd
 
-    # Format from stdin
+    # Format from stdin to stdout
     cat document.qmd | panache format
 
     # Check if a file is formatted
     panache format --check document.qmd
-
-    # Format in place
-    panache format --write document.qmd
 
     # Use custom config
     panache format --config custom.toml document.qmd
@@ -70,23 +67,20 @@ pub enum Commands {
     /// Format a Quarto, Pandoc, or Markdown document
     #[command(
         long_about = "Format a Quarto, Pandoc, or Markdown document according to panache's \
-        formatting rules. By default, outputs the formatted content to stdout. Use --write \
-        to format in place or --check to verify formatting without making changes."
+        formatting rules. By default, formats files in place. Use --check to verify formatting \
+        without making changes. Stdin input always outputs to stdout."
     )]
     #[command(after_help = "\
 EXAMPLES:
 
-    # Format to stdout
+    # Format file in place (default)
     panache format document.qmd
 
-    # Format from stdin
+    # Format from stdin to stdout
     echo '# Heading' | panache format
 
     # Check formatting (exit code 1 if not formatted)
     panache format --check document.qmd
-
-    # Format in place
-    panache format --write document.qmd
 
 FORMATTING RULES:
 
@@ -102,7 +96,9 @@ FORMATTING RULES:
         #[arg(help = "Input file path")]
         #[arg(
             long_help = "Path to the input file to format. If not provided, reads from stdin. \
-            Supports .qmd, .md, .Rmd, and other Markdown-based formats."
+            Supports .qmd, .md, .Rmd, and other Markdown-based formats. When a file path is \
+            provided, the file is formatted in place by default. Stdin input always outputs \
+            to stdout."
         )]
         file: Option<PathBuf>,
 
@@ -115,16 +111,6 @@ FORMATTING RULES:
             with code 1. If formatted, exits with code 0. Useful for CI/CD pipelines."
         )]
         check: bool,
-
-        /// Format files in place
-        #[arg(long)]
-        #[arg(help = "Format the file in place")]
-        #[arg(
-            long_help = "Write the formatted output back to the input file, modifying it in place. \
-            Cannot be used with stdin input. It's recommended to use version control before using \
-            this option."
-        )]
-        write: bool,
 
         /// Format only a specific line range (1-indexed, inclusive)
         #[arg(long, value_name = "START:END")]
