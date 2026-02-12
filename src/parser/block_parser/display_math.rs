@@ -32,17 +32,17 @@ pub(crate) fn try_parse_math_fence_open(
     let trimmed = strip_leading_spaces(content);
 
     // Check for backslash bracket opening: \[
+    // Per Pandoc spec, content can be on the same line
     if tex_math_single_backslash && trimmed.starts_with("\\[") {
-        // Rest of line must be empty (no content after opening \[)
-        if trimmed[2..].trim().is_empty() {
-            return Some(MathFenceInfo {
-                fence_type: MathFenceType::BackslashBracket,
-                fence_count: 1,
-            });
-        }
+        return Some(MathFenceInfo {
+            fence_type: MathFenceType::BackslashBracket,
+            fence_count: 1,
+        });
     }
 
     // Check for math fence opening ($$)
+    // Per Pandoc spec: "the delimiters may be separated from the formula by whitespace"
+    // This means content can be on the same line as the opening $$
     if !trimmed.starts_with('$') {
         return None;
     }
@@ -50,11 +50,6 @@ pub(crate) fn try_parse_math_fence_open(
     let fence_count = trimmed.chars().take_while(|&c| c == '$').count();
 
     if fence_count < 2 {
-        return None;
-    }
-
-    // Rest of line must be empty (no content after opening $$)
-    if !trimmed[fence_count..].trim().is_empty() {
         return None;
     }
 
@@ -71,11 +66,8 @@ pub(crate) fn is_closing_math_fence(content: &str, fence: &MathFenceInfo) -> boo
     match fence.fence_type {
         MathFenceType::BackslashBracket => {
             // Closing fence is \]
-            if !trimmed.starts_with("\\]") {
-                return false;
-            }
-            // Rest of line must be empty
-            trimmed[2..].trim().is_empty()
+            // Content after \] is allowed (becomes paragraph text)
+            trimmed.starts_with("\\]")
         }
         MathFenceType::Dollar => {
             if !trimmed.starts_with('$') {
@@ -84,12 +76,9 @@ pub(crate) fn is_closing_math_fence(content: &str, fence: &MathFenceInfo) -> boo
 
             let closing_count = trimmed.chars().take_while(|&c| c == '$').count();
 
-            if closing_count < fence.fence_count {
-                return false;
-            }
-
-            // Rest of line must be empty
-            trimmed[closing_count..].trim().is_empty()
+            // Must have at least as many $ as the opening
+            // Content after $$ is allowed (becomes paragraph text)
+            closing_count >= fence.fence_count
         }
     }
 }
@@ -111,15 +100,29 @@ pub(crate) fn parse_display_math_block(
     let (_, first_inner) = count_blockquote_markers(first_line);
     let first_trimmed = strip_leading_spaces(first_inner);
 
-    let opening_marker = match fence.fence_type {
-        MathFenceType::BackslashBracket => "\\[",
-        MathFenceType::Dollar => &first_trimmed[..fence.fence_count],
+    let (opening_marker, first_line_content) = match fence.fence_type {
+        MathFenceType::BackslashBracket => {
+            // For \[, content can be on the same line
+            let content_after = &first_trimmed[2..]; // Skip \[
+            ("\\[", content_after)
+        }
+        MathFenceType::Dollar => {
+            // For $$, content can be on the same line per Pandoc spec
+            let content_after = &first_trimmed[fence.fence_count..]; // Skip $$
+            (&first_trimmed[..fence.fence_count], content_after)
+        }
     };
 
     builder.token(SyntaxKind::BlockMathMarker.into(), opening_marker);
 
     let mut current_pos = start_pos + 1;
     let mut content_lines: Vec<&str> = Vec::new();
+
+    // Add first line content if present (for \[ with content on same line)
+    if !first_line_content.trim().is_empty() {
+        content_lines.push(first_line_content);
+    }
+
     let mut found_closing = false;
 
     while current_pos < lines.len() {

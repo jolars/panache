@@ -1,5 +1,5 @@
-ROOT@0..328
-  DOCUMENT@0..328
+ROOT@0..395
+  DOCUMENT@0..395
     Heading@0..22
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
@@ -66,4 +66,18 @@ ROOT@0..328
         InlineMathMarker@324..326 "\\)"
       TEXT@326..327 "."
       NEWLINE@327..328 "\n"
+    BlankLine@328..329
+      BlankLine@328..329 "\n"
+    PARAGRAPH@329..380
+      TEXT@329..379 "Here's one that start ..."
+      NEWLINE@379..380 "\n"
+    BlankLine@380..381
+      BlankLine@380..381 "\n"
+    MathBlock@381..395
+      BlockMathMarker@381..383 "\\["
+      MathContent@383..393
+        TEXT@383..390 " e = mc"
+        TEXT@390..391 "^"
+        TEXT@391..393 "2\n"
+      BlockMathMarker@393..395 "\\]"
 

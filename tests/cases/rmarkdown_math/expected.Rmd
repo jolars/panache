@@ -11,3 +11,9 @@ $$
 $$
 
 More inline math: $\alpha + \beta = \gamma$ and another $f(x) = ax^2 + bx + c$.
+
+Here's one that starts the math on the first line:
+
+$$
+e = mc^2
+$$
