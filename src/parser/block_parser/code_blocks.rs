@@ -164,8 +164,8 @@ impl InfoString {
         let mut chars = content.chars().peekable();
 
         while chars.peek().is_some() {
-            // Skip whitespace
-            while chars.peek() == Some(&' ') || chars.peek() == Some(&'\t') {
+            // Skip whitespace and commas
+            while matches!(chars.peek(), Some(&' ') | Some(&'\t') | Some(&',')) {
                 chars.next();
             }
 
@@ -176,7 +176,7 @@ impl InfoString {
             // Read key
             let mut key = String::new();
             while let Some(&ch) = chars.peek() {
-                if ch == '=' || ch == ' ' || ch == '\t' {
+                if ch == '=' || ch == ' ' || ch == '\t' || ch == ',' {
                     break;
                 }
                 key.push(ch);
@@ -187,8 +187,8 @@ impl InfoString {
                 break;
             }
 
-            // Skip whitespace
-            while chars.peek() == Some(&' ') || chars.peek() == Some(&'\t') {
+            // Skip whitespace and commas
+            while matches!(chars.peek(), Some(&' ') | Some(&'\t') | Some(&',')) {
                 chars.next();
             }
 
@@ -196,8 +196,8 @@ impl InfoString {
             if chars.peek() == Some(&'=') {
                 chars.next(); // consume '='
 
-                // Skip whitespace after '='
-                while chars.peek() == Some(&' ') || chars.peek() == Some(&'\t') {
+                // Skip whitespace and commas after '='
+                while matches!(chars.peek(), Some(&' ') | Some(&'\t') | Some(&',')) {
                     chars.next();
                 }
 
@@ -224,7 +224,7 @@ impl InfoString {
                     // Unquoted value
                     let mut val = String::new();
                     while let Some(&ch) = chars.peek() {
-                        if ch == ' ' || ch == '\t' {
+                        if ch == ' ' || ch == '\t' || ch == ',' {
                             break;
                         }
                         val.push(ch);
@@ -555,6 +555,47 @@ mod tests {
         assert_eq!(
             info.attributes[1],
             ("warning".to_string(), Some("true".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_info_string_executable_with_commas() {
+        let info = InfoString::parse("{r, echo=FALSE, warning=TRUE}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::Executable {
+                language: "r".to_string()
+            }
+        );
+        assert_eq!(info.attributes.len(), 2);
+        assert_eq!(
+            info.attributes[0],
+            ("echo".to_string(), Some("FALSE".to_string()))
+        );
+        assert_eq!(
+            info.attributes[1],
+            ("warning".to_string(), Some("TRUE".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_info_string_executable_mixed_commas_spaces() {
+        // R-style with commas and spaces
+        let info = InfoString::parse("{r, echo=FALSE, label=\"my chunk\"}");
+        assert_eq!(
+            info.block_type,
+            CodeBlockType::Executable {
+                language: "r".to_string()
+            }
+        );
+        assert_eq!(info.attributes.len(), 2);
+        assert_eq!(
+            info.attributes[0],
+            ("echo".to_string(), Some("FALSE".to_string()))
+        );
+        assert_eq!(
+            info.attributes[1],
+            ("label".to_string(), Some("my chunk".to_string()))
         );
     }
 

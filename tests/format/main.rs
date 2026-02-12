@@ -1,4 +1,5 @@
 mod bullet_standardization;
+mod code_chunks;
 mod comments;
 mod external_formatters;
 mod frontmatter;

@@ -121,7 +121,7 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
             if info.attributes.is_empty() {
                 String::new()
             } else {
-                format!(" {{{}}}", format_attributes(&info.attributes))
+                format!(" {{{}}}", format_attributes(&info.attributes, false))
             }
         }
         CodeBlockType::DisplayShortcut { language } => {
@@ -132,7 +132,11 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
                     if info.attributes.is_empty() {
                         language.clone()
                     } else {
-                        format!("{} {{{}}}", language, format_attributes(&info.attributes))
+                        format!(
+                            "{} {{{}}}",
+                            language,
+                            format_attributes(&info.attributes, false)
+                        )
                     }
                 }
                 AttributeStyle::Explicit => {
@@ -194,7 +198,7 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
                         if info.attributes.is_empty() {
                             String::new()
                         } else {
-                            format!("{{{}}}", format_attributes(&info.attributes))
+                            format!("{{{}}}", format_attributes(&info.attributes, false))
                         }
                     }
                 }
@@ -202,12 +206,16 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
             }
         }
         CodeBlockType::Executable { language } => {
-            // Executable chunk: NEVER normalize, preserve semantics
+            // Executable chunk: preserve unquoted values (booleans/numbers/identifiers)
             // Always keep as {language} with attributes
             if info.attributes.is_empty() {
                 format!("{{{}}}", language)
             } else {
-                format!("{{{} {}}}", language, format_attributes(&info.attributes))
+                format!(
+                    "{{{}, {}}}",
+                    language,
+                    format_attributes(&info.attributes, true)
+                )
             }
         }
         CodeBlockType::Raw { format } => {
@@ -219,18 +227,37 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
 }
 
 /// Format attribute key-value pairs
-fn format_attributes(attrs: &[(String, Option<String>)]) -> String {
+///
+/// For executable chunks, preserve unquoted values when they're safe identifiers
+/// (no spaces, no special chars). This preserves R/Julia/Python chunk semantics.
+fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool) -> String {
     attrs
         .iter()
         .map(|(k, v)| {
             if let Some(val) = v {
-                format!("{}=\"{}\"", k, val)
+                // Check if value needs quotes
+                let needs_quotes = if preserve_unquoted {
+                    // For executable chunks, only quote if value contains spaces or special chars
+                    val.is_empty()
+                        || val
+                            .chars()
+                            .any(|c| c.is_whitespace() || c == '"' || c == '\\')
+                } else {
+                    // For display blocks, always quote
+                    true
+                };
+
+                if needs_quotes {
+                    format!("{}=\"{}\"", k, val)
+                } else {
+                    format!("{}={}", k, val)
+                }
             } else {
                 k.clone()
             }
         })
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(", ")
 }
 
 /// Collect all code blocks and their info strings from the syntax tree.

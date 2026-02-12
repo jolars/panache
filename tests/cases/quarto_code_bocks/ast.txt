@@ -1,0 +1,14 @@
+ROOT@0..29
+  DOCUMENT@0..29
+    CodeBlock@0..29
+      CodeFenceOpen@0..19
+        CodeFenceMarker@0..3 "```"
+        CodeInfo@3..18 "{r, echo=FALSE}"
+        NEWLINE@18..19 "\n"
+      CodeContent@19..25
+        TEXT@19..24 "1 + 1"
+        NEWLINE@24..25 "\n"
+      CodeFenceClose@25..29
+        CodeFenceMarker@25..28 "```"
+        NEWLINE@28..29 "\n"
+
