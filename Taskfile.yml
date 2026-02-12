@@ -6,6 +6,11 @@ tasks:
     cmds:
       - cargo clippy --all-targets --all-features -- -D warnings
 
+  format:
+    desc: Check code formatting
+    cmds:
+      - cargo fmt --
+
   build-release:
     desc: Build release version
     cmds:
@@ -48,7 +53,7 @@ tasks:
     cmds:
       - cd crates/panache-wasm && wasm-pack build --target web
       - cp -r crates/panache-wasm/pkg docs/playground/
-      - rm -rf docs/playground/pkg/.gitignore 
+      - rm -rf docs/playground/pkg/.gitignore
 
   playground-serve:
     desc: Serve playground locally
