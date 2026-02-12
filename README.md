@@ -51,7 +51,7 @@ Packages include:
 
 ## Usage
 
-### CLI Formatting
+### Formatting
 
 ```bash
 # Format a file in place
@@ -63,8 +63,18 @@ panache format --check document.qmd
 # Format from stdin
 cat document.qmd | panache format
 
-# Parse and inspect the AST (for debugging)
-panache parse document.qmd
+# Format all .qmd files in directory
+panache format *.qmd
+```
+
+### Linting
+
+```bash
+# Lint a file
+panache lint document.qmd
+
+# Lint entire working directory
+panache lint .
 ```
 
 ### Language Server (LSP)
