@@ -379,7 +379,9 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 
 - Each `tests/cases/*` directory contains `input.qmd` and `expected.qmd`
 - Tests verify formatting is idempotent (format twice = format once)
-- Use `UPDATE_EXPECTED=1 cargo test` to update expected outputs (BE CAREFUL)
+- Use `UPDATE_EXPECTED=1 cargo test` to update expected formatted outputs (BE CAREFUL)
+- Use `UPDATE_AST=1 cargo test` to update expected AST outputs (BE CAREFUL)
+- Use both flags together to update both: `UPDATE_EXPECTED=1 UPDATE_AST=1 cargo test`
 - New features should have corresponding test cases added to cover new formatting scenarios.
 - **DO NOT** update expected outputs without verifying that the change is correct and intended.
 
@@ -585,7 +587,10 @@ The `docs/playground/` contains a WASM-based web interface:
 - Ensure formatting passes: `cargo fmt -- --check`
 - Test CLI functionality after building release binary
 - Consider idempotency - formatting twice should equal formatting once
-- Update golden test expectations carefully with `UPDATE_EXPECTED=1 cargo test`
+- Update golden test expectations carefully:
+  - `UPDATE_EXPECTED=1 cargo test` for formatted outputs
+  - `UPDATE_AST=1 cargo test` for AST snapshots
+  - Both flags can be combined if needed
 
 ### DON'T:
 

@@ -6,7 +6,9 @@
 //! - `ast.txt` - (Optional) Expected AST structure for parse regression testing
 //! - `panache.toml` - (Optional) Config to test specific flavors/extensions
 //!
-//! Run with `UPDATE_EXPECTED=1 cargo test` to regenerate expected outputs and AST files.
+//! Run with `UPDATE_EXPECTED=1 cargo test` to regenerate expected outputs.
+//! Run with `UPDATE_AST=1 cargo test` to regenerate AST files.
+//! Run with both flags to update both: `UPDATE_EXPECTED=1 UPDATE_AST=1 cargo test`.
 
 use panache::{Config, format, parse};
 use std::{
@@ -53,7 +55,8 @@ fn golden_cases() {
         .collect();
     entries.sort_by_key(|e| e.file_name());
 
-    let update = std::env::var_os("UPDATE_EXPECTED").is_some();
+    let update_expected = std::env::var_os("UPDATE_EXPECTED").is_some();
+    let update_ast = std::env::var_os("UPDATE_AST").is_some();
 
     for entry in entries {
         let dir = entry.path();
@@ -84,12 +87,12 @@ fn golden_cases() {
         let output_twice = format(&output, config.clone(), None);
         similar_asserts::assert_eq!(output, output_twice, "idempotency: {}", case_name);
 
-        // Test AST parsing (if ast.txt exists or we're updating)
-        if ast_path.exists() || update {
+        // Test AST parsing (if ast.txt exists or we're updating AST)
+        if ast_path.exists() || update_ast {
             let ast = parse(&input, config.clone());
             let ast_output = format!("{:#?}\n", ast);
 
-            if update {
+            if update_ast {
                 fs::write(&ast_path, &ast_output).unwrap();
             } else {
                 let expected_ast = fs::read_to_string(&ast_path)
@@ -103,7 +106,7 @@ fn golden_cases() {
             }
         }
 
-        if update {
+        if update_expected {
             fs::write(&expected_path, &output).unwrap();
             continue;
         }

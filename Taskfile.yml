@@ -60,7 +60,12 @@ tasks:
     cmds:
       - cd docs/playground && python3 -m http.server
 
-  update-golden:
-    desc: Update expected golden test outputs and AST files
+  update-golden-expected:
+    desc: Update expected golden test outputs
     cmds:
       - UPDATE_EXPECTED=1 cargo test golden_cases
+
+  update-golden-ast:
+    desc: Update golden test AST files
+    cmds:
+      - UPDATE_AST=1 cargo test golden_cases
