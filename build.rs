@@ -5,7 +5,6 @@ use std::env;
 use std::fs;
 use std::io::Result;
 use std::path::PathBuf;
-use std::process::Command;
 
 #[path = "src/cli.rs"]
 mod cli;
@@ -88,24 +87,32 @@ fn generate_cli_markdown() -> Result<()> {
     let output_path = docs_dir.join("cli.qmd");
     fs::write(&output_path, &document)?;
 
-    // Try to format with panache if the binary exists
-    // Check if panache binary exists in target/release or is in PATH
-    let panache_bin = PathBuf::from("target/release/panache");
-    if panache_bin.exists() {
+    // Try to format with panache binary (check debug first, then release)
+    let panache_debug = PathBuf::from("target/debug/panache");
+    let panache_release = PathBuf::from("target/release/panache");
+
+    let panache_bin = if panache_debug.exists() {
+        Some(panache_debug)
+    } else if panache_release.exists() {
+        Some(panache_release)
+    } else {
+        None
+    };
+
+    if let Some(bin_path) = panache_bin {
         // Format the file in place using the panache binary
-        let status = Command::new(&panache_bin)
+        match std::process::Command::new(&bin_path)
             .arg("format")
             .arg("--write")
             .arg(&output_path)
-            .status();
-
-        match status {
+            .status()
+        {
             Ok(exit_status) if exit_status.success() => {
                 println!("Generated and formatted CLI markdown: {:?}", output_path);
             }
             _ => {
                 println!(
-                    "Generated CLI markdown (formatting skipped): {:?}",
+                    "Generated CLI markdown (formatting failed): {:?}",
                     output_path
                 );
             }
