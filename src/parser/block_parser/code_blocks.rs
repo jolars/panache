@@ -101,11 +101,13 @@ impl InfoString {
             }
         }
 
-        let attrs = Self::parse_attributes(content);
+        // First, do a preliminary parse to determine block type
+        // Use chunk options parser (comma-aware) for initial detection
+        let prelim_attrs = Self::parse_chunk_options(content);
 
         // First non-ID, non-attribute token determines if it's executable or display
         let mut first_lang_token = None;
-        for (key, val) in attrs.iter() {
+        for (key, val) in prelim_attrs.iter() {
             if val.is_none() && !key.starts_with('#') {
                 first_lang_token = Some(key.as_str());
                 break;
@@ -116,6 +118,9 @@ impl InfoString {
 
         if first_token.starts_with('.') {
             // Display block: {.python} or {.haskell .numberLines}
+            // Re-parse with Pandoc-style parser (space-delimited)
+            let attrs = Self::parse_pandoc_attributes(content);
+
             let classes: Vec<String> = attrs
                 .iter()
                 .filter(|(k, v)| k.starts_with('.') && v.is_none())
@@ -134,7 +139,8 @@ impl InfoString {
             }
         } else if !first_token.is_empty() && !first_token.starts_with('#') {
             // Executable chunk: {python} or {r}
-            // Find the index of the language token
+            // Use chunk options parser (comma-delimited)
+            let attrs = Self::parse_chunk_options(content);
             let lang_index = attrs.iter().position(|(k, _)| k == first_token).unwrap();
 
             InfoString {
@@ -150,7 +156,8 @@ impl InfoString {
                     .collect(),
             }
         } else {
-            // Just attributes, no language
+            // Just attributes, no language - use Pandoc parser
+            let attrs = Self::parse_pandoc_attributes(content);
             InfoString {
                 raw: raw.to_string(),
                 block_type: CodeBlockType::Plain,
@@ -159,7 +166,94 @@ impl InfoString {
         }
     }
 
-    fn parse_attributes(content: &str) -> Vec<(String, Option<String>)> {
+    /// Parse Pandoc-style attributes for display blocks: {.class #id key="value"}
+    /// Spaces are the primary delimiter. Pandoc spec prefers explicit quoting.
+    fn parse_pandoc_attributes(content: &str) -> Vec<(String, Option<String>)> {
+        let mut attrs = Vec::new();
+        let mut chars = content.chars().peekable();
+
+        while chars.peek().is_some() {
+            // Skip whitespace
+            while matches!(chars.peek(), Some(&' ') | Some(&'\t')) {
+                chars.next();
+            }
+
+            if chars.peek().is_none() {
+                break;
+            }
+
+            // Read key
+            let mut key = String::new();
+            while let Some(&ch) = chars.peek() {
+                if ch == '=' || ch == ' ' || ch == '\t' {
+                    break;
+                }
+                key.push(ch);
+                chars.next();
+            }
+
+            if key.is_empty() {
+                break;
+            }
+
+            // Skip whitespace
+            while matches!(chars.peek(), Some(&' ') | Some(&'\t')) {
+                chars.next();
+            }
+
+            // Check for value
+            if chars.peek() == Some(&'=') {
+                chars.next(); // consume '='
+
+                // Skip whitespace after '='
+                while matches!(chars.peek(), Some(&' ') | Some(&'\t')) {
+                    chars.next();
+                }
+
+                // Read value (might be quoted)
+                let value = if chars.peek() == Some(&'"') {
+                    chars.next(); // consume opening quote
+                    let mut val = String::new();
+                    while let Some(&ch) = chars.peek() {
+                        chars.next();
+                        if ch == '"' {
+                            break;
+                        }
+                        if ch == '\\' {
+                            if let Some(&next_ch) = chars.peek() {
+                                chars.next();
+                                val.push(next_ch);
+                            }
+                        } else {
+                            val.push(ch);
+                        }
+                    }
+                    val
+                } else {
+                    // Unquoted value - read until space
+                    let mut val = String::new();
+                    while let Some(&ch) = chars.peek() {
+                        if ch == ' ' || ch == '\t' {
+                            break;
+                        }
+                        val.push(ch);
+                        chars.next();
+                    }
+                    val
+                };
+
+                attrs.push((key, Some(value)));
+            } else {
+                attrs.push((key, None));
+            }
+        }
+
+        attrs
+    }
+
+    /// Parse Quarto/RMarkdown chunk options: {language, option=value, option2=value2}
+    /// Commas are the primary delimiter (R CSV style). Supports unquoted barewords.
+    fn parse_chunk_options(content: &str) -> Vec<(String, Option<String>)> {
         let mut attrs = Vec::new();
         let mut chars = content.chars().peekable();
 
@@ -221,7 +315,7 @@ impl InfoString {
                     }
                     val
                 } else {
-                    // Unquoted value
+                    // Unquoted value - read until comma, space, or tab
                     let mut val = String::new();
                     while let Some(&ch) = chars.peek() {
                         if ch == ' ' || ch == '\t' || ch == ',' {
@@ -240,6 +334,13 @@ impl InfoString {
         }
 
         attrs
+    }
+
+    /// Legacy function - kept for backward compatibility in mixed-form parsing
+    /// For new code, use parse_pandoc_attributes or parse_chunk_options
+    fn parse_attributes(content: &str) -> Vec<(String, Option<String>)> {
+        // Default to chunk options parsing (comma-aware)
+        Self::parse_chunk_options(content)
     }
 }
 
@@ -715,5 +816,70 @@ mod tests {
                 format: "html".to_string()
             }
         );
+    }
+
+    #[test]
+    fn test_parse_pandoc_attributes_spaces() {
+        // Pandoc display blocks use spaces as delimiters
+        let attrs = InfoString::parse_pandoc_attributes(".python .numberLines startFrom=\"10\"");
+        assert_eq!(attrs.len(), 3);
+        assert_eq!(attrs[0], (".python".to_string(), None));
+        assert_eq!(attrs[1], (".numberLines".to_string(), None));
+        assert_eq!(attrs[2], ("startFrom".to_string(), Some("10".to_string())));
+    }
+
+    #[test]
+    fn test_parse_pandoc_attributes_no_commas() {
+        // Commas in Pandoc attributes should be treated as part of the value
+        let attrs = InfoString::parse_pandoc_attributes("#id .class key=value");
+        assert_eq!(attrs.len(), 3);
+        assert_eq!(attrs[0], ("#id".to_string(), None));
+        assert_eq!(attrs[1], (".class".to_string(), None));
+        assert_eq!(attrs[2], ("key".to_string(), Some("value".to_string())));
+    }
+
+    #[test]
+    fn test_parse_chunk_options_commas() {
+        // Quarto/RMarkdown chunks use commas as delimiters
+        let attrs = InfoString::parse_chunk_options("r, echo=FALSE, warning=TRUE");
+        assert_eq!(attrs.len(), 3);
+        assert_eq!(attrs[0], ("r".to_string(), None));
+        assert_eq!(attrs[1], ("echo".to_string(), Some("FALSE".to_string())));
+        assert_eq!(attrs[2], ("warning".to_string(), Some("TRUE".to_string())));
+    }
+
+    #[test]
+    fn test_parse_chunk_options_no_spaces() {
+        // Should handle comma-separated without spaces
+        let attrs = InfoString::parse_chunk_options("r,echo=FALSE,warning=TRUE");
+        assert_eq!(attrs.len(), 3);
+        assert_eq!(attrs[0], ("r".to_string(), None));
+        assert_eq!(attrs[1], ("echo".to_string(), Some("FALSE".to_string())));
+        assert_eq!(attrs[2], ("warning".to_string(), Some("TRUE".to_string())));
+    }
+
+    #[test]
+    fn test_parse_chunk_options_mixed() {
+        // Handle both commas and spaces
+        let attrs = InfoString::parse_chunk_options("python echo=False, warning=True");
+        assert_eq!(attrs.len(), 3);
+        assert_eq!(attrs[0], ("python".to_string(), None));
+        assert_eq!(attrs[1], ("echo".to_string(), Some("False".to_string())));
+        assert_eq!(attrs[2], ("warning".to_string(), Some("True".to_string())));
+    }
+
+    #[test]
+    fn test_display_vs_executable_parsing() {
+        // Display block should use Pandoc parser (spaces)
+        let info1 = InfoString::parse("{.python .numberLines startFrom=\"10\"}");
+        assert!(matches!(
+            info1.block_type,
+            CodeBlockType::DisplayExplicit { .. }
+        ));
+
+        // Executable chunk should use chunk options parser (commas)
+        let info2 = InfoString::parse("{r, echo=FALSE, warning=TRUE}");
+        assert!(matches!(info2.block_type, CodeBlockType::Executable { .. }));
+        assert_eq!(info2.attributes.len(), 2);
     }
 }
