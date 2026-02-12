@@ -329,19 +329,15 @@ impl LanguageServer for PanacheLsp {
         }
 
         // Calculate the range to replace (entire document)
-        let lines: Vec<&str> = text.lines().collect();
-        let end_line = lines.len().saturating_sub(1) as u32;
-        let end_char = lines.last().map(|l| l.len()).unwrap_or(0) as u32;
+        // Use text.len() to ensure we include any trailing newlines
+        let end_position = offset_to_position(&text, text.len());
 
         let range = Range {
             start: Position {
                 line: 0,
                 character: 0,
             },
-            end: Position {
-                line: end_line,
-                character: end_char,
-            },
+            end: end_position,
         };
 
         Ok(Some(vec![TextEdit {
