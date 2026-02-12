@@ -46,15 +46,14 @@ fn expand_paths(paths: &[PathBuf]) -> io::Result<Vec<PathBuf>> {
                 .build();
 
             for entry in walker {
-                let entry = entry.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+                let entry = entry.map_err(io::Error::other)?;
                 let entry_path = entry.path();
 
-                if entry_path.is_file() {
-                    if let Some(ext) = entry_path.extension().and_then(|e| e.to_str()) {
-                        if SUPPORTED_EXTENSIONS.contains(&ext) {
-                            files.push(entry_path.to_path_buf());
-                        }
-                    }
+                if entry_path.is_file()
+                    && let Some(ext) = entry_path.extension().and_then(|e| e.to_str())
+                    && SUPPORTED_EXTENSIONS.contains(&ext)
+                {
+                    files.push(entry_path.to_path_buf());
                 }
             }
         } else {
