@@ -1,5 +1,5 @@
-ROOT@0..29
-  DOCUMENT@0..29
+ROOT@0..117
+  DOCUMENT@0..117
     CodeBlock@0..29
       CodeFenceOpen@0..19
         CodeFenceMarker@0..3 "```"
@@ -11,4 +11,22 @@ ROOT@0..29
       CodeFenceClose@25..29
         CodeFenceMarker@25..28 "```"
         NEWLINE@28..29 "\n"
+    BlankLine@29..30
+      BlankLine@29..30 "\n"
+    PARAGRAPH@30..92
+      TEXT@30..91 "The following is a Qu ..."
+      NEWLINE@91..92 "\n"
+    BlankLine@92..93
+      BlankLine@92..93 "\n"
+    CodeBlock@93..117
+      CodeFenceOpen@93..107
+        CodeFenceMarker@93..96 "```"
+        CodeInfo@96..106 "{{python}}"
+        NEWLINE@106..107 "\n"
+      CodeContent@107..113
+        TEXT@107..112 "1 + 1"
+        NEWLINE@112..113 "\n"
+      CodeFenceClose@113..117
+        CodeFenceMarker@113..116 "```"
+        NEWLINE@116..117 "\n"
 
