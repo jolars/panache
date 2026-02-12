@@ -242,7 +242,13 @@ src/
 │   └── rules/
 │       └── heading_hierarchy.rs # Heading hierarchy rule (h1 → h3 warns)
 ├── lsp.rs               # LSP module entry point
-├── lsp/                 # (empty - LSP code in lsp.rs for now)
+├── lsp/
+│   ├── config.rs            # Config loading and management
+│   ├── conversions.rs       # Position/offset conversion utilities
+│   ├── documents.rs         # Document state management
+│   ├── handlers.rs          # LSP handler trait and implementations
+│   ├── handlers/            # Individual handler modules
+│   └── server.rs            # Backend server implementation
 ├── external_formatters.rs       # Async external formatter integration
 ├── external_formatters_sync.rs  # Sync external formatter integration
 └── external_formatters_common.rs # Shared formatter utilities
