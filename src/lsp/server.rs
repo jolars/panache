@@ -35,6 +35,7 @@ impl LanguageServer for PanacheLsp {
                 document_formatting_provider: Some(OneOf::Left(true)),
                 document_range_formatting_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                document_symbol_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -106,6 +107,18 @@ impl LanguageServer for PanacheLsp {
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await
+    }
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> Result<Option<DocumentSymbolResponse>> {
+        handlers::document_symbols::document_symbol(
+            &self.client,
+            Arc::clone(&self.document_map),
             params,
         )
         .await

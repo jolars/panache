@@ -458,17 +458,20 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 
 **Architecture:**
 
-- LSP code lives in `src/lsp.rs` (not a separate crate to avoid circular dependencies)
+- LSP code organized in `src/lsp/` modules (server, handlers, documents, conversions)
 - Implements `tower_lsp_server::LanguageServer` trait
 - Communicates via stdin/stdout using standard LSP JSON-RPC protocol
-- Uses `tokio::task::spawn_blocking` to handle non-Send `rowan::SyntaxNode` types
+- Document symbols built synchronously (SyntaxNode is not Send)
+- Hierarchical outline: headings contain tables/figures as children
 
 **Current Capabilities:**
 
 - ✅ `textDocument/formatting` - Full document formatting
+- ✅ `textDocument/rangeFormatting` - Range formatting
 - ✅ `textDocument/didOpen/didChange/didClose` - Document tracking (INCREMENTAL sync mode)
 - ✅ `textDocument/publishDiagnostics` - Live linting with diagnostics
 - ✅ `textDocument/codeAction` - Quick fixes for lint issues (heading hierarchy)
+- ✅ `textDocument/documentSymbol` - Document outline with headings, tables, and figures
 - ✅ Config discovery from workspace root (`.panache.toml`)
 - ✅ Thread-safe document state management with Arc
 - ✅ UTF-16 to UTF-8 position conversion for proper incremental edits
@@ -480,20 +483,32 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 - Diagnostics cleared on document close
 - Uses same linter infrastructure as CLI `lint` subcommand
 
+**Document Outline Implementation:**
+
+- Hierarchical structure: H1 contains H2, H2 contains H3, etc.
+- Tables and figures appear as children under their parent heading
+- Symbol extraction from syntax tree:
+  - Headings: Extract text from HeadingContent node
+  - Tables: Extract caption from TableCaption if present
+  - Figures: Extract alt text from ImageAlt node
+- Proper range calculation using `conversions::offset_to_position`
+- Edge case handling: empty headings, documents without headings
+
 **Implementation Details:**
 
 - Document URIs stored as strings (Uri type doesn't implement Send)
 - Workspace root captured from `InitializeParams.workspace_folders` or deprecated `root_uri`
 - Config loaded per formatting request (no caching yet)
-- Formatting runs in blocking task to avoid Send trait issues
-- Linting runs in blocking task (SyntaxNode isn't Send)
+- Document symbols built synchronously (SyntaxNode is not Send)
 - INCREMENTAL sync mode with proper UTF-16/UTF-8 position conversion
 - Full document reparsing (incremental parsing deferred for performance need)
 
 **Testing:**
 
+- 8 unit tests for document symbols (heading hierarchy, tables, figures, edge cases)
 - 13 unit tests for conversion functions (offset_to_position, convert_diagnostic, etc.)
 - Tests cover UTF-16 edge cases (emoji, accented characters)
+- Integration test document at `tests/document_symbols_test.qmd`
 - Manual testing via editor integration (see README.md for editor configs)
 
 **Testing LSP Manually:**

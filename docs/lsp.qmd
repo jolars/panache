@@ -10,6 +10,10 @@ provides document formatting capabilities for editors and IDEs.
 ## Features
 
 - Document formatting (`textDocument/formatting`)
+- Range formatting (`textDocument/rangeFormatting`)
+- Document outline (`textDocument/documentSymbol`) - hierarchical view of headings, tables, and figures
+- Live diagnostics (`textDocument/publishDiagnostics`) - linting errors and warnings
+- Code actions (`textDocument/codeAction`) - quick fixes for lint issues
 - Document tracking (`textDocument/didOpen/didChange/didClose`)
 - Configuration discovery from workspace root
 - Format on save support
@@ -225,12 +229,54 @@ The LSP determines the workspace root by looking for:
 The LSP provides full document formatting via the `textDocument/formatting`
 request. This is the same formatting as the `panache format` CLI command.
 
+Format entire documents or selected ranges:
+
+```vim
+" Neovim: format buffer
+:lua vim.lsp.buf.format()
+
+" Neovim: format selected range
+:'<,'>lua vim.lsp.buf.format()
+```
+
+Format on save is supported by all major editors (see configuration above).
+
+### Document Outline
+
+The LSP provides a hierarchical document outline/symbol view showing:
+
+- **Headings** (H1-H6) with proper nesting
+- **Tables** (with captions when available)
+- **Figures** (image links with alt text)
+
+This appears in:
+
+- VSCode: Outline view (sidebar) or breadcrumbs
+- Neovim: Telescope symbols (`<leader>ss`) or Aerial plugin
+- Helix: Symbol picker (`:symbol-picker`)
+
+The outline is automatically updated as you edit the document.
+
+### Live Diagnostics
+
+Linting errors and warnings are shown in real-time as you type:
+
+- Heading hierarchy violations
+- Future lint rules as they're added
+
+Quick fixes are available via code actions:
+
+```vim
+" Neovim: show code actions at cursor
+:lua vim.lsp.buf.code_action()
+```
+
 ### Document Synchronization
 
-The LSP tracks document changes using **full synchronization mode**:
+The LSP tracks document changes using **incremental synchronization mode**:
 
 - `textDocument/didOpen`: Document opened in editor
-- `textDocument/didChange`: Document content changed (full sync)
+- `textDocument/didChange`: Document content changed (incremental sync)
 - `textDocument/didClose`: Document closed
 
 This ensures the LSP always has the current document state for formatting.

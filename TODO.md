@@ -40,7 +40,7 @@ This document tracks implementation status for panache's features.
 
 #### Navigation & Symbols
 
-- ❌ **Document outline** - `textDocument/documentSymbol` for headings, tables, figures, etc.
+- ✅ **Document outline** - `textDocument/documentSymbol` for headings, tables, figures
 - ❌ **Folding ranges** - `textDocument/foldingRange` for headings, lists, code blocks
 - ❌ **Go to definition** - Jump to reference link/footnote/citation definitions
 - ❌ **Find references** - Find all uses of a reference link/footnote/citation
