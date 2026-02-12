@@ -18,8 +18,9 @@ fn r_chunk_with_comma_separated_options() {
     let input = "```{r, echo=FALSE}\n1 + 1\n```\n";
     let output = format(input, Some(quarto_config()), None);
 
-    // Should preserve unquoted boolean values
-    assert!(output.contains("{r, echo=FALSE}"));
+    // Should convert to hashpipe format in Quarto
+    assert!(output.contains("```{r}"));
+    assert!(output.contains("#| echo: false"));
     assert!(
         !output.contains("echo=\"FALSE\""),
         "Should not add quotes to boolean FALSE"
@@ -31,10 +32,10 @@ fn r_chunk_with_multiple_options() {
     let input = "```{r, echo=FALSE, warning=TRUE, message=FALSE}\nx <- 1\n```\n";
     let output = format(input, Some(quarto_config()), None);
 
-    // All boolean values should stay unquoted
-    assert!(output.contains("echo=FALSE"));
-    assert!(output.contains("warning=TRUE"));
-    assert!(output.contains("message=FALSE"));
+    // All boolean values should be converted to hashpipe with lowercase
+    assert!(output.contains("#| echo: false"));
+    assert!(output.contains("#| warning: true"));
+    assert!(output.contains("#| message: false"));
 }
 
 #[test]
@@ -42,9 +43,9 @@ fn r_chunk_with_quoted_string() {
     let input = "```{r, label=\"my chunk\", echo=FALSE}\ny <- 2\n```\n";
     let output = format(input, Some(quarto_config()), None);
 
-    // Quoted strings should keep quotes, barewords should not get quotes
-    assert!(output.contains("label=\"my chunk\""));
-    assert!(output.contains("echo=FALSE"));
+    // Quoted strings should be converted to hashpipe, preserving quotes
+    assert!(output.contains("#| label: \"my chunk\""));
+    assert!(output.contains("#| echo: false"));
     assert!(!output.contains("echo=\"FALSE\""));
 }
 
@@ -64,8 +65,9 @@ fn r_chunk_without_spaces_after_commas() {
     let input = "```{r,echo=TRUE,warning=FALSE}\na <- 4\n```\n";
     let output = format(input, Some(quarto_config()), None);
 
-    // Should normalize to have comma-space separator
-    assert!(output.contains("{r, echo=TRUE, warning=FALSE}"));
+    // Should convert to hashpipe format
+    assert!(output.contains("#| echo: true"));
+    assert!(output.contains("#| warning: false"));
 }
 
 #[test]
@@ -82,9 +84,9 @@ fn chunk_with_numeric_value() {
     let input = "```{r, fig.width=7, fig.height=5}\nplot(x)\n```\n";
     let output = format(input, Some(quarto_config()), None);
 
-    // Numeric values should stay unquoted
-    assert!(output.contains("fig.width=7"));
-    assert!(output.contains("fig.height=5"));
+    // Numeric values should be converted to hashpipe with normalized names
+    assert!(output.contains("#| fig-width: 7"));
+    assert!(output.contains("#| fig-height: 5"));
 }
 
 #[test]

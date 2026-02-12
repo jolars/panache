@@ -6,6 +6,7 @@ mod blockquotes;
 mod code_blocks;
 mod core;
 mod fenced_divs;
+mod hashpipe;
 mod headings;
 mod inline;
 mod lists;

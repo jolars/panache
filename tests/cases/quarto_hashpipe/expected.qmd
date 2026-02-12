@@ -1,0 +1,37 @@
+# Quarto Document with Code Chunks
+
+## Basic R Chunk
+
+```{r}
+#| echo: false
+#| warning: true
+x <- 1 + 1
+print(x)
+```
+
+## Chunk with Figure Options
+
+```{r}
+#| fig-cap: "A nice plot"
+#| fig-width: 7
+#| fig-height: 5
+plot(1:10, main="Test")
+```
+
+## Chunk with Label and Mixed Options
+
+```{r, cache=my_cache_var}
+#| label: analysis-chunk
+#| echo: false
+#| message: true
+# This has a complex expression that stays inline
+result <- analyze_data()
+```
+
+## Chunk with label
+
+```{r}
+#| label: mylabel
+#| echo: false
+summary(data)
+```

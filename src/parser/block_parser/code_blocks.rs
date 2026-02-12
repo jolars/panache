@@ -143,17 +143,49 @@ impl InfoString {
             let attrs = Self::parse_chunk_options(content);
             let lang_index = attrs.iter().position(|(k, _)| k == first_token).unwrap();
 
+            // Check if there's a second bareword (implicit label in R/Quarto chunks)
+            // Pattern: {r mylabel} is equivalent to {r, label=mylabel}
+            let mut has_implicit_label = false;
+            let implicit_label_value = if lang_index + 1 < attrs.len() {
+                if let (label_key, None) = &attrs[lang_index + 1] {
+                    // Second bareword after language
+                    has_implicit_label = true;
+                    Some(label_key.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let mut final_attrs: Vec<(String, Option<String>)> = attrs
+                .into_iter()
+                .enumerate()
+                .filter(|(i, _)| {
+                    // Remove language token
+                    if *i == lang_index {
+                        return false;
+                    }
+                    // Remove implicit label token (will be added back explicitly)
+                    if has_implicit_label && *i == lang_index + 1 {
+                        return false;
+                    }
+                    true
+                })
+                .map(|(_, attr)| attr)
+                .collect();
+
+            // Add explicit label if we found an implicit one
+            if let Some(label_val) = implicit_label_value {
+                final_attrs.insert(0, ("label".to_string(), Some(label_val)));
+            }
+
             InfoString {
                 raw: raw.to_string(),
                 block_type: CodeBlockType::Executable {
                     language: first_token.to_string(),
                 },
-                attributes: attrs
-                    .into_iter()
-                    .enumerate()
-                    .filter(|(i, _)| *i != lang_index)
-                    .map(|(_, attr)| attr)
-                    .collect(),
+                attributes: final_attrs,
             }
         } else {
             // Just attributes, no language - use Pandoc parser
@@ -881,5 +913,39 @@ mod tests {
         let info2 = InfoString::parse("{r, echo=FALSE, warning=TRUE}");
         assert!(matches!(info2.block_type, CodeBlockType::Executable { .. }));
         assert_eq!(info2.attributes.len(), 2);
+    }
+
+    #[test]
+    fn test_info_string_executable_implicit_label() {
+        // {r mylabel} should parse as label=mylabel
+        let info = InfoString::parse("{r mylabel}");
+        assert!(matches!(
+            info.block_type,
+            CodeBlockType::Executable { ref language } if language == "r"
+        ));
+        assert_eq!(info.attributes.len(), 1);
+        assert_eq!(
+            info.attributes[0],
+            ("label".to_string(), Some("mylabel".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_info_string_executable_implicit_label_with_options() {
+        // {r mylabel, echo=FALSE} should parse as label=mylabel, echo=FALSE
+        let info = InfoString::parse("{r mylabel, echo=FALSE}");
+        assert!(matches!(
+            info.block_type,
+            CodeBlockType::Executable { ref language } if language == "r"
+        ));
+        assert_eq!(info.attributes.len(), 2);
+        assert_eq!(
+            info.attributes[0],
+            ("label".to_string(), Some("mylabel".to_string()))
+        );
+        assert_eq!(
+            info.attributes[1],
+            ("echo".to_string(), Some("FALSE".to_string()))
+        );
     }
 }

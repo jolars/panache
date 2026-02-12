@@ -1,0 +1,112 @@
+ROOT@0..507
+  DOCUMENT@0..507
+    Heading@0..35
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..34
+        TEXT@2..34 "Quarto Document with  ..."
+      NEWLINE@34..35 "\n"
+    BlankLine@35..36
+      BlankLine@35..36 "\n"
+    Heading@36..53
+      AtxHeadingMarker@36..38
+        AtxHeadingMarker@36..38 "##"
+      WHITESPACE@38..39 " "
+      HeadingContent@39..52
+        TEXT@39..52 "Basic R Chunk"
+      NEWLINE@52..53 "\n"
+    BlankLine@53..54
+      BlankLine@53..54 "\n"
+    CodeBlock@54..115
+      CodeFenceOpen@54..91
+        CodeFenceMarker@54..57 "```"
+        CodeInfo@57..90 "{r, echo = FALSE, war ..."
+        NEWLINE@90..91 "\n"
+      CodeContent@91..111
+        TEXT@91..101 "x <- 1 + 1"
+        NEWLINE@101..102 "\n"
+        TEXT@102..110 "print(x)"
+        NEWLINE@110..111 "\n"
+      CodeFenceClose@111..115
+        CodeFenceMarker@111..114 "```"
+        NEWLINE@114..115 "\n"
+    BlankLine@115..116
+      BlankLine@115..116 "\n"
+    Heading@116..145
+      AtxHeadingMarker@116..118
+        AtxHeadingMarker@116..118 "##"
+      WHITESPACE@118..119 " "
+      HeadingContent@119..144
+        TEXT@119..144 "Chunk with Figure Opt ..."
+      NEWLINE@144..145 "\n"
+    BlankLine@145..146
+      BlankLine@145..146 "\n"
+    CodeBlock@146..237
+      CodeFenceOpen@146..176
+        CodeFenceMarker@146..149 "```"
+        CodeInfo@149..175 "{r, fig-cap=\"A nice p ..."
+        NEWLINE@175..176 "\n"
+      CodeContent@176..233
+        TEXT@176..191 "#| fig-width: 7"
+        NEWLINE@191..192 "\n"
+        TEXT@192..208 "#| fig-height: 5"
+        NEWLINE@208..209 "\n"
+        TEXT@209..232 "plot(1:10, main=\"Test\")"
+        NEWLINE@232..233 "\n"
+      CodeFenceClose@233..237
+        CodeFenceMarker@233..236 "```"
+        NEWLINE@236..237 "\n"
+    BlankLine@237..238
+      BlankLine@237..238 "\n"
+    Heading@238..276
+      AtxHeadingMarker@238..240
+        AtxHeadingMarker@238..240 "##"
+      WHITESPACE@240..241 " "
+      HeadingContent@241..275
+        TEXT@241..275 "Chunk with Label and  ..."
+      NEWLINE@275..276 "\n"
+    BlankLine@276..277
+      BlankLine@276..277 "\n"
+    CodeBlock@277..437
+      CodeFenceOpen@277..326
+        CodeFenceMarker@277..280 "```"
+        CodeInfo@280..325 "{r, label=analysis-ch ..."
+        NEWLINE@325..326 "\n"
+      CodeContent@326..433
+        TEXT@326..340 "#| echo: false"
+        NEWLINE@340..341 "\n"
+        TEXT@341..357 "#| message: true"
+        NEWLINE@357..358 "\n"
+        TEXT@358..407 "# This has a complex  ..."
+        NEWLINE@407..408 "\n"
+        TEXT@408..432 "result <- analyze_data()"
+        NEWLINE@432..433 "\n"
+      CodeFenceClose@433..437
+        CodeFenceMarker@433..436 "```"
+        NEWLINE@436..437 "\n"
+    BlankLine@437..438
+      BlankLine@437..438 "\n"
+    Heading@438..458
+      AtxHeadingMarker@438..440
+        AtxHeadingMarker@438..440 "##"
+      WHITESPACE@440..441 " "
+      HeadingContent@441..457
+        TEXT@441..457 "Chunk with label"
+      NEWLINE@457..458 "\n"
+    BlankLine@458..459
+      BlankLine@458..459 "\n"
+    CodeBlock@459..507
+      CodeFenceOpen@459..474
+        CodeFenceMarker@459..462 "```"
+        CodeInfo@462..473 "{r mylabel}"
+        NEWLINE@473..474 "\n"
+      CodeContent@474..503
+        TEXT@474..488 "#| echo: false"
+        NEWLINE@488..489 "\n"
+        TEXT@489..502 "summary(data)"
+        NEWLINE@502..503 "\n"
+      CodeFenceClose@503..507
+        CodeFenceMarker@503..506 "```"
+        NEWLINE@506..507 "\n"
+

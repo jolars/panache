@@ -1,4 +1,4 @@
-use crate::config::{AttributeStyle, Config, FenceStyle};
+use crate::config::{AttributeStyle, Config, FenceStyle, Flavor};
 #[cfg(feature = "lsp")]
 use crate::external_formatters::format_code_async;
 use crate::parser::block_parser::code_blocks::{CodeBlockType, InfoString};
@@ -7,6 +7,8 @@ use rowan::NodeOrToken;
 use std::collections::HashMap;
 #[cfg(feature = "lsp")]
 use std::time::Duration;
+
+use super::hashpipe;
 
 /// Format a code block, normalizing fence markers and attributes based on config
 pub(super) fn format_code_block(
@@ -64,22 +66,38 @@ pub(super) fn format_code_block(
         config.code_blocks.min_fence_length,
     );
 
-    // Format the info string based on config and block type
-    let formatted_info = format_info_string(&info, config);
+    // Check if we should use hashpipe format for Quarto executable chunks
+    let use_hashpipe = matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown)
+        && matches!(&info.block_type, CodeBlockType::Executable { .. });
 
-    // Output normalized code block
-    for _ in 0..fence_length {
-        output.push(fence_char);
+    if use_hashpipe {
+        // Format as hashpipe with YAML-style options
+        format_code_block_hashpipe(
+            &info,
+            final_content,
+            fence_char,
+            fence_length,
+            config,
+            output,
+        );
+    } else {
+        // Format the info string based on config and block type (traditional inline)
+        let formatted_info = format_info_string(&info, config);
+
+        // Output normalized code block
+        for _ in 0..fence_length {
+            output.push(fence_char);
+        }
+        if !formatted_info.is_empty() {
+            output.push_str(&formatted_info);
+        }
+        output.push('\n');
+        output.push_str(final_content);
+        for _ in 0..fence_length {
+            output.push(fence_char);
+        }
+        output.push('\n');
     }
-    if !formatted_info.is_empty() {
-        output.push_str(&formatted_info);
-    }
-    output.push('\n');
-    output.push_str(final_content);
-    for _ in 0..fence_length {
-        output.push(fence_char);
-    }
-    output.push('\n');
 }
 
 /// Determine the minimum fence length needed to avoid conflicts with content
@@ -224,6 +242,56 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
             format!("{{={}}}", format)
         }
     }
+}
+
+/// Format a code block using Quarto hashpipe style for executable chunks.
+///
+/// Converts simple inline options to hashpipe format with YAML syntax,
+/// while keeping complex expressions in the inline position.
+fn format_code_block_hashpipe(
+    info: &InfoString,
+    content: &str,
+    fence_char: char,
+    fence_length: usize,
+    config: &Config,
+    output: &mut String,
+) {
+    let language = match &info.block_type {
+        CodeBlockType::Executable { language } => language,
+        _ => unreachable!("hashpipe only for executable chunks"),
+    };
+
+    // Classify options into simple (hashpipe) vs complex (inline)
+    let (simple, complex) = hashpipe::split_options(&info.attributes);
+
+    // Open fence with language and any complex options
+    for _ in 0..fence_length {
+        output.push(fence_char);
+    }
+    output.push('{');
+    output.push_str(language);
+    if !complex.is_empty() {
+        output.push_str(", ");
+        output.push_str(&format_attributes(&complex, true));
+    }
+    output.push('}');
+    output.push('\n');
+
+    // Add hashpipe options
+    let hashpipe_lines = hashpipe::format_as_hashpipe(language, &simple, config.line_width);
+    for line in hashpipe_lines {
+        output.push_str(&line);
+        output.push('\n');
+    }
+
+    // Add content
+    output.push_str(content);
+
+    // Close fence
+    for _ in 0..fence_length {
+        output.push(fence_char);
+    }
+    output.push('\n');
 }
 
 /// Format attribute key-value pairs
