@@ -9,7 +9,7 @@
 //!
 //! This is enabled by the raw_attribute extension.
 
-use crate::block_parser::attributes::AttributeBlock;
+use crate::parser::block_parser::attributes::AttributeBlock;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -69,7 +69,7 @@ pub fn emit_raw_inline(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_parser::attributes::AttributeBlock;
+    use crate::parser::block_parser::attributes::AttributeBlock;
 
     #[test]
     fn test_is_raw_inline_html() {

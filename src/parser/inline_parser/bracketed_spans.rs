@@ -3,7 +3,7 @@
 //! Syntax: `[inline content]{.class key="val"}`
 
 use crate::config::Config;
-use crate::inline_parser::parse_inline_text;
+use crate::parser::inline_parser::parse_inline_text;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 

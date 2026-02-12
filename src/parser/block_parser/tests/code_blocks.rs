@@ -1,4 +1,6 @@
-use crate::block_parser::tests::helpers::{assert_block_kinds, find_all, find_first, parse_blocks};
+use crate::parser::block_parser::tests::helpers::{
+    assert_block_kinds, find_all, find_first, parse_blocks,
+};
 use crate::syntax::{SyntaxKind, SyntaxToken};
 
 fn get_code_content(node: &crate::syntax::SyntaxNode) -> Option<String> {

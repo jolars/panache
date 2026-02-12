@@ -60,7 +60,7 @@ pub fn parse_inline_text(
     builder: &mut GreenNodeBuilder,
     text: &str,
     config: &Config,
-    reference_registry: Option<&crate::block_parser::ReferenceRegistry>,
+    reference_registry: Option<&crate::parser::block_parser::ReferenceRegistry>,
 ) {
     log::trace!(
         "Parsing inline text: {:?} ({} bytes), tex_math_single_backslash={}",
@@ -458,7 +458,7 @@ fn find_next_inline_start(text: &str) -> usize {
 pub struct InlineParser {
     root: SyntaxNode,
     #[allow(dead_code)] // TODO: Will be used for reference link/image resolution
-    reference_registry: crate::block_parser::ReferenceRegistry,
+    reference_registry: crate::parser::block_parser::ReferenceRegistry,
     #[allow(dead_code)] // TODO: Will be used for extension configuration
     config: Config,
 }
@@ -467,7 +467,7 @@ impl InlineParser {
     pub fn new(
         root: SyntaxNode,
         config: Config,
-        reference_registry: crate::block_parser::ReferenceRegistry,
+        reference_registry: crate::parser::block_parser::ReferenceRegistry,
     ) -> Self {
         Self {
             root,
@@ -554,8 +554,8 @@ impl InlineParser {
 #[cfg(test)]
 mod inline_tests {
     use super::*;
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
+    use crate::parser::block_parser::BlockParser;
 
     fn find_nodes_by_kind(node: &SyntaxNode, kind: SyntaxKind) -> Vec<String> {
         let mut results = Vec::new();

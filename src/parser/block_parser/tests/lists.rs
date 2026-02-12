@@ -1,4 +1,4 @@
-use crate::block_parser::tests::helpers::{
+use crate::parser::block_parser::tests::helpers::{
     assert_block_kinds, count_children, find_all, find_first, parse_blocks,
 };
 use crate::syntax::SyntaxKind;
@@ -183,7 +183,7 @@ fn fancy_list_lower_alpha_period() {
         ..Default::default()
     };
     let input = "a. first\nb. second\nc. third\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -201,7 +201,7 @@ fn fancy_list_lower_alpha_right_paren() {
         ..Default::default()
     };
     let input = "a) first\nb) second\nc) third\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -219,7 +219,7 @@ fn fancy_list_lower_alpha_parens() {
         ..Default::default()
     };
     let input = "(a) first\n(b) second\n(c) third\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -237,7 +237,7 @@ fn fancy_list_upper_alpha_period() {
         ..Default::default()
     };
     let input = "A.  first\nB.  second\nC.  third\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -256,14 +256,14 @@ fn fancy_list_upper_alpha_period_requires_two_spaces() {
     };
     // One space should NOT parse as list (to avoid false positives like "B. Russell")
     let input = "A. first\nB. second\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     assert!(find_first(&tree, SyntaxKind::List).is_none());
 
     // Two spaces SHOULD parse as list
     let input_valid = "A.  first\nB.  second\n";
-    let tree_valid = crate::block_parser::BlockParser::new(input_valid, &config)
+    let tree_valid = crate::parser::block_parser::BlockParser::new(input_valid, &config)
         .parse()
         .0;
     let list = find_first(&tree_valid, SyntaxKind::List).expect("should find list with 2 spaces");
@@ -281,7 +281,7 @@ fn fancy_list_lower_roman_period() {
         ..Default::default()
     };
     let input = "i. first\nii. second\niii. third\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -299,7 +299,7 @@ fn fancy_list_lower_roman_right_paren() {
         ..Default::default()
     };
     let input = "i) first\nii) second\niii) third\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -317,7 +317,7 @@ fn fancy_list_lower_roman_parens() {
         ..Default::default()
     };
     let input = "(i) first\n(ii) second\n(iii) third\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -335,7 +335,7 @@ fn fancy_list_upper_roman_period() {
         ..Default::default()
     };
     let input = "I. first\nII. second\nIII. third\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -353,7 +353,7 @@ fn fancy_list_upper_roman_right_paren() {
         ..Default::default()
     };
     let input = "I) first\nII) second\nIII) third\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -372,7 +372,7 @@ fn fancy_list_disabled_when_extension_off() {
         ..Default::default()
     };
     let input = "a. first\nb. second\n";
-    let (tree, _) = crate::block_parser::BlockParser::new(input, &config).parse();
+    let (tree, _) = crate::parser::block_parser::BlockParser::new(input, &config).parse();
     assert!(find_first(&tree, SyntaxKind::List).is_none());
 }
 
@@ -388,7 +388,7 @@ fn fancy_list_complex_roman() {
     };
     let input =
         "iv. fourth\nv. fifth\nvi. sixth\nvii. seventh\nviii. eighth\nix. ninth\nx. tenth\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -408,7 +408,7 @@ fn example_list_basic() {
         ..Default::default()
     };
     let input = "(@) First example\n(@) Second example\n(@) Third example\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -426,7 +426,7 @@ fn example_list_with_labels() {
         ..Default::default()
     };
     let input = "(@good) This is a good example\n(@bad) This is a bad example\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -444,7 +444,7 @@ fn example_list_mixed_labeled_unlabeled() {
         ..Default::default()
     };
     let input = "(@) First example\n(@foo) Labeled example\n(@) Another example\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");
@@ -463,7 +463,7 @@ fn example_list_separated_by_text() {
     };
     // According to spec, example lists can be separated and continue numbering
     let input = "(@) First example\n\nSome text.\n\n(@) Second example\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let lists = find_all(&tree, SyntaxKind::List);
@@ -486,7 +486,7 @@ fn example_list_disabled_when_extension_off() {
         ..Default::default()
     };
     let input = "(@) example\n";
-    let (tree, _) = crate::block_parser::BlockParser::new(input, &config).parse();
+    let (tree, _) = crate::parser::block_parser::BlockParser::new(input, &config).parse();
     assert!(find_first(&tree, SyntaxKind::List).is_none());
 }
 
@@ -501,7 +501,7 @@ fn example_list_with_underscores_and_hyphens() {
         ..Default::default()
     };
     let input = "(@my_label) Example with underscore\n(@my-label) Example with hyphen\n";
-    let tree = crate::block_parser::BlockParser::new(input, &config)
+    let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
     let list = find_first(&tree, SyntaxKind::List).expect("should find list");

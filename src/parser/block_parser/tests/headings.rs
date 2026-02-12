@@ -1,4 +1,4 @@
-use crate::block_parser::tests::helpers::{find_first, parse_blocks};
+use crate::parser::block_parser::tests::helpers::{find_first, parse_blocks};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 fn get_heading_content(node: &SyntaxNode) -> Option<String> {

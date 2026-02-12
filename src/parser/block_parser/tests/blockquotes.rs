@@ -1,4 +1,4 @@
-use crate::block_parser::tests::helpers::parse_blocks;
+use crate::parser::block_parser::tests::helpers::parse_blocks;
 use crate::syntax::SyntaxKind;
 
 fn count_nodes_of_type(root: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {

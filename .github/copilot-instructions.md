@@ -135,10 +135,10 @@ RUST_LOG=debug panache format document.qmd
 RUST_LOG=trace panache format document.qmd
 
 # Module-specific: Only inline parser debug logs
-RUST_LOG=panache::inline_parser=debug panache format document.qmd
+RUST_LOG=panache::parser::inline_parser=debug panache format document.qmd
 
 # Multiple modules with different levels
-RUST_LOG=panache::block_parser=trace,panache::formatter=debug panache format document.qmd
+RUST_LOG=panache::parser::block_parser=trace,panache::formatter=debug panache format document.qmd
 ```
 
 **Log levels and content:**
@@ -149,8 +149,8 @@ RUST_LOG=panache::block_parser=trace,panache::formatter=debug panache format doc
 
 **Modules with logging:**
 
-- `panache::block_parser` - Block element detection (headings, tables, code blocks, etc.)
-- `panache::inline_parser` - Inline element matching (emphasis, code, math, links, footnotes)
+- `panache::parser::block_parser` - Block element detection (headings, tables, code blocks, etc.)
+- `panache::parser::inline_parser` - Inline element matching (emphasis, code, math, links, footnotes)
 - `panache::formatter` - Formatting decisions and node traversal
 - `panache::config` - Config file loading and resolution
 
@@ -191,47 +191,49 @@ src/
 │   ├── tables.rs           # Table formatting logic (grid tables, pipe tables, simple tables)
 │   ├── fenced_divs.rs      # Fenced div formatting logic (Quarto/Pandoc)
 │   └── metadata.rs         # Frontmatter formatting logic (YAML, TOML, Pandoc)
-├── block_parser.rs      # Block parser module entry point
-├── block_parser/
-│   ├── attributes.rs        # Attribute parsing ({#id .class key=value})
-│   ├── blockquotes.rs       # Blockquote parsing and resolution
-│   ├── code_blocks.rs       # Fenced code block parsing
-│   ├── container_stack.rs   # Container block stack management
-│   ├── definition_lists.rs  # Definition list parsing
-│   ├── display_math.rs      # Display math block parsing ($$)
-│   ├── fenced_divs.rs       # Quarto/Pandoc fenced div parsing (:::)
-│   ├── headings.rs          # ATX heading parsing (#)
-│   ├── horizontal_rules.rs  # Horizontal rule parsing (---)
-│   ├── html_blocks.rs       # HTML block parsing
-│   ├── indented_code.rs     # Indented code block parsing
-│   ├── latex_envs.rs        # LaTeX environment parsing (\begin{} \end{})
-│   ├── line_blocks.rs       # Line block parsing (|)
-│   ├── lists.rs             # List parsing (ordered/unordered/task/definition)
-│   ├── metadata.rs          # Frontmatter parsing (YAML, TOML, Pandoc title block)
-│   ├── paragraphs.rs        # Paragraph parsing
-│   ├── reference_definitions.rs # Reference link/footnote definition parsing
-│   ├── tables.rs            # Table parsing (grid, pipe, simple)
-│   ├── utils.rs             # Helper functions (strip_leading_spaces, etc.)
-│   └── tests/               # Block parser unit tests
-├── inline_parser.rs     # Inline parser module entry point
-├── inline_parser/
-│   ├── architecture_tests.rs # Tests for nested inline structures
-│   ├── bracketed_spans.rs    # Bracketed span parsing ([text]{.class})
-│   ├── citations.rs          # Citation parsing (@key, [@key])
-│   ├── code_spans.rs         # Code span parsing (`code`)
-│   ├── emphasis.rs           # Emphasis/strong parsing (*em* **strong**)
-│   ├── escapes.rs            # Escape sequence parsing (\*)
-│   ├── inline_footnotes.rs   # Inline footnote parsing (^[text])
-│   ├── inline_math.rs        # Inline math parsing ($x^2$)
-│   ├── latex.rs              # Inline LaTeX command parsing (\command)
-│   ├── links.rs              # Link and image parsing ([text](url))
-│   ├── native_spans.rs       # Native span parsing
-│   ├── raw_inline.rs         # Raw inline parsing (`code`{=format})
-│   ├── strikeout.rs          # Strikeout parsing (~~text~~)
-│   ├── subscript.rs          # Subscript parsing (~text~)
-│   ├── superscript.rs        # Superscript parsing (^text^)
-│   ├── tests/                # Inline parser test modules
-│   └── tests.rs              # Integration tests
+├── parser.rs            # Parser module entry point with parse() function
+├── parser/
+│   ├── block_parser.rs      # Block parser module entry point
+│   ├── block_parser/
+│   │   ├── attributes.rs        # Attribute parsing ({#id .class key=value})
+│   │   ├── blockquotes.rs       # Blockquote parsing and resolution
+│   │   ├── code_blocks.rs       # Fenced code block parsing
+│   │   ├── container_stack.rs   # Container block stack management
+│   │   ├── definition_lists.rs  # Definition list parsing
+│   │   ├── display_math.rs      # Display math block parsing ($$)
+│   │   ├── fenced_divs.rs       # Quarto/Pandoc fenced div parsing (:::)
+│   │   ├── headings.rs          # ATX heading parsing (#)
+│   │   ├── horizontal_rules.rs  # Horizontal rule parsing (---)
+│   │   ├── html_blocks.rs       # HTML block parsing
+│   │   ├── indented_code.rs     # Indented code block parsing
+│   │   ├── latex_envs.rs        # LaTeX environment parsing (\begin{} \end{})
+│   │   ├── line_blocks.rs       # Line block parsing (|)
+│   │   ├── lists.rs             # List parsing (ordered/unordered/task/definition)
+│   │   ├── metadata.rs          # Frontmatter parsing (YAML, TOML, Pandoc title block)
+│   │   ├── paragraphs.rs        # Paragraph parsing
+│   │   ├── reference_definitions.rs # Reference link/footnote definition parsing
+│   │   ├── tables.rs            # Table parsing (grid, pipe, simple)
+│   │   ├── utils.rs             # Helper functions (strip_leading_spaces, etc.)
+│   │   └── tests/               # Block parser unit tests
+│   ├── inline_parser.rs     # Inline parser module entry point
+│   └── inline_parser/
+│       ├── architecture_tests.rs # Tests for nested inline structures
+│       ├── bracketed_spans.rs    # Bracketed span parsing ([text]{.class})
+│       ├── citations.rs          # Citation parsing (@key, [@key])
+│       ├── code_spans.rs         # Code span parsing (`code`)
+│       ├── emphasis.rs           # Emphasis/strong parsing (*em* **strong**)
+│       ├── escapes.rs            # Escape sequence parsing (\*)
+│       ├── inline_footnotes.rs   # Inline footnote parsing (^[text])
+│       ├── inline_math.rs        # Inline math parsing ($x^2$)
+│       ├── latex.rs              # Inline LaTeX command parsing (\command)
+│       ├── links.rs              # Link and image parsing ([text](url))
+│       ├── native_spans.rs       # Native span parsing
+│       ├── raw_inline.rs         # Raw inline parsing (`code`{=format})
+│       ├── strikeout.rs          # Strikeout parsing (~~text~~)
+│       ├── subscript.rs          # Subscript parsing (~text~)
+│       ├── superscript.rs        # Superscript parsing (^text^)
+│       ├── tests/                # Inline parser test modules
+│       └── tests.rs              # Integration tests
 ├── linter.rs            # Linter module entry point (public API)
 ├── linter/
 │   ├── diagnostics.rs       # Diagnostic types (Location, Severity, Fix, Edit)
@@ -501,8 +503,8 @@ panache has comprehensive logging (~50 strategic log statements):
 
 - **Release builds**: INFO logs only (formatting metrics, config loading) - zero overhead for DEBUG/TRACE
 - **Debug builds**: Full DEBUG and TRACE logging available
-- **Modules logged**: block_parser, inline_parser, formatter, config
-- **Usage**: `RUST_LOG=debug cargo run` or `RUST_LOG=panache::inline_parser=trace cargo run`
+- **Modules logged**: parser::block_parser, parser::inline_parser, formatter, config
+- **Usage**: `RUST_LOG=debug cargo run` or `RUST_LOG=panache::parser::inline_parser=trace cargo run`
 - **Purpose**: Debug parsing decisions, understand element matching, trace formatter behavior
 
 Example log output (DEBUG level):
@@ -596,11 +598,12 @@ The `docs/playground/` contains a WASM-based web interface:
 - Block parser captures block structures (including nested ones) using a two-pass approach:
   1. First pass: Parse flat block structures (headings, code blocks, paragraphs, etc.)
   2. Second pass: Resolve container blocks (blockquotes, lists) from flat structure
-- Each block type is isolated in its own module under `src/block_parser/`
+- Each block type is isolated in its own module under `src/parser/block_parser/`
 - Inline parser runs after block parser to handle inline syntax within blocks
   - Uses delimiter-based parsing with proper precedence (CommonMark spec)
   - Recursive parsing for nested inline elements (e.g., code/emphasis in links)
   - Standalone `parse_inline_text()` function enables recursive calls
+- `parser::parse()` function provides clean API that hides two-stage implementation
 - Parser builds rowan CST consumed by formatter
 - Formatter is split into focused modules under `src/formatter/`:
   - Each module has clear responsibilities (wrapping, inline, paragraphs, headings, code blocks)

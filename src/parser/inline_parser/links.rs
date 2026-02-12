@@ -10,12 +10,12 @@
 //! - Reference images: `![alt][ref]`, `![alt][]`, `![alt]`
 
 use crate::config::Config;
-use crate::inline_parser::parse_inline_text;
+use crate::parser::inline_parser::parse_inline_text;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 // Import attribute parsing
-use crate::block_parser::attributes::{
+use crate::parser::block_parser::attributes::{
     AttributeBlock, emit_attributes, try_parse_trailing_attributes,
 };
 
@@ -136,7 +136,7 @@ pub fn emit_inline_image(
     builder.start_node(SyntaxKind::ImageAlt.into());
     // Use the standalone parse_inline_text function for recursive parsing
     // Note: nested contexts don't resolve references
-    crate::inline_parser::parse_inline_text(builder, alt_text, config, None);
+    crate::parser::inline_parser::parse_inline_text(builder, alt_text, config, None);
     builder.finish_node();
 
     // Closing ] and opening (
@@ -331,7 +331,7 @@ pub fn emit_inline_link(
     // Link text (recursively parse inline elements)
     builder.start_node(SyntaxKind::LinkText.into());
     // Use the standalone parse_inline_text function for recursive parsing
-    crate::inline_parser::parse_inline_text(builder, link_text, config, None);
+    crate::parser::inline_parser::parse_inline_text(builder, link_text, config, None);
     builder.finish_node();
 
     // Closing ] and opening (
@@ -480,7 +480,7 @@ pub fn emit_reference_link(
 
     // Link text (recursively parse inline elements)
     builder.start_node(SyntaxKind::LinkText.into());
-    crate::inline_parser::parse_inline_text(builder, link_text, config, None);
+    crate::parser::inline_parser::parse_inline_text(builder, link_text, config, None);
     builder.finish_node();
 
     // Closing ] and reference label

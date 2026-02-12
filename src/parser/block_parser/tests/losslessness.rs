@@ -1,5 +1,5 @@
-use crate::block_parser::BlockParser;
 use crate::config::Config;
+use crate::parser::block_parser::BlockParser;
 
 #[test]
 fn test_losslessness_basic() {

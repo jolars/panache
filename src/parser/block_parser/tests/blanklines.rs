@@ -1,4 +1,4 @@
-use crate::block_parser::tests::helpers::assert_block_kinds;
+use crate::parser::block_parser::tests::helpers::assert_block_kinds;
 use crate::syntax::SyntaxKind;
 
 #[test]

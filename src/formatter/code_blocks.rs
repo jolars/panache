@@ -1,7 +1,7 @@
-use crate::block_parser::code_blocks::{CodeBlockType, InfoString};
 use crate::config::{AttributeStyle, Config, FenceStyle};
 #[cfg(feature = "lsp")]
 use crate::external_formatters::format_code_async;
+use crate::parser::block_parser::code_blocks::{CodeBlockType, InfoString};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;

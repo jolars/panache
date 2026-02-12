@@ -3,7 +3,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 // Import the attribute parsing from block_parser
-use crate::block_parser::attributes::{
+use crate::parser::block_parser::attributes::{
     AttributeBlock, emit_attributes, try_parse_trailing_attributes,
 };
 

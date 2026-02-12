@@ -1,11 +1,11 @@
 // Architecture and nesting tests for inline parser
 
 #[cfg(test)]
-use crate::block_parser::BlockParser;
-#[cfg(test)]
 use crate::config::Config;
 #[cfg(test)]
-use crate::inline_parser::InlineParser;
+use crate::parser::block_parser::BlockParser;
+#[cfg(test)]
+use crate::parser::inline_parser::InlineParser;
 #[cfg(test)]
 use crate::syntax::SyntaxKind;
 

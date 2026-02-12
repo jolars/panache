@@ -3,9 +3,9 @@
 
 #[cfg(test)]
 mod emphasis_tests {
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
-    use crate::inline_parser::InlineParser;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
@@ -142,9 +142,9 @@ mod link_tests {
 
 #[cfg(test)]
 mod code_tests {
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
-    use crate::inline_parser::InlineParser;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
@@ -206,9 +206,9 @@ mod code_tests {
 
 #[cfg(test)]
 mod math_tests {
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
-    use crate::inline_parser::InlineParser;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
@@ -280,9 +280,9 @@ mod math_tests {
 
 #[cfg(test)]
 mod escape_tests {
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
-    use crate::inline_parser::InlineParser;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
@@ -416,9 +416,9 @@ mod escape_tests {
 
 #[cfg(test)]
 mod footnote_tests {
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
-    use crate::inline_parser::InlineParser;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
@@ -502,9 +502,9 @@ mod footnote_tests {
 
 #[cfg(test)]
 mod bracketed_span_tests {
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
-    use crate::inline_parser::InlineParser;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
@@ -583,9 +583,9 @@ mod bracketed_span_tests {
 
 #[cfg(test)]
 mod reference_tests {
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
-    use crate::inline_parser::InlineParser;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
     use crate::syntax::SyntaxKind;
 
     fn parse_with_refs(input: &str) -> crate::syntax::SyntaxNode {
@@ -683,9 +683,9 @@ mod reference_tests {
 
 #[cfg(test)]
 mod raw_inline_tests {
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
-    use crate::inline_parser::InlineParser;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {

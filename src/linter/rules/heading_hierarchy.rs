@@ -101,9 +101,9 @@ fn create_fix(heading: &SyntaxNode, current_level: usize, expected_level: usize)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_parser::BlockParser;
     use crate::config::Config;
-    use crate::inline_parser::InlineParser;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();

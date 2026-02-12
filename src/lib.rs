@@ -1,14 +1,13 @@
-pub mod block_parser;
 pub mod config;
 #[cfg(feature = "lsp")]
 pub mod external_formatters;
 mod external_formatters_common;
 pub mod external_formatters_sync;
 pub mod formatter;
-pub mod inline_parser;
 pub mod linter;
 #[cfg(feature = "lsp")]
 pub mod lsp;
+pub mod parser;
 pub mod range_utils;
 pub mod syntax;
 mod utils;
@@ -19,6 +18,7 @@ pub use config::ConfigBuilder;
 pub use formatter::format_tree;
 #[cfg(feature = "lsp")]
 pub use formatter::format_tree_async;
+pub use parser::parse;
 pub use syntax::SyntaxNode;
 
 fn init_logger() {
@@ -73,16 +73,11 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
 
     let normalized_input = input.replace("\r\n", "\n");
 
-    // Step 1: Parse blocks to create initial CST and extract reference definitions
+    // Step 1: Parse document into complete CST
     let config = config.unwrap_or_default();
-    let (block_tree, reference_registry) =
-        block_parser::BlockParser::new(&normalized_input, &config).parse();
+    let tree = parser::parse(&normalized_input, Some(config.clone()));
 
-    // Step 2: Run inline parser on block content to create final CST
-    let tree =
-        inline_parser::InlineParser::new(block_tree, config.clone(), reference_registry).parse();
-
-    // Step 3: Expand line range to byte offsets and block boundaries if specified
+    // Step 2: Expand line range to byte offsets and block boundaries if specified
     let expanded_range = range.and_then(|(start_line, end_line)| {
         let result = range_utils::expand_line_range_to_blocks(
             &tree,
@@ -104,7 +99,7 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
         result
     });
 
-    // Step 4: Format the final CST (synchronously, no external formatters)
+    // Step 3: Format the final CST (synchronously, no external formatters)
     let out = formatter::format_tree(&tree, &config, expanded_range);
 
     if line_ending == "\r\n" {
@@ -155,21 +150,16 @@ pub async fn format_async(
 
     let normalized_input = input.replace("\r\n", "\n");
 
-    // Step 1: Parse blocks to create initial CST and extract reference definitions
+    // Step 1: Parse document into complete CST
     let config = config.unwrap_or_default();
-    let (block_tree, reference_registry) =
-        block_parser::BlockParser::new(&normalized_input, &config).parse();
+    let tree = parser::parse(&normalized_input, Some(config.clone()));
 
-    // Step 2: Run inline parser on block content to create final CST
-    let tree =
-        inline_parser::InlineParser::new(block_tree, config.clone(), reference_registry).parse();
-
-    // Step 3: Expand line range to byte offsets and block boundaries if specified
+    // Step 2: Expand line range to byte offsets and block boundaries if specified
     let expanded_range = range.and_then(|(start_line, end_line)| {
         range_utils::expand_line_range_to_blocks(&tree, &normalized_input, start_line, end_line)
     });
 
-    // Step 4: Format the final CST (with external formatters if configured)
+    // Step 3: Format the final CST (with external formatters if configured)
     let out = formatter::format_tree_async(&tree, &config, expanded_range).await;
 
     if line_ending == "\r\n" {
@@ -182,31 +172,4 @@ pub async fn format_async(
 #[cfg(feature = "lsp")]
 pub async fn format_async_with_defaults(input: &str) -> String {
     format_async(input, None, None).await
-}
-
-/// Parses a Quarto document string into a syntax tree.
-///
-/// This function normalizes line endings and runs both the block parser
-/// and inline parser to produce a complete concrete syntax tree (CST).
-///
-/// # Examples
-///
-/// ```rust
-/// use panache::parse;
-///
-/// let input = "# Heading\n\nParagraph text.";
-/// let tree = parse(input, None);
-/// println!("{:#?}", tree);
-/// ```
-///
-/// # Arguments
-///
-/// * `input` - The Quarto document content to parse
-/// * `config` - Optional configuration. If None, uses default config.
-pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
-    let normalized_input = input.replace("\r\n", "\n");
-    let config = config.unwrap_or_default();
-    let (block_tree, reference_registry) =
-        block_parser::BlockParser::new(&normalized_input, &config).parse();
-    inline_parser::InlineParser::new(block_tree, config, reference_registry).parse()
 }

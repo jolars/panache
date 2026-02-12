@@ -1,5 +1,5 @@
-use crate::block_parser::BlockParser;
 use crate::config::Config;
+use crate::parser::block_parser::BlockParser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub fn parse_blocks(input: &str) -> SyntaxNode {
