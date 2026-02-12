@@ -1,0 +1,17 @@
+ROOT@0..301
+  DOCUMENT@0..301
+    PARAGRAPH@0..268
+      TEXT@0..74 "Let's write a long pa ..."
+      NEWLINE@74..75 "\n"
+      TEXT@75..151 "to see how the wrappi ..."
+      NEWLINE@151..152 "\n"
+      TEXT@152..232 "maximum line length.  ..."
+      NEWLINE@232..233 "\n"
+      TEXT@233..267 "that it looks good wh ..."
+      NEWLINE@267..268 "\n"
+    BlankLine@268..269
+      BlankLine@268..269 "\n"
+    PARAGRAPH@269..301
+      TEXT@269..300 "Here is just a short  ..."
+      NEWLINE@300..301 "\n"
+
