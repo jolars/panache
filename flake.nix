@@ -21,7 +21,7 @@
 
         panache = pkgs.rustPlatform.buildRustPackage {
           pname = "panache";
-          version = "0.1.0";
+          version = "1.0.0";
 
           src = ./.;
 
@@ -29,8 +29,19 @@
             lockFile = ./Cargo.lock;
           };
 
+          nativeBuildInputs = [ pkgs.installShellFiles ];
+
+          postInstall = ''
+            installShellCompletion --cmd panache \
+              --bash target/completions/panache.bash \
+              --fish target/completions/panache.fish \
+              --zsh target/completions/_panache
+
+            installManPage target/man/*
+          '';
+
           meta = with pkgs.lib; {
-            description = "A formatter for Quarto, R Markdown, and Markdown files";
+            description = "A formatter, linter, and LSP for Quarto, R Markdown, and Pandoc Markdown files";
             homepage = "https://github.com/jolars/panache";
             license = licenses.mit;
             maintainers = [ ];
