@@ -487,24 +487,95 @@ impl CodeBlockConfig {
 }
 
 /// Configuration for an external code formatter.
-#[derive(Debug, Clone, Deserialize, PartialEq)]
-#[serde(default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FormatterConfig {
     /// Command to execute (e.g., "black", "air", "rustfmt")
     pub cmd: String,
     /// Arguments to pass to the command (e.g., ["-", "--line-length=80"])
-    #[serde(default)]
     pub args: Vec<String>,
     /// Whether this formatter is enabled
-    #[serde(default = "default_true")]
     pub enabled: bool,
     /// Whether the formatter reads from stdin (true) or requires a file path (false)
-    #[serde(default = "default_true")]
     pub stdin: bool,
 }
 
-fn default_true() -> bool {
-    true
+/// Internal struct for deserializing FormatterConfig with preset support.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+struct RawFormatterConfig {
+    /// Preset name (e.g., "air", "ruff") - mutually exclusive with cmd
+    preset: Option<String>,
+    /// Command to execute
+    cmd: Option<String>,
+    /// Arguments to pass to the command
+    args: Option<Vec<String>>,
+    /// Whether this formatter is enabled
+    enabled: bool,
+    /// Whether the formatter reads from stdin
+    stdin: bool,
+}
+
+impl Default for RawFormatterConfig {
+    fn default() -> Self {
+        Self {
+            preset: None,
+            cmd: None,
+            args: None,
+            enabled: true,
+            stdin: true,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FormatterConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = RawFormatterConfig::deserialize(deserializer)?;
+
+        // Check mutual exclusivity of preset and cmd
+        if raw.preset.is_some() && raw.cmd.is_some() {
+            return Err(serde::de::Error::custom(
+                "FormatterConfig: 'preset' and 'cmd' are mutually exclusive - use one or the other",
+            ));
+        }
+
+        // If preset is specified, resolve it
+        if let Some(preset_name) = raw.preset {
+            let preset = get_formatter_preset(&preset_name).ok_or_else(|| {
+                serde::de::Error::custom(format!(
+                    "Unknown formatter preset: '{}'. Available presets: air, styler, ruff, black",
+                    preset_name
+                ))
+            })?;
+
+            // Return the preset, but respect enabled field if explicitly set
+            Ok(FormatterConfig {
+                cmd: preset.cmd,
+                args: preset.args,
+                enabled: raw.enabled,
+                stdin: preset.stdin,
+            })
+        } else if let Some(cmd) = raw.cmd {
+            // Custom configuration
+            Ok(FormatterConfig {
+                cmd,
+                args: raw.args.unwrap_or_default(),
+                enabled: raw.enabled,
+                stdin: raw.stdin,
+            })
+        } else {
+            // No preset and no cmd - return empty config
+            // This can happen with Default::default()
+            Ok(FormatterConfig {
+                cmd: String::new(),
+                args: raw.args.unwrap_or_default(),
+                enabled: raw.enabled,
+                stdin: raw.stdin,
+            })
+        }
+    }
 }
 
 impl Default for FormatterConfig {
@@ -516,6 +587,51 @@ impl Default for FormatterConfig {
             stdin: true,
         }
     }
+}
+
+/// Get a built-in formatter preset by name.
+/// Returns None if the preset doesn't exist.
+pub fn get_formatter_preset(name: &str) -> Option<FormatterConfig> {
+    match name {
+        // R formatters
+        "air" => Some(FormatterConfig {
+            cmd: "air".to_string(),
+            args: vec!["format".to_string(), "{}".to_string()],
+            enabled: true,
+            stdin: false,
+        }),
+        "styler" => Some(FormatterConfig {
+            cmd: "Rscript".to_string(),
+            args: vec!["-e".to_string(), "styler::style_file('{}')".to_string()],
+            enabled: true,
+            stdin: false,
+        }),
+
+        // Python formatters
+        "ruff" => Some(FormatterConfig {
+            cmd: "ruff".to_string(),
+            args: vec!["format".to_string()],
+            enabled: true,
+            stdin: true,
+        }),
+        "black" => Some(FormatterConfig {
+            cmd: "black".to_string(),
+            args: vec!["-".to_string()],
+            enabled: true,
+            stdin: true,
+        }),
+
+        _ => None,
+    }
+}
+
+/// Get the default formatters HashMap with built-in presets.
+/// Currently includes R (air) and Python (ruff).
+pub fn default_formatters() -> HashMap<String, FormatterConfig> {
+    let mut map = HashMap::new();
+    map.insert("r".to_string(), get_formatter_preset("air").unwrap());
+    map.insert("python".to_string(), get_formatter_preset("ruff").unwrap());
+    map
 }
 
 /// Style for formatting math delimiters
@@ -568,6 +684,12 @@ fn default_blank_lines() -> BlankLines {
 impl RawConfig {
     /// Finalize into Config, applying flavor-based defaults where needed
     fn finalize(self) -> Config {
+        // Merge user formatters with built-in defaults (user config takes precedence)
+        let mut formatters = default_formatters();
+        for (lang, config) in self.formatters {
+            formatters.insert(lang, config);
+        }
+
         Config {
             extensions: self
                 .extensions
@@ -582,7 +704,7 @@ impl RawConfig {
             math_indent: self.math_indent,
             math_delimiter_style: self.math_delimiter_style,
             blank_lines: self.blank_lines,
-            formatters: self.formatters,
+            formatters,
         }
     }
 }
@@ -623,7 +745,7 @@ impl Default for Config {
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             code_blocks: CodeBlockConfig::for_flavor(flavor),
-            formatters: HashMap::new(),
+            formatters: default_formatters(),
         }
     }
 }
@@ -822,7 +944,10 @@ mod tests {
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
         assert_eq!(cfg.line_width, 80);
-        assert!(cfg.formatters.is_empty());
+        // With built-in defaults, formatters should have R and Python
+        assert_eq!(cfg.formatters.len(), 2);
+        assert!(cfg.formatters.contains_key("r"));
+        assert!(cfg.formatters.contains_key("python"));
     }
 
     #[test]
@@ -898,6 +1023,132 @@ mod tests {
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
         let fmt = cfg.formatters.get("test").unwrap();
         assert_eq!(fmt.cmd, "");
+    }
+
+    #[test]
+    fn preset_resolution_air() {
+        let toml_str = r#"
+            [formatters.r]
+            preset = "air"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let r_fmt = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmt.cmd, "air");
+        assert_eq!(r_fmt.args, vec!["format", "{}"]);
+        assert!(!r_fmt.stdin);
+        assert!(r_fmt.enabled);
+    }
+
+    #[test]
+    fn preset_resolution_ruff() {
+        let toml_str = r#"
+            [formatters.python]
+            preset = "ruff"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let py_fmt = cfg.formatters.get("python").unwrap();
+        assert_eq!(py_fmt.cmd, "ruff");
+        assert_eq!(py_fmt.args, vec!["format"]);
+        assert!(py_fmt.stdin);
+        assert!(py_fmt.enabled);
+    }
+
+    #[test]
+    fn preset_resolution_black() {
+        let toml_str = r#"
+            [formatters.python]
+            preset = "black"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let py_fmt = cfg.formatters.get("python").unwrap();
+        assert_eq!(py_fmt.cmd, "black");
+        assert_eq!(py_fmt.args, vec!["-"]);
+        assert!(py_fmt.stdin);
+    }
+
+    #[test]
+    fn preset_and_cmd_mutually_exclusive() {
+        let toml_str = r#"
+            [formatters.r]
+            preset = "air"
+            cmd = "styler"
+        "#;
+        let result = toml::from_str::<Config>(toml_str);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("mutually exclusive"));
+    }
+
+    #[test]
+    fn unknown_preset_fails() {
+        let toml_str = r#"
+            [formatters.r]
+            preset = "nonexistent"
+        "#;
+        let result = toml::from_str::<Config>(toml_str);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Unknown formatter preset"));
+    }
+
+    #[test]
+    fn builtin_defaults_when_no_config() {
+        let cfg = Config::default();
+        // Should have R and Python with default presets
+        assert!(cfg.formatters.contains_key("r"));
+        assert!(cfg.formatters.contains_key("python"));
+
+        let r_fmt = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmt.cmd, "air");
+
+        let py_fmt = cfg.formatters.get("python").unwrap();
+        assert_eq!(py_fmt.cmd, "ruff");
+    }
+
+    #[test]
+    fn user_config_overrides_defaults() {
+        let toml_str = r#"
+            [formatters.r]
+            cmd = "custom"
+            args = ["--flag"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // R should have custom config
+        let r_fmt = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmt.cmd, "custom");
+        assert_eq!(r_fmt.args, vec!["--flag"]);
+
+        // Python should still have default
+        assert!(cfg.formatters.contains_key("python"));
+        let py_fmt = cfg.formatters.get("python").unwrap();
+        assert_eq!(py_fmt.cmd, "ruff");
+    }
+
+    #[test]
+    fn empty_formatters_section_gets_defaults() {
+        let toml_str = r#"
+            line_width = 100
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // Should still have default formatters
+        assert_eq!(cfg.formatters.len(), 2);
+        assert!(cfg.formatters.contains_key("r"));
+        assert!(cfg.formatters.contains_key("python"));
+    }
+
+    #[test]
+    fn preset_with_enabled_false() {
+        let toml_str = r#"
+            [formatters.r]
+            preset = "air"
+            enabled = false
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let r_fmt = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmt.cmd, "air");
+        assert!(!r_fmt.enabled);
     }
 
     #[test]

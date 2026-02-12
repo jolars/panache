@@ -178,42 +178,57 @@ line-ending = "auto"
 wrap = "reflow"
 
 # External code formatters
-[formatters.r]
-cmd = "styler"
-args = ["--scope=spaces"]
+# Note: R (air) and Python (ruff) are enabled by default - no config needed!
 
+# Switch to a different preset
+[formatters.r]
+preset = "styler"
+
+# Or use full custom configuration
 [formatters.python]
 cmd = "black"
 args = ["-", "--line-length=88"]
 
+# Add formatters for other languages
 [formatters.rust]
 cmd = "rustfmt"
-args = []
 ```
 
 See `.panache.toml.example` for a complete configuration reference.
 
 ### External Code Formatters
 
-panache can invoke external formatters for code blocks:
+panache includes **zero-config support** for formatting R and Python code blocks:
 
-- External formatters execute in parallel with panache's markdown formatting
-- Formatters can either read from stdin/write to stdout or read/write files
-- Formatters respect their own config files (`.prettierrc`, `pyproject.toml`, etc.)
-- On error, original code is preserved with a warning logged
+- **R**: Uses `air format` by default (if installed)
+- **Python**: Uses `ruff format` by default (if installed)
+- Formatters execute in parallel with panache's markdown formatting
+- On error, original code is preserved (no warnings needed)
 
-**Example**: Format R code with `styler` and Python with `black`:
+**No configuration needed!** If `air` or `ruff` are in your PATH, they just work.
+
+**Switch presets or add more formatters:**
 
 ```toml
+# Use different preset
 [formatters.r]
-cmd = "air"
-args = ["format"]
-stdin = false
+preset = "styler"  # Available: "air" (default), "styler"
 
+# Full custom config (overrides default)
 [formatters.python]
 cmd = "black"
-args = ["-"]
+args = ["-", "--line-length=88"]
+
+# Add formatters for other languages
+[formatters.rust]
+cmd = "rustfmt"
 ```
+
+**Additional details:**
+
+- Formatters respect their own config files (`.prettierrc`, `pyproject.toml`, etc.)
+- Support both stdin/stdout and file-based formatters
+- 30 second timeout per formatter invocation
 
 ## Motivation
 

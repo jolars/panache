@@ -1,0 +1,5 @@
+# Test configuration for standardize_bullets test case
+# Disable external formatters to test bullet standardization in isolation
+
+[formatters.python]
+enabled = false

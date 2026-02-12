@@ -238,20 +238,68 @@ quarto_crossrefs = true          # @fig-id, @tbl-id
 panache can invoke external formatters for code blocks. Formatters run in
 parallel for maximum performance.
 
-### Configuration
+### Built-in Presets
 
-External formatters support two modes: **stdin/stdout** or **file-based**.
+panache ships with sensible defaults for common languages—**zero configuration
+required!**
+
+**Default formatters (automatically enabled):**
+
+- **R**: `air format` - [air](https://github.com/etiennebacher/air) R formatter
+- **Python**: `ruff format` - [Ruff](https://github.com/astral-sh/ruff) Python
+  formatter
+
+If these tools are installed, your R and Python code blocks will be
+automatically formatted. If not, the original code is preserved with no errors.
+
+**Using preset formatters:**
+
+```toml
+# Option 1: Use a different preset for R
+[formatters.r]
+preset = "styler"  # Available: "air" (default), "styler"
+
+# Option 2: Switch Python formatter
+[formatters.python]
+preset = "black"   # Available: "ruff" (default), "black"
+```
+
+**Available presets:**
+
+| Language | Preset   | Command                    | Notes                     |
+| -------- | -------- | -------------------------- | ------------------------- |
+| `r`      | `air`    | `air format {}`            | Default, fast             |
+| `r`      | `styler` | `Rscript -e "styler::..."` | Requires styler R package |
+| `python` | `ruff`   | `ruff format`              | Default, fast             |
+| `python` | `black`  | `black -`                  | Popular alternative       |
+
+**Disabling built-in defaults:**
+
+```toml
+[formatters.r]
+enabled = false  # Disable R formatting
+
+[formatters.python]
+enabled = false  # Disable Python formatting
+```
+
+### Custom Configuration
+
+For full control, define formatters manually. External formatters support two
+modes: **stdin/stdout** or **file-based**.
 
 #### Stdin Mode (Default)
 
 For formatters that read from stdin and write to stdout:
 
 ```toml
+# Custom Python formatter (overrides built-in ruff default)
 [formatters.python]
 cmd = "black"
 args = ["-", "--line-length=88"]
 stdin = true  # Default
 
+# Add formatters for new languages
 [formatters.rust]
 cmd = "rustfmt"
 stdin = true
@@ -261,6 +309,10 @@ cmd = "prettier"
 args = ["--parser=babel"]
 stdin = true
 ```
+
+**Note:** When you define a `[formatters.X]` section with `cmd`, it completely
+replaces the built-in default for that language (if any). Other languages keep
+their defaults.
 
 #### File-Based Mode
 
@@ -278,7 +330,8 @@ args = ["-w"]  # -w writes to file
 stdin = false
 ```
 
-**File path placeholder:** Use `{}` in args to control where the file path is inserted. If omitted, it's appended at the end.
+**File path placeholder:** Use `{}` in args to control where the file path is
+inserted. If omitted, it's appended at the end.
 
 ```toml
 [formatters.r]
@@ -294,7 +347,8 @@ stdin = false
 
 ### Behavior
 
-- **Language matching:** Code block language (e.g., `` ```python ``) is matched to formatter key (case-insensitive)
+- **Language matching:** Code block language (e.g., `` ```python ``) is matched
+  to formatter key (case-insensitive)
 - **Parallel execution:** All formatters run concurrently for speed
 - **Error handling:** Failed formatters preserve original code with a warning
 - **Timeout:** 30 seconds per formatter invocation
@@ -340,14 +394,16 @@ task_lists = true
 emoji = false
 
 # External formatters
+# Option 1: Use presets
 [formatters.r]
-cmd = "styler"
-args = ["--scope=spaces"]
+preset = "styler"  # Switch from default "air"
 
+# Option 2: Full custom configuration (overrides default)
 [formatters.python]
 cmd = "black"
 args = ["-", "--line-length=88"]
 
+# Option 3: Add new formatters for other languages
 [formatters.rust]
 cmd = "rustfmt"
 args = []

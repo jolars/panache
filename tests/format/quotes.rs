@@ -36,7 +36,13 @@ fn quote_with_fenced_code_block() {
 > Text after code.
 "#;
 
-    let output = format(input, None, None);
+    // Use config with empty formatters to avoid external formatter invocation
+    let config = panache::Config {
+        formatters: std::collections::HashMap::new(),
+        ..Default::default()
+    };
+
+    let output = format(input, Some(config), None);
 
     // Should preserve blockquote markers
     assert!(output.contains("> ```python"));

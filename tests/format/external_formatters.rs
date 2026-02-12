@@ -37,7 +37,11 @@ hello world
 
 #[test]
 fn code_block_without_formatter_unchanged() {
-    let config = Config::default();
+    // Create config with empty formatters (no built-in defaults)
+    let config = Config {
+        formatters: HashMap::new(),
+        ..Default::default()
+    };
 
     let input = r#"
 ```python
