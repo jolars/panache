@@ -7,3 +7,22 @@ The following is a Quarto code block with execution disabled.
 ```{{python}}
 1 + 1
 ```
+
+If you want to show an example with multiple code blocks and other markdown,
+just enclose the entire example in 4 backticks (e.g. ````) and use the two curly
+brace syntax for code blocks within. For example:
+
+````
+---
+title: "My document"
+---
+
+Some markdown content.
+
+```{{python}}
+1 + 1
+```
+
+Some additional markdown content.
+
+````

@@ -1,5 +1,5 @@
-ROOT@0..117
-  DOCUMENT@0..117
+ROOT@0..451
+  DOCUMENT@0..451
     CodeBlock@0..29
       CodeFenceOpen@0..19
         CodeFenceMarker@0..3 "```"
@@ -29,4 +29,48 @@ ROOT@0..117
       CodeFenceClose@113..117
         CodeFenceMarker@113..116 "```"
         NEWLINE@116..117 "\n"
+    BlankLine@117..118
+      BlankLine@117..118 "\n"
+    PARAGRAPH@118..326
+      TEXT@118..194 "If you want to show a ..."
+      NEWLINE@194..195 "\n"
+      TEXT@195..248 "just enclose the enti ..."
+      TEXT@248..249 "`"
+      TEXT@249..250 "`"
+      TEXT@250..251 "`"
+      TEXT@251..252 "`"
+      TEXT@252..275 ") and use the two curly"
+      NEWLINE@275..276 "\n"
+      TEXT@276..325 "brace syntax for code ..."
+      NEWLINE@325..326 "\n"
+    BlankLine@326..327
+      BlankLine@326..327 "\n"
+    CodeBlock@327..451
+      CodeFenceOpen@327..332
+        CodeFenceMarker@327..331 "````"
+        NEWLINE@331..332 "\n"
+      CodeContent@332..446
+        TEXT@332..335 "---"
+        NEWLINE@335..336 "\n"
+        TEXT@336..356 "title: \"My document\""
+        NEWLINE@356..357 "\n"
+        TEXT@357..360 "---"
+        NEWLINE@360..361 "\n"
+        NEWLINE@361..362 "\n"
+        TEXT@362..384 "Some markdown content."
+        NEWLINE@384..385 "\n"
+        NEWLINE@385..386 "\n"
+        TEXT@386..399 "```{{python}}"
+        NEWLINE@399..400 "\n"
+        TEXT@400..405 "1 + 1"
+        NEWLINE@405..406 "\n"
+        TEXT@406..409 "```"
+        NEWLINE@409..410 "\n"
+        NEWLINE@410..411 "\n"
+        TEXT@411..444 "Some additional markd ..."
+        NEWLINE@444..445 "\n"
+        NEWLINE@445..446 "\n"
+      CodeFenceClose@446..451
+        CodeFenceMarker@446..450 "````"
+        NEWLINE@450..451 "\n"
 
