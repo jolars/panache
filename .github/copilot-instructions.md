@@ -2,27 +2,27 @@
 
 ## Repository Overview
 
-**panache** is a formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and Markdown
-files written in Rust. It's designed to understand Quarto/Pandoc-specific
-syntax that other formatters like Prettier and mdformat struggle with,
-including fenced divs, tables, and math formatting.
+**panache** is a formatter, linter, and LSP for Quarto (`.qmd`),
+Pandoc, and Markdown files written in Rust. It's designed to understand
+Quarto/Pandoc-specific syntax that other formatters like Prettier and mdformat
+struggle with, including fenced divs, tables, and math formatting.
 
-**Syntax Reference**: See <a>`docs/pandoc-spec.md`</a> for
-comprehensive Pandoc syntax specification. This index document links to
-individual specification files organized by syntax element type (paragraphs,
-headings, lists, tables, etc.) in the <a>`docs/pandoc-spec/`</a>
-directory. These documents represent the definitive reference for elements
-that the parser should understand and handle correctly. This specification
-is essential for understanding formatting requirements, implementing parser
-logic, and ensuring spec compliance. panache aims to support the full
-suite of Pandoc syntax, including all extensions. It will also support all
-the Quarto-specific syntax extensions.
+**Syntax Reference**: See <a>`docs/pandoc-spec.md`</a> for comprehensive Pandoc
+syntax specification. This index document links to individual specification
+files organized by syntax element type (paragraphs, headings, lists, tables,
+etc.) in the <a>`docs/pandoc-spec/`</a> directory. These documents represent
+the definitive reference for elements that the parser should understand and
+handle correctly. This specification is essential for understanding formatting
+requirements, implementing parser logic, and ensuring spec compliance. panache
+aims to support the full suite of Pandoc syntax, including all extensions. It
+will also support all the Quarto-specific syntax extensions.
 
 **Key Facts:**
 
 - **Language**: Rust (2024 edition), stable toolchain
 - **Size**: ~20k lines across 72 files
-- **Architecture**: Binary crate with workspace containing WASM crate for web playground
+- **Architecture**: Binary crate with workspace containing WASM crate for web
+  playground
 - **Status**: Early development - expect bugs and breaking changes
 
 ## Build and Validation Instructions
@@ -149,8 +149,10 @@ RUST_LOG=panache::parser::block_parser=trace,panache::formatter=debug panache fo
 
 **Modules with logging:**
 
-- `panache::parser::block_parser` - Block element detection (headings, tables, code blocks, etc.)
-- `panache::parser::inline_parser` - Inline element matching (emphasis, code, math, links, footnotes)
+- `panache::parser::block_parser` - Block element detection (headings, tables,
+  code blocks, etc.)
+- `panache::parser::inline_parser` - Inline element matching (emphasis, code,
+  math, links, footnotes)
 - `panache::formatter` - Formatting decisions and node traversal
 - `panache::config` - Config file loading and resolution
 
@@ -162,11 +164,14 @@ RUST_LOG=panache::parser::block_parser=trace,panache::formatter=debug panache fo
 
 ## Project Architecture and Layout
 
-The project is designed to first parse the document into a concrete syntax tree (CST)
-using a block parser, then run an inline parser/lexer to handle inline elements. The CST is
-represented using the `rowan` crate, which provides a red-green tree structure
-for efficient syntax tree manipulation. The formatter then traverses this tree to apply
-the formatting rules.
+The project is designed to first parse the document into a concrete syntax tree
+(CST) using a block parser, then run an inline parser/lexer to handle inline
+elements. The CST is represented using the `rowan` crate, which provides a
+red-green tree structure for efficient syntax tree manipulation. It is vital
+that the parser preserves **every byte** of the input in the syntax tree,
+including structural markers like `>` for blockquotes, to ensure lossless
+parsing so that LSP and linting features can accurately map source locations.
+The formatter then traverses this tree to apply the formatting rules.
 
 ### Source Structure
 
@@ -265,7 +270,8 @@ panache uses a hierarchical config lookup:
 
 **Extension Configuration**: The config system includes:
 
-- `flavor` field: Choose Markdown flavor (Pandoc, Quarto, RMarkdown, GFM, CommonMark)
+- `flavor` field: Choose Markdown flavor (Pandoc, Quarto, RMarkdown, GFM,
+  CommonMark)
 - `extensions` section: 60+ bool flags for individual Pandoc extensions
 - Each flavor has sensible defaults that can be overridden
 
@@ -333,9 +339,11 @@ docs/
 
 **Structure:**
 
-- **User guides**: Installation, CLI usage, LSP setup, configuration, feature showcase
+- **User guides**: Installation, CLI usage, LSP setup, configuration, feature
+  showcase
 - **playground/**: Interactive WASM-based formatter demo
-- **Published**: GitHub Pages via `docs.yml` workflow at https://jolars.github.io/panache/
+- **Published**: GitHub Pages via `docs.yml` workflow at
+  https://jolars.github.io/panache/
 
 **Building the docs:**
 
@@ -346,7 +354,8 @@ quarto preview  # Live preview
 quarto render   # Build to _site/
 ```
 
-**Note:** The README.md in the repo root contains the canonical documentation content.
+**Note:** The README.md in the repo root contains the canonical documentation
+content.
 
 ## CI/CD and Validation Pipeline
 
@@ -385,11 +394,15 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 
 - Each `tests/cases/*` directory contains `input.qmd` and `expected.qmd`
 - Tests verify formatting is idempotent (format twice = format once)
-- Use `UPDATE_EXPECTED=1 cargo test` to update expected formatted outputs (BE CAREFUL)
+- Use `UPDATE_EXPECTED=1 cargo test` to update expected formatted outputs (BE
+  CAREFUL)
 - Use `UPDATE_AST=1 cargo test` to update expected AST outputs (BE CAREFUL)
-- Use both flags together to update both: `UPDATE_EXPECTED=1 UPDATE_AST=1 cargo test`
-- New features should have corresponding test cases added to cover new formatting scenarios.
-- **DO NOT** update expected outputs without verifying that the change is correct and intended.
+- Use both flags together to update both:
+  `UPDATE_EXPECTED=1 UPDATE_AST=1 cargo test`
+- New features should have corresponding test cases added to cover new
+  formatting scenarios.
+- **DO NOT** update expected outputs without verifying that the change is
+  correct and intended.
 
 ## Key Development Facts
 
@@ -403,7 +416,8 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 - **serde**: Serialization for config structs
 - **tokio**: Async runtime (added `io-std` feature for LSP stdin/stdout)
 - **tower-lsp-server**: Community-maintained LSP framework (v0.23)
-- **log** + **env_logger**: Logging infrastructure (debug builds have DEBUG/TRACE, release builds have INFO only)
+- **log** + **env_logger**: Logging infrastructure (debug builds have
+  DEBUG/TRACE, release builds have INFO only)
 
 ### Linter
 
@@ -411,20 +425,23 @@ panache includes a built-in linter accessible via `panache lint`:
 
 **Architecture:**
 
-- Linter code lives in `src/linter.rs` with submodules for diagnostics, rules, and runner
+- Linter code lives in `src/linter.rs` with submodules for diagnostics, rules,
+  and runner
 - Provides diagnostic detection and auto-fixes
 - Uses modern Rust module structure (`linter.rs` instead of `linter/mod.rs`)
 
 **Components:**
 
-- **diagnostics.rs**: Core types (`Diagnostic`, `Location`, `Severity`, `Fix`, `Edit`)
+- **diagnostics.rs**: Core types (`Diagnostic`, `Location`, `Severity`, `Fix`,
+  `Edit`)
 - **runner.rs**: `LintRunner` that orchestrates rule execution
 - **rules.rs**: `Rule` trait and `RuleRegistry` for managing lint rules
 - **rules/**: Individual rule implementations
 
 **Current Rules:**
 
-- ✅ **heading-hierarchy**: Warns on skipped heading levels (e.g., h1 → h3), provides auto-fix to correct level
+- ✅ **heading-hierarchy**: Warns on skipped heading levels (e.g., h1 → h3),
+  provides auto-fix to correct level
 
 **Usage:**
 
@@ -458,7 +475,8 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 
 **Architecture:**
 
-- LSP code organized in `src/lsp/` modules (server, handlers, documents, conversions)
+- LSP code organized in `src/lsp/` modules (server, handlers, documents,
+  conversions)
 - Implements `tower_lsp_server::LanguageServer` trait
 - Communicates via stdin/stdout using standard LSP JSON-RPC protocol
 - Document symbols built synchronously (SyntaxNode is not Send)
@@ -468,10 +486,12 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 
 - ✅ `textDocument/formatting` - Full document formatting
 - ✅ `textDocument/rangeFormatting` - Range formatting
-- ✅ `textDocument/didOpen/didChange/didClose` - Document tracking (INCREMENTAL sync mode)
+- ✅ `textDocument/didOpen/didChange/didClose` - Document tracking (INCREMENTAL
+  sync mode)
 - ✅ `textDocument/publishDiagnostics` - Live linting with diagnostics
 - ✅ `textDocument/codeAction` - Quick fixes for lint issues (heading hierarchy)
-- ✅ `textDocument/documentSymbol` - Document outline with headings, tables, and figures
+- ✅ `textDocument/documentSymbol` - Document outline with headings, tables,
+  and figures
 - ✅ Config discovery from workspace root (`.panache.toml`)
 - ✅ Thread-safe document state management with Arc
 - ✅ UTF-16 to UTF-8 position conversion for proper incremental edits
@@ -497,7 +517,8 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 **Implementation Details:**
 
 - Document URIs stored as strings (Uri type doesn't implement Send)
-- Workspace root captured from `InitializeParams.workspace_folders` or deprecated `root_uri`
+- Workspace root captured from `InitializeParams.workspace_folders` or
+  deprecated `root_uri`
 - Config loaded per formatting request (no caching yet)
 - Document symbols built synchronously (SyntaxNode is not Send)
 - INCREMENTAL sync mode with proper UTF-16/UTF-8 position conversion
@@ -505,8 +526,10 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 
 **Testing:**
 
-- 8 unit tests for document symbols (heading hierarchy, tables, figures, edge cases)
-- 13 unit tests for conversion functions (offset_to_position, convert_diagnostic, etc.)
+- 8 unit tests for document symbols (heading hierarchy, tables, figures, edge
+  cases)
+- 13 unit tests for conversion functions (offset_to_position,
+  convert_diagnostic, etc.)
 - Tests cover UTF-16 edge cases (emoji, accented characters)
 - Integration test document at `tests/document_symbols_test.qmd`
 - Manual testing via editor integration (see README.md for editor configs)
@@ -524,11 +547,15 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 
 panache has comprehensive logging (~50 strategic log statements):
 
-- **Release builds**: INFO logs only (formatting metrics, config loading) - zero overhead for DEBUG/TRACE
+- **Release builds**: INFO logs only (formatting metrics, config loading) - zero
+  overhead for DEBUG/TRACE
 - **Debug builds**: Full DEBUG and TRACE logging available
-- **Modules logged**: parser::block_parser, parser::inline_parser, formatter, config
-- **Usage**: `RUST_LOG=debug cargo run` or `RUST_LOG=panache::parser::inline_parser=trace cargo run`
-- **Purpose**: Debug parsing decisions, understand element matching, trace formatter behavior
+- **Modules logged**: parser::block_parser, parser::inline_parser, formatter,
+  config
+- **Usage**: `RUST_LOG=debug cargo run` or
+  `RUST_LOG=panache::parser::inline_parser=trace cargo run`
+- **Purpose**: Debug parsing decisions, understand element matching, trace
+  formatter behavior
 
 Example log output (DEBUG level):
 
@@ -541,9 +568,11 @@ Example log output (DEBUG level):
 
 ### Testing Approach
 
-- Unit tests embedded in source modules (110+ inline parser tests, 20+ block parser tests)
+- Unit tests embedded in source modules (110+ inline parser tests, 20+ block
+  parser tests)
 - Integration tests for inline elements (architecture_tests.rs verifies nesting)
-- Golden tests comparing input/expected pairs (1 comprehensive test covering 9 scenarios)
+- Golden tests comparing input/expected pairs (1 comprehensive test covering
+  9 scenarios)
 - Format tests organized by feature (20 tests for specific formatting scenarios)
 - Property: formatting is idempotent
 - Test helpers abstract Config creation (parse_blocks(), parse_inline())
@@ -564,7 +593,8 @@ The library exposes two main functions in `src/lib.rs`:
 - Takes optional config (affects which extensions are enabled)
 - Returns rowan SyntaxNode for inspection/debugging
 
-Both functions accept an optional config to respect flavor-specific extensions and formatting preferences.
+Both functions accept an optional config to respect flavor-specific extensions
+and formatting preferences.
 
 ### Formatting Rules
 
@@ -580,7 +610,8 @@ Both functions accept an optional config to respect flavor-specific extensions a
 
 ## Configuration Files and Settings
 
-- `.panache.toml`: Project-specific config (flavor, line_width, line-ending, wrap mode, extensions)
+- `.panache.toml`: Project-specific config (flavor, line_width, line-ending,
+  wrap mode, extensions)
 - `.envrc`: direnv configuration for Nix environment
 - `.gitignore`: Excludes target/, devenv artifacts, Nix build outputs
 - `devenv.nix`: Development environment with go-task, quarto, wasm-pack
@@ -621,26 +652,34 @@ The `docs/playground/` contains a WASM-based web interface:
 
 ### Architecture Dependencies
 
-- Block parser captures block structures (including nested ones) using a two-pass approach:
-  1. First pass: Parse flat block structures (headings, code blocks, paragraphs, etc.)
-  2. Second pass: Resolve container blocks (blockquotes, lists) from flat structure
+- Block parser captures block structures (including nested ones) using a
+  two-pass approach:
+  1. First pass: Parse flat block structures (headings, code blocks, paragraphs,
+     etc.)
+  2. Second pass: Resolve container blocks (blockquotes, lists) from flat
+     structure
 - Each block type is isolated in its own module under `src/parser/block_parser/`
 - Inline parser runs after block parser to handle inline syntax within blocks
   - Uses delimiter-based parsing with proper precedence (CommonMark spec)
   - Recursive parsing for nested inline elements (e.g., code/emphasis in links)
   - Standalone `parse_inline_text()` function enables recursive calls
-- `parser::parse()` function provides clean API that hides two-stage implementation
+- `parser::parse()` function provides clean API that hides two-stage
+  implementation
 - Parser builds rowan CST consumed by formatter
 - Formatter is split into focused modules under `src/formatter/`:
-  - Each module has clear responsibilities (wrapping, inline, paragraphs, headings, code blocks)
-  - Core orchestration in `core.rs` with `format_node_sync` delegating to modules
-  - Placeholder modules exist for future extraction of complex logic (lists, tables, blockquotes)
+  - Each module has clear responsibilities (wrapping, inline, paragraphs,
+    headings, code blocks)
+  - Core orchestration in `core.rs` with `format_node_sync` delegating to
+    modules
+  - Placeholder modules exist for future extraction of complex logic (lists,
+    tables, blockquotes)
   - Public API limited to `format_tree()` and `format_tree_async()`
 - LSP implementation in `src/lsp.rs`:
   - Uses `spawn_blocking` wrapper to handle non-Send rowan types
   - Document state stored in Arc<Mutex<HashMap<String, String>>>
   - Config loaded per request from workspace root
-  - Returns to main crate via `io::Result<()>` (no additional error types needed)
+  - Returns to main crate via `io::Result<()>` (no additional error types
+    needed)
 - Config system provides extension flags to enable/disable features
   - Config fields marked `#[allow(dead_code)]` until features use them
 - Test helpers abstract Config creation to keep tests clean
@@ -650,4 +689,5 @@ The `docs/playground/` contains a WASM-based web interface:
 - Test helpers abstract Config creation to keep tests clean
 - WASM crate depends on main crate - changes affect both
 
-**Trust these instructions and search only when information is incomplete or incorrect.**
+**Trust these instructions and search only when information is incomplete or
+incorrect.**
