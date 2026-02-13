@@ -1,7 +1,7 @@
 [formatters.r]
 enabled = true
 cmd = "air"
-args = [ "format" ]
+args = ["format"]
 stdin = false
 
 [linters]
