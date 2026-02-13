@@ -340,16 +340,28 @@ mod escape_tests {
     }
 
     #[test]
-    #[ignore = "Hard line breaks span token boundaries - needs block parser support"]
     fn test_hard_line_break() {
-        // TODO: Backslash-newline escapes require coordination with block parser
-        // The backslash is in TEXT token, newline is in NEWLINE token
-        // Need to handle this at block parsing level or with token lookahead
         let input = "line1\\\nline2";
         let tree = parse_inline(input);
 
         let hard_break = count_nodes_of_kind(&tree, SyntaxKind::HardLineBreak);
         assert_eq!(hard_break, 1, "Should have one hard line break");
+    }
+
+    #[test]
+    fn test_hard_line_break_disabled() {
+        let input = "line1\\\nline2";
+        let mut config = Config::default();
+        config.extensions.escaped_line_breaks = false;
+
+        let (block_tree, registry) = BlockParser::new(input, &config).parse();
+        let tree = InlineParser::new(block_tree, config, registry).parse();
+
+        let hard_break = count_nodes_of_kind(&tree, SyntaxKind::HardLineBreak);
+        assert_eq!(
+            hard_break, 0,
+            "Should not have hard line break when extension disabled"
+        );
     }
 
     #[test]

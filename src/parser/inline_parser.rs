@@ -494,12 +494,35 @@ impl InlineParser {
     fn copy_node_to_builder(&self, builder: &mut GreenNodeBuilder, node: &SyntaxNode) {
         builder.start_node(node.kind().into());
 
-        for child in node.children_with_tokens() {
+        let mut children = node.children_with_tokens().peekable();
+        while let Some(child) = children.next() {
             match child {
                 rowan::NodeOrToken::Node(n) => {
                     self.copy_node_to_builder(builder, &n);
                 }
                 rowan::NodeOrToken::Token(t) => {
+                    // Check for escaped line break: TEXT ending with \ followed by NEWLINE
+                    // Only in non-verbatim contexts
+                    if self.config.extensions.escaped_line_breaks
+                        && t.kind() == SyntaxKind::TEXT
+                        && t.text().ends_with('\\')
+                        && self.should_parse_inline(&t) // Ensures not in verbatim context
+                        && let Some(rowan::NodeOrToken::Token(next)) = children.peek()
+                        && next.kind() == SyntaxKind::NEWLINE
+                    {
+                        // Emit the text before the backslash
+                        let text_before = &t.text()[..t.text().len() - 1];
+                        if !text_before.is_empty() {
+                            self.parse_text_with_refs(builder, text_before);
+                        }
+                        // Emit hard line break - preserve the backslash for losslessness
+                        builder.token(SyntaxKind::HardLineBreak.into(), "\\\n");
+                        // Skip the NEWLINE token
+                        children.next();
+                        continue;
+                    }
+
+                    // Normal token processing
                     if self.should_parse_inline(&t) {
                         // Parse inline text, passing registry for reference resolution
                         self.parse_text_with_refs(builder, t.text());
