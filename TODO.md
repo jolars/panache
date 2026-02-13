@@ -202,11 +202,6 @@ panache lint --config cfg.toml      # Custom config
 
 ## Formatter
 
-### Lists
-
-- ✅ **Bullet lists** - Standardize bullet list markers to `-` (all `*`, `+`,
-  `-` converted to `-`)
-
 ### Tables
 
 - ❌ **Simple tables** - Support for formatting tables
