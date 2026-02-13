@@ -37,6 +37,7 @@ impl LanguageServer for PanacheLsp {
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
+                definition_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -128,6 +129,19 @@ impl LanguageServer for PanacheLsp {
 
     async fn folding_range(&self, params: FoldingRangeParams) -> Result<Option<Vec<FoldingRange>>> {
         handlers::folding_ranges::folding_range(
+            &self.client,
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await
+    }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        handlers::goto_definition::goto_definition(
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),

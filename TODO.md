@@ -47,7 +47,8 @@ This document tracks implementation status for panache's features.
   figures
 - ✅ **Folding ranges** - `textDocument/foldingRange` for headings, code blocks,
   fenced divs, YAML frontmatter
-- ❌ **Go to definition** - Jump to reference link/footnote/citation definitions
+- ✅ **Go to definition** - Jump to reference link/footnote definitions
+  (reference links, images, footnotes)
 - ❌ **Find references** - Find all uses of a reference link/footnote/citation
 
 #### Completion

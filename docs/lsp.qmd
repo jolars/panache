@@ -11,7 +11,12 @@ provides document formatting capabilities for editors and IDEs.
 
 - Document formatting (`textDocument/formatting`)
 - Range formatting (`textDocument/rangeFormatting`)
+- **Go to definition** (`textDocument/definition`) - jump from references to definitions
+  - Reference links: `[text][ref]` → `[ref]: url`
+  - Reference images: `![alt][ref]` → `[ref]: url`
+  - Footnote references: `[^id]` → `[^id]: content`
 - Document outline (`textDocument/documentSymbol`) - hierarchical view of headings, tables, and figures
+- Folding ranges (`textDocument/foldingRange`) - code folding for headings, code blocks, fenced divs, YAML frontmatter
 - Live diagnostics (`textDocument/publishDiagnostics`) - linting errors and warnings
 - Code actions (`textDocument/codeAction`) - quick fixes for lint issues
 - Document tracking (`textDocument/didOpen/didChange/didClose`)
