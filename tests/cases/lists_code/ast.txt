@@ -12,7 +12,8 @@ ROOT@0..184
           WHITESPACE@13..17 "    "
           CodeFenceOpen@17..24
             CodeFenceMarker@17..20 "```"
-            CodeInfo@20..23 "c++"
+            CodeInfo@20..23
+              CodeLanguage@20..23 "c++"
             NEWLINE@23..24 "\n"
           CodeContent@24..37
             WHITESPACE@24..28 "    "
@@ -51,7 +52,8 @@ ROOT@0..184
               WHITESPACE@111..119 "        "
               CodeFenceOpen@119..126
                 CodeFenceMarker@119..122 "```"
-                CodeInfo@122..125 "c++"
+                CodeInfo@122..125
+                  CodeLanguage@122..125 "c++"
                 NEWLINE@125..126 "\n"
               CodeContent@126..143
                 WHITESPACE@126..134 "        "

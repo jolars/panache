@@ -41,7 +41,7 @@ pub fn collect_code_blocks(tree: &SyntaxNode, input: &str) -> HashMap<String, Ve
 fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
     use rowan::NodeOrToken;
 
-    let mut info_string_raw = String::new();
+    let mut language = None;
     let mut content = String::new();
     let mut content_start_offset = None;
 
@@ -49,11 +49,20 @@ fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
         if let NodeOrToken::Node(n) = child {
             match n.kind() {
                 SyntaxKind::CodeFenceOpen => {
-                    for token in n.children_with_tokens() {
-                        if let NodeOrToken::Token(t) = token
-                            && t.kind() == SyntaxKind::CodeInfo
+                    // Look for CodeInfo node, then extract CodeLanguage from inside it
+                    for fence_child in n.children_with_tokens() {
+                        if let NodeOrToken::Node(info_node) = fence_child
+                            && info_node.kind() == SyntaxKind::CodeInfo
                         {
-                            info_string_raw = t.text().to_string();
+                            // Search for CodeLanguage token inside CodeInfo node
+                            for info_token in info_node.children_with_tokens() {
+                                if let NodeOrToken::Token(t) = info_token
+                                    && t.kind() == SyntaxKind::CodeLanguage
+                                {
+                                    language = Some(t.text().to_string());
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -67,13 +76,10 @@ fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
         }
     }
 
-    // Extract first word as language
-    let language = info_string_raw
-        .split_whitespace()
-        .next()
-        .map(|s| s.to_string())?;
+    // Extract language - now from CodeLanguage token inside CodeInfo node
+    let language = language?;
 
-    // Skip if language is empty
+    // Skip if language is empty or content is empty
     if language.is_empty() || content.is_empty() {
         return None;
     }
@@ -291,5 +297,80 @@ print("hello")
         assert_eq!(offset_to_line(input, 5), 1); // Before first \n
         assert_eq!(offset_to_line(input, 6), 2); // Start of line 2
         assert_eq!(offset_to_line(input, 12), 3); // Start of line 3
+    }
+
+    #[test]
+    fn test_quarto_style_braces() {
+        // Quarto uses {r} instead of just r
+        let input = r#"```{r}
+x <- 1
+```
+"#;
+
+        let tree = parse(input, None);
+        let blocks = collect_code_blocks(&tree, input);
+
+        assert_eq!(blocks.len(), 1);
+        assert!(blocks.contains_key("r"), "Should extract 'r' from '{{r}}'");
+
+        let r_blocks = &blocks["r"];
+        assert_eq!(r_blocks.len(), 1);
+        assert_eq!(r_blocks[0].language, "r");
+        assert_eq!(r_blocks[0].content, "x <- 1\n");
+    }
+
+    #[test]
+    fn test_quarto_style_braces_with_options() {
+        // Quarto supports {r label, echo=FALSE}
+        let input = r#"```{r my-label, echo=FALSE}
+x <- 1
+```
+"#;
+
+        let tree = parse(input, None);
+        let blocks = collect_code_blocks(&tree, input);
+
+        assert_eq!(blocks.len(), 1);
+        assert!(
+            blocks.contains_key("r"),
+            "Should extract 'r' from '{{r my-label, echo=FALSE}}'"
+        );
+
+        let r_blocks = &blocks["r"];
+        assert_eq!(r_blocks.len(), 1);
+        assert_eq!(r_blocks[0].language, "r");
+    }
+
+    #[test]
+    fn test_quarto_various_syntaxes() {
+        let input = r#"```{r}
+a <- 1
+```
+
+```{python}
+b = 2
+```
+
+```{r chunk-label}
+c <- 3
+```
+
+```{r chunk2, echo=FALSE}
+d <- 4
+```
+"#;
+
+        let tree = parse(input, None);
+        let blocks = collect_code_blocks(&tree, input);
+
+        assert_eq!(blocks.len(), 2);
+        assert!(blocks.contains_key("r"));
+        assert!(blocks.contains_key("python"));
+
+        let r_blocks = &blocks["r"];
+        assert_eq!(r_blocks.len(), 3, "Should find all three R blocks");
+
+        let py_blocks = &blocks["python"];
+        assert_eq!(py_blocks.len(), 1);
     }
 }

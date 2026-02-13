@@ -28,7 +28,8 @@ ROOT@0..494
     CodeBlock@79..162
       CodeFenceOpen@79..90
         CodeFenceMarker@79..82 "```"
-        CodeInfo@82..89 "{=html}"
+        CodeInfo@82..89
+          TEXT@82..89 "{=html}"
         NEWLINE@89..90 "\n"
       CodeContent@90..158
         TEXT@90..110 "<div class=\"custom\">"
@@ -54,7 +55,8 @@ ROOT@0..494
     CodeBlock@183..242
       CodeFenceOpen@183..195
         CodeFenceMarker@183..186 "```"
-        CodeInfo@186..194 "{=latex}"
+        CodeInfo@186..194
+          TEXT@186..194 "{=latex}"
         NEWLINE@194..195 "\n"
       CodeContent@195..238
         TEXT@195..211 "\\begin{equation}"
@@ -80,7 +82,8 @@ ROOT@0..494
     CodeBlock@265..339
       CodeFenceOpen@265..279
         CodeFenceMarker@265..268 "```"
-        CodeInfo@268..278 "{=openxml}"
+        CodeInfo@268..278
+          TEXT@268..278 "{=openxml}"
         NEWLINE@278..279 "\n"
       CodeContent@279..335
         TEXT@279..284 "<w:p>"
@@ -110,7 +113,8 @@ ROOT@0..494
     CodeBlock@363..411
       CodeFenceOpen@363..372
         CodeFenceMarker@363..366 "```"
-        CodeInfo@366..371 "{=ms}"
+        CodeInfo@366..371
+          TEXT@366..371 "{=ms}"
         NEWLINE@371..372 "\n"
       CodeContent@372..407
         TEXT@372..380 ".MYMACRO"
@@ -134,7 +138,8 @@ ROOT@0..494
     CodeBlock@448..494
       CodeFenceOpen@448..458
         CodeFenceMarker@448..451 "```"
-        CodeInfo@451..457 "python"
+        CodeInfo@451..457
+          CodeLanguage@451..457 "python"
         NEWLINE@457..458 "\n"
       CodeContent@458..490
         TEXT@458..470 "def hello():"

@@ -25,12 +25,12 @@ pub(super) fn format_code_block(
         if let NodeOrToken::Node(n) = child {
             match n.kind() {
                 SyntaxKind::CodeFenceOpen => {
-                    // Find the info string
-                    for token in n.children_with_tokens() {
-                        if let NodeOrToken::Token(t) = token
-                            && t.kind() == SyntaxKind::CodeInfo
+                    // Find the info string - now it's a node, not a token
+                    for child_token in n.children_with_tokens() {
+                        if let NodeOrToken::Node(info_node) = child_token
+                            && info_node.kind() == SyntaxKind::CodeInfo
                         {
-                            info_string_raw = t.text().to_string();
+                            info_string_raw = info_node.text().to_string();
                         }
                     }
                 }
@@ -357,11 +357,11 @@ pub fn collect_code_blocks(tree: &SyntaxNode) -> Vec<(String, String)> {
                 if let NodeOrToken::Node(n) = child {
                     match n.kind() {
                         SyntaxKind::CodeFenceOpen => {
-                            for token in n.children_with_tokens() {
-                                if let NodeOrToken::Token(t) = token
-                                    && t.kind() == SyntaxKind::CodeInfo
+                            for child_token in n.children_with_tokens() {
+                                if let NodeOrToken::Node(info_node) = child_token
+                                    && info_node.kind() == SyntaxKind::CodeInfo
                                 {
-                                    info_string_raw = t.text().to_string();
+                                    info_string_raw = info_node.text().to_string();
                                 }
                             }
                         }

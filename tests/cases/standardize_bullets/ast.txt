@@ -208,7 +208,8 @@ ROOT@0..1226
           WHITESPACE@865..867 "  "
           CodeFenceOpen@867..877
             CodeFenceMarker@867..870 "```"
-            CodeInfo@870..876 "python"
+            CodeInfo@870..876
+              CodeLanguage@870..876 "python"
             NEWLINE@876..877 "\n"
           CodeContent@877..905
             WHITESPACE@877..879 "  "

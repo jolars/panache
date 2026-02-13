@@ -3,7 +3,8 @@ ROOT@0..463
     CodeBlock@0..32
       CodeFenceOpen@0..8
         CodeFenceMarker@0..3 "```"
-        CodeInfo@3..7 "bash"
+        CodeInfo@3..7
+          CodeLanguage@3..7 "bash"
         NEWLINE@7..8 "\n"
       CodeContent@8..28
         TEXT@8..27 "cargo install tomat"
@@ -33,7 +34,11 @@ ROOT@0..463
       CodeFenceOpen@96..149
         CodeFenceMarker@96..100 "~~~~"
         WHITESPACE@100..101 " "
-        CodeInfo@101..148 "{#mycode .haskell .nu ..."
+        CodeInfo@101..148
+          TEXT@101..110 "{#mycode "
+          TEXT@110..111 "."
+          CodeLanguage@111..118 "haskell"
+          TEXT@118..148 " .numberLines startFr ..."
         NEWLINE@148..149 "\n"
       CodeContent@149..257
         TEXT@149..166 "qsort []     = []"
@@ -50,7 +55,8 @@ ROOT@0..463
     CodeBlock@308..337
       CodeFenceOpen@308..319
         CodeFenceMarker@308..311 "```"
-        CodeInfo@311..318 "haskell"
+        CodeInfo@311..318
+          CodeLanguage@311..318 "haskell"
         NEWLINE@318..319 "\n"
       CodeContent@319..333
         TEXT@319..332 "qsort [] = []"
@@ -64,7 +70,11 @@ ROOT@0..463
       CodeFenceOpen@338..353
         CodeFenceMarker@338..341 "```"
         WHITESPACE@341..342 " "
-        CodeInfo@342..352 "{.haskell}"
+        CodeInfo@342..352
+          TEXT@342..343 "{"
+          TEXT@343..344 "."
+          CodeLanguage@344..351 "haskell"
+          TEXT@351..352 "}"
         NEWLINE@352..353 "\n"
       CodeContent@353..367
         TEXT@353..366 "qsort [] = []"
@@ -77,7 +87,9 @@ ROOT@0..463
     CodeBlock@372..416
       CodeFenceOpen@372..398
         CodeFenceMarker@372..375 "```"
-        CodeInfo@375..397 "haskell {.numberLines}"
+        CodeInfo@375..397
+          CodeLanguage@375..382 "haskell"
+          TEXT@382..397 " {.numberLines}"
         NEWLINE@397..398 "\n"
       CodeContent@398..412
         TEXT@398..411 "qsort [] = []"
@@ -91,7 +103,11 @@ ROOT@0..463
       CodeFenceOpen@417..445
         CodeFenceMarker@417..420 "```"
         WHITESPACE@420..421 " "
-        CodeInfo@421..444 "{.haskell .numberLines}"
+        CodeInfo@421..444
+          TEXT@421..422 "{"
+          TEXT@422..423 "."
+          CodeLanguage@423..430 "haskell"
+          TEXT@430..444 " .numberLines}"
         NEWLINE@444..445 "\n"
       CodeContent@445..459
         TEXT@445..458 "qsort [] = []"

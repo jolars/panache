@@ -440,6 +440,78 @@ pub(crate) fn is_closing_fence(content: &str, fence: &FenceInfo) -> bool {
     trimmed[closing_count..].trim().is_empty()
 }
 
+/// Helper to parse info string and emit CodeInfo node with parsed components.
+/// This breaks down the info string into its logical parts while preserving all bytes.
+fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &str) {
+    builder.start_node(SyntaxKind::CodeInfo.into());
+
+    let info = InfoString::parse(info_string);
+
+    match &info.block_type {
+        CodeBlockType::DisplayShortcut { language } => {
+            // Simple case: python or python {.class}
+            builder.token(SyntaxKind::CodeLanguage.into(), language);
+
+            // If there's more after the language, emit it as TEXT
+            let after_lang = &info_string[language.len()..];
+            if !after_lang.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), after_lang);
+            }
+        }
+        CodeBlockType::Executable { language } => {
+            // Quarto: {r} or {r my-label, echo=FALSE}
+            builder.token(SyntaxKind::TEXT.into(), "{");
+            builder.token(SyntaxKind::CodeLanguage.into(), language);
+
+            // Everything after language
+            let start_offset = 1 + language.len(); // Skip "{r"
+            if start_offset < info_string.len() {
+                let rest = &info_string[start_offset..];
+                builder.token(SyntaxKind::TEXT.into(), rest);
+            }
+        }
+        CodeBlockType::DisplayExplicit { classes } => {
+            // Pandoc: {.python} or {#id .haskell .numberLines}
+            // We need to find the first class in the raw string and emit everything around it
+
+            if let Some(lang) = classes.first() {
+                // Find where ".lang" appears in the info string
+                let needle = format!(".{}", lang);
+                if let Some(lang_start) = info_string.find(&needle) {
+                    // Emit everything before the language
+                    if lang_start > 0 {
+                        builder.token(SyntaxKind::TEXT.into(), &info_string[..lang_start]);
+                    }
+
+                    // Emit the dot
+                    builder.token(SyntaxKind::TEXT.into(), ".");
+
+                    // Emit the language
+                    builder.token(SyntaxKind::CodeLanguage.into(), lang);
+
+                    // Emit everything after
+                    let after_lang_start = lang_start + 1 + lang.len();
+                    if after_lang_start < info_string.len() {
+                        builder.token(SyntaxKind::TEXT.into(), &info_string[after_lang_start..]);
+                    }
+                } else {
+                    // Couldn't find it, just emit as TEXT
+                    builder.token(SyntaxKind::TEXT.into(), info_string);
+                }
+            } else {
+                // No classes
+                builder.token(SyntaxKind::TEXT.into(), info_string);
+            }
+        }
+        CodeBlockType::Raw { .. } | CodeBlockType::Plain => {
+            // No language, just emit as TEXT
+            builder.token(SyntaxKind::TEXT.into(), info_string);
+        }
+    }
+
+    builder.finish_node(); // CodeInfo
+}
+
 /// Parse a fenced code block, consuming lines from the parser.
 /// Returns the new position after the code block.
 /// Parse a fenced code block, consuming lines from the parser.
@@ -483,13 +555,13 @@ pub(crate) fn parse_fenced_code_block(
     if let Some(_space_stripped) = after_fence.strip_prefix(' ') {
         // There was a space - emit it as WHITESPACE
         builder.token(SyntaxKind::WHITESPACE.into(), " ");
-        // The info_string should match what comes after the space
+        // Parse and emit the info string as a structured node
         if !fence.info_string.is_empty() {
-            builder.token(SyntaxKind::CodeInfo.into(), &fence.info_string);
+            emit_code_info_node(builder, &fence.info_string);
         }
     } else if !fence.info_string.is_empty() {
-        // No space - emit info_string directly
-        builder.token(SyntaxKind::CodeInfo.into(), &fence.info_string);
+        // No space - parse and emit info_string as a structured node
+        emit_code_info_node(builder, &fence.info_string);
     }
 
     builder.token(SyntaxKind::NEWLINE.into(), "\n");

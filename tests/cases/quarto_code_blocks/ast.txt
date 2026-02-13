@@ -3,7 +3,10 @@ ROOT@0..451
     CodeBlock@0..29
       CodeFenceOpen@0..19
         CodeFenceMarker@0..3 "```"
-        CodeInfo@3..18 "{r, echo=FALSE}"
+        CodeInfo@3..18
+          TEXT@3..4 "{"
+          CodeLanguage@4..5 "r"
+          TEXT@5..18 ", echo=FALSE}"
         NEWLINE@18..19 "\n"
       CodeContent@19..25
         TEXT@19..24 "1 + 1"
@@ -21,7 +24,10 @@ ROOT@0..451
     CodeBlock@93..117
       CodeFenceOpen@93..107
         CodeFenceMarker@93..96 "```"
-        CodeInfo@96..106 "{{python}}"
+        CodeInfo@96..106
+          TEXT@96..97 "{"
+          CodeLanguage@97..105 "{python}"
+          TEXT@105..106 "}"
         NEWLINE@106..107 "\n"
       CodeContent@107..113
         TEXT@107..112 "1 + 1"

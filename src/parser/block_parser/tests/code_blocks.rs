@@ -1,25 +1,19 @@
 use crate::parser::block_parser::tests::helpers::{
     assert_block_kinds, find_all, find_first, parse_blocks,
 };
-use crate::syntax::{SyntaxKind, SyntaxToken};
+use crate::syntax::SyntaxKind;
 
 fn get_code_content(node: &crate::syntax::SyntaxNode) -> Option<String> {
     find_first(node, SyntaxKind::CodeContent).map(|n| n.text().to_string())
 }
 
-fn get_code_info_token(node: &crate::syntax::SyntaxNode) -> Option<SyntaxToken> {
-    for element in node.descendants_with_tokens() {
-        if let Some(token) = element.as_token()
-            && token.kind() == SyntaxKind::CodeInfo
-        {
-            return Some(token.clone());
-        }
-    }
-    None
+fn get_code_info_node(node: &crate::syntax::SyntaxNode) -> Option<crate::syntax::SyntaxNode> {
+    node.descendants()
+        .find(|element| element.kind() == SyntaxKind::CodeInfo)
 }
 
 fn get_code_info(node: &crate::syntax::SyntaxNode) -> Option<String> {
-    get_code_info_token(node).map(|t| t.text().to_string())
+    get_code_info_node(node).map(|n| n.text().to_string())
 }
 
 #[test]

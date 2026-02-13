@@ -21,7 +21,10 @@ ROOT@0..507
     CodeBlock@54..115
       CodeFenceOpen@54..91
         CodeFenceMarker@54..57 "```"
-        CodeInfo@57..90 "{r, echo = FALSE, war ..."
+        CodeInfo@57..90
+          TEXT@57..58 "{"
+          CodeLanguage@58..59 "r"
+          TEXT@59..90 ", echo = FALSE, warni ..."
         NEWLINE@90..91 "\n"
       CodeContent@91..111
         TEXT@91..101 "x <- 1 + 1"
@@ -45,7 +48,10 @@ ROOT@0..507
     CodeBlock@146..237
       CodeFenceOpen@146..176
         CodeFenceMarker@146..149 "```"
-        CodeInfo@149..175 "{r, fig-cap=\"A nice p ..."
+        CodeInfo@149..175
+          TEXT@149..150 "{"
+          CodeLanguage@150..151 "r"
+          TEXT@151..175 ", fig-cap=\"A nice plot\"}"
         NEWLINE@175..176 "\n"
       CodeContent@176..233
         TEXT@176..191 "#| fig-width: 7"
@@ -71,7 +77,14 @@ ROOT@0..507
     CodeBlock@277..437
       CodeFenceOpen@277..326
         CodeFenceMarker@277..280 "```"
-        CodeInfo@280..325 "{r, label=analysis-ch ..."
+        CodeInfo@280..325
+          TEXT@280..281 "{"
+          CodeLanguage@281..282 "r"
+          TEXT@282..314 ", label=analysis-chun ..."
+          TEXT@314..315 "_"
+          TEXT@315..320 "cache"
+          TEXT@320..321 "_"
+          TEXT@321..325 "var}"
         NEWLINE@325..326 "\n"
       CodeContent@326..433
         TEXT@326..340 "#| echo: false"
@@ -99,7 +112,10 @@ ROOT@0..507
     CodeBlock@459..507
       CodeFenceOpen@459..474
         CodeFenceMarker@459..462 "```"
-        CodeInfo@462..473 "{r mylabel}"
+        CodeInfo@462..473
+          TEXT@462..463 "{"
+          CodeLanguage@463..464 "r"
+          TEXT@464..473 " mylabel}"
         NEWLINE@473..474 "\n"
       CodeContent@474..503
         TEXT@474..488 "#| echo: false"

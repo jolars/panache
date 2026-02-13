@@ -146,7 +146,8 @@ pub enum SyntaxKind {
     // Code block parts
     CodeFenceOpen,
     CodeFenceClose,
-    CodeInfo,
+    CodeInfo,     // Raw info string (preserved for lossless formatting)
+    CodeLanguage, // Parsed language identifier (r, python, etc.)
     CodeContent,
 
     // Div parts
