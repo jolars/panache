@@ -43,7 +43,6 @@ fn image_without_attributes() {
 }
 
 #[test]
-#[ignore] // TODO: Fix bug where multiple images in same paragraph share attributes
 fn multiple_images_with_attributes() {
     // Use very long line width to avoid wrapping
     let cfg = panache::ConfigBuilder::default().line_width(200).build();
