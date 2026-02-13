@@ -596,6 +596,7 @@ dependencies = [
  "tokio",
  "toml",
  "tower-lsp-server",
+ "unicode-width",
  "uuid",
  "which",
 ]

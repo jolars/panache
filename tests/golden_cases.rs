@@ -168,6 +168,7 @@ golden_test_cases!(
     paragraph_wrapping,
     paragraphs,
     pipe_table,
+    pipe_table_unicode,
     quarto_code_blocks,
     quarto_hashpipe,
     raw_blocks,

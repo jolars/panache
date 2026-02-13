@@ -1,0 +1,16 @@
+ROOT@0..230
+  DOCUMENT@0..230
+    PipeTable@0..230
+      TableHeader@0..57
+        TEXT@0..56 "| Feature             ..."
+        NEWLINE@56..57 "\n"
+      TableSeparator@57..114
+        TEXT@57..113 "|-------------------- ..."
+        NEWLINE@113..114 "\n"
+      TableRow@114..172
+        TEXT@114..171 "| Formatting          ..."
+        NEWLINE@171..172 "\n"
+      TableRow@172..230
+        TEXT@172..229 "| Config discovery    ..."
+        NEWLINE@229..230 "\n"
+

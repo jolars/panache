@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::formatter::inline::format_inline_node;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
+use unicode_width::UnicodeWidthStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Alignment {
@@ -157,7 +158,8 @@ fn calculate_column_widths(rows: &[Vec<String>]) -> Vec<usize> {
     for row in rows {
         for (col_idx, cell) in row.iter().enumerate() {
             if col_idx < num_cols {
-                widths[col_idx] = widths[col_idx].max(cell.len());
+                // Use unicode display width instead of byte length
+                widths[col_idx] = widths[col_idx].max(cell.width());
             }
         }
     }
@@ -202,21 +204,23 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
             // Add padding
             output.push(' ');
 
-            // Apply alignment (only to data rows, not header)
+            // Apply alignment using unicode display width
+            let cell_width = cell.width();
+            let total_padding = width.saturating_sub(cell_width);
+
             let padded_cell = if row_idx == 0 {
                 // Header row: always left-align
-                format!("{:<width$}", cell, width = width)
+                format!("{}{}", cell, " ".repeat(total_padding))
             } else {
                 // Data rows: respect alignment
                 match alignment {
                     Alignment::Left | Alignment::Default => {
-                        format!("{:<width$}", cell, width = width)
+                        format!("{}{}", cell, " ".repeat(total_padding))
                     }
                     Alignment::Right => {
-                        format!("{:>width$}", cell, width = width)
+                        format!("{}{}", " ".repeat(total_padding), cell)
                     }
                     Alignment::Center => {
-                        let total_padding = width.saturating_sub(cell.len());
                         let left_padding = total_padding / 2;
                         let right_padding = total_padding - left_padding;
                         format!(
