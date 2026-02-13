@@ -26,7 +26,8 @@ This document tracks implementation status for panache's features.
 #### Diagnostics
 
 - ❌ **Syntax error diagnostics** - Report parsing errors as diagnostics
-- ❌ **Lint warnings** - Configurable linting rules (e.g., heading levels, list consistency)
+- ❌ **Lint warnings** - Configurable linting rules (e.g., heading levels, list
+  consistency)
 - ❌ **Link validation** - Check for broken internal links/references
 - ❌ **Citation validation** - Validate citation keys against bibliography
 - ❌ **Footnote validation** - Check for undefined footnotes
@@ -34,23 +35,30 @@ This document tracks implementation status for panache's features.
 #### Code Actions
 
 - ❌ **Convert lists** - Convert between bullet/ordered lists
+- ❌ **Convert loose/compact lists** - Toggle between loose and compact list
+  formatting
 - ❌ **Convert table** - Convert between table styles (simple, pipe, grid)
 - ❌ **Convert link styles** - Convert between inline/reference links
 - ❌ **Convert footnote styles** - Convert between inline/reference footnotes
 
 #### Navigation & Symbols
 
-- ✅ **Document outline** - `textDocument/documentSymbol` for headings, tables, figures
-- ❌ **Folding ranges** - `textDocument/foldingRange` for headings, lists, code blocks
+- ✅ **Document outline** - `textDocument/documentSymbol` for headings, tables,
+  figures
+- ❌ **Folding ranges** - `textDocument/foldingRange` for headings, lists, code
+  blocks
 - ❌ **Go to definition** - Jump to reference link/footnote/citation definitions
 - ❌ **Find references** - Find all uses of a reference link/footnote/citation
 
 #### Completion
 
-- ❌ **Citation completion** - `textDocument/completion` for `@cite` keys from bibliography
-- ❌ **Reference link completion** - Complete `[text][ref]` from defined references
+- ❌ **Citation completion** - `textDocument/completion` for `@cite` keys from
+  bibliography
+- ❌ **Reference link completion** - Complete `[text][ref]` from defined
+  references
 - ❌ **Heading link completion** - Complete internal links to headings
-- ❌ **Attribute completion** - Complete class names and attributes in `{.class #id}`
+- ❌ **Attribute completion** - Complete class names and attributes in
+  `{.class #id}`
 
 #### Hover Information
 
@@ -61,13 +69,16 @@ This document tracks implementation status for panache's features.
 
 #### Advanced
 
-- ✅ **Range formatting** - `textDocument/rangeFormatting` for selected text only
-- ❌ **On-type formatting** - `textDocument/onTypeFormatting` for auto-formatting triggers
+- ✅ **Range formatting** - `textDocument/rangeFormatting` for selected text
+  only
+- ❌ **On-type formatting** - `textDocument/onTypeFormatting` for
+  auto-formatting triggers
 - ❌ **Document links** - `textDocument/documentLink` for clickable links
 - ❌ **Semantic tokens** - Syntax highlighting via LSP
 - ❌ **Rename** - Rename reference links/footnotes/citations across document
 - ❌ **Workspace symbols** - Search for headings across all workspace documents
-- ❌ **Configuration via LSP** - `workspace/didChangeConfiguration` to reload config
+- ❌ **Configuration via LSP** - `workspace/didChangeConfiguration` to reload
+  config
 
 ---
 
@@ -85,9 +96,11 @@ This document tracks implementation status for panache's features.
 
 #### Per-Flavor Extension Configuration
 
-- ❌ **Per-flavor extension overrides** - `[extensions.gfm]`, `[extensions.quarto]`, `[extensions.rmarkdown]`, etc.
+- ❌ **Per-flavor extension overrides** - `[extensions.gfm]`,
+  `[extensions.quarto]`, `[extensions.rmarkdown]`, etc.
   - Allow fine-grained control of extensions for specific flavors
-  - Example: Enable `task_lists` only for GFM, disable `citations` for CommonMark
+  - Example: Enable `task_lists` only for GFM, disable `citations` for
+    CommonMark
   - Falls back to global `[extensions]` settings when not specified
 
 #### Per-File Pattern Overrides
@@ -95,8 +108,10 @@ This document tracks implementation status for panache's features.
 - ❌ **Glob pattern flavor overrides** - `[flavor_overrides]` with file patterns
   - Override flavor for specific files or patterns
   - Example: `"README.md" = "gfm"` or `"docs/**/*.md" = "gfm"`
-  - Useful for projects with mixed Markdown files (e.g., README.md as GFM, docs as Pandoc)
-  - Could potentially extend to per-pattern extension overrides: `[pattern_overrides."docs/**/*.md".extensions]`
+  - Useful for projects with mixed Markdown files (e.g., README.md as GFM, docs
+    as Pandoc)
+  - Could potentially extend to per-pattern extension overrides:
+    `[pattern_overrides."docs/**/*.md".extensions]`
 
 ---
 
@@ -113,7 +128,8 @@ This document tracks implementation status for panache's features.
 - ✅ `--fix` mode for auto-fixing violations
 - ✅ Diagnostic output with file locations
 - ✅ Pluggable rule system with `RuleRegistry`
-- ✅ **Implemented rule:** `heading-hierarchy` - Warns when heading levels are skipped (e.g., h1 → h3)
+- ✅ **Implemented rule:** `heading-hierarchy` - Warns when heading levels are
+  skipped (e.g., h1 → h3)
 
 ### Architecture
 
@@ -168,7 +184,8 @@ panache lint --config cfg.toml      # Custom config
 
 - ❌ Per-rule enable/disable in `.panache.toml` `[lint]` section
 - ❌ Severity levels (error, warning, info)
-- ❌ Auto-fix capability per rule (infrastructure exists, rules need implementation)
+- ❌ Auto-fix capability per rule (infrastructure exists, rules need
+  implementation)
 
 ### Next Steps
 
@@ -187,7 +204,8 @@ panache lint --config cfg.toml      # Custom config
 
 ### Lists
 
-- ✅ **Bullet lists** - Standardize bullet list markers to `-` (all `*`, `+`, `-` converted to `-`)
+- ✅ **Bullet lists** - Standardize bullet list markers to `-` (all `*`, `+`,
+  `-` converted to `-`)
 
 ### Tables
 
@@ -198,9 +216,11 @@ panache lint --config cfg.toml      # Custom config
 
 Parser - Comprehensive Pandoc Feature Coverage
 
-This section tracks implementation status of Pandoc Markdown features based on the spec files in `docs/pandoc-spec/`.
+This section tracks implementation status of Pandoc Markdown features based on
+the spec files in `docs/pandoc-spec/`.
 
-**Focus**: Initial development prioritizes **default Pandoc extensions**. Non-default extensions are tracked separately for future consideration.
+**Focus**: Initial development prioritizes **default Pandoc extensions**.
+Non-default extensions are tracked separately for future consideration.
 
 ### Block-Level Elements
 
@@ -215,16 +235,20 @@ This section tracks implementation status of Pandoc Markdown features based on t
 - ✅ ATX-style headings (`# Heading`)
 - ✅ Setext-style headings (underlined with `===` or `---`)
 - ✅ Heading identifier attributes (`# Heading {#id}`)
-- ✅ Extension: `blank_before_header` - Require blank line before headings (default behavior)
-- ✅ Extension: `header_attributes` - Full attribute syntax `{#id .class key=value}`
-- ⏹️ Extension: `implicit_header_references` - Auto-generate reference links (conversion feature, not formatting concern)
+- ✅ Extension: `blank_before_header` - Require blank line before headings
+  (default behavior)
+- ✅ Extension: `header_attributes` - Full attribute syntax
+  `{#id .class key=value}`
+- ⏹️ Extension: `implicit_header_references` - Auto-generate reference links
+  (conversion feature, not formatting concern)
 
 ### Block Quotations ✅
 
 - ✅ Basic block quotes (`> text`)
 - ✅ Nested block quotes (`> > nested`)
 - ✅ Block quotes with paragraphs
-- ✅ Extension: `blank_before_blockquote` - Require blank before quote (default behavior)
+- ✅ Extension: `blank_before_blockquote` - Require blank before quote (default
+  behavior)
 - ✅ Block quotes containing lists
 - ✅ Block quotes containing code blocks
 
@@ -236,7 +260,8 @@ This section tracks implementation status of Pandoc Markdown features based on t
 - ✅ List item continuation
 - 🚧 Complex nested mixed lists (fragile, needs parser structure improvement)
 - ✅ Extension: `fancy_lists` - Roman numerals, letters `(a)`, `A)`, etc.
-- ❌ Extension: `startnum` - Start ordered lists at arbitrary number (low priority)
+- ❌ Extension: `startnum` - Start ordered lists at arbitrary number (low
+  priority)
 - ✅ Extension: `example_lists` - Example lists with `(@)` markers
 - ✅ Extension: `task_lists` - GitHub-style `- [ ]` and `- [x]`
 - ✅ Extension: `definition_lists` - Term/definition syntax
@@ -263,11 +288,15 @@ This section tracks implementation status of Pandoc Markdown features based on t
 
 ### Tables ✅
 
-- ✅ Extension: `simple_tables` - Simple table syntax (parsing complete, formatting deferred)
+- ✅ Extension: `simple_tables` - Simple table syntax (parsing complete,
+  formatting deferred)
 - ✅ Extension: `table_captions` - Table captions (both before and after tables)
-- ✅ Extension: `pipe_tables` - GitHub/PHP Markdown tables (all alignments, orgtbl variant)
-- ✅ Extension: `multiline_tables` - Multiline cell content (parsing complete, formatting deferred)
-- ✅ Extension: `grid_tables` - Grid-style tables (parsing complete, formatting deferred)
+- ✅ Extension: `pipe_tables` - GitHub/PHP Markdown tables (all alignments,
+  orgtbl variant)
+- ✅ Extension: `multiline_tables` - Multiline cell content (parsing complete,
+  formatting deferred)
+- ✅ Extension: `grid_tables` - Grid-style tables (parsing complete, formatting
+  deferred)
 
 ### Line Blocks ✅
 
@@ -287,7 +316,8 @@ This section tracks implementation status of Pandoc Markdown features based on t
 - ✅ Extension: `strikeout` - `~~strikethrough~~`
 - ✅ Extension: `superscript` - `^super^`
 - ✅ Extension: `subscript` - `~sub~`
-- ✅ Extension: `bracketed_spans` - Small caps `[text]{.smallcaps}`, underline `[text]{.underline}`, etc.
+- ✅ Extension: `bracketed_spans` - Small caps `[text]{.smallcaps}`, underline
+  `[text]{.underline}`, etc.
 
 ### Code & Verbatim ✅
 
@@ -306,7 +336,8 @@ This section tracks implementation status of Pandoc Markdown features based on t
 - ✅ Reference links `[text][ref]`
 - ✅ Extension: `shortcut_reference_links` - `[ref]` without second `[]`
 - ✅ Extension: `link_attributes` - `[text](url){.class}`
-- ⏹️ Extension: `implicit_header_references` - `[Heading Name]` links to header (conversion feature, not formatting concern)
+- ⏹️ Extension: `implicit_header_references` - `[Heading Name]` links to header
+  (conversion feature, not formatting concern)
 
 ### Images ✅
 
@@ -333,7 +364,8 @@ This section tracks implementation status of Pandoc Markdown features based on t
 
 ### Citations ✅
 
-- ✅ Extension: `citations` - `[@cite]` and `@cite` syntax with complex key support
+- ✅ Extension: `citations` - `[@cite]` and `@cite` syntax with complex key
+  support
 
 ### Spans ✅
 
@@ -360,13 +392,17 @@ This section tracks implementation status of Pandoc Markdown features based on t
 
 ### Raw LaTeX ✅
 
-- ✅ Extension: `raw_tex` - Inline LaTeX commands (`\cite{ref}`, `\textbf{text}`, etc.)
-- ✅ Extension: `raw_tex` - Block LaTeX environments (`\begin{tabular}...\end{tabular}`)
-- ⏹️ Extension: `latex_macros` - Expand LaTeX macros (conversion feature, not formatting concern)
+- ✅ Extension: `raw_tex` - Inline LaTeX commands (`\cite{ref}`,
+  `\textbf{text}`, etc.)
+- ✅ Extension: `raw_tex` - Block LaTeX environments
+  (`\begin{tabular}...\end{tabular}`)
+- ⏹️ Extension: `latex_macros` - Expand LaTeX macros (conversion feature, not
+  formatting concern)
 
 ### Other Raw
 
-- ✅ Extension: `raw_attribute` - Generic raw blocks `{=format}` (blocks ✅, inline spans ✅)
+- ✅ Extension: `raw_attribute` - Generic raw blocks `{=format}` (blocks ✅,
+  inline spans ✅)
 
 ---
 
@@ -386,7 +422,8 @@ This section tracks implementation status of Pandoc Markdown features based on t
 
 ## Non-Default Extensions (Future Consideration)
 
-These extensions are **not enabled by default** in Pandoc and are lower priority for initial implementation.
+These extensions are **not enabled by default** in Pandoc and are lower priority
+for initial implementation.
 
 ### Non-Default: Emphasis & Formatting
 
@@ -395,12 +432,15 @@ These extensions are **not enabled by default** in Pandoc and are lower priority
 ### Non-Default: Links
 
 - ❌ Extension: `autolink_bare_uris` - Bare URLs as links (non-default)
-- ❌ Extension: `mmd_link_attributes` - MultiMarkdown link attributes (non-default)
+- ❌ Extension: `mmd_link_attributes` - MultiMarkdown link attributes
+  (non-default)
 
 ### Non-Default: Math
 
-- ✅ Extension: `tex_math_single_backslash` - `\( \)` and `\[ \]` (non-default, enabled for RMarkdown)
-- ✅ Extension: `tex_math_double_backslash` - `\\( \\)` and `\\[ \\]` (non-default)
+- ✅ Extension: `tex_math_single_backslash` - `\( \)` and `\[ \]` (non-default,
+  enabled for RMarkdown)
+- ✅ Extension: `tex_math_double_backslash` - `\\( \\)` and `\\[ \\]`
+  (non-default)
 - ❌ Extension: `tex_math_gfm` - GitHub Flavored Markdown math (non-default)
 
 ### Non-Default: Metadata
@@ -414,13 +454,15 @@ These extensions are **not enabled by default** in Pandoc and are lower priority
 ### Non-Default: Lists
 
 - ❌ Extension: `lists_without_preceding_blankline` (non-default)
-- ❌ Extension: `four_space_rule` - Four space vs two space list indent (non-default)
+- ❌ Extension: `four_space_rule` - Four space vs two space list indent
+  (non-default)
 
 ### Non-Default: Line Breaks
 
 - ❌ Extension: `hard_line_breaks` - Newline = `<br>` (non-default)
 - ❌ Extension: `ignore_line_breaks` - Ignore single newlines (non-default)
-- ❌ Extension: `east_asian_line_breaks` - Smart line breaks for CJK (non-default)
+- ❌ Extension: `east_asian_line_breaks` - Smart line breaks for CJK
+  (non-default)
 
 ### Non-Default: GitHub-specific
 
@@ -442,15 +484,18 @@ These extensions are **not enabled by default** in Pandoc and are lower priority
 ### Non-Default: Other
 
 - ❌ Extension: `abbreviations` - Abbreviation definitions (non-default)
-- ❌ Extension: `attributes` - Universal attribute syntax (non-default, commonmark only)
+- ❌ Extension: `attributes` - Universal attribute syntax (non-default,
+  commonmark only)
 - ❌ Extension: `gutenberg` - Project Gutenberg conventions (non-default)
 - ❌ Extension: `markdown_attribute` - `markdown="1"` in HTML (non-default)
 - ❌ Extension: `old_dashes` - Old-style em/en dash parsing (non-default)
 - ❌ Extension: `rebase_relative_paths` - Rebase relative paths (non-default)
-- ❌ Extension: `short_subsuperscripts` - MultiMarkdown `x^2` style (non-default)
+- ❌ Extension: `short_subsuperscripts` - MultiMarkdown `x^2` style
+  (non-default)
 - ❌ Extension: `sourcepos` - Include source position info (non-default)
 - ❌ Extension: `space_in_atx_header` - Allow no space after `#` (non-default)
-- ❌ Extension: `spaced_reference_links` - Allow space in `[ref] [def]` (non-default)
+- ❌ Extension: `spaced_reference_links` - Allow space in `[ref] [def]`
+  (non-default)
 
 ---
 
