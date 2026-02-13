@@ -6,8 +6,8 @@ use tower_lsp_server::Client;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
-use crate::lsp::config::load_config;
 use crate::lsp::conversions::offset_to_position;
+use crate::lsp::helpers::get_document_and_config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub async fn document_symbol(
@@ -17,22 +17,18 @@ pub async fn document_symbol(
     params: DocumentSymbolParams,
 ) -> Result<Option<DocumentSymbolResponse>> {
     let uri = params.text_document.uri;
-    let uri_str = uri.to_string();
-    log::debug!("document_symbol request for: {}", uri_str);
-    let doc_map = document_map.lock().await;
-    let content = match doc_map.get(&uri_str) {
-        Some(c) => c.clone(),
-        None => {
-            log::warn!("Document not found in document_map: {}", uri_str);
-            return Ok(None);
-        }
-    };
-    drop(doc_map);
-    log::debug!("Document content length: {} bytes", content.len());
+    log::debug!("document_symbol request for: {}", *uri);
 
-    // Load config (pass URI for file type detection)
-    let workspace_root = workspace_root.lock().await.clone();
-    let config = load_config(client, &workspace_root, Some(&uri)).await;
+    // Use helper to get document and config
+    let (content, config) =
+        match get_document_and_config(client, &document_map, &workspace_root, &uri).await {
+            Some(result) => result,
+            None => {
+                log::warn!("Document not found in document_map: {}", *uri);
+                return Ok(None);
+            }
+        };
+    log::debug!("Document content length: {} bytes", content.len());
 
     // Parse and build symbols synchronously (SyntaxNode is not Send)
     let syntax_tree = crate::parser::parse(&content, Some(config));

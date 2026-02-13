@@ -8,6 +8,7 @@ mod config;
 mod conversions;
 mod documents;
 mod handlers;
+mod helpers;
 mod server;
 
 pub struct PanacheLsp {

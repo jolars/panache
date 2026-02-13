@@ -8,8 +8,8 @@ use tower_lsp_server::ls_types::*;
 
 use crate::linter;
 
-use super::super::config::load_config;
 use super::super::conversions::{convert_diagnostic, offset_to_position};
+use super::super::helpers::get_document_and_config;
 
 /// Handle textDocument/codeAction request
 pub(crate) async fn code_action(
@@ -18,20 +18,16 @@ pub(crate) async fn code_action(
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: CodeActionParams,
 ) -> Result<Option<CodeActionResponse>> {
-    let uri_string = params.text_document.uri.to_string();
+    let uri = params.text_document.uri;
 
-    // Get document content
-    let text = {
-        let document_map = document_map.lock().await;
-        match document_map.get(&uri_string) {
-            Some(t) => t.clone(),
+    // Use helper to get document and config
+    let (text, config) =
+        match get_document_and_config(client, &document_map, &workspace_root, &uri).await {
+            Some(result) => result,
             None => return Ok(None),
-        }
-    };
+        };
 
-    // Load config and run linter
-    let workspace_root = workspace_root.lock().await.clone();
-    let config = load_config(client, &workspace_root, Some(&params.text_document.uri)).await;
+    // Run linter
     let text_clone = text.clone();
     let diagnostics = tokio::task::spawn_blocking(move || {
         let tree = crate::parse(&text_clone, Some(config.clone()));
@@ -58,7 +54,7 @@ pub(crate) async fn code_action(
                 })
                 .collect();
 
-            changes.insert(params.text_document.uri.clone(), text_edits);
+            changes.insert(uri.clone(), text_edits);
 
             let action = CodeAction {
                 title: fix.message.clone(),

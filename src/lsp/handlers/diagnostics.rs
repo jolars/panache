@@ -6,8 +6,8 @@ use tower_lsp_server::ls_types::*;
 
 use crate::linter;
 
-use super::super::config::load_config;
 use super::super::conversions::convert_diagnostic;
+use super::super::helpers::get_config;
 
 /// Parse document and run linter, then publish diagnostics
 pub(crate) async fn lint_and_publish(
@@ -16,8 +16,8 @@ pub(crate) async fn lint_and_publish(
     uri: Uri,
     text: String,
 ) {
-    let workspace_root = workspace_root.lock().await.clone();
-    let config = load_config(client, &workspace_root, Some(&uri)).await;
+    // Use helper to load config
+    let config = get_config(client, workspace_root, &uri).await;
 
     // Parse and lint (including external linters) in blocking task
     let text_clone = text.clone();

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_lsp_server::Client;
@@ -6,23 +7,25 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::conversions::offset_to_position;
+use crate::lsp::helpers::get_document_and_config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub async fn folding_range(
-    _client: &Client,
+    client: &Client,
     document_map: Arc<Mutex<HashMap<String, String>>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: FoldingRangeParams,
 ) -> Result<Option<Vec<FoldingRange>>> {
-    let uri_str = params.text_document.uri.to_string();
-    let doc_map = document_map.lock().await;
-    let content = match doc_map.get(&uri_str) {
-        Some(c) => c.clone(),
-        None => return Ok(None),
-    };
-    drop(doc_map);
+    let uri = params.text_document.uri;
+
+    // Use helper to get document and config
+    let (content, config) =
+        match get_document_and_config(client, &document_map, &workspace_root, &uri).await {
+            Some(result) => result,
+            None => return Ok(None),
+        };
 
     // Parse and build folding ranges synchronously (SyntaxNode is not Send)
-    let config = crate::config::Config::default();
     let syntax_tree = crate::parser::parse(&content, Some(config));
     let ranges = build_folding_ranges(&syntax_tree, &content);
 

@@ -6,8 +6,8 @@ use tower_lsp_server::Client;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
-use super::super::config::load_config;
 use super::super::conversions::offset_to_position;
+use super::super::helpers::get_document_and_config;
 
 /// Handle textDocument/formatting request
 pub(crate) async fn format_document(
@@ -17,35 +17,25 @@ pub(crate) async fn format_document(
     params: DocumentFormattingParams,
 ) -> Result<Option<Vec<TextEdit>>> {
     let uri = params.text_document.uri;
-    let uri_string = uri.to_string();
 
     client
         .log_message(
             MessageType::INFO,
-            format!("Formatting request for {}", uri_string),
+            format!("Formatting request for {}", *uri),
         )
         .await;
 
-    // Get document content (clone to avoid holding lock across await)
-    let text = {
-        let document_map = document_map.lock().await;
-        match document_map.get(&uri_string) {
-            Some(t) => t.clone(),
+    // Use helper to get document and config
+    let (text, config) =
+        match get_document_and_config(client, &document_map, &workspace_root, &uri).await {
+            Some(result) => result,
             None => {
                 client
-                    .log_message(
-                        MessageType::ERROR,
-                        format!("Document not found: {}", uri_string),
-                    )
+                    .log_message(MessageType::ERROR, format!("Document not found: {}", *uri))
                     .await;
                 return Ok(None);
             }
-        }
-    };
-
-    // Load config (pass URI for file type detection)
-    let workspace_root = workspace_root.lock().await.clone();
-    let config = load_config(client, &workspace_root, Some(&uri)).await;
+        };
 
     // Run formatting in a blocking task (because rowan::SyntaxNode isn't Send)
     // but use format_async inside to support external formatters
@@ -90,7 +80,6 @@ pub(crate) async fn format_range(
     params: DocumentRangeFormattingParams,
 ) -> Result<Option<Vec<TextEdit>>> {
     let uri = params.text_document.uri;
-    let uri_string = uri.to_string();
     let range = params.range;
 
     client
@@ -98,37 +87,28 @@ pub(crate) async fn format_range(
             MessageType::INFO,
             format!(
                 "Range formatting request for {} (lines {}-{})",
-                uri_string,
+                *uri,
                 range.start.line + 1,
                 range.end.line + 1
             ),
         )
         .await;
 
-    // Get document content (clone to avoid holding lock across await)
-    let text = {
-        let document_map = document_map.lock().await;
-        match document_map.get(&uri_string) {
-            Some(t) => t.clone(),
+    // Use helper to get document and config
+    let (text, config) =
+        match get_document_and_config(client, &document_map, &workspace_root, &uri).await {
+            Some(result) => result,
             None => {
                 client
-                    .log_message(
-                        MessageType::ERROR,
-                        format!("Document not found: {}", uri_string),
-                    )
+                    .log_message(MessageType::ERROR, format!("Document not found: {}", *uri))
                     .await;
                 return Ok(None);
             }
-        }
-    };
+        };
 
     // Convert LSP range (0-indexed lines) to panache range (1-indexed lines)
     let start_line = (range.start.line + 1) as usize;
     let end_line = (range.end.line + 1) as usize;
-
-    // Load config (pass URI for file type detection)
-    let workspace_root = workspace_root.lock().await.clone();
-    let config = load_config(client, &workspace_root, Some(&uri)).await;
 
     // Run range formatting in a blocking task
     let text_clone = text.clone();
