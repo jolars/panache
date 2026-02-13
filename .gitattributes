@@ -1,8 +1,9 @@
 # Let Git auto-detect text files
 * text=auto
 
-# Preserve CRLF in CRLF test cases (these test files must have CRLF)
+# Preserve CRLF in test cases that test CRLF handling (must have CRLF line endings)
 tests/cases/crlf_*/* -text
+tests/cases/line_ending_crlf/* -text
 
 # Other test cases can use LF (the default for most projects)
 # Individual test cases can override if needed
