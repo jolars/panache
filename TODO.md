@@ -90,7 +90,8 @@ This document tracks implementation status for panache's features.
 - ✅ Auto-detect flavor from file extension (.qmd → Quarto, .Rmd → RMarkdown)
 - ✅ `flavor` config field affects .md files and stdin
 - ✅ Global `[extensions]` overrides for all flavors
-- ✅ `[formatters]` configuration for external code formatters
+- ✅ `[formatters.<formatter>]` configuration for external code formatters
+- ✅ `[linters]` configuration for external code linters
 
 ### Future Enhancements
 
@@ -117,8 +118,7 @@ This document tracks implementation status for panache's features.
 
 ## Linter
 
-- [ ] External linter support for code blocks is enabled, but auto-fixing is not
-      yet implemented.
+- ❌ Auto-fixing for external code linters
 
 ### Current Status
 
