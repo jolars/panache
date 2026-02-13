@@ -60,6 +60,13 @@ This document tracks implementation status for panache's features.
 - ❌ **Attribute completion** - Complete class names and attributes in
   `{.class #id}`
 
+#### Inlay Hints
+
+- ❌ **Link target hints** - Show link targets as inlay hints
+- ❌ **Reference definition hints** - Show reference definitions as inlay hints
+- ❌ **Citation key hints** - Show bibliography entries for `@cite` keys
+- ❌ **Footnote content hints** - Show footnote content as inlay hints
+
 #### Hover Information
 
 - ❌ **Link preview** - `textDocument/hover` to show link target
