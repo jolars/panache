@@ -468,6 +468,7 @@ pub async fn spawn_and_await_formatters(
 
 /// Run external formatters for code blocks synchronously using threads.
 /// Returns a HashMap of original code -> formatted code (only successful formats).
+#[cfg(not(target_arch = "wasm32"))]
 pub fn spawn_and_await_formatters_sync(
     blocks: Vec<(String, String)>,
     config: &Config,
@@ -476,4 +477,13 @@ pub fn spawn_and_await_formatters_sync(
     let timeout = Duration::from_secs(30);
 
     crate::external_formatters_sync::run_formatters_parallel(blocks, &config.formatters, timeout)
+}
+
+/// WASM version that returns empty HashMap (no external formatters in WASM)
+#[cfg(target_arch = "wasm32")]
+pub fn spawn_and_await_formatters_sync(
+    _blocks: Vec<(String, String)>,
+    _config: &Config,
+) -> HashMap<String, String> {
+    HashMap::new()
 }

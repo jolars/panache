@@ -1,6 +1,8 @@
 pub mod code_block_collector;
 pub mod diagnostics;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod external_linters;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod external_linters_sync;
 pub mod rules;
 pub mod runner;
@@ -20,6 +22,7 @@ pub fn lint(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> 
 }
 
 /// Lint a document with external linters (sync version for CLI).
+#[cfg(not(target_arch = "wasm32"))]
 pub fn lint_with_external_sync(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> {
     let registry = default_registry();
     let runner = LintRunner::new(registry);
@@ -27,6 +30,7 @@ pub fn lint_with_external_sync(tree: &SyntaxNode, input: &str, config: &Config) 
 }
 
 /// Lint a document with external linters (async version for LSP).
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn lint_with_external(
     tree: &SyntaxNode,
     input: &str,

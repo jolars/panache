@@ -1,12 +1,15 @@
 use crate::config::Config;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::linter::code_block_collector::{collect_code_blocks, concatenate_with_blanks};
 use crate::linter::diagnostics::Diagnostic;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::linter::external_linters::{ExternalLinterRegistry, run_linter};
 use crate::linter::rules::RuleRegistry;
 use crate::syntax::SyntaxNode;
 
 pub struct LintRunner {
     registry: RuleRegistry,
+    #[cfg(not(target_arch = "wasm32"))]
     external_linters: ExternalLinterRegistry,
 }
 
@@ -14,6 +17,7 @@ impl LintRunner {
     pub fn new(registry: RuleRegistry) -> Self {
         Self {
             registry,
+            #[cfg(not(target_arch = "wasm32"))]
             external_linters: ExternalLinterRegistry::new(),
         }
     }
@@ -38,6 +42,7 @@ impl LintRunner {
     }
 
     /// Run external linters on code blocks (async version for LSP).
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn run_with_external_linters(
         &self,
         tree: &SyntaxNode,
@@ -94,6 +99,7 @@ impl LintRunner {
     }
 
     /// Run external linters on code blocks (sync version for CLI).
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn run_with_external_linters_sync(
         &self,
         tree: &SyntaxNode,

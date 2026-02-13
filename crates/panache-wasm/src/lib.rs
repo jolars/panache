@@ -5,7 +5,7 @@ pub fn format_qmd(input: &str, line_width: Option<usize>) -> String {
     let cfg = panache::ConfigBuilder::default()
         .line_width(line_width.unwrap_or(80))
         .build();
-    panache::format(input, Some(cfg))
+    panache::format(input, Some(cfg), None)
 }
 
 // Optional: expose tokenizer/AST for debugging
