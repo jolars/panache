@@ -197,6 +197,10 @@ args = ["-", "--line-length=88"]
 # Add formatters for other languages
 [formatters.rust]
 cmd = "rustfmt"
+
+# External code linters (opt-in)
+[linters]
+r = "jarl"  # Enable R linting
 ```
 
 See `.panache.toml.example` for a complete configuration reference.
@@ -242,6 +246,37 @@ cmd = "rustfmt"
 - Formatters respect their own config files (`.prettierrc`, `pyproject.toml`, etc.)
 - Support both stdin/stdout and file-based formatters
 - 30 second timeout per formatter invocation
+
+### External Code Linters
+
+panache supports external linters for code blocks—**opt-in via configuration**:
+
+```toml
+# Enable R linting
+[linters]
+r = "jarl"  # R linter with JSON output
+```
+
+**Key features:**
+
+- **Opt-in by design** - Only runs if configured
+- **Stateful code analysis** - Concatenates all code blocks of same language to handle cross-block dependencies
+- **LSP integration** - Diagnostics appear inline in your editor
+- **CLI support** - `panache lint` shows external linter issues
+- **Line-accurate diagnostics** - Reports exact line/column locations
+
+**How it works:**
+
+1. Collects all code blocks of each configured language
+2. Concatenates blocks with blank-line preservation (keeps original line numbers)
+3. Runs external linter on concatenated code
+4. Maps diagnostics back to original document positions
+
+**Supported linters:**
+
+- **jarl** - R linter with structured JSON output
+
+**Note:** Auto-fixes from external linters are currently disabled due to byte offset mapping complexity. Diagnostics work perfectly.
 
 ## Motivation
 

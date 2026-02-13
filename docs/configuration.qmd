@@ -366,6 +366,69 @@ Formatters run in **true parallel**. If you have 3 code blocks and each
 formatter takes 1 second, all 3 complete in ~1 second (not 3 seconds
 sequentially).
 
+## External Code Linters
+
+panache can invoke external linters for code blocks—**but they're opt-in**. You
+choose which languages to lint.
+
+### Quick Start
+
+Enable linters for specific languages:
+
+```toml
+# Enable R linting with jarl
+[linters]
+r = "jarl"
+```
+
+**Available linters:**
+
+| Language | Linter | Command | Notes                          |
+| -------- | ------ | ------- | ------------------------------ |
+| `r`      | `jarl` | `jarl`  | R linter with JSON diagnostics |
+
+### How It Works
+
+External linters analyze code blocks within your document:
+
+1. **Collection**: Gathers all code blocks of the configured language
+2. **Concatenation**: Combines blocks with blank-line preservation to maintain
+   original line numbers
+3. **Analysis**: Runs the external linter on the concatenated code
+4. **Mapping**: Maps diagnostics back to exact line/column positions in your
+   document
+
+This approach handles **stateful code** correctly. For example, if an R
+variable is defined in one code block and used in another, the linter sees both
+blocks together and won't report false "undefined variable" errors.
+
+### Where Linters Run
+
+- **CLI**: `panache lint` shows external linter diagnostics
+- **LSP**: Diagnostics appear inline in your editor as you type
+
+### Behavior
+
+- **Language matching**: Code block language (e.g., `` ```r ``) is matched to
+  linter key (case-insensitive)
+- **Error handling**: Missing linters are gracefully ignored with a warning
+- **Timeout**: 30 seconds per linter invocation
+- **Line-accurate**: Diagnostics report exact line/column locations
+- **Limitations**: Auto-fixes from external linters are currently disabled due
+  to byte offset mapping complexity. Diagnostics work perfectly.
+
+### Example
+
+```toml
+# .panache.toml
+[linters]
+r = "jarl"
+
+# Still enable R formatting separately
+[formatters.r]
+preset = "air"
+```
+
 ## Example Configuration
 
 Complete example with all common options:
@@ -402,6 +465,10 @@ args = []
 [formatters.javascript]
 cmd = "prettier"
 args = ["--parser=babel", "--stdin-filepath=file.js"]
+
+# External linters (opt-in)
+[linters]
+r = "jarl"  # Enable R linting
 ```
 
 ## See Also
