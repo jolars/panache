@@ -215,7 +215,7 @@ panache lint --config cfg.toml      # Custom config
 Parser - Comprehensive Pandoc Feature Coverage
 
 This section tracks implementation status of Pandoc Markdown features based on
-the spec files in `docs/pandoc-spec/`.
+the spec files in `assets/pandoc-spec/`.
 
 **Focus**: Initial development prioritizes **default Pandoc extensions**.
 Non-default extensions are tracked separately for future consideration.
