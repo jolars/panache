@@ -120,6 +120,7 @@ impl LanguageServer for PanacheLsp {
         handlers::document_symbols::document_symbol(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.workspace_root),
             params,
         )
         .await

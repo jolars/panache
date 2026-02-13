@@ -1,31 +1,44 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_lsp_server::Client;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
+use crate::lsp::config::load_config;
 use crate::lsp::conversions::offset_to_position;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub async fn document_symbol(
-    _client: &Client,
+    client: &Client,
     document_map: Arc<Mutex<HashMap<String, String>>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: DocumentSymbolParams,
 ) -> Result<Option<DocumentSymbolResponse>> {
-    let uri_str = params.text_document.uri.to_string();
+    let uri = params.text_document.uri;
+    let uri_str = uri.to_string();
+    log::debug!("document_symbol request for: {}", uri_str);
     let doc_map = document_map.lock().await;
     let content = match doc_map.get(&uri_str) {
         Some(c) => c.clone(),
-        None => return Ok(None),
+        None => {
+            log::warn!("Document not found in document_map: {}", uri_str);
+            return Ok(None);
+        }
     };
     drop(doc_map);
+    log::debug!("Document content length: {} bytes", content.len());
+
+    // Load config (pass URI for file type detection)
+    let workspace_root = workspace_root.lock().await.clone();
+    let config = load_config(client, &workspace_root, Some(&uri)).await;
 
     // Parse and build symbols synchronously (SyntaxNode is not Send)
-    let config = crate::config::Config::default();
     let syntax_tree = crate::parser::parse(&content, Some(config));
     let symbols = build_document_symbols(&syntax_tree, &content);
 
+    log::debug!("Found {} top-level symbols", symbols.len());
     if symbols.is_empty() {
         Ok(None)
     } else {
@@ -37,11 +50,19 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
     let mut symbols = Vec::new();
     let mut heading_stack: Vec<(usize, DocumentSymbol)> = Vec::new();
 
+    log::debug!("build_document_symbols: root kind = {:?}", root.kind());
+
     // Find DOCUMENT node
     let document = root.children().find(|n| n.kind() == SyntaxKind::DOCUMENT);
     let document = match document {
-        Some(d) => d,
-        None => return symbols,
+        Some(d) => {
+            log::debug!("Found DOCUMENT node with {} children", d.children().count());
+            d
+        }
+        None => {
+            log::warn!("No DOCUMENT node found in syntax tree");
+            return symbols;
+        }
     };
 
     for node in document.children() {
