@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.2.0](https://github.com/jolars/panache/compare/v2.1.0...v2.2.0) (2026-02-13)
+
+### Features
+
+* **cli:** format and lint multiple files, or by globbing ([f53a8fd](https://github.com/jolars/panache/commit/f53a8fdde164ec4348027e2969cec2e9b84eeedd))
+* **formatter:** initial formatting of execution options ([879b291](https://github.com/jolars/panache/commit/879b291ae4255f0a2a1cf68d8bb19b2a96ea2cf4))
+* **formatter:** normalize hard line breaks to escaped ([ada9f0f](https://github.com/jolars/panache/commit/ada9f0ffc9b1c46b88881b801cc906a33509290b))
+
+### Bug Fixes
+
+* correctly parse and handle escaped line breaks ([49154ff](https://github.com/jolars/panache/commit/49154ffde8d36ce549803012ae3f4caa6eecc769))
+* **formatter:** handle content after opening math delim ([ef8c220](https://github.com/jolars/panache/commit/ef8c2202e1192da7acd246b804a6d5bbbe09ec88))
+* **lsp:** auto-detect flavor from file extension ([84dc96f](https://github.com/jolars/panache/commit/84dc96f26bcfa06d76588d8ec2a7c7f368be2258))
+* make parser lossless ([4add809](https://github.com/jolars/panache/commit/4add809613bbe5db15549e8cd061a4d09fd19ee9))
+* **parser:** check for blank line in math after delim ([f65858e](https://github.com/jolars/panache/commit/f65858e3fa60f3d3d08551008314b605ca51fb76))
+
 ## [2.1.0](https://github.com/jolars/panache/compare/v2.0.0...v2.1.0) (2026-02-12)
 
 ### Features
