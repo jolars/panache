@@ -302,7 +302,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_expand_blockquote() {
         let doc = "Before\n\n> Line 1\n> Line 2\n> Line 3\n\nAfter\n";
         let tree = parse_test_doc(doc);
