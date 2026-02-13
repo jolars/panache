@@ -26,11 +26,6 @@ tasks:
     cmds:
       - RUST_LOG=panache::parser=trace cargo test
 
-  test-lexer:
-    desc: Run tests with trace logging for lexer
-    cmds:
-      - RUST_LOG=panache::lexer=trace cargo test
-
   test-quiet:
     desc: Run tests quietly (no debug output)
     cmds:
