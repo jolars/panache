@@ -46,7 +46,11 @@ result <- T
 
         // Check line numbers are correct
         assert_eq!(assignment_diags[0].location.line, 4); // x = 1 is on line 4
-        assert!(assignment_diags[0].fix.is_some(), "Expected auto-fix");
+        // Note: Auto-fixes are currently disabled due to byte offset mapping complexity
+        assert!(
+            assignment_diags[0].fix.is_none(),
+            "Auto-fixes should be disabled"
+        );
     }
 
     #[tokio::test]
@@ -124,7 +128,6 @@ x <- 1
         let _diagnostics = linter::lint_with_external(&tree, input, &config).await;
 
         // Should handle gracefully - just skip external linting
-        // No panics or errors
-        assert!(true);
+        // Test passes if no panic occurs
     }
 }

@@ -25,13 +25,13 @@ pub fn collect_code_blocks(tree: &SyntaxNode, input: &str) -> HashMap<String, Ve
     let mut blocks: HashMap<String, Vec<CodeBlock>> = HashMap::new();
 
     for node in tree.descendants() {
-        if node.kind() == SyntaxKind::CodeBlock {
-            if let Some(block) = extract_code_block(&node, input) {
-                blocks
-                    .entry(block.language.clone())
-                    .or_default()
-                    .push(block);
-            }
+        if node.kind() == SyntaxKind::CodeBlock
+            && let Some(block) = extract_code_block(&node, input)
+        {
+            blocks
+                .entry(block.language.clone())
+                .or_default()
+                .push(block);
         }
     }
 

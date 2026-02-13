@@ -293,7 +293,8 @@ fn main() -> io::Result<()> {
                 // Normalize line endings for consistent AST positions
                 let normalized_input = input.replace("\r\n", "\n");
                 let tree = parse(&normalized_input, Some(cfg.clone()));
-                let diagnostics = panache::linter::lint(&tree, &normalized_input, &cfg);
+                let diagnostics =
+                    panache::linter::lint_with_external_sync(&tree, &normalized_input, &cfg);
 
                 if diagnostics.is_empty() {
                     if !check {
@@ -343,7 +344,8 @@ fn main() -> io::Result<()> {
                 // Normalize line endings for consistent AST positions
                 let normalized_input = input.replace("\r\n", "\n");
                 let tree = parse(&normalized_input, Some(cfg.clone()));
-                let diagnostics = panache::linter::lint(&tree, &normalized_input, &cfg);
+                let diagnostics =
+                    panache::linter::lint_with_external_sync(&tree, &normalized_input, &cfg);
 
                 if !diagnostics.is_empty() {
                     any_issues = true;

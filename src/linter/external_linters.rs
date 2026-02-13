@@ -11,7 +11,7 @@ use std::time::Duration;
 use rowan::TextRange;
 use serde::Deserialize;
 
-use crate::linter::diagnostics::{Diagnostic, Edit, Fix, Location};
+use crate::linter::diagnostics::{Diagnostic, Location};
 
 /// Errors that can occur when invoking external linters.
 #[derive(Debug)]
@@ -140,8 +140,17 @@ pub async fn run_linter(
     }
 
     // Parse output based on linter type
+    parse_linter_output(linter_name, &stdout, code)
+}
+
+/// Parse linter output based on linter type (public for sync version to reuse).
+pub fn parse_linter_output(
+    linter_name: &str,
+    output: &str,
+    code: &str,
+) -> Result<Vec<Diagnostic>, LinterError> {
     match linter_name {
-        "jarl" => parse_jarl_output(&stdout, code),
+        "jarl" => parse_jarl_output(output, code),
         _ => Err(LinterError::ParseError(format!(
             "no parser for linter: {}",
             linter_name
@@ -164,6 +173,7 @@ struct JarlDiagnostic {
     filename: String,
     range: [usize; 2],
     location: JarlLocation,
+    #[allow(dead_code)] // TODO: Re-enable when auto-fix byte offset mapping is implemented
     fix: JarlFix,
 }
 
@@ -182,6 +192,7 @@ struct JarlLocation {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // TODO: Re-enable when auto-fix byte offset mapping is implemented
 struct JarlFix {
     content: String,
     start: usize,
@@ -214,22 +225,14 @@ fn parse_jarl_output(json: &str, _input: &str) -> Result<Vec<Diagnostic>, Linter
         };
 
         // Convert fix if available
-        let fix = if !jarl_diag.fix.to_skip {
-            let fix_range = TextRange::new(
-                (jarl_diag.fix.start as u32).into(),
-                (jarl_diag.fix.end as u32).into(),
-            );
-
-            Some(Fix {
-                message: format!("Apply jarl fix for {}", jarl_diag.message.name),
-                edits: vec![Edit {
-                    range: fix_range,
-                    replacement: jarl_diag.fix.content,
-                }],
-            })
-        } else {
-            None
-        };
+        // TODO: Auto-fixes from external linters are disabled for now.
+        // The issue: jarl's byte offsets are relative to the concatenated temp file,
+        // not the original document. To fix this properly, we'd need to:
+        // 1. Pass the original document input through to parse_jarl_output
+        // 2. Convert jarl's byte offsets → line/column in concatenated file
+        // 3. Convert line/column → byte offsets in original document
+        // This requires refactoring the parse function signature.
+        let fix = None;
 
         // jarl reports warnings, not errors
         let diagnostic =
@@ -299,11 +302,8 @@ mod tests {
         assert_eq!(diagnostics[0].message, "Use `<-` for assignment.");
         assert_eq!(diagnostics[0].location.line, 1);
         assert_eq!(diagnostics[0].location.column, 1);
-        assert!(diagnostics[0].fix.is_some());
-
-        let fix = diagnostics[0].fix.as_ref().unwrap();
-        assert_eq!(fix.edits.len(), 1);
-        assert_eq!(fix.edits[0].replacement, "x <- 1");
+        // Auto-fixes disabled for external linters (byte offset mapping issue)
+        assert!(diagnostics[0].fix.is_none());
     }
 
     #[test]

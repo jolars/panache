@@ -1,6 +1,7 @@
 pub mod code_block_collector;
 pub mod diagnostics;
 pub mod external_linters;
+pub mod external_linters_sync;
 pub mod rules;
 pub mod runner;
 
@@ -16,6 +17,13 @@ pub fn lint(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> 
     let registry = default_registry();
     let runner = LintRunner::new(registry);
     runner.run(tree, input, config)
+}
+
+/// Lint a document with external linters (sync version for CLI).
+pub fn lint_with_external_sync(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> {
+    let registry = default_registry();
+    let runner = LintRunner::new(registry);
+    runner.run_with_external_linters_sync(tree, input, config)
 }
 
 /// Lint a document with external linters (async version for LSP).
