@@ -217,6 +217,15 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 format!("{}{}{}", open, content, close)
             }
         }
+        SyntaxKind::HardLineBreak => {
+            // Normalize hard line breaks to backslash-newline when escaped_line_breaks is enabled
+            // Otherwise preserve original format (trailing spaces)
+            if config.extensions.escaped_line_breaks {
+                "\\\n".to_string()
+            } else {
+                node.text().to_string()
+            }
+        }
         _ => {
             // For other inline nodes, just return their text
             node.text().to_string()

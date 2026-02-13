@@ -286,10 +286,31 @@ pub(super) fn wrapped_lines_for_paragraph(
 
     if has_hard_breaks {
         // Don't wrap paragraphs with hard line breaks - preserve the breaks
-        // Format inline content directly without wrapping
+        // But normalize hard breaks and format inline elements
         log::debug!("Paragraph contains hard line breaks - preserving them");
-        let formatted = format_inline_fn(node);
-        return formatted.lines().map(|s| s.to_string()).collect();
+
+        let mut result = String::new();
+        for child in node.children_with_tokens() {
+            match child {
+                NodeOrToken::Node(n) => {
+                    result.push_str(&format_inline_fn(&n));
+                }
+                NodeOrToken::Token(t) => {
+                    if t.kind() == SyntaxKind::HardLineBreak {
+                        // Normalize to backslash-newline if extension enabled
+                        if _config.extensions.escaped_line_breaks {
+                            result.push_str("\\\n");
+                        } else {
+                            result.push_str(t.text());
+                        }
+                    } else {
+                        result.push_str(t.text());
+                    }
+                }
+            }
+        }
+
+        return result.lines().map(|s| s.to_string()).collect();
     }
 
     let mut arena: Vec<Box<str>> = Vec::new();
