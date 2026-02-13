@@ -1,7 +1,0 @@
----
-title: test
----
-
-```{r my-label, echo=FALSE}
-any(is.na(NA))
-```

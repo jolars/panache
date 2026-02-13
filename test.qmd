@@ -1,7 +1,0 @@
----
-title: test
----
-
-```{r}
-any(is.na(NA))
-```
