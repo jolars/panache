@@ -3,3 +3,6 @@ enabled = true
 cmd = "air"
 args = [ "format" ]
 stdin = false
+
+[linters]
+r = "jarl"
