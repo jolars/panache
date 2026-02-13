@@ -120,8 +120,11 @@ pub(crate) fn parse_display_math_block(
     let content_on_same_line = !first_line_content.trim().is_empty();
 
     // If content is NOT on the same line, emit newline (if present in original)
-    if !content_on_same_line && first_line_content.ends_with('\n') {
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    if !content_on_same_line {
+        let (_, newline_str) = strip_newline(first_trimmed);
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        }
     }
 
     let mut current_pos = start_pos + 1;
@@ -197,8 +200,9 @@ pub(crate) fn parse_display_math_block(
         builder.token(SyntaxKind::BlockMathMarker.into(), closing_marker);
 
         // Emit newline after closing marker if present
-        if closing_line.ends_with('\n') {
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        let (_, newline_str) = strip_newline(closing_trimmed);
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
         }
     }
 

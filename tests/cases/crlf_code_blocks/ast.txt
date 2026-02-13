@@ -1,0 +1,36 @@
+ROOT@0..67
+  DOCUMENT@0..67
+    Heading@0..13
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..11
+        TEXT@2..11 "Test CRLF"
+      NEWLINE@11..13 "\r\n"
+    BlankLine@13..15
+      BlankLine@13..15 "\r\n"
+    CodeBlock@15..41
+      CodeFenceOpen@15..24
+        CodeFenceMarker@15..18 "```"
+        CodeInfo@18..22
+          CodeLanguage@18..22 "bash"
+        NEWLINE@22..24 "\r\n"
+      CodeContent@24..36
+        TEXT@24..34 "echo hello"
+        NEWLINE@34..36 "\r\n"
+      CodeFenceClose@36..41
+        CodeFenceMarker@36..39 "```"
+        NEWLINE@39..41 "\r\n"
+    BlankLine@41..43
+      BlankLine@41..43 "\r\n"
+    CodeBlock@43..67
+      CodeFenceOpen@43..52
+        CodeFenceMarker@43..50 "~~~~~~~"
+        NEWLINE@50..52 "\r\n"
+      CodeContent@52..58
+        TEXT@52..56 "code"
+        NEWLINE@56..58 "\r\n"
+      CodeFenceClose@58..67
+        CodeFenceMarker@58..65 "~~~~~~~"
+        NEWLINE@65..67 "\r\n"
+

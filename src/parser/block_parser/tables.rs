@@ -3,7 +3,7 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-use super::utils::emit_line_tokens;
+use super::utils::{emit_line_tokens, strip_newline};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Alignment {
@@ -28,9 +28,9 @@ pub(crate) struct Column {
 /// Returns Some(column positions) if it's a valid separator.
 pub(crate) fn try_parse_table_separator(line: &str) -> Option<Vec<Column>> {
     let trimmed = line.trim_start();
-    // Strip trailing newline if present (from split_inclusive)
-    let trimmed = trimmed.trim_end_matches('\n');
-    let leading_spaces = line.len() - trimmed.len() - if line.ends_with('\n') { 1 } else { 0 };
+    // Strip trailing newline if present (CRLF or LF)
+    let (trimmed, newline_str) = strip_newline(trimmed);
+    let leading_spaces = line.len() - trimmed.len() - newline_str.len();
 
     // Must have leading spaces <= 3 to not be a code block
     if leading_spaces > 3 {
@@ -513,14 +513,12 @@ fn emit_table_row(
 ) {
     builder.start_node(row_kind.into());
 
-    // Lines from split_inclusive already contain trailing newline
+    // Lines from split_inclusive already contain trailing newline (LF or CRLF)
     // Split the text from the newline
-    if let Some(text) = line.strip_suffix('\n') {
-        builder.token(SyntaxKind::TEXT.into(), text);
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
-    } else {
-        // No trailing newline (last line of input)
-        builder.token(SyntaxKind::TEXT.into(), line);
+    let (text, newline_str) = strip_newline(line);
+    builder.token(SyntaxKind::TEXT.into(), text);
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
     builder.finish_node();

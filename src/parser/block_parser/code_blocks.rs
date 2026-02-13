@@ -404,8 +404,8 @@ pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
     }
 
     let info_string_raw = &trimmed[fence_count..];
-    // Trim trailing newline and at most one leading space
-    let info_string_trimmed = info_string_raw.trim_end_matches('\n');
+    // Strip trailing newline (LF or CRLF) and at most one leading space
+    let (info_string_trimmed, _) = strip_newline(info_string_raw);
     let info_string = if let Some(stripped) = info_string_trimmed.strip_prefix(' ') {
         stripped.to_string()
     } else {
@@ -564,7 +564,11 @@ pub(crate) fn parse_fenced_code_block(
         emit_code_info_node(builder, &fence.info_string);
     }
 
-    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    // Extract and emit the actual newline from the opening fence line
+    let (_, newline_str) = strip_newline(first_trimmed);
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+    }
     builder.finish_node(); // CodeFenceOpen
 
     let mut current_pos = start_pos + 1;
@@ -659,12 +663,17 @@ pub(crate) fn parse_fenced_code_block(
             .take_while(|&c| c == fence.fence_char)
             .count();
 
+        // Extract the actual newline from the closing line
+        let (_, newline_str) = strip_newline(closing_trimmed);
+
         builder.start_node(SyntaxKind::CodeFenceClose.into());
         builder.token(
             SyntaxKind::CodeFenceMarker.into(),
             &closing_trimmed[..closing_count],
         );
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        }
         builder.finish_node(); // CodeFenceClose
     }
 

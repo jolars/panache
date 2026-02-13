@@ -1,0 +1,53 @@
+ROOT@0..110
+  DOCUMENT@0..110
+    Heading@0..20
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..18
+        TEXT@2..18 "Definition Lists"
+      NEWLINE@18..20 "\r\n"
+    BlankLine@20..22
+      BlankLine@20..22 "\r\n"
+    DefinitionList@22..50
+      DefinitionItem@22..50
+        Term@22..30
+          TEXT@22..28 "Term 1"
+          NEWLINE@28..30 "\r\n"
+        BlankLine@30..32
+          BlankLine@30..32 "\r\n"
+        Definition@32..50
+          DefinitionMarker@32..33 ":"
+          WHITESPACE@33..36 "   "
+          TEXT@36..48 "Definition 1"
+          NEWLINE@48..50 "\r\n"
+    BlankLine@50..52
+      BlankLine@50..52 "\r\n"
+    DefinitionList@52..78
+      DefinitionItem@52..78
+        Term@52..60
+          TEXT@52..58 "Term 2"
+          NEWLINE@58..60 "\r\n"
+        Definition@60..78
+          DefinitionMarker@60..61 ":"
+          WHITESPACE@61..64 "   "
+          TEXT@64..76 "Definition 2"
+          NEWLINE@76..78 "\r\n"
+    BlankLine@78..80
+      BlankLine@78..80 "\r\n"
+    PARAGRAPH@80..90
+      TEXT@80..88 "Compact:"
+      NEWLINE@88..90 "\r\n"
+    BlankLine@90..92
+      BlankLine@90..92 "\r\n"
+    DefinitionList@92..110
+      DefinitionItem@92..110
+        Term@92..99
+          TEXT@92..97 "Apple"
+          NEWLINE@97..99 "\r\n"
+        Definition@99..110
+          DefinitionMarker@99..100 ":"
+          WHITESPACE@100..101 " "
+          TEXT@101..108 "A fruit"
+          NEWLINE@108..110 "\r\n"
+

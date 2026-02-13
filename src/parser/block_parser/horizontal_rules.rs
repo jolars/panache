@@ -3,6 +3,8 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::utils::strip_newline;
+
 /// Try to parse a horizontal rule from a line.
 /// Returns true if this line is a valid horizontal rule.
 ///
@@ -40,13 +42,14 @@ pub(crate) fn try_parse_horizontal_rule(line: &str) -> Option<char> {
 pub(crate) fn emit_horizontal_rule(builder: &mut GreenNodeBuilder<'static>, line: &str) {
     builder.start_node(SyntaxKind::HorizontalRule.into());
 
-    // Emit the rule content (trimmed)
-    let content = line.trim_end_matches('\n').trim();
+    // Strip trailing newline and emit the rule content (trimmed)
+    let (line_without_newline, newline_str) = strip_newline(line);
+    let content = line_without_newline.trim();
     builder.token(SyntaxKind::HorizontalRule.into(), content);
 
     // Emit newline separately if present
-    if line.ends_with('\n') {
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
     builder.finish_node();

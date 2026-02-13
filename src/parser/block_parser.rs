@@ -45,7 +45,7 @@ use tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
 };
-use utils::split_lines_inclusive;
+use utils::{split_lines_inclusive, strip_newline};
 
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -996,7 +996,7 @@ impl<'a> BlockParser<'a> {
 
             // Parse everything after colons
             let after_colons = &trimmed[div_fence.fence_count..];
-            let content_before_newline = after_colons.trim_end_matches('\n');
+            let (content_before_newline, newline_str) = strip_newline(after_colons);
 
             // Emit optional space before attributes
             let has_leading_space = content_before_newline.starts_with(' ');
@@ -1058,8 +1058,8 @@ impl<'a> BlockParser<'a> {
             }
 
             // Emit newline
-            if full_line.ends_with('\n') {
-                self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            if !newline_str.is_empty() {
+                self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
             }
             self.builder.finish_node(); // DivFenceOpen
 
@@ -1247,7 +1247,13 @@ impl<'a> BlockParser<'a> {
                 self.builder
                     .token(SyntaxKind::TEXT.into(), after_marker_and_spaces.trim_end());
             }
-            self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+
+            // Extract and emit the actual newline from the original line
+            let current_line = self.lines[self.pos];
+            let (_, newline_str) = strip_newline(current_line);
+            if !newline_str.is_empty() {
+                self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+            }
 
             self.containers.push(Container::Definition { content_col });
             self.pos += 1;

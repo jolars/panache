@@ -1,0 +1,16 @@
+ROOT@0..68
+  DOCUMENT@0..68
+    SimpleTable@0..68
+      TableSeparator@0..17
+        TEXT@0..15 "------- -------"
+        NEWLINE@15..17 "\r\n"
+      TableRow@17..34
+        TEXT@17..32 "     12      12"
+        NEWLINE@32..34 "\r\n"
+      TableRow@34..51
+        TEXT@34..49 "    123     123"
+        NEWLINE@49..51 "\r\n"
+      TableRow@51..68
+        TEXT@51..66 "------- -------"
+        NEWLINE@66..68 "\r\n"
+
