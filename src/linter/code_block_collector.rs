@@ -1,111 +1,9 @@
-//! Code block collection and concatenation for external linter invocation.
+//! Code block concatenation for external linter invocation.
 //!
-//! This module provides utilities to:
-//! 1. Extract code blocks from a parsed document
-//! 2. Group them by language
-//! 3. Concatenate blocks with blank line preservation for accurate position mapping
+//! This module provides utilities to concatenate code blocks with blank line
+//! preservation for accurate position mapping in diagnostics.
 
-use std::collections::HashMap;
-
-use crate::syntax::{SyntaxKind, SyntaxNode};
-
-/// A code block with its location in the document.
-#[derive(Debug, Clone)]
-pub struct CodeBlock {
-    /// Programming language of the block
-    pub language: String,
-    /// Content of the code block (without fences)
-    pub content: String,
-    /// Starting line number in the document (1-indexed)
-    pub start_line: usize,
-}
-
-/// Collect all fenced code blocks from a syntax tree, grouped by language.
-pub fn collect_code_blocks(tree: &SyntaxNode, input: &str) -> HashMap<String, Vec<CodeBlock>> {
-    let mut blocks: HashMap<String, Vec<CodeBlock>> = HashMap::new();
-
-    for node in tree.descendants() {
-        if node.kind() == SyntaxKind::CodeBlock
-            && let Some(block) = extract_code_block(&node, input)
-        {
-            blocks
-                .entry(block.language.clone())
-                .or_default()
-                .push(block);
-        }
-    }
-
-    blocks
-}
-
-fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
-    use rowan::NodeOrToken;
-
-    let mut language = None;
-    let mut content = String::new();
-    let mut content_start_offset = None;
-
-    for child in node.children_with_tokens() {
-        if let NodeOrToken::Node(n) = child {
-            match n.kind() {
-                SyntaxKind::CodeFenceOpen => {
-                    // Look for CodeInfo node, then extract CodeLanguage from inside it
-                    for fence_child in n.children_with_tokens() {
-                        if let NodeOrToken::Node(info_node) = fence_child
-                            && info_node.kind() == SyntaxKind::CodeInfo
-                        {
-                            // Search for CodeLanguage token inside CodeInfo node
-                            for info_token in info_node.children_with_tokens() {
-                                if let NodeOrToken::Token(t) = info_token
-                                    && t.kind() == SyntaxKind::CodeLanguage
-                                {
-                                    language = Some(t.text().to_string());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                SyntaxKind::CodeContent => {
-                    content = n.text().to_string();
-                    // Track where the actual code content starts (not the fence)
-                    content_start_offset = Some(n.text_range().start().into());
-                }
-                _ => {}
-            }
-        }
-    }
-
-    // Extract language - now from CodeLanguage token inside CodeInfo node
-    let language = language?;
-
-    // Skip if language is empty or content is empty
-    if language.is_empty() || content.is_empty() {
-        return None;
-    }
-
-    // Calculate start line from where content actually starts (after the fence line)
-    let start_line = if let Some(offset) = content_start_offset {
-        offset_to_line(input, offset)
-    } else {
-        // Fallback to block start if we can't find content offset
-        offset_to_line(input, node.text_range().start().into())
-    };
-
-    Some(CodeBlock {
-        language,
-        content,
-        start_line,
-    })
-}
-
-/// Convert byte offset to 1-indexed line number.
-fn offset_to_line(input: &str, offset: usize) -> usize {
-    // Count how many newlines precede this offset
-    let newline_count = input[..offset].chars().filter(|&c| c == '\n').count();
-    // Line number is newlines + 1
-    newline_count + 1
-}
+use crate::utils::CodeBlock;
 
 /// Concatenate code blocks with blank line preservation.
 ///
@@ -147,6 +45,7 @@ pub fn concatenate_with_blanks(blocks: &[CodeBlock]) -> String {
 mod tests {
     use super::*;
     use crate::parse;
+    use crate::utils::{CodeBlock, collect_code_blocks, offset_to_line};
 
     #[test]
     fn test_collect_single_r_block() {

@@ -1,11 +1,13 @@
 use crate::config::Config;
 #[cfg(not(target_arch = "wasm32"))]
-use crate::linter::code_block_collector::{collect_code_blocks, concatenate_with_blanks};
+use crate::linter::code_block_collector::concatenate_with_blanks;
 use crate::linter::diagnostics::Diagnostic;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::linter::external_linters::{ExternalLinterRegistry, run_linter};
 use crate::linter::rules::RuleRegistry;
 use crate::syntax::SyntaxNode;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::utils::collect_code_blocks;
 
 pub struct LintRunner {
     registry: RuleRegistry,

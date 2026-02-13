@@ -34,7 +34,8 @@ pub async fn format_tree_async(
 
     // Step 1: Spawn all external formatters immediately (run in background)
     let formatted_code_future = if !config.formatters.is_empty() {
-        let code_blocks = code_blocks::collect_code_blocks(tree);
+        let input = tree.text().to_string();
+        let code_blocks = code_blocks::collect_code_blocks(tree, &input);
         if !code_blocks.is_empty() {
             log::debug!(
                 "Found {} code blocks, spawning formatters...",
@@ -80,7 +81,8 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
 
     // Step 1: Run external formatters synchronously if configured
     let formatted_code = if !config.formatters.is_empty() {
-        let code_blocks = code_blocks::collect_code_blocks(tree);
+        let input = tree.text().to_string();
+        let code_blocks = code_blocks::collect_code_blocks(tree, &input);
         if !code_blocks.is_empty() {
             log::debug!(
                 "Found {} code blocks, spawning formatters...",

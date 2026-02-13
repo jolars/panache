@@ -3,6 +3,7 @@ use crate::config::{AttributeStyle, Config, FenceStyle, Flavor};
 use crate::external_formatters::format_code_async;
 use crate::parser::block_parser::code_blocks::{CodeBlockType, InfoString};
 use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::utils;
 use rowan::NodeOrToken;
 use std::collections::HashMap;
 #[cfg(feature = "lsp")]
@@ -345,66 +346,19 @@ fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool
 }
 
 /// Collect all code blocks and their info strings from the syntax tree.
-pub fn collect_code_blocks(tree: &SyntaxNode) -> Vec<(String, String)> {
-    let mut blocks = Vec::new();
+/// Collect all code blocks from the syntax tree for external formatting.
+/// Returns a flat list of (language, content) pairs.
+pub fn collect_code_blocks(tree: &SyntaxNode, input: &str) -> Vec<(String, String)> {
+    let blocks_by_language = utils::collect_code_blocks(tree, input);
 
-    for node in tree.descendants() {
-        if node.kind() == SyntaxKind::CodeBlock {
-            let mut info_string_raw = String::new();
-            let mut content = String::new();
-
-            for child in node.children_with_tokens() {
-                if let NodeOrToken::Node(n) = child {
-                    match n.kind() {
-                        SyntaxKind::CodeFenceOpen => {
-                            for child_token in n.children_with_tokens() {
-                                if let NodeOrToken::Node(info_node) = child_token
-                                    && info_node.kind() == SyntaxKind::CodeInfo
-                                {
-                                    info_string_raw = info_node.text().to_string();
-                                }
-                            }
-                        }
-                        SyntaxKind::CodeContent => {
-                            content = n.text().to_string();
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            if !content.is_empty() {
-                // Parse info string to check if it's a raw block
-                let info = InfoString::parse(&info_string_raw);
-
-                // Skip raw blocks - they should never be formatted
-                if matches!(info.block_type, CodeBlockType::Raw { .. }) {
-                    continue;
-                }
-
-                // Extract language from the parsed info string for matching with formatters
-                let lang_key = match &info.block_type {
-                    CodeBlockType::Executable { language } => language.to_lowercase(),
-                    CodeBlockType::DisplayShortcut { language } => language.to_lowercase(),
-                    CodeBlockType::DisplayExplicit { classes } => {
-                        // Use first class as language (e.g., {.python})
-                        classes
-                            .first()
-                            .map(|c| c.to_lowercase())
-                            .unwrap_or_default()
-                    }
-                    CodeBlockType::Plain => String::new(),
-                    CodeBlockType::Raw { .. } => unreachable!(), // Already filtered above
-                };
-
-                if !lang_key.is_empty() {
-                    blocks.push((lang_key, content));
-                }
-            }
+    let mut result = Vec::new();
+    for (_language, blocks) in blocks_by_language {
+        for block in blocks {
+            result.push((block.language, block.content));
         }
     }
 
-    blocks
+    result
 }
 
 /// Spawn external formatters for code blocks and await results.
