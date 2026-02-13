@@ -415,18 +415,15 @@ impl Extensions {
 /// Configuration for code block formatting.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(default)]
+#[serde(rename_all = "kebab-case")]
 pub struct CodeBlockConfig {
     /// Fence style: "backtick", "tilde", or "preserve"
-    #[serde(rename = "fence-style")]
     pub fence_style: FenceStyle,
     /// Attribute style: "shortcut", "explicit", or "preserve"
-    #[serde(rename = "attribute-style")]
     pub attribute_style: AttributeStyle,
     /// Minimum fence length (default: 3)
-    #[serde(rename = "min-fence-length")]
     pub min_fence_length: usize,
     /// Whether to normalize indented code blocks to fenced blocks (risky, default: false)
-    #[serde(rename = "normalize-indented")]
     pub normalize_indented: bool,
 }
 
@@ -661,13 +658,13 @@ struct RawConfig {
     line_width: usize,
     #[serde(default)]
     math_indent: usize,
-    #[serde(rename = "math-delimiter-style", default)]
+    #[serde(default)]
     math_delimiter_style: MathDelimiterStyle,
     #[serde(default)]
     wrap: Option<WrapMode>,
     #[serde(default = "default_blank_lines")]
     blank_lines: BlankLines,
-    #[serde(rename = "code-blocks", default)]
+    #[serde(default)]
     code_blocks: Option<CodeBlockConfig>,
     #[serde(default)]
     formatters: HashMap<String, FormatterConfig>,
