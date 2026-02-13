@@ -27,7 +27,9 @@ log = { version = "0.4.28", features = ["release_max_level_info"] }
 regex = "1.12.2"
 rowan = "0.16.1"
 serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0"
 similar = { version = "2.6.0", features = ["text"] }
+tempfile = "3.14"
 textwrap = "0.16.2"
 tokio = { version = "1", features = [
     "process",
@@ -45,6 +47,7 @@ uuid = { version = "1.11.0", features = ["v4"], optional = true }
 [dev-dependencies]
 similar-asserts = "1.7.0"
 tokio = { version = "1", features = ["macros", "rt"] }
+which = "7.0"
 
 [features]
 default = ["cli", "lsp"]

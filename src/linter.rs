@@ -1,4 +1,6 @@
+pub mod code_block_collector;
 pub mod diagnostics;
+pub mod external_linters;
 pub mod rules;
 pub mod runner;
 
@@ -9,11 +11,22 @@ pub use runner::LintRunner;
 use crate::config::Config;
 use crate::syntax::SyntaxNode;
 
-/// Lint a document and return diagnostics.
+/// Lint a document and return diagnostics (built-in rules only).
 pub fn lint(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> {
     let registry = default_registry();
     let runner = LintRunner::new(registry);
     runner.run(tree, input, config)
+}
+
+/// Lint a document with external linters (async version for LSP).
+pub async fn lint_with_external(
+    tree: &SyntaxNode,
+    input: &str,
+    config: &Config,
+) -> Vec<Diagnostic> {
+    let registry = default_registry();
+    let runner = LintRunner::new(registry);
+    runner.run_with_external_linters(tree, input, config).await
 }
 
 /// Create the default rule registry with all built-in rules.

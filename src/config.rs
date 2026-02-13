@@ -671,6 +671,8 @@ struct RawConfig {
     code_blocks: Option<CodeBlockConfig>,
     #[serde(default)]
     formatters: HashMap<String, FormatterConfig>,
+    #[serde(default)]
+    linters: HashMap<String, String>,
 }
 
 fn default_line_width() -> usize {
@@ -699,6 +701,7 @@ impl RawConfig {
             math_delimiter_style: self.math_delimiter_style,
             blank_lines: self.blank_lines,
             formatters: self.formatters, // Use user config as-is (no defaults merged)
+            linters: self.linters,
         }
     }
 }
@@ -715,6 +718,7 @@ pub struct Config {
     pub blank_lines: BlankLines,
     pub code_blocks: CodeBlockConfig,
     pub formatters: HashMap<String, FormatterConfig>,
+    pub linters: HashMap<String, String>,
 }
 
 impl<'de> Deserialize<'de> for Config {
@@ -740,6 +744,7 @@ impl Default for Config {
             blank_lines: BlankLines::Collapse,
             code_blocks: CodeBlockConfig::for_flavor(flavor),
             formatters: HashMap::new(), // Opt-in: empty by default
+            linters: HashMap::new(),    // Opt-in: empty by default
         }
     }
 }

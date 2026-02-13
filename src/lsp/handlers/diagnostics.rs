@@ -19,13 +19,27 @@ pub(crate) async fn lint_and_publish(
     let workspace_root = workspace_root.lock().await.clone();
     let config = load_config(client, &workspace_root, Some(&uri)).await;
 
-    // Parse and lint in blocking task
+    // Parse and lint (including external linters) in blocking task
     let text_clone = text.clone();
-    let diagnostics = tokio::task::spawn_blocking(move || {
-        let tree = crate::parse(&text_clone, Some(config.clone()));
-        linter::lint(&tree, &text_clone, &config)
-    })
-    .await;
+    let has_external_linters = !config.linters.is_empty();
+
+    let diagnostics = if has_external_linters {
+        // Use async runtime for external linters
+        tokio::task::spawn_blocking(move || {
+            let tree = crate::parse(&text_clone, Some(config.clone()));
+            // Create a runtime for the async lint function
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(linter::lint_with_external(&tree, &text_clone, &config))
+        })
+        .await
+    } else {
+        // Regular sync lint for built-in rules only
+        tokio::task::spawn_blocking(move || {
+            let tree = crate::parse(&text_clone, Some(config.clone()));
+            linter::lint(&tree, &text_clone, &config)
+        })
+        .await
+    };
 
     match diagnostics {
         Ok(panache_diagnostics) => {

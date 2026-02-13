@@ -111,14 +111,17 @@ async fn format_with_file(
         config.args.join(" ")
     );
 
-    // Create a temporary file
-    let temp_dir = std::env::temp_dir();
-    let temp_path = temp_dir.join(format!("panache-{}.tmp", uuid::Uuid::new_v4()));
+    // Create a temporary file using tempfile crate
+    let mut temp_file = tempfile::NamedTempFile::new().map_err(FormatterError::IoError)?;
 
-    // Write code to temp file
-    fs::write(&temp_path, code)
-        .await
+    // Write code to temp file (sync write since NamedTempFile is std::fs::File)
+    use std::io::Write;
+    temp_file
+        .write_all(code.as_bytes())
         .map_err(FormatterError::IoError)?;
+    temp_file.flush().map_err(FormatterError::IoError)?;
+
+    let temp_path = temp_file.path();
 
     // Build args with temp file path (replace {} placeholder or append)
     let args: Vec<String> = if config.args.iter().any(|arg| arg.contains("{}")) {
@@ -146,13 +149,12 @@ async fn format_with_file(
         .map_err(|_| FormatterError::Timeout)?
         .map_err(FormatterError::IoError)?;
 
-    // Read formatted content from file
+    // Read formatted content from file (async read)
     let formatted = fs::read_to_string(&temp_path)
         .await
         .map_err(FormatterError::IoError)?;
 
-    // Clean up temp file
-    let _ = fs::remove_file(&temp_path).await;
+    // Temp file automatically cleaned up when temp_file is dropped
 
     // Check exit status
     if !output.status.success() {
