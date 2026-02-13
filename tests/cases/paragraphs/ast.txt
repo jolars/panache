@@ -1,5 +1,5 @@
-ROOT@0..354
-  DOCUMENT@0..354
+ROOT@0..476
+  DOCUMENT@0..476
     PARAGRAPH@0..224
       TEXT@0..73 "A test paragraph that ..."
       NEWLINE@73..74 "\n"
@@ -20,4 +20,12 @@ ROOT@0..354
       TEXT@328..352 "It should not be wrapped"
       TEXT@352..353 "!"
       NEWLINE@353..354 "\n"
+    BlankLine@354..355
+      BlankLine@354..355 "\n"
+    PARAGRAPH@355..476
+      TEXT@355..414 "Here is a paragraph w ..."
+      HardLineBreak@414..417 "  \n"
+      TEXT@417..474 "This is also a hard l ..."
+      TEXT@474..475 "!"
+      NEWLINE@475..476 "\n"
 

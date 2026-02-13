@@ -278,6 +278,20 @@ pub(super) fn wrapped_lines_for_paragraph(
     format_inline_fn: impl Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
     log::debug!("wrapped_lines_for_paragraph called with width={}", width);
+
+    // Check if paragraph contains hard line breaks
+    let has_hard_breaks = node
+        .descendants_with_tokens()
+        .any(|el| el.kind() == SyntaxKind::HardLineBreak);
+
+    if has_hard_breaks {
+        // Don't wrap paragraphs with hard line breaks - preserve the breaks
+        // Format inline content directly without wrapping
+        log::debug!("Paragraph contains hard line breaks - preserving them");
+        let formatted = format_inline_fn(node);
+        return formatted.lines().map(|s| s.to_string()).collect();
+    }
+
     let mut arena: Vec<Box<str>> = Vec::new();
     let words = build_words(_config, node, &mut arena, format_inline_fn);
     log::debug!("Built {} words for paragraph", words.len());

@@ -501,25 +501,45 @@ impl InlineParser {
                     self.copy_node_to_builder(builder, &n);
                 }
                 rowan::NodeOrToken::Token(t) => {
-                    // Check for escaped line break: TEXT ending with \ followed by NEWLINE
+                    // Check for hard line breaks: two or more spaces at end of line, or backslash at end of line
                     // Only in non-verbatim contexts
-                    if self.config.extensions.escaped_line_breaks
-                        && t.kind() == SyntaxKind::TEXT
-                        && t.text().ends_with('\\')
-                        && self.should_parse_inline(&t) // Ensures not in verbatim context
+                    if t.kind() == SyntaxKind::TEXT
+                        && self.should_parse_inline(&t)
                         && let Some(rowan::NodeOrToken::Token(next)) = children.peek()
                         && next.kind() == SyntaxKind::NEWLINE
                     {
-                        // Emit the text before the backslash
-                        let text_before = &t.text()[..t.text().len() - 1];
-                        if !text_before.is_empty() {
-                            self.parse_text_with_refs(builder, text_before);
+                        let text = t.text();
+
+                        // Check for backslash-newline hard line break (requires escaped_line_breaks extension)
+                        if self.config.extensions.escaped_line_breaks && text.ends_with('\\') {
+                            // Emit the text before the backslash
+                            let text_before = &text[..text.len() - 1];
+                            if !text_before.is_empty() {
+                                self.parse_text_with_refs(builder, text_before);
+                            }
+                            // Emit hard line break - preserve the backslash for losslessness
+                            builder.token(SyntaxKind::HardLineBreak.into(), "\\\n");
+                            // Skip the NEWLINE token
+                            children.next();
+                            continue;
                         }
-                        // Emit hard line break - preserve the backslash for losslessness
-                        builder.token(SyntaxKind::HardLineBreak.into(), "\\\n");
-                        // Skip the NEWLINE token
-                        children.next();
-                        continue;
+
+                        // Check for two-or-more-spaces hard line break (always enabled in Pandoc)
+                        let trailing_spaces = text.chars().rev().take_while(|&c| c == ' ').count();
+                        if trailing_spaces >= 2 {
+                            // Emit the text before the trailing spaces
+                            let text_before = &text[..text.len() - trailing_spaces];
+                            if !text_before.is_empty() {
+                                self.parse_text_with_refs(builder, text_before);
+                            }
+                            // Emit hard line break - preserve the trailing spaces for losslessness
+                            let spaces = " ".repeat(trailing_spaces);
+                            builder
+                                .token(SyntaxKind::HardLineBreak.into(), &format!("{}\n", spaces));
+                            // Skip the NEWLINE token
+                            children.next();
+                            continue;
+                        }
                     }
 
                     // Normal token processing
