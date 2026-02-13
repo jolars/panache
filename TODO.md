@@ -49,6 +49,7 @@ This document tracks implementation status for panache's features.
   fenced divs, YAML frontmatter
 - ✅ **Go to definition** - Jump to reference link/footnote definitions
   (reference links, images, footnotes)
+- ❌ Go to definition for citations - Jump to bibliography entry for `@cite` keys
 - ❌ **Find references** - Find all uses of a reference link/footnote/citation
 
 #### Completion
