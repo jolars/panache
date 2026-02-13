@@ -209,7 +209,7 @@ panache lint --config cfg.toml      # Custom config
 
 - ❌ **Simple tables** - Support for formatting tables
 - ✅ **Pipe tables** - Support for formatting GitHub-style tables
-- ❌ **Grid tables** - Support for formatting grid-style tables
+- ✅ **Grid tables** - Support for formatting grid-style tables
 - ❌ **Multiline tables** - Support for formatting tables with multiline cells
 
 Parser - Comprehensive Pandoc Feature Coverage

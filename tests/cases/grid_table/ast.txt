@@ -1,0 +1,97 @@
+ROOT@0..647
+  DOCUMENT@0..647
+    GridTable@0..231
+      TableSeparator@0..33
+        TEXT@0..32 "+--------+----------+ ..."
+        NEWLINE@32..33 "\n"
+      TableHeader@33..66
+        TEXT@33..65 "| Header | Column 2 | ..."
+        NEWLINE@65..66 "\n"
+      TableSeparator@66..99
+        TEXT@66..98 "+========+==========+ ..."
+        NEWLINE@98..99 "\n"
+      TableRow@99..132
+        TEXT@99..131 "| A      | B        | ..."
+        NEWLINE@131..132 "\n"
+      TableSeparator@132..165
+        TEXT@132..164 "+--------+----------+ ..."
+        NEWLINE@164..165 "\n"
+      TableRow@165..198
+        TEXT@165..197 "| Data   | More     | ..."
+        NEWLINE@197..198 "\n"
+      TableSeparator@198..231
+        TEXT@198..230 "+--------+----------+ ..."
+        NEWLINE@230..231 "\n"
+    BlankLine@231..232
+      BlankLine@231..232 "\n"
+    PARAGRAPH@232..255
+      TEXT@232..254 "Table with alignments:"
+      NEWLINE@254..255 "\n"
+    BlankLine@255..256
+      BlankLine@255..256 "\n"
+    GridTable@256..480
+      TableSeparator@256..288
+        TEXT@256..287 "+:-------+--------:+: ..."
+        NEWLINE@287..288 "\n"
+      TableHeader@288..320
+        TEXT@288..319 "| Left   | Right   |  ..."
+        NEWLINE@319..320 "\n"
+      TableSeparator@320..352
+        TEXT@320..351 "+========+=========+= ..."
+        NEWLINE@351..352 "\n"
+      TableRow@352..384
+        TEXT@352..383 "| A      | B       |  ..."
+        NEWLINE@383..384 "\n"
+      TableSeparator@384..416
+        TEXT@384..415 "+--------+---------+- ..."
+        NEWLINE@415..416 "\n"
+      TableRow@416..448
+        TEXT@416..447 "| Short  | Longer  |  ..."
+        NEWLINE@447..448 "\n"
+      TableSeparator@448..480
+        TEXT@448..479 "+--------+---------+- ..."
+        NEWLINE@479..480 "\n"
+    BlankLine@480..481
+      BlankLine@480..481 "\n"
+    PARAGRAPH@481..516
+      TEXT@481..493 "With inline "
+      Emphasis@493..503
+        EmphasisMarker@493..494 "*"
+        TEXT@494..502 "emphasis"
+        EmphasisMarker@502..503 "*"
+      TEXT@503..508 " and "
+      CodeSpan@508..514
+        CodeSpanMarker@508..509 "`"
+        TEXT@509..513 "code"
+        CodeSpanMarker@513..514 "`"
+      TEXT@514..515 ":"
+      NEWLINE@515..516 "\n"
+    BlankLine@516..517
+      BlankLine@516..517 "\n"
+    GridTable@517..647
+      TableSeparator@517..543
+        TEXT@517..542 "+------------+------- ..."
+        NEWLINE@542..543 "\n"
+      TableHeader@543..569
+        TEXT@543..545 "| "
+        Emphasis@545..551
+          EmphasisMarker@545..546 "*"
+          TEXT@546..550 "Bold"
+          EmphasisMarker@550..551 "*"
+        TEXT@551..558 "     | "
+        CodeSpan@558..566
+          CodeSpanMarker@558..559 "`"
+          TEXT@559..565 "inline"
+          CodeSpanMarker@565..566 "`"
+        TEXT@566..568 " |"
+        NEWLINE@568..569 "\n"
+      TableSeparator@569..595
+        TEXT@569..594 "+============+======= ..."
+        NEWLINE@594..595 "\n"
+      TableRow@595..621
+        TEXT@595..620 "| Normal     | text   ..."
+        NEWLINE@620..621 "\n"
+      TableSeparator@621..647
+        TEXT@621..646 "+------------+------- ..."
+        NEWLINE@646..647 "\n"
+

@@ -940,6 +940,12 @@ impl Formatter {
                 self.output.push_str(&formatted);
             }
 
+            SyntaxKind::GridTable => {
+                // Format grid table with proper alignment and borders
+                let formatted = tables::format_grid_table(node, &self.config);
+                self.output.push_str(&formatted);
+            }
+
             SyntaxKind::InlineMath => {
                 // Check if this is display math (has BlockMathMarker)
                 let is_display_math = node.children_with_tokens().any(|t| {
