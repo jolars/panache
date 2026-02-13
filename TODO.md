@@ -45,8 +45,8 @@ This document tracks implementation status for panache's features.
 
 - ✅ **Document outline** - `textDocument/documentSymbol` for headings, tables,
   figures
-- ✅ **Folding ranges** - `textDocument/foldingRange` for headings, code
-  blocks, fenced divs, YAML frontmatter
+- ✅ **Folding ranges** - `textDocument/foldingRange` for headings, code blocks,
+  fenced divs, YAML frontmatter
 - ❌ **Go to definition** - Jump to reference link/footnote/citation definitions
 - ❌ **Find references** - Find all uses of a reference link/footnote/citation
 
@@ -116,6 +116,9 @@ This document tracks implementation status for panache's features.
 ---
 
 ## Linter
+
+- [ ] External linter support for code blocks is enabled, but auto-fixing is not
+      yet implemented.
 
 ### Current Status
 
