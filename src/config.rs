@@ -1207,3 +1207,65 @@ mod tests {
         assert!(!cfg.code_blocks.normalize_indented);
     }
 }
+
+#[cfg(test)]
+mod line_ending_test {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_line_ending_in_config() {
+        #[derive(Deserialize)]
+        struct TestConfig {
+            line_ending: LineEnding,
+        }
+
+        let cfg: TestConfig = toml::from_str(r#"line_ending = "lf""#).unwrap();
+        assert_eq!(cfg.line_ending, LineEnding::Lf);
+
+        let cfg2: TestConfig = toml::from_str(r#"line_ending = "auto""#).unwrap();
+        assert_eq!(cfg2.line_ending, LineEnding::Auto);
+
+        let cfg3: TestConfig = toml::from_str(r#"line_ending = "crlf""#).unwrap();
+        assert_eq!(cfg3.line_ending, LineEnding::Crlf);
+    }
+}
+
+#[cfg(test)]
+mod raw_config_test {
+    use super::*;
+
+    #[test]
+    fn test_raw_config_line_ending() {
+        // Must use hyphen (line-ending) not underscore due to #[serde(rename_all = "kebab-case")]
+        let cfg: Config = toml::from_str(r#"line-ending = "lf""#).unwrap();
+        assert_eq!(cfg.line_ending, Some(LineEnding::Lf));
+
+        // Test that it goes through RawConfig properly
+        let content = r#"
+        line-ending = "crlf"
+        line-width = 100
+        "#;
+        let cfg2: Config = toml::from_str(content).unwrap();
+        assert_eq!(cfg2.line_ending, Some(LineEnding::Crlf));
+        assert_eq!(cfg2.line_width, 100);
+    }
+}
+
+#[cfg(test)]
+mod field_name_test {
+    use super::*;
+
+    #[test]
+    fn test_line_ending_field_name() {
+        // The RawConfig uses #[serde(rename_all = "kebab-case")] so field names use hyphens
+        let cfg: Config = toml::from_str(r#"line-ending = "lf""#).unwrap();
+        assert_eq!(cfg.line_ending, Some(LineEnding::Lf));
+
+        // Test all three values
+        let cfg_auto: Config = toml::from_str(r#"line-ending = "auto""#).unwrap();
+        assert_eq!(cfg_auto.line_ending, Some(LineEnding::Auto));
+
+        let cfg_crlf: Config = toml::from_str(r#"line-ending = "crlf""#).unwrap();
+        assert_eq!(cfg_crlf.line_ending, Some(LineEnding::Crlf));
+    }
+}

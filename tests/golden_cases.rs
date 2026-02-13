@@ -152,6 +152,8 @@ golden_test_cases!(
     indented_code,
     inline_math,
     latex_environment,
+    line_ending_crlf,
+    line_ending_lf,
     links,
     lists_bullet,
     lists_code,

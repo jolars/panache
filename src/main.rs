@@ -290,11 +290,8 @@ fn main() -> io::Result<()> {
                 }
 
                 let input = read_all(None)?;
-                // Normalize line endings for consistent AST positions
-                let normalized_input = input.replace("\r\n", "\n");
-                let tree = parse(&normalized_input, Some(cfg.clone()));
-                let diagnostics =
-                    panache::linter::lint_with_external_sync(&tree, &normalized_input, &cfg);
+                let tree = parse(&input, Some(cfg.clone()));
+                let diagnostics = panache::linter::lint_with_external_sync(&tree, &input, &cfg);
 
                 if diagnostics.is_empty() {
                     if !check {
@@ -304,7 +301,7 @@ fn main() -> io::Result<()> {
                 }
 
                 if fix {
-                    let fixed_output = apply_fixes(&normalized_input, &diagnostics);
+                    let fixed_output = apply_fixes(&input, &diagnostics);
                     print!("{}", fixed_output);
                 } else {
                     print_diagnostics(&diagnostics, None);
@@ -341,18 +338,15 @@ fn main() -> io::Result<()> {
                 }
 
                 let input = fs::read_to_string(file_path)?;
-                // Normalize line endings for consistent AST positions
-                let normalized_input = input.replace("\r\n", "\n");
-                let tree = parse(&normalized_input, Some(cfg.clone()));
-                let diagnostics =
-                    panache::linter::lint_with_external_sync(&tree, &normalized_input, &cfg);
+                let tree = parse(&input, Some(cfg.clone()));
+                let diagnostics = panache::linter::lint_with_external_sync(&tree, &input, &cfg);
 
                 if !diagnostics.is_empty() {
                     any_issues = true;
                     total_issues += diagnostics.len();
 
                     if fix {
-                        let fixed_output = apply_fixes(&normalized_input, &diagnostics);
+                        let fixed_output = apply_fixes(&input, &diagnostics);
                         fs::write(file_path, fixed_output)?;
                         println!(
                             "Fixed {} issue(s) in {}",

@@ -27,7 +27,7 @@ fn init_logger() {
 }
 
 fn detect_line_ending(input: &str) -> &str {
-    // Check for first occurrence of \r\n or \n
+    // Detect first occurrence of \r\n or \n
     let rn_pos = input.find("\r\n");
     let n_pos = input.find('\n');
 
@@ -40,6 +40,18 @@ fn detect_line_ending(input: &str) -> &str {
     }
 
     "\n"
+}
+
+/// Apply line ending normalization to formatted output.
+/// Converts all line endings in the output to the target line ending.
+fn apply_line_ending(text: &str, target: &str) -> String {
+    if target == "\r\n" {
+        // Convert LF to CRLF (but don't double-convert existing CRLF)
+        text.replace("\r\n", "\n").replace("\n", "\r\n")
+    } else {
+        // Convert CRLF to LF
+        text.replace("\r\n", "\n")
+    }
 }
 
 /// Formats a Quarto document string with the specified configuration.
@@ -70,22 +82,24 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
         init_logger();
     }
 
-    let line_ending = detect_line_ending(input);
-
-    let normalized_input = input.replace("\r\n", "\n");
-
-    // Step 1: Parse document into complete CST
     let config = config.unwrap_or_default();
-    let tree = parser::parse(&normalized_input, Some(config.clone()));
+
+    // Determine target line ending based on config
+    let target_line_ending = match config.line_ending {
+        Some(config::LineEnding::Lf) => "\n",
+        Some(config::LineEnding::Crlf) => "\r\n",
+        Some(config::LineEnding::Auto) | None => {
+            // Auto-detect from input: use first line ending found
+            detect_line_ending(input)
+        }
+    };
+
+    // Step 1: Parse document into complete CST (parser preserves all bytes including CRLF)
+    let tree = parser::parse(input, Some(config.clone()));
 
     // Step 2: Expand line range to byte offsets and block boundaries if specified
     let expanded_range = range.and_then(|(start_line, end_line)| {
-        let result = range_utils::expand_line_range_to_blocks(
-            &tree,
-            &normalized_input,
-            start_line,
-            end_line,
-        );
+        let result = range_utils::expand_line_range_to_blocks(&tree, input, start_line, end_line);
         if let Some((start, end)) = result {
             log::info!(
                 "Range lines {}:{} expanded to byte range {}:{} (text: {:?}...{:?})",
@@ -93,8 +107,8 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
                 end_line,
                 start,
                 end,
-                &normalized_input[start..start.min(start + 20)],
-                &normalized_input[end.saturating_sub(20).max(start)..end]
+                &input[start..start.min(start + 20)],
+                &input[end.saturating_sub(20).max(start)..end]
             );
         }
         result
@@ -103,11 +117,8 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
     // Step 3: Format the final CST (synchronously, no external formatters)
     let out = formatter::format_tree(&tree, &config, expanded_range);
 
-    if line_ending == "\r\n" {
-        out.replace("\n", "\r\n")
-    } else {
-        out
-    }
+    // Step 4: Apply line ending normalization if needed
+    apply_line_ending(&out, target_line_ending)
 }
 
 /// Formats a Quarto document string using default configuration.
@@ -147,27 +158,31 @@ pub async fn format_async(
         init_logger();
     }
 
-    let line_ending = detect_line_ending(input);
-
-    let normalized_input = input.replace("\r\n", "\n");
-
-    // Step 1: Parse document into complete CST
     let config = config.unwrap_or_default();
-    let tree = parser::parse(&normalized_input, Some(config.clone()));
+
+    // Determine target line ending based on config
+    let target_line_ending = match config.line_ending {
+        Some(config::LineEnding::Lf) => "\n",
+        Some(config::LineEnding::Crlf) => "\r\n",
+        Some(config::LineEnding::Auto) | None => {
+            // Auto-detect from input: use first line ending found
+            detect_line_ending(input)
+        }
+    };
+
+    // Step 1: Parse document into complete CST (parser preserves all bytes including CRLF)
+    let tree = parser::parse(input, Some(config.clone()));
 
     // Step 2: Expand line range to byte offsets and block boundaries if specified
     let expanded_range = range.and_then(|(start_line, end_line)| {
-        range_utils::expand_line_range_to_blocks(&tree, &normalized_input, start_line, end_line)
+        range_utils::expand_line_range_to_blocks(&tree, input, start_line, end_line)
     });
 
     // Step 3: Format the final CST (with external formatters if configured)
     let out = formatter::format_tree_async(&tree, &config, expanded_range).await;
 
-    if line_ending == "\r\n" {
-        out.replace("\n", "\r\n")
-    } else {
-        out
-    }
+    // Step 4: Apply line ending normalization if needed
+    apply_line_ending(&out, target_line_ending)
 }
 
 #[cfg(feature = "lsp")]

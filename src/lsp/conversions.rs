@@ -8,6 +8,8 @@ pub(crate) fn position_to_offset(text: &str, position: Position) -> Option<usize
     let mut offset = 0;
     let mut current_line = 0;
 
+    let bytes = text.as_bytes();
+
     for line in text.lines() {
         if current_line == position.line {
             // LSP uses UTF-16 code units, Rust uses UTF-8 bytes
@@ -21,8 +23,21 @@ pub(crate) fn position_to_offset(text: &str, position: Position) -> Option<usize
             // Position is at or past end of line
             return Some(offset + line.len());
         }
-        // +1 for newline character
-        offset += line.len() + 1;
+
+        // Account for line ending: check if it's CRLF or LF
+        let line_end_offset = offset + line.len();
+        let line_ending_len = if line_end_offset + 1 < text.len()
+            && bytes[line_end_offset] == b'\r'
+            && bytes[line_end_offset + 1] == b'\n'
+        {
+            2 // CRLF
+        } else if line_end_offset < text.len() && bytes[line_end_offset] == b'\n' {
+            1 // LF
+        } else {
+            0 // No line ending (last line)
+        };
+
+        offset += line.len() + line_ending_len;
         current_line += 1;
     }
 
@@ -41,6 +56,8 @@ pub(crate) fn offset_to_position(text: &str, offset: usize) -> Position {
     let mut character = 0;
     let mut current_offset = 0;
 
+    let bytes = text.as_bytes();
+
     for text_line in text.lines() {
         if current_offset + text_line.len() >= offset {
             // Offset is in this line
@@ -49,7 +66,21 @@ pub(crate) fn offset_to_position(text: &str, offset: usize) -> Position {
             character = line_slice.chars().map(|c| c.len_utf16()).sum::<usize>() as u32;
             break;
         }
-        current_offset += text_line.len() + 1; // +1 for newline
+
+        // Account for line ending: check if it's CRLF or LF
+        let line_end_offset = current_offset + text_line.len();
+        let line_ending_len = if line_end_offset + 1 < text.len()
+            && bytes[line_end_offset] == b'\r'
+            && bytes[line_end_offset + 1] == b'\n'
+        {
+            2 // CRLF
+        } else if line_end_offset < text.len() && bytes[line_end_offset] == b'\n' {
+            1 // LF
+        } else {
+            0 // No line ending (last line)
+        };
+
+        current_offset += text_line.len() + line_ending_len;
         line += 1;
     }
 
@@ -482,5 +513,80 @@ mod tests {
         };
 
         assert_eq!(apply_content_change(text, &change), "line1\nliNEW\nLINEne3");
+    }
+
+    #[test]
+    fn test_position_to_offset_crlf() {
+        let text = "hello\r\nworld\r\n";
+
+        // Start of first line
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 0
+                }
+            ),
+            Some(0)
+        );
+
+        // Middle of first line
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 0,
+                    character: 3
+                }
+            ),
+            Some(3)
+        );
+
+        // Start of second line (after CRLF)
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 1,
+                    character: 0
+                }
+            ),
+            Some(7)
+        );
+
+        // Middle of second line
+        assert_eq!(
+            position_to_offset(
+                text,
+                Position {
+                    line: 1,
+                    character: 3
+                }
+            ),
+            Some(10)
+        );
+    }
+
+    #[test]
+    fn test_offset_to_position_crlf() {
+        let text = "hello\r\nworld\r\n";
+
+        let pos = offset_to_position(text, 0);
+        assert_eq!(pos.line, 0);
+        assert_eq!(pos.character, 0);
+
+        let pos = offset_to_position(text, 3);
+        assert_eq!(pos.line, 0);
+        assert_eq!(pos.character, 3);
+
+        // Offset 7 is start of second line (after \r\n which is treated as single line ending)
+        let pos = offset_to_position(text, 7);
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.character, 0);
+
+        let pos = offset_to_position(text, 10);
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.character, 3);
     }
 }
