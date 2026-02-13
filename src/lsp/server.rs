@@ -36,6 +36,7 @@ impl LanguageServer for PanacheLsp {
                 document_range_formatting_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
+                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -117,6 +118,15 @@ impl LanguageServer for PanacheLsp {
         params: DocumentSymbolParams,
     ) -> Result<Option<DocumentSymbolResponse>> {
         handlers::document_symbols::document_symbol(
+            &self.client,
+            Arc::clone(&self.document_map),
+            params,
+        )
+        .await
+    }
+
+    async fn folding_range(&self, params: FoldingRangeParams) -> Result<Option<Vec<FoldingRange>>> {
+        handlers::folding_ranges::folding_range(
             &self.client,
             Arc::clone(&self.document_map),
             params,
