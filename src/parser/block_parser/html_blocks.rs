@@ -4,7 +4,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::blockquotes::count_blockquote_markers;
-use super::utils::strip_leading_spaces;
+use super::utils::{strip_leading_spaces, strip_newline};
 
 /// HTML block-level tags as defined by CommonMark spec.
 /// These tags start an HTML block when found at the start of a line.
@@ -219,19 +219,14 @@ pub(crate) fn parse_html_block(
     builder.start_node(SyntaxKind::HtmlBlockTag.into());
 
     // Split off trailing newline if present
-    let (line_without_newline, has_newline) = if let Some(stripped) = first_line.strip_suffix('\n')
-    {
-        (stripped, true)
-    } else {
-        (first_line, false)
-    };
+    let (line_without_newline, newline_str) = strip_newline(first_line);
 
     if !line_without_newline.is_empty() {
         builder.token(SyntaxKind::TEXT.into(), line_without_newline);
     }
 
-    if has_newline {
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
     builder.finish_node(); // HtmlBlockTag
@@ -272,19 +267,14 @@ pub(crate) fn parse_html_block(
                 builder.start_node(SyntaxKind::HtmlBlockContent.into());
                 for content_line in &content_lines {
                     // Split off trailing newline if present
-                    let (line_without_newline, has_newline) =
-                        if let Some(stripped) = content_line.strip_suffix('\n') {
-                            (stripped, true)
-                        } else {
-                            (*content_line, false)
-                        };
+                    let (line_without_newline, newline_str) = strip_newline(content_line);
 
                     if !line_without_newline.is_empty() {
                         builder.token(SyntaxKind::TEXT.into(), line_without_newline);
                     }
 
-                    if has_newline {
-                        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    if !newline_str.is_empty() {
+                        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
                     }
                 }
                 builder.finish_node(); // HtmlBlockContent
@@ -294,19 +284,14 @@ pub(crate) fn parse_html_block(
             builder.start_node(SyntaxKind::HtmlBlockTag.into());
 
             // Split off trailing newline if present
-            let (line_without_newline, has_newline) =
-                if let Some(stripped) = line.strip_suffix('\n') {
-                    (stripped, true)
-                } else {
-                    (line, false)
-                };
+            let (line_without_newline, newline_str) = strip_newline(line);
 
             if !line_without_newline.is_empty() {
                 builder.token(SyntaxKind::TEXT.into(), line_without_newline);
             }
 
-            if has_newline {
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            if !newline_str.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
             }
 
             builder.finish_node(); // HtmlBlockTag
@@ -327,19 +312,14 @@ pub(crate) fn parse_html_block(
             builder.start_node(SyntaxKind::HtmlBlockContent.into());
             for content_line in &content_lines {
                 // Split off trailing newline if present
-                let (line_without_newline, has_newline) =
-                    if let Some(stripped) = content_line.strip_suffix('\n') {
-                        (stripped, true)
-                    } else {
-                        (*content_line, false)
-                    };
+                let (line_without_newline, newline_str) = strip_newline(content_line);
 
                 if !line_without_newline.is_empty() {
                     builder.token(SyntaxKind::TEXT.into(), line_without_newline);
                 }
 
-                if has_newline {
-                    builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                if !newline_str.is_empty() {
+                    builder.token(SyntaxKind::NEWLINE.into(), newline_str);
                 }
             }
             builder.finish_node(); // HtmlBlockContent

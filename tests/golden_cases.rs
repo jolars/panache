@@ -16,10 +16,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn normalize(s: &str) -> String {
-    s.replace("\r\n", "\n")
-}
-
 /// Find a file with given base name and any supported extension.
 fn find_file_with_extension(dir: &Path, base: &str) -> Option<PathBuf> {
     for ext in &["md", "qmd", "Rmd"] {
@@ -68,7 +64,8 @@ fn run_golden_case(case_name: &str) {
     // Load optional config
     let config = load_test_config(&dir);
 
-    let input = normalize(&fs::read_to_string(&input_path).unwrap());
+    // Read input file - preserve line endings exactly
+    let input = fs::read_to_string(&input_path).unwrap();
 
     // Test losslessness: parser must preserve input byte-for-byte
     // This is critical for LSP, linting, and range formatting
@@ -100,12 +97,7 @@ fn run_golden_case(case_name: &str) {
         } else {
             let expected_ast = fs::read_to_string(&ast_path)
                 .unwrap_or_else(|_| panic!("Failed to read ast.txt in {}", case_name));
-            similar_asserts::assert_eq!(
-                normalize(&expected_ast),
-                normalize(&ast_output),
-                "AST mismatch: {}",
-                case_name
-            );
+            similar_asserts::assert_eq!(expected_ast, ast_output, "AST mismatch: {}", case_name);
         }
     }
 
@@ -114,9 +106,7 @@ fn run_golden_case(case_name: &str) {
         return;
     }
 
-    let expected = fs::read_to_string(&expected_path)
-        .map(|s| normalize(&s))
-        .unwrap_or_else(|_| input.clone());
+    let expected = fs::read_to_string(&expected_path).unwrap_or_else(|_| input.clone());
 
     similar_asserts::assert_eq!(expected, output, "case: {}", case_name);
 }
@@ -146,6 +136,7 @@ golden_test_cases!(
     blockquotes,
     bracketed_spans,
     code_spans,
+    crlf_basic,
     definition_list,
     definition_list_nesting,
     display_math,

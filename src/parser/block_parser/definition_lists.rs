@@ -1,6 +1,8 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::utils::strip_newline;
+
 /// Tries to parse a definition list marker (`:` or `~`)
 ///
 /// Returns Some((marker_char, indent, spaces_after)) if found, None otherwise.
@@ -40,12 +42,10 @@ pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, us
 pub(crate) fn emit_term(builder: &mut GreenNodeBuilder<'static>, line: &str) {
     builder.start_node(SyntaxKind::Term.into());
     // Strip trailing newline from line (it will be emitted separately)
-    if let Some(text) = line.strip_suffix('\n') {
-        builder.token(SyntaxKind::TEXT.into(), text.trim_end());
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
-    } else {
-        // No trailing newline (last line of input)
-        builder.token(SyntaxKind::TEXT.into(), line.trim_end());
+    let (text, newline_str) = strip_newline(line);
+    builder.token(SyntaxKind::TEXT.into(), text.trim_end());
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
     builder.finish_node(); // Term
 }

@@ -1,0 +1,15 @@
+ROOT@0..35
+  DOCUMENT@0..35
+    Heading@0..11
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..9
+        TEXT@2..9 "Heading"
+      NEWLINE@9..11 "\r\n"
+    BlankLine@11..13
+      BlankLine@11..13 "\r\n"
+    PARAGRAPH@13..35
+      TEXT@13..33 "This is a paragraph."
+      NEWLINE@33..35 "\r\n"
+

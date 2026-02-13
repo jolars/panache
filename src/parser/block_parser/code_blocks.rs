@@ -4,7 +4,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::blockquotes::count_blockquote_markers;
-use super::utils::strip_leading_spaces;
+use super::utils::{strip_leading_spaces, strip_newline};
 
 /// Represents the type of code block based on its info string syntax.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -621,19 +621,14 @@ pub(crate) fn parse_fenced_code_block(
             };
 
             // Split off trailing newline if present (from split_inclusive)
-            let (line_without_newline, has_newline) =
-                if let Some(stripped) = after_indent.strip_suffix('\n') {
-                    (stripped, true)
-                } else {
-                    (after_indent, false)
-                };
+            let (line_without_newline, newline_str) = strip_newline(after_indent);
 
             if !line_without_newline.is_empty() {
                 builder.token(SyntaxKind::TEXT.into(), line_without_newline);
             }
 
-            if has_newline {
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            if !newline_str.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
             }
         }
         builder.finish_node(); // CodeContent

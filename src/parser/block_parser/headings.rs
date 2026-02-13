@@ -39,13 +39,15 @@ pub(crate) fn emit_atx_heading(
 ) {
     builder.start_node(SyntaxKind::Heading.into());
 
-    // Strip trailing newline for processing but remember to emit it later
-    let (content_without_newline, has_newline) = if let Some(stripped) = content.strip_suffix('\n')
-    {
-        (stripped, true)
-    } else {
-        (content, false)
-    };
+    // Strip trailing newline (LF or CRLF) for processing but remember to emit it later
+    let (content_without_newline, newline_str) =
+        if let Some(stripped) = content.strip_suffix("\r\n") {
+            (stripped, "\r\n")
+        } else if let Some(stripped) = content.strip_suffix('\n') {
+            (stripped, "\n")
+        } else {
+            (content, "")
+        };
 
     let trimmed = content_without_newline.trim_start();
     let leading_spaces = content_without_newline.len() - trimmed.len();
@@ -104,8 +106,8 @@ pub(crate) fn emit_atx_heading(
     }
 
     // Emit trailing newline if present
-    if has_newline {
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
     builder.finish_node(); // Heading

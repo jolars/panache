@@ -9,6 +9,8 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::utils::strip_newline;
+
 /// Check if a line is indented enough to be part of an indented code block.
 /// Returns true if the line starts with 4+ spaces or 1+ tab.
 pub(crate) fn is_indented_code_line(content: &str) -> bool {
@@ -115,19 +117,14 @@ pub(crate) fn parse_indented_code_block(
         let content = &inner[indent_bytes..];
 
         // Split off trailing newline if present (from split_inclusive)
-        let (content_without_newline, has_newline) =
-            if let Some(stripped) = content.strip_suffix('\n') {
-                (stripped, true)
-            } else {
-                (content, false)
-            };
+        let (content_without_newline, newline_str) = strip_newline(content);
 
         if !content_without_newline.is_empty() {
             builder.token(SyntaxKind::TEXT.into(), content_without_newline);
         }
 
-        if has_newline {
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
         }
 
         current_pos += 1;

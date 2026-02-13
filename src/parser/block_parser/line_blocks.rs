@@ -1,6 +1,8 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::utils::strip_newline;
+
 /// Try to parse the start of a line block.
 /// Returns Some(()) if this line starts a line block (| followed by space or end of line).
 pub fn try_parse_line_block_start(line: &str) -> Option<()> {
@@ -40,19 +42,14 @@ pub fn parse_line_block(
             let content = &line[content_start..];
 
             // Split off trailing newline if present
-            let (content_without_newline, has_newline) =
-                if let Some(stripped) = content.strip_suffix('\n') {
-                    (stripped, true)
-                } else {
-                    (content, false)
-                };
+            let (content_without_newline, newline_str) = strip_newline(content);
 
             if !content_without_newline.is_empty() {
                 builder.token(SyntaxKind::TEXT.into(), content_without_newline);
             }
 
-            if has_newline {
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            if !newline_str.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
             }
 
             builder.finish_node(); // LineBlockLine
@@ -68,19 +65,14 @@ pub fn parse_line_block(
                     builder.start_node(SyntaxKind::LineBlockLine.into());
 
                     // Split off trailing newline if present
-                    let (line_without_newline, has_newline) =
-                        if let Some(stripped) = next_line.strip_suffix('\n') {
-                            (stripped, true)
-                        } else {
-                            (next_line, false)
-                        };
+                    let (line_without_newline, newline_str) = strip_newline(next_line);
 
                     if !line_without_newline.is_empty() {
                         builder.token(SyntaxKind::TEXT.into(), line_without_newline);
                     }
 
-                    if has_newline {
-                        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+                    if !newline_str.is_empty() {
+                        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
                     }
 
                     builder.finish_node(); // LineBlockLine

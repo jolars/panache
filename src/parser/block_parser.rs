@@ -45,6 +45,7 @@ use tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
 };
+use utils::split_lines_inclusive;
 
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -62,8 +63,8 @@ pub struct BlockParser<'a> {
 
 impl<'a> BlockParser<'a> {
     pub fn new(input: &'a str, config: &'a Config) -> Self {
-        // Use split_inclusive to preserve newlines for lossless CST
-        let lines: Vec<&str> = input.split_inclusive('\n').collect();
+        // Use split_lines_inclusive to preserve line endings (both LF and CRLF)
+        let lines = split_lines_inclusive(input);
         Self {
             lines,
             pos: 0,
@@ -1543,20 +1544,16 @@ impl<'a> BlockParser<'a> {
         // For lossless parsing, preserve the line exactly as-is
         // Don't strip to content column in the parser - that's the formatter's job
 
-        // Split off trailing newline if present
-        let (text_without_newline, has_newline) = if let Some(stripped) = line.strip_suffix('\n') {
-            (stripped, true)
-        } else {
-            (line, false)
-        };
+        // Split off trailing newline (LF or CRLF) if present
+        let (text_without_newline, newline_str) = utils::strip_newline(line);
 
         if !text_without_newline.is_empty() {
             self.builder
                 .token(SyntaxKind::TEXT.into(), text_without_newline);
         }
 
-        if has_newline {
-            self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        if !newline_str.is_empty() {
+            self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
         }
     }
 

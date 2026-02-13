@@ -3,6 +3,8 @@ use crate::syntax::SyntaxKind;
 use log;
 use rowan::GreenNodeBuilder;
 
+use super::utils::strip_newline;
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ListMarker {
     Bullet(char),
@@ -592,11 +594,7 @@ pub(crate) fn emit_list_item(
         let remaining = &content[content_start..];
 
         // Strip trailing newline from remaining text (it will be emitted separately)
-        let (text_part, has_newline) = if let Some(text) = remaining.strip_suffix('\n') {
-            (text, true)
-        } else {
-            (remaining, false)
-        };
+        let (text_part, newline_str) = strip_newline(remaining);
 
         if !text_part.is_empty() {
             // Check if this is a task list item (starts with [ ] or [x] or [X])
@@ -626,13 +624,14 @@ pub(crate) fn emit_list_item(
         }
 
         // Emit newline token separately if present
-        if has_newline {
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
         }
     } else {
-        // Empty content but line has newline
-        if content.ends_with('\n') {
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        // Empty content line - just emit newline if present
+        let (_, line_newline_str) = strip_newline(content);
+        if !line_newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), line_newline_str);
         }
     }
 
@@ -813,18 +812,19 @@ pub(crate) fn try_parse_list(
         if content_start < line.len() {
             let remaining = &line[content_start..];
             // Strip trailing newline from remaining text (it will be emitted separately)
-            if let Some(text) = remaining.strip_suffix('\n') {
-                if !text.is_empty() {
-                    builder.token(SyntaxKind::TEXT.into(), text);
-                }
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
-            } else {
-                // No trailing newline (last line of input)
-                builder.token(SyntaxKind::TEXT.into(), remaining);
+            let (text, newline_str) = strip_newline(remaining);
+            if !text.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), text);
             }
-        } else if line.ends_with('\n') {
-            // Empty content but line has newline
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            if !newline_str.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+            }
+        } else {
+            // No content after marker, just check for newline
+            let (_, newline_str) = strip_newline(line);
+            if !newline_str.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+            }
         }
 
         item_stack.push(ItemCtx {

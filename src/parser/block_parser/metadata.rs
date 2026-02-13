@@ -3,6 +3,8 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::utils::strip_newline;
+
 /// Check if a line is a YAML metadata delimiter (`---` or `...`).
 /// Returns true if the line is exactly `---` or `...` (with optional leading/trailing spaces).
 #[allow(dead_code)]
@@ -59,11 +61,10 @@ pub(crate) fn try_parse_yaml_block(
     builder.start_node(SyntaxKind::YamlMetadata.into());
 
     // Opening delimiter - strip newline before emitting
-    if let Some(text) = line.strip_suffix('\n') {
-        builder.token(SyntaxKind::YamlMetadataDelim.into(), text.trim());
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
-    } else {
-        builder.token(SyntaxKind::YamlMetadataDelim.into(), line.trim());
+    let (text, newline_str) = strip_newline(line);
+    builder.token(SyntaxKind::YamlMetadataDelim.into(), text.trim());
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
     let mut current_pos = pos + 1;
@@ -76,11 +77,10 @@ pub(crate) fn try_parse_yaml_block(
         // Check for closing delimiter
         if content_line.trim() == "---" || content_line.trim() == "..." {
             found_closing = true;
-            if let Some(text) = content_line.strip_suffix('\n') {
-                builder.token(SyntaxKind::YamlMetadataDelim.into(), text.trim());
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
-            } else {
-                builder.token(SyntaxKind::YamlMetadataDelim.into(), content_line.trim());
+            let (text, newline_str) = strip_newline(content_line);
+            builder.token(SyntaxKind::YamlMetadataDelim.into(), text.trim());
+            if !newline_str.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
             }
             current_pos += 1;
             break;

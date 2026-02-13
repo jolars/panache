@@ -4,7 +4,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::blockquotes::count_blockquote_markers;
-use super::utils::strip_leading_spaces;
+use super::utils::{strip_leading_spaces, strip_newline};
 
 /// Math fence type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -167,19 +167,14 @@ pub(crate) fn parse_display_math_block(
         builder.start_node(SyntaxKind::MathContent.into());
         for content_line in content_lines.iter() {
             // Split off trailing newline if present (from split_inclusive)
-            let (text_without_newline, has_newline) =
-                if let Some(stripped) = content_line.strip_suffix('\n') {
-                    (stripped, true)
-                } else {
-                    (*content_line, false)
-                };
+            let (text_without_newline, newline_str) = strip_newline(content_line);
 
             if !text_without_newline.is_empty() {
                 builder.token(SyntaxKind::TEXT.into(), text_without_newline);
             }
 
-            if has_newline {
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            if !newline_str.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
             }
         }
         builder.finish_node(); // MathContent
