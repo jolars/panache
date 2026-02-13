@@ -1,0 +1,15 @@
+ROOT@0..30
+  DOCUMENT@0..30
+    Heading@0..10
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..9
+        TEXT@2..9 "Heading"
+      NEWLINE@9..10 "\n"
+    BlankLine@10..11
+      BlankLine@10..11 "\n"
+    PARAGRAPH@11..30
+      TEXT@11..29 "Paragraph with LF."
+      NEWLINE@29..30 "\n"
+
