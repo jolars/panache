@@ -187,5 +187,5 @@ golden_test_cases!(
     simple_table,
     standardize_bullets,
     table_with_caption,
-    yaml_metadata
+    yaml_metadata,
 );

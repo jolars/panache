@@ -1,0 +1,19 @@
+ROOT@0..44
+  DOCUMENT@0..44
+    BlankLine@0..1
+      BlankLine@0..1 "\n"
+    PipeTable@1..44
+      TableCaption@1..14
+        TableCaptionPrefix@1..3 ": "
+        TEXT@3..13 "My caption"
+        NEWLINE@13..14 "\n"
+      TableHeader@14..24
+        TEXT@14..23 "| A | B |"
+        NEWLINE@23..24 "\n"
+      TableSeparator@24..34
+        TEXT@24..33 "|---|---|"
+        NEWLINE@33..34 "\n"
+      TableRow@34..44
+        TEXT@34..43 "| C | D |"
+        NEWLINE@43..44 "\n"
+

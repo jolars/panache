@@ -1195,12 +1195,6 @@ impl<'a> BlockParser<'a> {
 
         // Definition list marker?
         if let Some((marker_char, indent, spaces_after)) = try_parse_definition_marker(content) {
-            // Check if this is actually a table caption, not a definition marker
-            if is_caption_followed_by_table(&self.lines, self.pos) {
-                // Don't parse as definition - let table parser handle it
-                return false;
-            }
-
             // Close paragraph before starting definition
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.containers

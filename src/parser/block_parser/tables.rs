@@ -146,6 +146,20 @@ fn is_table_caption_start(line: &str) -> bool {
     try_parse_caption_prefix(line).is_some()
 }
 
+/// Check if a line could be the start of a grid table.
+/// Grid tables start with a separator line like +---+---+ or +===+===+
+fn is_grid_table_start(line: &str) -> bool {
+    try_parse_grid_separator(line).is_some()
+}
+
+/// Check if a line could be the start of a multiline table.
+/// Multiline tables start with either:
+/// - A full-width dash separator (----)
+/// - A column separator with dashes and spaces (---- ---- ----)
+fn is_multiline_table_start(line: &str) -> bool {
+    try_parse_multiline_separator(line).is_some() || is_column_separator(line)
+}
+
 /// Check if there's a table following a potential caption at this position.
 /// This is used to avoid parsing a caption as a paragraph when it belongs to a table.
 pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -> bool {
@@ -176,16 +190,31 @@ pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -
 
     // Check for table at next position
     if pos < lines.len() {
-        // Could be a separator line (headerless table)
-        if try_parse_table_separator(lines[pos]).is_some() {
+        let line = lines[pos];
+
+        // Check for grid table start (+---+---+ or +===+===+)
+        if is_grid_table_start(line) {
             return true;
         }
-        // Or could be a header line followed by separator
-        if pos + 1 < lines.len()
-            && !lines[pos].trim().is_empty()
-            && try_parse_table_separator(lines[pos + 1]).is_some()
-        {
+
+        // Check for multiline table start (---- or ---- ---- ----)
+        if is_multiline_table_start(line) {
             return true;
+        }
+
+        // Could be a separator line (simple/pipe table, headerless)
+        if try_parse_table_separator(line).is_some() {
+            return true;
+        }
+
+        // Or could be a header line followed by separator (simple/pipe table with header)
+        if pos + 1 < lines.len() && !line.trim().is_empty() {
+            let next_line = lines[pos + 1];
+            if try_parse_table_separator(next_line).is_some()
+                || try_parse_pipe_separator(next_line).is_some()
+            {
+                return true;
+            }
         }
     }
 
@@ -621,14 +650,32 @@ pub(crate) fn try_parse_pipe_table(
         return None;
     }
 
+    // Check if this line is a caption followed by a table
+    // If so, the actual table starts after the caption and blank line
+    let (actual_start, has_caption_before) = if is_caption_followed_by_table(lines, start_pos) {
+        // Skip caption line
+        let mut pos = start_pos + 1;
+        // Skip blank line if present
+        while pos < lines.len() && lines[pos].trim().is_empty() {
+            pos += 1;
+        }
+        (pos, true)
+    } else {
+        (start_pos, false)
+    };
+
+    if actual_start + 1 >= lines.len() {
+        return None;
+    }
+
     // First line should have pipes (potential header)
-    let header_line = lines[start_pos];
+    let header_line = lines[actual_start];
     if !header_line.contains('|') {
         return None;
     }
 
     // Second line should be separator
-    let separator_line = lines[start_pos + 1];
+    let separator_line = lines[actual_start + 1];
     let alignments = try_parse_pipe_separator(separator_line)?;
 
     // Parse header cells
@@ -643,7 +690,7 @@ pub(crate) fn try_parse_pipe_table(
     }
 
     // Find table end (first blank line or end of input)
-    let mut end_pos = start_pos + 2;
+    let mut end_pos = actual_start + 2;
     while end_pos < lines.len() {
         let line = lines[end_pos];
         if line.trim().is_empty() {
@@ -657,12 +704,16 @@ pub(crate) fn try_parse_pipe_table(
     }
 
     // Must have at least one data row
-    if end_pos <= start_pos + 2 {
+    if end_pos <= actual_start + 2 {
         return None;
     }
 
-    // Check for caption before table
-    let caption_before = find_caption_before_table(lines, start_pos);
+    // Check for caption before table (only if we didn't already detect it)
+    let caption_before = if has_caption_before {
+        Some(start_pos)
+    } else {
+        find_caption_before_table(lines, actual_start)
+    };
 
     // Check for caption after table
     let caption_after = find_caption_after_table(lines, end_pos);
@@ -673,6 +724,16 @@ pub(crate) fn try_parse_pipe_table(
     // Emit caption before if present
     if let Some(caption_pos) = caption_before {
         emit_table_caption(builder, lines, caption_pos, caption_pos + 1);
+        // Emit blank line between caption and table if present
+        if caption_pos + 1 < actual_start {
+            for line in lines.iter().take(actual_start).skip(caption_pos + 1) {
+                if line.trim().is_empty() {
+                    builder.start_node(SyntaxKind::BlankLine.into());
+                    builder.token(SyntaxKind::BlankLine.into(), line);
+                    builder.finish_node();
+                }
+            }
+        }
     }
 
     // Emit header row
@@ -686,7 +747,7 @@ pub(crate) fn try_parse_pipe_table(
     builder.finish_node();
 
     // Emit data rows
-    for line in lines.iter().take(end_pos).skip(start_pos + 2) {
+    for line in lines.iter().take(end_pos).skip(actual_start + 2) {
         builder.start_node(SyntaxKind::TableRow.into());
         emit_line_tokens(builder, line);
         builder.finish_node();
@@ -706,7 +767,7 @@ pub(crate) fn try_parse_pipe_table(
     builder.finish_node(); // PipeTable
 
     // Calculate lines consumed
-    let table_start = caption_before.unwrap_or(start_pos);
+    let table_start = caption_before.unwrap_or(actual_start);
     let table_end = if let Some((_, cap_end)) = caption_after {
         cap_end
     } else {
@@ -1066,12 +1127,30 @@ pub(crate) fn try_parse_grid_table(
         return None;
     }
 
+    // Check if this line is a caption followed by a table
+    // If so, the actual table starts after the caption and blank line
+    let (actual_start, has_caption_before) = if is_caption_followed_by_table(lines, start_pos) {
+        // Skip caption line
+        let mut pos = start_pos + 1;
+        // Skip blank line if present
+        while pos < lines.len() && lines[pos].trim().is_empty() {
+            pos += 1;
+        }
+        (pos, true)
+    } else {
+        (start_pos, false)
+    };
+
+    if actual_start >= lines.len() {
+        return None;
+    }
+
     // First line must be a grid separator
-    let first_line = lines[start_pos];
+    let first_line = lines[actual_start];
     let _columns = try_parse_grid_separator(first_line)?;
 
     // Track table structure
-    let mut end_pos = start_pos + 1;
+    let mut end_pos = actual_start + 1;
     let mut found_header_sep = false;
     let mut in_footer = false;
 
@@ -1111,15 +1190,19 @@ pub(crate) fn try_parse_grid_table(
 
     // Must have consumed at least 3 lines (top separator, content, bottom separator)
     // Or just top + content rows that end with a separator
-    if end_pos <= start_pos + 1 {
+    if end_pos <= actual_start + 1 {
         return None;
     }
 
     // Last consumed line should be a separator for a well-formed table
     // But we'll be lenient and accept tables ending with content rows
 
-    // Check for caption before table
-    let caption_before = find_caption_before_table(lines, start_pos);
+    // Check for caption before table (only if we didn't already detect it)
+    let caption_before = if has_caption_before {
+        Some(start_pos)
+    } else {
+        find_caption_before_table(lines, actual_start)
+    };
 
     // Check for caption after table
     let caption_after = find_caption_after_table(lines, end_pos);
@@ -1130,6 +1213,16 @@ pub(crate) fn try_parse_grid_table(
     // Emit caption before if present
     if let Some(caption_pos) = caption_before {
         emit_table_caption(builder, lines, caption_pos, caption_pos + 1);
+        // Emit blank line between caption and table if present
+        if caption_pos + 1 < actual_start {
+            for line in lines.iter().take(actual_start).skip(caption_pos + 1) {
+                if line.trim().is_empty() {
+                    builder.start_node(SyntaxKind::BlankLine.into());
+                    builder.token(SyntaxKind::BlankLine.into(), line);
+                    builder.finish_node();
+                }
+            }
+        }
     }
 
     // Track whether we've passed the header separator
@@ -1137,7 +1230,7 @@ pub(crate) fn try_parse_grid_table(
     let mut in_footer_section = false;
 
     // Emit table rows
-    for line in lines.iter().take(end_pos).skip(start_pos) {
+    for line in lines.iter().take(end_pos).skip(actual_start) {
         if let Some(sep_cols) = try_parse_grid_separator(line) {
             let is_header_sep = sep_cols.iter().any(|c| c.is_header_separator);
 
@@ -1192,7 +1285,7 @@ pub(crate) fn try_parse_grid_table(
     builder.finish_node(); // GridTable
 
     // Calculate lines consumed
-    let table_start = caption_before.unwrap_or(start_pos);
+    let table_start = caption_before.unwrap_or(actual_start);
     let table_end = if let Some((_, cap_end)) = caption_after {
         cap_end
     } else {

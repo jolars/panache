@@ -59,9 +59,7 @@ fn test_pipe_table_with_caption_after() {
 #[test]
 fn test_pipe_table_with_caption_before() {
     let input = ": Caption text\n\n| A | B |\n|---|---|\n| C | D |";
-    // Note: Caption before table is parsed separately as definition list, then table has caption
-    let expected =
-        ":   Caption text\n\nTable: Caption text\n\n| A   | B   |\n| --- | --- |\n| C   | D   |\n";
+    let expected = "Table: Caption text\n\n| A   | B   |\n| --- | --- |\n| C   | D   |\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
