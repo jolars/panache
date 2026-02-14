@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.3.0](https://github.com/jolars/panache/compare/v2.2.0...v2.3.0) (2026-02-14)
+
+### Features
+
+* **cli:** add support for external linters ([c1937de](https://github.com/jolars/panache/commit/c1937deeb58c3f816709dd01c9976f5e0c7d3bac)), closes [#23](https://github.com/jolars/panache/issues/23)
+* **formatter:** add support for formatting grid tables ([ef47bac](https://github.com/jolars/panache/commit/ef47bac2c45e5e0d1e52341e20f440ca39ba5002))
+* **lsp:** add go to definition for links, images, footnotes ([d749424](https://github.com/jolars/panache/commit/d74942480682e0cb82d86b30eeb9d7f4c931dea9))
+* **lsp:** add support for external linters (just jarl for r now) ([5162096](https://github.com/jolars/panache/commit/516209697f9fe49e11bf6ec0e621f4a67f3dd466))
+* **lsp:** implement `textDocment/foldingRange` ([7ce6ce2](https://github.com/jolars/panache/commit/7ce6ce27a4abe2df6c6e087a1bab0222a1ea3f38))
+* **parser:** parse code block language as token ([c29016e](https://github.com/jolars/panache/commit/c29016e8ff56271d4b0f9e79abf582f6b29f8836))
+* **parser:** preseve LF and CRLF line endings ([a470713](https://github.com/jolars/panache/commit/a47071378bc46ca49a3cf1c15f3aee5512749664))
+
+### Bug Fixes
+
+* **formatter:** handle unicode in table formatting ([44f4bcf](https://github.com/jolars/panache/commit/44f4bcff60c85d6b4f672bca0a6aedf8d22236fd))
+* **formatter:** honor "line-ending" configuration option ([248e2f2](https://github.com/jolars/panache/commit/248e2f21fc3b89f3d02879a40a9ce860d144c235))
+* **lsp:** correctly detect flavor in document symbols ([60af5b4](https://github.com/jolars/panache/commit/60af5b4b7b943857a25ed35afc63bf351316cf2e))
+* **parser:** consistently handly CRLF line endings ([6b43c9c](https://github.com/jolars/panache/commit/6b43c9c54e70539ff3b3d51d4a26495e0a5219b9))
+* **parser:** correctly parse captions before tables ([2cb9e2d](https://github.com/jolars/panache/commit/2cb9e2d6a8daf9ee08c70eb57702cfef7fc84622))
+* **wasm:** fix wasm build by fixing command invocation ([a9a29a7](https://github.com/jolars/panache/commit/a9a29a7039b51efd41a5964496e609d1ed5b244a))
+
 ## [2.2.0](https://github.com/jolars/panache/compare/v2.1.0...v2.2.0) (2026-02-13)
 
 ### Features
