@@ -8,6 +8,7 @@ pub mod formatter;
 pub mod linter;
 #[cfg(feature = "lsp")]
 pub mod lsp;
+pub mod metadata;
 pub mod parser;
 pub mod range_utils;
 pub mod syntax;
