@@ -1,8 +1,5 @@
 [formatters.r]
-enabled = true
-cmd = "air"
-args = ["format"]
-stdin = false
+preset = "air"
 
 [formatters.yaml]
 preset = "yamlfmt"
