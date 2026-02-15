@@ -32,9 +32,10 @@ pub async fn format_tree_async(
         config.wrap
     );
 
-    // Step 1: Spawn all external formatters immediately (run in background)
+    let input = tree.text().to_string();
+
+    // Step 1: Spawn external formatters immediately (run in background)
     let formatted_code_future = if !config.formatters.is_empty() {
-        let input = tree.text().to_string();
         let code_blocks = code_blocks::collect_code_blocks(tree, &input);
         if !code_blocks.is_empty() {
             log::debug!(
@@ -44,6 +45,28 @@ pub async fn format_tree_async(
             let config_clone = config.clone();
             Some(tokio::spawn(async move {
                 code_blocks::spawn_and_await_formatters(code_blocks, &config_clone).await
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Step 1b: Spawn YAML frontmatter formatter if configured (uses same config as yaml code blocks)
+    let formatted_yaml_future = if let Some(yaml_config) = config.formatters.get("yaml")
+        && yaml_config.enabled
+        && !yaml_config.cmd.is_empty()
+    {
+        if let Some(yaml_content) = metadata::collect_yaml_metadata(tree) {
+            log::debug!("Found YAML metadata, spawning formatter...");
+            let yaml_config = yaml_config.clone();
+            Some(tokio::spawn(async move {
+                use crate::external_formatters::format_code_async;
+                use std::time::Duration;
+                let timeout = Duration::from_secs(30);
+                log::info!("Formatting YAML metadata with {}", yaml_config.cmd);
+                format_code_async(&yaml_content, &yaml_config, timeout).await
             }))
         } else {
             None
@@ -68,6 +91,21 @@ pub async fn format_tree_async(
         }
     }
 
+    // Step 4: Await YAML formatter result and apply if available
+    if let Some(handle) = formatted_yaml_future
+        && let Ok(Ok(formatted_yaml)) = handle.await
+    {
+        // Collect original YAML to find and replace
+        if let Some(original_yaml) = metadata::collect_yaml_metadata(tree) {
+            log::debug!(
+                "Applying formatted YAML: {} bytes -> {} bytes",
+                original_yaml.len(),
+                formatted_yaml.len()
+            );
+            output = output.replace(&original_yaml, &formatted_yaml);
+        }
+    }
+
     log::info!("Formatting complete: {} bytes output", output.len());
     output
 }
@@ -79,9 +117,10 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
         config.wrap
     );
 
+    let input = tree.text().to_string();
+
     // Step 1: Run external formatters synchronously if configured
     let formatted_code = if !config.formatters.is_empty() {
-        let input = tree.text().to_string();
         let code_blocks = code_blocks::collect_code_blocks(tree, &input);
         if !code_blocks.is_empty() {
             log::debug!(
@@ -96,6 +135,31 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
         HashMap::new()
     };
 
+    // Step 1b: Run YAML frontmatter formatter synchronously if configured (uses same config as yaml code blocks)
+    let formatted_yaml = if let Some(yaml_config) = config.formatters.get("yaml")
+        && yaml_config.enabled
+        && !yaml_config.cmd.is_empty()
+    {
+        if let Some(yaml_content) = metadata::collect_yaml_metadata(tree) {
+            log::debug!("Found YAML metadata, spawning formatter...");
+            use crate::external_formatters_sync::format_code_sync;
+            use std::time::Duration;
+            let timeout = Duration::from_secs(30);
+            log::info!("Formatting YAML metadata with {}", yaml_config.cmd);
+            match format_code_sync(&yaml_content, yaml_config, timeout) {
+                Ok(formatted) => Some((yaml_content, formatted)),
+                Err(e) => {
+                    log::warn!("Failed to format YAML metadata: {}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Step 2: Format markdown with formatted code blocks
     let mut output = Formatter::new(config.clone(), formatted_code.clone(), range).format(tree);
 
@@ -105,6 +169,16 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
         for (original, formatted) in &formatted_code {
             output = output.replace(original, formatted);
         }
+    }
+
+    // Step 4: Apply formatted YAML if available
+    if let Some((original_yaml, formatted_yaml)) = formatted_yaml {
+        log::debug!(
+            "Applying formatted YAML: {} bytes -> {} bytes",
+            original_yaml.len(),
+            formatted_yaml.len()
+        );
+        output = output.replace(&original_yaml, &formatted_yaml);
     }
 
     log::info!("Formatting complete: {} bytes output", output.len());

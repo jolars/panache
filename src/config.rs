@@ -590,6 +590,19 @@ impl Default for FormatterConfig {
 /// Returns None if the preset doesn't exist.
 pub fn get_formatter_preset(name: &str) -> Option<FormatterConfig> {
     match name {
+        // YAML formatters
+        "yamlfmt" => Some(FormatterConfig {
+            cmd: "yamlfmt".to_string(),
+            args: vec!["-".to_string()],
+            enabled: true,
+            stdin: true,
+        }),
+        "prettier" => Some(FormatterConfig {
+            cmd: "prettier".to_string(),
+            args: vec!["--parser".to_string(), "yaml".to_string()],
+            enabled: true,
+            stdin: true,
+        }),
         // R formatters
         "air" => Some(FormatterConfig {
             cmd: "air".to_string(),

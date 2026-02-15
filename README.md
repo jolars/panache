@@ -198,6 +198,10 @@ args = ["-", "--line-length=88"]
 [formatters.rust]
 cmd = "rustfmt"
 
+# YAML formatter (formats both code blocks AND frontmatter)
+[formatters.yaml]
+preset = "yamlfmt"  # Available: "yamlfmt", "prettier"
+
 # External code linters (opt-in)
 [linters]
 r = "jarl"  # Enable R linting
