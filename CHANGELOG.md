@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.4.0](https://github.com/jolars/panache/compare/v2.3.0...v2.4.0) (2026-02-15)
+
+### Features
+
+* **formatter:** format YAML metadata with ext formatters ([eb89f06](https://github.com/jolars/panache/commit/eb89f063f9135d0a9e18122ff63ca9742b421af4))
+* **lsp:** emit warnings for missing bibliographies ([14fa9c9](https://github.com/jolars/panache/commit/14fa9c9eff1d1dd908b8ff3e34a6a080ddb68311))
+
+### Bug Fixes
+
+* **formatter:** wrap first lines in definition lists ([3ad7576](https://github.com/jolars/panache/commit/3ad75764c290c26ec445362f29f7ec5db3602aae))
+
 ## [2.3.0](https://github.com/jolars/panache/compare/v2.2.0...v2.3.0) (2026-02-14)
 
 ### Features
