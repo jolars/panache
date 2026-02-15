@@ -10,8 +10,9 @@ ROOT@0..114
         Definition@6..22
           DefinitionMarker@6..7 ":"
           WHITESPACE@7..9 "  "
-          TEXT@9..21 "Definition 2"
-          NEWLINE@21..22 "\n"
+          Plain@9..22
+            TEXT@9..21 "Definition 2"
+            NEWLINE@21..22 "\n"
     BlankLine@22..23
       BlankLine@22..23 "\n"
     PARAGRAPH@23..40

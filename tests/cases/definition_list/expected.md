@@ -42,16 +42,9 @@ Term 1
 :   Definition 1
 
 Term 2 with *inline markup*
-:   Definition 2
-
-    ```
-    { some code, part of Definition 2 }
-    ```
-
-    Third paragraph of definition 2, quite long so that it wraps multiple lines
-    and should be wrapped and indented properly.
+:   Definition 2 { some code, part of Definition 2 } Third paragraph of definition
+    2, quite long so that it wraps multiple lines and should be wrapped and indented
+    properly.
 
 Term 3
-:   Definition with lazy continuation.
-
-    Second paragraph of the definition.
+:   Definition with lazy continuation. Second paragraph of the definition.

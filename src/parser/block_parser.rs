@@ -299,6 +299,21 @@ impl<'a> BlockParser<'a> {
                             "Closing container at blank line (depth {})",
                             self.containers.depth()
                         );
+
+                        // If closing a Definition with open Plain, close Plain first
+                        if let Some(Container::Definition {
+                            plain_open: true, ..
+                        }) = self.containers.last()
+                        {
+                            self.builder.finish_node(); // Close Plain node
+                            // Update container to mark Plain as closed before removing it
+                            if let Some(Container::Definition { plain_open, .. }) =
+                                self.containers.stack.last_mut()
+                            {
+                                *plain_open = false;
+                            }
+                        }
+
                         self.containers
                             .close_to(self.containers.depth() - 1, &mut self.builder);
                     }
@@ -549,7 +564,7 @@ impl<'a> BlockParser<'a> {
                         keep_level = i + 1;
                     }
                 }
-                Container::Definition { content_col } => {
+                Container::Definition { content_col, .. } => {
                     // Definition continuation: line must be indented at least 4 spaces
                     let min_indent = (*content_col).max(4);
                     if raw_indent_cols >= min_indent {
@@ -612,7 +627,7 @@ impl<'a> BlockParser<'a> {
             .iter()
             .filter_map(|c| match c {
                 Container::FootnoteDefinition { content_col, .. } => Some(*content_col),
-                Container::Definition { content_col } => Some(*content_col),
+                Container::Definition { content_col, .. } => Some(*content_col),
                 _ => None,
             })
             .sum()
@@ -624,6 +639,40 @@ impl<'a> BlockParser<'a> {
     /// `line_to_append` - Optional line to use when appending to paragraphs.
     ///                    If None, uses self.lines[self.pos]
     fn parse_inner_content(&mut self, content: &str, line_to_append: Option<&str>) -> bool {
+        // Check if we have an open Plain node in a Definition container
+        // If so, append this line to the Plain node instead of creating a new block
+        // BUT: Don't treat lines with definition markers as continuations
+        if let Some(Container::Definition {
+            plain_open: true, ..
+        }) = self.containers.last()
+        {
+            // Check if this line starts with a definition marker
+            // If so, don't treat it as a continuation - let it create a new definition
+            if try_parse_definition_marker(content).is_none() {
+                // This is a continuation line for an open Plain block
+                // For lossless parsing, we need to preserve the entire line including indent
+
+                // Get the original line to preserve exact whitespace
+                let full_line = self.lines[self.pos];
+
+                // Split off trailing newline
+                let (text_without_newline, newline_str) = utils::strip_newline(full_line);
+
+                // Emit the entire line (including indent) as TEXT + NEWLINE to open Plain node
+                if !text_without_newline.is_empty() {
+                    self.builder
+                        .token(SyntaxKind::TEXT.into(), text_without_newline);
+                }
+
+                if !newline_str.is_empty() {
+                    self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                }
+
+                self.pos += 1;
+                return true;
+            }
+        }
+
         // Calculate how much indentation should be stripped for content containers
         // (definitions, footnotes), but don't strip it yet - we need to handle it
         // carefully to preserve losslessness
@@ -1237,19 +1286,36 @@ impl<'a> BlockParser<'a> {
 
             // Emit remaining content on this line if any
             let after_marker_and_spaces = &content[indent + 1 + spaces_after..];
-            if !after_marker_and_spaces.trim().is_empty() {
+            let has_content = !after_marker_and_spaces.trim().is_empty();
+
+            if has_content {
+                // Wrap inline content in a Plain node (keep open for continuation lines)
+                self.builder.start_node(SyntaxKind::Plain.into());
                 self.builder
                     .token(SyntaxKind::TEXT.into(), after_marker_and_spaces.trim_end());
+
+                // Extract and emit the actual newline from the original line
+                let current_line = self.lines[self.pos];
+                let (_, newline_str) = strip_newline(current_line);
+                if !newline_str.is_empty() {
+                    self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                }
+
+                // DON'T close Plain node yet - continuation lines will be added to it
+                // self.builder.finish_node(); // Plain
+            } else {
+                // No content on this line, just emit newline directly
+                let current_line = self.lines[self.pos];
+                let (_, newline_str) = strip_newline(current_line);
+                if !newline_str.is_empty() {
+                    self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                }
             }
 
-            // Extract and emit the actual newline from the original line
-            let current_line = self.lines[self.pos];
-            let (_, newline_str) = strip_newline(current_line);
-            if !newline_str.is_empty() {
-                self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-            }
-
-            self.containers.push(Container::Definition { content_col });
+            self.containers.push(Container::Definition {
+                content_col,
+                plain_open: has_content,
+            });
             self.pos += 1;
             return true;
         }

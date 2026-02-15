@@ -1,5 +1,5 @@
-ROOT@0..116
-  DOCUMENT@0..116
+ROOT@0..115
+  DOCUMENT@0..115
     DefinitionList@0..115
       DefinitionItem@0..115
         Term@0..14
@@ -8,16 +8,15 @@ ROOT@0..116
         Definition@14..115
           DefinitionMarker@14..15 ":"
           WHITESPACE@15..18 "   "
-          Strong@18..52
-            StrongMarker@18..20 "**"
-            TEXT@20..50 "Thiele Postdoctoral R ..."
-            StrongMarker@50..52 "**"
-          TEXT@52..54 ", "
-          Emphasis@54..114
-            EmphasisMarker@54..55 "*"
-            TEXT@55..113 "Department of Mathema ..."
-            EmphasisMarker@113..114 "*"
-          NEWLINE@114..115 "\n"
-    BlankLine@115..116
-      BlankLine@115..116 "\n"
+          Plain@18..115
+            Strong@18..52
+              StrongMarker@18..20 "**"
+              TEXT@20..50 "Thiele Postdoctoral R ..."
+              StrongMarker@50..52 "**"
+            TEXT@52..54 ", "
+            Emphasis@54..114
+              EmphasisMarker@54..55 "*"
+              TEXT@55..113 "Department of Mathema ..."
+              EmphasisMarker@113..114 "*"
+            NEWLINE@114..115 "\n"
 

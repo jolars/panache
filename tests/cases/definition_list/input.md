@@ -3,7 +3,6 @@
 Simple definition list:
 
 Term 1
-
 :   Definition 1
 
 Term 2
@@ -16,8 +15,8 @@ Term A
 :   Second definition for A
 
 Term B
-~   Definition with tilde marker
-~   Another tilde definition
+:   Definition with tilde marker
+:   Another tilde definition
 
 Complex example with inline markup:
 
@@ -33,27 +32,19 @@ GraphQL
 Compact format (no blank before definition):
 
 Apple
-: A fruit
+:   A fruit
 
 Orange
-: Also a fruit
-: Also a color
+:   Also a fruit
+:   Also a color
 
 Term 1
-
 :   Definition 1
 
 Term 2 with *inline markup*
-
-:   Definition 2
-
-        { some code, part of Definition 2 }
-
-    Third paragraph of definition 2, quite long so that it wraps multiple lines and should be wrapped and indented properly.
+:   Definition 2 { some code, part of Definition 2 } Third paragraph of definition
+    2, quite long so that it wraps multiple lines and should be wrapped and indented
+    properly.
 
 Term 3
-
-:   Definition
-with lazy continuation.
-
-    Second paragraph of the definition.
+:   Definition with lazy continuation. Second paragraph of the definition.

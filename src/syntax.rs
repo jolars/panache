@@ -99,6 +99,7 @@ pub enum SyntaxKind {
     PandocTitleBlock,
     FencedDiv,
     PARAGRAPH,
+    Plain, // Inline content without paragraph break (tight lists, definition lists, table cells)
     BlockQuote,
     List,
     ListItem,

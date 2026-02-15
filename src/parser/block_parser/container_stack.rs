@@ -26,6 +26,7 @@ pub(crate) enum Container {
     },
     Definition {
         content_col: usize,
+        plain_open: bool,
     },
     Paragraph {
         content_col: usize,
@@ -65,6 +66,18 @@ impl ContainerStack {
     /// Close containers from the top down until `keep` remain.
     pub(crate) fn close_to(&mut self, keep: usize, builder: &mut GreenNodeBuilder<'static>) {
         while self.stack.len() > keep {
+            // If closing a Definition with open Plain, close Plain node first
+            if let Some(Container::Definition {
+                plain_open: true, ..
+            }) = self.stack.last()
+            {
+                builder.finish_node(); // Close Plain node
+                // Mark Plain as closed
+                if let Some(Container::Definition { plain_open, .. }) = self.stack.last_mut() {
+                    *plain_open = false;
+                }
+            }
+
             self.stack.pop();
             builder.finish_node();
         }

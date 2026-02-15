@@ -705,6 +705,40 @@ impl Formatter {
                 }
             }
 
+            SyntaxKind::Plain => {
+                // Plain is like PARAGRAPH but for tight contexts (definition lists, table cells)
+                // Apply wrapping with continuation indentation
+                let text = node.text().to_string();
+                log::debug!("Formatting Plain block, text length: {}", text.len());
+
+                let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+                match wrap_mode {
+                    WrapMode::Preserve => {
+                        self.output.push_str(&text);
+                        if !self.output.ends_with('\n') {
+                            self.output.push('\n');
+                        }
+                    }
+                    WrapMode::Reflow => {
+                        log::trace!("Reflowing Plain block to {} width", line_width);
+                        let lines = self.wrapped_lines_for_paragraph(node, line_width);
+
+                        for (i, line) in lines.iter().enumerate() {
+                            if i > 0 {
+                                self.output.push('\n');
+                                // Add continuation indent for wrapped lines
+                                self.output.push_str(&" ".repeat(indent));
+                            }
+                            self.output.push_str(line);
+                        }
+
+                        if !self.output.ends_with('\n') {
+                            self.output.push('\n');
+                        }
+                    }
+                }
+            }
+
             SyntaxKind::List => {
                 self.format_list(node, indent);
             }
@@ -866,6 +900,11 @@ impl Formatter {
                                         self.output.push('\n');
                                     }
                                     self.format_indented_code_block(n, def_indent);
+                                }
+                                SyntaxKind::Plain => {
+                                    // Plain block in definition - format inline with potential wrapping
+                                    // Already handled by Plain formatter above
+                                    self.format_node_sync(n, def_indent);
                                 }
                                 SyntaxKind::PARAGRAPH => {
                                     if first_para_idx == Some(i) {

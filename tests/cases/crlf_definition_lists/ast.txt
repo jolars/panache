@@ -19,8 +19,9 @@ ROOT@0..110
         Definition@32..50
           DefinitionMarker@32..33 ":"
           WHITESPACE@33..36 "   "
-          TEXT@36..48 "Definition 1"
-          NEWLINE@48..50 "\r\n"
+          Plain@36..50
+            TEXT@36..48 "Definition 1"
+            NEWLINE@48..50 "\r\n"
     BlankLine@50..52
       BlankLine@50..52 "\r\n"
     DefinitionList@52..78
@@ -31,8 +32,9 @@ ROOT@0..110
         Definition@60..78
           DefinitionMarker@60..61 ":"
           WHITESPACE@61..64 "   "
-          TEXT@64..76 "Definition 2"
-          NEWLINE@76..78 "\r\n"
+          Plain@64..78
+            TEXT@64..76 "Definition 2"
+            NEWLINE@76..78 "\r\n"
     BlankLine@78..80
       BlankLine@78..80 "\r\n"
     PARAGRAPH@80..90
@@ -48,6 +50,7 @@ ROOT@0..110
         Definition@99..110
           DefinitionMarker@99..100 ":"
           WHITESPACE@100..101 " "
-          TEXT@101..108 "A fruit"
-          NEWLINE@108..110 "\r\n"
+          Plain@101..110
+            TEXT@101..108 "A fruit"
+            NEWLINE@108..110 "\r\n"
 
