@@ -14,6 +14,7 @@
     pkgs.pandoc
     pkgs.jarl
     pkgs.air
+    pkgs.yamlfmt
     pkgs.ruff
     (pkgs.rWrapper.override {
       packages = with pkgs.rPackages; [

@@ -4,5 +4,8 @@ cmd = "air"
 args = ["format"]
 stdin = false
 
+[formatters.yaml]
+preset = "yamlfmt"
+
 [linters]
 r = "jarl"
