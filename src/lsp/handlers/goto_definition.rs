@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
+use crate::lsp::DocumentState;
 use crate::parser::parse;
 
 use super::super::{conversions, helpers};
@@ -19,7 +20,7 @@ use super::super::{conversions, helpers};
 /// Handle textDocument/definition request
 pub(crate) async fn goto_definition(
     client: &tower_lsp_server::Client,
-    document_map: Arc<Mutex<HashMap<String, String>>>,
+    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: GotoDefinitionParams,
 ) -> Result<Option<GotoDefinitionResponse>> {

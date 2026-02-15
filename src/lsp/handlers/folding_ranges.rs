@@ -6,13 +6,14 @@ use tower_lsp_server::Client;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
+use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
 use crate::lsp::helpers::get_document_and_config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub async fn folding_range(
     client: &Client,
-    document_map: Arc<Mutex<HashMap<String, String>>>,
+    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: FoldingRangeParams,
 ) -> Result<Option<Vec<FoldingRange>>> {

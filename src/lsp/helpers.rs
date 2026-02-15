@@ -5,6 +5,7 @@ use tokio::sync::Mutex;
 use tower_lsp_server::ls_types::Uri;
 
 use crate::Config;
+use crate::lsp::DocumentState;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::{NodeOrToken, TextRange, TextSize};
 
@@ -12,11 +13,13 @@ use super::config::load_config;
 
 /// Helper to get document content from the document map
 pub(crate) async fn get_document_content(
-    document_map: &Arc<Mutex<HashMap<String, String>>>,
+    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
     uri: &Uri,
 ) -> Option<String> {
     let doc_map = document_map.lock().await;
-    doc_map.get(&uri.to_string()).cloned()
+    doc_map
+        .get(&uri.to_string())
+        .map(|state| state.text.clone())
 }
 
 /// Helper to load config with URI-based flavor detection
@@ -32,7 +35,7 @@ pub(crate) async fn get_config(
 /// Combined helper: get document and config in one call
 pub(crate) async fn get_document_and_config(
     client: &tower_lsp_server::Client,
-    document_map: &Arc<Mutex<HashMap<String, String>>>,
+    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: &Arc<Mutex<Option<PathBuf>>>,
     uri: &Uri,
 ) -> Option<(String, Config)> {

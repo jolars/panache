@@ -7,6 +7,7 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::linter;
+use crate::lsp::DocumentState;
 
 use super::super::conversions::{convert_diagnostic, offset_to_position};
 use super::super::helpers::get_document_and_config;
@@ -14,7 +15,7 @@ use super::super::helpers::get_document_and_config;
 /// Handle textDocument/codeAction request
 pub(crate) async fn code_action(
     client: &Client,
-    document_map: Arc<Mutex<HashMap<String, String>>>,
+    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: CodeActionParams,
 ) -> Result<Option<CodeActionResponse>> {

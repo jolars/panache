@@ -8,11 +8,12 @@ use tower_lsp_server::ls_types::*;
 
 use super::super::conversions::offset_to_position;
 use super::super::helpers::get_document_and_config;
+use crate::lsp::DocumentState;
 
 /// Handle textDocument/formatting request
 pub(crate) async fn format_document(
     client: &Client,
-    document_map: Arc<Mutex<HashMap<String, String>>>,
+    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: DocumentFormattingParams,
 ) -> Result<Option<Vec<TextEdit>>> {
@@ -75,7 +76,7 @@ pub(crate) async fn format_document(
 /// Handle textDocument/rangeFormatting request
 pub(crate) async fn format_range(
     client: &Client,
-    document_map: Arc<Mutex<HashMap<String, String>>>,
+    document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: DocumentRangeFormattingParams,
 ) -> Result<Option<Vec<TextEdit>>> {
