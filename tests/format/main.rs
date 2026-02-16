@@ -21,3 +21,4 @@ mod subscript;
 mod superscript;
 mod tables;
 mod tex;
+mod yaml_frontmatter;

@@ -102,7 +102,12 @@ pub async fn format_tree_async(
                 original_yaml.len(),
                 formatted_yaml.len()
             );
-            output = output.replace(&original_yaml, &formatted_yaml);
+            // Wrap formatted YAML with newline to preserve frontmatter structure
+            // collect_yaml_metadata strips the leading newline after ---, so add it back
+            let wrapped_formatted = format!("\n{}\n", formatted_yaml.trim_end());
+            // Look for the pattern: newline + original_yaml + newline
+            // and replace with: newline + formatted_yaml + newline
+            output = output.replace(&format!("\n{}\n", original_yaml), &wrapped_formatted);
         }
     }
 
@@ -178,7 +183,12 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
             original_yaml.len(),
             formatted_yaml.len()
         );
-        output = output.replace(&original_yaml, &formatted_yaml);
+        // Wrap formatted YAML with newline to preserve frontmatter structure
+        // collect_yaml_metadata strips the leading newline after ---, so add it back
+        let wrapped_formatted = format!("\n{}\n", formatted_yaml.trim_end());
+        // Look for the pattern: newline + original_yaml + newline
+        // and replace with: newline + formatted_yaml + newline
+        output = output.replace(&format!("\n{}\n", original_yaml), &wrapped_formatted);
     }
 
     log::info!("Formatting complete: {} bytes output", output.len());
