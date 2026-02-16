@@ -98,13 +98,11 @@ printf "Math: \\(x^2\\)" | ./target/release/panache parse --config .panache.toml
 panache requires explicit subcommands:
 
 ```bash
-# Format (outputs to stdout by default)
-panache format document.qmd
-panache format < document.qmd
+panache format document.qmd   # writes file in place, support globbing
+panache format < document.qmd # writes to stdout
 
 # Format with options
 panache format --check document.qmd       # Check if formatted
-panache format --write document.qmd       # Format in place
 panache format --config cfg.toml file.qmd # Custom config
 
 # Parse (show AST for debugging)
@@ -649,8 +647,9 @@ The `docs/playground/` contains a WASM-based web interface:
 - Assume task runner is available - use direct cargo commands
 - Break the hierarchical config system (explicit > local > XDG > default)
 - Change core formatting without extensive golden test verification
-- Format code in the parser - the parser should preserve all input bytes, including whitespace
-  and structural markers. The formatter is responsible for applying formatting rules, not the parser.
+- Format code in the parser - the parser should preserve all input bytes,
+  including whitespace and structural markers. The formatter is responsible for
+  applying formatting rules, not the parser.
 
 ### Architecture Dependencies
 
