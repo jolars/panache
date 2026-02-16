@@ -1,13 +1,15 @@
 # panache <img src='https://raw.githubusercontent.com/jolars/panache/refs/heads/main/images/logo.png' align="right" width="139" />
 
-[![Build and Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
+[![Build and
+Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
 [![Crates.io](https://img.shields.io/crates/v/panache.svg)](https://crates.io/crates/panache)
 
 A formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and Markdown files.
 
 ## Work in Progress
 
-This project is in early development. Expect bugs, missing features, and breaking changes.
+This project is in early development. Expect bugs, missing features, and
+breaking changes.
 
 ## Installation
 
@@ -19,7 +21,8 @@ cargo install panache
 
 ### Pre-built Binaries
 
-Download pre-built binaries from the [releases page](https://github.com/jolars/panache/releases). Available for:
+Download pre-built binaries from the [releases
+page](https://github.com/jolars/panache/releases). Available for:
 
 - Linux (x86_64, ARM64)
 - macOS (Intel, Apple Silicon)
@@ -63,8 +66,8 @@ panache format --check document.qmd
 # Format from stdin
 cat document.qmd | panache format
 
-# Format all .qmd files in directory
-panache format *.qmd
+# Format all .qmd and .md files in directory, recursively
+panache format **/*.{qmd,md}
 ```
 
 ### Linting
@@ -79,7 +82,8 @@ panache lint .
 
 ### Language Server (LSP)
 
-panache includes a built-in Language Server Protocol implementation for editor integration.
+panache includes a built-in Language Server Protocol implementation for editor
+integration.
 
 **Start the server:**
 
@@ -89,7 +93,8 @@ panache lsp
 
 **Editor Configuration:**
 
-The LSP communicates over stdin/stdout and provides document formatting capabilities.
+The LSP communicates over stdin/stdout and provides document formatting
+capabilities.
 
 <details>
 <summary>Neovim (using nvim-lspconfig)</summary>
@@ -166,7 +171,8 @@ args = ["lsp"]
 
 </details>
 
-**Configuration:** The LSP automatically discovers `.panache.toml` from your workspace root.
+**Configuration:** The LSP automatically discovers `.panache.toml` from your
+workspace root.
 
 ## Configuration
 
@@ -211,7 +217,8 @@ See `.panache.toml.example` for a complete configuration reference.
 
 ### External Code Formatters
 
-panache supports external formatters for code blocks—**opt-in and easy to enable**:
+panache supports external formatters for code blocks—**opt-in and easy to
+enable**:
 
 ```toml
 # Enable R formatting with preset
@@ -247,7 +254,8 @@ cmd = "rustfmt"
 
 **Additional details:**
 
-- Formatters respect their own config files (`.prettierrc`, `pyproject.toml`, etc.)
+- Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
+  etc.)
 - Support both stdin/stdout and file-based formatters
 - 30 second timeout per formatter invocation
 
@@ -264,7 +272,8 @@ r = "jarl"  # R linter with JSON output
 **Key features:**
 
 - **Opt-in by design** - Only runs if configured
-- **Stateful code analysis** - Concatenates all code blocks of same language to handle cross-block dependencies
+- **Stateful code analysis** - Concatenates all code blocks of same language to
+  handle cross-block dependencies
 - **LSP integration** - Diagnostics appear inline in your editor
 - **CLI support** - `panache lint` shows external linter issues
 - **Line-accurate diagnostics** - Reports exact line/column locations
@@ -272,7 +281,8 @@ r = "jarl"  # R linter with JSON output
 **How it works:**
 
 1. Collects all code blocks of each configured language
-2. Concatenates blocks with blank-line preservation (keeps original line numbers)
+2. Concatenates blocks with blank-line preservation (keeps original line
+   numbers)
 3. Runs external linter on concatenated code
 4. Maps diagnostics back to original document positions
 
@@ -280,14 +290,15 @@ r = "jarl"  # R linter with JSON output
 
 - **jarl** - R linter with structured JSON output
 
-**Note:** Auto-fixes from external linters are currently disabled due to byte offset mapping complexity. Diagnostics work perfectly.
+**Note:** Auto-fixes from external linters are currently disabled due to byte
+offset mapping complexity. Diagnostics work perfectly.
 
 ## Motivation
 
-I wanted a formatter that understands Quarto and Pandoc syntax. I have tried
-to use Prettier as well as mdformat, but both fail to handle some of
-the particular syntax used in Quarto documents, such as fenced divs and
-some of the table syntax.
+I wanted a formatter that understands Quarto and Pandoc syntax. I have tried to
+use Prettier as well as mdformat, but both fail to handle some of the particular
+syntax used in Quarto documents, such as fenced divs and some of the table
+syntax.
 
 ## Design Goals
 
@@ -295,8 +306,8 @@ some of the table syntax.
 - Linting as part of LSP but also available as a standalone CLI command
 - Support Quarto, Pandoc, and Markdown syntax
 - Fast lossless parsing and formatting (no AST changes if already formatted)
-- Be configurable, but have sane defaults (that most people can
-  agree on)
+- Be configurable, but have sane defaults (that most people can agree on)
 - Format math
-- Hook into external formatters for code blocks (e.g. `air` for R, `ruff` for Python)
+- Hook into external formatters for code blocks (e.g. `air` for R, `ruff` for
+  Python)
 

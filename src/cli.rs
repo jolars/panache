@@ -80,9 +80,9 @@ EXAMPLES:
     panache format file1.md file2.md file3.qmd
 
     # Use glob patterns (expanded by shell)
-    panache format *.md docs/*.qmd
+    panache format **/*.{md,qmd}
 
-    # Format entire directory recursively
+    # Format entire directory recursively, all supported files
     panache format .
     panache format docs/
 
@@ -90,17 +90,7 @@ EXAMPLES:
     echo '# Heading' | panache format
 
     # Check formatting (exit code 1 if not formatted)
-    panache format --check document.qmd
-
-FORMATTING RULES:
-
-  - Default 80 character line width (configurable)
-  - Wraps paragraphs while preserving inline code/math whitespace
-  - Converts setext headings to ATX format
-  - Preserves frontmatter and code blocks
-  - Handles Quarto-specific syntax (fenced divs, math blocks)
-  - Auto-formats tables for consistency
-  - Formatting is idempotent (format twice = format once)")]
+    panache format --check document.qmd")]
     Format {
         /// Input file(s) (stdin if not provided)
         #[arg(help = "Input file path(s) or directories")]
