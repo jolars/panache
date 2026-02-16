@@ -9,9 +9,7 @@ tests/cases/*/*.Rmd eol=lf
 # Preserve CRLF in test cases that specifically test CRLF handling (must have CRLF line endings)
 tests/cases/crlf_*/* -text
 tests/cases/line_ending_crlf/* -text
-
-# Preserve LF in test cases that specifically test LF handling (must have LF line endings)
-tests/cases/line_ending_lf/* eol=lf
+tests/cases/line_ending_lf/* -text
 
 # AST files should always use LF endings (they contain literal string representations)
 tests/cases/*/ast.txt eol=lf
