@@ -209,6 +209,31 @@ impl Formatter {
         }
     }
 
+    /// Find Plain or PARAGRAPH child in a ListItem node.
+    /// These nodes wrap the text content in Pandoc-style AST.
+    /// For nested lists, skip Plain nodes that appear before the ListMarker
+    /// (these contain only indentation whitespace).
+    fn find_content_node(node: &SyntaxNode) -> Option<SyntaxNode> {
+        let mut seen_marker = false;
+        for el in node.children_with_tokens() {
+            match el {
+                rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::ListMarker => {
+                    seen_marker = true;
+                }
+                rowan::NodeOrToken::Node(n)
+                    if matches!(n.kind(), SyntaxKind::Plain | SyntaxKind::PARAGRAPH) =>
+                {
+                    // Only return Plain/PARAGRAPH nodes that come after the marker
+                    if seen_marker {
+                        return Some(n);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
     /// Format a ListItem node
     pub(super) fn format_list_item(&mut self, node: &SyntaxNode, indent: usize) {
         // Compute indent, marker, and checkbox from leading tokens
@@ -294,28 +319,41 @@ impl Formatter {
             marker_padding + marker.len() + spaces_after_marker + total_indent + checkbox_width;
         let available_width = self.config.line_width.saturating_sub(hanging);
 
-        // Build words from the whole node, then drop the leading marker word
+        // Build words from Plain/PARAGRAPH content node if present, otherwise from entire ListItem
         let mut arena: Vec<Box<str>> = Vec::new();
-        let mut words = wrapping::build_words(&self.config, node, &mut arena, |n| {
-            self.format_inline_node(n)
-        });
-        // Remove the original marker from words (not the standardized one)
-        if let Some(first) = words.first()
-            && first.word == original_marker
-        {
-            // Remove the marker; we will print it ourselves with a following space
-            words.remove(0);
-        }
+        let content_node = Self::find_content_node(node);
 
-        // Remove checkbox from words if present
-        if checkbox.is_some()
-            && let Some(first) = words.first()
-        {
-            let trimmed = first.word.trim_start();
-            if trimmed.starts_with('[') && trimmed.len() >= 3 {
-                words.remove(0);
+        let words = if let Some(content) = content_node {
+            // Extract words from Plain/PARAGRAPH child (postprocessor wraps all content in one node)
+            wrapping::build_words(&self.config, &content, &mut arena, |n| {
+                self.format_inline_node(n)
+            })
+        } else {
+            // Backwards compatibility: scan entire ListItem and remove marker/checkbox
+            let mut node_words = wrapping::build_words(&self.config, node, &mut arena, |n| {
+                self.format_inline_node(n)
+            });
+
+            // Remove the original marker from words (not the standardized one)
+            if let Some(first) = node_words.first()
+                && first.word == original_marker
+            {
+                // Remove the marker; we will print it ourselves with a following space
+                node_words.remove(0);
             }
-        }
+
+            // Remove checkbox from words if present
+            if checkbox.is_some()
+                && let Some(first) = node_words.first()
+            {
+                let trimmed = first.word.trim_start();
+                if trimmed.starts_with('[') && trimmed.len() >= 3 {
+                    node_words.remove(0);
+                }
+            }
+
+            node_words
+        };
 
         let algo = WrapAlgorithm::new();
         let line_widths = [available_width];
@@ -357,8 +395,28 @@ impl Formatter {
         }
 
         // Format nested blocks inside this list item aligned to the content column.
+        // Skip Plain/PARAGRAPH nodes that were already processed for word wrapping.
         for child in node.children() {
             match child.kind() {
+                SyntaxKind::Plain | SyntaxKind::PARAGRAPH => {
+                    // These blocks are already handled by word wrapping above if they're
+                    // direct children. Only process Plain/PARAGRAPH if it comes after a BlankLine
+                    // (indicating it's a true continuation paragraph, not the first content).
+                    let has_blank_before = child
+                        .prev_sibling()
+                        .map(|prev| prev.kind() == SyntaxKind::BlankLine)
+                        .unwrap_or(false);
+
+                    if has_blank_before {
+                        let content_indent = total_indent
+                            + marker_padding
+                            + marker.len()
+                            + spaces_after_marker
+                            + checkbox_width;
+                        self.format_list_continuation_paragraph(&child, content_indent);
+                    }
+                    // Otherwise skip - already handled
+                }
                 SyntaxKind::List => {
                     // Nested list indent includes: total_indent + marker_padding + marker + 1 space + checkbox
                     self.format_node_sync(
@@ -374,23 +432,6 @@ impl Formatter {
                         + spaces_after_marker
                         + checkbox_width;
                     self.format_indented_code_block(&child, content_indent);
-                }
-                SyntaxKind::PARAGRAPH => {
-                    // Only format PARAGRAPH if it comes after a BlankLine (true continuation)
-                    // Otherwise it's a lazy continuation already handled by wrapping
-                    let has_blank_before = child
-                        .prev_sibling()
-                        .map(|prev| prev.kind() == SyntaxKind::BlankLine)
-                        .unwrap_or(false);
-
-                    if has_blank_before {
-                        let content_indent = total_indent
-                            + marker_padding
-                            + marker.len()
-                            + spaces_after_marker
-                            + checkbox_width;
-                        self.format_list_continuation_paragraph(&child, content_indent);
-                    }
                 }
                 SyntaxKind::BlankLine => {
                     // Blank lines within list items

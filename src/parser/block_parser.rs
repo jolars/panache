@@ -1390,7 +1390,17 @@ impl<'a> BlockParser<'a> {
             return true;
         }
 
-        // Paragraph
+        // Paragraph or list item continuation
+        // Check if we're inside a ListItem - if so, emit bare tokens instead of wrapping in PARAGRAPH
+        if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+            // Inside list item - emit as bare tokens for postprocessor to wrap later
+            let line = line_to_append.unwrap_or(self.lines[self.pos]);
+            utils::emit_line_tokens(&mut self.builder, line);
+            self.pos += 1;
+            return true;
+        }
+
+        // Not in list item - create paragraph as usual
         self.start_paragraph_if_needed();
         // For lossless parsing: use line_to_append if provided (e.g., for blockquotes
         // where markers have been stripped), otherwise use the original line

@@ -22,15 +22,17 @@ ROOT@0..1418
         ListItem@120..160
           ListMarker@120..122 "1."
           WHITESPACE@122..123 " "
-          TEXT@123..159 "This is a list inside ..."
-          NEWLINE@159..160 "\n"
+          Plain@123..160
+            TEXT@123..159 "This is a list inside ..."
+            NEWLINE@159..160 "\n"
         BlockQuoteMarker@160..161 ">"
         WHITESPACE@161..162 " "
         ListItem@162..178
           ListMarker@162..164 "2."
           WHITESPACE@164..165 " "
-          TEXT@165..177 "Second item."
-          NEWLINE@177..178 "\n"
+          Plain@165..178
+            TEXT@165..177 "Second item."
+            NEWLINE@177..178 "\n"
     BlankLine@178..179
       BlankLine@178..179 "\n"
     PARAGRAPH@179..282
@@ -62,13 +64,15 @@ ROOT@0..1418
         ListItem@341..381
           ListMarker@341..343 "1."
           WHITESPACE@343..344 " "
-          TEXT@344..380 "This is a list inside ..."
-          NEWLINE@380..381 "\n"
+          Plain@344..381
+            TEXT@344..380 "This is a list inside ..."
+            NEWLINE@380..381 "\n"
         ListItem@381..397
           ListMarker@381..383 "2."
           WHITESPACE@383..384 " "
-          TEXT@384..396 "Second item."
-          NEWLINE@396..397 "\n"
+          Plain@384..397
+            TEXT@384..396 "Second item."
+            NEWLINE@396..397 "\n"
     BlankLine@397..398
       BlankLine@397..398 "\n"
     PARAGRAPH@398..523

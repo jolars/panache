@@ -9,18 +9,21 @@ ROOT@0..125
       ListItem@18..32
         ListMarker@18..20 "1."
         WHITESPACE@20..21 " "
-        TEXT@21..31 "First item"
-        NEWLINE@31..32 "\n"
+        Plain@21..32
+          TEXT@21..31 "First item"
+          NEWLINE@31..32 "\n"
       ListItem@32..47
         ListMarker@32..34 "2."
         WHITESPACE@34..35 " "
-        TEXT@35..46 "Second item"
-        NEWLINE@46..47 "\n"
+        Plain@35..47
+          TEXT@35..46 "Second item"
+          NEWLINE@46..47 "\n"
       ListItem@47..61
         ListMarker@47..49 "3."
         WHITESPACE@49..50 " "
-        TEXT@50..60 "Third item"
-        NEWLINE@60..61 "\n"
+        Plain@50..61
+          TEXT@50..60 "Third item"
+          NEWLINE@60..61 "\n"
     BlankLine@61..62
       BlankLine@61..62 "\n"
     PARAGRAPH@62..82
@@ -32,11 +35,13 @@ ROOT@0..125
       ListItem@83..104
         ListMarker@83..85 "#."
         WHITESPACE@85..86 " "
-        TEXT@86..103 "Auto-numbered one"
-        NEWLINE@103..104 "\n"
+        Plain@86..104
+          TEXT@86..103 "Auto-numbered one"
+          NEWLINE@103..104 "\n"
       ListItem@104..125
         ListMarker@104..106 "#."
         WHITESPACE@106..107 " "
-        TEXT@107..124 "Auto-numbered two"
-        NEWLINE@124..125 "\n"
+        Plain@107..125
+          TEXT@107..124 "Auto-numbered two"
+          NEWLINE@124..125 "\n"
 

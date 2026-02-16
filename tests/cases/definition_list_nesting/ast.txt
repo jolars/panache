@@ -22,11 +22,13 @@ ROOT@0..114
       BlankLine@40..41 "\n"
     List@41..114
       ListItem@41..92
-        WHITESPACE@41..44 "   "
+        PARAGRAPH@41..44
+          WHITESPACE@41..44 "   "
         ListMarker@44..45 "-"
         WHITESPACE@45..47 "  "
-        TEXT@47..53 "Bullet"
-        NEWLINE@53..54 "\n"
+        PARAGRAPH@47..54
+          TEXT@47..53 "Bullet"
+          NEWLINE@53..54 "\n"
         BlankLine@54..61
           BlankLine@54..61 "      \n"
         CodeBlock@61..92
@@ -45,9 +47,11 @@ ROOT@0..114
       BlankLine@92..93
         BlankLine@92..93 "\n"
       ListItem@93..114
-        WHITESPACE@93..96 "   "
+        PARAGRAPH@93..96
+          WHITESPACE@93..96 "   "
         ListMarker@96..97 "-"
         WHITESPACE@97..99 "  "
-        TEXT@99..113 "Another bullet"
-        NEWLINE@113..114 "\n"
+        PARAGRAPH@99..114
+          TEXT@99..113 "Another bullet"
+          NEWLINE@113..114 "\n"
 

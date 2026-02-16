@@ -4,8 +4,9 @@ ROOT@0..184
       ListItem@0..45
         ListMarker@0..1 "*"
         WHITESPACE@1..4 "   "
-        TEXT@4..11 "Bullet."
-        NEWLINE@11..12 "\n"
+        PARAGRAPH@4..12
+          TEXT@4..11 "Bullet."
+          NEWLINE@11..12 "\n"
         BlankLine@12..13
           BlankLine@12..13 "\n"
         CodeBlock@13..45
@@ -28,24 +29,28 @@ ROOT@0..184
       ListItem@46..63
         ListMarker@46..47 "*"
         WHITESPACE@47..50 "   "
-        TEXT@50..62 "Next bullet."
-        NEWLINE@62..63 "\n"
+        PARAGRAPH@50..63
+          TEXT@50..62 "Next bullet."
+          NEWLINE@62..63 "\n"
       BlankLine@63..64
         BlankLine@63..64 "\n"
       ListItem@64..184
         ListMarker@64..65 "*"
         WHITESPACE@65..68 "   "
-        TEXT@68..88 "Here's another list:"
-        NEWLINE@88..89 "\n"
+        PARAGRAPH@68..89
+          TEXT@68..88 "Here's another list:"
+          NEWLINE@88..89 "\n"
         BlankLine@89..90
           BlankLine@89..90 "\n"
         List@90..184
           ListItem@90..155
-            WHITESPACE@90..94 "    "
+            Plain@90..94
+              WHITESPACE@90..94 "    "
             ListMarker@94..95 "*"
             WHITESPACE@95..98 "   "
-            TEXT@98..109 "Sub-bullet."
-            NEWLINE@109..110 "\n"
+            Plain@98..110
+              TEXT@98..109 "Sub-bullet."
+              NEWLINE@109..110 "\n"
             BlankLine@110..111
               BlankLine@110..111 "\n"
             CodeBlock@111..155

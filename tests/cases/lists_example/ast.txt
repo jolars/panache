@@ -22,13 +22,15 @@ ROOT@0..879
       ListItem@59..102
         ListMarker@59..62 "(@)"
         WHITESPACE@62..63 " "
-        TEXT@63..101 "My first example will ..."
-        NEWLINE@101..102 "\n"
+        Plain@63..102
+          TEXT@63..101 "My first example will ..."
+          NEWLINE@101..102 "\n"
       ListItem@102..146
         ListMarker@102..105 "(@)"
         WHITESPACE@105..106 " "
-        TEXT@106..145 "My second example wil ..."
-        NEWLINE@145..146 "\n"
+        Plain@106..146
+          TEXT@106..145 "My second example wil ..."
+          NEWLINE@145..146 "\n"
     BlankLine@146..147
       BlankLine@146..147 "\n"
     PARAGRAPH@147..172
@@ -40,8 +42,9 @@ ROOT@0..879
       ListItem@173..216
         ListMarker@173..176 "(@)"
         WHITESPACE@176..177 " "
-        TEXT@177..215 "My third example will ..."
-        NEWLINE@215..216 "\n"
+        Plain@177..216
+          TEXT@177..215 "My third example will ..."
+          NEWLINE@215..216 "\n"
     BlankLine@216..217
       BlankLine@216..217 "\n"
     Heading@217..242
@@ -57,13 +60,15 @@ ROOT@0..879
       ListItem@243..275
         ListMarker@243..250 "(@good)"
         WHITESPACE@250..251 " "
-        TEXT@251..274 "This is a good example."
-        NEWLINE@274..275 "\n"
+        Plain@251..275
+          TEXT@251..274 "This is a good example."
+          NEWLINE@274..275 "\n"
       ListItem@275..305
         ListMarker@275..281 "(@bad)"
         WHITESPACE@281..282 " "
-        TEXT@282..304 "This is a bad example."
-        NEWLINE@304..305 "\n"
+        Plain@282..305
+          TEXT@282..304 "This is a bad example."
+          NEWLINE@304..305 "\n"
     BlankLine@305..306
       BlankLine@305..306 "\n"
     PARAGRAPH@306..356
@@ -88,18 +93,21 @@ ROOT@0..879
       ListItem@389..411
         ListMarker@389..392 "(@)"
         WHITESPACE@392..393 " "
-        TEXT@393..410 "Unlabeled example"
-        NEWLINE@410..411 "\n"
+        Plain@393..411
+          TEXT@393..410 "Unlabeled example"
+          NEWLINE@410..411 "\n"
       ListItem@411..456
         ListMarker@411..417 "(@foo)"
         WHITESPACE@417..418 " "
-        TEXT@418..455 "Labeled example with  ..."
-        NEWLINE@455..456 "\n"
+        Plain@418..456
+          TEXT@418..455 "Labeled example with  ..."
+          NEWLINE@455..456 "\n"
       ListItem@456..486
         ListMarker@456..459 "(@)"
         WHITESPACE@459..460 " "
-        TEXT@460..485 "Another unlabeled exa ..."
-        NEWLINE@485..486 "\n"
+        Plain@460..486
+          TEXT@460..485 "Another unlabeled exa ..."
+          NEWLINE@485..486 "\n"
     BlankLine@486..487
       BlankLine@486..487 "\n"
     Heading@487..519
@@ -115,18 +123,21 @@ ROOT@0..879
       ListItem@520..558
         ListMarker@520..533 "(@my_example)"
         WHITESPACE@533..534 " "
-        TEXT@534..557 "Example with underscore"
-        NEWLINE@557..558 "\n"
+        Plain@534..558
+          TEXT@534..557 "Example with underscore"
+          NEWLINE@557..558 "\n"
       ListItem@558..592
         ListMarker@558..571 "(@my-example)"
         WHITESPACE@571..572 " "
-        TEXT@572..591 "Example with hyphen"
-        NEWLINE@591..592 "\n"
+        Plain@572..592
+          TEXT@572..591 "Example with hyphen"
+          NEWLINE@591..592 "\n"
       ListItem@592..627
         ListMarker@592..605 "(@example123)"
         WHITESPACE@605..606 " "
-        TEXT@606..626 "Example with numbers"
-        NEWLINE@626..627 "\n"
+        Plain@606..627
+          TEXT@606..626 "Example with numbers"
+          NEWLINE@626..627 "\n"
     BlankLine@627..628
       BlankLine@627..628 "\n"
     Heading@628..658
@@ -142,36 +153,39 @@ ROOT@0..879
       ListItem@659..696
         ListMarker@659..662 "(@)"
         WHITESPACE@662..663 " "
-        TEXT@663..682 "First example with "
-        Strong@682..690
-          StrongMarker@682..684 "**"
-          TEXT@684..688 "bold"
-          StrongMarker@688..690 "**"
-        TEXT@690..695 " text"
-        NEWLINE@695..696 "\n"
+        Plain@663..696
+          TEXT@663..682 "First example with "
+          Strong@682..690
+            StrongMarker@682..684 "**"
+            TEXT@684..688 "bold"
+            StrongMarker@688..690 "**"
+          TEXT@690..695 " text"
+          NEWLINE@695..696 "\n"
       ListItem@696..727
         ListMarker@696..699 "(@)"
         WHITESPACE@699..700 " "
-        TEXT@700..720 "Second example with "
-        CodeSpan@720..726
-          CodeSpanMarker@720..721 "`"
-          TEXT@721..725 "code"
-          CodeSpanMarker@725..726 "`"
-        NEWLINE@726..727 "\n"
+        Plain@700..727
+          TEXT@700..720 "Second example with "
+          CodeSpan@720..726
+            CodeSpanMarker@720..721 "`"
+            TEXT@721..725 "code"
+            CodeSpanMarker@725..726 "`"
+          NEWLINE@726..727 "\n"
       ListItem@727..780
         ListMarker@727..730 "(@)"
         WHITESPACE@730..731 " "
-        TEXT@731..750 "Third example with "
-        Link@750..779
-          LinkStart@750..751
-            LinkStart@750..751 "["
-          LinkText@751..757
-            TEXT@751..757 "a link"
-          TEXT@757..759 "]("
-          LinkDest@759..778
-            TEXT@759..778 "https://example.com"
-          TEXT@778..779 ")"
-        NEWLINE@779..780 "\n"
+        Plain@731..780
+          TEXT@731..750 "Third example with "
+          Link@750..779
+            LinkStart@750..751
+              LinkStart@750..751 "["
+            LinkText@751..757
+              TEXT@751..757 "a link"
+            TEXT@757..759 "]("
+            LinkDest@759..778
+              TEXT@759..778 "https://example.com"
+            TEXT@778..779 ")"
+          NEWLINE@779..780 "\n"
     BlankLine@780..781
       BlankLine@780..781 "\n"
     PARAGRAPH@781..821
@@ -183,11 +197,13 @@ ROOT@0..879
       ListItem@822..861
         ListMarker@822..825 "(@)"
         WHITESPACE@825..826 " "
-        TEXT@826..860 "Fourth example contin ..."
-        NEWLINE@860..861 "\n"
+        Plain@826..861
+          TEXT@826..860 "Fourth example contin ..."
+          NEWLINE@860..861 "\n"
       ListItem@861..879
         ListMarker@861..864 "(@)"
         WHITESPACE@864..865 " "
-        TEXT@865..878 "Fifth example"
-        NEWLINE@878..879 "\n"
+        Plain@865..879
+          TEXT@865..878 "Fifth example"
+          NEWLINE@878..879 "\n"
 

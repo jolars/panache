@@ -5,6 +5,7 @@ use crate::syntax::SyntaxNode;
 
 pub mod block_parser;
 pub mod inline_parser;
+pub mod list_postprocessor;
 
 // Re-export commonly used types
 pub use block_parser::{BlockParser, ReferenceRegistry};
@@ -33,5 +34,9 @@ pub use inline_parser::{InlineParser, parse_inline_text};
 pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
     let config = config.unwrap_or_default();
     let (block_tree, reference_registry) = BlockParser::new(input, &config).parse();
-    InlineParser::new(block_tree, config, reference_registry).parse()
+    let inline_tree = InlineParser::new(block_tree, config, reference_registry).parse();
+
+    // Post-process to wrap list item content in Plain/PARAGRAPH blocks
+    let green = list_postprocessor::wrap_list_item_content(inline_tree);
+    SyntaxNode::new_root(green)
 }

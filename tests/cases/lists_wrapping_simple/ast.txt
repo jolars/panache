@@ -22,28 +22,32 @@ ROOT@0..1668
       ListItem@71..181
         ListMarker@71..72 "-"
         WHITESPACE@72..73 " "
-        TEXT@73..180 "This is a very long l ..."
-        NEWLINE@180..181 "\n"
+        Plain@73..181
+          TEXT@73..180 "This is a very long l ..."
+          NEWLINE@180..181 "\n"
       ListItem@181..194
         ListMarker@181..182 "-"
         WHITESPACE@182..183 " "
-        TEXT@183..193 "Short item"
-        NEWLINE@193..194 "\n"
+        Plain@183..194
+          TEXT@183..193 "Short item"
+          NEWLINE@193..194 "\n"
       ListItem@194..347
         ListMarker@194..195 "-"
         WHITESPACE@195..196 " "
-        TEXT@196..346 "Another extremely lon ..."
-        NEWLINE@346..347 "\n"
+        Plain@196..347
+          TEXT@196..346 "Another extremely lon ..."
+          NEWLINE@346..347 "\n"
       ListItem@347..473
         ListMarker@347..348 "-"
         WHITESPACE@348..349 " "
-        TEXT@349..365 "Final item with "
-        CodeSpan@365..378
-          CodeSpanMarker@365..366 "`"
-          TEXT@366..377 "inline code"
-          CodeSpanMarker@377..378 "`"
-        TEXT@378..472 " that should be prese ..."
-        NEWLINE@472..473 "\n"
+        Plain@349..473
+          TEXT@349..365 "Final item with "
+          CodeSpan@365..378
+            CodeSpanMarker@365..366 "`"
+            TEXT@366..377 "inline code"
+            CodeSpanMarker@377..378 "`"
+          TEXT@378..472 " that should be prese ..."
+          NEWLINE@472..473 "\n"
     BlankLine@473..474
       BlankLine@473..474 "\n"
     Heading@474..507
@@ -59,18 +63,21 @@ ROOT@0..1668
       ListItem@508..624
         ListMarker@508..510 "1."
         WHITESPACE@510..511 " "
-        TEXT@511..623 "This is the first ite ..."
-        NEWLINE@623..624 "\n"
+        Plain@511..624
+          TEXT@511..623 "This is the first ite ..."
+          NEWLINE@623..624 "\n"
       ListItem@624..639
         ListMarker@624..626 "2."
         WHITESPACE@626..627 " "
-        TEXT@627..638 "Second item"
-        NEWLINE@638..639 "\n"
+        Plain@627..639
+          TEXT@627..638 "Second item"
+          NEWLINE@638..639 "\n"
       ListItem@639..848
         ListMarker@639..641 "3."
         WHITESPACE@641..642 " "
-        TEXT@642..847 "The third item has an ..."
-        NEWLINE@847..848 "\n"
+        Plain@642..848
+          TEXT@642..847 "The third item has an ..."
+          NEWLINE@847..848 "\n"
     BlankLine@848..849
       BlankLine@848..849 "\n"
     Heading@849..879
@@ -87,20 +94,23 @@ ROOT@0..1668
         ListMarker@880..881 "-"
         WHITESPACE@881..882 " "
         TaskCheckbox@882..885 "[ ]"
-        TEXT@885..998 " This unchecked task  ..."
-        NEWLINE@998..999 "\n"
+        Plain@885..999
+          TEXT@885..998 " This unchecked task  ..."
+          NEWLINE@998..999 "\n"
       ListItem@999..1020
         ListMarker@999..1000 "-"
         WHITESPACE@1000..1001 " "
         TaskCheckbox@1001..1004 "[x]"
-        TEXT@1004..1019 " Completed task"
-        NEWLINE@1019..1020 "\n"
+        Plain@1004..1020
+          TEXT@1004..1019 " Completed task"
+          NEWLINE@1019..1020 "\n"
       ListItem@1020..1223
         ListMarker@1020..1021 "-"
         WHITESPACE@1021..1022 " "
         TaskCheckbox@1022..1025 "[ ]"
-        TEXT@1025..1222 " Another unchecked ta ..."
-        NEWLINE@1222..1223 "\n"
+        Plain@1025..1223
+          TEXT@1025..1222 " Another unchecked ta ..."
+          NEWLINE@1222..1223 "\n"
     BlankLine@1223..1224
       BlankLine@1223..1224 "\n"
     Heading@1224..1244
@@ -116,37 +126,47 @@ ROOT@0..1668
       ListItem@1245..1425
         ListMarker@1245..1246 "-"
         WHITESPACE@1246..1247 " "
-        TEXT@1247..1282 "Bullet point with rea ..."
-        NEWLINE@1282..1283 "\n"
+        Plain@1247..1283
+          TEXT@1247..1282 "Bullet point with rea ..."
+          NEWLINE@1282..1283 "\n"
         List@1283..1425
           ListItem@1283..1322
-            WHITESPACE@1283..1285 "  "
+            Plain@1283..1285
+              WHITESPACE@1283..1285 "  "
             ListMarker@1285..1287 "1."
             WHITESPACE@1287..1288 " "
-            TEXT@1288..1321 "Nested ordered item t ..."
-            NEWLINE@1321..1322 "\n"
+            Plain@1288..1322
+              TEXT@1288..1321 "Nested ordered item t ..."
+              NEWLINE@1321..1322 "\n"
           ListItem@1322..1425
-            WHITESPACE@1322..1324 "  "
+            Plain@1322..1324
+              WHITESPACE@1322..1324 "  "
             ListMarker@1324..1326 "2."
             WHITESPACE@1326..1327 " "
-            TEXT@1327..1424 "Nested ordered item w ..."
-            NEWLINE@1424..1425 "\n"
+            Plain@1327..1425
+              TEXT@1327..1424 "Nested ordered item w ..."
+              NEWLINE@1424..1425 "\n"
       ListItem@1425..1668
         ListMarker@1425..1426 "-"
         WHITESPACE@1426..1427 " "
-        TEXT@1427..1556 "Another bullet with a ..."
-        NEWLINE@1556..1557 "\n"
+        Plain@1427..1557
+          TEXT@1427..1556 "Another bullet with a ..."
+          NEWLINE@1556..1557 "\n"
         List@1557..1668
           ListItem@1557..1579
-            WHITESPACE@1557..1559 "  "
+            Plain@1557..1559
+              WHITESPACE@1557..1559 "  "
             ListMarker@1559..1560 "-"
             WHITESPACE@1560..1561 " "
-            TEXT@1561..1578 "Nested bullet one"
-            NEWLINE@1578..1579 "\n"
+            Plain@1561..1579
+              TEXT@1561..1578 "Nested bullet one"
+              NEWLINE@1578..1579 "\n"
           ListItem@1579..1668
-            WHITESPACE@1579..1581 "  "
+            Plain@1579..1581
+              WHITESPACE@1579..1581 "  "
             ListMarker@1581..1582 "-"
             WHITESPACE@1582..1583 " "
-            TEXT@1583..1667 "Nested bullet two wit ..."
-            NEWLINE@1667..1668 "\n"
+            Plain@1583..1668
+              TEXT@1583..1667 "Nested bullet two wit ..."
+              NEWLINE@1667..1668 "\n"
 
