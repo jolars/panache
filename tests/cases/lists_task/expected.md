@@ -12,9 +12,11 @@ title: Task Lists Test
 ## Task Lists with Different Bullets
 
 - [ ] Task with asterisk
+
 - [x] Completed task
 
 - [ ] Task with plus
+
 - [x] Completed task
 
 ## Task Lists with Content

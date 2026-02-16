@@ -23,9 +23,9 @@ fn bullet_list_requires_space_after_marker() {
 fn bullet_list_with_different_markers() {
     let input = "* item\n+ item\n- item\n";
     let tree = parse_blocks(input);
-    // Should create three separate lists (different markers)
+    // Should create ONE list (bullet markers are all equivalent per Pandoc)
     let lists = find_all(&tree, SyntaxKind::List);
-    assert_eq!(lists.len(), 3);
+    assert_eq!(lists.len(), 1);
 }
 
 #[test]

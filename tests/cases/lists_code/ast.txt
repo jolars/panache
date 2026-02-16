@@ -44,11 +44,11 @@ ROOT@0..184
           BlankLine@89..90 "\n"
         List@90..184
           ListItem@90..155
-            Plain@90..94
+            PARAGRAPH@90..94
               WHITESPACE@90..94 "    "
             ListMarker@94..95 "*"
             WHITESPACE@95..98 "   "
-            Plain@98..110
+            PARAGRAPH@98..110
               TEXT@98..109 "Sub-bullet."
               NEWLINE@109..110 "\n"
             BlankLine@110..111
@@ -70,11 +70,12 @@ ROOT@0..184
                 NEWLINE@154..155 "\n"
           BlankLine@155..156
             BlankLine@155..156 "\n"
-          List@156..184
-            ListItem@156..184
+          ListItem@156..184
+            PARAGRAPH@156..160
               WHITESPACE@156..160 "    "
-              ListMarker@160..161 "*"
-              WHITESPACE@161..164 "   "
+            ListMarker@160..161 "*"
+            WHITESPACE@161..164 "   "
+            PARAGRAPH@164..184
               TEXT@164..183 "Another sub-bullet."
               NEWLINE@183..184 "\n"
 

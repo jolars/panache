@@ -512,6 +512,13 @@ impl<'a> BlockParser<'a> {
         let (raw_indent_cols, _) = leading_indent(next_inner);
         let next_marker = try_parse_list_marker(next_inner, self.config);
 
+        log::debug!(
+            "compute_levels_to_keep: next_line indent={}, has_marker={}, stack_depth={}",
+            raw_indent_cols,
+            next_marker.is_some(),
+            self.containers.depth()
+        );
+
         let mut keep_level = 0;
         let mut content_indent_so_far = 0usize;
 
@@ -1180,9 +1187,50 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
-            // Nested list inside current item if indented to content column or beyond
+            // Check if this continues an existing list level
+            let matched_level = self.find_matching_list_level(&marker, indent_cols);
             let current_content_col = self.current_content_col();
+
+            // Decision tree:
+            // 1. If indent < content_col: Must be continuing a parent list (close nested and continue)
+            // 2. If indent >= content_col:
+            //    a. If exactly matches a nested list's base_indent: Continue that nested list
+            //    b. Otherwise: Start new nested list
+
             if current_content_col > 0 && indent_cols >= current_content_col {
+                // Potentially nested - but check if it EXACTLY matches an existing nested list first
+                if let Some(level) = matched_level
+                    && let Some(Container::List {
+                        base_indent_cols, ..
+                    }) = self.containers.stack.get(level)
+                    && indent_cols == *base_indent_cols
+                {
+                    // Exact match - this is a sibling item in the matched list
+                    let num_parent_lists = self.containers.stack[..level]
+                        .iter()
+                        .filter(|c| matches!(c, Container::List { .. }))
+                        .count();
+
+                    if num_parent_lists > 0 {
+                        // This matches a nested list - continue it
+                        self.continue_list_at_level(level);
+                        if let Some(indent_str) = indent_to_emit {
+                            self.builder
+                                .token(SyntaxKind::WHITESPACE.into(), indent_str);
+                        }
+                        self.add_list_item(
+                            content,
+                            marker_len,
+                            spaces_after,
+                            indent_cols,
+                            indent_bytes,
+                        );
+                        self.pos += 1;
+                        return true;
+                    }
+                }
+
+                // No exact match - start new nested list
                 self.start_nested_list(
                     content,
                     &marker,
@@ -1196,21 +1244,20 @@ impl<'a> BlockParser<'a> {
                 return true;
             }
 
-            // Find matching list level
-            let matched_level = self.find_matching_list_level(&marker, indent_cols);
-
+            // indent < content_col: Continue parent list if matched
             if let Some(level) = matched_level {
                 self.continue_list_at_level(level);
-                // Emit footnote/definition indent before list item (for losslessness)
                 if let Some(indent_str) = indent_to_emit {
                     self.builder
                         .token(SyntaxKind::WHITESPACE.into(), indent_str);
                 }
-            } else {
-                self.start_new_list(&marker, indent_cols, indent_to_emit);
+                self.add_list_item(content, marker_len, spaces_after, indent_cols, indent_bytes);
+                self.pos += 1;
+                return true;
             }
 
-            // Start list item
+            // No match and not nested - start new top-level list
+            self.start_new_list(&marker, indent_cols, indent_to_emit);
             self.add_list_item(content, marker_len, spaces_after, indent_cols, indent_bytes);
             self.pos += 1;
             return true;

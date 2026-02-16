@@ -58,36 +58,35 @@ ROOT@0..734
       NEWLINE@188..189 "\n"
     BlankLine@189..190
       BlankLine@189..190 "\n"
-    List@190..236
+    List@190..279
       ListItem@190..215
         ListMarker@190..191 "*"
         WHITESPACE@191..192 " "
         TaskCheckbox@192..195 "[ ]"
-        Plain@195..215
+        PARAGRAPH@195..215
           TEXT@195..214 " Task with asterisk"
           NEWLINE@214..215 "\n"
       ListItem@215..236
         ListMarker@215..216 "*"
         WHITESPACE@216..217 " "
         TaskCheckbox@217..220 "[x]"
-        Plain@220..236
+        PARAGRAPH@220..236
           TEXT@220..235 " Completed task"
           NEWLINE@235..236 "\n"
-    BlankLine@236..237
-      BlankLine@236..237 "\n"
-    List@237..279
+      BlankLine@236..237
+        BlankLine@236..237 "\n"
       ListItem@237..258
         ListMarker@237..238 "+"
         WHITESPACE@238..239 " "
         TaskCheckbox@239..242 "[ ]"
-        Plain@242..258
+        PARAGRAPH@242..258
           TEXT@242..257 " Task with plus"
           NEWLINE@257..258 "\n"
       ListItem@258..279
         ListMarker@258..259 "+"
         WHITESPACE@259..260 " "
         TaskCheckbox@260..263 "[x]"
-        Plain@263..279
+        PARAGRAPH@263..279
           TEXT@263..278 " Completed task"
           NEWLINE@278..279 "\n"
     BlankLine@279..280

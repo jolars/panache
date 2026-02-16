@@ -100,9 +100,16 @@ impl Formatter {
 
     /// Format a List node
     pub(super) fn format_list(&mut self, node: &SyntaxNode, indent: usize) {
-        // Add blank line before top-level lists (indent == 0) that follow content.
-        // Don't add for nested lists (indent > 0) as they follow their parent item's content.
-        if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") {
+        // Add blank line before top-level lists (indent == 0) that follow content,
+        // UNLESS the previous sibling was also a List (they're separate lists in the source).
+        // If previous was a List, it already has spacing and we normalize markers instead.
+        let prev_is_list = node
+            .prev_sibling()
+            .map(|prev| matches!(prev.kind(), SyntaxKind::List | SyntaxKind::BlankLine))
+            .unwrap_or(false);
+
+        if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") && !prev_is_list
+        {
             self.output.push('\n');
         }
 
@@ -110,51 +117,58 @@ impl Formatter {
         let max_marker_width = Self::calculate_max_marker_width(node);
         self.max_marker_widths.push(max_marker_width);
 
-        let mut prev_was_item = false;
-        let mut prev_was_blank = false;
-        let mut prev_item_had_trailing_blank = false;
+        // Detect if this is a loose list by checking for PARAGRAPH wrapper nodes
+        // (Parser marks loose lists with PARAGRAPH, tight lists with Plain)
+        let is_loose = node
+            .children()
+            .find(|child| child.kind() == SyntaxKind::ListItem)
+            .and_then(|item| {
+                item.children()
+                    .find(|c| matches!(c.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::Plain))
+            })
+            .map(|wrapper| wrapper.kind() == SyntaxKind::PARAGRAPH)
+            .unwrap_or(false);
+
+        log::debug!("Formatting list: is_loose={}", is_loose);
+
+        let mut item_count = 0;
+        let total_items = node
+            .children()
+            .filter(|c| c.kind() == SyntaxKind::ListItem)
+            .count();
+
         let mut last_item_content_indent = 0;
 
         for child in node.children() {
             if child.kind() == SyntaxKind::ListItem {
-                // Only strip double newlines if:
-                // 1. There was no explicit blank line before this item (at List level)
-                // 2. The previous ListItem didn't have a trailing BlankLine child
-                if prev_was_item && !prev_was_blank && !prev_item_had_trailing_blank {
+                item_count += 1;
+
+                // Strip double newlines ONLY between items within a tight list
+                // Don't strip if we're at the first item (preserves spacing before the list)
+                if !is_loose && item_count > 1 {
                     while self.output.ends_with("\n\n") {
                         self.output.pop();
                     }
                 }
 
-                // Check if this list item has a trailing BlankLine child
-                prev_item_had_trailing_blank = child
-                    .children()
-                    .last()
-                    .map(|last_child| last_child.kind() == SyntaxKind::BlankLine)
-                    .unwrap_or(false);
-
-                prev_was_item = true;
-                prev_was_blank = false;
-
                 // Calculate content indent for this list item (marker + space)
                 last_item_content_indent =
                     indent + Self::calculate_list_item_content_indent(&child, max_marker_width);
-            }
 
-            // Preserve blank lines between list items
-            if child.kind() == SyntaxKind::BlankLine {
-                self.output.push('\n');
-                prev_was_blank = true;
+                self.format_node_sync(&child, indent);
+
+                // Add blank line after each item for loose lists (except last)
+                if is_loose && item_count < total_items && !self.output.ends_with("\n\n") {
+                    self.output.push('\n');
+                }
+            } else if child.kind() == SyntaxKind::BlankLine {
+                // Skip BlankLine nodes - we're normalizing spacing based on loose/tight
                 continue;
-            }
-
-            // Paragraphs that are siblings of ListItems are continuation content
-            // Format them with the last list item's content indentation
-            if child.kind() == SyntaxKind::PARAGRAPH && prev_was_item {
+            } else if child.kind() == SyntaxKind::PARAGRAPH {
+                // Paragraphs that are siblings of ListItems are continuation content
                 self.format_list_continuation_paragraph(&child, last_item_content_indent);
-            } else if child.kind() == SyntaxKind::CodeBlock && prev_was_item {
+            } else if child.kind() == SyntaxKind::CodeBlock {
                 // Code blocks that are siblings of ListItems are also continuation content
-                // Format them with indentation
                 self.format_indented_code_block(&child, last_item_content_indent);
             } else {
                 self.format_node_sync(&child, indent);

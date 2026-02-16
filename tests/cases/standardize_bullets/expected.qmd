@@ -7,12 +7,15 @@ This document tests bullet list marker standardization.
 Different markers:
 
 - Asterisk item 1
+
 - Asterisk item 2
 
 - Plus item 1
+
 - Plus item 2
 
 - Hyphen item 1
+
 - Hyphen item 2
 
 ## Nested Lists
@@ -30,10 +33,8 @@ Task lists with different markers:
 
 - [ ] Unchecked with asterisk
 - [x] Checked with asterisk
-
 - [ ] Unchecked with plus
 - [X] Checked with plus (capital X)
-
 - [ ] Unchecked with hyphen
 - [x] Checked with hyphen
 
@@ -42,6 +43,7 @@ Task lists with different markers:
 Lists with code blocks and other elements:
 
 - List item with `inline code`
+
 - List item with more text that wraps over multiple lines when the formatter
   processes it
 
