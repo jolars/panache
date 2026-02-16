@@ -66,7 +66,7 @@ panache format document.qmd
 Format a file in place:
 
 ```bash
-panache format --write document.qmd
+panache format document.qmd
 ```
 
 ### Format from stdin
