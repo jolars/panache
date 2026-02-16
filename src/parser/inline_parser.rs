@@ -14,6 +14,7 @@ mod latex;
 mod links;
 mod native_spans;
 mod raw_inline;
+mod shortcodes;
 mod strikeout;
 mod subscript;
 mod superscript;
@@ -46,6 +47,7 @@ use links::{
 };
 use native_spans::{emit_native_span, try_parse_native_span};
 use raw_inline::{emit_raw_inline, is_raw_inline};
+use shortcodes::{emit_shortcode, try_parse_shortcode};
 use strikeout::{emit_strikeout, try_parse_strikeout};
 use subscript::{emit_subscript, try_parse_subscript};
 use superscript::{emit_superscript, try_parse_superscript};
@@ -145,6 +147,22 @@ pub fn parse_inline_text(
         {
             log::debug!("Matched LaTeX command at pos {}", pos);
             parse_latex_command(builder, &text[pos..], len);
+            pos += len;
+            continue;
+        }
+
+        // Try to parse Quarto shortcodes (before code spans, since both can start with braces)
+        if bytes[pos] == b'{'
+            && config.extensions.quarto_shortcodes
+            && let Some((len, content, is_escaped)) = try_parse_shortcode(&text[pos..])
+        {
+            log::debug!(
+                "Matched shortcode at pos {}: escaped={}, content={:?}",
+                pos,
+                is_escaped,
+                &content[..content.len().min(20)]
+            );
+            emit_shortcode(builder, &content, is_escaped);
             pos += len;
             continue;
         }
@@ -440,6 +458,15 @@ fn find_next_inline_start(text: &str) -> usize {
     for (i, ch) in text.char_indices() {
         match ch {
             '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' | '^' | '~' | '@' => return i.max(1),
+            '{' => {
+                // Only stop if this could be a shortcode ({{<)
+                if i + 2 < text.len()
+                    && text.as_bytes()[i + 1] == b'{'
+                    && text.as_bytes()[i + 2] == b'<'
+                {
+                    return i.max(1);
+                }
+            }
             '-' => {
                 // Check if this might be a suppress-author citation -@
                 if i + 1 < text.len() && text.as_bytes()[i + 1] == b'@' {

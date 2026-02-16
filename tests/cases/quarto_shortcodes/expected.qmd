@@ -1,0 +1,40 @@
+# Quarto Shortcodes Test
+
+This document tests Quarto shortcode parsing and formatting.
+
+## Basic Shortcodes
+
+The title is {{< meta title >}}.
+
+The version is {{< var version >}}.
+
+Current user: {{< env USER >}}.
+
+## Shortcodes with Arguments
+
+{{< video src="https://example.com/video.mp4" >}}
+
+{{< env PATH "default/path" >}}
+
+{{< video src="movie.mp4" width="100%" height="500px" >}}
+
+## Dot Notation
+
+Author name: {{< meta author.1 >}}.
+
+Email: {{< var email.info >}}.
+
+Escaped dots: {{< meta field\\.with\\.dots >}}.
+
+## Escaped Shortcodes (for documentation)
+
+To show a shortcode literally, use triple braces: {{{< var version >}}}.
+
+Another example: {{{< meta title >}}}.
+
+## Mixed Content
+
+This paragraph has {{< meta title >}} in the middle of text, and also
+{{< var version >}} on the same line.
+
+The {{< env HOME >}} directory contains your files.

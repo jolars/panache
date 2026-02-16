@@ -68,6 +68,12 @@ pub enum SyntaxKind {
     SpanBracketOpen,  // [
     SpanBracketClose, // ]
 
+    // Shortcodes (Quarto)
+    Shortcode,            // {{< name args >}} or {{{< name args >}}}
+    ShortcodeMarkerOpen,  // {{< or {{{<
+    ShortcodeMarkerClose, // >}} or >}}}
+    ShortcodeContent,     // content between markers
+
     // Code
     CodeSpan,
     CodeSpanMarker,  // ` or `` or ```

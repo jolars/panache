@@ -178,6 +178,8 @@ pub struct Extensions {
     pub quarto_callouts: bool,
     /// Quarto cross-references @fig-id, @tbl-id
     pub quarto_crossrefs: bool,
+    /// Quarto shortcodes {{< name args >}}
+    pub quarto_shortcodes: bool,
 }
 
 impl Default for Extensions {
@@ -289,6 +291,7 @@ impl Extensions {
             // Quarto-specific (OFF for Pandoc)
             quarto_callouts: false,
             quarto_crossrefs: false,
+            quarto_shortcodes: false,
         }
     }
 
@@ -303,6 +306,7 @@ impl Extensions {
         // Quarto-specific
         ext.quarto_callouts = true;
         ext.quarto_crossrefs = true;
+        ext.quarto_shortcodes = true;
 
         ext
     }
@@ -408,6 +412,7 @@ impl Extensions {
 
             quarto_callouts: false,
             quarto_crossrefs: false,
+            quarto_shortcodes: false,
         }
     }
 }

@@ -13,6 +13,7 @@ mod inline;
 mod lists;
 mod metadata;
 mod paragraphs;
+mod shortcodes;
 mod tables;
 mod utils;
 mod wrapping;

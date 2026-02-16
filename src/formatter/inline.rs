@@ -1,4 +1,5 @@
 use crate::config::{Config, MathDelimiterStyle};
+use crate::formatter::shortcodes::format_shortcode;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -225,6 +226,10 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             } else {
                 node.text().to_string()
             }
+        }
+        SyntaxKind::Shortcode => {
+            // Format Quarto shortcodes with normalized spacing
+            format_shortcode(node)
         }
         _ => {
             // For other inline nodes, just return their text

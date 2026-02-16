@@ -509,3 +509,13 @@ for initial implementation.
 ## Won't Implement
 
 - Format-specific output conventions (e.g., `gutenberg` for plain text output)
+
+## Quarto Shortcodes
+
+- ✅ Parser support for `{{< name args >}}` syntax
+- ✅ Parser support for `{{{< name args >}}}` escape syntax  
+- ✅ Formatter with normalized spacing
+- ✅ Extension flag `quarto_shortcodes` (enabled for Quarto flavor)
+- ✅ Golden test coverage
+- ❌ LSP diagnostics for malformed shortcodes (future)
+- ❌ Completion for built-in shortcode names (future)

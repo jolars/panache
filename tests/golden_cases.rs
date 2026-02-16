@@ -180,6 +180,7 @@ golden_test_cases!(
     pipe_table_unicode,
     quarto_code_blocks,
     quarto_hashpipe,
+    quarto_shortcodes,
     raw_blocks,
     reference_footnotes,
     reference_images,
