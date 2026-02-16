@@ -8,6 +8,7 @@ mod core;
 mod fenced_divs;
 mod hashpipe;
 mod headings;
+mod indent_utils;
 mod inline;
 mod lists;
 mod metadata;

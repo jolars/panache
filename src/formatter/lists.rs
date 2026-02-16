@@ -1,4 +1,5 @@
 use crate::config::WrapMode;
+use crate::formatter::indent_utils::{calculate_list_item_indent, is_alignable_marker};
 use crate::formatter::wrapping;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
@@ -25,30 +26,6 @@ impl Formatter {
         None
     }
 
-    /// Check if a marker should be right-aligned (Roman numerals and alphabetic markers)
-    pub(super) fn is_alignable_marker(marker: &str) -> bool {
-        // Don't align example lists (they start with '(@')
-        if marker.starts_with("(@") {
-            return false;
-        }
-
-        // Don't align bullet lists
-        if marker.len() == 1 && (marker == "-" || marker == "*" || marker == "+") {
-            return false;
-        }
-
-        // Align all ordered list styles with letters or Roman numerals:
-        // Period: a., i., A., I.
-        // Right-paren: a), i), A), I)
-        // Parens: (a), (i), (A), (I)
-        if marker.len() < 2 {
-            return false;
-        }
-
-        // Check if the marker contains a letter (handles all three delimiter styles)
-        marker.chars().any(|c| c.is_alphabetic())
-    }
-
     /// Calculate the maximum marker width for all direct ListItem children of a List
     /// Returns 0 if markers shouldn't be aligned
     pub(super) fn calculate_max_marker_width(list_node: &SyntaxNode) -> usize {
@@ -59,14 +36,14 @@ impl Formatter {
             .collect();
 
         // Check if any marker is alignable
-        if !markers.iter().any(|m| Self::is_alignable_marker(m)) {
+        if !markers.iter().any(|m| is_alignable_marker(m)) {
             return 0;
         }
 
         // Return max width of alignable markers
         markers
             .iter()
-            .filter(|m| Self::is_alignable_marker(m))
+            .filter(|m| is_alignable_marker(m))
             .map(|m| m.len())
             .max()
             .unwrap_or(0)
@@ -80,23 +57,6 @@ impl Formatter {
     ) -> usize {
         let marker = Self::extract_list_marker(item_node).unwrap_or_default();
 
-        // Calculate marker padding (for right-alignment)
-        let marker_padding = if Self::is_alignable_marker(&marker) && max_marker_width > 0 {
-            max_marker_width.saturating_sub(marker.len())
-        } else {
-            0
-        };
-
-        // Spaces after marker (minimum 1, or 2 for uppercase letter markers)
-        let spaces_after = if marker.len() == 2
-            && marker.starts_with(|c: char| c.is_ascii_uppercase())
-            && marker.ends_with('.')
-        {
-            2
-        } else {
-            1
-        };
-
         // Check for task checkbox (adds 4 more characters: "[x] ")
         let has_checkbox = item_node.children_with_tokens().any(|el| {
             if let NodeOrToken::Token(t) = el {
@@ -105,9 +65,9 @@ impl Formatter {
                 false
             }
         });
-        let checkbox_width = if has_checkbox { 4 } else { 0 };
 
-        marker_padding + marker.len() + spaces_after + checkbox_width
+        let indent = calculate_list_item_indent(&marker, max_marker_width, has_checkbox);
+        indent.content_offset()
     }
 
     /// Format a paragraph that is a continuation of a list item.
@@ -275,48 +235,11 @@ impl Formatter {
         // Get max marker width for this list level
         let max_marker_width = self.max_marker_widths.last().copied().unwrap_or(0);
 
-        // Calculate leading spaces for right-alignment of markers
-        // and standard spacing after marker
-        let (marker_padding, spaces_after_marker) =
-            if Self::is_alignable_marker(&marker) && max_marker_width > 0 {
-                // Right-align markers by adding leading spaces
-                let padding = max_marker_width.saturating_sub(marker.len());
-
-                // Check if this is uppercase letter with period (needs minimum 2 spaces)
-                let min_spaces = if marker.len() == 2
-                    && marker.starts_with(|c: char| c.is_ascii_uppercase())
-                    && marker.ends_with('.')
-                {
-                    2
-                } else {
-                    1
-                };
-
-                (padding, min_spaces)
-            } else {
-                // Non-alignable markers: no padding
-                let spaces = if marker.len() == 2
-                    && marker.starts_with(|c: char| c.is_ascii_uppercase())
-                    && marker.ends_with('.')
-                {
-                    2
-                } else {
-                    1
-                };
-                (0, spaces)
-            };
+        // Calculate indentation using the utility
+        let list_indent = calculate_list_item_indent(&marker, max_marker_width, checkbox.is_some());
 
         let total_indent = indent;
-
-        // Calculate checkbox width if present (checkbox + space after)
-        let checkbox_width = if let Some(ref cb) = checkbox {
-            cb.len() + 1 // "[x] " is 4 characters
-        } else {
-            0
-        };
-
-        let hanging =
-            marker_padding + marker.len() + spaces_after_marker + total_indent + checkbox_width;
+        let hanging = list_indent.hanging_indent(total_indent);
         let available_width = self.config.line_width.saturating_sub(hanging);
 
         // Build words from Plain/PARAGRAPH content node if present, otherwise from entire ListItem
@@ -370,9 +293,10 @@ impl Formatter {
             if i == 0 {
                 // First line: output indent + marker padding + marker + spaces + checkbox
                 self.output.push_str(&" ".repeat(total_indent));
-                self.output.push_str(&" ".repeat(marker_padding));
+                self.output
+                    .push_str(&" ".repeat(list_indent.marker_padding));
                 self.output.push_str(&marker);
-                self.output.push_str(&" ".repeat(spaces_after_marker));
+                self.output.push_str(&" ".repeat(list_indent.spaces_after));
 
                 // Output checkbox if present
                 if let Some(ref cb) = checkbox {
@@ -408,29 +332,21 @@ impl Formatter {
                         .unwrap_or(false);
 
                     if has_blank_before {
-                        let content_indent = total_indent
-                            + marker_padding
-                            + marker.len()
-                            + spaces_after_marker
-                            + checkbox_width;
+                        let content_indent = list_indent.hanging_indent(total_indent);
                         self.format_list_continuation_paragraph(&child, content_indent);
                     }
                     // Otherwise skip - already handled
                 }
                 SyntaxKind::List => {
-                    // Nested list indent includes: total_indent + marker_padding + marker + 1 space + checkbox
+                    // Nested list indent: base + marker + 1 space + checkbox
                     self.format_node_sync(
                         &child,
-                        total_indent + marker_padding + marker.len() + 1 + checkbox_width,
+                        total_indent + list_indent.marker_width + 1 + list_indent.checkbox_width,
                     );
                 }
                 SyntaxKind::CodeBlock => {
                     // Code blocks in list items need indentation
-                    let content_indent = total_indent
-                        + marker_padding
-                        + marker.len()
-                        + spaces_after_marker
-                        + checkbox_width;
+                    let content_indent = list_indent.hanging_indent(total_indent);
                     self.format_indented_code_block(&child, content_indent);
                 }
                 SyntaxKind::BlankLine => {

@@ -19,12 +19,35 @@ pub(crate) fn emit_line_tokens(builder: &mut GreenNodeBuilder<'static>, line: &s
     }
 }
 
+/// Strip up to N leading spaces from a line.
+/// This is the generalized version of the previous strip_leading_spaces (which stripped up to 3).
+pub(crate) fn strip_leading_spaces_n(line: &str, max_spaces: usize) -> &str {
+    let spaces_to_strip = line
+        .chars()
+        .take(max_spaces)
+        .take_while(|&c| c == ' ')
+        .count();
+    &line[spaces_to_strip..]
+}
+
 /// Strip up to 3 leading spaces from a line.
+/// This is a convenience wrapper for the common case in Markdown parsing.
 pub(crate) fn strip_leading_spaces(line: &str) -> &str {
-    line.strip_prefix("   ")
-        .or_else(|| line.strip_prefix("  "))
-        .or_else(|| line.strip_prefix(" "))
-        .unwrap_or(line)
+    strip_leading_spaces_n(line, 3)
+}
+
+/// Count leading spaces in a line, up to a maximum.
+/// Returns the actual count (may be less than max).
+#[allow(dead_code)] // Utility function for future use
+pub(crate) fn count_leading_spaces(line: &str, max: usize) -> usize {
+    line.chars().take(max).take_while(|&c| c == ' ').count()
+}
+
+/// Skip leading whitespace (spaces and tabs) from a string.
+/// Returns the string with leading whitespace removed.
+#[allow(dead_code)] // Utility function for future use
+pub(crate) fn skip_whitespace(s: &str) -> &str {
+    s.trim_start_matches([' ', '\t'])
 }
 
 /// Strip trailing newline (LF or CRLF) from a line, returning the content and the newline string.
@@ -74,4 +97,41 @@ pub(crate) fn split_lines_inclusive(input: &str) -> Vec<&str> {
     }
 
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_strip_leading_spaces_n() {
+        assert_eq!(strip_leading_spaces_n("   text", 3), "text");
+        assert_eq!(strip_leading_spaces_n("  text", 3), "text");
+        assert_eq!(strip_leading_spaces_n(" text", 3), "text");
+        assert_eq!(strip_leading_spaces_n("text", 3), "text");
+        assert_eq!(strip_leading_spaces_n("    text", 3), " text");
+    }
+
+    #[test]
+    fn test_count_leading_spaces() {
+        assert_eq!(count_leading_spaces("   text", 10), 3);
+        assert_eq!(count_leading_spaces("  text", 10), 2);
+        assert_eq!(count_leading_spaces("text", 10), 0);
+        assert_eq!(count_leading_spaces("     text", 3), 3);
+    }
+
+    #[test]
+    fn test_skip_whitespace() {
+        assert_eq!(skip_whitespace("  \t text"), "text");
+        assert_eq!(skip_whitespace("\t\ttext"), "text");
+        assert_eq!(skip_whitespace("text"), "text");
+        assert_eq!(skip_whitespace("   "), "");
+    }
+
+    #[test]
+    fn test_strip_newline() {
+        assert_eq!(strip_newline("text\n"), ("text", "\n"));
+        assert_eq!(strip_newline("text\r\n"), ("text", "\r\n"));
+        assert_eq!(strip_newline("text"), ("text", ""));
+    }
 }

@@ -17,13 +17,13 @@ mod indented_code;
 mod latex_envs;
 mod line_blocks;
 mod lists;
+mod marker_utils;
 mod metadata;
 mod paragraphs;
 pub mod reference_definitions; // Public for use in inline_parser
 mod tables;
 mod utils;
 
-use blockquotes::count_blockquote_markers;
 use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
@@ -36,6 +36,7 @@ use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
 use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
+use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 pub use reference_definitions::{
     ReferenceRegistry, try_parse_footnote_definition, try_parse_footnote_marker,
@@ -154,42 +155,6 @@ impl<'a> BlockParser<'a> {
             }
         }
         remaining
-    }
-
-    /// Parse blockquote markers and return their positions.
-    /// Returns Vec of (leading_spaces, has_trailing_space) for each marker found.
-    fn parse_blockquote_marker_info(line: &str) -> Vec<(usize, bool)> {
-        let mut markers = Vec::new();
-        let mut remaining = line;
-
-        loop {
-            let bytes = remaining.as_bytes();
-            let mut i = 0;
-
-            // Count leading whitespace (up to 3 spaces before >)
-            let mut spaces = 0;
-            while i < bytes.len() && bytes[i] == b' ' && spaces < 3 {
-                spaces += 1;
-                i += 1;
-            }
-
-            // Check if there's a > marker
-            if i >= bytes.len() || bytes[i] != b'>' {
-                break;
-            }
-            i += 1; // skip '>'
-
-            // Check for optional space after >
-            let has_trailing_space = i < bytes.len() && bytes[i] == b' ';
-            if has_trailing_space {
-                i += 1;
-            }
-
-            markers.push((spaces, has_trailing_space));
-            remaining = &remaining[i..];
-        }
-
-        markers
     }
 
     /// Emit one blockquote marker with its whitespace.
@@ -323,10 +288,13 @@ impl<'a> BlockParser<'a> {
 
             // Emit blockquote markers for this blank line if inside blockquotes
             if bq_depth > 0 {
-                let marker_info = Self::parse_blockquote_marker_info(line);
+                let marker_info = parse_blockquote_marker_info(line);
                 for i in 0..bq_depth {
-                    if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(i) {
-                        self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                    if let Some(info) = marker_info.get(i) {
+                        self.emit_one_blockquote_marker(
+                            info.leading_spaces,
+                            info.has_trailing_space,
+                        );
                     }
                 }
             }
@@ -372,10 +340,13 @@ impl<'a> BlockParser<'a> {
                     self.strip_n_blockquote_markers(line, current_bq_depth);
 
                 // Emit blockquote markers for current depth (for losslessness)
-                let marker_info = Self::parse_blockquote_marker_info(line);
+                let marker_info = parse_blockquote_marker_info(line);
                 for i in 0..current_bq_depth {
-                    if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(i) {
-                        self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                    if let Some(info) = marker_info.get(i) {
+                        self.emit_one_blockquote_marker(
+                            info.leading_spaces,
+                            info.has_trailing_space,
+                        );
                     }
                 }
 
@@ -400,12 +371,12 @@ impl<'a> BlockParser<'a> {
             }
 
             // Parse marker information for all levels
-            let marker_info = Self::parse_blockquote_marker_info(line);
+            let marker_info = parse_blockquote_marker_info(line);
 
             // First, emit markers for existing blockquote levels (before opening new ones)
             for level in 0..current_bq_depth {
-                if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(level) {
-                    self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                if let Some(info) = marker_info.get(level) {
+                    self.emit_one_blockquote_marker(info.leading_spaces, info.has_trailing_space);
                 }
             }
 
@@ -414,8 +385,8 @@ impl<'a> BlockParser<'a> {
                 self.builder.start_node(SyntaxKind::BlockQuote.into());
 
                 // Emit the marker for this new level
-                if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(level) {
-                    self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                if let Some(info) = marker_info.get(level) {
+                    self.emit_one_blockquote_marker(info.leading_spaces, info.has_trailing_space);
                 }
 
                 self.containers
@@ -471,10 +442,13 @@ impl<'a> BlockParser<'a> {
             // Parse the inner content at the new depth
             if bq_depth > 0 {
                 // Emit markers at current depth before parsing content
-                let marker_info = Self::parse_blockquote_marker_info(line);
+                let marker_info = parse_blockquote_marker_info(line);
                 for i in 0..bq_depth {
-                    if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(i) {
-                        self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                    if let Some(info) = marker_info.get(i) {
+                        self.emit_one_blockquote_marker(
+                            info.leading_spaces,
+                            info.has_trailing_space,
+                        );
                     }
                 }
                 // Content with markers stripped - use inner_content for paragraph appending
@@ -493,10 +467,10 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
-            let marker_info = Self::parse_blockquote_marker_info(line);
+            let marker_info = parse_blockquote_marker_info(line);
             for i in 0..bq_depth {
-                if let Some(&(leading_spaces, has_trailing_space)) = marker_info.get(i) {
-                    self.emit_one_blockquote_marker(leading_spaces, has_trailing_space);
+                if let Some(info) = marker_info.get(i) {
+                    self.emit_one_blockquote_marker(info.leading_spaces, info.has_trailing_space);
                 }
             }
             // Same blockquote depth - markers stripped, use inner_content for appending
