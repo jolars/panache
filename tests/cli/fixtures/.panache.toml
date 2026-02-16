@@ -1,0 +1,5 @@
+flavor = "quarto"
+line_width = 60
+
+[extensions]
+citations = true

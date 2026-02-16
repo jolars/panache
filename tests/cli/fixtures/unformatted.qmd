@@ -1,0 +1,7 @@
+# Heading
+
+This is a very long paragraph that exceeds the default line width of 80 characters and should be wrapped when formatted.
+
+## Subheading
+
+Another long line that should wrap when formatted properly by panache to respect the line width.

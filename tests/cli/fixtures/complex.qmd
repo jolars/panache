@@ -1,0 +1,37 @@
+# Document Title
+
+## Introduction
+
+This is a paragraph with *emphasis* and **strong** text.
+
+### Subsection
+
+Here's a list:
+
+- Item 1
+- Item 2
+- Item 3
+
+And a table:
+
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+| Cell 3   | Cell 4   |
+
+## Math
+
+Inline math: $x^2 + y^2 = z^2$
+
+Display math:
+
+$$
+\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
+$$
+
+## Code
+
+```python
+def hello():
+    print("Hello, world!")
+```

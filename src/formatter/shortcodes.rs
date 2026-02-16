@@ -150,9 +150,11 @@ mod tests {
 
         let input = "{{< video src=\"https://example.com/video.mp4\" >}}";
         let flavor = Flavor::Quarto;
-        let mut config = Config::default();
-        config.flavor = flavor;
-        config.extensions = Extensions::for_flavor(flavor);
+        let config = Config {
+            flavor,
+            extensions: Extensions::for_flavor(flavor),
+            ..Default::default()
+        };
 
         let output = format(input, Some(config), None);
         assert_eq!(
@@ -168,9 +170,11 @@ mod tests {
 
         let input = "{{<meta title>}}";
         let flavor = Flavor::Quarto;
-        let mut config = Config::default();
-        config.flavor = flavor;
-        config.extensions = Extensions::for_flavor(flavor);
+        let config = Config {
+            flavor,
+            extensions: Extensions::for_flavor(flavor),
+            ..Default::default()
+        };
 
         let output = format(input, Some(config), None);
         assert_eq!(output.trim(), "{{< meta title >}}");

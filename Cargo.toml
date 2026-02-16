@@ -3,7 +3,7 @@ name = "panache"
 version = "2.4.0"
 edition = "2024"
 readme = "README.md"
-description = "A formatter for Pandoc, Quarto, and RMarkdown documents"
+description = "An LSP, formatter, and linter for Pandoc markdown, Quarto, and RMarkdown"
 license = "MIT"
 repository = "https://github.com/jolars/panache"
 homepage = "https://jolars.github.io/panache"
@@ -50,6 +50,8 @@ uuid = { version = "1.21.0", features = ["v4"], optional = true }
 similar-asserts = "1.7.0"
 tokio = { version = "1", features = ["macros", "rt"] }
 which = "8.0"
+assert_cmd = "2.0"
+predicates = "3.0"
 
 [features]
 default = ["cli", "lsp"]

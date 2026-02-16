@@ -128,7 +128,7 @@ mod tests {
         let markers = parse_blockquote_marker_info("> text");
         assert_eq!(markers.len(), 1);
         assert_eq!(markers[0].leading_spaces, 0);
-        assert_eq!(markers[0].has_trailing_space, true);
+        assert!(markers[0].has_trailing_space);
     }
 
     #[test]
@@ -146,6 +146,6 @@ mod tests {
         let markers = parse_blockquote_marker_info("  > text");
         assert_eq!(markers.len(), 1);
         assert_eq!(markers[0].leading_spaces, 2);
-        assert_eq!(markers[0].has_trailing_space, true);
+        assert!(markers[0].has_trailing_space);
     }
 }
