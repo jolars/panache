@@ -7,20 +7,21 @@ Pandoc, and Markdown files written in Rust. It's designed to understand
 Quarto/Pandoc-specific syntax that other formatters like Prettier and mdformat
 struggle with, including fenced divs, tables, and math formatting.
 
-**Syntax Reference**: See <a>`docs/pandoc-spec.md`</a> for comprehensive Pandoc
-syntax specification. This index document links to individual specification
-files organized by syntax element type (paragraphs, headings, lists, tables,
-etc.) in the <a>`docs/pandoc-spec/`</a> directory. These documents represent
-the definitive reference for elements that the parser should understand and
-handle correctly. This specification is essential for understanding formatting
-requirements, implementing parser logic, and ensuring spec compliance. panache
-aims to support the full suite of Pandoc syntax, including all extensions. It
-will also support all the Quarto-specific syntax extensions.
+**Syntax Reference**: See <a>`assets/pandoc-spec.md`</a> for comprehensive
+Pandoc syntax specification. This index document links to individual
+specification files organized by syntax element type (paragraphs, headings,
+lists, tables, etc.) in the <a>`assets/pandoc-spec/`</a> directory. These
+documents represent the definitive reference for elements that the parser
+should understand and handle correctly. This specification is essential for
+understanding formatting requirements, implementing parser logic, and ensuring
+spec compliance. panache aims to support the full suite of Pandoc syntax,
+including all extensions. It will also support all the Quarto-specific syntax
+extensions.
 
 **Key Facts:**
 
 - **Language**: Rust (2024 edition), stable toolchain
-- **Size**: ~20k lines across 72 files
+- **Size**: ~30k lines across 100+ files
 - **Architecture**: Binary crate with workspace containing WASM crate for web
   playground
 - **Status**: Early development - expect bugs and breaking changes
@@ -156,7 +157,7 @@ RUST_LOG=panache::parser::block_parser=trace,panache::formatter=debug panache fo
 
 ### Timing Notes
 
-- `cargo test`: ~1 second (591 lib tests + integration + doc tests = 616 total)
+- `cargo test`: ~1 second (229 total tests across all test suites)
 - `cargo build --release`: ~25 seconds
 - `cargo check`: ~1 second
 
@@ -189,17 +190,21 @@ src/
 │   ├── inline.rs           # Inline element formatting (emphasis, code, links)
 │   ├── headings.rs         # Heading formatting
 │   ├── utils.rs            # Helper functions (is_block_element)
+│   ├── indent_utils.rs     # Indentation utilities
 │   ├── blockquotes.rs      # Blockquote formatting logic
 │   ├── lists.rs            # List formatting logic (ordered/unordered/task)
 │   ├── tables.rs           # Table formatting logic (grid tables, pipe tables, simple tables)
 │   ├── fenced_divs.rs      # Fenced div formatting logic (Quarto/Pandoc)
-│   └── metadata.rs         # Frontmatter formatting logic (YAML, TOML, Pandoc)
+│   ├── metadata.rs         # Frontmatter formatting logic (YAML, TOML, Pandoc)
+│   ├── hashpipe.rs         # Hashpipe formatting (Quarto-specific)
+│   └── shortcodes.rs       # Shortcode formatting (Quarto-specific)
 ├── parser.rs            # Parser module entry point with parse() function
 ├── parser/
 │   ├── block_parser.rs      # Block parser module entry point
 │   ├── block_parser/
 │   │   ├── attributes.rs        # Attribute parsing ({#id .class key=value})
 │   │   ├── blockquotes.rs       # Blockquote parsing and resolution
+│   │   ├── chunk_options.rs     # Chunk option parsing (Quarto/RMarkdown)
 │   │   ├── code_blocks.rs       # Fenced code block parsing
 │   │   ├── container_stack.rs   # Container block stack management
 │   │   ├── definition_lists.rs  # Definition list parsing
@@ -212,6 +217,7 @@ src/
 │   │   ├── latex_envs.rs        # LaTeX environment parsing (\begin{} \end{})
 │   │   ├── line_blocks.rs       # Line block parsing (|)
 │   │   ├── lists.rs             # List parsing (ordered/unordered/task/definition)
+│   │   ├── marker_utils.rs      # List marker utilities
 │   │   ├── metadata.rs          # Frontmatter parsing (YAML, TOML, Pandoc title block)
 │   │   ├── paragraphs.rs        # Paragraph parsing
 │   │   ├── reference_definitions.rs # Reference link/footnote definition parsing
@@ -251,7 +257,20 @@ src/
 │   ├── documents.rs         # Document state management
 │   ├── handlers.rs          # LSP handler trait and implementations
 │   ├── handlers/            # Individual handler modules
+│   │   ├── code_actions.rs      # Code action implementations
+│   │   ├── diagnostics.rs       # Diagnostic publishing
+│   │   ├── document_symbols.rs  # Document outline/symbols
+│   │   ├── folding_ranges.rs    # Code folding ranges
+│   │   ├── formatting.rs        # Document/range formatting
+│   │   └── goto_definition.rs   # Go to definition support
+│   ├── helpers.rs           # Helper functions for LSP
 │   └── server.rs            # Backend server implementation
+├── metadata.rs          # Metadata module entry point
+├── metadata/
+│   ├── bibliography.rs      # Bibliography/citation handling
+│   └── yaml.rs              # YAML frontmatter utilities
+├── utils.rs             # General utility functions
+└── range_utils.rs       # Range manipulation utilities
 ├── external_formatters.rs       # Async external formatter integration
 ├── external_formatters_sync.rs  # Sync external formatter integration
 └── external_formatters_common.rs # Shared formatter utilities
@@ -289,17 +308,28 @@ citations = true
 
 ```
 tests/
-├── golden_cases.rs   # Main integration tests using test case directories
-├── cases/           # Input/expected output pairs (9 test scenarios)
+├── golden_cases.rs      # Main integration tests using test case directories
+├── cases/              # Input/expected output pairs (60+ test scenarios)
 │   ├── wrap_paragraph/
-│   │   ├── input.qmd     # Raw input
-│   │   └── expected.qmd  # Expected formatted output
+│   │   ├── ast.txt      # AST snapshot of input for debugging
+│   │   ├── panache.toml # Optional config for this test case
+│   │   ├── input.md     # Raw input (can be .md, .qmd, .Rmd)
+│   │   └── expected.md  # Expected formatted output (can be .md, .qmd, .Rmd)
 │   └── ...
-└── format/          # Unit tests organized by feature
-    ├── code_cells.rs
-    ├── headings.rs
-    ├── math.rs
-    └── ...
+├── cli/                # CLI integration tests
+│   ├── main.rs         # CLI test harness entry point
+│   ├── common.rs       # Shared test utilities
+│   ├── format.rs       # Format subcommand tests
+│   ├── parse.rs        # Parse subcommand tests
+│   ├── lint.rs         # Lint subcommand tests
+│   ├── lsp.rs          # LSP subcommand tests
+│   └── fixtures/       # Test fixtures for CLI tests
+├── format/             # Unit tests organized by feature
+│   ├── code_chunks.rs
+│   ├── headings.rs
+│   ├── yaml_frontmatter.rs
+│   └── ...
+└── external_linters.rs # External linter integration tests
 ```
 
 ### Workspace Structure
@@ -412,8 +442,14 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 - **textwrap**: Text wrapping functionality
 - **toml**: Configuration file parsing
 - **serde**: Serialization for config structs
-- **tokio**: Async runtime (added `io-std` feature for LSP stdin/stdout)
+- **tokio**: Async runtime (features: process, rt-multi-thread, io-util, io-std,
+  time, macros, fs)
 - **tower-lsp-server**: Community-maintained LSP framework (v0.23)
+- **similar**: Text diffing library for diagnostics
+- **serde-saphyr**: YAML parsing for frontmatter
+- **unicode-width**: Unicode character width calculations
+- **uuid**: UUID generation for LSP
+- **tempfile**: Temporary file handling for external formatters
 - **log** + **env_logger**: Logging infrastructure (debug builds have
   DEBUG/TRACE, release builds have INFO only)
 
@@ -490,6 +526,10 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 - ✅ `textDocument/codeAction` - Quick fixes for lint issues (heading hierarchy)
 - ✅ `textDocument/documentSymbol` - Document outline with headings, tables,
   and figures
+- ✅ `textDocument/foldingRange` - Code folding support for headings, code
+  blocks, lists, tables, and more
+- ✅ `textDocument/definition` - Go to definition for reference links and
+  footnotes
 - ✅ Config discovery from workspace root (`.panache.toml`)
 - ✅ Thread-safe document state management with Arc
 - ✅ UTF-16 to UTF-8 position conversion for proper incremental edits
@@ -524,12 +564,12 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 
 **Testing:**
 
-- 8 unit tests for document symbols (heading hierarchy, tables, figures, edge
-  cases)
-- 13 unit tests for conversion functions (offset_to_position,
-  convert_diagnostic, etc.)
+- Comprehensive unit tests for LSP handlers (symbols, folding, goto definition,
+  etc.)
+- Unit tests for conversion functions (offset_to_position, convert_diagnostic,
+  etc.)
 - Tests cover UTF-16 edge cases (emoji, accented characters)
-- Integration test document at `tests/document_symbols_test.qmd`
+- Integration test documents in `tests/` directory
 - Manual testing via editor integration (see README.md for editor configs)
 
 **Testing LSP Manually:**
@@ -566,12 +606,11 @@ Example log output (DEBUG level):
 
 ### Testing Approach
 
-- Unit tests embedded in source modules (110+ inline parser tests, 20+ block
-  parser tests)
+- Unit tests embedded in source modules (inline and block parser tests)
 - Integration tests for inline elements (architecture_tests.rs verifies nesting)
 - Golden tests comparing input/expected pairs (1 comprehensive test covering
-  9 scenarios)
-- Format tests organized by feature (20 tests for specific formatting scenarios)
+  60+ scenarios)
+- Format tests organized by feature (tests for specific formatting scenarios)
 - Property: formatting is idempotent
 - Test helpers abstract Config creation (parse_blocks(), parse_inline())
 
@@ -633,11 +672,13 @@ The `docs/playground/` contains a WASM-based web interface:
 ### DO:
 
 - Run full test suite after every change: `cargo test`
-- Ensure clippy passes: `cargo clippy -- -D warnings`
-- Ensure formatting passes: `cargo fmt -- --check`
+- Ensure clippy passes:
+  `cargo clippy --all-targets --all-features -- -D warnings`
+- Ensure formatting passes: `cargo fmt -- --check` (or just run `cargo fmt` to
+  format automatically)
 - Test CLI functionality after building release binary
 - Consider idempotency - formatting twice should equal formatting once
-- Update golden test expectations carefully:
+- Update golden test expectations (CAREFULLY!):
   - `UPDATE_EXPECTED=1 cargo test` for formatted outputs
   - `UPDATE_AST=1 cargo test` for AST snapshots
   - Both flags can be combined if needed
@@ -675,20 +716,20 @@ The `docs/playground/` contains a WASM-based web interface:
   - Placeholder modules exist for future extraction of complex logic (lists,
     tables, blockquotes)
   - Public API limited to `format_tree()` and `format_tree_async()`
-- LSP implementation in `src/lsp.rs`:
+- LSP implementation in `src/lsp/`:
   - Uses `spawn_blocking` wrapper to handle non-Send rowan types
   - Document state stored in Arc<Mutex<HashMap<String, String>>>
   - Config loaded per request from workspace root
-  - Returns to main crate via `io::Result<()>` (no additional error types
-    needed)
+  - Multiple handler modules for different LSP capabilities (formatting,
+    symbols, folding, diagnostics, goto definition, code actions)
+  - Helper functions in `helpers.rs` for common LSP operations
 - Config system provides extension flags to enable/disable features
   - Config fields marked `#[allow(dead_code)]` until features use them
 - Test helpers abstract Config creation to keep tests clean
 - WASM crate depends on main crate - changes affect both
-- Config system provides extension flags to enable/disable features
-  - Config fields marked `#[allow(dead_code)]` until features use them
-- Test helpers abstract Config creation to keep tests clean
-- WASM crate depends on main crate - changes affect both
+- Metadata module (`src/metadata/`) handles bibliography and YAML frontmatter
+  parsing
+- Range utilities (`src/range_utils.rs`) for range manipulation and validation
 
 **Trust these instructions and search only when information is incomplete or
 incorrect.**
