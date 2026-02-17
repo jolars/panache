@@ -157,7 +157,7 @@ RUST_LOG=panache::parser::block_parser=trace,panache::formatter=debug panache fo
 
 ### Timing Notes
 
-- `cargo test`: ~1 second (229 total tests across all test suites)
+- `cargo test`: ~1 second (817 total tests: 747 unit + 70 integration)
 - `cargo build --release`: ~25 seconds
 - `cargo check`: ~1 second
 
@@ -170,7 +170,14 @@ red-green tree structure for efficient syntax tree manipulation. It is vital
 that the parser preserves **every byte** of the input in the syntax tree,
 including structural markers like `>` for blockquotes, to ensure lossless
 parsing so that LSP and linting features can accurately map source locations.
-The formatter then traverses this tree to apply the formatting rules.
+
+**Typed AST Wrappers**: The CST provides low-level access via `SyntaxNode`, but
+for ergonomic use (especially in LSP), panache provides typed wrapper structs
+that implement the `AstNode` trait. These wrappers (e.g., `Heading`, `Link`,
+`Table`) provide type-safe access with convenient methods like `heading.level()`
+and `link.dest()`. This pattern is borrowed from rust-analyzer and significantly
+improves code readability in LSP handlers. The formatter works directly with
+`SyntaxNode` for maximum flexibility, but can use wrappers where beneficial.
 
 ### Source Structure
 
@@ -180,7 +187,14 @@ src/
 ├── lib.rs               # Public API with format() and parse() functions
 ├── cli.rs               # CLI argument definitions with clap
 ├── config.rs            # Configuration handling (.panache.toml, flavor, extensions)
-├── syntax.rs            # Syntax node definitions and AST types (rowan-based)
+├── syntax.rs            # Syntax module entry point (re-exports, type aliases)
+├── syntax/
+│   ├── kind.rs              # SyntaxKind enum (SCREAMING_SNAKE_CASE) + QuartoLanguage
+│   ├── ast.rs               # AstNode trait + support helpers for typed wrappers
+│   ├── headings.rs          # Heading, HeadingContent typed wrappers
+│   ├── links.rs             # Link, ImageLink, Figure typed wrappers
+│   ├── tables.rs            # Table typed wrappers (PipeTable, GridTable, etc.)
+│   └── references.rs        # ReferenceDefinition, Footnote typed wrappers
 ├── utils.rs             # General utility functions
 ├── range_utils.rs       # Range manipulation utilities
 ├── external_formatters.rs       # Async external formatter integration
@@ -308,6 +322,19 @@ line_width = 80
 hard_line_breaks = false
 citations = true
 ```
+
+### SyntaxKind Naming Convention
+
+All `SyntaxKind` enum variants follow **SCREAMING_SNAKE_CASE** convention,
+matching rust-analyzer and other rowan-based parsers:
+
+- ✅ `HEADING`, `PARAGRAPH`, `CODE_BLOCK`, `LINK`, `IMAGE_LINK`
+- ✅ `ATX_HEADING_MARKER`, `FOOTNOTE_REFERENCE`, `TABLE_CAPTION`
+- ❌ ~~`Heading`~~, ~~`CodeBlock`~~, ~~`ImageLink`~~ (old UpperCamelCase - removed)
+
+**Rationale**: These are CST discriminants, not type names. The `#[allow(non_camel_case_types)]`
+attribute suppresses Rust's lint warning. Typed wrappers use UpperCamelCase
+(`Heading`, `Link`, etc.) to distinguish them from the raw discriminants.
 
 ### Test Architecture
 
@@ -566,6 +593,39 @@ panache includes a built-in LSP implementation accessible via `panache lsp`:
 - Document symbols built synchronously (SyntaxNode is not Send)
 - INCREMENTAL sync mode with proper UTF-16/UTF-8 position conversion
 - Full document reparsing (incremental parsing deferred for performance need)
+- **Uses typed AST wrappers** for cleaner code: `Heading::cast(node)` provides
+  type-safe access with methods like `.level()` and `.text()` instead of manual
+  tree traversal
+
+**Typed AST Wrappers**:
+
+The `syntax` module provides typed wrappers following rust-analyzer's pattern:
+
+- **Location**: `src/syntax/ast.rs` defines `AstNode` trait
+- **Wrappers**: Implemented in `src/syntax/{headings,links,tables,references}.rs`
+- **Pattern**: Each wrapper wraps `SyntaxNode` and provides `cast()` method
+- **Benefits**: Type safety, ergonomic APIs, self-documenting code
+- **Usage**: Prefer wrappers in LSP handlers, optional in formatter
+- **Tier 1 implemented**: Heading, Link, Image, Table, Reference/Footnote types
+- **Future**: Tier 2 (CodeBlock, List, BlockQuote) and Tier 3 (inline formatting)
+
+Example:
+```rust
+// Without wrapper (manual tree traversal)
+if node.kind() == SyntaxKind::HEADING {
+    for child in node.children() {
+        if child.kind() == SyntaxKind::HEADING_CONTENT {
+            let text = child.text().to_string();
+        }
+    }
+}
+
+// With wrapper (type-safe and clean)
+if let Some(heading) = Heading::cast(node) {
+    let text = heading.text();
+    let level = heading.level();
+}
+```
 
 **Testing:**
 
