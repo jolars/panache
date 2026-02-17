@@ -23,7 +23,7 @@ pub fn parse_line_block(
 ) -> usize {
     log::debug!("Parsing line block at line {}", start_pos + 1);
 
-    builder.start_node(SyntaxKind::LineBlock.into());
+    builder.start_node(SyntaxKind::LINE_BLOCK.into());
 
     let mut pos = start_pos;
 
@@ -33,10 +33,10 @@ pub fn parse_line_block(
         // Check if this is a line block line (starts with |)
         if let Some(content_start) = parse_line_block_line_marker(line) {
             // This is a line block line
-            builder.start_node(SyntaxKind::LineBlockLine.into());
+            builder.start_node(SyntaxKind::LINE_BLOCK_LINE.into());
 
             // Emit the marker
-            builder.token(SyntaxKind::LineBlockMarker.into(), "| ");
+            builder.token(SyntaxKind::LINE_BLOCK_MARKER.into(), "| ");
 
             // Emit the content (preserving leading spaces)
             let content = &line[content_start..];
@@ -62,7 +62,7 @@ pub fn parse_line_block(
                 // Continuation line must start with space and not be a new line block line
                 if next_line.starts_with(' ') && !next_line.trim_start().starts_with("| ") {
                     // This is a continuation of the previous line
-                    builder.start_node(SyntaxKind::LineBlockLine.into());
+                    builder.start_node(SyntaxKind::LINE_BLOCK_LINE.into());
 
                     // Split off trailing newline if present
                     let (line_without_newline, newline_str) = strip_newline(next_line);

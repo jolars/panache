@@ -1,66 +1,66 @@
 ROOT@0..398
   DOCUMENT@0..398
-    Heading@0..22
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..22
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..21
+      HEADING_CONTENT@2..21
         TEXT@2..21 "RMarkdown Math Test"
       NEWLINE@21..22 "\n"
-    BlankLine@22..23
-      BlankLine@22..23 "\n"
+    BLANK_LINE@22..23
+      BLANK_LINE@22..23 "\n"
     PARAGRAPH@23..80
       TEXT@23..79 "RMarkdown uses backsl ..."
       NEWLINE@79..80 "\n"
-    BlankLine@80..81
-      BlankLine@80..81 "\n"
+    BLANK_LINE@80..81
+      BLANK_LINE@80..81 "\n"
     PARAGRAPH@81..150
       TEXT@81..121 "Inline math with back ..."
-      InlineMath@121..140
-        InlineMathMarker@121..123 "\\("
+      INLINE_MATH@121..140
+        INLINE_MATH_MARKER@121..123 "\\("
         TEXT@123..138 "x^2 + y^2 = z^2"
-        InlineMathMarker@138..140 "\\)"
+        INLINE_MATH_MARKER@138..140 "\\)"
       TEXT@140..149 " in text."
       NEWLINE@149..150 "\n"
-    BlankLine@150..151
-      BlankLine@150..151 "\n"
+    BLANK_LINE@150..151
+      BLANK_LINE@150..151 "\n"
     PARAGRAPH@151..189
       TEXT@151..188 "Display math with bac ..."
       NEWLINE@188..189 "\n"
-    BlankLine@189..190
-      BlankLine@189..190 "\n"
+    BLANK_LINE@189..190
+      BLANK_LINE@189..190 "\n"
     PARAGRAPH@190..245
-      DisplayMath@190..244
-        DisplayMathMarker@190..192 "\\["
+      DISPLAY_MATH@190..244
+        DISPLAY_MATH_MARKER@190..192 "\\["
         TEXT@192..242 "\n\\int_0^\\infty e^{-x^ ..."
-        DisplayMathMarker@242..244 "\\]"
+        DISPLAY_MATH_MARKER@242..244 "\\]"
       NEWLINE@244..245 "\n"
-    BlankLine@245..246
-      BlankLine@245..246 "\n"
+    BLANK_LINE@245..246
+      BLANK_LINE@245..246 "\n"
     PARAGRAPH@246..330
       TEXT@246..264 "More inline math: "
-      InlineMath@264..291
-        InlineMathMarker@264..266 "\\("
+      INLINE_MATH@264..291
+        INLINE_MATH_MARKER@264..266 "\\("
         TEXT@266..289 "\\alpha + \\beta = \\gamma"
-        InlineMathMarker@289..291 "\\)"
+        INLINE_MATH_MARKER@289..291 "\\)"
       TEXT@291..304 " and another "
-      InlineMath@304..328
-        InlineMathMarker@304..306 "\\("
+      INLINE_MATH@304..328
+        INLINE_MATH_MARKER@304..306 "\\("
         TEXT@306..326 "f(x) = ax^2 + bx + c"
-        InlineMathMarker@326..328 "\\)"
+        INLINE_MATH_MARKER@326..328 "\\)"
       TEXT@328..329 "."
       NEWLINE@329..330 "\n"
-    BlankLine@330..331
-      BlankLine@330..331 "\n"
+    BLANK_LINE@330..331
+      BLANK_LINE@330..331 "\n"
     PARAGRAPH@331..382
       TEXT@331..381 "Here's one that start ..."
       NEWLINE@381..382 "\n"
-    BlankLine@382..383
-      BlankLine@382..383 "\n"
+    BLANK_LINE@382..383
+      BLANK_LINE@382..383 "\n"
     PARAGRAPH@383..398
-      DisplayMath@383..397
-        DisplayMathMarker@383..385 "\\["
+      DISPLAY_MATH@383..397
+        DISPLAY_MATH_MARKER@383..385 "\\["
         TEXT@385..395 " e = mc^2\n"
-        DisplayMathMarker@395..397 "\\]"
+        DISPLAY_MATH_MARKER@395..397 "\\]"
       NEWLINE@397..398 "\n"
 

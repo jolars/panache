@@ -6,7 +6,7 @@ use rowan::NodeOrToken;
 pub fn collect_yaml_metadata(tree: &SyntaxNode) -> Option<String> {
     // Find YamlMetadata node
     for node in tree.descendants() {
-        if node.kind() == SyntaxKind::YamlMetadata {
+        if node.kind() == SyntaxKind::YAML_METADATA {
             // Extract YAML content between --- delimiters
             let mut yaml_content = String::new();
             let mut in_content = false;
@@ -15,7 +15,7 @@ pub fn collect_yaml_metadata(tree: &SyntaxNode) -> Option<String> {
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Token(token) => {
-                        if token.kind() == SyntaxKind::YamlMetadataDelim {
+                        if token.kind() == SyntaxKind::YAML_METADATA_DELIM {
                             if token.text() == "---" && !in_content {
                                 // Opening delimiter - start collecting (but skip next newline)
                                 in_content = true;

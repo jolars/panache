@@ -3,67 +3,67 @@ ROOT@0..693
     PARAGRAPH@0..22
       TEXT@0..21 "A simple bullet list:"
       NEWLINE@21..22 "\n"
-    BlankLine@22..23
-      BlankLine@22..23 "\n"
-    List@23..127
-      ListItem@23..36
-        ListMarker@23..24 "*"
+    BLANK_LINE@22..23
+      BLANK_LINE@22..23 "\n"
+    LIST@23..127
+      LIST_ITEM@23..36
+        LIST_MARKER@23..24 "*"
         WHITESPACE@24..25 " "
-        Plain@25..36
+        PLAIN@25..36
           TEXT@25..35 "First item"
           NEWLINE@35..36 "\n"
-      ListItem@36..114
-        ListMarker@36..37 "*"
+      LIST_ITEM@36..114
+        LIST_MARKER@36..37 "*"
         WHITESPACE@37..38 " "
-        Plain@38..114
+        PLAIN@38..114
           TEXT@38..113 "Second item with a lo ..."
           NEWLINE@113..114 "\n"
-      ListItem@114..127
-        ListMarker@114..115 "*"
+      LIST_ITEM@114..127
+        LIST_MARKER@114..115 "*"
         WHITESPACE@115..116 " "
-        Plain@116..127
+        PLAIN@116..127
           TEXT@116..126 "Third item"
           NEWLINE@126..127 "\n"
-    BlankLine@127..128
-      BlankLine@127..128 "\n"
+    BLANK_LINE@127..128
+      BLANK_LINE@127..128 "\n"
     PARAGRAPH@128..164
       TEXT@128..163 "Another list with dif ..."
       NEWLINE@163..164 "\n"
-    BlankLine@164..165
-      BlankLine@164..165 "\n"
-    List@165..693
-      ListItem@165..176
-        ListMarker@165..166 "-"
+    BLANK_LINE@164..165
+      BLANK_LINE@164..165 "\n"
+    LIST@165..693
+      LIST_ITEM@165..176
+        LIST_MARKER@165..166 "-"
         WHITESPACE@166..167 " "
         PARAGRAPH@167..176
           TEXT@167..175 "Item one"
           NEWLINE@175..176 "\n"
-      ListItem@176..187
-        ListMarker@176..177 "-"
+      LIST_ITEM@176..187
+        LIST_MARKER@176..177 "-"
         WHITESPACE@177..178 " "
         PARAGRAPH@178..187
           TEXT@178..186 "Item two"
           NEWLINE@186..187 "\n"
-      BlankLine@187..188
-        BlankLine@187..188 "\n"
-      ListItem@188..323
-        ListMarker@188..189 "-"
+      BLANK_LINE@187..188
+        BLANK_LINE@187..188 "\n"
+      LIST_ITEM@188..323
+        LIST_MARKER@188..189 "-"
         WHITESPACE@189..192 "   "
         PARAGRAPH@192..323
           TEXT@192..263 "A function has a name ..."
           NEWLINE@263..264 "\n"
           TEXT@264..322 "and when called it ev ..."
           NEWLINE@322..323 "\n"
-      ListItem@323..454
-        ListMarker@323..324 "-"
+      LIST_ITEM@323..454
+        LIST_MARKER@323..324 "-"
         WHITESPACE@324..327 "   "
         PARAGRAPH@327..454
           TEXT@327..400 "The function returns  ..."
           NEWLINE@400..401 "\n"
           TEXT@401..453 "when the body contain ..."
           NEWLINE@453..454 "\n"
-      ListItem@454..615
-        ListMarker@454..455 "-"
+      LIST_ITEM@454..615
+        LIST_MARKER@454..455 "-"
         WHITESPACE@455..458 "   "
         PARAGRAPH@458..615
           TEXT@458..524 "Formal arguments can  ..."
@@ -72,8 +72,8 @@ ROOT@0..693
           NEWLINE@602..603 "\n"
           TEXT@603..614 "as by name."
           NEWLINE@614..615 "\n"
-      ListItem@615..693
-        ListMarker@615..616 "-"
+      LIST_ITEM@615..693
+        LIST_MARKER@615..616 "-"
         WHITESPACE@616..619 "   "
         PARAGRAPH@619..693
           TEXT@619..692 "Functions should do a ..."

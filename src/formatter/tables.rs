@@ -101,14 +101,14 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
 
     for child in node.children() {
         match child.kind() {
-            SyntaxKind::TableCaption => {
+            SyntaxKind::TABLE_CAPTION => {
                 // Build normalized caption: "Table: " + caption text (without prefix)
                 let mut caption_text = String::from("Table: ");
 
                 for caption_child in child.children_with_tokens() {
                     match caption_child {
                         rowan::NodeOrToken::Token(token)
-                            if token.kind() == SyntaxKind::TableCaptionPrefix =>
+                            if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
                         {
                             // Skip the original prefix - we're adding normalized "Table: " above
                         }
@@ -124,12 +124,12 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                 caption = Some(caption_text.trim().to_string());
                 caption_after = seen_separator; // After if we've seen separator/rows
             }
-            SyntaxKind::TableSeparator => {
+            SyntaxKind::TABLE_SEPARATOR => {
                 let separator_text = child.text().to_string();
                 alignments = extract_alignments(&separator_text);
                 seen_separator = true;
             }
-            SyntaxKind::TableHeader | SyntaxKind::TableRow => {
+            SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW => {
                 let row_content = format_cell_content(&child, config);
                 let cells = split_row(&row_content);
                 rows.push(cells);
@@ -373,14 +373,14 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> TableData {
 
     for child in node.children() {
         match child.kind() {
-            SyntaxKind::TableCaption => {
+            SyntaxKind::TABLE_CAPTION => {
                 // Build normalized caption: "Table: " + caption text (without prefix)
                 let mut caption_text = String::from("Table: ");
 
                 for caption_child in child.children_with_tokens() {
                     match caption_child {
                         rowan::NodeOrToken::Token(token)
-                            if token.kind() == SyntaxKind::TableCaptionPrefix =>
+                            if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
                         {
                             // Skip the original prefix
                         }
@@ -396,7 +396,7 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                 caption = Some(caption_text.trim().to_string());
                 caption_after = seen_header; // After if we've seen table content
             }
-            SyntaxKind::TableSeparator => {
+            SyntaxKind::TABLE_SEPARATOR => {
                 let separator_text = child.text().to_string();
 
                 // Always extract alignments from separators (if not already set)
@@ -413,7 +413,7 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                     seen_header = true;
                 }
             }
-            SyntaxKind::TableHeader | SyntaxKind::TableRow => {
+            SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW => {
                 let row_content = format_cell_content(&child, config);
                 let cells = split_grid_row(&row_content);
                 rows.push(cells);

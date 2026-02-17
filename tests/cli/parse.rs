@@ -13,7 +13,7 @@ fn test_parse_stdin() {
         .assert()
         .success()
         .stdout(predicate::str::contains("ROOT"))
-        .stdout(predicate::str::contains("Heading"));
+        .stdout(predicate::str::contains("HEADING"));
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn test_parse_simple_file() {
         .assert()
         .success()
         .stdout(predicate::str::contains("ROOT"))
-        .stdout(predicate::str::contains("Heading"))
+        .stdout(predicate::str::contains("HEADING"))
         .stdout(predicate::str::contains("PARAGRAPH"));
 }
 
@@ -70,9 +70,9 @@ fn test_parse_complex_document() {
         .args(["parse", test_file.to_str().unwrap()])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Heading"))
-        .stdout(predicate::str::contains("List"))
-        .stdout(predicate::str::contains("PipeTable"));
+        .stdout(predicate::str::contains("HEADING"))
+        .stdout(predicate::str::contains("LIST"))
+        .stdout(predicate::str::contains("PIPE_TABLE"));
 }
 
 #[test]

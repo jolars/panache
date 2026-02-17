@@ -40,12 +40,12 @@ pub(crate) fn try_parse_horizontal_rule(line: &str) -> Option<char> {
 
 /// Emit a horizontal rule node to the builder.
 pub(crate) fn emit_horizontal_rule(builder: &mut GreenNodeBuilder<'static>, line: &str) {
-    builder.start_node(SyntaxKind::HorizontalRule.into());
+    builder.start_node(SyntaxKind::HORIZONTAL_RULE.into());
 
     // Strip trailing newline and emit the rule content (trimmed)
     let (line_without_newline, newline_str) = strip_newline(line);
     let content = line_without_newline.trim();
-    builder.token(SyntaxKind::HorizontalRule.into(), content);
+    builder.token(SyntaxKind::HORIZONTAL_RULE.into(), content);
 
     // Emit newline separately if present
     if !newline_str.is_empty() {

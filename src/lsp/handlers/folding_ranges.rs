@@ -52,22 +52,22 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
 
     for node in document.children() {
         match node.kind() {
-            SyntaxKind::Heading => {
+            SyntaxKind::HEADING => {
                 let level = get_heading_level(&node);
                 let start_offset = node.text_range().start().into();
                 heading_positions.push((level, start_offset));
             }
-            SyntaxKind::CodeBlock => {
+            SyntaxKind::CODE_BLOCK => {
                 if let Some(range) = extract_code_block_range(&node, content) {
                     ranges.push(range);
                 }
             }
-            SyntaxKind::FencedDiv => {
+            SyntaxKind::FENCED_DIV => {
                 if let Some(range) = extract_fenced_div_range(&node, content) {
                     ranges.push(range);
                 }
             }
-            SyntaxKind::YamlMetadata => {
+            SyntaxKind::YAML_METADATA => {
                 if let Some(range) = extract_yaml_metadata_range(&node, content) {
                     ranges.push(range);
                 }
@@ -115,11 +115,11 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
 fn get_heading_level(heading: &SyntaxNode) -> usize {
     // Count # markers or determine from setext underline
     for child in heading.children() {
-        if child.kind() == SyntaxKind::AtxHeadingMarker {
+        if child.kind() == SyntaxKind::ATX_HEADING_MARKER {
             let text = child.text().to_string();
             return text.chars().filter(|&c| c == '#').count();
         }
-        if child.kind() == SyntaxKind::SetextHeadingUnderline {
+        if child.kind() == SyntaxKind::SETEXT_HEADING_UNDERLINE {
             let text = child.text().to_string();
             return if text.contains('=') { 1 } else { 2 };
         }

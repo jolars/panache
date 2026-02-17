@@ -13,7 +13,7 @@ impl Formatter {
     pub(super) fn extract_list_marker(node: &SyntaxNode) -> Option<String> {
         for el in node.children_with_tokens() {
             if let NodeOrToken::Token(t) = el
-                && t.kind() == SyntaxKind::ListMarker
+                && t.kind() == SyntaxKind::LIST_MARKER
             {
                 let marker = t.text().to_string();
                 // Standardize bullet list markers: convert *, +, - to "-"
@@ -31,7 +31,7 @@ impl Formatter {
     pub(super) fn calculate_max_marker_width(list_node: &SyntaxNode) -> usize {
         let markers: Vec<String> = list_node
             .children()
-            .filter(|child| child.kind() == SyntaxKind::ListItem)
+            .filter(|child| child.kind() == SyntaxKind::LIST_ITEM)
             .filter_map(|item| Self::extract_list_marker(&item))
             .collect();
 
@@ -60,7 +60,7 @@ impl Formatter {
         // Check for task checkbox (adds 4 more characters: "[x] ")
         let has_checkbox = item_node.children_with_tokens().any(|el| {
             if let NodeOrToken::Token(t) = el {
-                t.kind() == SyntaxKind::TaskCheckbox
+                t.kind() == SyntaxKind::TASK_CHECKBOX
             } else {
                 false
             }
@@ -105,7 +105,7 @@ impl Formatter {
         // If previous was a List, it already has spacing and we normalize markers instead.
         let prev_is_list = node
             .prev_sibling()
-            .map(|prev| matches!(prev.kind(), SyntaxKind::List | SyntaxKind::BlankLine))
+            .map(|prev| matches!(prev.kind(), SyntaxKind::LIST | SyntaxKind::BLANK_LINE))
             .unwrap_or(false);
 
         if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") && !prev_is_list
@@ -121,10 +121,10 @@ impl Formatter {
         // (Parser marks loose lists with PARAGRAPH, tight lists with Plain)
         let is_loose = node
             .children()
-            .find(|child| child.kind() == SyntaxKind::ListItem)
+            .find(|child| child.kind() == SyntaxKind::LIST_ITEM)
             .and_then(|item| {
                 item.children()
-                    .find(|c| matches!(c.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::Plain))
+                    .find(|c| matches!(c.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN))
             })
             .map(|wrapper| wrapper.kind() == SyntaxKind::PARAGRAPH)
             .unwrap_or(false);
@@ -134,13 +134,13 @@ impl Formatter {
         let mut item_count = 0;
         let total_items = node
             .children()
-            .filter(|c| c.kind() == SyntaxKind::ListItem)
+            .filter(|c| c.kind() == SyntaxKind::LIST_ITEM)
             .count();
 
         let mut last_item_content_indent = 0;
 
         for child in node.children() {
-            if child.kind() == SyntaxKind::ListItem {
+            if child.kind() == SyntaxKind::LIST_ITEM {
                 item_count += 1;
 
                 // Strip double newlines ONLY between items within a tight list
@@ -161,13 +161,13 @@ impl Formatter {
                 if is_loose && item_count < total_items && !self.output.ends_with("\n\n") {
                     self.output.push('\n');
                 }
-            } else if child.kind() == SyntaxKind::BlankLine {
+            } else if child.kind() == SyntaxKind::BLANK_LINE {
                 // Skip BlankLine nodes - we're normalizing spacing based on loose/tight
                 continue;
             } else if child.kind() == SyntaxKind::PARAGRAPH {
                 // Paragraphs that are siblings of ListItems are continuation content
                 self.format_list_continuation_paragraph(&child, last_item_content_indent);
-            } else if child.kind() == SyntaxKind::CodeBlock {
+            } else if child.kind() == SyntaxKind::CODE_BLOCK {
                 // Code blocks that are siblings of ListItems are also continuation content
                 self.format_indented_code_block(&child, last_item_content_indent);
             } else {
@@ -191,11 +191,11 @@ impl Formatter {
         let mut seen_marker = false;
         for el in node.children_with_tokens() {
             match el {
-                rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::ListMarker => {
+                rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::LIST_MARKER => {
                     seen_marker = true;
                 }
                 rowan::NodeOrToken::Node(n)
-                    if matches!(n.kind(), SyntaxKind::Plain | SyntaxKind::PARAGRAPH) =>
+                    if matches!(n.kind(), SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH) =>
                 {
                     // Only return Plain/PARAGRAPH nodes that come after the marker
                     if seen_marker {
@@ -226,7 +226,7 @@ impl Formatter {
                         // Skip - we don't accumulate source indentation
                         // The `indent` parameter determines output indentation
                     }
-                    SyntaxKind::ListMarker => {
+                    SyntaxKind::LIST_MARKER => {
                         let raw_marker = t.text().to_string();
                         original_marker = raw_marker.clone();
                         // Standardize bullet list markers to "-"
@@ -238,7 +238,7 @@ impl Formatter {
                             raw_marker
                         };
                     }
-                    SyntaxKind::TaskCheckbox => {
+                    SyntaxKind::TASK_CHECKBOX => {
                         checkbox = Some(t.text().to_string());
                     }
                     _ => {}
@@ -336,13 +336,13 @@ impl Formatter {
         // Skip Plain/PARAGRAPH nodes that were already processed for word wrapping.
         for child in node.children() {
             match child.kind() {
-                SyntaxKind::Plain | SyntaxKind::PARAGRAPH => {
+                SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH => {
                     // These blocks are already handled by word wrapping above if they're
                     // direct children. Only process Plain/PARAGRAPH if it comes after a BlankLine
                     // (indicating it's a true continuation paragraph, not the first content).
                     let has_blank_before = child
                         .prev_sibling()
-                        .map(|prev| prev.kind() == SyntaxKind::BlankLine)
+                        .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
                         .unwrap_or(false);
 
                     if has_blank_before {
@@ -351,19 +351,19 @@ impl Formatter {
                     }
                     // Otherwise skip - already handled
                 }
-                SyntaxKind::List => {
+                SyntaxKind::LIST => {
                     // Nested list indent: base + marker + 1 space + checkbox
                     self.format_node_sync(
                         &child,
                         total_indent + list_indent.marker_width + 1 + list_indent.checkbox_width,
                     );
                 }
-                SyntaxKind::CodeBlock => {
+                SyntaxKind::CODE_BLOCK => {
                     // Code blocks in list items need indentation
                     let content_indent = list_indent.hanging_indent(total_indent);
                     self.format_indented_code_block(&child, content_indent);
                 }
-                SyntaxKind::BlankLine => {
+                SyntaxKind::BLANK_LINE => {
                     // Blank lines within list items
                     self.output.push('\n');
                 }

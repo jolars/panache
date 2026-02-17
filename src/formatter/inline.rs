@@ -7,20 +7,20 @@ use rowan::NodeOrToken;
 #[allow(clippy::only_used_in_recursion)]
 pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
     match node.kind() {
-        SyntaxKind::CodeSpan => {
+        SyntaxKind::CODE_SPAN => {
             let mut content = String::new();
             let mut backtick_count = 1;
             let mut attributes = String::new();
 
             for child in node.children_with_tokens() {
                 match child {
-                    NodeOrToken::Node(n) if n.kind() == SyntaxKind::Attribute => {
+                    NodeOrToken::Node(n) if n.kind() == SyntaxKind::ATTRIBUTE => {
                         attributes = n.text().to_string();
                     }
                     NodeOrToken::Token(t) => {
-                        if t.kind() == SyntaxKind::CodeSpanMarker {
+                        if t.kind() == SyntaxKind::CODE_SPAN_MARKER {
                             backtick_count = t.text().len();
-                        } else if t.kind() != SyntaxKind::Attribute {
+                        } else if t.kind() != SyntaxKind::ATTRIBUTE {
                             content.push_str(t.text());
                         }
                     }
@@ -36,7 +36,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 attributes
             )
         }
-        SyntaxKind::RawInline => {
+        SyntaxKind::RAW_INLINE => {
             // Format raw inline span: `content`{=format}
             let mut content = String::new();
             let mut backtick_count = 1;
@@ -44,13 +44,13 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
 
             for child in node.children_with_tokens() {
                 match child {
-                    NodeOrToken::Node(n) if n.kind() == SyntaxKind::Attribute => {
+                    NodeOrToken::Node(n) if n.kind() == SyntaxKind::ATTRIBUTE => {
                         format_attr = n.text().to_string();
                     }
                     NodeOrToken::Token(t) => {
-                        if t.kind() == SyntaxKind::RawInlineMarker {
+                        if t.kind() == SyntaxKind::RAW_INLINE_MARKER {
                             backtick_count = t.text().len();
-                        } else if t.kind() == SyntaxKind::RawInlineContent {
+                        } else if t.kind() == SyntaxKind::RAW_INLINE_CONTENT {
                             content.push_str(t.text());
                         }
                     }
@@ -66,13 +66,13 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 format_attr
             )
         }
-        SyntaxKind::Emphasis => {
+        SyntaxKind::EMPHASIS => {
             let mut content = String::new();
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Node(n) => content.push_str(&format_inline_node(&n, config)),
                     NodeOrToken::Token(t) => {
-                        if t.kind() != SyntaxKind::EmphasisMarker {
+                        if t.kind() != SyntaxKind::EMPHASIS_MARKER {
                             content.push_str(t.text());
                         }
                     }
@@ -80,13 +80,13 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             }
             format!("*{}*", content)
         }
-        SyntaxKind::Strong => {
+        SyntaxKind::STRONG => {
             let mut content = String::new();
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Node(n) => content.push_str(&format_inline_node(&n, config)),
                     NodeOrToken::Token(t) => {
-                        if t.kind() != SyntaxKind::StrongMarker {
+                        if t.kind() != SyntaxKind::STRONG_MARKER {
                             content.push_str(t.text());
                         }
                     }
@@ -94,7 +94,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             }
             format!("**{}**", content)
         }
-        SyntaxKind::BracketedSpan => {
+        SyntaxKind::BRACKETED_SPAN => {
             // Format bracketed span: [content]{.attributes}
             // Need to traverse children to avoid extra spaces
             let mut result = String::new();
@@ -105,7 +105,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                     }
                     NodeOrToken::Node(n) => {
                         // Recursively format nested content
-                        if n.kind() == SyntaxKind::SpanContent {
+                        if n.kind() == SyntaxKind::SPAN_CONTENT {
                             for elem in n.children_with_tokens() {
                                 match elem {
                                     NodeOrToken::Token(t) => result.push_str(t.text()),
@@ -114,7 +114,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                                     }
                                 }
                             }
-                        } else if n.kind() == SyntaxKind::SpanAttributes {
+                        } else if n.kind() == SyntaxKind::SPAN_ATTRIBUTES {
                             // Normalize attributes: skip WHITESPACE, join with single space
                             result.push('{');
                             let mut attr_parts = Vec::new();
@@ -142,10 +142,10 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             }
             result
         }
-        SyntaxKind::InlineMath => {
+        SyntaxKind::INLINE_MATH => {
             // Check if this is display math (has DisplayMathMarker)
             let is_display_math = node.children_with_tokens().any(|t| {
-                matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DisplayMathMarker)
+                matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DISPLAY_MATH_MARKER)
             });
 
             // Get the actual content (TEXT token, not node)
@@ -164,8 +164,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 .children_with_tokens()
                 .find_map(|t| match t {
                     NodeOrToken::Token(tok)
-                        if tok.kind() == SyntaxKind::InlineMathMarker
-                            || tok.kind() == SyntaxKind::DisplayMathMarker =>
+                        if tok.kind() == SyntaxKind::INLINE_MATH_MARKER
+                            || tok.kind() == SyntaxKind::DISPLAY_MATH_MARKER =>
                     {
                         Some(tok.text().to_string())
                     }
@@ -218,7 +218,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 format!("{}{}{}", open, content, close)
             }
         }
-        SyntaxKind::DisplayMath => {
+        SyntaxKind::DISPLAY_MATH => {
             // Display math: $$content$$ or \[content\] or \\[content\\]
             // Format on separate lines with proper normalization
             let mut content = String::new();
@@ -227,7 +227,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
 
             for child in node.children_with_tokens() {
                 if let NodeOrToken::Token(tok) = child {
-                    if tok.kind() == SyntaxKind::DisplayMathMarker {
+                    if tok.kind() == SyntaxKind::DISPLAY_MATH_MARKER {
                         if opening_marker.is_none() {
                             opening_marker = Some(tok.text().to_string());
                         } else {
@@ -283,7 +283,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             result.push_str(close);
             result
         }
-        SyntaxKind::HardLineBreak => {
+        SyntaxKind::HARD_LINE_BREAK => {
             // Normalize hard line breaks to backslash-newline when escaped_line_breaks is enabled
             // Otherwise preserve original format (trailing spaces)
             if config.extensions.escaped_line_breaks {
@@ -292,7 +292,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 node.text().to_string()
             }
         }
-        SyntaxKind::Shortcode => {
+        SyntaxKind::SHORTCODE => {
             // Format Quarto shortcodes with normalized spacing
             format_shortcode(node)
         }

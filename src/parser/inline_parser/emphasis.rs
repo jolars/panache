@@ -365,17 +365,17 @@ pub fn emit_emphasis(
 
     match level {
         1 => {
-            builder.start_node(SyntaxKind::Emphasis.into());
-            builder.token(SyntaxKind::EmphasisMarker.into(), delim);
+            builder.start_node(SyntaxKind::EMPHASIS.into());
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), delim);
             builder.token(SyntaxKind::TEXT.into(), inner_text);
-            builder.token(SyntaxKind::EmphasisMarker.into(), delim);
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), delim);
             builder.finish_node();
         }
         2 => {
-            builder.start_node(SyntaxKind::Strong.into());
-            builder.token(SyntaxKind::StrongMarker.into(), delim);
+            builder.start_node(SyntaxKind::STRONG.into());
+            builder.token(SyntaxKind::STRONG_MARKER.into(), delim);
             builder.token(SyntaxKind::TEXT.into(), inner_text);
-            builder.token(SyntaxKind::StrongMarker.into(), delim);
+            builder.token(SyntaxKind::STRONG_MARKER.into(), delim);
             builder.finish_node();
         }
         _ => {
@@ -383,16 +383,16 @@ pub fn emit_emphasis(
             let inner_delim = if delim_char == '_' { "_" } else { "*" };
             let outer_delim = if delim_char == '_' { "__" } else { "**" };
 
-            builder.start_node(SyntaxKind::Strong.into());
-            builder.token(SyntaxKind::StrongMarker.into(), outer_delim);
+            builder.start_node(SyntaxKind::STRONG.into());
+            builder.token(SyntaxKind::STRONG_MARKER.into(), outer_delim);
 
-            builder.start_node(SyntaxKind::Emphasis.into());
-            builder.token(SyntaxKind::EmphasisMarker.into(), inner_delim);
+            builder.start_node(SyntaxKind::EMPHASIS.into());
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), inner_delim);
             builder.token(SyntaxKind::TEXT.into(), inner_text);
-            builder.token(SyntaxKind::EmphasisMarker.into(), inner_delim);
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), inner_delim);
             builder.finish_node();
 
-            builder.token(SyntaxKind::StrongMarker.into(), outer_delim);
+            builder.token(SyntaxKind::STRONG_MARKER.into(), outer_delim);
             builder.finish_node();
         }
     }

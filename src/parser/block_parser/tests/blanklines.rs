@@ -7,7 +7,7 @@ fn blankline_between_paragraphs() {
         "Paragraph 1\n\nParagraph 2\n",
         &[
             SyntaxKind::PARAGRAPH,
-            SyntaxKind::BlankLine,
+            SyntaxKind::BLANK_LINE,
             SyntaxKind::PARAGRAPH,
         ],
     );
@@ -19,9 +19,9 @@ fn multiple_blanklines_between_paragraphs() {
         "Paragraph 1\n\n\n\nParagraph 2\n",
         &[
             SyntaxKind::PARAGRAPH,
-            SyntaxKind::BlankLine,
-            SyntaxKind::BlankLine,
-            SyntaxKind::BlankLine,
+            SyntaxKind::BLANK_LINE,
+            SyntaxKind::BLANK_LINE,
+            SyntaxKind::BLANK_LINE,
             SyntaxKind::PARAGRAPH,
         ],
     );
@@ -31,6 +31,6 @@ fn multiple_blanklines_between_paragraphs() {
 fn blankline_before_paragraph() {
     assert_block_kinds(
         "\nParagraph 1\n",
-        &[SyntaxKind::BlankLine, SyntaxKind::PARAGRAPH],
+        &[SyntaxKind::BLANK_LINE, SyntaxKind::PARAGRAPH],
     );
 }

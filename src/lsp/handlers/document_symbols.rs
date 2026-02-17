@@ -64,7 +64,7 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
 
     for node in document.children() {
         match node.kind() {
-            SyntaxKind::Heading => {
+            SyntaxKind::HEADING => {
                 if let Some(symbol) = extract_heading_symbol(&node, content) {
                     let level = get_heading_level(&node);
 
@@ -86,10 +86,10 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
                     heading_stack.push((level, symbol));
                 }
             }
-            SyntaxKind::SimpleTable
-            | SyntaxKind::PipeTable
-            | SyntaxKind::GridTable
-            | SyntaxKind::MultilineTable => {
+            SyntaxKind::SIMPLE_TABLE
+            | SyntaxKind::PIPE_TABLE
+            | SyntaxKind::GRID_TABLE
+            | SyntaxKind::MULTILINE_TABLE => {
                 if let Some(symbol) = extract_table_symbol(&node, content) {
                     // Add to current heading section or root
                     if let Some((_, heading)) = heading_stack.last_mut() {
@@ -99,11 +99,11 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
                     }
                 }
             }
-            SyntaxKind::Figure => {
+            SyntaxKind::FIGURE => {
                 // Figure is a standalone image block
                 // Look for ImageLink child
                 for child in node.children() {
-                    if child.kind() == SyntaxKind::ImageLink
+                    if child.kind() == SyntaxKind::IMAGE_LINK
                         && let Some(symbol) = extract_figure_symbol(&child, content)
                     {
                         // Add to current heading section or root
@@ -119,7 +119,7 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
                 // Check if paragraph contains an ImageLink (figure)
                 // This handles the old case where images were in paragraphs
                 for child in node.children() {
-                    if child.kind() == SyntaxKind::ImageLink
+                    if child.kind() == SyntaxKind::IMAGE_LINK
                         && let Some(symbol) = extract_figure_symbol(&child, content)
                     {
                         // Add to current heading section or root
@@ -150,7 +150,7 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
 fn get_heading_level(node: &SyntaxNode) -> usize {
     // Count ATX markers (#)
     for child in node.children() {
-        if child.kind() == SyntaxKind::AtxHeadingMarker {
+        if child.kind() == SyntaxKind::ATX_HEADING_MARKER {
             let text = child.text().to_string();
             return text.chars().filter(|&c| c == '#').count();
         }
@@ -178,7 +178,7 @@ fn extract_heading_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSy
 
 fn extract_heading_text(node: &SyntaxNode) -> Option<String> {
     for child in node.children() {
-        if child.kind() == SyntaxKind::HeadingContent {
+        if child.kind() == SyntaxKind::HEADING_CONTENT {
             let text = child.text().to_string().trim().to_string();
             return if text.is_empty() {
                 Some("(empty)".to_string())
@@ -216,7 +216,7 @@ fn extract_table_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymb
 
 fn extract_table_caption(node: &SyntaxNode) -> Option<String> {
     for child in node.children() {
-        if child.kind() == SyntaxKind::TableCaption {
+        if child.kind() == SyntaxKind::TABLE_CAPTION {
             let text = child.text().to_string().trim().to_string();
             return if text.is_empty() { None } else { Some(text) };
         }
@@ -250,7 +250,7 @@ fn extract_figure_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSym
 
 fn extract_image_alt(node: &SyntaxNode) -> Option<String> {
     for child in node.children() {
-        if child.kind() == SyntaxKind::ImageAlt {
+        if child.kind() == SyntaxKind::IMAGE_ALT {
             let text = child.text().to_string().trim().to_string();
             return if text.is_empty() { None } else { Some(text) };
         }

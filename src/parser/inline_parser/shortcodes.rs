@@ -71,14 +71,14 @@ pub(crate) fn try_parse_shortcode(text: &str) -> Option<(usize, String, bool)> {
 
 /// Emit a shortcode node
 pub(crate) fn emit_shortcode(builder: &mut GreenNodeBuilder, content: &str, is_escaped: bool) {
-    builder.start_node(SyntaxKind::Shortcode.into());
+    builder.start_node(SyntaxKind::SHORTCODE.into());
 
     // Opening marker
     let open_marker = if is_escaped { "{{{<" } else { "{{<" };
-    builder.token(SyntaxKind::ShortcodeMarkerOpen.into(), open_marker);
+    builder.token(SyntaxKind::SHORTCODE_MARKER_OPEN.into(), open_marker);
 
     // Content (preserved as-is, formatter will normalize)
-    builder.start_node(SyntaxKind::ShortcodeContent.into());
+    builder.start_node(SyntaxKind::SHORTCODE_CONTENT.into());
 
     // Emit content as TEXT, preserving all whitespace
     if !content.is_empty() {
@@ -89,7 +89,7 @@ pub(crate) fn emit_shortcode(builder: &mut GreenNodeBuilder, content: &str, is_e
 
     // Closing marker
     let close_marker = if is_escaped { ">}}}" } else { ">}}" };
-    builder.token(SyntaxKind::ShortcodeMarkerClose.into(), close_marker);
+    builder.token(SyntaxKind::SHORTCODE_MARKER_CLOSE.into(), close_marker);
 
     builder.finish_node(); // Shortcode
 }

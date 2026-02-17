@@ -7,24 +7,24 @@ ROOT@0..476
       NEWLINE@149..150 "\n"
       TEXT@150..223 "breaks when the lines ..."
       NEWLINE@223..224 "\n"
-    BlankLine@224..225
-      BlankLine@224..225 "\n"
+    BLANK_LINE@224..225
+      BLANK_LINE@224..225 "\n"
     PARAGRAPH@225..283
       TEXT@225..282 "Here is a new paragra ..."
       NEWLINE@282..283 "\n"
-    BlankLine@283..284
-      BlankLine@283..284 "\n"
+    BLANK_LINE@283..284
+      BLANK_LINE@283..284 "\n"
     PARAGRAPH@284..354
       TEXT@284..326 "Here is a paragraph w ..."
-      HardLineBreak@326..328 "\\\n"
+      HARD_LINE_BREAK@326..328 "\\\n"
       TEXT@328..352 "It should not be wrapped"
       TEXT@352..353 "!"
       NEWLINE@353..354 "\n"
-    BlankLine@354..355
-      BlankLine@354..355 "\n"
+    BLANK_LINE@354..355
+      BLANK_LINE@354..355 "\n"
     PARAGRAPH@355..476
       TEXT@355..414 "Here is a paragraph w ..."
-      HardLineBreak@414..417 "  \n"
+      HARD_LINE_BREAK@414..417 "  \n"
       TEXT@417..474 "This is also a hard l ..."
       TEXT@474..475 "!"
       NEWLINE@475..476 "\n"

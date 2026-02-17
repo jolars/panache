@@ -81,7 +81,7 @@ fn find_yaml_metadata_node(tree: &crate::syntax::SyntaxNode) -> Option<crate::sy
     use crate::syntax::SyntaxKind;
 
     tree.descendants()
-        .find(|child| child.kind() == SyntaxKind::YamlMetadata)
+        .find(|child| child.kind() == SyntaxKind::YAML_METADATA)
 }
 
 #[cfg(test)]

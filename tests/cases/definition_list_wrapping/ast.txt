@@ -1,22 +1,22 @@
 ROOT@0..115
   DOCUMENT@0..115
-    DefinitionList@0..115
-      DefinitionItem@0..115
-        Term@0..14
+    DEFINITION_LIST@0..115
+      DEFINITION_ITEM@0..115
+        TERM@0..14
           TEXT@0..13 "2024--present"
           NEWLINE@13..14 "\n"
-        Definition@14..115
-          DefinitionMarker@14..15 ":"
+        DEFINITION@14..115
+          DEFINITION_MARKER@14..15 ":"
           WHITESPACE@15..18 "   "
-          Plain@18..115
-            Strong@18..52
-              StrongMarker@18..20 "**"
+          PLAIN@18..115
+            STRONG@18..52
+              STRONG_MARKER@18..20 "**"
               TEXT@20..50 "Thiele Postdoctoral R ..."
-              StrongMarker@50..52 "**"
+              STRONG_MARKER@50..52 "**"
             TEXT@52..54 ", "
-            Emphasis@54..114
-              EmphasisMarker@54..55 "*"
+            EMPHASIS@54..114
+              EMPHASIS_MARKER@54..55 "*"
               TEXT@55..113 "Department of Mathema ..."
-              EmphasisMarker@113..114 "*"
+              EMPHASIS_MARKER@113..114 "*"
             NEWLINE@114..115 "\n"
 

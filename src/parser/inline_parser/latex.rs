@@ -123,7 +123,7 @@ fn skip_braced_arg(text: &str, start: usize) -> Option<usize> {
 
 /// Parse a LaTeX command and add it to the builder.
 pub(crate) fn parse_latex_command(builder: &mut GreenNodeBuilder, text: &str, len: usize) {
-    builder.start_node(SyntaxKind::LatexCommand.into());
+    builder.start_node(SyntaxKind::LATEX_COMMAND.into());
     builder.token(SyntaxKind::TEXT.into(), &text[..len]);
     builder.finish_node();
 }

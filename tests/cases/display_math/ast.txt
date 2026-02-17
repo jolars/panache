@@ -3,64 +3,64 @@ ROOT@0..292
     PARAGRAPH@0..31
       TEXT@0..30 "Some text before the  ..."
       NEWLINE@30..31 "\n"
-    BlankLine@31..32
-      BlankLine@31..32 "\n"
+    BLANK_LINE@31..32
+      BLANK_LINE@31..32 "\n"
     PARAGRAPH@32..50
-      DisplayMath@32..49
-        DisplayMathMarker@32..34 "$$"
+      DISPLAY_MATH@32..49
+        DISPLAY_MATH_MARKER@32..34 "$$"
         TEXT@34..47 "\n  x = y + z\n"
-        DisplayMathMarker@47..49 "$$"
+        DISPLAY_MATH_MARKER@47..49 "$$"
       NEWLINE@49..50 "\n"
-    BlankLine@50..51
-      BlankLine@50..51 "\n"
+    BLANK_LINE@50..51
+      BLANK_LINE@50..51 "\n"
     PARAGRAPH@51..68
       TEXT@51..67 "Some text after."
       NEWLINE@67..68 "\n"
-    BlankLine@68..69
-      BlankLine@68..69 "\n"
+    BLANK_LINE@68..69
+      BLANK_LINE@68..69 "\n"
     PARAGRAPH@69..149
       TEXT@69..97 "Here's inline display ..."
-      DisplayMath@97..106
-        DisplayMathMarker@97..99 "$$"
+      DISPLAY_MATH@97..106
+        DISPLAY_MATH_MARKER@97..99 "$$"
         TEXT@99..104 "a = b"
-        DisplayMathMarker@104..106 "$$"
+        DISPLAY_MATH_MARKER@104..106 "$$"
       TEXT@106..148 " that should be conve ..."
       NEWLINE@148..149 "\n"
-    BlankLine@149..150
-      BlankLine@149..150 "\n"
+    BLANK_LINE@149..150
+      BLANK_LINE@149..150 "\n"
     PARAGRAPH@150..176
       TEXT@150..175 "Another standalone bl ..."
       NEWLINE@175..176 "\n"
-    BlankLine@176..177
-      BlankLine@176..177 "\n"
+    BLANK_LINE@176..177
+      BLANK_LINE@176..177 "\n"
     PARAGRAPH@177..199
-      DisplayMath@177..198
-        DisplayMathMarker@177..179 "$$"
+      DISPLAY_MATH@177..198
+        DISPLAY_MATH_MARKER@177..179 "$$"
         TEXT@179..196 "\n\\frac{a}{b} = c\n"
-        DisplayMathMarker@196..198 "$$"
+        DISPLAY_MATH_MARKER@196..198 "$$"
       NEWLINE@198..199 "\n"
-    BlankLine@199..200
-      BlankLine@199..200 "\n"
+    BLANK_LINE@199..200
+      BLANK_LINE@199..200 "\n"
     PARAGRAPH@200..217
       TEXT@200..216 "End of document."
       NEWLINE@216..217 "\n"
-    BlankLine@217..218
-      BlankLine@217..218 "\n"
+    BLANK_LINE@217..218
+      BLANK_LINE@217..218 "\n"
     PARAGRAPH@218..236
       TEXT@218..235 "This is not math:"
       NEWLINE@235..236 "\n"
-    BlankLine@236..237
-      BlankLine@236..237 "\n"
+    BLANK_LINE@236..237
+      BLANK_LINE@236..237 "\n"
     PARAGRAPH@237..256
       TEXT@237..238 "$"
       TEXT@238..239 "$"
       NEWLINE@239..240 "\n"
-      LatexCommand@240..251
+      LATEX_COMMAND@240..251
         TEXT@240..251 "\\frac{a}{b}"
       TEXT@251..255 " = c"
       NEWLINE@255..256 "\n"
-    BlankLine@256..257
-      BlankLine@256..257 "\n"
+    BLANK_LINE@256..257
+      BLANK_LINE@256..257 "\n"
     PARAGRAPH@257..292
       TEXT@257..291 "Because it is not clo ..."
       NEWLINE@291..292 "\n"

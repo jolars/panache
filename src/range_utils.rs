@@ -65,15 +65,15 @@ fn find_expandable_container(node: &SyntaxNode) -> Option<SyntaxNode> {
     loop {
         match current.kind() {
             // Lists should be formatted as a whole unit
-            SyntaxKind::List => return Some(current),
+            SyntaxKind::LIST => return Some(current),
             // BlockQuotes should be formatted as a whole unit
-            SyntaxKind::BlockQuote => return Some(current),
+            SyntaxKind::BLOCKQUOTE => return Some(current),
             // FencedDivs should be formatted as a whole unit
-            SyntaxKind::FencedDiv => return Some(current),
+            SyntaxKind::FENCED_DIV => return Some(current),
             // Definition lists should be formatted as a whole unit
-            SyntaxKind::DefinitionList => return Some(current),
+            SyntaxKind::DEFINITION_LIST => return Some(current),
             // Line blocks should be formatted as a whole unit
-            SyntaxKind::LineBlock => return Some(current),
+            SyntaxKind::LINE_BLOCK => return Some(current),
             _ => {}
         }
 

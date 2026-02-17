@@ -269,77 +269,77 @@ pub fn try_parse_double_backslash_display_math(text: &str) -> Option<(usize, &st
 
 /// Emit an inline math node to the builder.
 pub fn emit_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
-    builder.start_node(SyntaxKind::InlineMath.into());
+    builder.start_node(SyntaxKind::INLINE_MATH.into());
 
     // Opening $
-    builder.token(SyntaxKind::InlineMathMarker.into(), "$");
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "$");
 
     // Math content
     builder.token(SyntaxKind::TEXT.into(), content);
 
     // Closing $
-    builder.token(SyntaxKind::InlineMathMarker.into(), "$");
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "$");
 
     builder.finish_node();
 }
 
 /// Emit a single backslash inline math node: \(...\)
 pub fn emit_single_backslash_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
-    builder.start_node(SyntaxKind::InlineMath.into());
+    builder.start_node(SyntaxKind::INLINE_MATH.into());
 
-    builder.token(SyntaxKind::InlineMathMarker.into(), r"\(");
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), r"\(");
     builder.token(SyntaxKind::TEXT.into(), content);
-    builder.token(SyntaxKind::InlineMathMarker.into(), r"\)");
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), r"\)");
 
     builder.finish_node();
 }
 
 /// Emit a double backslash inline math node: \\(...\\)
 pub fn emit_double_backslash_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
-    builder.start_node(SyntaxKind::InlineMath.into());
+    builder.start_node(SyntaxKind::INLINE_MATH.into());
 
-    builder.token(SyntaxKind::InlineMathMarker.into(), r"\\(");
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), r"\\(");
     builder.token(SyntaxKind::TEXT.into(), content);
-    builder.token(SyntaxKind::InlineMathMarker.into(), r"\\)");
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), r"\\)");
 
     builder.finish_node();
 }
 
 /// Emit a display math node to the builder (when occurring inline in paragraph).
 pub fn emit_display_math(builder: &mut GreenNodeBuilder, content: &str, dollar_count: usize) {
-    builder.start_node(SyntaxKind::DisplayMath.into());
+    builder.start_node(SyntaxKind::DISPLAY_MATH.into());
 
     // Opening $$
     let marker = "$".repeat(dollar_count);
-    builder.token(SyntaxKind::DisplayMathMarker.into(), &marker);
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), &marker);
 
     // Math content
     builder.token(SyntaxKind::TEXT.into(), content);
 
     // Closing $$
-    builder.token(SyntaxKind::DisplayMathMarker.into(), &marker);
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), &marker);
 
     builder.finish_node();
 }
 
 /// Emit a single backslash display math node: \[...\]
 pub fn emit_single_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
-    builder.start_node(SyntaxKind::DisplayMath.into());
+    builder.start_node(SyntaxKind::DISPLAY_MATH.into());
 
-    builder.token(SyntaxKind::DisplayMathMarker.into(), r"\[");
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), r"\[");
     builder.token(SyntaxKind::TEXT.into(), content);
-    builder.token(SyntaxKind::DisplayMathMarker.into(), r"\]");
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), r"\]");
 
     builder.finish_node();
 }
 
 /// Emit a double backslash display math node: \\[...\\]
 pub fn emit_double_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
-    builder.start_node(SyntaxKind::DisplayMath.into());
+    builder.start_node(SyntaxKind::DISPLAY_MATH.into());
 
-    builder.token(SyntaxKind::DisplayMathMarker.into(), r"\\[");
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), r"\\[");
     builder.token(SyntaxKind::TEXT.into(), content);
-    builder.token(SyntaxKind::DisplayMathMarker.into(), r"\\]");
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), r"\\]");
 
     builder.finish_node();
 }

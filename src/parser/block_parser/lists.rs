@@ -566,7 +566,7 @@ pub(crate) fn emit_list_item(
     indent_cols: usize,
     indent_bytes: usize,
 ) -> usize {
-    builder.start_node(SyntaxKind::ListItem.into());
+    builder.start_node(SyntaxKind::LIST_ITEM.into());
 
     // Emit leading indentation for lossless parsing
     if indent_bytes > 0 {
@@ -574,7 +574,7 @@ pub(crate) fn emit_list_item(
     }
 
     let marker_text = &content[indent_bytes..indent_bytes + marker_len];
-    builder.token(SyntaxKind::ListMarker.into(), marker_text);
+    builder.token(SyntaxKind::LIST_MARKER.into(), marker_text);
 
     if spaces_after > 0 {
         let space_start = indent_bytes + marker_len;
@@ -611,7 +611,7 @@ pub(crate) fn emit_list_item(
                 }
 
                 // Emit the checkbox as a token
-                builder.token(SyntaxKind::TaskCheckbox.into(), &trimmed[..3]);
+                builder.token(SyntaxKind::TASK_CHECKBOX.into(), &trimmed[..3]);
 
                 // Emit the rest as TEXT
                 if trimmed.len() > 3 {
@@ -907,7 +907,7 @@ pub(super) fn start_new_list(
     while matches!(containers.last(), Some(Container::List { .. })) {
         containers.close_to(containers.depth() - 1, builder);
     }
-    builder.start_node(SyntaxKind::List.into());
+    builder.start_node(SyntaxKind::LIST.into());
     // Emit footnote/definition indent for losslessness
     if let Some(indent_str) = indent_to_emit {
         builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
@@ -934,7 +934,7 @@ pub(super) fn start_nested_list(
     if matches!(containers.last(), Some(Container::Paragraph { .. })) {
         containers.close_to(containers.depth() - 1, builder);
     }
-    builder.start_node(SyntaxKind::List.into());
+    builder.start_node(SyntaxKind::LIST.into());
     // Emit footnote/definition indent for losslessness
     if let Some(indent_str) = indent_to_emit {
         builder.token(SyntaxKind::WHITESPACE.into(), indent_str);

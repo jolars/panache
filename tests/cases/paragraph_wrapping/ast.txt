@@ -9,8 +9,8 @@ ROOT@0..301
       NEWLINE@232..233 "\n"
       TEXT@233..267 "that it looks good wh ..."
       NEWLINE@267..268 "\n"
-    BlankLine@268..269
-      BlankLine@268..269 "\n"
+    BLANK_LINE@268..269
+      BLANK_LINE@268..269 "\n"
     PARAGRAPH@269..301
       TEXT@269..300 "Here is just a short  ..."
       NEWLINE@300..301 "\n"

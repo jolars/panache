@@ -1,42 +1,42 @@
 ROOT@0..206
   DOCUMENT@0..206
-    Heading@0..26
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..26
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..25
+      HEADING_CONTENT@2..25
         TEXT@2..25 "Display Math Formatting"
       NEWLINE@25..26 "\n"
-    BlankLine@26..27
-      BlankLine@26..27 "\n"
+    BLANK_LINE@26..27
+      BLANK_LINE@26..27 "\n"
     PARAGRAPH@27..94
       TEXT@27..93 "Testing that display  ..."
       NEWLINE@93..94 "\n"
-    BlankLine@94..95
-      BlankLine@94..95 "\n"
+    BLANK_LINE@94..95
+      BLANK_LINE@94..95 "\n"
     PARAGRAPH@95..151
       TEXT@95..116 "Inline display math: "
-      DisplayMath@116..125
-        DisplayMathMarker@116..118 "$$"
+      DISPLAY_MATH@116..125
+        DISPLAY_MATH_MARKER@116..118 "$$"
         TEXT@118..123 "x = y"
-        DisplayMathMarker@123..125 "$$"
+        DISPLAY_MATH_MARKER@123..125 "$$"
       TEXT@125..150 " gets formatted to bl ..."
       NEWLINE@150..151 "\n"
-    BlankLine@151..152
-      BlankLine@151..152 "\n"
+    BLANK_LINE@151..152
+      BLANK_LINE@151..152 "\n"
     PARAGRAPH@152..175
       TEXT@152..174 "Properly closed block:"
       NEWLINE@174..175 "\n"
-    BlankLine@175..176
-      BlankLine@175..176 "\n"
+    BLANK_LINE@175..176
+      BLANK_LINE@175..176 "\n"
     PARAGRAPH@176..188
-      DisplayMath@176..187
-        DisplayMathMarker@176..178 "$$"
+      DISPLAY_MATH@176..187
+        DISPLAY_MATH_MARKER@176..178 "$$"
         TEXT@178..185 "\na = b\n"
-        DisplayMathMarker@185..187 "$$"
+        DISPLAY_MATH_MARKER@185..187 "$$"
       NEWLINE@187..188 "\n"
-    BlankLine@188..189
-      BlankLine@188..189 "\n"
+    BLANK_LINE@188..189
+      BLANK_LINE@188..189 "\n"
     PARAGRAPH@189..206
       TEXT@189..205 "Works correctly."
       NEWLINE@205..206 "\n"

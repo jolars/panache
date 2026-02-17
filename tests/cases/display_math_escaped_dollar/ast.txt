@@ -1,46 +1,46 @@
 ROOT@0..240
   DOCUMENT@0..240
-    Heading@0..36
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..36
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..35
+      HEADING_CONTENT@2..35
         TEXT@2..35 "Display Math with Esc ..."
       NEWLINE@35..36 "\n"
-    BlankLine@36..37
-      BlankLine@36..37 "\n"
+    BLANK_LINE@36..37
+      BLANK_LINE@36..37 "\n"
     PARAGRAPH@37..101
       TEXT@37..100 "Testing that escaped  ..."
       NEWLINE@100..101 "\n"
-    BlankLine@101..102
-      BlankLine@101..102 "\n"
+    BLANK_LINE@101..102
+      BLANK_LINE@101..102 "\n"
     PARAGRAPH@102..136
-      DisplayMath@102..135
-        DisplayMathMarker@102..104 "$$"
+      DISPLAY_MATH@102..135
+        DISPLAY_MATH_MARKER@102..104 "$$"
         TEXT@104..133 "\n\\text{Price} = \\$100 ..."
-        DisplayMathMarker@133..135 "$$"
+        DISPLAY_MATH_MARKER@133..135 "$$"
       NEWLINE@135..136 "\n"
-    BlankLine@136..137
-      BlankLine@136..137 "\n"
+    BLANK_LINE@136..137
+      BLANK_LINE@136..137 "\n"
     PARAGRAPH@137..191
       TEXT@137..149 "And inline: "
-      DisplayMath@149..172
-        DisplayMathMarker@149..151 "$$"
+      DISPLAY_MATH@149..172
+        DISPLAY_MATH_MARKER@149..151 "$$"
         TEXT@151..170 "\\text{Cost: } \\$200"
-        DisplayMathMarker@170..172 "$$"
+        DISPLAY_MATH_MARKER@170..172 "$$"
       TEXT@172..190 " in the paragraph."
       NEWLINE@190..191 "\n"
-    BlankLine@191..192
-      BlankLine@191..192 "\n"
+    BLANK_LINE@191..192
+      BLANK_LINE@191..192 "\n"
     PARAGRAPH@192..210
       TEXT@192..209 "Multiple escapes:"
       NEWLINE@209..210 "\n"
-    BlankLine@210..211
-      BlankLine@210..211 "\n"
+    BLANK_LINE@210..211
+      BLANK_LINE@210..211 "\n"
     PARAGRAPH@211..240
-      DisplayMath@211..239
-        DisplayMathMarker@211..213 "$$"
+      DISPLAY_MATH@211..239
+        DISPLAY_MATH_MARKER@211..213 "$$"
         TEXT@213..237 "\na = \\$x + \\$y \\neq \\$z\n"
-        DisplayMathMarker@237..239 "$$"
+        DISPLAY_MATH_MARKER@237..239 "$$"
       NEWLINE@239..240 "\n"
 

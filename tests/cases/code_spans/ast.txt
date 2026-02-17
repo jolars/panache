@@ -1,69 +1,69 @@
 ROOT@0..255
   DOCUMENT@0..255
-    Heading@0..13
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..13
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..12
+      HEADING_CONTENT@2..12
         TEXT@2..12 "Code Spans"
       NEWLINE@12..13 "\n"
-    BlankLine@13..14
-      BlankLine@13..14 "\n"
+    BLANK_LINE@13..14
+      BLANK_LINE@13..14 "\n"
     PARAGRAPH@14..34
       TEXT@14..27 "Simple code: "
-      CodeSpan@27..33
-        CodeSpanMarker@27..28 "`"
+      CODE_SPAN@27..33
+        CODE_SPAN_MARKER@27..28 "`"
         TEXT@28..32 "code"
-        CodeSpanMarker@32..33 "`"
+        CODE_SPAN_MARKER@32..33 "`"
       NEWLINE@33..34 "\n"
-    BlankLine@34..35
-      BlankLine@34..35 "\n"
+    BLANK_LINE@34..35
+      BLANK_LINE@34..35 "\n"
     PARAGRAPH@35..69
       TEXT@35..48 "With spaces: "
-      CodeSpan@48..68
-        CodeSpanMarker@48..49 "`"
+      CODE_SPAN@48..68
+        CODE_SPAN_MARKER@48..49 "`"
         TEXT@49..67 " code with spaces "
-        CodeSpanMarker@67..68 "`"
+        CODE_SPAN_MARKER@67..68 "`"
       NEWLINE@68..69 "\n"
-    BlankLine@69..70
-      BlankLine@69..70 "\n"
+    BLANK_LINE@69..70
+      BLANK_LINE@69..70 "\n"
     PARAGRAPH@70..122
       TEXT@70..90 "Multiple backticks: "
-      CodeSpan@90..121
-        CodeSpanMarker@90..92 "``"
+      CODE_SPAN@90..121
+        CODE_SPAN_MARKER@90..92 "``"
         TEXT@92..119 "code with `backtick`  ..."
-        CodeSpanMarker@119..121 "``"
+        CODE_SPAN_MARKER@119..121 "``"
       NEWLINE@121..122 "\n"
-    BlankLine@122..123
-      BlankLine@122..123 "\n"
+    BLANK_LINE@122..123
+      BLANK_LINE@122..123 "\n"
     PARAGRAPH@123..167
       TEXT@123..141 "Code in emphasis: "
-      Emphasis@141..166
-        EmphasisMarker@141..142 "*"
+      EMPHASIS@141..166
+        EMPHASIS_MARKER@141..142 "*"
         TEXT@142..165 "text with `code` inside"
-        EmphasisMarker@165..166 "*"
+        EMPHASIS_MARKER@165..166 "*"
       NEWLINE@166..167 "\n"
-    BlankLine@167..168
-      BlankLine@167..168 "\n"
+    BLANK_LINE@167..168
+      BLANK_LINE@167..168 "\n"
     PARAGRAPH@168..215
       TEXT@168..183 "Adjacent code: "
-      CodeSpan@183..190
-        CodeSpanMarker@183..184 "`"
+      CODE_SPAN@183..190
+        CODE_SPAN_MARKER@183..184 "`"
         TEXT@184..189 "first"
-        CodeSpanMarker@189..190 "`"
+        CODE_SPAN_MARKER@189..190 "`"
       TEXT@190..195 " and "
-      CodeSpan@195..203
-        CodeSpanMarker@195..196 "`"
+      CODE_SPAN@195..203
+        CODE_SPAN_MARKER@195..196 "`"
         TEXT@196..202 "second"
-        CodeSpanMarker@202..203 "`"
+        CODE_SPAN_MARKER@202..203 "`"
       TEXT@203..214 " code spans"
       NEWLINE@214..215 "\n"
-    BlankLine@215..216
-      BlankLine@215..216 "\n"
+    BLANK_LINE@215..216
+      BLANK_LINE@215..216 "\n"
     PARAGRAPH@216..255
       TEXT@216..242 "Escaped backtick outs ..."
-      EscapedChar@242..244 "\\`"
+      ESCAPED_CHAR@242..244 "\\`"
       TEXT@244..252 "not code"
-      EscapedChar@252..254 "\\`"
+      ESCAPED_CHAR@252..254 "\\`"
       NEWLINE@254..255 "\n"
 

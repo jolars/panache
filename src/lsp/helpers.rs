@@ -66,7 +66,7 @@ fn normalize_label(label: &str) -> String {
 /// Extract the reference label from a LinkRef or FootnoteReference node
 pub(crate) fn extract_reference_label(node: &SyntaxNode) -> Option<(String, bool)> {
     match node.kind() {
-        SyntaxKind::LinkRef => {
+        SyntaxKind::LINK_REF => {
             // LinkRef contains TEXT child with the label
             let text = node
                 .children_with_tokens()
@@ -76,7 +76,7 @@ pub(crate) fn extract_reference_label(node: &SyntaxNode) -> Option<(String, bool
                 .collect::<String>();
             Some((normalize_label(&text), false))
         }
-        SyntaxKind::FootnoteReference => {
+        SyntaxKind::FOOTNOTE_REFERENCE => {
             // FootnoteReference has TEXT children: "[^", "id", "]"
             // Extract the middle TEXT token (the ID)
             let tokens: Vec<_> = node
@@ -101,13 +101,13 @@ pub(crate) fn extract_reference_label(node: &SyntaxNode) -> Option<(String, bool
 /// Extract the label from a definition node (ReferenceDefinition or FootnoteDefinition)
 fn extract_definition_label(node: &SyntaxNode) -> Option<String> {
     match node.kind() {
-        SyntaxKind::ReferenceDefinition => {
+        SyntaxKind::REFERENCE_DEFINITION => {
             // ReferenceDefinition has a Link child with LinkText containing the label
             node.children()
-                .find(|child| child.kind() == SyntaxKind::Link)
+                .find(|child| child.kind() == SyntaxKind::LINK)
                 .and_then(|link| {
                     link.children()
-                        .find(|child| child.kind() == SyntaxKind::LinkText)
+                        .find(|child| child.kind() == SyntaxKind::LINK_TEXT)
                 })
                 .map(|link_text| {
                     let text = link_text
@@ -119,11 +119,11 @@ fn extract_definition_label(node: &SyntaxNode) -> Option<String> {
                     normalize_label(&text)
                 })
         }
-        SyntaxKind::FootnoteDefinition => {
+        SyntaxKind::FOOTNOTE_DEFINITION => {
             // FootnoteDefinition has a FootnoteReference token with text like "[^1]: "
             node.children_with_tokens()
                 .filter_map(|child| child.into_token())
-                .find(|token| token.kind() == SyntaxKind::FootnoteReference)
+                .find(|token| token.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
                 .and_then(|token| {
                     let text = token.text();
                     // Extract ID from "[^id]: " format
@@ -146,9 +146,9 @@ pub(crate) fn find_definition_node(
     is_footnote: bool,
 ) -> Option<SyntaxNode> {
     let target_kind = if is_footnote {
-        SyntaxKind::FootnoteDefinition
+        SyntaxKind::FOOTNOTE_DEFINITION
     } else {
-        SyntaxKind::ReferenceDefinition
+        SyntaxKind::REFERENCE_DEFINITION
     };
 
     root.descendants().find(|node| {
@@ -171,10 +171,10 @@ pub(crate) fn find_definition_at_offset(root: &SyntaxNode, offset: usize) -> Opt
         }
 
         // Check if this is a Link that might contain a LinkRef
-        if node.kind() == SyntaxKind::Link
+        if node.kind() == SyntaxKind::LINK
             && let Some(link_ref) = node
                 .children()
-                .find(|child| child.kind() == SyntaxKind::LinkRef)
+                .find(|child| child.kind() == SyntaxKind::LINK_REF)
             && let Some((label, is_footnote)) = extract_reference_label(&link_ref)
         {
             let definition = find_definition_node(root, &label, is_footnote)?;
@@ -182,10 +182,10 @@ pub(crate) fn find_definition_at_offset(root: &SyntaxNode, offset: usize) -> Opt
         }
 
         // Check if this is an ImageLink that might contain a LinkRef
-        if node.kind() == SyntaxKind::ImageLink
+        if node.kind() == SyntaxKind::IMAGE_LINK
             && let Some(link_ref) = node
                 .children()
-                .find(|child| child.kind() == SyntaxKind::LinkRef)
+                .find(|child| child.kind() == SyntaxKind::LINK_REF)
             && let Some((label, is_footnote)) = extract_reference_label(&link_ref)
         {
             let definition = find_definition_node(root, &label, is_footnote)?;
@@ -232,7 +232,7 @@ mod tests {
         let root = parse("[text][ref]");
         let link_ref = root
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::LinkRef)
+            .find(|n| n.kind() == SyntaxKind::LINK_REF)
             .expect("Should find LinkRef");
 
         let (label, is_footnote) =
@@ -246,7 +246,7 @@ mod tests {
         let root = parse("[^1]");
         let footnote_ref = root
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::FootnoteReference)
+            .find(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
             .expect("Should find FootnoteReference");
 
         let (label, is_footnote) =
@@ -260,7 +260,7 @@ mod tests {
         let root = parse("[ref]: /url");
         let def = root
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::ReferenceDefinition)
+            .find(|n| n.kind() == SyntaxKind::REFERENCE_DEFINITION)
             .expect("Should find ReferenceDefinition");
 
         let label = extract_definition_label(&def).expect("Should extract label");
@@ -272,7 +272,7 @@ mod tests {
         let root = parse("[^1]: content");
         let def = root
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::FootnoteDefinition)
+            .find(|n| n.kind() == SyntaxKind::FOOTNOTE_DEFINITION)
             .expect("Should find FootnoteDefinition");
 
         let label = extract_definition_label(&def).expect("Should extract label");
@@ -284,7 +284,7 @@ mod tests {
         let root = parse("[text][ref]\n\n[ref]: /url");
         let def = find_definition_node(&root, "ref", false);
         assert!(def.is_some());
-        assert_eq!(def.unwrap().kind(), SyntaxKind::ReferenceDefinition);
+        assert_eq!(def.unwrap().kind(), SyntaxKind::REFERENCE_DEFINITION);
     }
 
     #[test]
@@ -299,7 +299,7 @@ mod tests {
         let root = parse("Text[^1]\n\n[^1]: content");
         let def = find_definition_node(&root, "1", true);
         assert!(def.is_some());
-        assert_eq!(def.unwrap().kind(), SyntaxKind::FootnoteDefinition);
+        assert_eq!(def.unwrap().kind(), SyntaxKind::FOOTNOTE_DEFINITION);
     }
 
     #[test]

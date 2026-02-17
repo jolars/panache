@@ -168,7 +168,7 @@ impl<'a> BlockParser<'a> {
             if bq_depth > current_bq_depth {
                 // Open blockquotes
                 for _ in current_bq_depth..bq_depth {
-                    self.builder.start_node(SyntaxKind::BlockQuote.into());
+                    self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
                     self.containers
                         .push(Container::BlockQuote { content_col: 0 });
                 }
@@ -256,9 +256,9 @@ impl<'a> BlockParser<'a> {
                 }
             }
 
-            self.builder.start_node(SyntaxKind::BlankLine.into());
+            self.builder.start_node(SyntaxKind::BLANK_LINE.into());
             self.builder
-                .token(SyntaxKind::BlankLine.into(), inner_content);
+                .token(SyntaxKind::BLANK_LINE.into(), inner_content);
             self.builder.finish_node();
             self.pos += 1;
             return true;
@@ -344,7 +344,7 @@ impl<'a> BlockParser<'a> {
 
             // Then open new blockquotes and emit their markers
             for level in current_bq_depth..bq_depth {
-                self.builder.start_node(SyntaxKind::BlockQuote.into());
+                self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
 
                 // Emit the marker for this new level
                 if let Some(info) = marker_info.get(level) {
@@ -1032,12 +1032,12 @@ impl<'a> BlockParser<'a> {
 
             // Start the footnote definition container
             self.builder
-                .start_node(SyntaxKind::FootnoteDefinition.into());
+                .start_node(SyntaxKind::FOOTNOTE_DEFINITION.into());
 
             // Emit the marker
             let marker_text = &content[..content_start];
             self.builder
-                .token(SyntaxKind::FootnoteReference.into(), marker_text);
+                .token(SyntaxKind::FOOTNOTE_REFERENCE.into(), marker_text);
 
             // Calculate content column (minimum 4 spaces for continuation)
             // The first line can start right after the marker, but subsequent lines
@@ -1072,7 +1072,7 @@ impl<'a> BlockParser<'a> {
 
             // Emit as a node - preserve original text including newline
             self.builder
-                .start_node(SyntaxKind::ReferenceDefinition.into());
+                .start_node(SyntaxKind::REFERENCE_DEFINITION.into());
 
             // Get the full original line to preserve losslessness
             let full_line = self.lines[self.pos];
@@ -1126,10 +1126,10 @@ impl<'a> BlockParser<'a> {
             }
 
             // Start FencedDiv node
-            self.builder.start_node(SyntaxKind::FencedDiv.into());
+            self.builder.start_node(SyntaxKind::FENCED_DIV.into());
 
             // Emit opening fence with attributes as child node to avoid duplication
-            self.builder.start_node(SyntaxKind::DivFenceOpen.into());
+            self.builder.start_node(SyntaxKind::DIV_FENCE_OPEN.into());
 
             // Get original full line
             let full_line = self.lines[self.pos];
@@ -1164,7 +1164,7 @@ impl<'a> BlockParser<'a> {
             };
 
             // Emit attributes as DivInfo child node (avoids duplication)
-            self.builder.start_node(SyntaxKind::DivInfo.into());
+            self.builder.start_node(SyntaxKind::DIV_INFO.into());
             self.builder
                 .token(SyntaxKind::TEXT.into(), &div_fence.attributes);
             self.builder.finish_node(); // DivInfo
@@ -1231,7 +1231,7 @@ impl<'a> BlockParser<'a> {
             }
 
             // Emit closing fence - parse to avoid newline duplication
-            self.builder.start_node(SyntaxKind::DivFenceClose.into());
+            self.builder.start_node(SyntaxKind::DIV_FENCE_CLOSE.into());
 
             // Get original full line
             let full_line = self.lines[self.pos];
@@ -1438,7 +1438,7 @@ impl<'a> BlockParser<'a> {
 
             // Start definition list if not in one
             if !definition_lists::in_definition_list(&self.containers) {
-                self.builder.start_node(SyntaxKind::DefinitionList.into());
+                self.builder.start_node(SyntaxKind::DEFINITION_LIST.into());
                 self.containers.push(Container::DefinitionList {});
             }
 
@@ -1453,14 +1453,14 @@ impl<'a> BlockParser<'a> {
                 self.containers.last(),
                 Some(Container::DefinitionItem { .. })
             ) {
-                self.builder.start_node(SyntaxKind::DefinitionItem.into());
+                self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
                 self.containers.push(Container::DefinitionItem {
                     in_definition: true,
                 });
             }
 
             // Start Definition node
-            self.builder.start_node(SyntaxKind::Definition.into());
+            self.builder.start_node(SyntaxKind::DEFINITION.into());
 
             // Emit container indent (e.g., footnote indent) before the marker
             if let Some(indent_str) = indent_to_emit {
@@ -1483,7 +1483,7 @@ impl<'a> BlockParser<'a> {
 
             if has_content {
                 // Wrap inline content in a Plain node (keep open for continuation lines)
-                self.builder.start_node(SyntaxKind::Plain.into());
+                self.builder.start_node(SyntaxKind::PLAIN.into());
                 self.builder
                     .token(SyntaxKind::TEXT.into(), after_marker_and_spaces.trim_end());
 
@@ -1526,7 +1526,7 @@ impl<'a> BlockParser<'a> {
 
             // Start definition list if not in one
             if !definition_lists::in_definition_list(&self.containers) {
-                self.builder.start_node(SyntaxKind::DefinitionList.into());
+                self.builder.start_node(SyntaxKind::DEFINITION_LIST.into());
                 self.containers.push(Container::DefinitionList {});
             }
 
@@ -1540,7 +1540,7 @@ impl<'a> BlockParser<'a> {
             }
 
             // Start new definition item
-            self.builder.start_node(SyntaxKind::DefinitionItem.into());
+            self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
             self.containers.push(Container::DefinitionItem {
                 in_definition: false,
             });
@@ -1553,8 +1553,9 @@ impl<'a> BlockParser<'a> {
             for _ in 0..blank_count {
                 if self.pos < self.lines.len() {
                     let blank_line = self.lines[self.pos];
-                    self.builder.start_node(SyntaxKind::BlankLine.into());
-                    self.builder.token(SyntaxKind::BlankLine.into(), blank_line);
+                    self.builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    self.builder
+                        .token(SyntaxKind::BLANK_LINE.into(), blank_line);
                     self.builder.finish_node();
                     self.pos += 1;
                 }

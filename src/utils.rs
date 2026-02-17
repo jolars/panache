@@ -8,15 +8,15 @@ pub fn is_block_element(kind: SyntaxKind) -> bool {
     matches!(
         kind,
         SyntaxKind::PARAGRAPH
-            | SyntaxKind::Figure
-            | SyntaxKind::List
-            | SyntaxKind::DefinitionList
-            | SyntaxKind::BlockQuote
-            | SyntaxKind::CodeBlock
-            | SyntaxKind::SimpleTable
-            | SyntaxKind::MultilineTable
-            | SyntaxKind::PipeTable
-            | SyntaxKind::LineBlock
+            | SyntaxKind::FIGURE
+            | SyntaxKind::LIST
+            | SyntaxKind::DEFINITION_LIST
+            | SyntaxKind::BLOCKQUOTE
+            | SyntaxKind::CODE_BLOCK
+            | SyntaxKind::SIMPLE_TABLE
+            | SyntaxKind::MULTILINE_TABLE
+            | SyntaxKind::PIPE_TABLE
+            | SyntaxKind::LINE_BLOCK
     )
 }
 
@@ -26,27 +26,27 @@ pub fn is_structural_block(kind: SyntaxKind) -> bool {
     matches!(
         kind,
         SyntaxKind::PARAGRAPH
-            | SyntaxKind::Figure
-            | SyntaxKind::Heading
-            | SyntaxKind::CodeBlock
-            | SyntaxKind::BlockQuote
-            | SyntaxKind::List
-            | SyntaxKind::ListItem
-            | SyntaxKind::DefinitionList
-            | SyntaxKind::DefinitionItem
-            | SyntaxKind::LineBlock
-            | SyntaxKind::SimpleTable
-            | SyntaxKind::MultilineTable
-            | SyntaxKind::PipeTable
-            | SyntaxKind::GridTable
-            | SyntaxKind::FencedDiv
-            | SyntaxKind::HorizontalRule
-            | SyntaxKind::YamlMetadata
-            | SyntaxKind::PandocTitleBlock
-            | SyntaxKind::HtmlBlock
-            | SyntaxKind::BlankLine
-            | SyntaxKind::ReferenceDefinition
-            | SyntaxKind::FootnoteDefinition
+            | SyntaxKind::FIGURE
+            | SyntaxKind::HEADING
+            | SyntaxKind::CODE_BLOCK
+            | SyntaxKind::BLOCKQUOTE
+            | SyntaxKind::LIST
+            | SyntaxKind::LIST_ITEM
+            | SyntaxKind::DEFINITION_LIST
+            | SyntaxKind::DEFINITION_ITEM
+            | SyntaxKind::LINE_BLOCK
+            | SyntaxKind::SIMPLE_TABLE
+            | SyntaxKind::MULTILINE_TABLE
+            | SyntaxKind::PIPE_TABLE
+            | SyntaxKind::GRID_TABLE
+            | SyntaxKind::FENCED_DIV
+            | SyntaxKind::HORIZONTAL_RULE
+            | SyntaxKind::YAML_METADATA
+            | SyntaxKind::PANDOC_TITLE_BLOCK
+            | SyntaxKind::HTML_BLOCK
+            | SyntaxKind::BLANK_LINE
+            | SyntaxKind::REFERENCE_DEFINITION
+            | SyntaxKind::FOOTNOTE_DEFINITION
     )
 }
 
@@ -66,7 +66,7 @@ pub fn collect_code_blocks(tree: &SyntaxNode, input: &str) -> HashMap<String, Ve
     let mut blocks: HashMap<String, Vec<CodeBlock>> = HashMap::new();
 
     for node in tree.descendants() {
-        if node.kind() == SyntaxKind::CodeBlock
+        if node.kind() == SyntaxKind::CODE_BLOCK
             && let Some(block) = extract_code_block(&node, input)
         {
             blocks
@@ -87,16 +87,16 @@ fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
     for child in node.children_with_tokens() {
         if let NodeOrToken::Node(n) = child {
             match n.kind() {
-                SyntaxKind::CodeFenceOpen => {
+                SyntaxKind::CODE_FENCE_OPEN => {
                     // Look for CodeInfo node, then extract CodeLanguage from inside it
                     for fence_child in n.children_with_tokens() {
                         if let NodeOrToken::Node(info_node) = fence_child
-                            && info_node.kind() == SyntaxKind::CodeInfo
+                            && info_node.kind() == SyntaxKind::CODE_INFO
                         {
                             // Search for CodeLanguage token inside CodeInfo node
                             for info_token in info_node.children_with_tokens() {
                                 if let NodeOrToken::Token(t) = info_token
-                                    && t.kind() == SyntaxKind::CodeLanguage
+                                    && t.kind() == SyntaxKind::CODE_LANGUAGE
                                 {
                                     language = Some(t.text().to_string());
                                     break;
@@ -105,7 +105,7 @@ fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
                         }
                     }
                 }
-                SyntaxKind::CodeContent => {
+                SyntaxKind::CODE_CONTENT => {
                     content = n.text().to_string();
                     // Track where the actual code content starts (not the fence)
                     content_start_offset = Some(n.text_range().start().into());

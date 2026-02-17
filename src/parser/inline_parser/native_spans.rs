@@ -117,24 +117,24 @@ pub(crate) fn emit_native_span(
     attributes: &str,
     config: &Config,
 ) {
-    builder.start_node(SyntaxKind::BracketedSpan.into());
+    builder.start_node(SyntaxKind::BRACKETED_SPAN.into());
 
     // Opening tag
-    builder.token(SyntaxKind::SpanBracketOpen.into(), "<span");
+    builder.token(SyntaxKind::SPAN_BRACKET_OPEN.into(), "<span");
     if !attributes.is_empty() {
         // Add space before attributes
         builder.token(SyntaxKind::WHITESPACE.into(), " ");
-        builder.token(SyntaxKind::SpanAttributes.into(), attributes);
+        builder.token(SyntaxKind::SPAN_ATTRIBUTES.into(), attributes);
     }
-    builder.token(SyntaxKind::SpanBracketOpen.into(), ">");
+    builder.token(SyntaxKind::SPAN_BRACKET_OPEN.into(), ">");
 
     // Parse the content recursively for inline markdown
-    builder.start_node(SyntaxKind::SpanContent.into());
+    builder.start_node(SyntaxKind::SPAN_CONTENT.into());
     parse_inline_text(builder, content, config, None);
     builder.finish_node();
 
     // Closing tag
-    builder.token(SyntaxKind::SpanBracketClose.into(), "</span>");
+    builder.token(SyntaxKind::SPAN_BRACKET_CLOSE.into(), "</span>");
 
     builder.finish_node();
 }

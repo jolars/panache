@@ -1,42 +1,42 @@
 ROOT@0..451
   DOCUMENT@0..451
-    CodeBlock@0..29
-      CodeFenceOpen@0..19
-        CodeFenceMarker@0..3 "```"
-        CodeInfo@3..18
+    CODE_BLOCK@0..29
+      CODE_FENCE_OPEN@0..19
+        CODE_FENCE_MARKER@0..3 "```"
+        CODE_INFO@3..18
           TEXT@3..4 "{"
-          CodeLanguage@4..5 "r"
+          CODE_LANGUAGE@4..5 "r"
           TEXT@5..18 ", echo=FALSE}"
         NEWLINE@18..19 "\n"
-      CodeContent@19..25
+      CODE_CONTENT@19..25
         TEXT@19..24 "1 + 1"
         NEWLINE@24..25 "\n"
-      CodeFenceClose@25..29
-        CodeFenceMarker@25..28 "```"
+      CODE_FENCE_CLOSE@25..29
+        CODE_FENCE_MARKER@25..28 "```"
         NEWLINE@28..29 "\n"
-    BlankLine@29..30
-      BlankLine@29..30 "\n"
+    BLANK_LINE@29..30
+      BLANK_LINE@29..30 "\n"
     PARAGRAPH@30..92
       TEXT@30..91 "The following is a Qu ..."
       NEWLINE@91..92 "\n"
-    BlankLine@92..93
-      BlankLine@92..93 "\n"
-    CodeBlock@93..117
-      CodeFenceOpen@93..107
-        CodeFenceMarker@93..96 "```"
-        CodeInfo@96..106
+    BLANK_LINE@92..93
+      BLANK_LINE@92..93 "\n"
+    CODE_BLOCK@93..117
+      CODE_FENCE_OPEN@93..107
+        CODE_FENCE_MARKER@93..96 "```"
+        CODE_INFO@96..106
           TEXT@96..97 "{"
-          CodeLanguage@97..105 "{python}"
+          CODE_LANGUAGE@97..105 "{python}"
           TEXT@105..106 "}"
         NEWLINE@106..107 "\n"
-      CodeContent@107..113
+      CODE_CONTENT@107..113
         TEXT@107..112 "1 + 1"
         NEWLINE@112..113 "\n"
-      CodeFenceClose@113..117
-        CodeFenceMarker@113..116 "```"
+      CODE_FENCE_CLOSE@113..117
+        CODE_FENCE_MARKER@113..116 "```"
         NEWLINE@116..117 "\n"
-    BlankLine@117..118
-      BlankLine@117..118 "\n"
+    BLANK_LINE@117..118
+      BLANK_LINE@117..118 "\n"
     PARAGRAPH@118..326
       TEXT@118..194 "If you want to show a ..."
       NEWLINE@194..195 "\n"
@@ -49,13 +49,13 @@ ROOT@0..451
       NEWLINE@275..276 "\n"
       TEXT@276..325 "brace syntax for code ..."
       NEWLINE@325..326 "\n"
-    BlankLine@326..327
-      BlankLine@326..327 "\n"
-    CodeBlock@327..451
-      CodeFenceOpen@327..332
-        CodeFenceMarker@327..331 "````"
+    BLANK_LINE@326..327
+      BLANK_LINE@326..327 "\n"
+    CODE_BLOCK@327..451
+      CODE_FENCE_OPEN@327..332
+        CODE_FENCE_MARKER@327..331 "````"
         NEWLINE@331..332 "\n"
-      CodeContent@332..446
+      CODE_CONTENT@332..446
         TEXT@332..335 "---"
         NEWLINE@335..336 "\n"
         TEXT@336..356 "title: \"My document\""
@@ -76,7 +76,7 @@ ROOT@0..451
         TEXT@411..444 "Some additional markd ..."
         NEWLINE@444..445 "\n"
         NEWLINE@445..446 "\n"
-      CodeFenceClose@446..451
-        CodeFenceMarker@446..450 "````"
+      CODE_FENCE_CLOSE@446..451
+        CODE_FENCE_MARKER@446..450 "````"
         NEWLINE@450..451 "\n"
 

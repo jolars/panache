@@ -68,19 +68,19 @@ pub fn try_parse_superscript(text: &str) -> Option<(usize, &str)> {
 
 /// Emit a superscript node with its content
 pub fn emit_superscript(builder: &mut GreenNodeBuilder, inner_text: &str, config: &Config) {
-    builder.start_node(SyntaxKind::Superscript.into());
+    builder.start_node(SyntaxKind::SUPERSCRIPT.into());
 
     // Opening marker
-    builder.start_node(SyntaxKind::SuperscriptMarker.into());
-    builder.token(SyntaxKind::SuperscriptMarker.into(), "^");
+    builder.start_node(SyntaxKind::SUPERSCRIPT_MARKER.into());
+    builder.token(SyntaxKind::SUPERSCRIPT_MARKER.into(), "^");
     builder.finish_node();
 
     // Parse inner content recursively for nested inline elements
     super::parse_inline_text(builder, inner_text, config, None);
 
     // Closing marker
-    builder.start_node(SyntaxKind::SuperscriptMarker.into());
-    builder.token(SyntaxKind::SuperscriptMarker.into(), "^");
+    builder.start_node(SyntaxKind::SUPERSCRIPT_MARKER.into());
+    builder.token(SyntaxKind::SUPERSCRIPT_MARKER.into(), "^");
     builder.finish_node();
 
     builder.finish_node();

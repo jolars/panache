@@ -443,14 +443,14 @@ pub(crate) fn is_closing_fence(content: &str, fence: &FenceInfo) -> bool {
 /// Helper to parse info string and emit CodeInfo node with parsed components.
 /// This breaks down the info string into its logical parts while preserving all bytes.
 fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &str) {
-    builder.start_node(SyntaxKind::CodeInfo.into());
+    builder.start_node(SyntaxKind::CODE_INFO.into());
 
     let info = InfoString::parse(info_string);
 
     match &info.block_type {
         CodeBlockType::DisplayShortcut { language } => {
             // Simple case: python or python {.class}
-            builder.token(SyntaxKind::CodeLanguage.into(), language);
+            builder.token(SyntaxKind::CODE_LANGUAGE.into(), language);
 
             // If there's more after the language, emit it as TEXT
             let after_lang = &info_string[language.len()..];
@@ -461,7 +461,7 @@ fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &st
         CodeBlockType::Executable { language } => {
             // Quarto: {r} or {r my-label, echo=FALSE}
             builder.token(SyntaxKind::TEXT.into(), "{");
-            builder.token(SyntaxKind::CodeLanguage.into(), language);
+            builder.token(SyntaxKind::CODE_LANGUAGE.into(), language);
 
             // Everything after language
             let start_offset = 1 + language.len(); // Skip "{r"
@@ -487,7 +487,7 @@ fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &st
                     builder.token(SyntaxKind::TEXT.into(), ".");
 
                     // Emit the language
-                    builder.token(SyntaxKind::CodeLanguage.into(), lang);
+                    builder.token(SyntaxKind::CODE_LANGUAGE.into(), lang);
 
                     // Emit everything after
                     let after_lang_start = lang_start + 1 + lang.len();
@@ -526,7 +526,7 @@ pub(crate) fn parse_fenced_code_block(
     base_indent: usize,
 ) -> usize {
     // Start code block
-    builder.start_node(SyntaxKind::CodeBlock.into());
+    builder.start_node(SyntaxKind::CODE_BLOCK.into());
 
     // Opening fence
     let first_line = lines[start_pos];
@@ -544,9 +544,9 @@ pub(crate) fn parse_fenced_code_block(
     };
     let first_trimmed = strip_leading_spaces(first_stripped);
 
-    builder.start_node(SyntaxKind::CodeFenceOpen.into());
+    builder.start_node(SyntaxKind::CODE_FENCE_OPEN.into());
     builder.token(
-        SyntaxKind::CodeFenceMarker.into(),
+        SyntaxKind::CODE_FENCE_MARKER.into(),
         &first_trimmed[..fence.fence_count],
     );
 
@@ -607,7 +607,7 @@ pub(crate) fn parse_fenced_code_block(
 
     // Add content
     if !content_lines.is_empty() {
-        builder.start_node(SyntaxKind::CodeContent.into());
+        builder.start_node(SyntaxKind::CODE_CONTENT.into());
         for content_line in content_lines.iter() {
             // Emit base indent for lossless parsing (if present in original line)
             if base_indent > 0 && content_line.len() >= base_indent {
@@ -666,9 +666,9 @@ pub(crate) fn parse_fenced_code_block(
         // Extract the actual newline from the closing line
         let (_, newline_str) = strip_newline(closing_trimmed);
 
-        builder.start_node(SyntaxKind::CodeFenceClose.into());
+        builder.start_node(SyntaxKind::CODE_FENCE_CLOSE.into());
         builder.token(
-            SyntaxKind::CodeFenceMarker.into(),
+            SyntaxKind::CODE_FENCE_MARKER.into(),
             &closing_trimmed[..closing_count],
         );
         if !newline_str.is_empty() {

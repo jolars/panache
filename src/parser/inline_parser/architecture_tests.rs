@@ -28,7 +28,7 @@ fn test_code_inside_unimplemented_link() {
     let tree = parse_inline(input);
 
     // Code spans should still be detected in the TEXT
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
     assert_eq!(
         code_spans, 1,
         "Code span should be parsed even in unimplemented link"
@@ -40,7 +40,7 @@ fn test_math_inside_unimplemented_link() {
     let input = "[see $x$](url)";
     let tree = parse_inline(input);
 
-    let math = count_nodes_of_kind(&tree, SyntaxKind::InlineMath);
+    let math = count_nodes_of_kind(&tree, SyntaxKind::INLINE_MATH);
     assert_eq!(
         math, 1,
         "Inline math should be parsed even in unimplemented link"
@@ -53,8 +53,8 @@ fn test_code_span_contains_dollar() {
     let input = "`$x$`";
     let tree = parse_inline(input);
 
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
-    let math = count_nodes_of_kind(&tree, SyntaxKind::InlineMath);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
+    let math = count_nodes_of_kind(&tree, SyntaxKind::INLINE_MATH);
 
     assert_eq!(code_spans, 1, "Should parse as code span");
     assert_eq!(math, 0, "Should NOT parse math inside code span");
@@ -66,8 +66,8 @@ fn test_math_contains_backtick() {
     let input = "$`x`$";
     let tree = parse_inline(input);
 
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
-    let math = count_nodes_of_kind(&tree, SyntaxKind::InlineMath);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
+    let math = count_nodes_of_kind(&tree, SyntaxKind::INLINE_MATH);
 
     assert_eq!(math, 1, "Should parse as inline math");
     assert_eq!(code_spans, 0, "Should NOT parse code inside math");
@@ -78,8 +78,8 @@ fn test_code_then_math() {
     let input = "`code` and $math$";
     let tree = parse_inline(input);
 
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
-    let math = count_nodes_of_kind(&tree, SyntaxKind::InlineMath);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
+    let math = count_nodes_of_kind(&tree, SyntaxKind::INLINE_MATH);
 
     assert_eq!(code_spans, 1);
     assert_eq!(math, 1);
@@ -90,8 +90,8 @@ fn test_math_then_code() {
     let input = "$math$ and `code`";
     let tree = parse_inline(input);
 
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
-    let math = count_nodes_of_kind(&tree, SyntaxKind::InlineMath);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
+    let math = count_nodes_of_kind(&tree, SyntaxKind::INLINE_MATH);
 
     assert_eq!(code_spans, 1);
     assert_eq!(math, 1);
@@ -104,7 +104,7 @@ fn test_consecutive_code_spans() {
     let input = "`one``two`";
     let tree = parse_inline(input);
 
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
     // This parses as ONE code span: `one``two` where content is "one``two"
     assert_eq!(
         code_spans, 1,
@@ -118,7 +118,7 @@ fn test_two_separate_code_spans() {
     let input = "`one` `two`";
     let tree = parse_inline(input);
 
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
     assert_eq!(
         code_spans, 2,
         "Should parse as two separate code spans with space"
@@ -136,7 +136,7 @@ fn test_consecutive_math() {
 
     // The behavior here depends on display math handling
     // Current implementation should parse $x$ and leave $$ alone
-    let math = count_nodes_of_kind(&tree, SyntaxKind::InlineMath);
+    let math = count_nodes_of_kind(&tree, SyntaxKind::INLINE_MATH);
     // This is actually ambiguous: could be $x$ followed by $y$ or $x$ followed by $$y$$
     // Our implementation currently parses $x$ and then treats $$ as display math start
     assert!(math >= 1, "Should parse at least one math expression");
@@ -148,7 +148,7 @@ fn test_unmatched_code_span() {
     let tree = parse_inline(input);
 
     // Unmatched backtick should remain as TEXT
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
     assert_eq!(
         code_spans, 0,
         "Unmatched backtick should not create code span"
@@ -161,7 +161,7 @@ fn test_unmatched_math() {
     let tree = parse_inline(input);
 
     // Unmatched dollar should remain as TEXT
-    let math = count_nodes_of_kind(&tree, SyntaxKind::InlineMath);
+    let math = count_nodes_of_kind(&tree, SyntaxKind::INLINE_MATH);
     assert_eq!(math, 0, "Unmatched dollar should not create math");
 }
 
@@ -183,7 +183,7 @@ fn test_empty_code_span() {
     let input = "``";
     let tree = parse_inline(input);
 
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
     // Our current implementation requires matching backtick counts
     // `` is 2 backticks, which opens a 2-backtick code span, but has no closing
     // So this should NOT parse as a code span (no matching close)
@@ -199,7 +199,7 @@ fn test_double_backtick_code_span() {
     let input = "`` ``";
     let tree = parse_inline(input);
 
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
     assert_eq!(
         code_spans, 1,
         "Double backticks with space creates code span"
@@ -211,7 +211,7 @@ fn test_code_span_with_only_space() {
     let input = "` `";
     let tree = parse_inline(input);
 
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
     assert_eq!(code_spans, 1, "Code span with space should parse");
 }
 
@@ -221,9 +221,9 @@ fn test_architecture_preserves_block_structure() {
     let input = "# Heading\n\nParagraph with `code`.";
     let tree = parse_inline(input);
 
-    let headings = count_nodes_of_kind(&tree, SyntaxKind::Heading);
+    let headings = count_nodes_of_kind(&tree, SyntaxKind::HEADING);
     let paragraphs = count_nodes_of_kind(&tree, SyntaxKind::PARAGRAPH);
-    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+    let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
 
     assert_eq!(headings, 1, "Should preserve heading");
     assert_eq!(paragraphs, 1, "Should preserve paragraph");

@@ -1,63 +1,63 @@
 ROOT@0..387
   DOCUMENT@0..387
-    Heading@0..29
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..29
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..28
+      HEADING_CONTENT@2..28
         TEXT@2..28 "Double Backslash Math ..."
       NEWLINE@28..29 "\n"
-    BlankLine@29..30
-      BlankLine@29..30 "\n"
+    BLANK_LINE@29..30
+      BLANK_LINE@29..30 "\n"
     PARAGRAPH@30..91
       TEXT@30..90 "Testing double backsl ..."
       NEWLINE@90..91 "\n"
-    BlankLine@91..92
-      BlankLine@91..92 "\n"
+    BLANK_LINE@91..92
+      BLANK_LINE@91..92 "\n"
     PARAGRAPH@92..158
       TEXT@92..127 "Inline math with doub ..."
-      InlineMath@127..148
-        InlineMathMarker@127..130 "\\\\("
+      INLINE_MATH@127..148
+        INLINE_MATH_MARKER@127..130 "\\\\("
         TEXT@130..145 "x^2 + y^2 = z^2"
-        InlineMathMarker@145..148 "\\\\)"
+        INLINE_MATH_MARKER@145..148 "\\\\)"
       TEXT@148..157 " in text."
       NEWLINE@157..158 "\n"
-    BlankLine@158..159
-      BlankLine@158..159 "\n"
+    BLANK_LINE@158..159
+      BLANK_LINE@158..159 "\n"
     PARAGRAPH@159..195
       TEXT@159..194 "Display math with dou ..."
       NEWLINE@194..195 "\n"
-    BlankLine@195..196
-      BlankLine@195..196 "\n"
+    BLANK_LINE@195..196
+      BLANK_LINE@195..196 "\n"
     PARAGRAPH@196..253
-      DisplayMath@196..252
-        DisplayMathMarker@196..199 "\\\\["
+      DISPLAY_MATH@196..252
+        DISPLAY_MATH_MARKER@196..199 "\\\\["
         TEXT@199..249 " \\int_0^\\infty e^{-x^ ..."
-        DisplayMathMarker@249..252 "\\\\]"
+        DISPLAY_MATH_MARKER@249..252 "\\\\]"
       NEWLINE@252..253 "\n"
-    BlankLine@253..254
-      BlankLine@253..254 "\n"
+    BLANK_LINE@253..254
+      BLANK_LINE@253..254 "\n"
     PARAGRAPH@254..317
       TEXT@254..267 "More inline: "
-      InlineMath@267..296
-        InlineMathMarker@267..270 "\\\\("
+      INLINE_MATH@267..296
+        INLINE_MATH_MARKER@267..270 "\\\\("
         TEXT@270..293 "\\alpha + \\beta = \\gamma"
-        InlineMathMarker@293..296 "\\\\)"
+        INLINE_MATH_MARKER@293..296 "\\\\)"
       TEXT@296..301 " and "
-      InlineMath@301..315
-        InlineMathMarker@301..304 "\\\\("
+      INLINE_MATH@301..315
+        INLINE_MATH_MARKER@301..304 "\\\\("
         TEXT@304..312 "E = mc^2"
-        InlineMathMarker@312..315 "\\\\)"
+        INLINE_MATH_MARKER@312..315 "\\\\)"
       TEXT@315..316 "."
       NEWLINE@316..317 "\n"
-    BlankLine@317..318
-      BlankLine@317..318 "\n"
+    BLANK_LINE@317..318
+      BLANK_LINE@317..318 "\n"
     PARAGRAPH@318..387
       TEXT@318..361 "Inline display math w ..."
-      DisplayMath@361..377
-        DisplayMathMarker@361..364 "\\\\["
+      DISPLAY_MATH@361..377
+        DISPLAY_MATH_MARKER@361..364 "\\\\["
         TEXT@364..374 " E = mc^2 "
-        DisplayMathMarker@374..377 "\\\\]"
+        DISPLAY_MATH_MARKER@374..377 "\\\\]"
       TEXT@377..386 " in text."
       NEWLINE@386..387 "\n"
 

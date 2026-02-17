@@ -240,39 +240,39 @@ fn is_internal_punctuation(ch: char) -> bool {
 
 /// Emit a bracketed citation node to the builder.
 pub(crate) fn emit_bracketed_citation(builder: &mut GreenNodeBuilder, content: &str) {
-    builder.start_node(SyntaxKind::Citation.into());
+    builder.start_node(SyntaxKind::CITATION.into());
 
     // Opening bracket
-    builder.token(SyntaxKind::LinkStart.into(), "[");
+    builder.token(SyntaxKind::LINK_START.into(), "[");
 
     // The content contains the citation(s) and any prefix/suffix text
     // We emit it as raw text for now - the formatter can handle the structure
-    builder.token(SyntaxKind::CitationContent.into(), content);
+    builder.token(SyntaxKind::CITATION_CONTENT.into(), content);
 
     // Closing bracket
-    builder.token(SyntaxKind::LinkDest.into(), "]");
+    builder.token(SyntaxKind::LINK_DEST.into(), "]");
 
     builder.finish_node();
 }
 
 /// Emit a bare citation node to the builder.
 pub(crate) fn emit_bare_citation(builder: &mut GreenNodeBuilder, key: &str, has_suppress: bool) {
-    builder.start_node(SyntaxKind::Citation.into());
+    builder.start_node(SyntaxKind::CITATION.into());
 
     // Emit marker (@ or -@)
     if has_suppress {
-        builder.token(SyntaxKind::CitationMarker.into(), "-@");
+        builder.token(SyntaxKind::CITATION_MARKER.into(), "-@");
     } else {
-        builder.token(SyntaxKind::CitationMarker.into(), "@");
+        builder.token(SyntaxKind::CITATION_MARKER.into(), "@");
     }
 
     // Check if key is braced
     if key.starts_with('{') && key.ends_with('}') {
-        builder.token(SyntaxKind::CitationBraceOpen.into(), "{");
-        builder.token(SyntaxKind::CitationKey.into(), &key[1..key.len() - 1]);
-        builder.token(SyntaxKind::CitationBraceClose.into(), "}");
+        builder.token(SyntaxKind::CITATION_BRACE_OPEN.into(), "{");
+        builder.token(SyntaxKind::CITATION_KEY.into(), &key[1..key.len() - 1]);
+        builder.token(SyntaxKind::CITATION_BRACE_CLOSE.into(), "}");
     } else {
-        builder.token(SyntaxKind::CitationKey.into(), key);
+        builder.token(SyntaxKind::CITATION_KEY.into(), key);
     }
 
     builder.finish_node();

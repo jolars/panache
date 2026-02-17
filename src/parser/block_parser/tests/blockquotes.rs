@@ -46,10 +46,10 @@ fn single_blockquote_paragraph() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node and 1 Paragraph node
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::PARAGRAPH), 1);
 
-    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
     let blockquote = &blockquotes[0];
 
     // The paragraph should be inside the blockquote
@@ -62,7 +62,7 @@ fn multi_line_blockquote() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node and 1 Paragraph node (multi-line paragraph)
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::PARAGRAPH), 1);
 }
 
@@ -72,15 +72,15 @@ fn nested_blockquotes() {
     let tree = parse_blocks(input);
 
     // Should have 2 BlockQuote nodes (outer and inner)
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 2);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 2);
 
-    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
 
     // Outer blockquote should contain the inner blockquote
     let outer = &blockquotes[0]; // First one should be the outer
 
     // Check that inner blockquote is actually inside the outer one
-    let inner_found_in_outer = !find_nodes_of_type(outer, SyntaxKind::BlockQuote).is_empty();
+    let inner_found_in_outer = !find_nodes_of_type(outer, SyntaxKind::BLOCKQUOTE).is_empty();
     assert!(
         inner_found_in_outer,
         "Inner blockquote should be nested inside outer"
@@ -93,7 +93,7 @@ fn triple_nested_blockquotes() {
     let tree = parse_blocks(input);
 
     // Should have 3 BlockQuote nodes
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 3);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 3);
 }
 
 #[test]
@@ -102,10 +102,10 @@ fn blockquote_with_blank_lines() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
 
     // Should have 2 Paragraph nodes inside the blockquote
-    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
     let blockquote = &blockquotes[0];
     assert_eq!(count_nodes_of_type(blockquote, SyntaxKind::PARAGRAPH), 2);
 }
@@ -116,13 +116,13 @@ fn blockquote_with_heading() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
 
-    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
     let blockquote = &blockquotes[0];
 
     // Should have 1 Heading and 1 Paragraph inside the blockquote
-    assert_eq!(count_nodes_of_type(blockquote, SyntaxKind::Heading), 1);
+    assert_eq!(count_nodes_of_type(blockquote, SyntaxKind::HEADING), 1);
     assert_eq!(count_nodes_of_type(blockquote, SyntaxKind::PARAGRAPH), 1);
 }
 
@@ -132,7 +132,7 @@ fn blockquote_requires_blank_line_before() {
     let tree = parse_blocks(input);
 
     // Should have 0 BlockQuote nodes (no blank line before)
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 0);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 0);
     // Should have 1 paragraph (no blank line means they merge in Markdown)
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::PARAGRAPH), 1);
 }
@@ -143,7 +143,7 @@ fn blockquote_at_start_of_document() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node (no blank line needed at start)
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn blockquote_after_blank_line() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node (has blank line before)
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
     // Should have 1 regular paragraph + 1 paragraph inside blockquote
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::PARAGRAPH), 2);
 }
@@ -163,7 +163,7 @@ fn complex_nested_structure() {
     let tree = parse_blocks(input);
 
     // Should have multiple BlockQuote nodes (at least 3 levels)
-    let blockquote_count = count_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquote_count = count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
     assert!(
         blockquote_count >= 3,
         "Should have at least 3 blockquote levels, found {}",
@@ -187,10 +187,10 @@ fn spec_basic_blockquote() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
 
     // Should contain paragraphs (lists not yet parsed, but treated as paragraphs)
-    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
     let blockquote = &blockquotes[0];
     assert!(count_nodes_of_type(blockquote, SyntaxKind::PARAGRAPH) >= 1);
 }
@@ -201,14 +201,14 @@ fn spec_nested_blockquote() {
     let tree = parse_blocks(input);
 
     // Should have 2 BlockQuote nodes (outer and inner)
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 2);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 2);
 
     // Verify nesting structure
-    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
     let outer = &blockquotes[0];
 
     // Inner blockquote should be nested inside outer
-    assert!(!find_nodes_of_type(outer, SyntaxKind::BlockQuote).is_empty());
+    assert!(!find_nodes_of_type(outer, SyntaxKind::BLOCKQUOTE).is_empty());
 }
 
 #[test]
@@ -218,7 +218,7 @@ fn spec_blank_before_blockquote_required() {
     let tree = parse_blocks(input);
 
     // Should have only 1 BlockQuote node (the >> line becomes part of the paragraph)
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
 
     // Should have 1 paragraph containing both lines
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::PARAGRAPH), 1);
@@ -230,10 +230,10 @@ fn spec_blockquote_with_indented_code() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
 
     // The content should preserve the indentation
-    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
     let blockquote = &blockquotes[0];
     let text = blockquote.text().to_string();
     assert!(
@@ -253,8 +253,8 @@ fn spec_blockquote_optional_space_after_marker() {
     let tree2 = parse_blocks(input2);
 
     // Both should create blockquotes
-    assert_eq!(count_nodes_of_type(&tree1, SyntaxKind::BlockQuote), 1);
-    assert_eq!(count_nodes_of_type(&tree2, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree1, SyntaxKind::BLOCKQUOTE), 1);
+    assert_eq!(count_nodes_of_type(&tree2, SyntaxKind::BLOCKQUOTE), 1);
 }
 
 #[test]
@@ -268,11 +268,11 @@ fn spec_blockquote_max_three_space_indent() {
     let tree2 = parse_blocks(input2);
 
     // First should create blockquote
-    assert_eq!(count_nodes_of_type(&tree1, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree1, SyntaxKind::BLOCKQUOTE), 1);
 
     // Second should NOT create blockquote (should be treated as code block)
-    assert_eq!(count_nodes_of_type(&tree2, SyntaxKind::BlockQuote), 0);
-    assert_eq!(count_nodes_of_type(&tree2, SyntaxKind::CodeBlock), 1);
+    assert_eq!(count_nodes_of_type(&tree2, SyntaxKind::BLOCKQUOTE), 0);
+    assert_eq!(count_nodes_of_type(&tree2, SyntaxKind::CODE_BLOCK), 1);
 }
 
 // Test lazy blockquote form
@@ -282,10 +282,10 @@ fn spec_lazy_blockquote_form() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote node containing the lazy continuation
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
 
     // The blockquote should contain both lines as a single paragraph
-    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
     let blockquote = &blockquotes[0];
     let text = blockquote.text().to_string();
 
@@ -306,12 +306,12 @@ fn blockquote_with_code_block() {
     let tree = parse_blocks(input);
 
     // Should have 1 BlockQuote with 1 CodeBlock inside
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BlockQuote), 1);
-    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::CodeBlock), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::CODE_BLOCK), 1);
 
-    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BlockQuote);
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
     let blockquote = &blockquotes[0];
 
     // Code block should be inside the blockquote
-    assert_eq!(count_nodes_of_type(blockquote, SyntaxKind::CodeBlock), 1);
+    assert_eq!(count_nodes_of_type(blockquote, SyntaxKind::CODE_BLOCK), 1);
 }

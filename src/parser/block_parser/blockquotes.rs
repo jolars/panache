@@ -56,7 +56,7 @@ pub(super) fn emit_one_blockquote_marker(
     if leading_spaces > 0 {
         builder.token(SyntaxKind::WHITESPACE.into(), &" ".repeat(leading_spaces));
     }
-    builder.token(SyntaxKind::BlockQuoteMarker.into(), ">");
+    builder.token(SyntaxKind::BLOCKQUOTE_MARKER.into(), ">");
     if has_trailing_space {
         builder.token(SyntaxKind::WHITESPACE.into(), " ");
     }

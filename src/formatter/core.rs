@@ -159,7 +159,7 @@ impl Formatter {
     #[allow(clippy::too_many_lines)]
     pub(super) fn format_node_sync(&mut self, node: &SyntaxNode, indent: usize) {
         // Reset blank line counter when we hit a non-blank node
-        if node.kind() != SyntaxKind::BlankLine {
+        if node.kind() != SyntaxKind::BLANK_LINE {
             self.consecutive_blank_lines = 0;
         }
 
@@ -178,16 +178,16 @@ impl Formatter {
                         rowan::NodeOrToken::Token(t) => match t.kind() {
                             SyntaxKind::WHITESPACE => {}
                             SyntaxKind::NEWLINE => {}
-                            SyntaxKind::BlankLine => {
+                            SyntaxKind::BLANK_LINE => {
                                 self.output.push('\n');
                             }
-                            SyntaxKind::EscapedChar => {
+                            SyntaxKind::ESCAPED_CHAR => {
                                 // Token already includes backslash (e.g., "\*")
                                 self.output.push_str(t.text());
                             }
-                            SyntaxKind::ImageLinkStart
-                            | SyntaxKind::LinkStart
-                            | SyntaxKind::LatexCommand => {
+                            SyntaxKind::IMAGE_LINK_START
+                            | SyntaxKind::LINK_START
+                            | SyntaxKind::LATEX_COMMAND => {
                                 self.output.push_str(t.text());
                             }
                             _ => self.output.push_str(t.text()),
@@ -196,7 +196,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::Heading => {
+            SyntaxKind::HEADING => {
                 log::trace!("Formatting heading");
                 // Determine level
                 let mut level = 1;
@@ -205,11 +205,11 @@ impl Formatter {
                 // First pass: get level and attributes
                 for child in node.children() {
                     match child.kind() {
-                        SyntaxKind::AtxHeadingMarker => {
+                        SyntaxKind::ATX_HEADING_MARKER => {
                             let t = child.text().to_string();
                             level = t.chars().take_while(|&c| c == '#').count().clamp(1, 6);
                         }
-                        SyntaxKind::SetextHeadingUnderline => {
+                        SyntaxKind::SETEXT_HEADING_UNDERLINE => {
                             let t = child.text().to_string();
                             if t.chars().all(|c| c == '=') {
                                 level = 1;
@@ -217,7 +217,7 @@ impl Formatter {
                                 level = 2;
                             }
                         }
-                        SyntaxKind::Attribute => {
+                        SyntaxKind::ATTRIBUTE => {
                             attributes = child.text().to_string();
                         }
                         _ => {}
@@ -232,7 +232,7 @@ impl Formatter {
                 // This preserves formatting without adding spaces between inline elements
                 let content_start = self.output.len();
                 for child in node.children() {
-                    if child.kind() == SyntaxKind::HeadingContent {
+                    if child.kind() == SyntaxKind::HEADING_CONTENT {
                         for element in child.children_with_tokens() {
                             match element {
                                 NodeOrToken::Token(t) => {
@@ -274,7 +274,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::HorizontalRule => {
+            SyntaxKind::HORIZONTAL_RULE => {
                 // Output normalized horizontal rule (always use "---")
                 self.output.push_str("---");
                 self.output.push('\n');
@@ -288,7 +288,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::ReferenceDefinition => {
+            SyntaxKind::REFERENCE_DEFINITION => {
                 // Output reference definition as-is: [label]: url "title"
                 let text = node.text().to_string();
                 self.output.push_str(text.trim_end());
@@ -299,15 +299,15 @@ impl Formatter {
                 // Ensure blank line after if followed by non-reference block element
                 if let Some(next) = node.next_sibling()
                     && is_block_element(next.kind())
-                    && next.kind() != SyntaxKind::ReferenceDefinition
-                    && next.kind() != SyntaxKind::FootnoteDefinition
+                    && next.kind() != SyntaxKind::REFERENCE_DEFINITION
+                    && next.kind() != SyntaxKind::FOOTNOTE_DEFINITION
                     && !self.output.ends_with("\n\n")
                 {
                     self.output.push('\n');
                 }
             }
 
-            SyntaxKind::FootnoteDefinition => {
+            SyntaxKind::FOOTNOTE_DEFINITION => {
                 // Format footnote definition with proper indentation
                 // Extract marker and children first
                 let mut marker = String::new();
@@ -316,7 +316,7 @@ impl Formatter {
                 for element in node.children_with_tokens() {
                     match element {
                         NodeOrToken::Token(token)
-                            if token.kind() == SyntaxKind::FootnoteReference =>
+                            if token.kind() == SyntaxKind::FOOTNOTE_REFERENCE =>
                         {
                             marker = token.text().to_string();
                         }
@@ -339,7 +339,7 @@ impl Formatter {
 
                 for child in &child_blocks {
                     // Add blank line between blocks (except after BlankLine or at start)
-                    if !first && prev_was_code_or_list && child.kind() != SyntaxKind::BlankLine {
+                    if !first && prev_was_code_or_list && child.kind() != SyntaxKind::BLANK_LINE {
                         self.output.push('\n');
                     }
 
@@ -396,16 +396,16 @@ impl Formatter {
                                 }
                             }
                         }
-                        SyntaxKind::BlankLine => {
+                        SyntaxKind::BLANK_LINE => {
                             // Normalize blank lines to just newlines
                             self.output.push('\n');
                         }
-                        SyntaxKind::CodeBlock => {
+                        SyntaxKind::CODE_BLOCK => {
                             // Format code blocks as fenced blocks with indentation
                             // Extract code content, stripping WHITESPACE tokens (indentation)
                             let mut code_lines = Vec::new();
                             for code_child in child.children() {
-                                if code_child.kind() == SyntaxKind::CodeContent {
+                                if code_child.kind() == SyntaxKind::CODE_CONTENT {
                                     // Build content line by line, skipping WHITESPACE tokens
                                     let mut line_content = String::new();
                                     for token in code_child.children_with_tokens() {
@@ -459,7 +459,7 @@ impl Formatter {
 
                     // Track if this was a code block or list for spacing
                     prev_was_code_or_list =
-                        matches!(child.kind(), SyntaxKind::CodeBlock | SyntaxKind::List);
+                        matches!(child.kind(), SyntaxKind::CODE_BLOCK | SyntaxKind::LIST);
                 }
 
                 // If no child blocks, just end with newline
@@ -470,14 +470,15 @@ impl Formatter {
                 // Add blank line after footnote definition (matching Pandoc's behavior)
                 if let Some(next) = node.next_sibling() {
                     let next_kind = next.kind();
-                    if next_kind == SyntaxKind::FootnoteDefinition && !self.output.ends_with("\n\n")
+                    if next_kind == SyntaxKind::FOOTNOTE_DEFINITION
+                        && !self.output.ends_with("\n\n")
                     {
                         self.output.push('\n');
                     }
                 }
             }
 
-            SyntaxKind::LatexEnvironment => {
+            SyntaxKind::LATEX_ENVIRONMENT => {
                 // Output the environment exactly as written
                 let text = node.text().to_string();
                 self.output.push_str(&text);
@@ -486,7 +487,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::HtmlBlock => {
+            SyntaxKind::HTML_BLOCK => {
                 // Output HTML block exactly as written
                 let text = node.text().to_string();
                 self.output.push_str(&text);
@@ -495,7 +496,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::Comment => {
+            SyntaxKind::COMMENT => {
                 let text = node.text().to_string();
                 self.output.push_str(&text);
                 if !text.ends_with('\n') {
@@ -503,20 +504,20 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::LatexCommand => {
+            SyntaxKind::LATEX_COMMAND => {
                 // Standalone LaTeX commands - preserve exactly as written
                 let text = node.text().to_string();
                 self.output.push_str(&text);
                 // Don't add extra newlines for standalone LaTeX commands
             }
 
-            SyntaxKind::BlockQuote => {
+            SyntaxKind::BLOCKQUOTE => {
                 log::trace!("Formatting blockquote");
                 // Determine nesting depth by counting ancestor BlockQuote nodes (including self)
                 let mut depth = 0usize;
                 let mut cur = Some(node.clone());
                 while let Some(n) = cur {
-                    if n.kind() == SyntaxKind::BlockQuote {
+                    if n.kind() == SyntaxKind::BLOCKQUOTE {
                         depth += 1;
                     }
                     cur = n.parent();
@@ -534,7 +535,7 @@ impl Formatter {
                 for child in node.children() {
                     match child.kind() {
                         // Skip BlockQuoteMarker tokens - we add prefixes dynamically
-                        SyntaxKind::BlockQuoteMarker => continue,
+                        SyntaxKind::BLOCKQUOTE_MARKER => continue,
 
                         SyntaxKind::PARAGRAPH => match wrap_mode {
                             WrapMode::Preserve => {
@@ -545,7 +546,7 @@ impl Formatter {
                                 for item in child.children_with_tokens() {
                                     match item {
                                         NodeOrToken::Token(t)
-                                            if t.kind() == SyntaxKind::BlockQuoteMarker =>
+                                            if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER =>
                                         {
                                             // Skip marker - we add these dynamically
                                             // Also skip the following whitespace (part of marker syntax)
@@ -586,16 +587,16 @@ impl Formatter {
                                 }
                             }
                         },
-                        SyntaxKind::BlankLine => {
+                        SyntaxKind::BLANK_LINE => {
                             self.output.push_str(blank_prefix);
                             self.output.push('\n');
                         }
-                        SyntaxKind::HorizontalRule => {
+                        SyntaxKind::HORIZONTAL_RULE => {
                             self.output.push_str(&content_prefix);
                             self.output.push_str("---");
                             self.output.push('\n');
                         }
-                        SyntaxKind::Heading => {
+                        SyntaxKind::HEADING => {
                             // Format heading with blockquote prefix
                             let heading_text = self.format_heading(&child);
                             for line in heading_text.lines() {
@@ -604,7 +605,7 @@ impl Formatter {
                                 self.output.push('\n');
                             }
                         }
-                        SyntaxKind::List => {
+                        SyntaxKind::LIST => {
                             // Format list with blockquote prefix
                             // Save current output, format list to temp, then prefix each line
                             let saved_output = self.output.clone();
@@ -623,7 +624,7 @@ impl Formatter {
                                 self.output.push('\n');
                             }
                         }
-                        SyntaxKind::CodeBlock => {
+                        SyntaxKind::CODE_BLOCK => {
                             // Format code block with blockquote prefix
                             // Save current output, format code block to temp, then prefix each line
                             let saved_output = self.output.clone();
@@ -693,7 +694,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::Figure => {
+            SyntaxKind::FIGURE => {
                 // Figure is a standalone image - format the inline content directly
                 log::debug!("Formatting figure");
                 let text = self.format_inline_node(node);
@@ -703,7 +704,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::Plain => {
+            SyntaxKind::PLAIN => {
                 // Plain is like PARAGRAPH but for tight contexts (definition lists, table cells)
                 // Apply wrapping with continuation indentation
                 let text = node.text().to_string();
@@ -737,17 +738,17 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::List => {
+            SyntaxKind::LIST => {
                 self.format_list(node, indent);
             }
 
-            SyntaxKind::DefinitionList => {
+            SyntaxKind::DEFINITION_LIST => {
                 // Add blank line before top-level definition lists
                 if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") {
                     self.output.push('\n');
                 }
                 for child in node.children() {
-                    if child.kind() == SyntaxKind::BlankLine {
+                    if child.kind() == SyntaxKind::BLANK_LINE {
                         continue;
                     }
                     self.format_node_sync(&child, indent);
@@ -757,7 +758,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::LineBlock => {
+            SyntaxKind::LINE_BLOCK => {
                 log::debug!("Formatting line block");
                 // Add blank line before line blocks if not at start
                 if !self.output.is_empty() && !self.output.ends_with("\n\n") {
@@ -766,7 +767,7 @@ impl Formatter {
 
                 // Format each line preserving line breaks and leading spaces
                 for child in node.children() {
-                    if child.kind() == SyntaxKind::LineBlockLine {
+                    if child.kind() == SyntaxKind::LINE_BLOCK_LINE {
                         // Get the text content, preserving leading spaces
                         let text = child.text().to_string();
                         // The text might start with "| " from the marker, or be continuation
@@ -802,17 +803,17 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::DefinitionItem => {
+            SyntaxKind::DEFINITION_ITEM => {
                 // Format term and definitions in compact format (no blank lines)
                 for child in node.children() {
-                    if child.kind() == SyntaxKind::BlankLine {
+                    if child.kind() == SyntaxKind::BLANK_LINE {
                         continue; // Skip blank lines for compact format
                     }
                     self.format_node_sync(&child, indent);
                 }
             }
 
-            SyntaxKind::Term => {
+            SyntaxKind::TERM => {
                 // Format term - just emit text with newline
                 for child in node.children_with_tokens() {
                     match child {
@@ -830,7 +831,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::Definition => {
+            SyntaxKind::DEFINITION => {
                 // Format definition with marker and content
                 // The definition marker itself is at the base indent level
                 // Definition content is indented 4 spaces from the margin
@@ -866,7 +867,7 @@ impl Formatter {
                                     first_para_idx = Some(i);
                                     break;
                                 }
-                                SyntaxKind::BlankLine => {
+                                SyntaxKind::BLANK_LINE => {
                                     // BlankLine before paragraph - not lazy
                                     break;
                                 }
@@ -889,7 +890,7 @@ impl Formatter {
                                 self.output.push('\n');
                             }
                         }
-                        NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DefinitionMarker => {
+                        NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DEFINITION_MARKER => {
                             // Skip - we already added `:   `
                         }
                         NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::WHITESPACE => {
@@ -898,14 +899,14 @@ impl Formatter {
                         NodeOrToken::Node(n) => {
                             // Handle continuation content with proper indentation
                             match n.kind() {
-                                SyntaxKind::CodeBlock => {
+                                SyntaxKind::CODE_BLOCK => {
                                     // Add blank line before code block if needed
                                     if !self.output.ends_with("\n\n") {
                                         self.output.push('\n');
                                     }
                                     self.format_indented_code_block(n, def_indent);
                                 }
-                                SyntaxKind::Plain => {
+                                SyntaxKind::PLAIN => {
                                     // Plain block in definition - format inline with potential wrapping
                                     // Already handled by Plain formatter above
                                     self.format_node_sync(n, def_indent);
@@ -923,7 +924,7 @@ impl Formatter {
                                         self.format_list_continuation_paragraph(n, def_indent);
                                     }
                                 }
-                                SyntaxKind::BlankLine => {
+                                SyntaxKind::BLANK_LINE => {
                                     // Normalize blank lines in definitions to just newlines
                                     // (strip trailing whitespace)
                                     let is_before_first_para =
@@ -946,16 +947,16 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::SimpleTable | SyntaxKind::MultilineTable => {
+            SyntaxKind::SIMPLE_TABLE | SyntaxKind::MULTILINE_TABLE => {
                 // Handle table with proper caption formatting
                 for child in node.children() {
                     match child.kind() {
-                        SyntaxKind::TableCaption => {
+                        SyntaxKind::TABLE_CAPTION => {
                             // Normalize caption prefix to "Table: "
                             for caption_child in child.children_with_tokens() {
                                 match caption_child {
                                     rowan::NodeOrToken::Token(token)
-                                        if token.kind() == SyntaxKind::TableCaptionPrefix =>
+                                        if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
                                     {
                                         // Always emit normalized "Table: " prefix
                                         self.output.push_str("Table: ");
@@ -977,22 +978,22 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::PipeTable => {
+            SyntaxKind::PIPE_TABLE => {
                 // Format pipe table with proper alignment
                 let formatted = tables::format_pipe_table(node, &self.config);
                 self.output.push_str(&formatted);
             }
 
-            SyntaxKind::GridTable => {
+            SyntaxKind::GRID_TABLE => {
                 // Format grid table with proper alignment and borders
                 let formatted = tables::format_grid_table(node, &self.config);
                 self.output.push_str(&formatted);
             }
 
-            SyntaxKind::InlineMath => {
+            SyntaxKind::INLINE_MATH => {
                 // Check if this is display math (has DisplayMathMarker)
                 let is_display_math = node.children_with_tokens().any(|t| {
-                    matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DisplayMathMarker)
+                    matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DISPLAY_MATH_MARKER)
                 });
 
                 // Get the actual content (TEXT token, not node)
@@ -1011,8 +1012,8 @@ impl Formatter {
                     .children_with_tokens()
                     .find_map(|t| match t {
                         NodeOrToken::Token(tok)
-                            if tok.kind() == SyntaxKind::InlineMathMarker
-                                || tok.kind() == SyntaxKind::DisplayMathMarker =>
+                            if tok.kind() == SyntaxKind::INLINE_MATH_MARKER
+                                || tok.kind() == SyntaxKind::DISPLAY_MATH_MARKER =>
                         {
                             Some(tok.text().to_string())
                         }
@@ -1071,11 +1072,11 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::ListItem => {
+            SyntaxKind::LIST_ITEM => {
                 self.format_list_item(node, indent);
             }
 
-            SyntaxKind::FencedDiv => {
+            SyntaxKind::FENCED_DIV => {
                 // Use more colons for nested divs: 3 base + 2 per depth level
                 let colon_count = 3 + (self.fenced_div_depth * 2);
                 let colons = ":".repeat(colon_count);
@@ -1084,17 +1085,17 @@ impl Formatter {
 
                 for child in node.children() {
                     match child.kind() {
-                        SyntaxKind::DivFenceOpen => {
+                        SyntaxKind::DIV_FENCE_OPEN => {
                             // Extract attributes from DivInfo child node
                             for fence_child in child.children() {
-                                if fence_child.kind() == SyntaxKind::DivInfo {
+                                if fence_child.kind() == SyntaxKind::DIV_INFO {
                                     attributes = Some(fence_child.text().to_string());
                                     break;
                                 }
                             }
                         }
 
-                        SyntaxKind::DivFenceClose => {
+                        SyntaxKind::DIV_FENCE_CLOSE => {
                             // Will be handled after content
                         }
 
@@ -1118,7 +1119,9 @@ impl Formatter {
                 for child in node.children() {
                     if !matches!(
                         child.kind(),
-                        SyntaxKind::DivFenceOpen | SyntaxKind::DivInfo | SyntaxKind::DivFenceClose
+                        SyntaxKind::DIV_FENCE_OPEN
+                            | SyntaxKind::DIV_INFO
+                            | SyntaxKind::DIV_FENCE_CLOSE
                     ) {
                         self.format_node_sync(&child, indent);
                     }
@@ -1135,12 +1138,12 @@ impl Formatter {
                 self.output.push('\n');
             }
 
-            SyntaxKind::InlineMathMarker => {
+            SyntaxKind::INLINE_MATH_MARKER => {
                 // Output inline math as $...$ or $$...$$ (on the same line)
                 self.output.push_str(node.text().to_string().trim());
             }
 
-            SyntaxKind::DisplayMath => {
+            SyntaxKind::DISPLAY_MATH => {
                 // Display math ($$...$$) - format on separate lines
                 // Even though it's parsed as inline, it should display as block-level
 
@@ -1150,7 +1153,7 @@ impl Formatter {
 
                 for child in node.children_with_tokens() {
                     if let rowan::NodeOrToken::Token(t) = child {
-                        if t.kind() == SyntaxKind::DisplayMathMarker {
+                        if t.kind() == SyntaxKind::DISPLAY_MATH_MARKER {
                             let marker_text = t.text().to_string();
                             if opening_marker.is_none() {
                                 opening_marker = Some(marker_text);
@@ -1195,13 +1198,13 @@ impl Formatter {
                 self.output.push('\n');
             }
 
-            SyntaxKind::CodeBlock => {
+            SyntaxKind::CODE_BLOCK => {
                 log::trace!("Formatting code block");
                 // Normalize code blocks to use backticks
                 self.format_code_block(node);
             }
 
-            SyntaxKind::YamlMetadata | SyntaxKind::PandocTitleBlock => {
+            SyntaxKind::YAML_METADATA | SyntaxKind::PANDOC_TITLE_BLOCK => {
                 // Preserve these blocks as-is
                 let text = node.text().to_string();
                 self.output.push_str(&text);
@@ -1211,21 +1214,21 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::BlankLine => {
+            SyntaxKind::BLANK_LINE => {
                 // BlankLine nodes preserve exact whitespace in the AST for losslessness
                 // But when formatting, we normalize to just newlines (no trailing spaces)
                 self.output.push('\n');
                 self.consecutive_blank_lines += 1;
             }
 
-            SyntaxKind::Emphasis => {
+            SyntaxKind::EMPHASIS => {
                 // Normalize emphasis to always use single asterisks
                 self.output.push('*');
                 for child in node.children_with_tokens() {
                     match child {
                         rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
                         rowan::NodeOrToken::Token(t) => {
-                            if t.kind() != SyntaxKind::EmphasisMarker {
+                            if t.kind() != SyntaxKind::EMPHASIS_MARKER {
                                 self.output.push_str(t.text());
                             }
                         }
@@ -1234,14 +1237,14 @@ impl Formatter {
                 self.output.push('*');
             }
 
-            SyntaxKind::Strong => {
+            SyntaxKind::STRONG => {
                 // Normalize strong emphasis to always use double asterisks
                 self.output.push_str("**");
                 for child in node.children_with_tokens() {
                     match child {
                         rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
                         rowan::NodeOrToken::Token(t) => {
-                            if t.kind() != SyntaxKind::StrongMarker {
+                            if t.kind() != SyntaxKind::STRONG_MARKER {
                                 self.output.push_str(t.text());
                             }
                         }
@@ -1250,14 +1253,14 @@ impl Formatter {
                 self.output.push_str("**");
             }
 
-            SyntaxKind::Strikeout => {
+            SyntaxKind::STRIKEOUT => {
                 // Format strikeout with tildes
                 self.output.push_str("~~");
                 for child in node.children_with_tokens() {
                     match child {
                         rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
                         rowan::NodeOrToken::Token(t) => {
-                            if t.kind() != SyntaxKind::StrikeoutMarker {
+                            if t.kind() != SyntaxKind::STRIKEOUT_MARKER {
                                 self.output.push_str(t.text());
                             }
                         }
@@ -1266,14 +1269,14 @@ impl Formatter {
                 self.output.push_str("~~");
             }
 
-            SyntaxKind::Superscript => {
+            SyntaxKind::SUPERSCRIPT => {
                 // Format superscript with carets
                 self.output.push('^');
                 for child in node.children_with_tokens() {
                     match child {
                         rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
                         rowan::NodeOrToken::Token(t) => {
-                            if t.kind() != SyntaxKind::SuperscriptMarker {
+                            if t.kind() != SyntaxKind::SUPERSCRIPT_MARKER {
                                 self.output.push_str(t.text());
                             }
                         }
@@ -1282,14 +1285,14 @@ impl Formatter {
                 self.output.push('^');
             }
 
-            SyntaxKind::Subscript => {
+            SyntaxKind::SUBSCRIPT => {
                 // Format subscript with tildes
                 self.output.push('~');
                 for child in node.children_with_tokens() {
                     match child {
                         rowan::NodeOrToken::Node(n) => self.format_node_sync(&n, indent),
                         rowan::NodeOrToken::Token(t) => {
-                            if t.kind() != SyntaxKind::SubscriptMarker {
+                            if t.kind() != SyntaxKind::SUBSCRIPT_MARKER {
                                 self.output.push_str(t.text());
                             }
                         }

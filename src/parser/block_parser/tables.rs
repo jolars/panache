@@ -289,7 +289,7 @@ fn emit_table_caption(
     start: usize,
     end: usize,
 ) {
-    builder.start_node(SyntaxKind::TableCaption.into());
+    builder.start_node(SyntaxKind::TABLE_CAPTION.into());
 
     for (i, line) in lines[start..end].iter().enumerate() {
         if i == 0 {
@@ -323,7 +323,7 @@ fn emit_table_caption(
             };
 
             if prefix_len > 0 {
-                builder.token(SyntaxKind::TableCaptionPrefix.into(), prefix_text);
+                builder.token(SyntaxKind::TABLE_CAPTION_PREFIX.into(), prefix_text);
 
                 // Emit rest of line after prefix
                 let rest_start = leading_ws_len + prefix_len;
@@ -436,7 +436,7 @@ pub(crate) fn try_parse_simple_table(
     let caption_after = find_caption_after_table(lines, end_pos);
 
     // Build the table
-    builder.start_node(SyntaxKind::SimpleTable.into());
+    builder.start_node(SyntaxKind::SIMPLE_TABLE.into());
 
     // Emit caption before if present
     if let Some(caption_pos) = caption_before {
@@ -449,26 +449,26 @@ pub(crate) fn try_parse_simple_table(
             builder,
             lines[separator_pos - 1],
             &columns,
-            SyntaxKind::TableHeader,
+            SyntaxKind::TABLE_HEADER,
         );
     }
 
     // Emit separator
-    builder.start_node(SyntaxKind::TableSeparator.into());
+    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
     emit_line_tokens(builder, separator_line);
     builder.finish_node();
 
     // Emit data rows
     for line in lines.iter().take(end_pos).skip(separator_pos + 1) {
-        emit_table_row(builder, line, &columns, SyntaxKind::TableRow);
+        emit_table_row(builder, line, &columns, SyntaxKind::TABLE_ROW);
     }
 
     // Emit caption after if present
     if let Some((cap_start, cap_end)) = caption_after {
         // Emit blank line before caption if needed
         if cap_start > end_pos {
-            builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "\n");
+            builder.start_node(SyntaxKind::BLANK_LINE.into());
+            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
             builder.finish_node();
         }
         emit_table_caption(builder, lines, cap_start, cap_end);
@@ -719,7 +719,7 @@ pub(crate) fn try_parse_pipe_table(
     let caption_after = find_caption_after_table(lines, end_pos);
 
     // Build the pipe table
-    builder.start_node(SyntaxKind::PipeTable.into());
+    builder.start_node(SyntaxKind::PIPE_TABLE.into());
 
     // Emit caption before if present
     if let Some(caption_pos) = caption_before {
@@ -728,8 +728,8 @@ pub(crate) fn try_parse_pipe_table(
         if caption_pos + 1 < actual_start {
             for line in lines.iter().take(actual_start).skip(caption_pos + 1) {
                 if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BlankLine.into());
-                    builder.token(SyntaxKind::BlankLine.into(), line);
+                    builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
                     builder.finish_node();
                 }
             }
@@ -737,18 +737,18 @@ pub(crate) fn try_parse_pipe_table(
     }
 
     // Emit header row
-    builder.start_node(SyntaxKind::TableHeader.into());
+    builder.start_node(SyntaxKind::TABLE_HEADER.into());
     emit_line_tokens(builder, header_line);
     builder.finish_node();
 
     // Emit separator
-    builder.start_node(SyntaxKind::TableSeparator.into());
+    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
     emit_line_tokens(builder, separator_line);
     builder.finish_node();
 
     // Emit data rows
     for line in lines.iter().take(end_pos).skip(actual_start + 2) {
-        builder.start_node(SyntaxKind::TableRow.into());
+        builder.start_node(SyntaxKind::TABLE_ROW.into());
         emit_line_tokens(builder, line);
         builder.finish_node();
     }
@@ -757,8 +757,8 @@ pub(crate) fn try_parse_pipe_table(
     if let Some((cap_start, cap_end)) = caption_after {
         // Emit blank line before caption if needed
         if cap_start > end_pos {
-            builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "\n");
+            builder.start_node(SyntaxKind::BLANK_LINE.into());
+            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
             builder.finish_node();
         }
         emit_table_caption(builder, lines, cap_start, cap_end);
@@ -1208,7 +1208,7 @@ pub(crate) fn try_parse_grid_table(
     let caption_after = find_caption_after_table(lines, end_pos);
 
     // Build the grid table
-    builder.start_node(SyntaxKind::GridTable.into());
+    builder.start_node(SyntaxKind::GRID_TABLE.into());
 
     // Emit caption before if present
     if let Some(caption_pos) = caption_before {
@@ -1217,8 +1217,8 @@ pub(crate) fn try_parse_grid_table(
         if caption_pos + 1 < actual_start {
             for line in lines.iter().take(actual_start).skip(caption_pos + 1) {
                 if line.trim().is_empty() {
-                    builder.start_node(SyntaxKind::BlankLine.into());
-                    builder.token(SyntaxKind::BlankLine.into(), line);
+                    builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
                     builder.finish_node();
                 }
             }
@@ -1237,7 +1237,7 @@ pub(crate) fn try_parse_grid_table(
             if is_header_sep {
                 if !past_header_sep {
                     // This is the header/body separator
-                    builder.start_node(SyntaxKind::TableSeparator.into());
+                    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
                     emit_line_tokens(builder, line);
                     builder.finish_node();
                     past_header_sep = true;
@@ -1246,24 +1246,24 @@ pub(crate) fn try_parse_grid_table(
                     if !in_footer_section {
                         in_footer_section = true;
                     }
-                    builder.start_node(SyntaxKind::TableSeparator.into());
+                    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
                     emit_line_tokens(builder, line);
                     builder.finish_node();
                 }
             } else {
                 // Regular separator
-                builder.start_node(SyntaxKind::TableSeparator.into());
+                builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
                 emit_line_tokens(builder, line);
                 builder.finish_node();
             }
         } else if is_grid_content_row(line) {
             // Content row
             let row_kind = if !past_header_sep && found_header_sep {
-                SyntaxKind::TableHeader
+                SyntaxKind::TABLE_HEADER
             } else if in_footer_section {
-                SyntaxKind::TableFooter
+                SyntaxKind::TABLE_FOOTER
             } else {
-                SyntaxKind::TableRow
+                SyntaxKind::TABLE_ROW
             };
 
             builder.start_node(row_kind.into());
@@ -1275,14 +1275,14 @@ pub(crate) fn try_parse_grid_table(
     // Emit caption after if present
     if let Some((cap_start, cap_end)) = caption_after {
         if cap_start > end_pos {
-            builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "\n");
+            builder.start_node(SyntaxKind::BLANK_LINE.into());
+            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
             builder.finish_node();
         }
         emit_table_caption(builder, lines, cap_start, cap_end);
     }
 
-    builder.finish_node(); // GridTable
+    builder.finish_node(); // GRID_TABLE
 
     // Calculate lines consumed
     let table_start = caption_before.unwrap_or(actual_start);
@@ -1629,7 +1629,7 @@ pub(crate) fn try_parse_multiline_table(
     let caption_after = find_caption_after_table(lines, end_pos);
 
     // Build the multiline table
-    builder.start_node(SyntaxKind::MultilineTable.into());
+    builder.start_node(SyntaxKind::MULTILINE_TABLE.into());
 
     // Emit caption before if present
     if let Some(caption_pos) = caption_before {
@@ -1637,7 +1637,7 @@ pub(crate) fn try_parse_multiline_table(
     }
 
     // Emit opening separator
-    builder.start_node(SyntaxKind::TableSeparator.into());
+    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
     emit_line_tokens(builder, lines[start_pos]);
     builder.finish_node();
 
@@ -1650,11 +1650,11 @@ pub(crate) fn try_parse_multiline_table(
         if i == column_sep_pos {
             // Emit any accumulated header lines
             if !current_row_lines.is_empty() {
-                emit_multiline_row(builder, &current_row_lines, SyntaxKind::TableHeader);
+                emit_multiline_row(builder, &current_row_lines, SyntaxKind::TABLE_HEADER);
                 current_row_lines.clear();
             }
 
-            builder.start_node(SyntaxKind::TableSeparator.into());
+            builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
             emit_line_tokens(builder, line);
             builder.finish_node();
             in_header = false;
@@ -1666,15 +1666,15 @@ pub(crate) fn try_parse_multiline_table(
             // Emit any accumulated row lines
             if !current_row_lines.is_empty() {
                 let kind = if in_header {
-                    SyntaxKind::TableHeader
+                    SyntaxKind::TABLE_HEADER
                 } else {
-                    SyntaxKind::TableRow
+                    SyntaxKind::TABLE_ROW
                 };
                 emit_multiline_row(builder, &current_row_lines, kind);
                 current_row_lines.clear();
             }
 
-            builder.start_node(SyntaxKind::TableSeparator.into());
+            builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
             emit_line_tokens(builder, line);
             builder.finish_node();
             continue;
@@ -1685,16 +1685,16 @@ pub(crate) fn try_parse_multiline_table(
             // Emit accumulated row
             if !current_row_lines.is_empty() {
                 let kind = if in_header {
-                    SyntaxKind::TableHeader
+                    SyntaxKind::TABLE_HEADER
                 } else {
-                    SyntaxKind::TableRow
+                    SyntaxKind::TABLE_ROW
                 };
                 emit_multiline_row(builder, &current_row_lines, kind);
                 current_row_lines.clear();
             }
 
-            builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "\n");
+            builder.start_node(SyntaxKind::BLANK_LINE.into());
+            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
             builder.finish_node();
             continue;
         }
@@ -1706,9 +1706,9 @@ pub(crate) fn try_parse_multiline_table(
     // Emit any remaining accumulated lines
     if !current_row_lines.is_empty() {
         let kind = if in_header {
-            SyntaxKind::TableHeader
+            SyntaxKind::TABLE_HEADER
         } else {
-            SyntaxKind::TableRow
+            SyntaxKind::TABLE_ROW
         };
         emit_multiline_row(builder, &current_row_lines, kind);
     }
@@ -1716,8 +1716,8 @@ pub(crate) fn try_parse_multiline_table(
     // Emit caption after if present
     if let Some((cap_start, cap_end)) = caption_after {
         if cap_start > end_pos {
-            builder.start_node(SyntaxKind::BlankLine.into());
-            builder.token(SyntaxKind::BlankLine.into(), "\n");
+            builder.start_node(SyntaxKind::BLANK_LINE.into());
+            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
             builder.finish_node();
         }
         emit_table_caption(builder, lines, cap_start, cap_end);

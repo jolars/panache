@@ -78,17 +78,17 @@ pub(super) fn build_words<'a>(
         for el in node.children_with_tokens() {
             match el {
                 NodeOrToken::Token(t) => match t.kind() {
-                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BlankLine => {
+                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
                         b.pending_space = true;
                     }
                     // Skip blockquote markers - they're in the tree for losslessness but
                     // the formatter adds them dynamically when formatting BlockQuote nodes
-                    SyntaxKind::BlockQuoteMarker => {}
-                    SyntaxKind::EscapedChar => {
+                    SyntaxKind::BLOCKQUOTE_MARKER => {}
+                    SyntaxKind::ESCAPED_CHAR => {
                         // Token already includes backslash (e.g., "\*")
                         b.push_piece(t.text());
                     }
-                    SyntaxKind::EmphasisMarker | SyntaxKind::StrongMarker => {
+                    SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {
                         // Skip original markers - we'll add normalized ones
                     }
                     SyntaxKind::TEXT => {
@@ -122,20 +122,20 @@ pub(super) fn build_words<'a>(
                     }
                 },
                 NodeOrToken::Node(n) => match n.kind() {
-                    SyntaxKind::List => {
+                    SyntaxKind::LIST => {
                         b.pending_space = true;
                     }
-                    SyntaxKind::CodeBlock | SyntaxKind::BlankLine => {
+                    SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {
                         // Skip code blocks and blank lines - they'll be handled separately
                         // Don't recurse into them
                     }
-                    SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::ListItem) => {
+                    SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
                         // For PARAGRAPH children of ListItem, check if there's a BlankLine before it
                         // If yes, it's a true continuation paragraph (skip in wrapping)
                         // If no, it's a lazy continuation (include in wrapping)
                         let has_blank_before = n
                             .prev_sibling()
-                            .map(|prev| prev.kind() == SyntaxKind::BlankLine)
+                            .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
                             .unwrap_or(false);
 
                         if has_blank_before {
@@ -149,17 +149,17 @@ pub(super) fn build_words<'a>(
                         // Recursively process PARAGRAPH content instead of treating it as a unit
                         process_node_recursive(&n, b, format_inline_fn);
                     }
-                    SyntaxKind::Emphasis => {
+                    SyntaxKind::EMPHASIS => {
                         b.push_piece("*");
                         process_node_recursive(&n, b, format_inline_fn);
                         b.push_piece("*");
                     }
-                    SyntaxKind::Strong => {
+                    SyntaxKind::STRONG => {
                         b.push_piece("**");
                         process_node_recursive(&n, b, format_inline_fn);
                         b.push_piece("**");
                     }
-                    SyntaxKind::Link => {
+                    SyntaxKind::LINK => {
                         // Links can wrap at whitespace boundaries in link text
                         // Two types: inline [text](url) and reference [text][ref]
                         b.push_piece("[");
@@ -167,7 +167,7 @@ pub(super) fn build_words<'a>(
                         // Process link text recursively to allow wrapping
                         for child in n.children_with_tokens() {
                             if let NodeOrToken::Node(link_child) = child
-                                && link_child.kind() == SyntaxKind::LinkText
+                                && link_child.kind() == SyntaxKind::LINK_TEXT
                             {
                                 process_node_recursive(&link_child, b, format_inline_fn);
                             }
@@ -183,12 +183,12 @@ pub(super) fn build_words<'a>(
                         for child in n.children_with_tokens() {
                             match child {
                                 NodeOrToken::Node(link_child) => match link_child.kind() {
-                                    SyntaxKind::LinkText => {
+                                    SyntaxKind::LINK_TEXT => {
                                         past_link_text = true;
                                     }
-                                    SyntaxKind::LinkDest
-                                    | SyntaxKind::LinkRef
-                                    | SyntaxKind::Attribute => {
+                                    SyntaxKind::LINK_DEST
+                                    | SyntaxKind::LINK_REF
+                                    | SyntaxKind::ATTRIBUTE => {
                                         if past_link_text {
                                             closing.push_str(&link_child.text().to_string());
                                         }
@@ -205,7 +205,7 @@ pub(super) fn build_words<'a>(
 
                         b.attach_to_previous(&closing);
                     }
-                    SyntaxKind::ImageLink => {
+                    SyntaxKind::IMAGE_LINK => {
                         // Image links work similarly to links but with "![" prefix
                         // Structure: ImageLinkStart "![" + ImageAlt (wrappable) + "](" + LinkDest + ")" + Attribute
                         b.push_piece("![");
@@ -213,7 +213,7 @@ pub(super) fn build_words<'a>(
                         // Process image alt text recursively to allow wrapping
                         for child in n.children_with_tokens() {
                             if let NodeOrToken::Node(img_child) = child
-                                && img_child.kind() == SyntaxKind::ImageAlt
+                                && img_child.kind() == SyntaxKind::IMAGE_ALT
                             {
                                 process_node_recursive(&img_child, b, format_inline_fn);
                             }
@@ -226,10 +226,10 @@ pub(super) fn build_words<'a>(
                         for child in n.children_with_tokens() {
                             match child {
                                 NodeOrToken::Node(img_child) => match img_child.kind() {
-                                    SyntaxKind::ImageAlt => {
+                                    SyntaxKind::IMAGE_ALT => {
                                         past_image_alt = true;
                                     }
-                                    SyntaxKind::LinkDest | SyntaxKind::Attribute => {
+                                    SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE => {
                                         if past_image_alt {
                                             closing.push_str(&img_child.text().to_string());
                                         }
@@ -282,7 +282,7 @@ pub(super) fn wrapped_lines_for_paragraph(
     // Check if paragraph contains hard line breaks
     let has_hard_breaks = node
         .descendants_with_tokens()
-        .any(|el| el.kind() == SyntaxKind::HardLineBreak);
+        .any(|el| el.kind() == SyntaxKind::HARD_LINE_BREAK);
 
     if has_hard_breaks {
         // Don't wrap paragraphs with hard line breaks - preserve the breaks
@@ -296,7 +296,7 @@ pub(super) fn wrapped_lines_for_paragraph(
                     result.push_str(&format_inline_fn(&n));
                 }
                 NodeOrToken::Token(t) => {
-                    if t.kind() == SyntaxKind::HardLineBreak {
+                    if t.kind() == SyntaxKind::HARD_LINE_BREAK {
                         // Normalize to backslash-newline if extension enabled
                         if _config.extensions.escaped_line_breaks {
                             result.push_str("\\\n");

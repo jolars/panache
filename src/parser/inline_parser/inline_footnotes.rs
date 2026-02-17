@@ -58,16 +58,16 @@ pub(crate) fn try_parse_inline_footnote(text: &str) -> Option<(usize, &str)> {
 
 /// Emit an inline footnote node to the builder.
 pub(crate) fn emit_inline_footnote(builder: &mut GreenNodeBuilder, content: &str, config: &Config) {
-    builder.start_node(SyntaxKind::InlineFootnote.into());
+    builder.start_node(SyntaxKind::INLINE_FOOTNOTE.into());
 
     // Opening marker
-    builder.token(SyntaxKind::InlineFootnoteStart.into(), "^[");
+    builder.token(SyntaxKind::INLINE_FOOTNOTE_START.into(), "^[");
 
     // Parse the content recursively for nested inline elements
     parse_inline_text(builder, content, config, None);
 
     // Closing marker
-    builder.token(SyntaxKind::InlineFootnoteEnd.into(), "]");
+    builder.token(SyntaxKind::INLINE_FOOTNOTE_END.into(), "]");
 
     builder.finish_node();
 }
@@ -102,7 +102,7 @@ pub(crate) fn try_parse_footnote_reference(text: &str) -> Option<(usize, String)
 
 /// Emit a footnote reference node to the builder.
 pub(crate) fn emit_footnote_reference(builder: &mut GreenNodeBuilder, id: &str) {
-    builder.start_node(SyntaxKind::FootnoteReference.into());
+    builder.start_node(SyntaxKind::FOOTNOTE_REFERENCE.into());
     builder.token(SyntaxKind::TEXT.into(), "[^");
     builder.token(SyntaxKind::TEXT.into(), id);
     builder.token(SyntaxKind::TEXT.into(), "]");

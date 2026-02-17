@@ -41,25 +41,25 @@ pub fn emit_raw_inline(
     backtick_count: usize,
     format: &str,
 ) {
-    builder.start_node(SyntaxKind::RawInline.into());
+    builder.start_node(SyntaxKind::RAW_INLINE.into());
 
     // Opening backticks
     builder.token(
-        SyntaxKind::RawInlineMarker.into(),
+        SyntaxKind::RAW_INLINE_MARKER.into(),
         &"`".repeat(backtick_count),
     );
 
     // Raw content
-    builder.token(SyntaxKind::RawInlineContent.into(), content);
+    builder.token(SyntaxKind::RAW_INLINE_CONTENT.into(), content);
 
     // Closing backticks
     builder.token(
-        SyntaxKind::RawInlineMarker.into(),
+        SyntaxKind::RAW_INLINE_MARKER.into(),
         &"`".repeat(backtick_count),
     );
 
     // Format attribute: {=format}
-    builder.start_node(SyntaxKind::Attribute.into());
+    builder.start_node(SyntaxKind::ATTRIBUTE.into());
     builder.token(SyntaxKind::TEXT.into(), &format!("{{={}}}", format));
     builder.finish_node();
 

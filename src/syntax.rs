@@ -1,5 +1,6 @@
 use rowan::Language;
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 pub enum SyntaxKind {
@@ -7,162 +8,162 @@ pub enum SyntaxKind {
     WHITESPACE = 0,
     NEWLINE,
     TEXT,
-    Backslash,         // \ (for escaping)
-    EscapedChar,       // Any escaped character
-    NonbreakingSpace,  // \<space>
-    HardLineBreak,     // \<newline>
-    DivMarker,         // :::
-    YamlMetadataDelim, // --- or ... (for YAML blocks)
-    BlockQuoteMarker,  // >
-    ImageLinkStart,    // ![
-    ListMarker,        // - + *
-    TaskCheckbox,      // [ ] or [x] or [X]
-    CommentStart,      // <!--
-    CommentEnd,        // -->
-    Attribute,         // {#label} for headings, math, etc.
-    HorizontalRule,    // --- or *** or ___
-    BlankLine,
+    BACKSLASH,           // \ (for escaping)
+    ESCAPED_CHAR,        // Any escaped character
+    NONBREAKING_SPACE,   // \<space>
+    HARD_LINE_BREAK,     // \<newline>
+    DIV_MARKER,          // :::
+    YAML_METADATA_DELIM, // --- or ... (for YAML blocks)
+    BLOCKQUOTE_MARKER,   // >
+    IMAGE_LINK_START,    // ![
+    LIST_MARKER,         // - + *
+    TASK_CHECKBOX,       // [ ] or [x] or [X]
+    COMMENT_START,       // <!--
+    COMMENT_END,         // -->
+    ATTRIBUTE,           // {#label} for headings, math, etc.
+    HORIZONTAL_RULE,     // --- or *** or ___
+    BLANK_LINE,
 
     // Links and images
-    LinkStart,           // [
-    Link,                // [text](url)
-    LinkText,            // text part of link
-    LinkDest,            // (url) or (url "title")
-    LinkRef,             // [ref] in reference links
-    ImageLink,           // ![alt](url)
-    ImageAlt,            // alt text in image
-    AutoLink,            // <http://example.com>
-    AutoLinkMarker,      // < and >
-    ReferenceDefinition, // [label]: url "title"
-    FootnoteDefinition,  // [^id]: content
-    FootnoteReference,   // [^id]
-    ReferenceLabel,      // [label] part
-    ReferenceUrl,        // url part
-    ReferenceTitle,      // "title" part
+    LINK_START,           // [
+    LINK,                 // [text](url)
+    LINK_TEXT,            // text part of link
+    LINK_DEST,            // (url) or (url "title")
+    LINK_REF,             // [ref] in reference links
+    IMAGE_LINK,           // ![alt](url)
+    IMAGE_ALT,            // alt text in image
+    AUTO_LINK,            // <http://example.com>
+    AUTO_LINK_MARKER,     // < and >
+    REFERENCE_DEFINITION, // [label]: url "title"
+    FOOTNOTE_DEFINITION,  // [^id]: content
+    FOOTNOTE_REFERENCE,   // [^id]
+    REFERENCE_LABEL,      // [label] part
+    REFERENCE_URL,        // url part
+    REFERENCE_TITLE,      // "title" part
 
     // Math
-    InlineMathMarker,  // $
-    DisplayMathMarker, // $$
-    InlineMath,
-    DisplayMath,
-    MathContent,
+    INLINE_MATH_MARKER,  // $
+    DISPLAY_MATH_MARKER, // $$
+    INLINE_MATH,
+    DISPLAY_MATH,
+    MATH_CONTENT,
 
     // Footnotes
-    InlineFootnoteStart, // ^[
-    InlineFootnoteEnd,   // ]
-    InlineFootnote,      // ^[text]
+    INLINE_FOOTNOTE_START, // ^[
+    INLINE_FOOTNOTE_END,   // ]
+    INLINE_FOOTNOTE,       // ^[text]
 
     // Citations
-    Citation,           // [@key] or @key
-    CitationMarker,     // @ or -@
-    CitationKey,        // The citation key identifier
-    CitationBraceOpen,  // { for complex keys
-    CitationBraceClose, // } for complex keys
-    CitationContent,    // Text content in bracketed citations
-    CitationSeparator,  // ; between multiple citations
+    CITATION,             // [@key] or @key
+    CITATION_MARKER,      // @ or -@
+    CITATION_KEY,         // The citation key identifier
+    CITATION_BRACE_OPEN,  // { for complex keys
+    CITATION_BRACE_CLOSE, // } for complex keys
+    CITATION_CONTENT,     // Text content in bracketed citations
+    CITATION_SEPARATOR,   // ; between multiple citations
 
     // Spans
-    BracketedSpan,    // [text]{.class}
-    SpanContent,      // text inside span
-    SpanAttributes,   // {.class key="val"}
-    SpanBracketOpen,  // [
-    SpanBracketClose, // ]
+    BRACKETED_SPAN,     // [text]{.class}
+    SPAN_CONTENT,       // text inside span
+    SPAN_ATTRIBUTES,    // {.class key="val"}
+    SPAN_BRACKET_OPEN,  // [
+    SPAN_BRACKET_CLOSE, // ]
 
     // Shortcodes (Quarto)
-    Shortcode,            // {{< name args >}} or {{{< name args >}}}
-    ShortcodeMarkerOpen,  // {{< or {{{<
-    ShortcodeMarkerClose, // >}} or >}}}
-    ShortcodeContent,     // content between markers
+    SHORTCODE,              // {{< name args >}} or {{{< name args >}}}
+    SHORTCODE_MARKER_OPEN,  // {{< or {{{<
+    SHORTCODE_MARKER_CLOSE, // >}} or >}}}
+    SHORTCODE_CONTENT,      // content between markers
 
     // Code
-    CodeSpan,
-    CodeSpanMarker,  // ` or `` or ```
-    CodeFenceMarker, // ``` or ~~~
-    CodeBlock,
+    CODE_SPAN,
+    CODE_SPAN_MARKER,  // ` or `` or ```
+    CODE_FENCE_MARKER, // ``` or ~~~
+    CODE_BLOCK,
 
     // Raw inline spans
-    RawInline,        // `content`{=format}
-    RawInlineMarker,  // ` markers
-    RawInlineFormat,  // format name (html, latex, etc.)
-    RawInlineContent, // raw content
+    RAW_INLINE,         // `content`{=format}
+    RAW_INLINE_MARKER,  // ` markers
+    RAW_INLINE_FORMAT,  // format name (html, latex, etc.)
+    RAW_INLINE_CONTENT, // raw content
 
     // Inline emphasis and formatting
-    Emphasis,          // *text* or _text_
-    Strong,            // **text** or __text__
-    Strikeout,         // ~~text~~
-    Superscript,       // ^text^
-    Subscript,         // ~text~
-    EmphasisMarker,    // * or _ (for emphasis)
-    StrongMarker,      // ** or __ (for strong)
-    StrikeoutMarker,   // ~~ (for strikeout)
-    SuperscriptMarker, // ^ (for superscript)
-    SubscriptMarker,   // ~ (for subscript)
+    EMPHASIS,           // *text* or _text_
+    STRONG,             // **text** or __text__
+    STRIKEOUT,          // ~~text~~
+    SUPERSCRIPT,        // ^text^
+    SUBSCRIPT,          // ~text~
+    EMPHASIS_MARKER,    // * or _ (for emphasis)
+    STRONG_MARKER,      // ** or __ (for strong)
+    STRIKEOUT_MARKER,   // ~~ (for strikeout)
+    SUPERSCRIPT_MARKER, // ^ (for superscript)
+    SUBSCRIPT_MARKER,   // ~ (for subscript)
 
     // Composite nodes
     ROOT,
     DOCUMENT,
-    YamlMetadata,
-    PandocTitleBlock,
-    FencedDiv,
+    YAML_METADATA,
+    PANDOC_TITLE_BLOCK,
+    FENCED_DIV,
     PARAGRAPH,
-    Plain, // Inline content without paragraph break (tight lists, definition lists, table cells)
-    BlockQuote,
-    List,
-    ListItem,
-    DefinitionList,
-    DefinitionItem,
-    Term,
-    Definition,
-    DefinitionMarker, // : or ~
-    LineBlock,
-    LineBlockLine,
-    LineBlockMarker, // |
-    Comment,
-    Figure, // Standalone image (Pandoc figure)
+    PLAIN, // Inline content without paragraph break (tight lists, definition lists, table cells)
+    BLOCKQUOTE,
+    LIST,
+    LIST_ITEM,
+    DEFINITION_LIST,
+    DEFINITION_ITEM,
+    TERM,
+    DEFINITION,
+    DEFINITION_MARKER, // : or ~
+    LINE_BLOCK,
+    LINE_BLOCK_LINE,
+    LINE_BLOCK_MARKER, // |
+    COMMENT,
+    FIGURE, // Standalone image (Pandoc figure)
 
     // HTML blocks
-    HtmlBlock,        // Generic HTML block
-    HtmlBlockTag,     // Opening/closing tags
-    HtmlBlockContent, // Content between tags
+    HTML_BLOCK,         // Generic HTML block
+    HTML_BLOCK_TAG,     // Opening/closing tags
+    HTML_BLOCK_CONTENT, // Content between tags
 
     // Headings
-    Heading,
-    HeadingContent,
-    AtxHeadingMarker,       // leading #####
-    SetextHeadingUnderline, // ===== or -----
+    HEADING,
+    HEADING_CONTENT,
+    ATX_HEADING_MARKER,       // leading #####
+    SETEXT_HEADING_UNDERLINE, // ===== or -----
 
     // LaTeX environments
-    LatexCommand,     // \command{...}
-    LatexEnvironment, // \begin{...}...\end{...}
-    LatexEnvBegin,    // \begin{...}
-    LatexEnvEnd,      // \end{...}
-    LatexEnvContent,  //
+    LATEX_COMMAND,     // \command{...}
+    LATEX_ENVIRONMENT, // \begin{...}...\end{...}
+    LATEX_ENV_BEGIN,   // \begin{...}
+    LATEX_ENV_END,     // \end{...}
+    LATEX_ENV_CONTENT, //
 
     // Tables
-    SimpleTable,
-    MultilineTable,
-    PipeTable,
-    GridTable,
-    TableHeader,
-    TableFooter,
-    TableSeparator,
-    TableRow,
-    TableCell,
-    TableCaption,
-    TableCaptionPrefix, // "Table: ", "table: ", or ": "
+    SIMPLE_TABLE,
+    MULTILINE_TABLE,
+    PIPE_TABLE,
+    GRID_TABLE,
+    TABLE_HEADER,
+    TABLE_FOOTER,
+    TABLE_SEPARATOR,
+    TABLE_ROW,
+    TABLE_CELL,
+    TABLE_CAPTION,
+    TABLE_CAPTION_PREFIX, // "Table: ", "table: ", or ": "
 
     // Code block parts
-    CodeFenceOpen,
-    CodeFenceClose,
-    CodeInfo,     // Raw info string (preserved for lossless formatting)
-    CodeLanguage, // Parsed language identifier (r, python, etc.)
-    CodeContent,
+    CODE_FENCE_OPEN,
+    CODE_FENCE_CLOSE,
+    CODE_INFO,     // Raw info string (preserved for lossless formatting)
+    CODE_LANGUAGE, // Parsed language identifier (r, python, etc.)
+    CODE_CONTENT,
 
     // Div parts
-    DivFenceOpen,
-    DivFenceClose,
-    DivInfo,
-    DivContent,
+    DIV_FENCE_OPEN,
+    DIV_FENCE_CLOSE,
+    DIV_INFO,
+    DIV_CONTENT,
 }
 
 impl From<SyntaxKind> for rowan::SyntaxKind {

@@ -69,11 +69,11 @@ pub(crate) fn parse_latex_environment(
     bq_depth: usize,
 ) -> usize {
     // Start LaTeX environment block
-    builder.start_node(SyntaxKind::LatexEnvironment.into());
+    builder.start_node(SyntaxKind::LATEX_ENVIRONMENT.into());
 
     // Opening \begin{name}
     let first_line = lines[start_pos];
-    builder.start_node(SyntaxKind::LatexEnvBegin.into());
+    builder.start_node(SyntaxKind::LATEX_ENV_BEGIN.into());
     emit_line_tokens(builder, first_line);
     builder.finish_node(); // LatexEnvBegin
 
@@ -131,7 +131,7 @@ pub(crate) fn parse_latex_environment(
 
                     // Emit content
                     if !content_lines.is_empty() {
-                        builder.start_node(SyntaxKind::LatexEnvContent.into());
+                        builder.start_node(SyntaxKind::LATEX_ENV_CONTENT.into());
                         for content_line in &content_lines {
                             emit_line_tokens(builder, content_line);
                         }
@@ -139,7 +139,7 @@ pub(crate) fn parse_latex_environment(
                     }
 
                     // Emit closing \end{name}
-                    builder.start_node(SyntaxKind::LatexEnvEnd.into());
+                    builder.start_node(SyntaxKind::LATEX_ENV_END.into());
                     emit_line_tokens(builder, line);
                     builder.finish_node(); // LatexEnvEnd
 
@@ -172,7 +172,7 @@ pub(crate) fn parse_latex_environment(
             start_pos + 1
         );
         if !content_lines.is_empty() {
-            builder.start_node(SyntaxKind::LatexEnvContent.into());
+            builder.start_node(SyntaxKind::LATEX_ENV_CONTENT.into());
             for content_line in &content_lines {
                 emit_line_tokens(builder, content_line);
             }

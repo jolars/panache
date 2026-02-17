@@ -1,87 +1,87 @@
 ROOT@0..367
   DOCUMENT@0..367
-    Heading@0..11
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..11
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..10
+      HEADING_CONTENT@2..10
         TEXT@2..10 "Emphasis"
       NEWLINE@10..11 "\n"
-    BlankLine@11..12
-      BlankLine@11..12 "\n"
+    BLANK_LINE@11..12
+      BLANK_LINE@11..12 "\n"
     PARAGRAPH@12..44
       TEXT@12..30 "Single asterisks: "
-      Emphasis@30..43
-        EmphasisMarker@30..31 "*"
+      EMPHASIS@30..43
+        EMPHASIS_MARKER@30..31 "*"
         TEXT@31..42 "italic text"
-        EmphasisMarker@42..43 "*"
+        EMPHASIS_MARKER@42..43 "*"
       NEWLINE@43..44 "\n"
-    BlankLine@44..45
-      BlankLine@44..45 "\n"
+    BLANK_LINE@44..45
+      BLANK_LINE@44..45 "\n"
     PARAGRAPH@45..79
       TEXT@45..65 "Single underscores: "
-      Emphasis@65..78
-        EmphasisMarker@65..66 "_"
+      EMPHASIS@65..78
+        EMPHASIS_MARKER@65..66 "_"
         TEXT@66..77 "italic text"
-        EmphasisMarker@77..78 "_"
+        EMPHASIS_MARKER@77..78 "_"
       NEWLINE@78..79 "\n"
-    BlankLine@79..80
-      BlankLine@79..80 "\n"
+    BLANK_LINE@79..80
+      BLANK_LINE@79..80 "\n"
     PARAGRAPH@80..112
       TEXT@80..98 "Double asterisks: "
-      Strong@98..111
-        StrongMarker@98..100 "**"
+      STRONG@98..111
+        STRONG_MARKER@98..100 "**"
         TEXT@100..109 "bold text"
-        StrongMarker@109..111 "**"
+        STRONG_MARKER@109..111 "**"
       NEWLINE@111..112 "\n"
-    BlankLine@112..113
-      BlankLine@112..113 "\n"
+    BLANK_LINE@112..113
+      BLANK_LINE@112..113 "\n"
     PARAGRAPH@113..147
       TEXT@113..133 "Double underscores: "
-      Strong@133..146
-        StrongMarker@133..135 "__"
+      STRONG@133..146
+        STRONG_MARKER@133..135 "__"
         TEXT@135..144 "bold text"
-        StrongMarker@144..146 "__"
+        STRONG_MARKER@144..146 "__"
       NEWLINE@146..147 "\n"
-    BlankLine@147..148
-      BlankLine@147..148 "\n"
+    BLANK_LINE@147..148
+      BLANK_LINE@147..148 "\n"
     PARAGRAPH@148..188
       TEXT@148..158 "Combined: "
-      Strong@158..186
-        StrongMarker@158..160 "**"
+      STRONG@158..186
+        STRONG_MARKER@158..160 "**"
         TEXT@160..184 "bold with *nested italic"
-        StrongMarker@184..186 "**"
+        STRONG_MARKER@184..186 "**"
       TEXT@186..187 "*"
       NEWLINE@187..188 "\n"
-    BlankLine@188..189
-      BlankLine@188..189 "\n"
+    BLANK_LINE@188..189
+      BLANK_LINE@188..189 "\n"
     PARAGRAPH@189..234
       TEXT@189..204 "Mixed markers: "
-      Emphasis@204..224
-        EmphasisMarker@204..205 "*"
+      EMPHASIS@204..224
+        EMPHASIS_MARKER@204..205 "*"
         TEXT@205..223 "italic with **bold"
-        EmphasisMarker@223..224 "*"
+        EMPHASIS_MARKER@223..224 "*"
       TEXT@224..225 "*"
       TEXT@225..232 " inside"
       TEXT@232..233 "*"
       NEWLINE@233..234 "\n"
-    BlankLine@234..235
-      BlankLine@234..235 "\n"
+    BLANK_LINE@234..235
+      BLANK_LINE@234..235 "\n"
     PARAGRAPH@235..275
       TEXT@235..245 "Adjacent: "
-      Emphasis@245..252
-        EmphasisMarker@245..246 "*"
+      EMPHASIS@245..252
+        EMPHASIS_MARKER@245..246 "*"
         TEXT@246..251 "first"
-        EmphasisMarker@251..252 "*"
+        EMPHASIS_MARKER@251..252 "*"
       TEXT@252..257 " and "
-      Emphasis@257..265
-        EmphasisMarker@257..258 "*"
+      EMPHASIS@257..265
+        EMPHASIS_MARKER@257..258 "*"
         TEXT@258..264 "second"
-        EmphasisMarker@264..265 "*"
+        EMPHASIS_MARKER@264..265 "*"
       TEXT@265..274 " emphasis"
       NEWLINE@274..275 "\n"
-    BlankLine@275..276
-      BlankLine@275..276 "\n"
+    BLANK_LINE@275..276
+      BLANK_LINE@275..276 "\n"
     PARAGRAPH@276..339
       TEXT@276..289 "Intraword: un"
       TEXT@289..290 "*"
@@ -95,8 +95,8 @@ ROOT@0..367
       TEXT@327..328 "*"
       TEXT@328..338 "believable"
       NEWLINE@338..339 "\n"
-    BlankLine@339..340
-      BlankLine@339..340 "\n"
+    BLANK_LINE@339..340
+      BLANK_LINE@339..340 "\n"
     PARAGRAPH@340..367
       TEXT@340..348 "This is "
       TEXT@348..349 "_"

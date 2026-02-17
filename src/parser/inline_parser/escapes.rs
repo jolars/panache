@@ -55,18 +55,18 @@ pub fn emit_escape(builder: &mut GreenNodeBuilder, ch: char, escape_type: Escape
     match escape_type {
         EscapeType::NonbreakingSpace => {
             // Emit as a special nonbreaking space token
-            builder.token(SyntaxKind::NonbreakingSpace.into(), "\u{00A0}");
+            builder.token(SyntaxKind::NONBREAKING_SPACE.into(), "\u{00A0}");
         }
         EscapeType::HardLineBreak => {
             // Emit as a special hard line break token
-            builder.token(SyntaxKind::HardLineBreak.into(), "\n");
+            builder.token(SyntaxKind::HARD_LINE_BREAK.into(), "\n");
         }
         EscapeType::Literal => {
             // Emit the full escape sequence (backslash + character) for losslessness
             let mut s = String::new();
             s.push('\\');
             s.push(ch);
-            builder.token(SyntaxKind::EscapedChar.into(), &s);
+            builder.token(SyntaxKind::ESCAPED_CHAR.into(), &s);
         }
     }
 }

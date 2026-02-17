@@ -53,8 +53,8 @@ pub(crate) fn parse_indented_code_block(
 ) -> usize {
     use super::blockquotes::count_blockquote_markers;
 
-    builder.start_node(SyntaxKind::CodeBlock.into());
-    builder.start_node(SyntaxKind::CodeContent.into());
+    builder.start_node(SyntaxKind::CODE_BLOCK.into());
+    builder.start_node(SyntaxKind::CODE_CONTENT.into());
 
     let mut current_pos = start_pos;
     // Total indent needed: base (e.g., footnote) + 4 for code

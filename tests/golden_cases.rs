@@ -173,6 +173,7 @@ golden_test_cases!(
     images,
     indented_code,
     inline_math,
+    // grid_table, // TODO: bug, fixing is deferred
     latex_environment,
     lazy_continuation_deep,
     line_ending_crlf,

@@ -1,69 +1,69 @@
 ROOT@0..223
   DOCUMENT@0..223
-    Heading@0..14
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..14
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..13
+      HEADING_CONTENT@2..13
         TEXT@2..13 "Inline Math"
       NEWLINE@13..14 "\n"
-    BlankLine@14..15
-      BlankLine@14..15 "\n"
+    BLANK_LINE@14..15
+      BLANK_LINE@14..15 "\n"
     PARAGRAPH@15..36
       TEXT@15..28 "Simple math: "
-      InlineMath@28..35
-        InlineMathMarker@28..29 "$"
+      INLINE_MATH@28..35
+        INLINE_MATH_MARKER@28..29 "$"
         TEXT@29..34 "x = y"
-        InlineMathMarker@34..35 "$"
+        INLINE_MATH_MARKER@34..35 "$"
       NEWLINE@35..36 "\n"
-    BlankLine@36..37
-      BlankLine@36..37 "\n"
+    BLANK_LINE@36..37
+      BLANK_LINE@36..37 "\n"
     PARAGRAPH@37..64
       TEXT@37..50 "With spaces: "
       TEXT@50..51 "$"
       TEXT@51..62 " a + b = c "
       TEXT@62..63 "$"
       NEWLINE@63..64 "\n"
-    BlankLine@64..65
-      BlankLine@64..65 "\n"
+    BLANK_LINE@64..65
+      BLANK_LINE@64..65 "\n"
     PARAGRAPH@65..110
       TEXT@65..83 "Math in emphasis: "
-      Emphasis@83..109
-        EmphasisMarker@83..84 "*"
+      EMPHASIS@83..109
+        EMPHASIS_MARKER@83..84 "*"
         TEXT@84..108 "equation $E = mc^2$ here"
-        EmphasisMarker@108..109 "*"
+        EMPHASIS_MARKER@108..109 "*"
       NEWLINE@109..110 "\n"
-    BlankLine@110..111
-      BlankLine@110..111 "\n"
+    BLANK_LINE@110..111
+      BLANK_LINE@110..111 "\n"
     PARAGRAPH@111..148
       TEXT@111..126 "Adjacent math: "
-      InlineMath@126..129
-        InlineMathMarker@126..127 "$"
+      INLINE_MATH@126..129
+        INLINE_MATH_MARKER@126..127 "$"
         TEXT@127..128 "x"
-        InlineMathMarker@128..129 "$"
+        INLINE_MATH_MARKER@128..129 "$"
       TEXT@129..134 " and "
-      InlineMath@134..137
-        InlineMathMarker@134..135 "$"
+      INLINE_MATH@134..137
+        INLINE_MATH_MARKER@134..135 "$"
         TEXT@135..136 "y"
-        InlineMathMarker@136..137 "$"
+        INLINE_MATH_MARKER@136..137 "$"
       TEXT@137..147 " variables"
       NEWLINE@147..148 "\n"
-    BlankLine@148..149
-      BlankLine@148..149 "\n"
+    BLANK_LINE@148..149
+      BLANK_LINE@148..149 "\n"
     PARAGRAPH@149..180
       TEXT@149..158 "Complex: "
-      InlineMath@158..179
-        InlineMathMarker@158..159 "$"
+      INLINE_MATH@158..179
+        INLINE_MATH_MARKER@158..159 "$"
         TEXT@159..178 "\\frac{n!}{k!(n-k)!}"
-        InlineMathMarker@178..179 "$"
+        INLINE_MATH_MARKER@178..179 "$"
       NEWLINE@179..180 "\n"
-    BlankLine@180..181
-      BlankLine@180..181 "\n"
+    BLANK_LINE@180..181
+      BLANK_LINE@180..181 "\n"
     PARAGRAPH@181..223
       TEXT@181..199 "Multiple dollars: "
-      DisplayMath@199..222
-        DisplayMathMarker@199..201 "$$"
+      DISPLAY_MATH@199..222
+        DISPLAY_MATH_MARKER@199..201 "$$"
         TEXT@201..220 "\\text{display math}"
-        DisplayMathMarker@220..222 "$$"
+        DISPLAY_MATH_MARKER@220..222 "$$"
       NEWLINE@222..223 "\n"
 

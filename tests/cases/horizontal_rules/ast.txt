@@ -3,57 +3,57 @@ ROOT@0..190
     PARAGRAPH@0..28
       TEXT@0..27 "First section with co ..."
       NEWLINE@27..28 "\n"
-    BlankLine@28..29
-      BlankLine@28..29 "\n"
-    HorizontalRule@29..33
-      HorizontalRule@29..32 "***"
+    BLANK_LINE@28..29
+      BLANK_LINE@28..29 "\n"
+    HORIZONTAL_RULE@29..33
+      HORIZONTAL_RULE@29..32 "***"
       NEWLINE@32..33 "\n"
-    BlankLine@33..34
-      BlankLine@33..34 "\n"
+    BLANK_LINE@33..34
+      BLANK_LINE@33..34 "\n"
     PARAGRAPH@34..71
       TEXT@34..70 "Second section with d ..."
       NEWLINE@70..71 "\n"
-    BlankLine@71..72
-      BlankLine@71..72 "\n"
-    HorizontalRule@72..82
-      HorizontalRule@72..81 "- - - - -"
+    BLANK_LINE@71..72
+      BLANK_LINE@71..72 "\n"
+    HORIZONTAL_RULE@72..82
+      HORIZONTAL_RULE@72..81 "- - - - -"
       NEWLINE@81..82 "\n"
-    BlankLine@82..83
-      BlankLine@82..83 "\n"
+    BLANK_LINE@82..83
+      BLANK_LINE@82..83 "\n"
     PARAGRAPH@83..115
       TEXT@83..114 "Third section with un ..."
       NEWLINE@114..115 "\n"
-    BlankLine@115..116
-      BlankLine@115..116 "\n"
-    HorizontalRule@116..122
-      HorizontalRule@116..121 "_____"
+    BLANK_LINE@115..116
+      BLANK_LINE@115..116 "\n"
+    HORIZONTAL_RULE@116..122
+      HORIZONTAL_RULE@116..121 "_____"
       NEWLINE@121..122 "\n"
-    BlankLine@122..123
-      BlankLine@122..123 "\n"
-    BlockQuote@123..172
-      BlockQuoteMarker@123..124 ">"
+    BLANK_LINE@122..123
+      BLANK_LINE@122..123 "\n"
+    BLOCKQUOTE@123..172
+      BLOCKQUOTE_MARKER@123..124 ">"
       WHITESPACE@124..125 " "
       PARAGRAPH@125..143
         TEXT@125..142 "Quote before rule"
         NEWLINE@142..143 "\n"
-      BlockQuoteMarker@143..144 ">"
-      BlankLine@144..145
-        BlankLine@144..145 "\n"
-      BlockQuoteMarker@145..146 ">"
+      BLOCKQUOTE_MARKER@143..144 ">"
+      BLANK_LINE@144..145
+        BLANK_LINE@144..145 "\n"
+      BLOCKQUOTE_MARKER@145..146 ">"
       WHITESPACE@146..147 " "
-      HorizontalRule@147..151
-        HorizontalRule@147..150 "***"
+      HORIZONTAL_RULE@147..151
+        HORIZONTAL_RULE@147..150 "***"
         NEWLINE@150..151 "\n"
-      BlockQuoteMarker@151..152 ">"
-      BlankLine@152..153
-        BlankLine@152..153 "\n"
-      BlockQuoteMarker@153..154 ">"
+      BLOCKQUOTE_MARKER@151..152 ">"
+      BLANK_LINE@152..153
+        BLANK_LINE@152..153 "\n"
+      BLOCKQUOTE_MARKER@153..154 ">"
       WHITESPACE@154..155 " "
       PARAGRAPH@155..172
         TEXT@155..171 "Quote after rule"
         NEWLINE@171..172 "\n"
-    BlankLine@172..173
-      BlankLine@172..173 "\n"
+    BLANK_LINE@172..173
+      BLANK_LINE@172..173 "\n"
     PARAGRAPH@173..190
       TEXT@173..189 "Final paragraph."
       NEWLINE@189..190 "\n"

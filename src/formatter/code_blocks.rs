@@ -25,17 +25,17 @@ pub(super) fn format_code_block(
     for child in node.children_with_tokens() {
         if let NodeOrToken::Node(n) = child {
             match n.kind() {
-                SyntaxKind::CodeFenceOpen => {
+                SyntaxKind::CODE_FENCE_OPEN => {
                     // Find the info string - now it's a node, not a token
                     for child_token in n.children_with_tokens() {
                         if let NodeOrToken::Node(info_node) = child_token
-                            && info_node.kind() == SyntaxKind::CodeInfo
+                            && info_node.kind() == SyntaxKind::CODE_INFO
                         {
                             info_string_raw = info_node.text().to_string();
                         }
                     }
                 }
-                SyntaxKind::CodeContent => {
+                SyntaxKind::CODE_CONTENT => {
                     // Extract content, stripping leading WHITESPACE tokens on each line
                     // (for lossless parsing, indented code blocks preserve indentation as WHITESPACE)
                     for token in n.children_with_tokens() {

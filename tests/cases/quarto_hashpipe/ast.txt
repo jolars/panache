@@ -1,92 +1,92 @@
 ROOT@0..507
   DOCUMENT@0..507
-    Heading@0..35
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..35
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..34
+      HEADING_CONTENT@2..34
         TEXT@2..34 "Quarto Document with  ..."
       NEWLINE@34..35 "\n"
-    BlankLine@35..36
-      BlankLine@35..36 "\n"
-    Heading@36..53
-      AtxHeadingMarker@36..38
-        AtxHeadingMarker@36..38 "##"
+    BLANK_LINE@35..36
+      BLANK_LINE@35..36 "\n"
+    HEADING@36..53
+      ATX_HEADING_MARKER@36..38
+        ATX_HEADING_MARKER@36..38 "##"
       WHITESPACE@38..39 " "
-      HeadingContent@39..52
+      HEADING_CONTENT@39..52
         TEXT@39..52 "Basic R Chunk"
       NEWLINE@52..53 "\n"
-    BlankLine@53..54
-      BlankLine@53..54 "\n"
-    CodeBlock@54..115
-      CodeFenceOpen@54..91
-        CodeFenceMarker@54..57 "```"
-        CodeInfo@57..90
+    BLANK_LINE@53..54
+      BLANK_LINE@53..54 "\n"
+    CODE_BLOCK@54..115
+      CODE_FENCE_OPEN@54..91
+        CODE_FENCE_MARKER@54..57 "```"
+        CODE_INFO@57..90
           TEXT@57..58 "{"
-          CodeLanguage@58..59 "r"
+          CODE_LANGUAGE@58..59 "r"
           TEXT@59..90 ", echo = FALSE, warni ..."
         NEWLINE@90..91 "\n"
-      CodeContent@91..111
+      CODE_CONTENT@91..111
         TEXT@91..101 "x <- 1 + 1"
         NEWLINE@101..102 "\n"
         TEXT@102..110 "print(x)"
         NEWLINE@110..111 "\n"
-      CodeFenceClose@111..115
-        CodeFenceMarker@111..114 "```"
+      CODE_FENCE_CLOSE@111..115
+        CODE_FENCE_MARKER@111..114 "```"
         NEWLINE@114..115 "\n"
-    BlankLine@115..116
-      BlankLine@115..116 "\n"
-    Heading@116..145
-      AtxHeadingMarker@116..118
-        AtxHeadingMarker@116..118 "##"
+    BLANK_LINE@115..116
+      BLANK_LINE@115..116 "\n"
+    HEADING@116..145
+      ATX_HEADING_MARKER@116..118
+        ATX_HEADING_MARKER@116..118 "##"
       WHITESPACE@118..119 " "
-      HeadingContent@119..144
+      HEADING_CONTENT@119..144
         TEXT@119..144 "Chunk with Figure Opt ..."
       NEWLINE@144..145 "\n"
-    BlankLine@145..146
-      BlankLine@145..146 "\n"
-    CodeBlock@146..237
-      CodeFenceOpen@146..176
-        CodeFenceMarker@146..149 "```"
-        CodeInfo@149..175
+    BLANK_LINE@145..146
+      BLANK_LINE@145..146 "\n"
+    CODE_BLOCK@146..237
+      CODE_FENCE_OPEN@146..176
+        CODE_FENCE_MARKER@146..149 "```"
+        CODE_INFO@149..175
           TEXT@149..150 "{"
-          CodeLanguage@150..151 "r"
+          CODE_LANGUAGE@150..151 "r"
           TEXT@151..175 ", fig-cap=\"A nice plot\"}"
         NEWLINE@175..176 "\n"
-      CodeContent@176..233
+      CODE_CONTENT@176..233
         TEXT@176..191 "#| fig-width: 7"
         NEWLINE@191..192 "\n"
         TEXT@192..208 "#| fig-height: 5"
         NEWLINE@208..209 "\n"
         TEXT@209..232 "plot(1:10, main=\"Test\")"
         NEWLINE@232..233 "\n"
-      CodeFenceClose@233..237
-        CodeFenceMarker@233..236 "```"
+      CODE_FENCE_CLOSE@233..237
+        CODE_FENCE_MARKER@233..236 "```"
         NEWLINE@236..237 "\n"
-    BlankLine@237..238
-      BlankLine@237..238 "\n"
-    Heading@238..276
-      AtxHeadingMarker@238..240
-        AtxHeadingMarker@238..240 "##"
+    BLANK_LINE@237..238
+      BLANK_LINE@237..238 "\n"
+    HEADING@238..276
+      ATX_HEADING_MARKER@238..240
+        ATX_HEADING_MARKER@238..240 "##"
       WHITESPACE@240..241 " "
-      HeadingContent@241..275
+      HEADING_CONTENT@241..275
         TEXT@241..275 "Chunk with Label and  ..."
       NEWLINE@275..276 "\n"
-    BlankLine@276..277
-      BlankLine@276..277 "\n"
-    CodeBlock@277..437
-      CodeFenceOpen@277..326
-        CodeFenceMarker@277..280 "```"
-        CodeInfo@280..325
+    BLANK_LINE@276..277
+      BLANK_LINE@276..277 "\n"
+    CODE_BLOCK@277..437
+      CODE_FENCE_OPEN@277..326
+        CODE_FENCE_MARKER@277..280 "```"
+        CODE_INFO@280..325
           TEXT@280..281 "{"
-          CodeLanguage@281..282 "r"
+          CODE_LANGUAGE@281..282 "r"
           TEXT@282..314 ", label=analysis-chun ..."
           TEXT@314..315 "_"
           TEXT@315..320 "cache"
           TEXT@320..321 "_"
           TEXT@321..325 "var}"
         NEWLINE@325..326 "\n"
-      CodeContent@326..433
+      CODE_CONTENT@326..433
         TEXT@326..340 "#| echo: false"
         NEWLINE@340..341 "\n"
         TEXT@341..357 "#| message: true"
@@ -95,34 +95,34 @@ ROOT@0..507
         NEWLINE@407..408 "\n"
         TEXT@408..432 "result <- analyze_data()"
         NEWLINE@432..433 "\n"
-      CodeFenceClose@433..437
-        CodeFenceMarker@433..436 "```"
+      CODE_FENCE_CLOSE@433..437
+        CODE_FENCE_MARKER@433..436 "```"
         NEWLINE@436..437 "\n"
-    BlankLine@437..438
-      BlankLine@437..438 "\n"
-    Heading@438..458
-      AtxHeadingMarker@438..440
-        AtxHeadingMarker@438..440 "##"
+    BLANK_LINE@437..438
+      BLANK_LINE@437..438 "\n"
+    HEADING@438..458
+      ATX_HEADING_MARKER@438..440
+        ATX_HEADING_MARKER@438..440 "##"
       WHITESPACE@440..441 " "
-      HeadingContent@441..457
+      HEADING_CONTENT@441..457
         TEXT@441..457 "Chunk with label"
       NEWLINE@457..458 "\n"
-    BlankLine@458..459
-      BlankLine@458..459 "\n"
-    CodeBlock@459..507
-      CodeFenceOpen@459..474
-        CodeFenceMarker@459..462 "```"
-        CodeInfo@462..473
+    BLANK_LINE@458..459
+      BLANK_LINE@458..459 "\n"
+    CODE_BLOCK@459..507
+      CODE_FENCE_OPEN@459..474
+        CODE_FENCE_MARKER@459..462 "```"
+        CODE_INFO@462..473
           TEXT@462..463 "{"
-          CodeLanguage@463..464 "r"
+          CODE_LANGUAGE@463..464 "r"
           TEXT@464..473 " mylabel}"
         NEWLINE@473..474 "\n"
-      CodeContent@474..503
+      CODE_CONTENT@474..503
         TEXT@474..488 "#| echo: false"
         NEWLINE@488..489 "\n"
         TEXT@489..502 "summary(data)"
         NEWLINE@502..503 "\n"
-      CodeFenceClose@503..507
-        CodeFenceMarker@503..506 "```"
+      CODE_FENCE_CLOSE@503..507
+        CODE_FENCE_MARKER@503..506 "```"
         NEWLINE@506..507 "\n"
 

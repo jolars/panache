@@ -19,9 +19,9 @@ pub fn wrap_list_item_content(root: SyntaxNode) -> GreenNode {
 
 fn process_node(node: &SyntaxNode, builder: &mut GreenNodeBuilder) {
     match node.kind() {
-        SyntaxKind::List => {
+        SyntaxKind::LIST => {
             // Start the List node
-            builder.start_node(SyntaxKind::List.into());
+            builder.start_node(SyntaxKind::LIST.into());
 
             // Determine if this list is tight or loose
             let is_loose = has_blank_line_between_items(node);
@@ -29,7 +29,7 @@ fn process_node(node: &SyntaxNode, builder: &mut GreenNodeBuilder) {
             // Process each child
             for child in node.children_with_tokens() {
                 if let Some(child_node) = child.as_node() {
-                    if child_node.kind() == SyntaxKind::ListItem {
+                    if child_node.kind() == SyntaxKind::LIST_ITEM {
                         process_list_item(child_node, is_loose, builder);
                     } else {
                         // Other children (BlankLine, etc.) - recurse normally
@@ -79,14 +79,14 @@ fn has_blank_line_between_items(list_node: &SyntaxNode) -> bool {
 
     for child in list_node.children() {
         match child.kind() {
-            SyntaxKind::ListItem => {
+            SyntaxKind::LIST_ITEM => {
                 prev_was_item = true;
             }
-            SyntaxKind::BlankLine => {
+            SyntaxKind::BLANK_LINE => {
                 if prev_was_item {
                     // Found a blank line after an item - check if there's another item after
                     if let Some(next_sibling) = child.next_sibling()
-                        && next_sibling.kind() == SyntaxKind::ListItem
+                        && next_sibling.kind() == SyntaxKind::LIST_ITEM
                     {
                         return true;
                     }
@@ -101,12 +101,12 @@ fn has_blank_line_between_items(list_node: &SyntaxNode) -> bool {
 
 /// Processes a single list item, wrapping bare tokens in Plain/PARAGRAPH.
 fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeBuilder) {
-    builder.start_node(SyntaxKind::ListItem.into());
+    builder.start_node(SyntaxKind::LIST_ITEM.into());
 
     let wrapper_kind = if is_loose {
         SyntaxKind::PARAGRAPH
     } else {
-        SyntaxKind::Plain
+        SyntaxKind::PLAIN
     };
 
     let mut in_content_wrapper = false;
@@ -118,7 +118,7 @@ fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeB
                 let kind = token.kind();
 
                 // ListMarker and first WHITESPACE after it are not wrapped
-                if kind == SyntaxKind::ListMarker {
+                if kind == SyntaxKind::LIST_MARKER {
                     // Close wrapper if open
                     if in_content_wrapper {
                         builder.finish_node();
@@ -194,16 +194,16 @@ fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeB
 fn is_block_node(kind: SyntaxKind) -> bool {
     matches!(
         kind,
-        SyntaxKind::CodeBlock
-            | SyntaxKind::List
-            | SyntaxKind::BlockQuote
-            | SyntaxKind::SimpleTable
-            | SyntaxKind::PipeTable
-            | SyntaxKind::GridTable
-            | SyntaxKind::BlankLine
-            | SyntaxKind::HorizontalRule
-            | SyntaxKind::HtmlBlock
-            | SyntaxKind::FencedDiv
+        SyntaxKind::CODE_BLOCK
+            | SyntaxKind::LIST
+            | SyntaxKind::BLOCKQUOTE
+            | SyntaxKind::SIMPLE_TABLE
+            | SyntaxKind::PIPE_TABLE
+            | SyntaxKind::GRID_TABLE
+            | SyntaxKind::BLANK_LINE
+            | SyntaxKind::HORIZONTAL_RULE
+            | SyntaxKind::HTML_BLOCK
+            | SyntaxKind::FENCED_DIV
             | SyntaxKind::PARAGRAPH // Existing PARAGRAPH nodes from parser should be preserved
     )
 }

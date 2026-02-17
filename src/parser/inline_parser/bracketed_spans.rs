@@ -95,21 +95,21 @@ pub(crate) fn emit_bracketed_span(
     attributes: &str,
     config: &Config,
 ) {
-    builder.start_node(SyntaxKind::BracketedSpan.into());
+    builder.start_node(SyntaxKind::BRACKETED_SPAN.into());
 
     // Opening bracket
-    builder.token(SyntaxKind::SpanBracketOpen.into(), "[");
+    builder.token(SyntaxKind::SPAN_BRACKET_OPEN.into(), "[");
 
     // Content (with recursive inline parsing)
-    builder.start_node(SyntaxKind::SpanContent.into());
+    builder.start_node(SyntaxKind::SPAN_CONTENT.into());
     parse_inline_text(builder, content, config, None);
     builder.finish_node(); // SpanContent
 
     // Closing bracket
-    builder.token(SyntaxKind::SpanBracketClose.into(), "]");
+    builder.token(SyntaxKind::SPAN_BRACKET_CLOSE.into(), "]");
 
     // Attributes (preserve all whitespace - formatter will normalize)
-    builder.start_node(SyntaxKind::SpanAttributes.into());
+    builder.start_node(SyntaxKind::SPAN_ATTRIBUTES.into());
     builder.token(SyntaxKind::TEXT.into(), "{");
 
     // Parse attributes byte-by-byte to preserve whitespace

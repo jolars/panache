@@ -17,7 +17,7 @@ mod emphasis_tests {
     fn find_emphasis(node: &crate::syntax::SyntaxNode) -> Vec<String> {
         let mut emphasis = Vec::new();
         for child in node.descendants() {
-            if child.kind() == SyntaxKind::Emphasis {
+            if child.kind() == SyntaxKind::EMPHASIS {
                 emphasis.push(child.to_string());
             }
         }
@@ -27,7 +27,7 @@ mod emphasis_tests {
     fn find_strong(node: &crate::syntax::SyntaxNode) -> Vec<String> {
         let mut strong = Vec::new();
         for child in node.descendants() {
-            if child.kind() == SyntaxKind::Strong {
+            if child.kind() == SyntaxKind::STRONG {
                 strong.push(child.to_string());
             }
         }
@@ -156,7 +156,7 @@ mod code_tests {
     fn find_code_spans(node: &crate::syntax::SyntaxNode) -> Vec<String> {
         let mut code_spans = Vec::new();
         for child in node.descendants() {
-            if child.kind() == SyntaxKind::CodeSpan {
+            if child.kind() == SyntaxKind::CODE_SPAN {
                 code_spans.push(child.to_string());
             }
         }
@@ -220,7 +220,7 @@ mod math_tests {
     fn find_inline_math(node: &crate::syntax::SyntaxNode) -> Vec<String> {
         let mut math = Vec::new();
         for child in node.descendants() {
-            if child.kind() == SyntaxKind::InlineMath {
+            if child.kind() == SyntaxKind::INLINE_MATH {
                 math.push(child.to_string());
             }
         }
@@ -302,7 +302,7 @@ mod escape_tests {
         let input = r"This is \*not emphasis\*.";
         let tree = parse_inline(input);
 
-        let escaped = count_nodes_of_kind(&tree, SyntaxKind::EscapedChar);
+        let escaped = count_nodes_of_kind(&tree, SyntaxKind::ESCAPED_CHAR);
         assert_eq!(escaped, 2, "Should have two escaped asterisks");
     }
 
@@ -311,8 +311,8 @@ mod escape_tests {
         let input = r"This is \`not code\`.";
         let tree = parse_inline(input);
 
-        let escaped = count_nodes_of_kind(&tree, SyntaxKind::EscapedChar);
-        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+        let escaped = count_nodes_of_kind(&tree, SyntaxKind::ESCAPED_CHAR);
+        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
 
         assert_eq!(escaped, 2, "Should have two escaped backticks");
         assert_eq!(code_spans, 0, "Should not create code span");
@@ -323,8 +323,8 @@ mod escape_tests {
         let input = r"Price is \$5.";
         let tree = parse_inline(input);
 
-        let escaped = count_nodes_of_kind(&tree, SyntaxKind::EscapedChar);
-        let math = count_nodes_of_kind(&tree, SyntaxKind::InlineMath);
+        let escaped = count_nodes_of_kind(&tree, SyntaxKind::ESCAPED_CHAR);
+        let math = count_nodes_of_kind(&tree, SyntaxKind::INLINE_MATH);
 
         assert_eq!(escaped, 1, "Should have one escaped dollar");
         assert_eq!(math, 0, "Should not create math");
@@ -335,7 +335,7 @@ mod escape_tests {
         let input = r"word1\ word2";
         let tree = parse_inline(input);
 
-        let nbsp = count_nodes_of_kind(&tree, SyntaxKind::NonbreakingSpace);
+        let nbsp = count_nodes_of_kind(&tree, SyntaxKind::NONBREAKING_SPACE);
         assert_eq!(nbsp, 1, "Should have one nonbreaking space");
     }
 
@@ -344,7 +344,7 @@ mod escape_tests {
         let input = "line1\\\nline2";
         let tree = parse_inline(input);
 
-        let hard_break = count_nodes_of_kind(&tree, SyntaxKind::HardLineBreak);
+        let hard_break = count_nodes_of_kind(&tree, SyntaxKind::HARD_LINE_BREAK);
         assert_eq!(hard_break, 1, "Should have one hard line break");
     }
 
@@ -357,7 +357,7 @@ mod escape_tests {
         let (block_tree, registry) = BlockParser::new(input, &config).parse();
         let tree = InlineParser::new(block_tree, config, registry).parse();
 
-        let hard_break = count_nodes_of_kind(&tree, SyntaxKind::HardLineBreak);
+        let hard_break = count_nodes_of_kind(&tree, SyntaxKind::HARD_LINE_BREAK);
         assert_eq!(
             hard_break, 0,
             "Should not have hard line break when extension disabled"
@@ -369,7 +369,7 @@ mod escape_tests {
         let input = r"\`not code\`";
         let tree = parse_inline(input);
 
-        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
         assert_eq!(code_spans, 0, "Escaped backticks should prevent code span");
     }
 
@@ -378,7 +378,7 @@ mod escape_tests {
         let input = r"\$not math\$";
         let tree = parse_inline(input);
 
-        let math = count_nodes_of_kind(&tree, SyntaxKind::InlineMath);
+        let math = count_nodes_of_kind(&tree, SyntaxKind::INLINE_MATH);
         assert_eq!(math, 0, "Escaped dollars should prevent math");
     }
 
@@ -388,7 +388,7 @@ mod escape_tests {
         let input = r"`\*code\*`";
         let tree = parse_inline(input);
 
-        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CodeSpan);
+        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
         assert_eq!(code_spans, 1, "Should create code span");
 
         // The backslashes should be preserved as-is inside the code span
@@ -404,7 +404,7 @@ mod escape_tests {
         let input = r"Escape \* and \$ and \[";
         let tree = parse_inline(input);
 
-        let escaped = count_nodes_of_kind(&tree, SyntaxKind::EscapedChar);
+        let escaped = count_nodes_of_kind(&tree, SyntaxKind::ESCAPED_CHAR);
         assert_eq!(escaped, 3, "Should have three escaped characters");
     }
 
@@ -414,7 +414,7 @@ mod escape_tests {
         let input = r"\a normal text";
         let tree = parse_inline(input);
 
-        let escaped = count_nodes_of_kind(&tree, SyntaxKind::EscapedChar);
+        let escaped = count_nodes_of_kind(&tree, SyntaxKind::ESCAPED_CHAR);
         assert_eq!(escaped, 0, "Should not escape letter 'a'");
 
         // The backslash should remain in output
@@ -442,7 +442,7 @@ mod footnote_tests {
     fn find_footnotes(node: &crate::syntax::SyntaxNode) -> Vec<String> {
         let mut footnotes = Vec::new();
         for child in node.descendants() {
-            if child.kind() == SyntaxKind::InlineFootnote {
+            if child.kind() == SyntaxKind::INLINE_FOOTNOTE {
                 footnotes.push(child.to_string());
             }
         }
@@ -544,28 +544,28 @@ mod bracketed_span_tests {
     #[test]
     fn simple_span() {
         let tree = parse_inline("[text]{.class}");
-        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
-        assert_has_text(&tree, SyntaxKind::SpanContent, "text");
+        assert_has_kind(&tree, SyntaxKind::BRACKETED_SPAN);
+        assert_has_text(&tree, SyntaxKind::SPAN_CONTENT, "text");
     }
 
     #[test]
     fn span_with_emphasis() {
         let tree = parse_inline("[**bold** text]{.highlight}");
-        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
-        assert_has_kind(&tree, SyntaxKind::Strong);
+        assert_has_kind(&tree, SyntaxKind::BRACKETED_SPAN);
+        assert_has_kind(&tree, SyntaxKind::STRONG);
     }
 
     #[test]
     fn span_with_code() {
         let tree = parse_inline("[`code` text]{.mono}");
-        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
-        assert_has_kind(&tree, SyntaxKind::CodeSpan);
+        assert_has_kind(&tree, SyntaxKind::BRACKETED_SPAN);
+        assert_has_kind(&tree, SyntaxKind::CODE_SPAN);
     }
 
     #[test]
     fn span_in_paragraph() {
         let tree = parse_inline("Before [span]{.class} after");
-        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
+        assert_has_kind(&tree, SyntaxKind::BRACKETED_SPAN);
         let text = tree.text().to_string();
         assert!(text.contains("Before"));
         assert!(text.contains("after"));
@@ -576,7 +576,7 @@ mod bracketed_span_tests {
         let tree = parse_inline("[first]{.a} and [second]{.b}");
         let spans: Vec<_> = tree
             .descendants()
-            .filter(|n| n.kind() == SyntaxKind::BracketedSpan)
+            .filter(|n| n.kind() == SyntaxKind::BRACKETED_SPAN)
             .collect();
         assert_eq!(spans.len(), 2);
     }
@@ -584,8 +584,8 @@ mod bracketed_span_tests {
     #[test]
     fn nested_brackets_in_span() {
         let tree = parse_inline("[[nested]]{.class}");
-        assert_has_kind(&tree, SyntaxKind::BracketedSpan);
-        assert_has_text(&tree, SyntaxKind::SpanContent, "[nested]");
+        assert_has_kind(&tree, SyntaxKind::BRACKETED_SPAN);
+        assert_has_text(&tree, SyntaxKind::SPAN_CONTENT, "[nested]");
     }
 }
 
@@ -636,7 +636,7 @@ mod reference_tests {
 
         let image = para
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::ImageLink)
+            .find(|n| n.kind() == SyntaxKind::IMAGE_LINK)
             .expect("image node");
 
         // Should preserve reference syntax
@@ -654,7 +654,7 @@ mod reference_tests {
         let para = parsed.first_child().expect("paragraph");
         let image = para
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::ImageLink)
+            .find(|n| n.kind() == SyntaxKind::IMAGE_LINK)
             .expect("image node");
 
         // Should preserve implicit reference syntax
@@ -684,7 +684,7 @@ mod reference_tests {
         let para = parsed.first_child().expect("paragraph");
         let image = para
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::ImageLink)
+            .find(|n| n.kind() == SyntaxKind::IMAGE_LINK)
             .expect("image node");
 
         // Should preserve reference syntax (case insensitivity is for lookup, not formatting)
@@ -714,7 +714,7 @@ mod raw_inline_tests {
     fn find_raw_inline(node: &crate::syntax::SyntaxNode) -> Vec<String> {
         let mut raw_inlines = Vec::new();
         for child in node.descendants() {
-            if child.kind() == SyntaxKind::RawInline {
+            if child.kind() == SyntaxKind::RAW_INLINE {
                 raw_inlines.push(child.to_string());
             }
         }
@@ -724,7 +724,7 @@ mod raw_inline_tests {
     fn find_code_spans(node: &crate::syntax::SyntaxNode) -> Vec<String> {
         let mut code_spans = Vec::new();
         for child in node.descendants() {
-            if child.kind() == SyntaxKind::CodeSpan {
+            if child.kind() == SyntaxKind::CODE_SPAN {
                 code_spans.push(child.to_string());
             }
         }

@@ -1,28 +1,28 @@
 ROOT@0..53
   DOCUMENT@0..53
-    Heading@0..8
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..8
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..6
+      HEADING_CONTENT@2..6
         TEXT@2..6 "Test"
       NEWLINE@6..8 "\r\n"
-    BlankLine@8..10
-      BlankLine@8..10 "\r\n"
-    CodeBlock@10..44
-      CodeFenceOpen@10..22
-        CodeFenceMarker@10..13 "```"
-        CodeInfo@13..20
+    BLANK_LINE@8..10
+      BLANK_LINE@8..10 "\r\n"
+    CODE_BLOCK@10..44
+      CODE_FENCE_OPEN@10..22
+        CODE_FENCE_MARKER@10..13 "```"
+        CODE_INFO@13..20
           TEXT@13..20 "{=html}"
         NEWLINE@20..22 "\r\n"
-      CodeContent@22..39
+      CODE_CONTENT@22..39
         TEXT@22..37 "<div>test</div>"
         NEWLINE@37..39 "\r\n"
-      CodeFenceClose@39..44
-        CodeFenceMarker@39..42 "```"
+      CODE_FENCE_CLOSE@39..44
+        CODE_FENCE_MARKER@39..42 "```"
         NEWLINE@42..44 "\r\n"
-    BlankLine@44..46
-      BlankLine@44..46 "\r\n"
+    BLANK_LINE@44..46
+      BLANK_LINE@44..46 "\r\n"
     PARAGRAPH@46..53
       TEXT@46..51 "Done."
       NEWLINE@51..53 "\r\n"

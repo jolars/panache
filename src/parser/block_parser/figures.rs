@@ -38,7 +38,7 @@ pub(super) fn try_parse_figure(line: &str) -> bool {
 /// The line is preserved exactly for lossless parsing, and the inline parser
 /// will later process the image syntax.
 pub(super) fn parse_figure(builder: &mut GreenNodeBuilder<'static>, line: &str) {
-    builder.start_node(SyntaxKind::Figure.into());
+    builder.start_node(SyntaxKind::FIGURE.into());
 
     // Split off trailing newline
     let (text_without_newline, newline_str) = utils::strip_newline(line);

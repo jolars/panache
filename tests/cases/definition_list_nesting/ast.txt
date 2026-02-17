@@ -1,55 +1,55 @@
 ROOT@0..114
   DOCUMENT@0..114
-    DefinitionList@0..22
-      DefinitionItem@0..22
-        Term@0..5
+    DEFINITION_LIST@0..22
+      DEFINITION_ITEM@0..22
+        TERM@0..5
           TEXT@0..4 "Term"
           NEWLINE@4..5 "\n"
-        BlankLine@5..6
-          BlankLine@5..6 "\n"
-        Definition@6..22
-          DefinitionMarker@6..7 ":"
+        BLANK_LINE@5..6
+          BLANK_LINE@5..6 "\n"
+        DEFINITION@6..22
+          DEFINITION_MARKER@6..7 ":"
           WHITESPACE@7..9 "  "
-          Plain@9..22
+          PLAIN@9..22
             TEXT@9..21 "Definition 2"
             NEWLINE@21..22 "\n"
-    BlankLine@22..23
-      BlankLine@22..23 "\n"
+    BLANK_LINE@22..23
+      BLANK_LINE@22..23 "\n"
     PARAGRAPH@23..40
       TEXT@23..39 "   Another list:"
       NEWLINE@39..40 "\n"
-    BlankLine@40..41
-      BlankLine@40..41 "\n"
-    List@41..114
-      ListItem@41..92
+    BLANK_LINE@40..41
+      BLANK_LINE@40..41 "\n"
+    LIST@41..114
+      LIST_ITEM@41..92
         PARAGRAPH@41..44
           WHITESPACE@41..44 "   "
-        ListMarker@44..45 "-"
+        LIST_MARKER@44..45 "-"
         WHITESPACE@45..47 "  "
         PARAGRAPH@47..54
           TEXT@47..53 "Bullet"
           NEWLINE@53..54 "\n"
-        BlankLine@54..61
-          BlankLine@54..61 "      \n"
-        CodeBlock@61..92
+        BLANK_LINE@54..61
+          BLANK_LINE@54..61 "      \n"
+        CODE_BLOCK@61..92
           WHITESPACE@61..67 "      "
-          CodeFenceOpen@67..71
-            CodeFenceMarker@67..70 "```"
+          CODE_FENCE_OPEN@67..71
+            CODE_FENCE_MARKER@67..70 "```"
             NEWLINE@70..71 "\n"
-          CodeContent@71..82
+          CODE_CONTENT@71..82
             WHITESPACE@71..77 "      "
             TEXT@77..81 "code"
             NEWLINE@81..82 "\n"
           WHITESPACE@82..88 "      "
-          CodeFenceClose@88..92
-            CodeFenceMarker@88..91 "```"
+          CODE_FENCE_CLOSE@88..92
+            CODE_FENCE_MARKER@88..91 "```"
             NEWLINE@91..92 "\n"
-      BlankLine@92..93
-        BlankLine@92..93 "\n"
-      ListItem@93..114
+      BLANK_LINE@92..93
+        BLANK_LINE@92..93 "\n"
+      LIST_ITEM@93..114
         PARAGRAPH@93..96
           WHITESPACE@93..96 "   "
-        ListMarker@96..97 "-"
+        LIST_MARKER@96..97 "-"
         WHITESPACE@97..99 "  "
         PARAGRAPH@99..114
           TEXT@99..113 "Another bullet"

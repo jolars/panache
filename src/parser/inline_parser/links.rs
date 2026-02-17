@@ -125,15 +125,15 @@ pub fn emit_inline_image(
     raw_attributes: Option<&str>,
     config: &Config,
 ) {
-    builder.start_node(SyntaxKind::ImageLink.into());
+    builder.start_node(SyntaxKind::IMAGE_LINK.into());
 
     // Opening ![
-    builder.start_node(SyntaxKind::ImageLinkStart.into());
-    builder.token(SyntaxKind::ImageLinkStart.into(), "![");
+    builder.start_node(SyntaxKind::IMAGE_LINK_START.into());
+    builder.token(SyntaxKind::IMAGE_LINK_START.into(), "![");
     builder.finish_node();
 
     // Alt text (recursively parse inline elements)
-    builder.start_node(SyntaxKind::ImageAlt.into());
+    builder.start_node(SyntaxKind::IMAGE_ALT.into());
     // Use the standalone parse_inline_text function for recursive parsing
     // Note: nested contexts don't resolve references
     crate::parser::inline_parser::parse_inline_text(builder, alt_text, config, None);
@@ -143,7 +143,7 @@ pub fn emit_inline_image(
     builder.token(SyntaxKind::TEXT.into(), "](");
 
     // Destination
-    builder.start_node(SyntaxKind::LinkDest.into());
+    builder.start_node(SyntaxKind::LINK_DEST.into());
     builder.token(SyntaxKind::TEXT.into(), dest);
     builder.finish_node();
 
@@ -152,8 +152,8 @@ pub fn emit_inline_image(
 
     // Emit raw attributes if present (preserve original formatting)
     if let Some(raw_attrs) = raw_attributes {
-        builder.start_node(SyntaxKind::Attribute.into());
-        builder.token(SyntaxKind::Attribute.into(), raw_attrs);
+        builder.start_node(SyntaxKind::ATTRIBUTE.into());
+        builder.token(SyntaxKind::ATTRIBUTE.into(), raw_attrs);
         builder.finish_node();
     }
 
@@ -199,19 +199,19 @@ pub fn try_parse_autolink(text: &str) -> Option<(usize, &str)> {
 
 /// Emit an automatic link node to the builder.
 pub fn emit_autolink(builder: &mut GreenNodeBuilder, _text: &str, url: &str) {
-    builder.start_node(SyntaxKind::AutoLink.into());
+    builder.start_node(SyntaxKind::AUTO_LINK.into());
 
     // Opening <
-    builder.start_node(SyntaxKind::AutoLinkMarker.into());
-    builder.token(SyntaxKind::AutoLinkMarker.into(), "<");
+    builder.start_node(SyntaxKind::AUTO_LINK_MARKER.into());
+    builder.token(SyntaxKind::AUTO_LINK_MARKER.into(), "<");
     builder.finish_node();
 
     // URL content
     builder.token(SyntaxKind::TEXT.into(), url);
 
     // Closing >
-    builder.start_node(SyntaxKind::AutoLinkMarker.into());
-    builder.token(SyntaxKind::AutoLinkMarker.into(), ">");
+    builder.start_node(SyntaxKind::AUTO_LINK_MARKER.into());
+    builder.token(SyntaxKind::AUTO_LINK_MARKER.into(), ">");
     builder.finish_node();
 
     builder.finish_node();
@@ -325,15 +325,15 @@ pub fn emit_inline_link(
     raw_attributes: Option<&str>,
     config: &Config,
 ) {
-    builder.start_node(SyntaxKind::Link.into());
+    builder.start_node(SyntaxKind::LINK.into());
 
     // Opening [
-    builder.start_node(SyntaxKind::LinkStart.into());
-    builder.token(SyntaxKind::LinkStart.into(), "[");
+    builder.start_node(SyntaxKind::LINK_START.into());
+    builder.token(SyntaxKind::LINK_START.into(), "[");
     builder.finish_node();
 
     // Link text (recursively parse inline elements)
-    builder.start_node(SyntaxKind::LinkText.into());
+    builder.start_node(SyntaxKind::LINK_TEXT.into());
     // Use the standalone parse_inline_text function for recursive parsing
     crate::parser::inline_parser::parse_inline_text(builder, link_text, config, None);
     builder.finish_node();
@@ -342,7 +342,7 @@ pub fn emit_inline_link(
     builder.token(SyntaxKind::TEXT.into(), "](");
 
     // Destination
-    builder.start_node(SyntaxKind::LinkDest.into());
+    builder.start_node(SyntaxKind::LINK_DEST.into());
     builder.token(SyntaxKind::TEXT.into(), dest);
     builder.finish_node();
 
@@ -351,8 +351,8 @@ pub fn emit_inline_link(
 
     // Emit raw attributes if present (preserve original formatting)
     if let Some(raw_attrs) = raw_attributes {
-        builder.start_node(SyntaxKind::Attribute.into());
-        builder.token(SyntaxKind::Attribute.into(), raw_attrs);
+        builder.start_node(SyntaxKind::ATTRIBUTE.into());
+        builder.token(SyntaxKind::ATTRIBUTE.into(), raw_attrs);
         builder.finish_node();
     }
 
@@ -477,15 +477,15 @@ pub fn emit_reference_link(
     is_shortcut: bool,
     config: &Config,
 ) {
-    builder.start_node(SyntaxKind::Link.into());
+    builder.start_node(SyntaxKind::LINK.into());
 
     // Opening [
-    builder.start_node(SyntaxKind::LinkStart.into());
-    builder.token(SyntaxKind::LinkStart.into(), "[");
+    builder.start_node(SyntaxKind::LINK_START.into());
+    builder.token(SyntaxKind::LINK_START.into(), "[");
     builder.finish_node();
 
     // Link text (recursively parse inline elements)
-    builder.start_node(SyntaxKind::LinkText.into());
+    builder.start_node(SyntaxKind::LINK_TEXT.into());
     crate::parser::inline_parser::parse_inline_text(builder, link_text, config, None);
     builder.finish_node();
 
@@ -495,7 +495,7 @@ pub fn emit_reference_link(
     if !is_shortcut {
         // Explicit or implicit reference: [text][label] or [text][]
         builder.token(SyntaxKind::TEXT.into(), "[");
-        builder.start_node(SyntaxKind::LinkRef.into());
+        builder.start_node(SyntaxKind::LINK_REF.into());
         // For implicit references (label == text), emit empty label to get [text][]
         // For explicit references, emit the label to get [text][label]
         if label != link_text {
@@ -598,15 +598,15 @@ pub fn emit_reference_image(
     is_shortcut: bool,
     config: &Config,
 ) {
-    builder.start_node(SyntaxKind::ImageLink.into());
+    builder.start_node(SyntaxKind::IMAGE_LINK.into());
 
     // Emit as reference image (preserve original syntax)
-    builder.start_node(SyntaxKind::ImageLinkStart.into());
-    builder.token(SyntaxKind::ImageLinkStart.into(), "![");
+    builder.start_node(SyntaxKind::IMAGE_LINK_START.into());
+    builder.token(SyntaxKind::IMAGE_LINK_START.into(), "![");
     builder.finish_node();
 
     // Alt text (recursively parse inline elements)
-    builder.start_node(SyntaxKind::ImageAlt.into());
+    builder.start_node(SyntaxKind::IMAGE_ALT.into());
     parse_inline_text(builder, alt_text, config, None);
     builder.finish_node();
 

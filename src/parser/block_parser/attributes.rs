@@ -176,7 +176,7 @@ fn parse_attribute_content(content: &str) -> Option<AttributeBlock> {
 
 /// Emit attribute block as AST nodes
 pub fn emit_attributes(builder: &mut GreenNodeBuilder, attrs: &AttributeBlock) {
-    builder.start_node(SyntaxKind::Attribute.into());
+    builder.start_node(SyntaxKind::ATTRIBUTE.into());
 
     // Build the attribute string to emit
     let mut attr_str = String::from("{");
@@ -215,7 +215,7 @@ pub fn emit_attributes(builder: &mut GreenNodeBuilder, attrs: &AttributeBlock) {
 
     attr_str.push('}');
 
-    builder.token(SyntaxKind::Attribute.into(), &attr_str);
+    builder.token(SyntaxKind::ATTRIBUTE.into(), &attr_str);
     builder.finish_node();
 }
 

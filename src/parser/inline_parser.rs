@@ -762,7 +762,7 @@ impl InlineParser {
                                     self.parse_text_with_refs(builder, text_before);
                                 }
                                 // Emit hard line break - preserve the backslash for losslessness
-                                builder.token(SyntaxKind::HardLineBreak.into(), "\\\n");
+                                builder.token(SyntaxKind::HARD_LINE_BREAK.into(), "\\\n");
                                 // Skip the NEWLINE token
                                 children.next();
                                 continue;
@@ -780,7 +780,7 @@ impl InlineParser {
                                 // Emit hard line break - preserve the trailing spaces for losslessness
                                 let spaces = " ".repeat(trailing_spaces);
                                 builder.token(
-                                    SyntaxKind::HardLineBreak.into(),
+                                    SyntaxKind::HARD_LINE_BREAK.into(),
                                     &format!("{}\n", spaces),
                                 );
                                 // Skip the NEWLINE token
@@ -851,16 +851,16 @@ impl InlineParser {
         // or line block (where inline parsing is handled differently - preserves line structure)
         if let Some(parent) = token.parent() {
             match parent.kind() {
-                SyntaxKind::CodeBlock
-                | SyntaxKind::CodeContent
-                | SyntaxKind::LatexEnvironment
-                | SyntaxKind::LatexEnvBegin
-                | SyntaxKind::LatexEnvEnd
-                | SyntaxKind::LatexEnvContent
-                | SyntaxKind::HtmlBlock
-                | SyntaxKind::HtmlBlockTag
-                | SyntaxKind::HtmlBlockContent
-                | SyntaxKind::LineBlockLine => {
+                SyntaxKind::CODE_BLOCK
+                | SyntaxKind::CODE_CONTENT
+                | SyntaxKind::LATEX_ENVIRONMENT
+                | SyntaxKind::LATEX_ENV_BEGIN
+                | SyntaxKind::LATEX_ENV_END
+                | SyntaxKind::LATEX_ENV_CONTENT
+                | SyntaxKind::HTML_BLOCK
+                | SyntaxKind::HTML_BLOCK_TAG
+                | SyntaxKind::HTML_BLOCK_CONTENT
+                | SyntaxKind::LINE_BLOCK_LINE => {
                     return false;
                 }
                 _ => {}
@@ -908,7 +908,7 @@ mod inline_tests {
         let input = "Visit <https://example.com> for more.";
         let inline_tree = parse_inline(input);
 
-        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
+        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AUTO_LINK);
         assert_eq!(autolinks.len(), 1);
         assert_eq!(autolinks[0], "<https://example.com>");
     }
@@ -918,7 +918,7 @@ mod inline_tests {
         let input = "Email me at <user@example.com>.";
         let inline_tree = parse_inline(input);
 
-        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
+        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AUTO_LINK);
         assert_eq!(autolinks.len(), 1);
         assert_eq!(autolinks[0], "<user@example.com>");
     }
@@ -928,7 +928,7 @@ mod inline_tests {
         let input = "Click [here](https://example.com) to continue.";
         let inline_tree = parse_inline(input);
 
-        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
+        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::LINK);
         assert_eq!(links.len(), 1);
         assert_eq!(links[0], "[here](https://example.com)");
     }
@@ -938,7 +938,7 @@ mod inline_tests {
         let input = r#"See [this](url "title") link."#;
         let inline_tree = parse_inline(input);
 
-        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
+        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::LINK);
         assert_eq!(links.len(), 1);
         assert_eq!(links[0], r#"[this](url "title")"#);
     }
@@ -948,7 +948,7 @@ mod inline_tests {
         let input = "Visit [site1](url1) and [site2](url2).";
         let inline_tree = parse_inline(input);
 
-        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
+        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::LINK);
         assert_eq!(links.len(), 2);
     }
 
@@ -957,7 +957,7 @@ mod inline_tests {
         let input = "Here is an image: ![alt text](image.jpg).";
         let inline_tree = parse_inline(input);
 
-        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
+        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::IMAGE_LINK);
         assert_eq!(images.len(), 1);
         assert_eq!(images[0], "![alt text](image.jpg)");
     }
@@ -967,7 +967,7 @@ mod inline_tests {
         let input = r#"See ![photo](pic.jpg "My Photo") here."#;
         let inline_tree = parse_inline(input);
 
-        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
+        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::IMAGE_LINK);
         assert_eq!(images.len(), 1);
         assert_eq!(images[0], r#"![photo](pic.jpg "My Photo")"#);
     }
@@ -977,7 +977,7 @@ mod inline_tests {
         let input = "![img1](a.jpg) and ![img2](b.jpg)";
         let inline_tree = parse_inline(input);
 
-        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
+        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::IMAGE_LINK);
         assert_eq!(images.len(), 2);
     }
 
@@ -986,8 +986,8 @@ mod inline_tests {
         let input = "A [link](url) and an ![image](pic.jpg).";
         let inline_tree = parse_inline(input);
 
-        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::Link);
-        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::ImageLink);
+        let links = find_nodes_by_kind(&inline_tree, SyntaxKind::LINK);
+        let images = find_nodes_by_kind(&inline_tree, SyntaxKind::IMAGE_LINK);
         assert_eq!(links.len(), 1);
         assert_eq!(images.len(), 1);
     }
@@ -997,7 +997,7 @@ mod inline_tests {
         let input = "As @doe99 notes, the result is clear.";
         let inline_tree = parse_inline(input);
 
-        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::CITATION);
         assert_eq!(citations.len(), 1);
         assert_eq!(citations[0], "@doe99");
     }
@@ -1007,7 +1007,7 @@ mod inline_tests {
         let input = "This is a fact [@doe99].";
         let inline_tree = parse_inline(input);
 
-        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::CITATION);
         assert_eq!(citations.len(), 1);
         assert_eq!(citations[0], "[@doe99]");
     }
@@ -1017,7 +1017,7 @@ mod inline_tests {
         let input = "Multiple sources [@doe99; @smith2000; @jones2010].";
         let inline_tree = parse_inline(input);
 
-        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::CITATION);
         assert_eq!(citations.len(), 1);
         assert_eq!(citations[0], "[@doe99; @smith2000; @jones2010]");
     }
@@ -1027,7 +1027,7 @@ mod inline_tests {
         let input = "See the discussion [@doe99, pp. 33-35].";
         let inline_tree = parse_inline(input);
 
-        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::CITATION);
         assert_eq!(citations.len(), 1);
         assert_eq!(citations[0], "[@doe99, pp. 33-35]");
     }
@@ -1037,7 +1037,7 @@ mod inline_tests {
         let input = "Smith says blah [-@smith04].";
         let inline_tree = parse_inline(input);
 
-        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::CITATION);
         assert_eq!(citations.len(), 1);
         assert_eq!(citations[0], "[-@smith04]");
     }
@@ -1047,7 +1047,7 @@ mod inline_tests {
         let input = "See -@doe99 for details.";
         let inline_tree = parse_inline(input);
 
-        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::CITATION);
         assert_eq!(citations.len(), 1);
         assert_eq!(citations[0], "-@doe99");
     }
@@ -1058,8 +1058,8 @@ mod inline_tests {
         let input = "Email <user@example.com> for info.";
         let inline_tree = parse_inline(input);
 
-        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
-        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::Citation);
+        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AUTO_LINK);
+        let citations = find_nodes_by_kind(&inline_tree, SyntaxKind::CITATION);
         assert_eq!(autolinks.len(), 1);
         assert_eq!(citations.len(), 0);
     }
@@ -1069,7 +1069,7 @@ mod inline_tests {
         let input = "Text with <span>highlighted</span> content.";
         let inline_tree = parse_inline(input);
 
-        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BracketedSpan);
+        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BRACKETED_SPAN);
         assert_eq!(spans.len(), 1);
         assert!(spans[0].contains("highlighted"));
     }
@@ -1079,7 +1079,7 @@ mod inline_tests {
         let input = r#"Use <span class="important">this</span> wisely."#;
         let inline_tree = parse_inline(input);
 
-        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BracketedSpan);
+        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BRACKETED_SPAN);
         assert_eq!(spans.len(), 1);
         assert!(spans[0].contains("this"));
     }
@@ -1089,12 +1089,12 @@ mod inline_tests {
         let input = "<span>Contains *emphasis* and `code`</span>.";
         let inline_tree = parse_inline(input);
 
-        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BracketedSpan);
+        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BRACKETED_SPAN);
         assert_eq!(spans.len(), 1);
 
         // Should have parsed the emphasis and code inside
-        let emphasis = find_nodes_by_kind(&inline_tree, SyntaxKind::Emphasis);
-        let code = find_nodes_by_kind(&inline_tree, SyntaxKind::CodeSpan);
+        let emphasis = find_nodes_by_kind(&inline_tree, SyntaxKind::EMPHASIS);
+        let code = find_nodes_by_kind(&inline_tree, SyntaxKind::CODE_SPAN);
         assert_eq!(emphasis.len(), 1);
         assert_eq!(code.len(), 1);
     }
@@ -1104,8 +1104,8 @@ mod inline_tests {
         let input = "Link <https://example.com> and <span>text</span>.";
         let inline_tree = parse_inline(input);
 
-        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AutoLink);
-        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BracketedSpan);
+        let autolinks = find_nodes_by_kind(&inline_tree, SyntaxKind::AUTO_LINK);
+        let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BRACKETED_SPAN);
         assert_eq!(autolinks.len(), 1);
         assert_eq!(spans.len(), 1);
     }

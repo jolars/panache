@@ -40,7 +40,7 @@ pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, us
 
 /// Emit a term line into the syntax tree
 pub(crate) fn emit_term(builder: &mut GreenNodeBuilder<'static>, line: &str) {
-    builder.start_node(SyntaxKind::Term.into());
+    builder.start_node(SyntaxKind::TERM.into());
     // Strip trailing newline from line (it will be emitted separately)
     let (text, newline_str) = strip_newline(line);
     builder.token(SyntaxKind::TEXT.into(), text.trim_end());
@@ -59,7 +59,7 @@ pub(crate) fn emit_definition_marker(
     if indent > 0 {
         builder.token(SyntaxKind::WHITESPACE.into(), &" ".repeat(indent));
     }
-    builder.token(SyntaxKind::DefinitionMarker.into(), &marker.to_string());
+    builder.token(SyntaxKind::DEFINITION_MARKER.into(), &marker.to_string());
 }
 
 // Helper functions for definition list management in BlockParser

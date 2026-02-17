@@ -1,71 +1,71 @@
 ROOT@0..220
   DOCUMENT@0..220
-    Heading@0..43
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..43
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..42
+      HEADING_CONTENT@2..42
         TEXT@2..42 "Test: Changing blockq ..."
       NEWLINE@42..43 "\n"
-    BlankLine@43..44
-      BlankLine@43..44 "\n"
-    BlockQuote@44..97
-      BlockQuoteMarker@44..45 ">"
+    BLANK_LINE@43..44
+      BLANK_LINE@43..44 "\n"
+    BLOCKQUOTE@44..97
+      BLOCKQUOTE_MARKER@44..45 ">"
       WHITESPACE@45..46 " "
-      List@46..97
-        ListItem@46..70
-          ListMarker@46..47 "-"
+      LIST@46..97
+        LIST_ITEM@46..70
+          LIST_MARKER@46..47 "-"
           WHITESPACE@47..48 " "
-          Plain@48..70
+          PLAIN@48..70
             TEXT@48..69 "First item at depth 1"
             NEWLINE@69..70 "\n"
-        BlockQuoteMarker@70..71 ">"
+        BLOCKQUOTE_MARKER@70..71 ">"
         WHITESPACE@71..72 " "
-        ListItem@72..97
-          ListMarker@72..73 "-"
+        LIST_ITEM@72..97
+          LIST_MARKER@72..73 "-"
           WHITESPACE@73..74 " "
-          Plain@74..97
+          PLAIN@74..97
             TEXT@74..96 "Second item at depth 1"
             NEWLINE@96..97 "\n"
-    BlankLine@97..98
-      BlankLine@97..98 "\n"
-    BlockQuote@98..152
-      BlockQuoteMarker@98..99 ">"
+    BLANK_LINE@97..98
+      BLANK_LINE@97..98 "\n"
+    BLOCKQUOTE@98..152
+      BLOCKQUOTE_MARKER@98..99 ">"
       WHITESPACE@99..100 " "
-      BlockQuote@100..152
-        BlockQuoteMarker@100..101 ">"
+      BLOCKQUOTE@100..152
+        BLOCKQUOTE_MARKER@100..101 ">"
         WHITESPACE@101..102 " "
-        List@102..152
-          ListItem@102..127
-            ListMarker@102..103 "-"
+        LIST@102..152
+          LIST_ITEM@102..127
+            LIST_MARKER@102..103 "-"
             WHITESPACE@103..104 " "
-            Plain@104..127
+            PLAIN@104..127
               TEXT@104..126 "Nested item at depth 2"
               NEWLINE@126..127 "\n"
-          BlockQuoteMarker@127..128 ">"
+          BLOCKQUOTE_MARKER@127..128 ">"
           WHITESPACE@128..129 " "
-          BlockQuoteMarker@129..130 ">"
+          BLOCKQUOTE_MARKER@129..130 ">"
           WHITESPACE@130..131 " "
-          ListItem@131..152
-            ListMarker@131..132 "-"
+          LIST_ITEM@131..152
+            LIST_MARKER@131..132 "-"
             WHITESPACE@132..133 " "
-            Plain@133..152
+            PLAIN@133..152
               TEXT@133..151 "Another at depth 2"
               NEWLINE@151..152 "\n"
-    BlankLine@152..153
-      BlankLine@152..153 "\n"
-    BlockQuote@153..173
-      BlockQuoteMarker@153..154 ">"
+    BLANK_LINE@152..153
+      BLANK_LINE@152..153 "\n"
+    BLOCKQUOTE@153..173
+      BLOCKQUOTE_MARKER@153..154 ">"
       WHITESPACE@154..155 " "
-      List@155..173
-        ListItem@155..173
-          ListMarker@155..156 "-"
+      LIST@155..173
+        LIST_ITEM@155..173
+          LIST_MARKER@155..156 "-"
           WHITESPACE@156..157 " "
-          Plain@157..173
+          PLAIN@157..173
             TEXT@157..172 "Back to depth 1"
             NEWLINE@172..173 "\n"
-    BlankLine@173..174
-      BlankLine@173..174 "\n"
+    BLANK_LINE@173..174
+      BLANK_LINE@173..174 "\n"
     PARAGRAPH@174..220
       TEXT@174..219 "How should the list s ..."
       NEWLINE@219..220 "\n"

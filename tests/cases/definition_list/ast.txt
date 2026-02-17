@@ -1,216 +1,216 @@
 ROOT@0..870
   DOCUMENT@0..870
-    Heading@0..19
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..19
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..18
+      HEADING_CONTENT@2..18
         TEXT@2..18 "Definition Lists"
       NEWLINE@18..19 "\n"
-    BlankLine@19..20
-      BlankLine@19..20 "\n"
+    BLANK_LINE@19..20
+      BLANK_LINE@19..20 "\n"
     PARAGRAPH@20..44
       TEXT@20..43 "Simple definition list:"
       NEWLINE@43..44 "\n"
-    BlankLine@44..45
-      BlankLine@44..45 "\n"
-    DefinitionList@45..69
-      DefinitionItem@45..69
-        Term@45..52
+    BLANK_LINE@44..45
+      BLANK_LINE@44..45 "\n"
+    DEFINITION_LIST@45..69
+      DEFINITION_ITEM@45..69
+        TERM@45..52
           TEXT@45..51 "Term 1"
           NEWLINE@51..52 "\n"
-        Definition@52..69
-          DefinitionMarker@52..53 ":"
+        DEFINITION@52..69
+          DEFINITION_MARKER@52..53 ":"
           WHITESPACE@53..56 "   "
-          Plain@56..69
+          PLAIN@56..69
             TEXT@56..68 "Definition 1"
             NEWLINE@68..69 "\n"
-    BlankLine@69..70
-      BlankLine@69..70 "\n"
-    DefinitionList@70..94
-      DefinitionItem@70..94
-        Term@70..77
+    BLANK_LINE@69..70
+      BLANK_LINE@69..70 "\n"
+    DEFINITION_LIST@70..94
+      DEFINITION_ITEM@70..94
+        TERM@70..77
           TEXT@70..76 "Term 2"
           NEWLINE@76..77 "\n"
-        Definition@77..94
-          DefinitionMarker@77..78 ":"
+        DEFINITION@77..94
+          DEFINITION_MARKER@77..78 ":"
           WHITESPACE@78..81 "   "
-          Plain@81..94
+          PLAIN@81..94
             TEXT@81..93 "Definition 2"
             NEWLINE@93..94 "\n"
-    BlankLine@94..95
-      BlankLine@94..95 "\n"
+    BLANK_LINE@94..95
+      BLANK_LINE@94..95 "\n"
     PARAGRAPH@95..126
       TEXT@95..125 "Multiple definitions  ..."
       NEWLINE@125..126 "\n"
-    BlankLine@126..127
-      BlankLine@126..127 "\n"
-    DefinitionList@127..189
-      DefinitionItem@127..189
-        Term@127..134
+    BLANK_LINE@126..127
+      BLANK_LINE@126..127 "\n"
+    DEFINITION_LIST@127..189
+      DEFINITION_ITEM@127..189
+        TERM@127..134
           TEXT@127..133 "Term A"
           NEWLINE@133..134 "\n"
-        Definition@134..161
-          DefinitionMarker@134..135 ":"
+        DEFINITION@134..161
+          DEFINITION_MARKER@134..135 ":"
           WHITESPACE@135..138 "   "
-          Plain@138..161
+          PLAIN@138..161
             TEXT@138..160 "First definition for A"
             NEWLINE@160..161 "\n"
-        Definition@161..189
-          DefinitionMarker@161..162 ":"
+        DEFINITION@161..189
+          DEFINITION_MARKER@161..162 ":"
           WHITESPACE@162..165 "   "
-          Plain@165..189
+          PLAIN@165..189
             TEXT@165..188 "Second definition for A"
             NEWLINE@188..189 "\n"
-    BlankLine@189..190
-      BlankLine@189..190 "\n"
-    DefinitionList@190..259
-      DefinitionItem@190..259
-        Term@190..197
+    BLANK_LINE@189..190
+      BLANK_LINE@189..190 "\n"
+    DEFINITION_LIST@190..259
+      DEFINITION_ITEM@190..259
+        TERM@190..197
           TEXT@190..196 "Term B"
           NEWLINE@196..197 "\n"
-        Definition@197..230
-          DefinitionMarker@197..198 ":"
+        DEFINITION@197..230
+          DEFINITION_MARKER@197..198 ":"
           WHITESPACE@198..201 "   "
-          Plain@201..230
+          PLAIN@201..230
             TEXT@201..229 "Definition with tilde ..."
             NEWLINE@229..230 "\n"
-        Definition@230..259
-          DefinitionMarker@230..231 ":"
+        DEFINITION@230..259
+          DEFINITION_MARKER@230..231 ":"
           WHITESPACE@231..234 "   "
-          Plain@234..259
+          PLAIN@234..259
             TEXT@234..258 "Another tilde definition"
             NEWLINE@258..259 "\n"
-    BlankLine@259..260
-      BlankLine@259..260 "\n"
+    BLANK_LINE@259..260
+      BLANK_LINE@259..260 "\n"
     PARAGRAPH@260..296
       TEXT@260..295 "Complex example with  ..."
       NEWLINE@295..296 "\n"
-    BlankLine@296..297
-      BlankLine@296..297 "\n"
-    DefinitionList@297..339
-      DefinitionItem@297..339
-        Term@297..301
+    BLANK_LINE@296..297
+      BLANK_LINE@296..297 "\n"
+    DEFINITION_LIST@297..339
+      DEFINITION_ITEM@297..339
+        TERM@297..301
           TEXT@297..300 "API"
           NEWLINE@300..301 "\n"
-        Definition@301..339
-          DefinitionMarker@301..302 ":"
+        DEFINITION@301..339
+          DEFINITION_MARKER@301..302 ":"
           WHITESPACE@302..305 "   "
-          Plain@305..339
+          PLAIN@305..339
             TEXT@305..338 "Application Programmi ..."
             NEWLINE@338..339 "\n"
-    BlankLine@339..340
-      BlankLine@339..340 "\n"
-    DefinitionList@340..381
-      DefinitionItem@340..381
-        Term@340..345
+    BLANK_LINE@339..340
+      BLANK_LINE@339..340 "\n"
+    DEFINITION_LIST@340..381
+      DEFINITION_ITEM@340..381
+        TERM@340..345
           TEXT@340..344 "REST"
           NEWLINE@344..345 "\n"
-        Definition@345..381
-          DefinitionMarker@345..346 ":"
+        DEFINITION@345..381
+          DEFINITION_MARKER@345..346 ":"
           WHITESPACE@346..349 "   "
-          Plain@349..381
+          PLAIN@349..381
             TEXT@349..380 "Representational Stat ..."
             NEWLINE@380..381 "\n"
-    BlankLine@381..382
-      BlankLine@381..382 "\n"
-    DefinitionList@382..444
-      DefinitionItem@382..444
-        Term@382..390
+    BLANK_LINE@381..382
+      BLANK_LINE@381..382 "\n"
+    DEFINITION_LIST@382..444
+      DEFINITION_ITEM@382..444
+        TERM@382..390
           TEXT@382..389 "GraphQL"
           NEWLINE@389..390 "\n"
-        Definition@390..444
-          DefinitionMarker@390..391 ":"
+        DEFINITION@390..444
+          DEFINITION_MARKER@390..391 ":"
           WHITESPACE@391..394 "   "
-          Plain@394..444
+          PLAIN@394..444
             TEXT@394..433 "A query language for  ..."
-            Emphasis@433..443
-              EmphasisMarker@433..434 "*"
+            EMPHASIS@433..443
+              EMPHASIS_MARKER@433..434 "*"
               TEXT@434..442 "Facebook"
-              EmphasisMarker@442..443 "*"
+              EMPHASIS_MARKER@442..443 "*"
             NEWLINE@443..444 "\n"
-    BlankLine@444..445
-      BlankLine@444..445 "\n"
+    BLANK_LINE@444..445
+      BLANK_LINE@444..445 "\n"
     PARAGRAPH@445..490
       TEXT@445..489 "Compact format (no bl ..."
       NEWLINE@489..490 "\n"
-    BlankLine@490..491
-      BlankLine@490..491 "\n"
-    DefinitionList@491..509
-      DefinitionItem@491..509
-        Term@491..497
+    BLANK_LINE@490..491
+      BLANK_LINE@490..491 "\n"
+    DEFINITION_LIST@491..509
+      DEFINITION_ITEM@491..509
+        TERM@491..497
           TEXT@491..496 "Apple"
           NEWLINE@496..497 "\n"
-        Definition@497..509
-          DefinitionMarker@497..498 ":"
+        DEFINITION@497..509
+          DEFINITION_MARKER@497..498 ":"
           WHITESPACE@498..501 "   "
-          Plain@501..509
+          PLAIN@501..509
             TEXT@501..508 "A fruit"
             NEWLINE@508..509 "\n"
-    BlankLine@509..510
-      BlankLine@509..510 "\n"
-    DefinitionList@510..551
-      DefinitionItem@510..551
-        Term@510..517
+    BLANK_LINE@509..510
+      BLANK_LINE@509..510 "\n"
+    DEFINITION_LIST@510..551
+      DEFINITION_ITEM@510..551
+        TERM@510..517
           TEXT@510..516 "Orange"
           NEWLINE@516..517 "\n"
-        Definition@517..534
-          DefinitionMarker@517..518 ":"
+        DEFINITION@517..534
+          DEFINITION_MARKER@517..518 ":"
           WHITESPACE@518..521 "   "
-          Plain@521..534
+          PLAIN@521..534
             TEXT@521..533 "Also a fruit"
             NEWLINE@533..534 "\n"
-        Definition@534..551
-          DefinitionMarker@534..535 ":"
+        DEFINITION@534..551
+          DEFINITION_MARKER@534..535 ":"
           WHITESPACE@535..538 "   "
-          Plain@538..551
+          PLAIN@538..551
             TEXT@538..550 "Also a color"
             NEWLINE@550..551 "\n"
-    BlankLine@551..552
-      BlankLine@551..552 "\n"
-    DefinitionList@552..576
-      DefinitionItem@552..576
-        Term@552..559
+    BLANK_LINE@551..552
+      BLANK_LINE@551..552 "\n"
+    DEFINITION_LIST@552..576
+      DEFINITION_ITEM@552..576
+        TERM@552..559
           TEXT@552..558 "Term 1"
           NEWLINE@558..559 "\n"
-        Definition@559..576
-          DefinitionMarker@559..560 ":"
+        DEFINITION@559..576
+          DEFINITION_MARKER@559..560 ":"
           WHITESPACE@560..563 "   "
-          Plain@563..576
+          PLAIN@563..576
             TEXT@563..575 "Definition 1"
             NEWLINE@575..576 "\n"
-    BlankLine@576..577
-      BlankLine@576..577 "\n"
-    DefinitionList@577..787
-      DefinitionItem@577..787
-        Term@577..605
+    BLANK_LINE@576..577
+      BLANK_LINE@576..577 "\n"
+    DEFINITION_LIST@577..787
+      DEFINITION_ITEM@577..787
+        TERM@577..605
           TEXT@577..589 "Term 2 with "
-          Emphasis@589..604
-            EmphasisMarker@589..590 "*"
+          EMPHASIS@589..604
+            EMPHASIS_MARKER@589..590 "*"
             TEXT@590..603 "inline markup"
-            EmphasisMarker@603..604 "*"
+            EMPHASIS_MARKER@603..604 "*"
           NEWLINE@604..605 "\n"
-        Definition@605..787
-          DefinitionMarker@605..606 ":"
+        DEFINITION@605..787
+          DEFINITION_MARKER@605..606 ":"
           WHITESPACE@606..609 "   "
-          Plain@609..787
+          PLAIN@609..787
             TEXT@609..687 "Definition 2 { some c ..."
             NEWLINE@687..688 "\n"
             TEXT@688..772 "    2, quite long so  ..."
             NEWLINE@772..773 "\n"
             TEXT@773..786 "    properly."
             NEWLINE@786..787 "\n"
-    BlankLine@787..788
-      BlankLine@787..788 "\n"
-    DefinitionList@788..870
-      DefinitionItem@788..870
-        Term@788..795
+    BLANK_LINE@787..788
+      BLANK_LINE@787..788 "\n"
+    DEFINITION_LIST@788..870
+      DEFINITION_ITEM@788..870
+        TERM@788..795
           TEXT@788..794 "Term 3"
           NEWLINE@794..795 "\n"
-        Definition@795..870
-          DefinitionMarker@795..796 ":"
+        DEFINITION@795..870
+          DEFINITION_MARKER@795..796 ":"
           WHITESPACE@796..799 "   "
-          Plain@799..870
+          PLAIN@799..870
             TEXT@799..869 "Definition with lazy  ..."
             NEWLINE@869..870 "\n"
 

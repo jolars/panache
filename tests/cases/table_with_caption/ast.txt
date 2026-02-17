@@ -1,25 +1,25 @@
 ROOT@0..243
   DOCUMENT@0..243
-    SimpleTable@0..243
-      TableHeader@0..40
+    SIMPLE_TABLE@0..243
+      TABLE_HEADER@0..40
         TEXT@0..39 "  Right     Left      ..."
         NEWLINE@39..40 "\n"
-      TableSeparator@40..80
+      TABLE_SEPARATOR@40..80
         TEXT@40..79 "-------     ------ -- ..."
         NEWLINE@79..80 "\n"
-      TableRow@80..119
+      TABLE_ROW@80..119
         TEXT@80..118 "     12     12        ..."
         NEWLINE@118..119 "\n"
-      TableRow@119..158
+      TABLE_ROW@119..158
         TEXT@119..157 "    123     123       ..."
         NEWLINE@157..158 "\n"
-      TableRow@158..197
+      TABLE_ROW@158..197
         TEXT@158..196 "      1     1         ..."
         NEWLINE@196..197 "\n"
-      BlankLine@197..198
-        BlankLine@197..198 "\n"
-      TableCaption@198..243
-        TableCaptionPrefix@198..205 "Table: "
+      BLANK_LINE@197..198
+        BLANK_LINE@197..198 "\n"
+      TABLE_CAPTION@198..243
+        TABLE_CAPTION_PREFIX@198..205 "Table: "
         TEXT@205..242 "Demonstration of simp ..."
         NEWLINE@242..243 "\n"
 

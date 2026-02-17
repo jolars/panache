@@ -7,8 +7,8 @@ use crate::syntax::SyntaxKind;
 fn simple_bullet_list() {
     let input = "* one\n* two\n* three\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -16,7 +16,7 @@ fn bullet_list_requires_space_after_marker() {
     let input = "*one\n*two\n";
     let tree = parse_blocks(input);
     // Should not parse as list
-    assert!(find_first(&tree, SyntaxKind::List).is_none());
+    assert!(find_first(&tree, SyntaxKind::LIST).is_none());
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn bullet_list_with_different_markers() {
     let input = "* item\n+ item\n- item\n";
     let tree = parse_blocks(input);
     // Should create ONE list (bullet markers are all equivalent per Pandoc)
-    let lists = find_all(&tree, SyntaxKind::List);
+    let lists = find_all(&tree, SyntaxKind::LIST);
     assert_eq!(lists.len(), 1);
 }
 
@@ -33,7 +33,7 @@ fn bullet_list_indented_1_to_3_spaces() {
     let input = " * one space\n  * two spaces\n   * three spaces\n";
     let tree = parse_blocks(input);
     // All should be valid list items
-    let list_items = find_all(&tree, SyntaxKind::ListItem);
+    let list_items = find_all(&tree, SyntaxKind::LIST_ITEM);
     assert_eq!(list_items.len(), 3);
 }
 
@@ -42,34 +42,34 @@ fn bullet_list_indented_4_spaces_is_code() {
     let input = "    * not a list\n";
     let tree = parse_blocks(input);
     // Should be code block, not list
-    assert!(find_first(&tree, SyntaxKind::List).is_none());
+    assert!(find_first(&tree, SyntaxKind::LIST).is_none());
 }
 
 #[test]
 fn bullet_list_with_continuation() {
     let input = "* here is my first\n  list item.\n* and my second.\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 2);
 }
 
 #[test]
 fn bullet_list_lazy_continuation() {
     let input = "* here is my first\nlist item.\n* and my second.\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 2);
 }
 
 #[test]
 fn nested_bullet_lists() {
     let input = "* fruits\n  + apples\n  + pears\n* vegetables\n";
     let tree = parse_blocks(input);
-    let outer_list = find_first(&tree, SyntaxKind::List).expect("should find outer list");
-    assert_eq!(count_children(&outer_list, SyntaxKind::ListItem), 2);
+    let outer_list = find_first(&tree, SyntaxKind::LIST).expect("should find outer list");
+    assert_eq!(count_children(&outer_list, SyntaxKind::LIST_ITEM), 2);
 
     // Should have nested list inside first item
-    let nested_lists = find_all(&tree, SyntaxKind::List);
+    let nested_lists = find_all(&tree, SyntaxKind::LIST);
     assert!(
         nested_lists.len() >= 2,
         "should have at least 2 lists (outer + nested)"
@@ -80,32 +80,32 @@ fn nested_bullet_lists() {
 fn loose_list_with_blank_lines() {
     let input = "* one\n\n* two\n\n* three\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
 fn simple_ordered_list() {
     let input = "1. one\n2. two\n3. three\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
 fn ordered_list_numbers_ignored() {
     let input = "5. one\n7. two\n1. three\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
 fn ordered_list_with_hash_marker() {
     let input = "#. one\n#. two\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 2);
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn ordered_list_requires_space_after_marker() {
     let input = "1.one\n2.two\n";
     let tree = parse_blocks(input);
     // Should not parse as list
-    assert!(find_first(&tree, SyntaxKind::List).is_none());
+    assert!(find_first(&tree, SyntaxKind::LIST).is_none());
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn mixed_markers_create_separate_lists() {
     let input = "(2) Two\n(5) Three\n1. Four\n* Five\n";
     let tree = parse_blocks(input);
     // Should create separate lists for each marker type
-    let lists = find_all(&tree, SyntaxKind::List);
+    let lists = find_all(&tree, SyntaxKind::LIST);
     assert!(lists.len() >= 3, "should have at least 3 separate lists");
 }
 
@@ -129,32 +129,32 @@ fn mixed_markers_create_separate_lists() {
 fn task_list_unchecked() {
     let input = "- [ ] unchecked task\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 1);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 1);
 }
 
 #[test]
 fn task_list_checked() {
     let input = "- [x] checked task\n- [X] also checked\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 2);
 }
 
 #[test]
 fn list_with_multiple_paragraphs() {
     let input = "* First paragraph.\n\n  Continued.\n\n* Second item.\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 2);
 }
 
 #[test]
 fn list_after_blank_line() {
     let input = "\n* item\n";
     let tree = parse_blocks(input);
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list after blank");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 1);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list after blank");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 1);
 }
 
 #[test]
@@ -164,8 +164,8 @@ fn list_after_paragraph() {
         input,
         &[
             SyntaxKind::PARAGRAPH,
-            SyntaxKind::BlankLine,
-            SyntaxKind::List,
+            SyntaxKind::BLANK_LINE,
+            SyntaxKind::LIST,
         ],
     );
 }
@@ -186,8 +186,8 @@ fn fancy_list_lower_alpha_period() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -204,8 +204,8 @@ fn fancy_list_lower_alpha_right_paren() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -222,8 +222,8 @@ fn fancy_list_lower_alpha_parens() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -240,8 +240,8 @@ fn fancy_list_upper_alpha_period() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -259,15 +259,15 @@ fn fancy_list_upper_alpha_period_requires_two_spaces() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    assert!(find_first(&tree, SyntaxKind::List).is_none());
+    assert!(find_first(&tree, SyntaxKind::LIST).is_none());
 
     // Two spaces SHOULD parse as list
     let input_valid = "A.  first\nB.  second\n";
     let tree_valid = crate::parser::block_parser::BlockParser::new(input_valid, &config)
         .parse()
         .0;
-    let list = find_first(&tree_valid, SyntaxKind::List).expect("should find list with 2 spaces");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+    let list = find_first(&tree_valid, SyntaxKind::LIST).expect("should find list with 2 spaces");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 2);
 }
 
 #[test]
@@ -284,8 +284,8 @@ fn fancy_list_lower_roman_period() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -302,8 +302,8 @@ fn fancy_list_lower_roman_right_paren() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -320,8 +320,8 @@ fn fancy_list_lower_roman_parens() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -338,8 +338,8 @@ fn fancy_list_upper_roman_period() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -356,8 +356,8 @@ fn fancy_list_upper_roman_right_paren() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -373,7 +373,7 @@ fn fancy_list_disabled_when_extension_off() {
     };
     let input = "a. first\nb. second\n";
     let (tree, _) = crate::parser::block_parser::BlockParser::new(input, &config).parse();
-    assert!(find_first(&tree, SyntaxKind::List).is_none());
+    assert!(find_first(&tree, SyntaxKind::LIST).is_none());
 }
 
 #[test]
@@ -391,8 +391,8 @@ fn fancy_list_complex_roman() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 7);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 7);
 }
 
 // Example lists tests - require example_lists extension
@@ -411,8 +411,8 @@ fn example_list_basic() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -429,8 +429,8 @@ fn example_list_with_labels() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 2);
 }
 
 #[test]
@@ -447,8 +447,8 @@ fn example_list_mixed_labeled_unlabeled() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 3);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
 
 #[test]
@@ -466,12 +466,12 @@ fn example_list_separated_by_text() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let lists = find_all(&tree, SyntaxKind::List);
+    let lists = find_all(&tree, SyntaxKind::LIST);
     // Should have 2 separate lists
     assert_eq!(lists.len(), 2);
     // Each should have 1 item
-    assert_eq!(count_children(&lists[0], SyntaxKind::ListItem), 1);
-    assert_eq!(count_children(&lists[1], SyntaxKind::ListItem), 1);
+    assert_eq!(count_children(&lists[0], SyntaxKind::LIST_ITEM), 1);
+    assert_eq!(count_children(&lists[1], SyntaxKind::LIST_ITEM), 1);
 }
 
 #[test]
@@ -487,7 +487,7 @@ fn example_list_disabled_when_extension_off() {
     };
     let input = "(@) example\n";
     let (tree, _) = crate::parser::block_parser::BlockParser::new(input, &config).parse();
-    assert!(find_first(&tree, SyntaxKind::List).is_none());
+    assert!(find_first(&tree, SyntaxKind::LIST).is_none());
 }
 
 #[test]
@@ -504,6 +504,6 @@ fn example_list_with_underscores_and_hyphens() {
     let tree = crate::parser::block_parser::BlockParser::new(input, &config)
         .parse()
         .0;
-    let list = find_first(&tree, SyntaxKind::List).expect("should find list");
-    assert_eq!(count_children(&list, SyntaxKind::ListItem), 2);
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 2);
 }

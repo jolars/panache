@@ -37,7 +37,7 @@ pub(crate) fn emit_atx_heading(
     content: &str,
     level: usize,
 ) {
-    builder.start_node(SyntaxKind::Heading.into());
+    builder.start_node(SyntaxKind::HEADING.into());
 
     // Strip trailing newline (LF or CRLF) for processing but remember to emit it later
     let (content_without_newline, newline_str) =
@@ -61,8 +61,8 @@ pub(crate) fn emit_atx_heading(
     }
 
     // Marker node for the hashes (must be a node containing a token, not just a token)
-    builder.start_node(SyntaxKind::AtxHeadingMarker.into());
-    builder.token(SyntaxKind::AtxHeadingMarker.into(), &trimmed[..level]);
+    builder.start_node(SyntaxKind::ATX_HEADING_MARKER.into());
+    builder.token(SyntaxKind::ATX_HEADING_MARKER.into(), &trimmed[..level]);
     builder.finish_node();
 
     // Get content after marker
@@ -94,7 +94,7 @@ pub(crate) fn emit_atx_heading(
         };
 
     // Heading content node
-    builder.start_node(SyntaxKind::HeadingContent.into());
+    builder.start_node(SyntaxKind::HEADING_CONTENT.into());
     if !text_content.is_empty() {
         builder.token(SyntaxKind::TEXT.into(), text_content);
     }

@@ -2,7 +2,7 @@ use crate::parser::block_parser::tests::helpers::{find_first, parse_blocks};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 fn get_heading_content(node: &SyntaxNode) -> Option<String> {
-    find_first(node, SyntaxKind::HeadingContent).map(|n| n.text().to_string())
+    find_first(node, SyntaxKind::HEADING_CONTENT).map(|n| n.text().to_string())
 }
 
 #[test]
@@ -43,13 +43,13 @@ fn parses_atx_heading_with_trailing_hashes() {
 #[test]
 fn does_not_parse_with_four_leading_spaces() {
     let node = parse_blocks("    # Not a heading\n");
-    assert!(find_first(&node, SyntaxKind::Heading).is_none());
+    assert!(find_first(&node, SyntaxKind::HEADING).is_none());
 }
 
 #[test]
 fn requires_blank_line_before_heading() {
     let node = parse_blocks("text\n# Heading\n");
-    assert!(find_first(&node, SyntaxKind::Heading).is_none());
+    assert!(find_first(&node, SyntaxKind::HEADING).is_none());
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn parses_multiple_headings() {
     let node = parse_blocks("# First\n\n## Second\n");
     let mut headings = node
         .descendants()
-        .filter(|n| n.kind() == SyntaxKind::HeadingContent);
+        .filter(|n| n.kind() == SyntaxKind::HEADING_CONTENT);
     assert_eq!(headings.next().unwrap().text(), "First");
     assert_eq!(headings.next().unwrap().text(), "Second");
 }

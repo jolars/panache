@@ -47,7 +47,7 @@ fn collect_headings(tree: &SyntaxNode) -> Vec<(SyntaxNode, usize)> {
     let mut headings = Vec::new();
 
     fn walk(node: &SyntaxNode, headings: &mut Vec<(SyntaxNode, usize)>) {
-        if node.kind() == SyntaxKind::Heading
+        if node.kind() == SyntaxKind::HEADING
             && let Some(level) = extract_heading_level(node)
         {
             headings.push((node.clone(), level));
@@ -64,7 +64,7 @@ fn collect_headings(tree: &SyntaxNode) -> Vec<(SyntaxNode, usize)> {
 
 fn extract_heading_level(heading: &SyntaxNode) -> Option<usize> {
     for child in heading.children() {
-        if child.kind() == SyntaxKind::AtxHeadingMarker {
+        if child.kind() == SyntaxKind::ATX_HEADING_MARKER {
             let marker_text = child.text().to_string();
             return Some(marker_text.trim().chars().filter(|&c| c == '#').count());
         }
@@ -75,7 +75,7 @@ fn extract_heading_level(heading: &SyntaxNode) -> Option<usize> {
 fn create_fix(heading: &SyntaxNode, current_level: usize, expected_level: usize) -> Fix {
     // Find the AtxHeadingMarker node, then get its first token child
     for child in heading.children() {
-        if child.kind() == SyntaxKind::AtxHeadingMarker {
+        if child.kind() == SyntaxKind::ATX_HEADING_MARKER {
             // The marker node contains a token with the actual ### text
             if let Some(token) = child.first_token() {
                 let range = token.text_range();

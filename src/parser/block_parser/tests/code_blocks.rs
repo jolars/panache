@@ -4,12 +4,12 @@ use crate::parser::block_parser::tests::helpers::{
 use crate::syntax::SyntaxKind;
 
 fn get_code_content(node: &crate::syntax::SyntaxNode) -> Option<String> {
-    find_first(node, SyntaxKind::CodeContent).map(|n| n.text().to_string())
+    find_first(node, SyntaxKind::CODE_CONTENT).map(|n| n.text().to_string())
 }
 
 fn get_code_info_node(node: &crate::syntax::SyntaxNode) -> Option<crate::syntax::SyntaxNode> {
     node.descendants()
-        .find(|element| element.kind() == SyntaxKind::CodeInfo)
+        .find(|element| element.kind() == SyntaxKind::CODE_INFO)
 }
 
 fn get_code_info(node: &crate::syntax::SyntaxNode) -> Option<String> {
@@ -21,7 +21,7 @@ fn parses_simple_backtick_code_block() {
     let input = "```\nprint(\"hello\")\n```\n";
     let node = parse_blocks(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "print(\"hello\")\n");
@@ -32,7 +32,7 @@ fn parses_simple_tilde_code_block() {
     let input = "~~~\nprint(\"hello\")\n~~~\n";
     let node = parse_blocks(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "print(\"hello\")\n");
@@ -43,7 +43,7 @@ fn parses_code_block_with_language() {
     let input = "```python\nprint(\"hello\")\n```\n";
     let node = parse_blocks(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "print(\"hello\")\n");
@@ -57,7 +57,7 @@ fn parses_code_block_with_attributes() {
     let input = "```{python}\nprint(\"hello\")\n```\n";
     let node = parse_blocks(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "print(\"hello\")\n");
@@ -71,7 +71,7 @@ fn parses_code_block_with_complex_attributes() {
     let input = "```{python #mycode .numberLines startFrom=\"100\"}\nprint(\"hello\")\n```\n";
     let node = parse_blocks(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "print(\"hello\")\n");
@@ -85,7 +85,7 @@ fn parses_multiline_code_block() {
     let input = "```python\nfor i in range(10):\n    print(i)\n```\n";
     let node = parse_blocks(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "for i in range(10):\n    print(i)\n");
@@ -97,14 +97,14 @@ fn requires_blank_line_before_code_block() {
     let node = parse_blocks(input);
 
     // Should parse as paragraph, not code block
-    assert!(find_first(&node, SyntaxKind::CodeBlock).is_none());
+    assert!(find_first(&node, SyntaxKind::CODE_BLOCK).is_none());
 }
 
 #[test]
 fn parses_code_block_at_start_of_document() {
     let input = "```\ncode\n```\n";
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 }
 
 #[test]
@@ -114,12 +114,12 @@ fn parses_code_block_after_blank_line() {
 
     let blocks: Vec<_> = node
         .descendants()
-        .filter(|n| matches!(n.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::CodeBlock))
+        .filter(|n| matches!(n.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::CODE_BLOCK))
         .collect();
 
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].kind(), SyntaxKind::PARAGRAPH);
-    assert_eq!(blocks[1].kind(), SyntaxKind::CodeBlock);
+    assert_eq!(blocks[1].kind(), SyntaxKind::CODE_BLOCK);
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn requires_at_least_three_fence_chars() {
     let node = parse_blocks(input);
 
     // Should not parse as code block
-    assert!(find_first(&node, SyntaxKind::CodeBlock).is_none());
+    assert!(find_first(&node, SyntaxKind::CODE_BLOCK).is_none());
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn closing_fence_must_have_at_least_same_length() {
     let node = parse_blocks(input);
 
     // Code block should be parsed, but without proper closing
-    assert!(find_first(&node, SyntaxKind::CodeBlock).is_some());
+    assert!(find_first(&node, SyntaxKind::CODE_BLOCK).is_some());
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "code\n```\n"); // The ``` becomes part of content
@@ -148,7 +148,7 @@ fn closing_fence_can_be_longer() {
     let input = "```\ncode\n`````\n";
     let node = parse_blocks(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "code\n");
@@ -160,7 +160,7 @@ fn mixed_fence_chars_dont_close() {
     let node = parse_blocks(input);
 
     // Should parse code block but ~~~ becomes content
-    assert!(find_first(&node, SyntaxKind::CodeBlock).is_some());
+    assert!(find_first(&node, SyntaxKind::CODE_BLOCK).is_some());
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "code\n~~~\n");
@@ -171,7 +171,7 @@ fn empty_code_block() {
     let input = "```\n```\n";
     let node = parse_blocks(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 
     // Should have no content node for empty blocks
     assert!(get_code_content(&node).is_none());
@@ -182,7 +182,7 @@ fn code_block_with_leading_spaces() {
     let input = "  ```python\n  print(\"hello\")\n  ```\n";
     let node = parse_blocks(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CodeBlock]);
+    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "  print(\"hello\")\n");
@@ -197,8 +197,8 @@ fn parses_indented_code_block() {
     code line 2";
     let tree = parse_blocks(input);
 
-    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 1);
-    let code_blocks = find_all(&tree, SyntaxKind::CodeBlock);
+    assert_eq!(find_all(&tree, SyntaxKind::CODE_BLOCK).len(), 1);
+    let code_blocks = find_all(&tree, SyntaxKind::CODE_BLOCK);
     let code = &code_blocks[0];
     let text = code.text().to_string();
     assert!(text.contains("code line 1"));
@@ -213,7 +213,7 @@ fn indented_code_block_with_blank_line() {
     code line 2";
     let tree = parse_blocks(input);
 
-    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 1);
+    assert_eq!(find_all(&tree, SyntaxKind::CODE_BLOCK).len(), 1);
 }
 
 #[test]
@@ -223,7 +223,7 @@ fn indented_code_requires_blank_line_before() {
     let tree = parse_blocks(input);
 
     // Should be a single paragraph, not a code block
-    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 0);
+    assert_eq!(find_all(&tree, SyntaxKind::CODE_BLOCK).len(), 0);
     assert_eq!(find_all(&tree, SyntaxKind::PARAGRAPH).len(), 1);
 }
 
@@ -233,7 +233,7 @@ fn indented_code_with_tab() {
 \tcode with tab";
     let tree = parse_blocks(input);
 
-    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 1);
+    assert_eq!(find_all(&tree, SyntaxKind::CODE_BLOCK).len(), 1);
 }
 
 #[test]
@@ -242,6 +242,6 @@ fn indented_code_in_blockquote() {
 >     code in blockquote";
     let tree = parse_blocks(input);
 
-    assert_eq!(find_all(&tree, SyntaxKind::BlockQuote).len(), 1);
-    assert_eq!(find_all(&tree, SyntaxKind::CodeBlock).len(), 1);
+    assert_eq!(find_all(&tree, SyntaxKind::BLOCKQUOTE).len(), 1);
+    assert_eq!(find_all(&tree, SyntaxKind::CODE_BLOCK).len(), 1);
 }

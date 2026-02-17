@@ -1,62 +1,62 @@
 ROOT@0..244
   DOCUMENT@0..244
-    Heading@0..42
-      AtxHeadingMarker@0..1
-        AtxHeadingMarker@0..1 "#"
+    HEADING@0..42
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..41
+      HEADING_CONTENT@2..41
         TEXT@2..41 "Display Math with Con ..."
       NEWLINE@41..42 "\n"
-    BlankLine@42..43
-      BlankLine@42..43 "\n"
+    BLANK_LINE@42..43
+      BLANK_LINE@42..43 "\n"
     PARAGRAPH@43..100
       TEXT@43..99 "Testing content on sa ..."
       NEWLINE@99..100 "\n"
-    BlankLine@100..101
-      BlankLine@100..101 "\n"
+    BLANK_LINE@100..101
+      BLANK_LINE@100..101 "\n"
     PARAGRAPH@101..117
-      DisplayMath@101..116
-        DisplayMathMarker@101..103 "$$"
+      DISPLAY_MATH@101..116
+        DISPLAY_MATH_MARKER@101..103 "$$"
         TEXT@103..114 " x = y + z\n"
-        DisplayMathMarker@114..116 "$$"
+        DISPLAY_MATH_MARKER@114..116 "$$"
       NEWLINE@116..117 "\n"
-    BlankLine@117..118
-      BlankLine@117..118 "\n"
+    BLANK_LINE@117..118
+      BLANK_LINE@117..118 "\n"
     PARAGRAPH@118..144
       TEXT@118..143 "And with closing cont ..."
       NEWLINE@143..144 "\n"
-    BlankLine@144..145
-      BlankLine@144..145 "\n"
+    BLANK_LINE@144..145
+      BLANK_LINE@144..145 "\n"
     PARAGRAPH@145..157
-      DisplayMath@145..156
-        DisplayMathMarker@145..147 "$$"
+      DISPLAY_MATH@145..156
+        DISPLAY_MATH_MARKER@145..147 "$$"
         TEXT@147..154 "\na = b "
-        DisplayMathMarker@154..156 "$$"
+        DISPLAY_MATH_MARKER@154..156 "$$"
       NEWLINE@156..157 "\n"
-    BlankLine@157..158
-      BlankLine@157..158 "\n"
+    BLANK_LINE@157..158
+      BLANK_LINE@157..158 "\n"
     PARAGRAPH@158..177
       TEXT@158..176 "Both on same line:"
       NEWLINE@176..177 "\n"
-    BlankLine@177..178
-      BlankLine@177..178 "\n"
+    BLANK_LINE@177..178
+      BLANK_LINE@177..178 "\n"
     PARAGRAPH@178..193
-      DisplayMath@178..192
-        DisplayMathMarker@178..180 "$$"
+      DISPLAY_MATH@178..192
+        DISPLAY_MATH_MARKER@178..180 "$$"
         TEXT@180..190 " E = mc^2 "
-        DisplayMathMarker@190..192 "$$"
+        DISPLAY_MATH_MARKER@190..192 "$$"
       NEWLINE@192..193 "\n"
-    BlankLine@193..194
-      BlankLine@193..194 "\n"
+    BLANK_LINE@193..194
+      BLANK_LINE@193..194 "\n"
     PARAGRAPH@194..213
       TEXT@194..212 "Backslash variant:"
       NEWLINE@212..213 "\n"
-    BlankLine@213..214
-      BlankLine@213..214 "\n"
+    BLANK_LINE@213..214
+      BLANK_LINE@213..214 "\n"
     PARAGRAPH@214..244
-      DisplayMath@214..243
-        DisplayMathMarker@214..216 "\\["
+      DISPLAY_MATH@214..243
+        DISPLAY_MATH_MARKER@214..216 "\\["
         TEXT@216..241 " \\alpha + \\beta = \\ga ..."
-        DisplayMathMarker@241..243 "\\]"
+        DISPLAY_MATH_MARKER@241..243 "\\]"
       NEWLINE@243..244 "\n"
 

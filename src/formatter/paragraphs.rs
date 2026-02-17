@@ -6,7 +6,7 @@ use rowan::NodeOrToken;
 /// Check if a paragraph contains inline display math ($$...$$ within paragraph)
 pub(super) fn contains_inline_display_math(node: &SyntaxNode) -> bool {
     for child in node.descendants() {
-        if child.kind() == SyntaxKind::DisplayMath {
+        if child.kind() == SyntaxKind::DISPLAY_MATH {
             return true;
         }
     }
@@ -29,7 +29,7 @@ pub(super) fn format_paragraph_with_display_math(
     while i < children.len() {
         match &children[i] {
             NodeOrToken::Node(n) => {
-                if n.kind() == SyntaxKind::DisplayMath {
+                if n.kind() == SyntaxKind::DISPLAY_MATH {
                     // Save current text as paragraph part
                     if !current_text.trim().is_empty() {
                         parts.push((false, current_text.clone()));
@@ -53,7 +53,7 @@ pub(super) fn format_paragraph_with_display_math(
                         // Check for Attribute node
                         if next_idx < children.len()
                             && let NodeOrToken::Node(attr_node) = &children[next_idx]
-                            && attr_node.kind() == SyntaxKind::Attribute
+                            && attr_node.kind() == SyntaxKind::ATTRIBUTE
                         {
                             // Append attribute on same line as closing $$
                             // Remove trailing newline from formatted math

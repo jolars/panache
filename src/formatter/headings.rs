@@ -7,11 +7,11 @@ pub(super) fn format_heading(node: &SyntaxNode) -> String {
 
     for child in node.children() {
         match child.kind() {
-            SyntaxKind::AtxHeadingMarker => {
+            SyntaxKind::ATX_HEADING_MARKER => {
                 let t = child.text().to_string();
                 level = t.chars().take_while(|&c| c == '#').count().clamp(1, 6);
             }
-            SyntaxKind::SetextHeadingUnderline => {
+            SyntaxKind::SETEXT_HEADING_UNDERLINE => {
                 let t = child.text().to_string();
                 if t.chars().all(|c| c == '=') {
                     level = 1;
@@ -19,7 +19,7 @@ pub(super) fn format_heading(node: &SyntaxNode) -> String {
                     level = 2;
                 }
             }
-            SyntaxKind::HeadingContent => {
+            SyntaxKind::HEADING_CONTENT => {
                 let mut t = child.text().to_string();
                 t = t.trim_end().to_string();
                 let trimmed_hash = t.trim_end_matches('#').to_string();

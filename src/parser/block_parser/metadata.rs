@@ -50,11 +50,11 @@ pub(crate) fn try_parse_yaml_block(
     }
 
     // Start metadata node
-    builder.start_node(SyntaxKind::YamlMetadata.into());
+    builder.start_node(SyntaxKind::YAML_METADATA.into());
 
     // Opening delimiter - strip newline before emitting
     let (text, newline_str) = strip_newline(line);
-    builder.token(SyntaxKind::YamlMetadataDelim.into(), text.trim());
+    builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), text.trim());
     if !newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
@@ -70,7 +70,7 @@ pub(crate) fn try_parse_yaml_block(
         if content_line.trim() == "---" || content_line.trim() == "..." {
             found_closing = true;
             let (text, newline_str) = strip_newline(content_line);
-            builder.token(SyntaxKind::YamlMetadataDelim.into(), text.trim());
+            builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), text.trim());
             if !newline_str.is_empty() {
                 builder.token(SyntaxKind::NEWLINE.into(), newline_str);
             }
@@ -117,7 +117,7 @@ pub(crate) fn try_parse_pandoc_title_block(
     }
 
     // Start title block node
-    builder.start_node(SyntaxKind::PandocTitleBlock.into());
+    builder.start_node(SyntaxKind::PANDOC_TITLE_BLOCK.into());
 
     let mut current_pos = 0;
     let mut field_count = 0;

@@ -211,12 +211,12 @@ pub(crate) fn parse_html_block(
     bq_depth: usize,
 ) -> usize {
     // Start HTML block
-    builder.start_node(SyntaxKind::HtmlBlock.into());
+    builder.start_node(SyntaxKind::HTML_BLOCK.into());
 
     let first_line = lines[start_pos];
 
     // Emit opening line
-    builder.start_node(SyntaxKind::HtmlBlockTag.into());
+    builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
 
     // Split off trailing newline if present
     let (line_without_newline, newline_str) = strip_newline(first_line);
@@ -264,7 +264,7 @@ pub(crate) fn parse_html_block(
 
             // Emit content
             if !content_lines.is_empty() {
-                builder.start_node(SyntaxKind::HtmlBlockContent.into());
+                builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
                 for content_line in &content_lines {
                     // Split off trailing newline if present
                     let (line_without_newline, newline_str) = strip_newline(content_line);
@@ -281,7 +281,7 @@ pub(crate) fn parse_html_block(
             }
 
             // Emit closing line
-            builder.start_node(SyntaxKind::HtmlBlockTag.into());
+            builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
 
             // Split off trailing newline if present
             let (line_without_newline, newline_str) = strip_newline(line);
@@ -309,7 +309,7 @@ pub(crate) fn parse_html_block(
     if !found_closing {
         log::debug!("HTML block at line {} has no closing marker", start_pos + 1);
         if !content_lines.is_empty() {
-            builder.start_node(SyntaxKind::HtmlBlockContent.into());
+            builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
             for content_line in &content_lines {
                 // Split off trailing newline if present
                 let (line_without_newline, newline_str) = strip_newline(content_line);
