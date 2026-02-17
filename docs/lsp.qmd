@@ -11,13 +11,17 @@ provides document formatting capabilities for editors and IDEs.
 
 - Document formatting (`textDocument/formatting`)
 - Range formatting (`textDocument/rangeFormatting`)
-- **Go to definition** (`textDocument/definition`) - jump from references to definitions
+- **Go to definition** (`textDocument/definition`) - jump from references to
+  definitions
   - Reference links: `[text][ref]` → `[ref]: url`
   - Reference images: `![alt][ref]` → `[ref]: url`
   - Footnote references: `[^id]` → `[^id]: content`
-- Document outline (`textDocument/documentSymbol`) - hierarchical view of headings, tables, and figures
-- Folding ranges (`textDocument/foldingRange`) - code folding for headings, code blocks, fenced divs, YAML frontmatter
-- Live diagnostics (`textDocument/publishDiagnostics`) - linting errors and warnings
+- Document outline (`textDocument/documentSymbol`) - hierarchical view of
+  headings, tables, and figures
+- Folding ranges (`textDocument/foldingRange`) - code folding for headings, code
+  blocks, fenced divs, YAML frontmatter
+- Live diagnostics (`textDocument/publishDiagnostics`) - linting errors and
+  warnings
 - Code actions (`textDocument/codeAction`) - quick fixes for lint issues
 - Document tracking (`textDocument/didOpen/didChange/didClose`)
 - Configuration discovery from workspace root
@@ -92,8 +96,8 @@ vim.keymap.set('n', '<leader>f', vim.lsp.buf.format, { desc = 'Format buffer' })
 
 #### Option 1: Custom LSP Extension
 
-Install the
-[Custom LSP](https://marketplace.visualstudio.com/items?itemName=josa.custom-lsp)
+Install the [Custom
+LSP](https://marketplace.visualstudio.com/items?itemName=josa.custom-lsp)
 extension, then configure in `settings.json`:
 
 ```json
@@ -339,14 +343,14 @@ For large documents:
 
 ## Comparison with CLI
 
-| Feature              | LSP                           | CLI                     |
-|----------------------|-------------------------------|-------------------------|
-| Formatting           | ✅ Same engine                | ✅ Direct               |
-| Config discovery     | ✅ From workspace root        | ✅ From file directory  |
-| Format on save       | ✅ Automatic                  | ❌ Manual               |
-| Multiple files       | ✅ Per-editor-tab             | ✅ Shell scripting      |
-| Error reporting      | ✅ In-editor diagnostics      | ✅ stderr output        |
-| External formatters  | ✅ Supported                  | ✅ Supported            |
+| Feature             | LSP                      | CLI                    |
+| ------------------- | ------------------------ | ---------------------- |
+| Formatting          | ✅ Same engine           | ✅ Direct              |
+| Config discovery    | ✅ From workspace root   | ✅ From file directory |
+| Format on save      | ✅ Automatic             | ❌ Manual              |
+| Multiple files      | ✅ Per-editor-tab        | ✅ Shell scripting     |
+| Error reporting     | ✅ In-editor diagnostics | ✅ stderr output       |
+| External formatters | ✅ Supported             | ✅ Supported           |
 
 ## Best Practices
 

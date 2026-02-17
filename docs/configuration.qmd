@@ -398,9 +398,9 @@ External linters analyze code blocks within your document:
 4. **Mapping**: Maps diagnostics back to exact line/column positions in your
    document
 
-This approach handles **stateful code** correctly. For example, if an R
-variable is defined in one code block and used in another, the linter sees both
-blocks together and won't report false "undefined variable" errors.
+This approach handles **stateful code** correctly. For example, if an R variable
+is defined in one code block and used in another, the linter sees both blocks
+together and won't report false "undefined variable" errors.
 
 ### Where Linters Run
 
