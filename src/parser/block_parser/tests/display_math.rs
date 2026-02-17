@@ -52,20 +52,21 @@ $$"#;
 }
 
 #[test]
-fn test_display_math_blank_line_terminates() {
-    // Per Pandoc spec: "there can be no blank lines between the opening and closing $$ delimiters"
+fn test_display_math_blank_line_prevents_recognition() {
+    // Per Pandoc: math blocks MUST have closing delimiters
+    // Blank lines before closing delimiter mean it's not a valid math block
     let input = "$$\n\nmath\n$$";
     let output = parse(input);
-    // Math block should terminate at the blank line
-    assert!(output.contains("MathBlock"));
+    // Should NOT be parsed as MathBlock - it's just paragraphs
+    assert!(!output.contains("MathBlock"));
     assert!(output.contains("BlankLine"));
     assert!(output.contains("PARAGRAPH"));
-    // The content after blank line should be in a paragraph, not in math block
-    assert!(output.contains("TEXT") && output.contains("math"));
+    // The $$ should be treated as literal text in paragraphs
+    assert!(output.contains("TEXT"));
 }
 
 #[test]
-fn test_backslash_bracket_blank_line_terminates() {
+fn test_backslash_bracket_blank_line_prevents_recognition() {
     // Same blank line restriction applies to \[...\]
     let input = "\\[\n\ne = mc^2\n\\]";
     let config = Config {
@@ -78,12 +79,10 @@ fn test_backslash_bracket_blank_line_terminates() {
     let tree = BlockParser::new(input, &config).parse().0;
     let output = format!("{:#?}", tree);
 
-    // Math block should terminate at the blank line
-    assert!(output.contains("MathBlock"));
+    // Should NOT be parsed as MathBlock due to blank line
+    assert!(!output.contains("MathBlock"));
     assert!(output.contains("BlankLine"));
     assert!(output.contains("PARAGRAPH"));
-    // The content after blank line should be in paragraph
-    assert!(output.contains("e = mc"));
 }
 
 #[test]

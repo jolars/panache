@@ -1,5 +1,5 @@
-ROOT@0..217
-  DOCUMENT@0..217
+ROOT@0..292
+  DOCUMENT@0..292
     PARAGRAPH@0..31
       TEXT@0..30 "Some text before the  ..."
       NEWLINE@30..31 "\n"
@@ -50,4 +50,24 @@ ROOT@0..217
     PARAGRAPH@200..217
       TEXT@200..216 "End of document."
       NEWLINE@216..217 "\n"
+    BlankLine@217..218
+      BlankLine@217..218 "\n"
+    PARAGRAPH@218..236
+      TEXT@218..235 "This is not math:"
+      NEWLINE@235..236 "\n"
+    BlankLine@236..237
+      BlankLine@236..237 "\n"
+    PARAGRAPH@237..256
+      TEXT@237..238 "$"
+      TEXT@238..239 "$"
+      NEWLINE@239..240 "\n"
+      LatexCommand@240..251
+        TEXT@240..251 "\\frac{a}{b}"
+      TEXT@251..255 " = c"
+      NEWLINE@255..256 "\n"
+    BlankLine@256..257
+      BlankLine@256..257 "\n"
+    PARAGRAPH@257..292
+      TEXT@257..291 "Because it is not clo ..."
+      NEWLINE@291..292 "\n"
 

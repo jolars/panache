@@ -654,9 +654,9 @@ pub fn default_formatters() -> HashMap<String, FormatterConfig> {
 #[serde(rename_all = "kebab-case")]
 pub enum MathDelimiterStyle {
     /// Preserve original delimiter style (\(...\) stays \(...\), $...$ stays $...$)
+    #[default]
     Preserve,
     /// Normalize all to dollar syntax ($...$ and $$...$$)
-    #[default]
     Dollars,
     /// Normalize all to backslash syntax (\(...\) and \[...\])
     Backslash,

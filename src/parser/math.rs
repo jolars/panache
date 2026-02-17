@@ -166,8 +166,17 @@ pub fn try_parse_double_backslash_display_math(text: &str) -> Option<(usize, &st
 pub fn try_parse_math_fence_open(
     content: &str,
     tex_math_single_backslash: bool,
+    tex_math_double_backslash: bool,
 ) -> Option<MathFenceInfo> {
     let trimmed = content.trim_start();
+
+    // Check for double backslash bracket opening: \\[
+    if tex_math_double_backslash && trimmed.starts_with("\\\\[") {
+        return Some(MathFenceInfo {
+            fence_type: MathFenceType::DoubleBackslashBracket,
+            fence_count: 1,
+        });
+    }
 
     // Check for backslash bracket opening: \[
     // Per Pandoc spec, content can be on the same line
@@ -197,32 +206,78 @@ pub fn try_parse_math_fence_open(
     })
 }
 
-/// Check if a line is a valid closing fence for the given fence info.
+/// Find the position of a closing fence in a line and return (fence_start_pos, fence_length).
+/// Returns None if no closing fence is found that matches the fence info.
 ///
-/// This is used by the block parser when iterating through lines.
-pub fn is_closing_math_fence(content: &str, fence: &MathFenceInfo) -> bool {
-    let trimmed = content.trim_start();
-
+/// This is used by the block parser to extract content before the closing delimiter,
+/// which is part of the math content per Pandoc spec.
+pub fn find_closing_fence_position(line: &str, fence: &MathFenceInfo) -> Option<(usize, usize)> {
     match fence.fence_type {
         MathFenceType::BackslashBracket => {
-            // Closing fence is \]
-            // Content after \] is allowed (becomes paragraph text)
-            trimmed.starts_with("\\]")
+            line.find("\\]").map(|pos| (pos, 2)) // 2 = length of \]
         }
         MathFenceType::DoubleBackslashBracket => {
-            // Closing fence is \\]
-            trimmed.starts_with("\\\\]")
+            line.find("\\\\]").map(|pos| (pos, 3)) // 3 = length of \\]
         }
         MathFenceType::Dollar => {
-            if !trimmed.starts_with('$') {
-                return false;
+            // Find a run of $$ (or more) matching the fence count
+            let chars: Vec<char> = line.chars().collect();
+            for i in 0..chars.len() {
+                if chars[i] == '$' {
+                    let mut count = 0;
+                    let mut j = i;
+                    while j < chars.len() && chars[j] == '$' {
+                        count += 1;
+                        j += 1;
+                    }
+                    if count >= fence.fence_count {
+                        return Some((i, count));
+                    }
+                }
+            }
+            None
+        }
+    }
+}
+
+/// Check if a line contains a valid closing fence for the given fence info.
+///
+/// This is used by the block parser when iterating through lines.
+/// Returns true if the closing delimiter is found anywhere in the line.
+/// Content before the closing delimiter is part of the math content.
+/// Content after the closing delimiter becomes paragraph text.
+pub fn is_closing_math_fence(content: &str, fence: &MathFenceInfo) -> bool {
+    match fence.fence_type {
+        MathFenceType::BackslashBracket => {
+            // Look for \] anywhere in the line
+            content.contains("\\]")
+        }
+        MathFenceType::DoubleBackslashBracket => {
+            // Look for \\] anywhere in the line
+            content.contains("\\\\]")
+        }
+        MathFenceType::Dollar => {
+            // Look for $$ (or more) anywhere in the line
+            let chars: Vec<char> = content.chars().collect();
+
+            for i in 0..chars.len() {
+                if chars[i] == '$' {
+                    // Count consecutive dollars
+                    let mut count = 0;
+                    let mut j = i;
+                    while j < chars.len() && chars[j] == '$' {
+                        count += 1;
+                        j += 1;
+                    }
+
+                    // Need at least as many as the opening fence
+                    if count >= fence.fence_count {
+                        return true;
+                    }
+                }
             }
 
-            let closing_count = trimmed.chars().take_while(|&c| c == '$').count();
-
-            // Must have at least as many $ as the opening
-            // Content after $$ is allowed (becomes paragraph text)
-            closing_count >= fence.fence_count
+            false
         }
     }
 }
@@ -309,20 +364,20 @@ mod tests {
     // Fence detection tests
     #[test]
     fn test_fence_open_two_dollar() {
-        let fence = try_parse_math_fence_open("$$", false).unwrap();
+        let fence = try_parse_math_fence_open("$$", false, false).unwrap();
         assert_eq!(fence.fence_type, MathFenceType::Dollar);
         assert_eq!(fence.fence_count, 2);
     }
 
     #[test]
     fn test_fence_open_backslash_bracket() {
-        let fence = try_parse_math_fence_open("\\[", true).unwrap();
+        let fence = try_parse_math_fence_open("\\[", true, false).unwrap();
         assert_eq!(fence.fence_type, MathFenceType::BackslashBracket);
     }
 
     #[test]
     fn test_fence_open_backslash_bracket_disabled() {
-        assert!(try_parse_math_fence_open("\\[", false).is_none());
+        assert!(try_parse_math_fence_open("\\[", false, false).is_none());
     }
 
     #[test]
@@ -334,6 +389,9 @@ mod tests {
         assert!(is_closing_math_fence("$$", &fence));
         assert!(is_closing_math_fence("$$$", &fence)); // More dollars OK
         assert!(!is_closing_math_fence("$", &fence)); // Too few
+        // Content before closing delimiter (Pandoc allows this)
+        assert!(is_closing_math_fence("text $$", &fence));
+        assert!(is_closing_math_fence("a = b $$", &fence));
     }
 
     #[test]
@@ -364,7 +422,7 @@ mod tests {
     #[test]
     fn test_fence_open_with_leading_spaces() {
         // Fence detection should handle leading spaces
-        let fence = try_parse_math_fence_open("  $$", false).unwrap();
+        let fence = try_parse_math_fence_open("  $$", false, false).unwrap();
         assert_eq!(fence.fence_type, MathFenceType::Dollar);
         assert_eq!(fence.fence_count, 2);
     }

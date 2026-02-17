@@ -1,0 +1,45 @@
+ROOT@0..206
+  DOCUMENT@0..206
+    Heading@0..26
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..25
+        TEXT@2..25 "Display Math Formatting"
+      NEWLINE@25..26 "\n"
+    BlankLine@26..27
+      BlankLine@26..27 "\n"
+    PARAGRAPH@27..94
+      TEXT@27..93 "Testing that display  ..."
+      NEWLINE@93..94 "\n"
+    BlankLine@94..95
+      BlankLine@94..95 "\n"
+    PARAGRAPH@95..151
+      TEXT@95..116 "Inline display math: "
+      InlineMath@116..125
+        BlockMathMarker@116..118 "$$"
+        TEXT@118..123 "x = y"
+        BlockMathMarker@123..125 "$$"
+      TEXT@125..150 " gets formatted to bl ..."
+      NEWLINE@150..151 "\n"
+    BlankLine@151..152
+      BlankLine@151..152 "\n"
+    PARAGRAPH@152..175
+      TEXT@152..174 "Properly closed block:"
+      NEWLINE@174..175 "\n"
+    BlankLine@175..176
+      BlankLine@175..176 "\n"
+    MathBlock@176..188
+      BlockMathMarker@176..178 "$$"
+      NEWLINE@178..179 "\n"
+      MathContent@179..185
+        TEXT@179..184 "a = b"
+        NEWLINE@184..185 "\n"
+      BlockMathMarker@185..187 "$$"
+      NEWLINE@187..188 "\n"
+    BlankLine@188..189
+      BlankLine@188..189 "\n"
+    PARAGRAPH@189..206
+      TEXT@189..205 "Works correctly."
+      NEWLINE@205..206 "\n"
+

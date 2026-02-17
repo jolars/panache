@@ -1,0 +1,65 @@
+ROOT@0..240
+  DOCUMENT@0..240
+    Heading@0..36
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..35
+        TEXT@2..35 "Display Math with Esc ..."
+      NEWLINE@35..36 "\n"
+    BlankLine@36..37
+      BlankLine@36..37 "\n"
+    PARAGRAPH@37..101
+      TEXT@37..100 "Testing that escaped  ..."
+      NEWLINE@100..101 "\n"
+    BlankLine@101..102
+      BlankLine@101..102 "\n"
+    MathBlock@102..136
+      BlockMathMarker@102..104 "$$"
+      NEWLINE@104..105 "\n"
+      MathContent@105..133
+        LatexCommand@105..117
+          TEXT@105..117 "\\text{Price}"
+        TEXT@117..120 " = "
+        EscapedChar@120..122 "\\$"
+        TEXT@122..128 "100 + "
+        EscapedChar@128..130 "\\$"
+        TEXT@130..132 "50"
+        NEWLINE@132..133 "\n"
+      BlockMathMarker@133..135 "$$"
+      NEWLINE@135..136 "\n"
+    BlankLine@136..137
+      BlankLine@136..137 "\n"
+    PARAGRAPH@137..191
+      TEXT@137..149 "And inline: "
+      InlineMath@149..172
+        BlockMathMarker@149..151 "$$"
+        TEXT@151..170 "\\text{Cost: } \\$200"
+        BlockMathMarker@170..172 "$$"
+      TEXT@172..190 " in the paragraph."
+      NEWLINE@190..191 "\n"
+    BlankLine@191..192
+      BlankLine@191..192 "\n"
+    PARAGRAPH@192..210
+      TEXT@192..209 "Multiple escapes:"
+      NEWLINE@209..210 "\n"
+    BlankLine@210..211
+      BlankLine@210..211 "\n"
+    MathBlock@211..240
+      BlockMathMarker@211..213 "$$"
+      NEWLINE@213..214 "\n"
+      MathContent@214..237
+        TEXT@214..218 "a = "
+        EscapedChar@218..220 "\\$"
+        TEXT@220..224 "x + "
+        EscapedChar@224..226 "\\$"
+        TEXT@226..228 "y "
+        LatexCommand@228..232
+          TEXT@228..232 "\\neq"
+        TEXT@232..233 " "
+        EscapedChar@233..235 "\\$"
+        TEXT@235..236 "z"
+        NEWLINE@236..237 "\n"
+      BlockMathMarker@237..239 "$$"
+      NEWLINE@239..240 "\n"
+

@@ -1156,19 +1156,58 @@ impl Formatter {
             SyntaxKind::MathBlock => {
                 let mut label = None;
                 let mut math_content = None;
-                for child in node.children() {
-                    match child.kind() {
-                        SyntaxKind::MathContent => {
-                            math_content = Some(child.text().to_string());
+                let mut opening_marker: Option<String> = None;
+                let mut closing_marker: Option<String> = None;
+
+                for child in node.children_with_tokens() {
+                    match child {
+                        rowan::NodeOrToken::Node(n) => match n.kind() {
+                            SyntaxKind::MathContent => {
+                                math_content = Some(n.text().to_string());
+                            }
+                            SyntaxKind::Attribute => {
+                                label = Some(n.text().to_string().trim().to_string());
+                            }
+                            _ => {}
+                        },
+                        rowan::NodeOrToken::Token(t) => {
+                            if t.kind() == SyntaxKind::BlockMathMarker {
+                                let marker_text = t.text().to_string();
+                                // First marker is opening, second is closing
+                                if opening_marker.is_none() {
+                                    opening_marker = Some(marker_text);
+                                } else if closing_marker.is_none() {
+                                    closing_marker = Some(marker_text);
+                                }
+                            }
                         }
-                        SyntaxKind::Attribute => {
-                            label = Some(child.text().to_string().trim().to_string());
-                        }
-                        _ => {}
                     }
                 }
+
+                // Default to $$ if markers not found
+                let opening = opening_marker.as_deref().unwrap_or("$$");
+                let closing_from_tree = closing_marker.as_deref().unwrap_or("$$");
+
+                // Apply delimiter style preference
+                use crate::config::MathDelimiterStyle;
+                let (open, close) = match self.config.math_delimiter_style {
+                    MathDelimiterStyle::Preserve => {
+                        // Keep original format
+                        (opening, closing_from_tree)
+                    }
+                    MathDelimiterStyle::Dollars => {
+                        // Normalize to dollars
+                        ("$$", "$$")
+                    }
+                    MathDelimiterStyle::Backslash => {
+                        // Normalize to single backslash
+                        (r"\[", r"\]")
+                    }
+                };
+
                 // Opening fence
-                self.output.push_str("$$\n");
+                self.output.push_str(open);
+                self.output.push('\n');
                 // Math content
                 if let Some(content) = math_content {
                     let math_indent = self.config.math_indent;
@@ -1179,7 +1218,7 @@ impl Formatter {
                     }
                 }
                 // Closing fence (with label if present)
-                self.output.push_str("$$");
+                self.output.push_str(close);
                 if let Some(lbl) = label {
                     self.output.push(' ');
                     self.output.push_str(&lbl);

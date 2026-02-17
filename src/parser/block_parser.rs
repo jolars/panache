@@ -28,7 +28,7 @@ mod utils;
 use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
-use display_math::{parse_display_math_block, try_parse_math_fence_open};
+use display_math::{has_valid_math_closing, parse_display_math_block, try_parse_math_fence_open};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
 use figures::{parse_figure, try_parse_figure};
 use headings::{emit_atx_heading, try_parse_atx_heading};
@@ -607,6 +607,7 @@ impl<'a> BlockParser<'a> {
                             || try_parse_math_fence_open(
                                 after_content_indent,
                                 self.config.extensions.tex_math_single_backslash,
+                                self.config.extensions.tex_math_double_backslash,
                             )
                             .is_some()
                             || try_parse_div_fence_open(after_content_indent).is_some()
@@ -770,6 +771,7 @@ impl<'a> BlockParser<'a> {
                 || try_parse_math_fence_open(
                     stripped_content,
                     self.config.extensions.tex_math_single_backslash,
+                    self.config.extensions.tex_math_double_backslash,
                 )
                 .is_some()
                 || try_parse_div_fence_open(stripped_content).is_some()
@@ -1126,30 +1128,37 @@ impl<'a> BlockParser<'a> {
 
         // Check for display math block
         // Close paragraph first if one is open, then parse as MathBlock
-        if let Some(math_fence) =
-            try_parse_math_fence_open(content, self.config.extensions.tex_math_single_backslash)
-        {
-            log::debug!(
-                "Parsed display math block at line {}: {:?}",
-                self.pos,
-                math_fence.fence_type
-            );
-            // Close paragraph before opening display math block
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
-            }
-
+        if let Some(math_fence) = try_parse_math_fence_open(
+            content,
+            self.config.extensions.tex_math_single_backslash,
+            self.config.extensions.tex_math_double_backslash,
+        ) {
+            // Check if this math block has a valid closing fence (Pandoc compat)
             let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
-            let new_pos = parse_display_math_block(
-                &mut self.builder,
-                &self.lines,
-                self.pos,
-                math_fence,
-                bq_depth,
-            );
-            self.pos = new_pos;
-            return true;
+            if has_valid_math_closing(&self.lines, self.pos, &math_fence, bq_depth) {
+                // Has valid closing - parse as math block
+                log::debug!(
+                    "Parsed display math block at line {}: {:?}",
+                    self.pos,
+                    math_fence.fence_type
+                );
+                // Close paragraph before opening display math block
+                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                    self.containers
+                        .close_to(self.containers.depth() - 1, &mut self.builder);
+                }
+
+                let new_pos = parse_display_math_block(
+                    &mut self.builder,
+                    &self.lines,
+                    self.pos,
+                    math_fence,
+                    bq_depth,
+                );
+                self.pos = new_pos;
+                return true;
+            }
+            // No valid closing fence - not a math block, fall through to paragraph handling
         }
 
         // Check for fenced div opening

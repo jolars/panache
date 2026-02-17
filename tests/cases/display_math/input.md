@@ -15,3 +15,10 @@ $$
 $$
 
 End of document.
+
+This is not math:
+
+$$
+\frac{a}{b} = c
+
+Because it is not closed properly.
