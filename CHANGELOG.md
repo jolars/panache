@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.5.0](https://github.com/jolars/panache/compare/v2.4.0...v2.5.0) (2026-02-17)
+
+### Features
+
+* **parser:** parse compact and loose lists and use  `Plain` ([3258724](https://github.com/jolars/panache/commit/3258724c72268f45499b89bcf4290199c11a4380))
+* **parser:** parse quarto equation references ([0ce1f7d](https://github.com/jolars/panache/commit/0ce1f7d9242cc6d85af045b9d3815ca53c24e17a))
+* **parser:** parse shortcodes ([c6abc24](https://github.com/jolars/panache/commit/c6abc2479aca0267d5d8c9dedb40702d6e6f58e3))
+* **parser:** rename BlockMathMarker to DisplayMathMarker ([68c9c32](https://github.com/jolars/panache/commit/68c9c32532e4c78016d6f870500c8ffb24053cb5))
+* **parser:** standalone figures as `Figure` node ([59d74e7](https://github.com/jolars/panache/commit/59d74e7cdbe4434b52b127144dd1cc316aaeda40))
+
+### Bug Fixes
+
+* **config:** override flavor defaults ([8fe291b](https://github.com/jolars/panache/commit/8fe291b1c001b83ba7d74c7a0ec6ad2c4f0e151e))
+* **formatter:** strip newline for external yaml format ([3d54b3e](https://github.com/jolars/panache/commit/3d54b3eaea79ae41f2fc76abfa3ab93a09e11a66))
+* **parser:** correctly parse lists with different markers ([273ba39](https://github.com/jolars/panache/commit/273ba39c1c247073c83c6d2e66dbb058b26f7e2e))
+* **parser:** handle lazy lists with blanklines ([9d82a92](https://github.com/jolars/panache/commit/9d82a92dd8ba2eeeb7cf84875164156c05042291))
+* **parser:** parse blanklines away from plain nodes ([e7972ee](https://github.com/jolars/panache/commit/e7972ee46473ec37363ba2634488ccb339f96a4f))
+* **parser:** parse display math if begin/ends on delim line ([ef16594](https://github.com/jolars/panache/commit/ef165947530a99ba32fe3eaf14c14461133e04bf))
+
 ## [2.4.0](https://github.com/jolars/panache/compare/v2.3.0...v2.4.0) (2026-02-15)
 
 ### Features
