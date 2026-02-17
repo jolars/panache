@@ -3,6 +3,7 @@
 [![Build and
 Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
 [![Crates.io](https://img.shields.io/crates/v/panache.svg)](https://crates.io/crates/panache)
+[![codecov](https://codecov.io/gh/jolars/panache/graph/badge.svg?token=uaBVOBfILv)](https://codecov.io/gh/jolars/panache)
 
 A formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and Markdown files.
 
