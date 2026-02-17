@@ -798,3 +798,179 @@ fn detects_example_list_markers() {
         "(@) should not parse when extension disabled"
     );
 }
+
+// Helper functions for list management in BlockParser
+
+use super::container_stack::{Container, ContainerStack};
+
+/// Check if we're in any list.
+pub(super) fn in_list(containers: &ContainerStack) -> bool {
+    containers
+        .stack
+        .iter()
+        .any(|c| matches!(c, Container::List { .. }))
+}
+
+/// Check if we're in a list inside a blockquote.
+pub(super) fn in_blockquote_list(containers: &ContainerStack) -> bool {
+    let mut seen_blockquote = false;
+    for c in &containers.stack {
+        if matches!(c, Container::BlockQuote { .. }) {
+            seen_blockquote = true;
+        }
+        if seen_blockquote && matches!(c, Container::List { .. }) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Find matching list level for a marker with the given indent.
+pub(super) fn find_matching_list_level(
+    containers: &ContainerStack,
+    marker: &ListMarker,
+    indent_cols: usize,
+) -> Option<usize> {
+    // Search from deepest (last) to shallowest (first)
+    // But for shallow items (0-3 indent), prefer matching at the closest base indent
+    let mut best_match: Option<(usize, usize)> = None; // (index, distance)
+
+    for (i, c) in containers.stack.iter().enumerate().rev() {
+        if let Container::List {
+            marker: list_marker,
+            base_indent_cols,
+        } = c
+            && markers_match(marker, list_marker)
+        {
+            let matches = if indent_cols >= 4 && *base_indent_cols >= 4 {
+                // Both deeply indented - require close match
+                indent_cols >= *base_indent_cols && indent_cols <= base_indent_cols + 3
+            } else if indent_cols >= 4 || *base_indent_cols >= 4 {
+                // One shallow, one deep - no match
+                false
+            } else {
+                // Both at shallow indentation (0-3)
+                // Allow items within 3 spaces
+                indent_cols.abs_diff(*base_indent_cols) <= 3
+            };
+
+            if matches {
+                let distance = indent_cols.abs_diff(*base_indent_cols);
+                if let Some((_, best_dist)) = best_match {
+                    if distance < best_dist {
+                        best_match = Some((i, distance));
+                    }
+                } else {
+                    best_match = Some((i, distance));
+                }
+
+                // If we found an exact match, return immediately
+                if distance == 0 {
+                    return Some(i);
+                }
+            }
+        }
+    }
+
+    best_match.map(|(i, _)| i)
+}
+
+/// Continue list at a specific level (close containers down to level+1).
+pub(super) fn continue_list_at_level(
+    containers: &mut ContainerStack,
+    builder: &mut GreenNodeBuilder<'static>,
+    level: usize,
+) {
+    containers.close_to(level + 1, builder);
+    if matches!(containers.last(), Some(Container::Paragraph { .. })) {
+        containers.close_to(containers.depth() - 1, builder);
+    }
+    if matches!(containers.last(), Some(Container::ListItem { .. })) {
+        containers.close_to(containers.depth() - 1, builder);
+    }
+}
+
+/// Start a new list, closing any existing lists/list items.
+pub(super) fn start_new_list(
+    containers: &mut ContainerStack,
+    builder: &mut GreenNodeBuilder<'static>,
+    marker: &ListMarker,
+    indent_cols: usize,
+    indent_to_emit: Option<&str>,
+) {
+    if matches!(containers.last(), Some(Container::Paragraph { .. })) {
+        containers.close_to(containers.depth() - 1, builder);
+    }
+    while matches!(containers.last(), Some(Container::ListItem { .. })) {
+        containers.close_to(containers.depth() - 1, builder);
+    }
+    while matches!(containers.last(), Some(Container::List { .. })) {
+        containers.close_to(containers.depth() - 1, builder);
+    }
+    builder.start_node(SyntaxKind::List.into());
+    // Emit footnote/definition indent for losslessness
+    if let Some(indent_str) = indent_to_emit {
+        builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+    }
+    containers.push(Container::List {
+        marker: marker.clone(),
+        base_indent_cols: indent_cols,
+    });
+}
+
+/// Start a nested list within an existing list item.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn start_nested_list(
+    containers: &mut ContainerStack,
+    builder: &mut GreenNodeBuilder<'static>,
+    content: &str,
+    marker: &ListMarker,
+    marker_len: usize,
+    spaces_after: usize,
+    indent_cols: usize,
+    indent_bytes: usize,
+    indent_to_emit: Option<&str>,
+) {
+    if matches!(containers.last(), Some(Container::Paragraph { .. })) {
+        containers.close_to(containers.depth() - 1, builder);
+    }
+    builder.start_node(SyntaxKind::List.into());
+    // Emit footnote/definition indent for losslessness
+    if let Some(indent_str) = indent_to_emit {
+        builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+    }
+    containers.push(Container::List {
+        marker: marker.clone(),
+        base_indent_cols: indent_cols,
+    });
+    let content_col = emit_list_item(
+        builder,
+        content,
+        marker_len,
+        spaces_after,
+        indent_cols,
+        indent_bytes,
+    );
+    containers.push(Container::ListItem { content_col });
+}
+
+/// Add a list item to the current list.
+pub(super) fn add_list_item(
+    containers: &mut ContainerStack,
+    builder: &mut GreenNodeBuilder<'static>,
+    content: &str,
+    marker_len: usize,
+    spaces_after: usize,
+    indent_cols: usize,
+    indent_bytes: usize,
+) {
+    let content_col = emit_list_item(
+        builder,
+        content,
+        marker_len,
+        spaces_after,
+        indent_cols,
+        indent_bytes,
+    );
+    containers.push(Container::ListItem { content_col });
+}

@@ -35,7 +35,7 @@ use html_blocks::{parse_html_block, try_parse_html_block_start};
 use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
 use line_blocks::{parse_line_block, try_parse_line_block_start};
-use lists::{ListMarker, emit_list_item, markers_match, try_parse_list_marker};
+use lists::{markers_match, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 pub use reference_definitions::{
@@ -117,84 +117,11 @@ impl<'a> BlockParser<'a> {
         self.builder.finish_node(); // DOCUMENT
     }
 
-    /// Check if we need a blank line before starting a new blockquote.
-    /// Returns true if a blockquote can start here.
-    fn can_start_blockquote(&self) -> bool {
-        // At start of document, no blank line needed
-        if self.pos == 0 {
-            return true;
-        }
-        // After a blank line, can start blockquote
-        if self.pos > 0 && self.lines[self.pos - 1].trim().is_empty() {
-            return true;
-        }
-        // If we're already in a blockquote, nested blockquotes need blank line too
-        // (blank_before_blockquote extension)
-        false
-    }
-
-    /// Get the current blockquote depth from the container stack.
-    fn current_blockquote_depth(&self) -> usize {
-        self.containers
-            .stack
-            .iter()
-            .filter(|c| matches!(c, Container::BlockQuote { .. }))
-            .count()
-    }
-
-    /// Strip exactly n blockquote markers from a line, returning the rest.
-    fn strip_n_blockquote_markers<'b>(&self, line: &'b str, n: usize) -> &'b str {
-        use blockquotes::try_parse_blockquote_marker;
-        let mut remaining = line;
-        for _ in 0..n {
-            if let Some((_, content_start)) = try_parse_blockquote_marker(remaining) {
-                remaining = &remaining[content_start..];
-            } else {
-                break;
-            }
-        }
-        remaining
-    }
-
-    /// Emit one blockquote marker with its whitespace.
-    fn emit_one_blockquote_marker(&mut self, leading_spaces: usize, has_trailing_space: bool) {
-        if leading_spaces > 0 {
-            self.builder
-                .token(SyntaxKind::WHITESPACE.into(), &" ".repeat(leading_spaces));
-        }
-        self.builder.token(SyntaxKind::BlockQuoteMarker.into(), ">");
-        if has_trailing_space {
-            self.builder.token(SyntaxKind::WHITESPACE.into(), " ");
-        }
-    }
-
-    /// Close blockquotes down to a target depth.
-    fn close_blockquotes_to_depth(&mut self, target_depth: usize) {
-        let mut current = self.current_blockquote_depth();
-        while current > target_depth {
-            // Close everything until we hit a blockquote, then close it
-            while !matches!(self.containers.last(), Some(Container::BlockQuote { .. })) {
-                if self.containers.depth() == 0 {
-                    break;
-                }
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
-            }
-            if matches!(self.containers.last(), Some(Container::BlockQuote { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
-                current -= 1;
-            } else {
-                break;
-            }
-        }
-    }
-
     /// Returns true if the line was consumed.
     fn parse_line(&mut self, line: &str) -> bool {
         // Count blockquote markers on this line
         let (bq_depth, inner_content) = count_blockquote_markers(line);
-        let current_bq_depth = self.current_blockquote_depth();
+        let current_bq_depth = blockquotes::current_blockquote_depth(&self.containers);
 
         // Handle blank lines specially (including blank lines inside blockquotes)
         // A line like ">" with nothing after is a blank line inside a blockquote
@@ -223,7 +150,11 @@ impl<'a> BlockParser<'a> {
                 }
             } else if bq_depth < current_bq_depth {
                 // Close blockquotes down to bq_depth
-                self.close_blockquotes_to_depth(bq_depth);
+                blockquotes::close_blockquotes_to_depth(
+                    &mut self.containers,
+                    &mut self.builder,
+                    bq_depth,
+                );
             }
 
             // Peek ahead to determine what containers to keep open
@@ -290,7 +221,8 @@ impl<'a> BlockParser<'a> {
                 let marker_info = parse_blockquote_marker_info(line);
                 for i in 0..bq_depth {
                     if let Some(info) = marker_info.get(i) {
-                        self.emit_one_blockquote_marker(
+                        blockquotes::emit_one_blockquote_marker(
+                            &mut self.builder,
                             info.leading_spaces,
                             info.has_trailing_space,
                         );
@@ -310,10 +242,10 @@ impl<'a> BlockParser<'a> {
         if bq_depth > current_bq_depth {
             // Need to open new blockquote(s)
             // But first check blank_before_blockquote requirement
-            if current_bq_depth == 0 && !self.can_start_blockquote() {
+            if current_bq_depth == 0 && !blockquotes::can_start_blockquote(self.pos, &self.lines) {
                 // Can't start blockquote without blank line - treat as paragraph
-                self.start_paragraph_if_needed();
-                self.append_paragraph_line(line);
+                paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+                paragraphs::append_paragraph_line(&mut self.builder, line);
                 self.pos += 1;
                 return true;
             }
@@ -336,13 +268,14 @@ impl<'a> BlockParser<'a> {
                 // Can't nest deeper - treat extra > as content
                 // Only strip markers up to current depth
                 let content_at_current_depth =
-                    self.strip_n_blockquote_markers(line, current_bq_depth);
+                    blockquotes::strip_n_blockquote_markers(line, current_bq_depth);
 
                 // Emit blockquote markers for current depth (for losslessness)
                 let marker_info = parse_blockquote_marker_info(line);
                 for i in 0..current_bq_depth {
                     if let Some(info) = marker_info.get(i) {
-                        self.emit_one_blockquote_marker(
+                        blockquotes::emit_one_blockquote_marker(
+                            &mut self.builder,
                             info.leading_spaces,
                             info.has_trailing_space,
                         );
@@ -351,13 +284,13 @@ impl<'a> BlockParser<'a> {
 
                 if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                     // Lazy continuation with the extra > as content
-                    self.append_paragraph_line(content_at_current_depth);
+                    paragraphs::append_paragraph_line(&mut self.builder, content_at_current_depth);
                     self.pos += 1;
                     return true;
                 } else {
                     // Start new paragraph with the extra > as content
-                    self.start_paragraph_if_needed();
-                    self.append_paragraph_line(content_at_current_depth);
+                    paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+                    paragraphs::append_paragraph_line(&mut self.builder, content_at_current_depth);
                     self.pos += 1;
                     return true;
                 }
@@ -375,7 +308,11 @@ impl<'a> BlockParser<'a> {
             // First, emit markers for existing blockquote levels (before opening new ones)
             for level in 0..current_bq_depth {
                 if let Some(info) = marker_info.get(level) {
-                    self.emit_one_blockquote_marker(info.leading_spaces, info.has_trailing_space);
+                    blockquotes::emit_one_blockquote_marker(
+                        &mut self.builder,
+                        info.leading_spaces,
+                        info.has_trailing_space,
+                    );
                 }
             }
 
@@ -385,7 +322,11 @@ impl<'a> BlockParser<'a> {
 
                 // Emit the marker for this new level
                 if let Some(info) = marker_info.get(level) {
-                    self.emit_one_blockquote_marker(info.leading_spaces, info.has_trailing_space);
+                    blockquotes::emit_one_blockquote_marker(
+                        &mut self.builder,
+                        info.leading_spaces,
+                        info.has_trailing_space,
+                    );
                 }
 
                 self.containers
@@ -401,22 +342,30 @@ impl<'a> BlockParser<'a> {
             if bq_depth == 0 {
                 // Check for lazy paragraph continuation
                 if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                    self.append_paragraph_line(line);
+                    paragraphs::append_paragraph_line(&mut self.builder, line);
                     self.pos += 1;
                     return true;
                 }
 
                 // Check for lazy list continuation - if we're in a list item and
                 // this line looks like a list item with matching marker
-                if self.in_blockquote_list()
+                if lists::in_blockquote_list(&self.containers)
                     && let Some((marker, marker_len, spaces_after)) =
                         try_parse_list_marker(line, self.config)
                 {
                     let (indent_cols, indent_bytes) = leading_indent(line);
-                    if let Some(level) = self.find_matching_list_level(&marker, indent_cols) {
+                    if let Some(level) =
+                        lists::find_matching_list_level(&self.containers, &marker, indent_cols)
+                    {
                         // Continue the list inside the blockquote
-                        self.continue_list_at_level(level);
-                        self.add_list_item(
+                        lists::continue_list_at_level(
+                            &mut self.containers,
+                            &mut self.builder,
+                            level,
+                        );
+                        lists::add_list_item(
+                            &mut self.containers,
+                            &mut self.builder,
                             line,
                             marker_len,
                             spaces_after,
@@ -436,7 +385,11 @@ impl<'a> BlockParser<'a> {
             }
 
             // Close blockquotes down to the new depth
-            self.close_blockquotes_to_depth(bq_depth);
+            blockquotes::close_blockquotes_to_depth(
+                &mut self.containers,
+                &mut self.builder,
+                bq_depth,
+            );
 
             // Parse the inner content at the new depth
             if bq_depth > 0 {
@@ -444,7 +397,8 @@ impl<'a> BlockParser<'a> {
                 let marker_info = parse_blockquote_marker_info(line);
                 for i in 0..bq_depth {
                     if let Some(info) = marker_info.get(i) {
-                        self.emit_one_blockquote_marker(
+                        blockquotes::emit_one_blockquote_marker(
+                            &mut self.builder,
                             info.leading_spaces,
                             info.has_trailing_space,
                         );
@@ -469,7 +423,11 @@ impl<'a> BlockParser<'a> {
             let marker_info = parse_blockquote_marker_info(line);
             for i in 0..bq_depth {
                 if let Some(info) = marker_info.get(i) {
-                    self.emit_one_blockquote_marker(info.leading_spaces, info.has_trailing_space);
+                    blockquotes::emit_one_blockquote_marker(
+                        &mut self.builder,
+                        info.leading_spaces,
+                        info.has_trailing_space,
+                    );
                 }
             }
             // Same blockquote depth - markers stripped, use inner_content for appending
@@ -481,20 +439,30 @@ impl<'a> BlockParser<'a> {
         if current_bq_depth > 0 {
             // Check for lazy paragraph continuation
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.append_paragraph_line(line);
+                paragraphs::append_paragraph_line(&mut self.builder, line);
                 self.pos += 1;
                 return true;
             }
 
             // Check for lazy list continuation
-            if self.in_blockquote_list()
+            if lists::in_blockquote_list(&self.containers)
                 && let Some((marker, marker_len, spaces_after)) =
                     try_parse_list_marker(line, self.config)
             {
                 let (indent_cols, indent_bytes) = leading_indent(line);
-                if let Some(level) = self.find_matching_list_level(&marker, indent_cols) {
-                    self.continue_list_at_level(level);
-                    self.add_list_item(line, marker_len, spaces_after, indent_cols, indent_bytes);
+                if let Some(level) =
+                    lists::find_matching_list_level(&self.containers, &marker, indent_cols)
+                {
+                    lists::continue_list_at_level(&mut self.containers, &mut self.builder, level);
+                    lists::add_list_item(
+                        &mut self.containers,
+                        &mut self.builder,
+                        line,
+                        marker_len,
+                        spaces_after,
+                        indent_cols,
+                        indent_bytes,
+                    );
                     self.pos += 1;
                     return true;
                 }
@@ -688,7 +656,8 @@ impl<'a> BlockParser<'a> {
 
         // For indented code blocks, we need a stricter condition - only actual blank lines count
         // Being at document start (pos == 0) is OK only if we're not inside a blockquote
-        let at_document_start = self.pos == 0 && self.current_blockquote_depth() == 0;
+        let at_document_start =
+            self.pos == 0 && blockquotes::current_blockquote_depth(&self.containers) == 0;
         let prev_line_blank = if self.pos > 0 {
             let prev_line = self.lines[self.pos - 1];
             let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
@@ -699,7 +668,7 @@ impl<'a> BlockParser<'a> {
         let has_blank_before_strict = at_document_start || prev_line_blank;
 
         // At top level only (not inside blockquotes), check for YAML metadata
-        if self.current_blockquote_depth() == 0 && content.trim() == "---" {
+        if blockquotes::current_blockquote_depth(&self.containers) == 0 && content.trim() == "---" {
             let at_document_start = self.pos == 0;
             if let Some(new_pos) =
                 try_parse_yaml_block(&self.lines, self.pos, &mut self.builder, at_document_start)
@@ -720,7 +689,7 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
-            let bq_depth = self.current_blockquote_depth();
+            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
             let new_pos = parse_html_block(
                 &mut self.builder,
                 &self.lines,
@@ -808,8 +777,8 @@ impl<'a> BlockParser<'a> {
 
         // Check for fenced code block
         // When inside a list, strip list indentation before checking
-        let list_indent_stripped = if self.in_list() {
-            let content_col = self.current_content_col();
+        let list_indent_stripped = if lists::in_list(&self.containers) {
+            let content_col = paragraphs::current_content_col(&self.containers);
             if content_col > 0 {
                 // We're inside a list item - strip up to content column
                 let (indent_cols, _) = leading_indent(content);
@@ -838,7 +807,7 @@ impl<'a> BlockParser<'a> {
         };
 
         if has_blank_before && let Some(fence) = try_parse_fence_open(content_for_fence_check) {
-            let bq_depth = self.current_blockquote_depth();
+            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
             log::debug!(
                 "Parsed fenced code block at line {}: {} fence",
                 self.pos,
@@ -900,8 +869,8 @@ impl<'a> BlockParser<'a> {
             // Parse the first line content (if any)
             let first_line_content = &content[content_start..];
             if !first_line_content.trim().is_empty() {
-                self.start_paragraph_if_needed();
-                self.append_paragraph_line(first_line_content);
+                paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+                paragraphs::append_paragraph_line(&mut self.builder, first_line_content);
             }
 
             self.pos += 1;
@@ -948,7 +917,7 @@ impl<'a> BlockParser<'a> {
             && is_indented_code_line(content)
             && try_parse_list_marker(content, self.config).is_none()
         {
-            let bq_depth = self.current_blockquote_depth();
+            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
             log::debug!("Parsed indented code block at line {}", self.pos);
             let new_pos = parse_indented_code_block(
                 &mut self.builder,
@@ -977,7 +946,7 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
-            let bq_depth = self.current_blockquote_depth();
+            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
             let new_pos = parse_display_math_block(
                 &mut self.builder,
                 &self.lines,
@@ -1155,7 +1124,7 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
-            let bq_depth = self.current_blockquote_depth();
+            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
             let new_pos = parse_latex_environment(
                 &mut self.builder,
                 &self.lines,
@@ -1172,10 +1141,10 @@ impl<'a> BlockParser<'a> {
             try_parse_list_marker(content, self.config)
         {
             let (indent_cols, indent_bytes) = leading_indent(content);
-            if indent_cols >= 4 && !self.in_list() {
+            if indent_cols >= 4 && !lists::in_list(&self.containers) {
                 // Code block at top-level, treat as paragraph
-                self.start_paragraph_if_needed();
-                self.append_paragraph_line(content);
+                paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+                paragraphs::append_paragraph_line(&mut self.builder, content);
                 self.pos += 1;
                 return true;
             }
@@ -1187,8 +1156,9 @@ impl<'a> BlockParser<'a> {
             }
 
             // Check if this continues an existing list level
-            let matched_level = self.find_matching_list_level(&marker, indent_cols);
-            let current_content_col = self.current_content_col();
+            let matched_level =
+                lists::find_matching_list_level(&self.containers, &marker, indent_cols);
+            let current_content_col = paragraphs::current_content_col(&self.containers);
 
             // Decision tree:
             // 1. If indent < content_col: Must be continuing a parent list (close nested and continue)
@@ -1212,12 +1182,18 @@ impl<'a> BlockParser<'a> {
 
                     if num_parent_lists > 0 {
                         // This matches a nested list - continue it
-                        self.continue_list_at_level(level);
+                        lists::continue_list_at_level(
+                            &mut self.containers,
+                            &mut self.builder,
+                            level,
+                        );
                         if let Some(indent_str) = indent_to_emit {
                             self.builder
                                 .token(SyntaxKind::WHITESPACE.into(), indent_str);
                         }
-                        self.add_list_item(
+                        lists::add_list_item(
+                            &mut self.containers,
+                            &mut self.builder,
                             content,
                             marker_len,
                             spaces_after,
@@ -1230,7 +1206,9 @@ impl<'a> BlockParser<'a> {
                 }
 
                 // No exact match - start new nested list
-                self.start_nested_list(
+                lists::start_nested_list(
+                    &mut self.containers,
+                    &mut self.builder,
                     content,
                     &marker,
                     marker_len,
@@ -1245,19 +1223,41 @@ impl<'a> BlockParser<'a> {
 
             // indent < content_col: Continue parent list if matched
             if let Some(level) = matched_level {
-                self.continue_list_at_level(level);
+                lists::continue_list_at_level(&mut self.containers, &mut self.builder, level);
                 if let Some(indent_str) = indent_to_emit {
                     self.builder
                         .token(SyntaxKind::WHITESPACE.into(), indent_str);
                 }
-                self.add_list_item(content, marker_len, spaces_after, indent_cols, indent_bytes);
+                lists::add_list_item(
+                    &mut self.containers,
+                    &mut self.builder,
+                    content,
+                    marker_len,
+                    spaces_after,
+                    indent_cols,
+                    indent_bytes,
+                );
                 self.pos += 1;
                 return true;
             }
 
             // No match and not nested - start new top-level list
-            self.start_new_list(&marker, indent_cols, indent_to_emit);
-            self.add_list_item(content, marker_len, spaces_after, indent_cols, indent_bytes);
+            lists::start_new_list(
+                &mut self.containers,
+                &mut self.builder,
+                &marker,
+                indent_cols,
+                indent_to_emit,
+            );
+            lists::add_list_item(
+                &mut self.containers,
+                &mut self.builder,
+                content,
+                marker_len,
+                spaces_after,
+                indent_cols,
+                indent_bytes,
+            );
             self.pos += 1;
             return true;
         }
@@ -1271,7 +1271,7 @@ impl<'a> BlockParser<'a> {
             }
 
             // Start definition list if not in one
-            if !self.in_definition_list() {
+            if !definition_lists::in_definition_list(&self.containers) {
                 self.builder.start_node(SyntaxKind::DefinitionList.into());
                 self.containers.push(Container::DefinitionList {});
             }
@@ -1341,7 +1341,8 @@ impl<'a> BlockParser<'a> {
         }
 
         // Term line (if next line has definition marker)?
-        if let Some(blank_count) = self.next_line_is_definition_marker()
+        if let Some(blank_count) =
+            definition_lists::next_line_is_definition_marker(&self.lines, self.pos)
             && !content.trim().is_empty()
         {
             // Close any open structures
@@ -1351,7 +1352,7 @@ impl<'a> BlockParser<'a> {
             }
 
             // Start definition list if not in one
-            if !self.in_definition_list() {
+            if !definition_lists::in_definition_list(&self.containers) {
                 self.builder.start_node(SyntaxKind::DefinitionList.into());
                 self.containers.push(Container::DefinitionList {});
             }
@@ -1421,20 +1422,13 @@ impl<'a> BlockParser<'a> {
         }
 
         // Not in list item - create paragraph as usual
-        self.start_paragraph_if_needed();
+        paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
         // For lossless parsing: use line_to_append if provided (e.g., for blockquotes
         // where markers have been stripped), otherwise use the original line
         let line = line_to_append.unwrap_or(self.lines[self.pos]);
-        self.append_paragraph_line(line);
+        paragraphs::append_paragraph_line(&mut self.builder, line);
         self.pos += 1;
         true
-    }
-
-    fn in_list(&self) -> bool {
-        self.containers
-            .stack
-            .iter()
-            .any(|c| matches!(c, Container::List { .. }))
     }
 
     fn in_fenced_div(&self) -> bool {
@@ -1442,228 +1436,6 @@ impl<'a> BlockParser<'a> {
             .stack
             .iter()
             .any(|c| matches!(c, Container::FencedDiv { .. }))
-    }
-
-    /// Check if we're in a list inside a blockquote.
-    fn in_blockquote_list(&self) -> bool {
-        let mut seen_blockquote = false;
-        for c in &self.containers.stack {
-            if matches!(c, Container::BlockQuote { .. }) {
-                seen_blockquote = true;
-            }
-            if seen_blockquote && matches!(c, Container::List { .. }) {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn find_matching_list_level(&self, marker: &ListMarker, indent_cols: usize) -> Option<usize> {
-        // Search from deepest (last) to shallowest (first)
-        // But for shallow items (0-3 indent), prefer matching at the closest base indent
-        let mut best_match: Option<(usize, usize)> = None; // (index, distance)
-
-        for (i, c) in self.containers.stack.iter().enumerate().rev() {
-            if let Container::List {
-                marker: list_marker,
-                base_indent_cols,
-            } = c
-                && markers_match(marker, list_marker)
-            {
-                let matches = if indent_cols >= 4 && *base_indent_cols >= 4 {
-                    // Both deeply indented - require close match
-                    indent_cols >= *base_indent_cols && indent_cols <= base_indent_cols + 3
-                } else if indent_cols >= 4 || *base_indent_cols >= 4 {
-                    // One shallow, one deep - no match
-                    false
-                } else {
-                    // Both at shallow indentation (0-3)
-                    // Allow items within 3 spaces
-                    indent_cols.abs_diff(*base_indent_cols) <= 3
-                };
-
-                if matches {
-                    let distance = indent_cols.abs_diff(*base_indent_cols);
-                    if let Some((_, best_dist)) = best_match {
-                        if distance < best_dist {
-                            best_match = Some((i, distance));
-                        }
-                    } else {
-                        best_match = Some((i, distance));
-                    }
-
-                    // If we found an exact match, return immediately
-                    if distance == 0 {
-                        return Some(i);
-                    }
-                }
-            }
-        }
-
-        best_match.map(|(i, _)| i)
-    }
-
-    fn in_definition_list(&self) -> bool {
-        self.containers
-            .stack
-            .iter()
-            .any(|c| matches!(c, Container::DefinitionList { .. }))
-    }
-
-    fn next_line_is_definition_marker(&self) -> Option<usize> {
-        // Look ahead past blank lines to find a definition marker
-        // Returns Some(blank_line_count) if found, None otherwise
-        let mut check_pos = self.pos + 1;
-        let mut blank_count = 0;
-        while check_pos < self.lines.len() {
-            let line = self.lines[check_pos];
-            if line.trim().is_empty() {
-                blank_count += 1;
-                check_pos += 1;
-                continue;
-            }
-            if try_parse_definition_marker(line).is_some() {
-                return Some(blank_count);
-            } else {
-                return None;
-            }
-        }
-        None
-    }
-
-    fn continue_list_at_level(&mut self, level: usize) {
-        self.containers.close_to(level + 1, &mut self.builder);
-        if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-            self.containers
-                .close_to(self.containers.depth() - 1, &mut self.builder);
-        }
-        if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
-            self.containers
-                .close_to(self.containers.depth() - 1, &mut self.builder);
-        }
-    }
-
-    fn start_new_list(
-        &mut self,
-        marker: &ListMarker,
-        indent_cols: usize,
-        indent_to_emit: Option<&str>,
-    ) {
-        if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-            self.containers
-                .close_to(self.containers.depth() - 1, &mut self.builder);
-        }
-        while matches!(self.containers.last(), Some(Container::ListItem { .. })) {
-            self.containers
-                .close_to(self.containers.depth() - 1, &mut self.builder);
-        }
-        while matches!(self.containers.last(), Some(Container::List { .. })) {
-            self.containers
-                .close_to(self.containers.depth() - 1, &mut self.builder);
-        }
-        self.builder.start_node(SyntaxKind::List.into());
-        // Emit footnote/definition indent for losslessness
-        if let Some(indent_str) = indent_to_emit {
-            self.builder
-                .token(SyntaxKind::WHITESPACE.into(), indent_str);
-        }
-        self.containers.push(Container::List {
-            marker: marker.clone(),
-            base_indent_cols: indent_cols,
-        });
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn start_nested_list(
-        &mut self,
-        content: &str,
-        marker: &ListMarker,
-        marker_len: usize,
-        spaces_after: usize,
-        indent_cols: usize,
-        indent_bytes: usize,
-        indent_to_emit: Option<&str>,
-    ) {
-        if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-            self.containers
-                .close_to(self.containers.depth() - 1, &mut self.builder);
-        }
-        self.builder.start_node(SyntaxKind::List.into());
-        // Emit footnote/definition indent for losslessness
-        if let Some(indent_str) = indent_to_emit {
-            self.builder
-                .token(SyntaxKind::WHITESPACE.into(), indent_str);
-        }
-        self.containers.push(Container::List {
-            marker: marker.clone(),
-            base_indent_cols: indent_cols,
-        });
-        let content_col = emit_list_item(
-            &mut self.builder,
-            content,
-            marker_len,
-            spaces_after,
-            indent_cols,
-            indent_bytes,
-        );
-        self.containers.push(Container::ListItem { content_col });
-    }
-
-    fn add_list_item(
-        &mut self,
-        content: &str,
-        marker_len: usize,
-        spaces_after: usize,
-        indent_cols: usize,
-        indent_bytes: usize,
-    ) {
-        let content_col = emit_list_item(
-            &mut self.builder,
-            content,
-            marker_len,
-            spaces_after,
-            indent_cols,
-            indent_bytes,
-        );
-        self.containers.push(Container::ListItem { content_col });
-    }
-
-    fn start_paragraph_if_needed(&mut self) {
-        if !matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-            let content_col = self.current_content_col();
-            self.builder.start_node(SyntaxKind::PARAGRAPH.into());
-            self.containers.push(Container::Paragraph { content_col });
-        }
-    }
-
-    fn append_paragraph_line(&mut self, line: &str) {
-        // For lossless parsing, preserve the line exactly as-is
-        // Don't strip to content column in the parser - that's the formatter's job
-
-        // Split off trailing newline (LF or CRLF) if present
-        let (text_without_newline, newline_str) = utils::strip_newline(line);
-
-        if !text_without_newline.is_empty() {
-            self.builder
-                .token(SyntaxKind::TEXT.into(), text_without_newline);
-        }
-
-        if !newline_str.is_empty() {
-            self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-        }
-    }
-
-    fn current_content_col(&self) -> usize {
-        self.containers
-            .stack
-            .iter()
-            .rev()
-            .find_map(|c| match c {
-                Container::ListItem { content_col } => Some(*content_col),
-                Container::FootnoteDefinition { content_col, .. } => Some(*content_col),
-                _ => None,
-            })
-            .unwrap_or(0)
     }
 }
 
