@@ -4,7 +4,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// The flavor of Markdown to parse and format.
 /// Each flavor has a different set of default extensions enabled.
@@ -28,7 +28,7 @@ pub enum Flavor {
 /// Pandoc/Markdown extensions configuration.
 /// Each field represents a specific Pandoc extension.
 /// Extensions marked with a comment indicate implementation status.
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Extensions {
     // ===== Block-level extensions =====
@@ -415,6 +415,43 @@ impl Extensions {
             quarto_shortcodes: false,
         }
     }
+
+    /// Merge user-specified extension overrides with flavor defaults.
+    ///
+    /// This is used to support partial extension overrides in config files.
+    /// For example, if a user specifies `flavor = "quarto"` and then sets
+    /// `[extensions] quarto_crossrefs = false`, we want all other extensions
+    /// to use Quarto defaults, not Pandoc defaults.
+    ///
+    /// # Arguments
+    /// * `user_overrides` - Map of extension names to their user-specified values
+    /// * `flavor` - The flavor to use for default values
+    ///
+    /// # Returns
+    /// A new Extensions struct with flavor defaults merged with user overrides
+    pub fn merge_with_flavor(user_overrides: HashMap<String, bool>, flavor: Flavor) -> Self {
+        use serde_json::{Map, Value};
+
+        // Start with flavor defaults
+        let defaults = Self::for_flavor(flavor);
+        let defaults_value =
+            serde_json::to_value(&defaults).expect("Failed to serialize flavor defaults");
+
+        let mut merged = if let Value::Object(obj) = defaults_value {
+            obj
+        } else {
+            Map::new()
+        };
+
+        // Apply user overrides
+        for (key, value) in user_overrides {
+            merged.insert(key, Value::Bool(value));
+        }
+
+        // Deserialize back to Extensions
+        serde_json::from_value(Value::Object(merged))
+            .expect("Failed to deserialize merged extensions")
+    }
 }
 
 /// Configuration for code block formatting.
@@ -669,7 +706,7 @@ struct RawConfig {
     #[serde(default)]
     flavor: Flavor,
     #[serde(default)]
-    extensions: Option<Extensions>,
+    extensions: Option<HashMap<String, bool>>,
     #[serde(default)]
     line_ending: Option<LineEnding>,
     #[serde(default = "default_line_width")]
@@ -702,9 +739,10 @@ impl RawConfig {
     /// Finalize into Config, applying flavor-based defaults where needed
     fn finalize(self) -> Config {
         Config {
-            extensions: self
-                .extensions
-                .unwrap_or_else(|| Extensions::for_flavor(self.flavor)),
+            extensions: self.extensions.map_or_else(
+                || Extensions::for_flavor(self.flavor),
+                |user_overrides| Extensions::merge_with_flavor(user_overrides, self.flavor),
+            ),
             code_blocks: self
                 .code_blocks
                 .unwrap_or_else(|| CodeBlockConfig::for_flavor(self.flavor)),
@@ -1220,6 +1258,106 @@ mod tests {
         // These come from CodeBlockConfig::default(), not flavor-specific
         assert_eq!(cfg.code_blocks.min_fence_length, 3);
         assert!(!cfg.code_blocks.normalize_indented);
+    }
+
+    #[test]
+    fn extensions_merge_with_flavor_quarto() {
+        // Test that extension overrides properly merge with Quarto flavor defaults
+        let toml_str = r#"
+            flavor = "quarto"
+            
+            [extensions]
+            quarto_crossrefs = false
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // The overridden extension should be false
+        assert!(!cfg.extensions.quarto_crossrefs);
+
+        // Other Quarto-specific extensions should still use Quarto defaults (true)
+        assert!(cfg.extensions.quarto_callouts);
+        assert!(cfg.extensions.quarto_shortcodes);
+
+        // General Pandoc extensions should also use Quarto defaults
+        assert!(cfg.extensions.citations);
+        assert!(cfg.extensions.yaml_metadata_block);
+        assert!(cfg.extensions.fenced_divs);
+    }
+
+    #[test]
+    fn extensions_merge_with_flavor_pandoc() {
+        // Test that extension overrides work with Pandoc flavor
+        let toml_str = r#"
+            flavor = "pandoc"
+            
+            [extensions]
+            citations = false
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // The overridden extension should be false
+        assert!(!cfg.extensions.citations);
+
+        // Other Pandoc extensions should still use Pandoc defaults (true)
+        assert!(cfg.extensions.yaml_metadata_block);
+        assert!(cfg.extensions.fenced_divs);
+
+        // Quarto extensions should be false in Pandoc flavor
+        assert!(!cfg.extensions.quarto_crossrefs);
+        assert!(!cfg.extensions.quarto_callouts);
+    }
+
+    #[test]
+    fn extensions_no_override_uses_flavor_defaults() {
+        // Test that omitting [extensions] uses flavor defaults
+        let toml_str = r#"
+            flavor = "quarto"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // Should use Quarto defaults
+        assert!(cfg.extensions.quarto_crossrefs);
+        assert!(cfg.extensions.quarto_callouts);
+        assert!(cfg.extensions.quarto_shortcodes);
+    }
+
+    #[test]
+    fn extensions_empty_section_uses_flavor_defaults() {
+        // Test that empty [extensions] section still uses flavor defaults
+        let toml_str = r#"
+            flavor = "quarto"
+            
+            [extensions]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // Should use Quarto defaults
+        assert!(cfg.extensions.quarto_crossrefs);
+        assert!(cfg.extensions.quarto_callouts);
+        assert!(cfg.extensions.quarto_shortcodes);
+    }
+
+    #[test]
+    fn extensions_multiple_overrides() {
+        // Test multiple extension overrides
+        let toml_str = r#"
+            flavor = "quarto"
+            
+            [extensions]
+            quarto_crossrefs = false
+            citations = false
+            emoji = true
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // Overridden extensions
+        assert!(!cfg.extensions.quarto_crossrefs);
+        assert!(!cfg.extensions.citations);
+        assert!(cfg.extensions.emoji);
+
+        // Other Quarto defaults should remain
+        assert!(cfg.extensions.quarto_callouts);
+        assert!(cfg.extensions.quarto_shortcodes);
     }
 }
 
