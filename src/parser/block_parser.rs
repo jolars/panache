@@ -123,6 +123,15 @@ impl<'a> BlockParser<'a> {
         let (bq_depth, inner_content) = count_blockquote_markers(line);
         let current_bq_depth = blockquotes::current_blockquote_depth(&self.containers);
 
+        log::debug!(
+            "parse_line [{}]: bq_depth={}, current_bq={}, depth={}, line={:?}",
+            self.pos,
+            bq_depth,
+            current_bq_depth,
+            self.containers.depth(),
+            line.trim_end()
+        );
+
         // Handle blank lines specially (including blank lines inside blockquotes)
         // A line like ">" with nothing after is a blank line inside a blockquote
         // Note: lines may end with \n from split_inclusive
@@ -190,9 +199,11 @@ impl<'a> BlockParser<'a> {
                     | Some(Container::Definition { .. })
                     | Some(Container::DefinitionItem { .. })
                     | Some(Container::DefinitionList { .. }) => {
-                        log::trace!(
-                            "Closing container at blank line (depth {})",
-                            self.containers.depth()
+                        log::debug!(
+                            "Closing {:?} at blank line (depth {} > levels_to_keep {})",
+                            self.containers.last(),
+                            self.containers.depth(),
+                            levels_to_keep
                         );
 
                         // If closing a Definition with open Plain, close Plain first
@@ -413,11 +424,48 @@ impl<'a> BlockParser<'a> {
         } else if bq_depth > 0 {
             // Same blockquote depth - emit markers and continue parsing inner content
 
-            // Before emitting markers for a new line, close any line-level containers
-            // (ListItems should be closed when we see the next line)
-            if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+            // Check if we should close the ListItem
+            // ListItem should continue if the line is properly indented for continuation
+            if matches!(
+                self.containers.last(),
+                Some(Container::ListItem { content_col: _ })
+            ) {
+                let (indent_cols, _) = leading_indent(inner_content);
+                let content_indent = self.content_container_indent_to_strip();
+                let effective_indent = indent_cols.saturating_sub(content_indent);
+                let content_col = match self.containers.last() {
+                    Some(Container::ListItem { content_col }) => *content_col,
+                    _ => 0,
+                };
+
+                // Check if this line starts a new list item at outer level
+                let is_new_item_at_outer_level = if let Some((_marker, _, _)) =
+                    try_parse_list_marker(inner_content, self.config)
+                {
+                    effective_indent < content_col
+                } else {
+                    false
+                };
+
+                // Close ListItem if:
+                // 1. It's a new list item at an outer (or same) level, OR
+                // 2. The line is not indented enough to continue the current item
+                if is_new_item_at_outer_level || effective_indent < content_col {
+                    log::debug!(
+                        "Closing ListItem: is_new_item={}, effective_indent={} < content_col={}",
+                        is_new_item_at_outer_level,
+                        effective_indent,
+                        content_col
+                    );
+                    self.containers
+                        .close_to(self.containers.depth() - 1, &mut self.builder);
+                } else {
+                    log::debug!(
+                        "Keeping ListItem: effective_indent={} >= content_col={}",
+                        effective_indent,
+                        content_col
+                    );
+                }
             }
 
             let marker_info = parse_blockquote_marker_info(line);
@@ -479,11 +527,16 @@ impl<'a> BlockParser<'a> {
         let (raw_indent_cols, _) = leading_indent(next_inner);
         let next_marker = try_parse_list_marker(next_inner, self.config);
 
+        // Calculate current blockquote depth for proper indent calculation
+        let current_bq_depth = blockquotes::current_blockquote_depth(&self.containers);
+
         log::debug!(
-            "compute_levels_to_keep: next_line indent={}, has_marker={}, stack_depth={}",
+            "compute_levels_to_keep: next_line indent={}, has_marker={}, stack_depth={}, current_bq={}, next_bq={}",
             raw_indent_cols,
             next_marker.is_some(),
-            self.containers.depth()
+            self.containers.depth(),
+            current_bq_depth,
+            next_bq_depth
         );
 
         let mut keep_level = 0;
@@ -548,7 +601,30 @@ impl<'a> BlockParser<'a> {
                 Container::ListItem { content_col } => {
                     // Keep list item if next line is indented to content column
                     // BUT NOT if it's a new list item marker at an outer level
-                    let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
+
+                    // Special case: if next line has MORE blockquote markers than current depth,
+                    // those extra markers count as "content" that should be indented for list continuation.
+                    // Example: "> - item" followed by ">   > nested" - the 2 spaces between the markers
+                    // indicate list continuation, and the second > is content.
+                    let effective_indent = if next_bq_depth > current_bq_depth {
+                        // The line has extra blockquote markers. After stripping current depth's markers,
+                        // check the indent before any remaining markers.
+                        let after_current_bq =
+                            blockquotes::strip_n_blockquote_markers(next_line, current_bq_depth);
+                        let (spaces_before_next_marker, _) = leading_indent(after_current_bq);
+                        spaces_before_next_marker.saturating_sub(content_indent_so_far)
+                    } else {
+                        raw_indent_cols.saturating_sub(content_indent_so_far)
+                    };
+
+                    log::debug!(
+                        "ListItem continuation check: content_col={}, effective_indent={}, next_bq_depth={}, current_bq_depth={}",
+                        content_col,
+                        effective_indent,
+                        next_bq_depth,
+                        current_bq_depth
+                    );
+
                     let is_new_item_at_outer_level = if let Some((ref _nm, _, _)) = next_marker {
                         // Check if this marker would start a sibling item (at parent list level)
                         // by checking if it's at or before the current item's start
@@ -559,12 +635,27 @@ impl<'a> BlockParser<'a> {
 
                     if !is_new_item_at_outer_level && effective_indent >= *content_col {
                         keep_level = i + 1;
+                        log::debug!(
+                            "Keeping ListItem: keep_level now {} (i={}, effective_indent={} >= content_col={})",
+                            keep_level,
+                            i,
+                            effective_indent,
+                            content_col
+                        );
+                    } else {
+                        log::debug!(
+                            "NOT keeping ListItem: is_new_item={}, effective_indent={} < content_col={}",
+                            is_new_item_at_outer_level,
+                            effective_indent,
+                            content_col
+                        );
                     }
                 }
                 _ => {}
             }
         }
 
+        log::debug!("compute_levels_to_keep returning: {}", keep_level);
         keep_level
     }
 
@@ -587,16 +678,72 @@ impl<'a> BlockParser<'a> {
     /// `line_to_append` - Optional line to use when appending to paragraphs.
     ///                    If None, uses self.lines[self.pos]
     fn parse_inner_content(&mut self, content: &str, line_to_append: Option<&str>) -> bool {
+        log::debug!(
+            "parse_inner_content [{}]: depth={}, last={:?}, content={:?}",
+            self.pos,
+            self.containers.depth(),
+            self.containers.last(),
+            content.trim_end()
+        );
+        // Calculate how much indentation should be stripped for content containers
+        // (definitions, footnotes) FIRST, so we can check for block markers correctly
+        let content_indent = self.content_container_indent_to_strip();
+        let (stripped_content, indent_to_emit) = if content_indent > 0 {
+            let (indent_cols, _) = leading_indent(content);
+            if indent_cols >= content_indent {
+                let idx = byte_index_at_column(content, content_indent);
+                (&content[idx..], Some(&content[..idx]))
+            } else {
+                // Line has less indent than required - preserve leading whitespace
+                let trimmed_start = content.trim_start();
+                let ws_len = content.len() - trimmed_start.len();
+                if ws_len > 0 {
+                    (trimmed_start, Some(&content[..ws_len]))
+                } else {
+                    (content, None)
+                }
+            }
+        } else {
+            (content, None)
+        };
+
         // Check if we have an open Plain node in a Definition container
         // If so, append this line to the Plain node instead of creating a new block
-        // BUT: Don't treat lines with definition markers as continuations
+        // BUT: Don't treat lines with block element markers as continuations
         if let Some(Container::Definition {
             plain_open: true, ..
         }) = self.containers.last()
         {
-            // Check if this line starts with a definition marker
-            // If so, don't treat it as a continuation - let it create a new definition
-            if try_parse_definition_marker(content).is_none() {
+            // Check if this line starts with any block element marker
+            // Use stripped_content so we check AFTER removing footnote/definition indent
+            let is_block_element = try_parse_definition_marker(stripped_content).is_some()
+                || try_parse_list_marker(stripped_content, self.config).is_some()
+                || count_blockquote_markers(stripped_content).0 > 0
+                || try_parse_fence_open(stripped_content).is_some()
+                || try_parse_math_fence_open(
+                    stripped_content,
+                    self.config.extensions.tex_math_single_backslash,
+                )
+                .is_some()
+                || try_parse_div_fence_open(stripped_content).is_some()
+                || try_parse_horizontal_rule(stripped_content).is_some()
+                || try_parse_atx_heading(stripped_content).is_some()
+                || (self.config.extensions.raw_html
+                    && try_parse_html_block_start(stripped_content).is_some())
+                || (self.config.extensions.raw_tex
+                    && try_parse_latex_env_begin(stripped_content).is_some());
+
+            if is_block_element {
+                // Close the Plain node before processing the block element
+                self.builder.finish_node(); // Close Plain
+                // Update container to mark Plain as closed
+                if let Some(Container::Definition { plain_open, .. }) =
+                    self.containers.stack.last_mut()
+                {
+                    *plain_open = false;
+                }
+                // Fall through to parse the block element
+            } else {
                 // This is a continuation line for an open Plain block
                 // For lossless parsing, we need to preserve the entire line including indent
 
@@ -621,31 +768,7 @@ impl<'a> BlockParser<'a> {
             }
         }
 
-        // Calculate how much indentation should be stripped for content containers
-        // (definitions, footnotes), but don't strip it yet - we need to handle it
-        // carefully to preserve losslessness
-        let content_indent = self.content_container_indent_to_strip();
-        let (stripped_content, indent_to_emit) = if content_indent > 0 {
-            let (indent_cols, _) = leading_indent(content);
-            if indent_cols >= content_indent {
-                let idx = byte_index_at_column(content, content_indent);
-                (&content[idx..], Some(&content[..idx]))
-            } else {
-                // Line has less indent than required - preserve leading whitespace
-                let trimmed_start = content.trim_start();
-                let ws_len = content.len() - trimmed_start.len();
-                if ws_len > 0 {
-                    (trimmed_start, Some(&content[..ws_len]))
-                } else {
-                    (content, None)
-                }
-            }
-        } else {
-            (content, None)
-        };
-
-        // Store the indent for later emission when starting new blocks
-        // (emitted for block elements like lists, not paragraph continuations)
+        // Store the stripped content for later use
         let content = stripped_content;
 
         // Check for heading (needs blank line before, or at start of container)
@@ -1414,6 +1537,10 @@ impl<'a> BlockParser<'a> {
         // Paragraph or list item continuation
         // Check if we're inside a ListItem - if so, emit bare tokens instead of wrapping in PARAGRAPH
         if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+            log::debug!(
+                "Inside ListItem - emitting bare tokens for: {:?}",
+                line_to_append.unwrap_or(self.lines[self.pos]).trim_end()
+            );
             // Inside list item - emit as bare tokens for postprocessor to wrap later
             let line = line_to_append.unwrap_or(self.lines[self.pos]);
             utils::emit_line_tokens(&mut self.builder, line);
@@ -1421,6 +1548,10 @@ impl<'a> BlockParser<'a> {
             return true;
         }
 
+        log::debug!(
+            "Not in ListItem - creating paragraph for: {:?}",
+            line_to_append.unwrap_or(self.lines[self.pos]).trim_end()
+        );
         // Not in list item - create paragraph as usual
         paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
         // For lossless parsing: use line_to_append if provided (e.g., for blockquotes

@@ -62,6 +62,39 @@ pub(crate) fn emit_definition_marker(
     builder.token(SyntaxKind::DefinitionMarker.into(), &marker.to_string());
 }
 
+// Helper functions for definition list management in BlockParser
+
+use super::container_stack::{Container, ContainerStack};
+
+/// Check if we're in a definition list.
+pub(super) fn in_definition_list(containers: &ContainerStack) -> bool {
+    containers
+        .stack
+        .iter()
+        .any(|c| matches!(c, Container::DefinitionList { .. }))
+}
+
+/// Look ahead past blank lines to find a definition marker.
+/// Returns Some(blank_line_count) if found, None otherwise.
+pub(super) fn next_line_is_definition_marker(lines: &[&str], pos: usize) -> Option<usize> {
+    let mut check_pos = pos + 1;
+    let mut blank_count = 0;
+    while check_pos < lines.len() {
+        let line = lines[check_pos];
+        if line.trim().is_empty() {
+            blank_count += 1;
+            check_pos += 1;
+            continue;
+        }
+        if try_parse_definition_marker(line).is_some() {
+            return Some(blank_count);
+        } else {
+            return None;
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,37 +141,4 @@ mod tests {
     fn test_parse_definition_marker_at_eol() {
         assert_eq!(try_parse_definition_marker(":"), Some((':', 0, 0)));
     }
-}
-
-// Helper functions for definition list management in BlockParser
-
-use super::container_stack::{Container, ContainerStack};
-
-/// Check if we're in a definition list.
-pub(super) fn in_definition_list(containers: &ContainerStack) -> bool {
-    containers
-        .stack
-        .iter()
-        .any(|c| matches!(c, Container::DefinitionList { .. }))
-}
-
-/// Look ahead past blank lines to find a definition marker.
-/// Returns Some(blank_line_count) if found, None otherwise.
-pub(super) fn next_line_is_definition_marker(lines: &[&str], pos: usize) -> Option<usize> {
-    let mut check_pos = pos + 1;
-    let mut blank_count = 0;
-    while check_pos < lines.len() {
-        let line = lines[check_pos];
-        if line.trim().is_empty() {
-            blank_count += 1;
-            check_pos += 1;
-            continue;
-        }
-        if try_parse_definition_marker(line).is_some() {
-            return Some(blank_count);
-        } else {
-            return None;
-        }
-    }
-    None
 }

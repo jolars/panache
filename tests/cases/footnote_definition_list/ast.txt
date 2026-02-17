@@ -1,0 +1,69 @@
+ROOT@0..299
+  DOCUMENT@0..299
+    Heading@0..64
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..63
+        TEXT@2..63 "Test: Footnote contai ..."
+      NEWLINE@63..64 "\n"
+    BlankLine@64..65
+      BlankLine@64..65 "\n"
+    FootnoteDefinition@65..114
+      FootnoteReference@65..71 "[^1]: "
+      PARAGRAPH@71..114
+        TEXT@71..113 "This is a footnote wi ..."
+        NEWLINE@113..114 "\n"
+    BlankLine@114..115
+      BlankLine@114..115 "\n"
+    DefinitionList@115..191
+      DefinitionItem@115..191
+        Definition@115..128
+          DefinitionMarker@115..116 ":"
+          WHITESPACE@116..119 "   "
+          Plain@119..128
+            TEXT@119..127 "term one"
+            NEWLINE@127..128 "\n"
+        Definition@128..191
+          DefinitionMarker@128..129 ":"
+          WHITESPACE@129..132 "   "
+          Plain@132..165
+            TEXT@132..163 "definition with neste ..."
+            NEWLINE@163..164 "\n"
+            BlankLine@164..165
+              BlankLine@164..165 "\n"
+          List@165..191
+            WHITESPACE@165..169 "    "
+            ListItem@169..191
+              ListMarker@169..170 "-"
+              WHITESPACE@170..171 " "
+              Plain@171..191
+                TEXT@171..190 "bullet 1 - bullet 2"
+                NEWLINE@190..191 "\n"
+    BlankLine@191..192
+      BlankLine@191..192 "\n"
+    DefinitionList@192..263
+      DefinitionItem@192..263
+        Definition@192..205
+          DefinitionMarker@192..193 ":"
+          WHITESPACE@193..196 "   "
+          Plain@196..205
+            TEXT@196..204 "term two"
+            NEWLINE@204..205 "\n"
+        Definition@205..263
+          DefinitionMarker@205..206 ":"
+          WHITESPACE@206..209 "   "
+          Plain@209..263
+            TEXT@209..262 "another definition Pa ..."
+            NEWLINE@262..263 "\n"
+    BlankLine@263..264
+      BlankLine@263..264 "\n"
+    PARAGRAPH@264..299
+      TEXT@264..285 "Reference to footnote"
+      FootnoteReference@285..289
+        TEXT@285..287 "[^"
+        TEXT@287..288 "1"
+        TEXT@288..289 "]"
+      TEXT@289..298 " in text."
+      NEWLINE@298..299 "\n"
+

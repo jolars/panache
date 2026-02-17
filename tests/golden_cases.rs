@@ -133,6 +133,9 @@ macro_rules! golden_test_cases {
 // 1. Create a new directory under tests/cases/
 // 2. Add the directory name to this list
 golden_test_cases!(
+    blockquote_depth_change,
+    blockquote_list_blanks,
+    blockquote_list_blockquote,
     blockquotes,
     bracketed_spans,
     code_spans,
@@ -154,6 +157,7 @@ golden_test_cases!(
     fenced_code,
     fenced_code_quarto,
     fenced_divs,
+    footnote_definition_list,
     headerless_table,
     horizontal_rules,
     html_block,
@@ -161,6 +165,7 @@ golden_test_cases!(
     indented_code,
     inline_math,
     latex_environment,
+    lazy_continuation_deep,
     line_ending_crlf,
     line_ending_lf,
     links,
