@@ -6,7 +6,6 @@ use crate::syntax::SyntaxNode;
 pub mod block_parser;
 pub mod inline_parser;
 pub mod list_postprocessor;
-pub mod math;
 
 // Re-export commonly used types
 pub use block_parser::{BlockParser, ReferenceRegistry};

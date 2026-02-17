@@ -9,9 +9,9 @@ mod code_spans;
 mod emphasis;
 mod escapes;
 mod inline_footnotes;
-mod inline_math;
 mod latex;
 pub mod links; // Public for try_parse_inline_image used by block parser
+mod math;
 mod native_spans;
 mod raw_inline;
 mod shortcodes;
@@ -32,18 +32,18 @@ use inline_footnotes::{
     emit_footnote_reference, emit_inline_footnote, try_parse_footnote_reference,
     try_parse_inline_footnote,
 };
-use inline_math::{
-    emit_display_math, emit_double_backslash_display_math, emit_double_backslash_inline_math,
-    emit_inline_math, emit_single_backslash_display_math, emit_single_backslash_inline_math,
-    try_parse_display_math, try_parse_double_backslash_display_math,
-    try_parse_double_backslash_inline_math, try_parse_inline_math,
-    try_parse_single_backslash_display_math, try_parse_single_backslash_inline_math,
-};
 use latex::{parse_latex_command, try_parse_latex_command};
 use links::{
     emit_autolink, emit_inline_image, emit_inline_link, emit_reference_image, emit_reference_link,
     try_parse_autolink, try_parse_inline_image, try_parse_inline_link, try_parse_reference_image,
     try_parse_reference_link,
+};
+use math::{
+    emit_display_math, emit_double_backslash_display_math, emit_double_backslash_inline_math,
+    emit_inline_math, emit_single_backslash_display_math, emit_single_backslash_inline_math,
+    try_parse_display_math, try_parse_double_backslash_display_math,
+    try_parse_double_backslash_inline_math, try_parse_inline_math,
+    try_parse_single_backslash_display_math, try_parse_single_backslash_inline_math,
 };
 use native_spans::{emit_native_span, try_parse_native_span};
 use raw_inline::{emit_raw_inline, is_raw_inline};
