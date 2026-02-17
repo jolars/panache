@@ -49,6 +49,6 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: github/panache
+          slug: jolars/panache
           fail_ci_if_error: true
           files: lcov.info
