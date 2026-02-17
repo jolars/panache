@@ -58,7 +58,6 @@ pub struct BlockParser<'a> {
     builder: GreenNodeBuilder<'static>,
     containers: ContainerStack,
     reference_registry: ReferenceRegistry,
-    #[allow(dead_code)] // TODO: Will be used for extension configuration
     config: &'a Config,
 }
 

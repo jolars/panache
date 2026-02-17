@@ -486,7 +486,6 @@ pub struct InlineParser {
     root: SyntaxNode,
     #[allow(dead_code)] // TODO: Will be used for reference link/image resolution
     reference_registry: crate::parser::block_parser::ReferenceRegistry,
-    #[allow(dead_code)] // TODO: Will be used for extension configuration
     config: Config,
 }
 

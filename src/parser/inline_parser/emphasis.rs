@@ -23,7 +23,6 @@ use rowan::GreenNodeBuilder;
 
 /// A delimiter in the delimiter stack
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 struct Delimiter {
     char: char,            // * or _
     count: usize,          // remaining delimiter characters
@@ -36,7 +35,6 @@ struct Delimiter {
 
 /// A matched emphasis span
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
 pub struct EmphasisMatch {
     pub start: usize,         // byte position of opening delimiter
     pub end: usize,           // byte position after closing delimiter

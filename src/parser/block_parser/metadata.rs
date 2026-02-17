@@ -5,14 +5,6 @@ use rowan::GreenNodeBuilder;
 
 use super::utils::strip_newline;
 
-/// Check if a line is a YAML metadata delimiter (`---` or `...`).
-/// Returns true if the line is exactly `---` or `...` (with optional leading/trailing spaces).
-#[allow(dead_code)]
-pub(crate) fn is_yaml_delimiter(line: &str) -> bool {
-    let trimmed = line.trim();
-    trimmed == "---" || trimmed == "..."
-}
-
 /// Try to parse a YAML metadata block starting at the given position.
 /// Returns the new position after the block if successful, None otherwise.
 ///
@@ -178,16 +170,6 @@ pub(crate) fn try_parse_pandoc_title_block(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_is_yaml_delimiter() {
-        assert!(is_yaml_delimiter("---"));
-        assert!(is_yaml_delimiter("  ---  "));
-        assert!(is_yaml_delimiter("..."));
-        assert!(is_yaml_delimiter("  ...  "));
-        assert!(!is_yaml_delimiter("----"));
-        assert!(!is_yaml_delimiter("-- -"));
-    }
 
     #[test]
     fn test_yaml_block_at_start() {

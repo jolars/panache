@@ -110,19 +110,6 @@ pub(crate) fn try_parse_native_span(text: &str) -> Option<(usize, &str, String)>
     None
 }
 
-/// Parse HTML attributes and convert to a format suitable for storage.
-/// For now, we just store the raw HTML attributes as a string.
-///
-/// HTML attributes like: class="foo bar" id="baz" data-x="value"
-/// Could be converted to Pandoc format: #baz .foo .bar data-x="value"
-/// But for simplicity, we'll keep them as HTML attributes for now.
-#[allow(dead_code)] // TODO: Use for attribute conversion
-pub(crate) fn parse_span_attributes(html_attrs: &str) -> String {
-    // For now, just return the HTML attributes as-is
-    // Future enhancement: parse and convert to Pandoc attribute format
-    html_attrs.to_string()
-}
-
 /// Emit a native span node to the builder.
 pub(crate) fn emit_native_span(
     builder: &mut GreenNodeBuilder,

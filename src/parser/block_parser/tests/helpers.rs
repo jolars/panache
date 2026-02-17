@@ -36,12 +36,6 @@ pub fn assert_block_kinds(input: &str, expected: &[SyntaxKind]) {
     );
 }
 
-/// Print debug tree for inspection
-#[allow(dead_code)]
-pub fn debug_tree(node: &SyntaxNode) -> String {
-    format!("{:#?}", node)
-}
-
 /// Count direct children of a specific kind
 pub fn count_children(node: &SyntaxNode, kind: SyntaxKind) -> usize {
     node.children().filter(|n| n.kind() == kind).count()
