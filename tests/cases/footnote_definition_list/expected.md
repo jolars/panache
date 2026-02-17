@@ -1,12 +1,16 @@
-# Test: Footnote containing definition list with nested bullets
+# Test: Definition list inside footnote
 
-[^1]: This is a footnote with a definition list:
+Text with footnote reference[^1].
 
-:   term one
-:   definition with nested bullets:
-    - bullet 1 - bullet 2
+[^1]: Footnote containing a definition list:
 
-:   term two
-:   another definition Paragraph continuing the footnote.
+    :   First definition
 
-Reference to footnote[^1] in text.
+    :   Second definition with nested list:
+
+        - Nested bullet 1
+        - Nested bullet 2
+
+    :   Third definition
+
+    Continuing paragraph after the definition list.

@@ -69,6 +69,8 @@ For more information, visit: https://github.com/jolars/panache
   panache will search for .panache.toml or panache.toml in the current directory
   and its parents, then fall back to ~/.config/panache/config.toml.
 
+
+
 ## `panache format`
 
 Format a Quarto, Pandoc, or Markdown document according to panache's formatting
@@ -124,6 +126,8 @@ panache format --check document.qmd
   Note: This feature is experimental. Range filtering may not work correctly in
   all cases.
 
+
+
 ## `panache parse`
 
 Parse a document and display its Abstract Syntax Tree (AST) for debugging and
@@ -157,6 +161,8 @@ The AST output shows the concrete syntax tree built by the parser, including:
 - `<FILE>` — Path to the input file to parse. If not provided, reads from stdin.
   The parser respects extension flags from the configuration file.
 
+
+
 ## `panache lsp`
 
 Start the panache Language Server Protocol (LSP) server for editor integration.
@@ -171,6 +177,8 @@ command manually.
 
 For editor configuration examples, see:
 https://github.com/jolars/panache#editor-integration
+
+
 
 ## `panache lint`
 
@@ -217,4 +225,6 @@ Configure rules in .panache.toml with [lint] section.
 
 - `--check` — Exit with code 1 if violations found (CI mode)
 - `--fix` — Automatically fix violations where possible
+
+
 

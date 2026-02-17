@@ -1,4 +1,4 @@
-use crate::config::{BlankLines, Config, WrapMode};
+use crate::config::{Config, WrapMode};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;
@@ -397,6 +397,7 @@ impl Formatter {
                             }
                         }
                         SyntaxKind::BlankLine => {
+                            // Normalize blank lines to just newlines
                             self.output.push('\n');
                         }
                         SyntaxKind::CodeBlock => {
@@ -834,8 +835,14 @@ impl Formatter {
 
             SyntaxKind::Definition => {
                 // Format definition with marker and content
+                // The definition marker itself is at the base indent level
                 // Definition content is indented 4 spaces from the margin
                 let def_indent = indent + 4;
+
+                // Emit base indentation before the marker
+                if indent > 0 {
+                    self.output.push_str(&" ".repeat(indent));
+                }
                 self.output.push_str(":   ");
 
                 // Collect children to determine lazy continuation
@@ -920,12 +927,12 @@ impl Formatter {
                                     }
                                 }
                                 SyntaxKind::BlankLine => {
-                                    // Preserve blank lines in definition content
-                                    // Only skip blank lines before the first paragraph if it's lazy
+                                    // Normalize blank lines in definitions to just newlines
+                                    // (strip trailing whitespace)
                                     let is_before_first_para =
                                         first_para_idx.is_some_and(|idx| i < idx);
 
-                                    if !is_before_first_para && !self.output.ends_with("\n\n") {
+                                    if !is_before_first_para {
                                         self.output.push('\n');
                                     }
                                 }
@@ -1187,22 +1194,10 @@ impl Formatter {
             }
 
             SyntaxKind::BlankLine => {
-                // Apply blank_lines config to collapse consecutive blank lines
-                match self.config.blank_lines {
-                    BlankLines::Preserve => {
-                        // Always output blank line
-                        self.output.push('\n');
-                        self.consecutive_blank_lines += 1;
-                    }
-                    BlankLines::Collapse => {
-                        // Only output if we haven't already output one blank line
-                        if self.consecutive_blank_lines == 0 {
-                            self.output.push('\n');
-                            self.consecutive_blank_lines = 1;
-                        }
-                        // Otherwise skip this blank line (collapsing to one)
-                    }
-                }
+                // BlankLine nodes preserve exact whitespace in the AST for losslessness
+                // But when formatting, we normalize to just newlines (no trailing spaces)
+                self.output.push('\n');
+                self.consecutive_blank_lines += 1;
             }
 
             SyntaxKind::Emphasis => {

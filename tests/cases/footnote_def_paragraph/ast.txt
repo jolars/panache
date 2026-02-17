@@ -1,0 +1,43 @@
+ROOT@0..95
+  DOCUMENT@0..95
+    Heading@0..7
+      AtxHeadingMarker@0..1
+        AtxHeadingMarker@0..1 "#"
+      WHITESPACE@1..2 " "
+      HeadingContent@2..6
+        TEXT@2..6 "Test"
+      NEWLINE@6..7 "\n"
+    BlankLine@7..8
+      BlankLine@7..8 "\n"
+    PARAGRAPH@8..27
+      TEXT@8..21 "Text with ref"
+      FootnoteReference@21..25
+        TEXT@21..23 "[^"
+        TEXT@23..24 "1"
+        TEXT@24..25 "]"
+      TEXT@25..26 "."
+      NEWLINE@26..27 "\n"
+    BlankLine@27..28
+      BlankLine@27..28 "\n"
+    FootnoteDefinition@28..95
+      FootnoteReference@28..34 "[^1]: "
+      PARAGRAPH@34..48
+        TEXT@34..47 "Footnote text"
+        NEWLINE@47..48 "\n"
+      BlankLine@48..49
+        BlankLine@48..49 "\n"
+      DefinitionList@49..68
+        DefinitionItem@49..68
+          Definition@49..68
+            WHITESPACE@49..53 "    "
+            DefinitionMarker@53..54 ":"
+            WHITESPACE@54..57 "   "
+            Plain@57..68
+              TEXT@57..67 "Definition"
+              NEWLINE@67..68 "\n"
+      BlankLine@68..69
+        BlankLine@68..69 "\n"
+      PARAGRAPH@69..95
+        TEXT@69..94 "    Continuing paragr ..."
+        NEWLINE@94..95 "\n"
+

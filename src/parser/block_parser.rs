@@ -145,6 +145,21 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
+            // Close Plain node in Definition if open
+            // Blank lines should close Plain, allowing subsequent content to be siblings
+            if let Some(Container::Definition {
+                plain_open: true, ..
+            }) = self.containers.last()
+            {
+                self.builder.finish_node(); // Close Plain node
+                // Mark Plain as closed
+                if let Some(Container::Definition { plain_open, .. }) =
+                    self.containers.stack.last_mut()
+                {
+                    *plain_open = false;
+                }
+            }
+
             // Note: Blank lines between terms and definitions are now preserved
             // and emitted as part of the term parsing logic
 
@@ -567,9 +582,39 @@ impl<'a> BlockParser<'a> {
                 }
                 Container::Definition { content_col, .. } => {
                     // Definition continuation: line must be indented at least 4 spaces
+                    // After a blank line, only keep if there's nested block content (lists, code, etc)
+                    // Plain text after blank line should close the definition
                     let min_indent = (*content_col).max(4);
                     if raw_indent_cols >= min_indent {
-                        keep_level = i + 1;
+                        // Check what kind of content this is
+                        let after_content_indent = if raw_indent_cols >= content_indent_so_far {
+                            let idx = byte_index_at_column(next_line, content_indent_so_far);
+                            &next_line[idx..]
+                        } else {
+                            next_line
+                        };
+
+                        // Keep Definition if there's a definition marker or nested block structure
+                        let has_definition_marker =
+                            try_parse_definition_marker(after_content_indent).is_some();
+                        let has_list_marker =
+                            try_parse_list_marker(after_content_indent, self.config).is_some();
+                        let has_block_structure = has_list_marker
+                            || count_blockquote_markers(after_content_indent).0 > 0
+                            || try_parse_fence_open(after_content_indent).is_some()
+                            || try_parse_math_fence_open(
+                                after_content_indent,
+                                self.config.extensions.tex_math_single_backslash,
+                            )
+                            .is_some()
+                            || try_parse_div_fence_open(after_content_indent).is_some()
+                            || try_parse_horizontal_rule(after_content_indent).is_some();
+
+                        if !has_definition_marker && has_block_structure {
+                            // Keep Definition for nested block content
+                            keep_level = i + 1;
+                        }
+                        // Otherwise let Definition close (either new definition or plain text)
                     }
                 }
                 Container::List {
@@ -1418,6 +1463,13 @@ impl<'a> BlockParser<'a> {
 
             // Start Definition node
             self.builder.start_node(SyntaxKind::Definition.into());
+
+            // Emit container indent (e.g., footnote indent) before the marker
+            if let Some(indent_str) = indent_to_emit {
+                self.builder
+                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
+            }
+
             emit_definition_marker(&mut self.builder, marker_char, indent);
             if spaces_after > 0 {
                 self.builder

@@ -1,69 +1,82 @@
-ROOT@0..299
-  DOCUMENT@0..299
-    Heading@0..64
+ROOT@0..340
+  DOCUMENT@0..340
+    Heading@0..40
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
       WHITESPACE@1..2 " "
-      HeadingContent@2..63
-        TEXT@2..63 "Test: Footnote contai ..."
-      NEWLINE@63..64 "\n"
-    BlankLine@64..65
-      BlankLine@64..65 "\n"
-    FootnoteDefinition@65..114
-      FootnoteReference@65..71 "[^1]: "
-      PARAGRAPH@71..114
-        TEXT@71..113 "This is a footnote wi ..."
-        NEWLINE@113..114 "\n"
-    BlankLine@114..115
-      BlankLine@114..115 "\n"
-    DefinitionList@115..191
-      DefinitionItem@115..191
-        Definition@115..128
-          DefinitionMarker@115..116 ":"
-          WHITESPACE@116..119 "   "
-          Plain@119..128
-            TEXT@119..127 "term one"
-            NEWLINE@127..128 "\n"
-        Definition@128..191
-          DefinitionMarker@128..129 ":"
-          WHITESPACE@129..132 "   "
-          Plain@132..165
-            TEXT@132..163 "definition with neste ..."
-            NEWLINE@163..164 "\n"
-            BlankLine@164..165
-              BlankLine@164..165 "\n"
-          List@165..191
-            WHITESPACE@165..169 "    "
-            ListItem@169..191
-              ListMarker@169..170 "-"
-              WHITESPACE@170..171 " "
-              Plain@171..191
-                TEXT@171..190 "bullet 1 - bullet 2"
-                NEWLINE@190..191 "\n"
-    BlankLine@191..192
-      BlankLine@191..192 "\n"
-    DefinitionList@192..263
-      DefinitionItem@192..263
-        Definition@192..205
-          DefinitionMarker@192..193 ":"
-          WHITESPACE@193..196 "   "
-          Plain@196..205
-            TEXT@196..204 "term two"
-            NEWLINE@204..205 "\n"
-        Definition@205..263
-          DefinitionMarker@205..206 ":"
-          WHITESPACE@206..209 "   "
-          Plain@209..263
-            TEXT@209..262 "another definition Pa ..."
-            NEWLINE@262..263 "\n"
-    BlankLine@263..264
-      BlankLine@263..264 "\n"
-    PARAGRAPH@264..299
-      TEXT@264..285 "Reference to footnote"
-      FootnoteReference@285..289
-        TEXT@285..287 "[^"
-        TEXT@287..288 "1"
-        TEXT@288..289 "]"
-      TEXT@289..298 " in text."
-      NEWLINE@298..299 "\n"
+      HeadingContent@2..39
+        TEXT@2..39 "Test: Definition list ..."
+      NEWLINE@39..40 "\n"
+    BlankLine@40..41
+      BlankLine@40..41 "\n"
+    PARAGRAPH@41..75
+      TEXT@41..69 "Text with footnote re ..."
+      FootnoteReference@69..73
+        TEXT@69..71 "[^"
+        TEXT@71..72 "1"
+        TEXT@72..73 "]"
+      TEXT@73..74 "."
+      NEWLINE@74..75 "\n"
+    BlankLine@75..76
+      BlankLine@75..76 "\n"
+    FootnoteDefinition@76..340
+      FootnoteReference@76..82 "[^1]: "
+      PARAGRAPH@82..121
+        TEXT@82..120 "Footnote containing a ..."
+        NEWLINE@120..121 "\n"
+      BlankLine@121..122
+        BlankLine@121..122 "\n"
+      DefinitionList@122..147
+        DefinitionItem@122..147
+          Definition@122..147
+            WHITESPACE@122..126 "    "
+            DefinitionMarker@126..127 ":"
+            WHITESPACE@127..130 "   "
+            Plain@130..147
+              TEXT@130..146 "First definition"
+              NEWLINE@146..147 "\n"
+      BlankLine@147..152
+        BlankLine@147..152 "    \n"
+      DefinitionList@152..253
+        DefinitionItem@152..253
+          Definition@152..253
+            WHITESPACE@152..156 "    "
+            DefinitionMarker@156..157 ":"
+            WHITESPACE@157..160 "   "
+            Plain@160..196
+              TEXT@160..195 "Second definition wit ..."
+              NEWLINE@195..196 "\n"
+            BlankLine@196..201
+              BlankLine@196..201 "    \n"
+            List@201..253
+              WHITESPACE@201..209 "        "
+              ListItem@209..227
+                ListMarker@209..210 "-"
+                WHITESPACE@210..211 " "
+                Plain@211..227
+                  TEXT@211..226 "Nested bullet 1"
+                  NEWLINE@226..227 "\n"
+              WHITESPACE@227..235 "        "
+              ListItem@235..253
+                ListMarker@235..236 "-"
+                WHITESPACE@236..237 " "
+                Plain@237..253
+                  TEXT@237..252 "Nested bullet 2"
+                  NEWLINE@252..253 "\n"
+      BlankLine@253..258
+        BlankLine@253..258 "    \n"
+      DefinitionList@258..283
+        DefinitionItem@258..283
+          Definition@258..283
+            WHITESPACE@258..262 "    "
+            DefinitionMarker@262..263 ":"
+            WHITESPACE@263..266 "   "
+            Plain@266..283
+              TEXT@266..282 "Third definition"
+              NEWLINE@282..283 "\n"
+      BlankLine@283..288
+        BlankLine@283..288 "    \n"
+      PARAGRAPH@288..340
+        TEXT@288..339 "    Continuing paragr ..."
+        NEWLINE@339..340 "\n"
 
