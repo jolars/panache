@@ -6,82 +6,10 @@ use rowan::GreenNodeBuilder;
 use super::blockquotes::count_blockquote_markers;
 use super::utils::{strip_leading_spaces, strip_newline};
 
-/// Math fence type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum MathFenceType {
-    /// Dollar signs: $$
-    Dollar,
-    /// Backslash brackets: \[
-    BackslashBracket,
-}
-
-/// Information about a detected math fence opening.
-pub(crate) struct MathFenceInfo {
-    pub fence_type: MathFenceType,
-    pub fence_count: usize, // For dollars: number of $; for backslash: always 1
-}
-
-/// Try to detect a display math block opening from content.
-/// Returns fence info if this is a valid opening fence.
-/// Supports both $$ (dollar) and \[ (backslash bracket) formats.
-/// The tex_math_single_backslash parameter controls whether \[ is recognized.
-pub(crate) fn try_parse_math_fence_open(
-    content: &str,
-    tex_math_single_backslash: bool,
-) -> Option<MathFenceInfo> {
-    let trimmed = strip_leading_spaces(content);
-
-    // Check for backslash bracket opening: \[
-    // Per Pandoc spec, content can be on the same line
-    if tex_math_single_backslash && trimmed.starts_with("\\[") {
-        return Some(MathFenceInfo {
-            fence_type: MathFenceType::BackslashBracket,
-            fence_count: 1,
-        });
-    }
-
-    // Check for math fence opening ($$)
-    // Per Pandoc spec: "the delimiters may be separated from the formula by whitespace"
-    // This means content can be on the same line as the opening $$
-    if !trimmed.starts_with('$') {
-        return None;
-    }
-
-    let fence_count = trimmed.chars().take_while(|&c| c == '$').count();
-
-    if fence_count < 2 {
-        return None;
-    }
-
-    Some(MathFenceInfo {
-        fence_type: MathFenceType::Dollar,
-        fence_count,
-    })
-}
-
-/// Check if a line is a valid closing fence for the given fence info.
-pub(crate) fn is_closing_math_fence(content: &str, fence: &MathFenceInfo) -> bool {
-    let trimmed = strip_leading_spaces(content);
-
-    match fence.fence_type {
-        MathFenceType::BackslashBracket => {
-            // Closing fence is \]
-            // Content after \] is allowed (becomes paragraph text)
-            trimmed.starts_with("\\]")
-        }
-        MathFenceType::Dollar => {
-            if !trimmed.starts_with('$') {
-                return false;
-            }
-
-            let closing_count = trimmed.chars().take_while(|&c| c == '$').count();
-
-            // Must have at least as many $ as the opening
-            // Content after $$ is allowed (becomes paragraph text)
-            closing_count >= fence.fence_count
-        }
-    }
-}
+// Re-export for use within block_parser module
+pub(crate) use crate::parser::math::{
+    MathFenceInfo, MathFenceType, is_closing_math_fence, try_parse_math_fence_open,
+};
 
 /// Parse a display math block, consuming lines from the parser.
 /// Returns the new position after the math block.
@@ -105,6 +33,11 @@ pub(crate) fn parse_display_math_block(
             // For \[, content can be on the same line
             let content_after = &first_trimmed[2..]; // Skip \[
             ("\\[", content_after)
+        }
+        MathFenceType::DoubleBackslashBracket => {
+            // For \\[, content can be on the same line
+            let content_after = &first_trimmed[3..]; // Skip \\[
+            ("\\\\[", content_after)
         }
         MathFenceType::Dollar => {
             // For $$, content can be on the same line per Pandoc spec
@@ -191,6 +124,7 @@ pub(crate) fn parse_display_math_block(
 
         let closing_marker = match fence.fence_type {
             MathFenceType::BackslashBracket => "\\]",
+            MathFenceType::DoubleBackslashBracket => "\\\\]",
             MathFenceType::Dollar => {
                 let closing_count = closing_trimmed.chars().take_while(|&c| c == '$').count();
                 &closing_trimmed[..closing_count]

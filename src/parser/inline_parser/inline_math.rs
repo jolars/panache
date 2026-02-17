@@ -1,4 +1,5 @@
-/// Parsing for inline math ($...$) and display math ($$...$$)
+/// Parsing for inline math ($...$)
+use crate::parser::math;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -139,110 +140,25 @@ pub fn try_parse_double_backslash_inline_math(text: &str) -> Option<(usize, &str
     None
 }
 
+// Display math functions now use the shared math module
+// The emit functions remain here since node emission is context-specific
+
 /// Try to parse display math ($$...$$) starting at the current position.
-/// Returns the number of characters consumed and the math content if successful.
-/// Display math can span multiple lines in inline contexts.
+/// This is a wrapper around the shared math module function.
 pub fn try_parse_display_math(text: &str) -> Option<(usize, &str)> {
-    // Must start with at least $$
-    if !text.starts_with("$$") {
-        return None;
-    }
-
-    // Count opening dollar signs
-    let opening_count = text.chars().take_while(|&c| c == '$').count();
-    if opening_count < 2 {
-        return None;
-    }
-
-    let rest = &text[opening_count..];
-
-    // Look for matching closing delimiter
-    let mut pos = 0;
-    while pos < rest.len() {
-        let ch = rest[pos..].chars().next()?;
-
-        if ch == '$' {
-            // Check if it's escaped
-            if pos > 0 && rest.as_bytes()[pos - 1] == b'\\' {
-                // Escaped dollar, continue searching
-                pos += ch.len_utf8();
-                continue;
-            }
-
-            // Count closing dollar signs
-            let closing_count = rest[pos..].chars().take_while(|&c| c == '$').count();
-
-            // Must have at least as many closing dollars as opening
-            if closing_count >= opening_count {
-                let math_content = &rest[..pos];
-                let total_len = opening_count + pos + closing_count;
-                return Some((total_len, math_content));
-            }
-
-            // Not enough dollars, skip this run and continue
-            pos += closing_count;
-            continue;
-        }
-
-        pos += ch.len_utf8();
-    }
-
-    // No matching close found
-    None
+    math::try_parse_display_math(text)
 }
 
 /// Try to parse single backslash display math: \[...\]
-/// Extension: tex_math_single_backslash
+/// This is a wrapper around the shared math module function.
 pub fn try_parse_single_backslash_display_math(text: &str) -> Option<(usize, &str)> {
-    if !text.starts_with(r"\[") {
-        return None;
-    }
-
-    let rest = &text[2..]; // Skip \[
-
-    // Look for closing \]
-    let mut pos = 0;
-    while pos < rest.len() {
-        let ch = rest[pos..].chars().next()?;
-
-        if ch == '\\' && rest[pos..].starts_with(r"\]") {
-            // Found closing \]
-            let math_content = &rest[..pos];
-            let total_len = 2 + pos + 2; // \[ + content + \]
-            return Some((total_len, math_content));
-        }
-
-        pos += ch.len_utf8();
-    }
-
-    None
+    math::try_parse_single_backslash_display_math(text)
 }
 
 /// Try to parse double backslash display math: \\[...\\]
-/// Extension: tex_math_double_backslash
+/// This is a wrapper around the shared math module function.
 pub fn try_parse_double_backslash_display_math(text: &str) -> Option<(usize, &str)> {
-    if !text.starts_with(r"\\[") {
-        return None;
-    }
-
-    let rest = &text[3..]; // Skip \\[
-
-    // Look for closing \\]
-    let mut pos = 0;
-    while pos < rest.len() {
-        let ch = rest[pos..].chars().next()?;
-
-        if ch == '\\' && rest[pos..].starts_with(r"\\]") {
-            // Found closing \\]
-            let math_content = &rest[..pos];
-            let total_len = 3 + pos + 3; // \\[ + content + \\]
-            return Some((total_len, math_content));
-        }
-
-        pos += ch.len_utf8();
-    }
-
-    None
+    math::try_parse_double_backslash_display_math(text)
 }
 
 /// Emit an inline math node to the builder.
