@@ -181,6 +181,11 @@ src/
 ├── cli.rs               # CLI argument definitions with clap
 ├── config.rs            # Configuration handling (.panache.toml, flavor, extensions)
 ├── syntax.rs            # Syntax node definitions and AST types (rowan-based)
+├── utils.rs             # General utility functions
+├── range_utils.rs       # Range manipulation utilities
+├── external_formatters.rs       # Async external formatter integration
+├── external_formatters_sync.rs  # Sync external formatter integration
+├── external_formatters_common.rs # Shared formatter utilities
 ├── formatter.rs         # Formatter module entry point (public API)
 ├── formatter/
 │   ├── core.rs             # Formatter struct + format_node_sync orchestration
@@ -208,8 +213,8 @@ src/
 │   │   ├── code_blocks.rs       # Fenced code block parsing
 │   │   ├── container_stack.rs   # Container block stack management
 │   │   ├── definition_lists.rs  # Definition list parsing
-│   │   ├── display_math.rs      # Display math block parsing ($$)
 │   │   ├── fenced_divs.rs       # Quarto/Pandoc fenced div parsing (:::)
+│   │   ├── figures.rs           # Figure parsing (![alt](img))
 │   │   ├── headings.rs          # ATX heading parsing (#)
 │   │   ├── horizontal_rules.rs  # Horizontal rule parsing (---)
 │   │   ├── html_blocks.rs       # HTML block parsing
@@ -225,27 +230,32 @@ src/
 │   │   ├── utils.rs             # Helper functions (strip_leading_spaces, etc.)
 │   │   └── tests/               # Block parser unit tests
 │   ├── inline_parser.rs     # Inline parser module entry point
-│   └── inline_parser/
-│       ├── architecture_tests.rs # Tests for nested inline structures
-│       ├── bracketed_spans.rs    # Bracketed span parsing ([text]{.class})
-│       ├── citations.rs          # Citation parsing (@key, [@key])
-│       ├── code_spans.rs         # Code span parsing (`code`)
-│       ├── emphasis.rs           # Emphasis/strong parsing (*em* **strong**)
-│       ├── escapes.rs            # Escape sequence parsing (\*)
-│       ├── inline_footnotes.rs   # Inline footnote parsing (^[text])
-│       ├── inline_math.rs        # Inline math parsing ($x^2$)
-│       ├── latex.rs              # Inline LaTeX command parsing (\command)
-│       ├── links.rs              # Link and image parsing ([text](url))
-│       ├── native_spans.rs       # Native span parsing
-│       ├── raw_inline.rs         # Raw inline parsing (`code`{=format})
-│       ├── strikeout.rs          # Strikeout parsing (~~text~~)
-│       ├── subscript.rs          # Subscript parsing (~text~)
-│       ├── superscript.rs        # Superscript parsing (^text^)
-│       ├── tests/                # Inline parser test modules
-│       └── tests.rs              # Integration tests
+│   ├── inline_parser/
+│   │   ├── architecture_tests.rs # Tests for nested inline structures
+│   │   ├── bracketed_spans.rs    # Bracketed span parsing ([text]{.class})
+│   │   ├── citations.rs          # Citation parsing (@key, [@key])
+│   │   ├── code_spans.rs         # Code span parsing (`code`)
+│   │   ├── emphasis.rs           # Emphasis/strong parsing (*em* **strong**)
+│   │   ├── escapes.rs            # Escape sequence parsing (\*)
+│   │   ├── inline_footnotes.rs   # Inline footnote parsing (^[text])
+│   │   ├── latex.rs              # Inline LaTeX command parsing (\command)
+│   │   ├── links.rs              # Link and image parsing ([text](url))
+│   │   ├── math.rs               # Inline math parsing ($x^2$)
+│   │   ├── native_spans.rs       # Native span parsing
+│   │   ├── raw_inline.rs         # Raw inline parsing (`code`{=format})
+│   │   ├── shortcodes.rs         # Shortcode parsing (Quarto-specific)
+│   │   ├── strikeout.rs          # Strikeout parsing (~~text~~)
+│   │   ├── subscript.rs          # Subscript parsing (~text~)
+│   │   ├── superscript.rs        # Superscript parsing (^text^)
+│   │   ├── tests/                # Inline parser test modules
+│   │   └── tests.rs              # Integration tests
+│   └── list_postprocessor.rs # List post-processing utilities
 ├── linter.rs            # Linter module entry point (public API)
 ├── linter/
+│   ├── code_block_collector.rs  # Code block collection for linting
 │   ├── diagnostics.rs       # Diagnostic types (Location, Severity, Fix, Edit)
+│   ├── external_linters.rs  # Async external linter integration
+│   ├── external_linters_sync.rs # Sync external linter integration
 │   ├── runner.rs            # LintRunner orchestration
 │   ├── rules.rs             # Rule trait and RuleRegistry
 │   └── rules/
@@ -266,14 +276,9 @@ src/
 │   ├── helpers.rs           # Helper functions for LSP
 │   └── server.rs            # Backend server implementation
 ├── metadata.rs          # Metadata module entry point
-├── metadata/
-│   ├── bibliography.rs      # Bibliography/citation handling
-│   └── yaml.rs              # YAML frontmatter utilities
-├── utils.rs             # General utility functions
-└── range_utils.rs       # Range manipulation utilities
-├── external_formatters.rs       # Async external formatter integration
-├── external_formatters_sync.rs  # Sync external formatter integration
-└── external_formatters_common.rs # Shared formatter utilities
+└── metadata/
+    ├── bibliography.rs      # Bibliography/citation handling
+    └── yaml.rs              # YAML frontmatter utilities
 ```
 
 ### Configuration System
