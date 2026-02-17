@@ -9,7 +9,10 @@ use tower_lsp_server::ls_types::*;
 use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
 use crate::lsp::helpers::get_document_and_config;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{
+    AstNode, GridTable, Heading, ImageLink, MultilineTable, PipeTable, SimpleTable, SyntaxKind,
+    SyntaxNode,
+};
 
 pub async fn document_symbol(
     client: &Client,
@@ -148,50 +151,43 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
 }
 
 fn get_heading_level(node: &SyntaxNode) -> usize {
-    // Count ATX markers (#)
-    for child in node.children() {
-        if child.kind() == SyntaxKind::ATX_HEADING_MARKER {
-            let text = child.text().to_string();
-            return text.chars().filter(|&c| c == '#').count();
-        }
-    }
-    1 // Default to H1
+    // Use typed wrapper for cleaner access
+    Heading::cast(node.clone()).map(|h| h.level()).unwrap_or(1)
 }
 
 fn extract_heading_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {
-    let heading_text = extract_heading_text(node)?;
+    // Use typed wrapper
+    let heading = Heading::cast(node.clone())?;
+    let text = heading.text();
+
     let range = node_to_range(node, content)?;
-    let selection_range = node_to_range(node, content)?; // For now, same as range
 
     #[allow(deprecated)]
     Some(DocumentSymbol {
-        name: heading_text,
+        name: if text.is_empty() {
+            "(empty)".to_string()
+        } else {
+            text
+        },
         detail: None,
         kind: SymbolKind::STRING,
         tags: None,
         deprecated: None,
         range,
-        selection_range,
+        selection_range: range,
         children: Some(Vec::new()),
     })
 }
 
-fn extract_heading_text(node: &SyntaxNode) -> Option<String> {
-    for child in node.children() {
-        if child.kind() == SyntaxKind::HEADING_CONTENT {
-            let text = child.text().to_string().trim().to_string();
-            return if text.is_empty() {
-                Some("(empty)".to_string())
-            } else {
-                Some(text)
-            };
-        }
-    }
-    Some("(empty)".to_string())
-}
-
 fn extract_table_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {
-    let caption = extract_table_caption(node);
+    // Use typed wrappers to extract caption
+    let caption = PipeTable::cast(node.clone())
+        .and_then(|t| t.caption())
+        .or_else(|| GridTable::cast(node.clone()).and_then(|t| t.caption()))
+        .or_else(|| SimpleTable::cast(node.clone()).and_then(|t| t.caption()))
+        .or_else(|| MultilineTable::cast(node.clone()).and_then(|t| t.caption()))
+        .map(|c| c.text());
+
     let name = if let Some(cap) = caption {
         format!("Table: {}", cap)
     } else {
@@ -214,18 +210,13 @@ fn extract_table_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymb
     })
 }
 
-fn extract_table_caption(node: &SyntaxNode) -> Option<String> {
-    for child in node.children() {
-        if child.kind() == SyntaxKind::TABLE_CAPTION {
-            let text = child.text().to_string().trim().to_string();
-            return if text.is_empty() { None } else { Some(text) };
-        }
-    }
-    None
-}
-
 fn extract_figure_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {
-    let alt_text = extract_image_alt(node);
+    // Use typed wrapper for cleaner access
+    let alt_text = ImageLink::cast(node.clone())
+        .and_then(|img| img.alt())
+        .map(|alt| alt.text())
+        .filter(|text| !text.is_empty());
+
     let name = if let Some(alt) = alt_text {
         format!("Figure: {}", alt)
     } else {
@@ -246,16 +237,6 @@ fn extract_figure_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSym
         selection_range,
         children: None,
     })
-}
-
-fn extract_image_alt(node: &SyntaxNode) -> Option<String> {
-    for child in node.children() {
-        if child.kind() == SyntaxKind::IMAGE_ALT {
-            let text = child.text().to_string().trim().to_string();
-            return if text.is_empty() { None } else { Some(text) };
-        }
-    }
-    None
 }
 
 fn node_to_range(node: &SyntaxNode, content: &str) -> Option<Range> {
