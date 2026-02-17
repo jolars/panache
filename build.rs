@@ -83,45 +83,10 @@ fn generate_cli_markdown() -> Result<()> {
     document.push_str("---\n\n");
     document.push_str(&markdown);
 
-    // Write unformatted version first
+    // Write the document
     let output_path = docs_dir.join("cli.qmd");
     fs::write(&output_path, &document)?;
-
-    // Try to format with panache binary (check debug first, then release)
-    let panache_debug = PathBuf::from("target/debug/panache");
-    let panache_release = PathBuf::from("target/release/panache");
-
-    let panache_bin = if panache_debug.exists() {
-        Some(panache_debug)
-    } else if panache_release.exists() {
-        Some(panache_release)
-    } else {
-        None
-    };
-
-    if let Some(bin_path) = panache_bin {
-        // Format the file in place using the panache binary
-        match std::process::Command::new(&bin_path)
-            .arg("format")
-            .arg(&output_path)
-            .status()
-        {
-            Ok(exit_status) if exit_status.success() => {
-                println!("Generated and formatted CLI markdown: {:?}", output_path);
-            }
-            _ => {
-                println!(
-                    "Generated CLI markdown (formatting failed): {:?}",
-                    output_path
-                );
-            }
-        }
-    } else {
-        println!(
-            "Generated CLI markdown (panache binary not found, skipping format): {:?}",
-            output_path
-        );
-    }
+    println!("Generated CLI markdown: {:?}", output_path);
 
     Ok(())
 }
