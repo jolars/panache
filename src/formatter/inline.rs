@@ -218,6 +218,71 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 format!("{}{}{}", open, content, close)
             }
         }
+        SyntaxKind::DisplayMath => {
+            // Display math: $$content$$ or \[content\] or \\[content\\]
+            // Format on separate lines with proper normalization
+            let mut content = String::new();
+            let mut opening_marker = None;
+            let mut closing_marker = None;
+
+            for child in node.children_with_tokens() {
+                if let NodeOrToken::Token(tok) = child {
+                    if tok.kind() == SyntaxKind::BlockMathMarker {
+                        if opening_marker.is_none() {
+                            opening_marker = Some(tok.text().to_string());
+                        } else {
+                            closing_marker = Some(tok.text().to_string());
+                        }
+                    } else if tok.kind() == SyntaxKind::TEXT {
+                        content.push_str(tok.text());
+                    }
+                }
+            }
+
+            // Apply delimiter style preference
+            let (open, close) = match config.math_delimiter_style {
+                MathDelimiterStyle::Preserve => {
+                    let opening = opening_marker.as_deref().unwrap_or("$$");
+                    let closing = closing_marker.as_deref().unwrap_or("$$");
+                    (opening, closing)
+                }
+                MathDelimiterStyle::Dollars => ("$$", "$$"),
+                MathDelimiterStyle::Backslash => (r"\[", r"\]"),
+            };
+
+            // Normalize content:
+            // 1. Trim leading/trailing whitespace (including newlines)
+            // 2. Ensure content is on separate lines from delimiters
+            // 3. Strip common leading whitespace from all lines (preserve relative indentation)
+            let mut result = String::new();
+            result.push_str(open);
+            result.push('\n');
+
+            // Process content: trim overall, then strip common leading whitespace
+            let trimmed_content = content.trim();
+            if !trimmed_content.is_empty() {
+                // Find minimum indentation across all non-empty lines
+                let min_indent = trimmed_content
+                    .lines()
+                    .filter(|line| !line.trim().is_empty())
+                    .map(|line| line.len() - line.trim_start().len())
+                    .min()
+                    .unwrap_or(0);
+
+                // Strip common indentation from each line
+                for line in trimmed_content.lines() {
+                    if line.len() >= min_indent {
+                        result.push_str(&line[min_indent..]);
+                    } else {
+                        result.push_str(line);
+                    }
+                    result.push('\n');
+                }
+            }
+
+            result.push_str(close);
+            result
+        }
         SyntaxKind::HardLineBreak => {
             // Normalize hard line breaks to backslash-newline when escaped_line_breaks is enabled
             // Otherwise preserve original format (trailing spaces)

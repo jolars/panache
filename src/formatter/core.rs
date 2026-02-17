@@ -654,22 +654,9 @@ impl Formatter {
                 let text = node.text().to_string();
                 log::debug!("Formatting paragraph, text length: {}", text.len());
 
-                // If paragraph contains display math across lines ($$\n...\n$$), preserve as-is
-                // Check that it's actually dollar signs, not just any characters
-                let has_multiline_display_math = text.contains("$$\n") || text.contains("\n$$");
-                if has_multiline_display_math {
-                    log::debug!("Paragraph has multiline display math, preserving");
-                    self.output.push_str(&text);
-                    if !self.output.ends_with('\n') {
-                        self.output.push('\n');
-                    }
-                    return;
-                }
-
                 // Check if paragraph contains inline display math ($$...$$)
-                // Only reformat if it's on a single line
                 if self.contains_inline_display_math(node) {
-                    log::debug!("Paragraph has inline display math");
+                    log::debug!("Paragraph has display math");
                     self.format_paragraph_with_display_math(node, indent, line_width);
                     return;
                 }
@@ -1153,33 +1140,25 @@ impl Formatter {
                 self.output.push_str(node.text().to_string().trim());
             }
 
-            SyntaxKind::MathBlock => {
-                let mut label = None;
+            SyntaxKind::DisplayMath => {
+                // Display math ($$...$$) - format on separate lines
+                // Even though it's parsed as inline, it should display as block-level
+
                 let mut math_content = None;
                 let mut opening_marker: Option<String> = None;
                 let mut closing_marker: Option<String> = None;
 
                 for child in node.children_with_tokens() {
-                    match child {
-                        rowan::NodeOrToken::Node(n) => match n.kind() {
-                            SyntaxKind::MathContent => {
-                                math_content = Some(n.text().to_string());
+                    if let rowan::NodeOrToken::Token(t) = child {
+                        if t.kind() == SyntaxKind::BlockMathMarker {
+                            let marker_text = t.text().to_string();
+                            if opening_marker.is_none() {
+                                opening_marker = Some(marker_text);
+                            } else if closing_marker.is_none() {
+                                closing_marker = Some(marker_text);
                             }
-                            SyntaxKind::Attribute => {
-                                label = Some(n.text().to_string().trim().to_string());
-                            }
-                            _ => {}
-                        },
-                        rowan::NodeOrToken::Token(t) => {
-                            if t.kind() == SyntaxKind::BlockMathMarker {
-                                let marker_text = t.text().to_string();
-                                // First marker is opening, second is closing
-                                if opening_marker.is_none() {
-                                    opening_marker = Some(marker_text);
-                                } else if closing_marker.is_none() {
-                                    closing_marker = Some(marker_text);
-                                }
-                            }
+                        } else if t.kind() == SyntaxKind::TEXT {
+                            math_content = Some(t.text().to_string());
                         }
                     }
                 }
@@ -1191,23 +1170,16 @@ impl Formatter {
                 // Apply delimiter style preference
                 use crate::config::MathDelimiterStyle;
                 let (open, close) = match self.config.math_delimiter_style {
-                    MathDelimiterStyle::Preserve => {
-                        // Keep original format
-                        (opening, closing_from_tree)
-                    }
-                    MathDelimiterStyle::Dollars => {
-                        // Normalize to dollars
-                        ("$$", "$$")
-                    }
-                    MathDelimiterStyle::Backslash => {
-                        // Normalize to single backslash
-                        (r"\[", r"\]")
-                    }
+                    MathDelimiterStyle::Preserve => (opening, closing_from_tree),
+                    MathDelimiterStyle::Dollars => ("$$", "$$"),
+                    MathDelimiterStyle::Backslash => (r"\[", r"\]"),
                 };
 
                 // Opening fence
+                self.output.push('\n');
                 self.output.push_str(open);
                 self.output.push('\n');
+
                 // Math content
                 if let Some(content) = math_content {
                     let math_indent = self.config.math_indent;
@@ -1217,12 +1189,9 @@ impl Formatter {
                         self.output.push('\n');
                     }
                 }
-                // Closing fence (with label if present)
+
+                // Closing fence
                 self.output.push_str(close);
-                if let Some(lbl) = label {
-                    self.output.push(' ');
-                    self.output.push_str(&lbl);
-                }
                 self.output.push('\n');
             }
 

@@ -1,0 +1,15 @@
+ROOT@0..106
+  DOCUMENT@0..106
+    PARAGRAPH@0..67
+      TEXT@0..66 "The following is a pa ..."
+      NEWLINE@66..67 "\n"
+    BlankLine@67..68
+      BlankLine@67..68 "\n"
+    PARAGRAPH@68..106
+      DisplayMath@68..82
+        BlockMathMarker@68..70 "$$"
+        TEXT@70..80 "\nE = mc^2\n"
+        BlockMathMarker@80..82 "$$"
+      TEXT@82..105 " some text coming here."
+      NEWLINE@105..106 "\n"
+

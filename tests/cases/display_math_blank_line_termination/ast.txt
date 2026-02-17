@@ -16,7 +16,7 @@ ROOT@0..206
       BlankLine@94..95 "\n"
     PARAGRAPH@95..151
       TEXT@95..116 "Inline display math: "
-      InlineMath@116..125
+      DisplayMath@116..125
         BlockMathMarker@116..118 "$$"
         TEXT@118..123 "x = y"
         BlockMathMarker@123..125 "$$"
@@ -29,13 +29,11 @@ ROOT@0..206
       NEWLINE@174..175 "\n"
     BlankLine@175..176
       BlankLine@175..176 "\n"
-    MathBlock@176..188
-      BlockMathMarker@176..178 "$$"
-      NEWLINE@178..179 "\n"
-      MathContent@179..185
-        TEXT@179..184 "a = b"
-        NEWLINE@184..185 "\n"
-      BlockMathMarker@185..187 "$$"
+    PARAGRAPH@176..188
+      DisplayMath@176..187
+        BlockMathMarker@176..178 "$$"
+        TEXT@178..185 "\na = b\n"
+        BlockMathMarker@185..187 "$$"
       NEWLINE@187..188 "\n"
     BlankLine@188..189
       BlankLine@188..189 "\n"

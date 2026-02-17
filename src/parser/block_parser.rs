@@ -8,7 +8,6 @@ pub mod chunk_options; // Public for hashpipe formatter
 pub mod code_blocks; // Public for formatter access to InfoString and CodeBlockType
 mod container_stack;
 mod definition_lists;
-mod display_math;
 mod fenced_divs;
 mod figures;
 mod headings;
@@ -28,7 +27,6 @@ mod utils;
 use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
-use display_math::{has_valid_math_closing, parse_display_math_block, try_parse_math_fence_open};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
 use figures::{parse_figure, try_parse_figure};
 use headings::{emit_atx_heading, try_parse_atx_heading};
@@ -604,12 +602,6 @@ impl<'a> BlockParser<'a> {
                         let has_block_structure = has_list_marker
                             || count_blockquote_markers(after_content_indent).0 > 0
                             || try_parse_fence_open(after_content_indent).is_some()
-                            || try_parse_math_fence_open(
-                                after_content_indent,
-                                self.config.extensions.tex_math_single_backslash,
-                                self.config.extensions.tex_math_double_backslash,
-                            )
-                            .is_some()
                             || try_parse_div_fence_open(after_content_indent).is_some()
                             || try_parse_horizontal_rule(after_content_indent).is_some();
 
@@ -768,12 +760,6 @@ impl<'a> BlockParser<'a> {
                 || try_parse_list_marker(stripped_content, self.config).is_some()
                 || count_blockquote_markers(stripped_content).0 > 0
                 || try_parse_fence_open(stripped_content).is_some()
-                || try_parse_math_fence_open(
-                    stripped_content,
-                    self.config.extensions.tex_math_single_backslash,
-                    self.config.extensions.tex_math_double_backslash,
-                )
-                .is_some()
                 || try_parse_div_fence_open(stripped_content).is_some()
                 || try_parse_horizontal_rule(stripped_content).is_some()
                 || try_parse_atx_heading(stripped_content).is_some()
@@ -1126,41 +1112,6 @@ impl<'a> BlockParser<'a> {
             return true;
         }
 
-        // Check for display math block
-        // Close paragraph first if one is open, then parse as MathBlock
-        if let Some(math_fence) = try_parse_math_fence_open(
-            content,
-            self.config.extensions.tex_math_single_backslash,
-            self.config.extensions.tex_math_double_backslash,
-        ) {
-            // Check if this math block has a valid closing fence (Pandoc compat)
-            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
-            if has_valid_math_closing(&self.lines, self.pos, &math_fence, bq_depth) {
-                // Has valid closing - parse as math block
-                log::debug!(
-                    "Parsed display math block at line {}: {:?}",
-                    self.pos,
-                    math_fence.fence_type
-                );
-                // Close paragraph before opening display math block
-                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                    self.containers
-                        .close_to(self.containers.depth() - 1, &mut self.builder);
-                }
-
-                let new_pos = parse_display_math_block(
-                    &mut self.builder,
-                    &self.lines,
-                    self.pos,
-                    math_fence,
-                    bq_depth,
-                );
-                self.pos = new_pos;
-                return true;
-            }
-            // No valid closing fence - not a math block, fall through to paragraph handling
-        }
-
         // Check for fenced div opening
         if has_blank_before && let Some(div_fence) = try_parse_div_fence_open(content) {
             log::debug!(
@@ -1352,8 +1303,20 @@ impl<'a> BlockParser<'a> {
                 return true;
             }
 
-            // Close paragraph before list item
+            // Lists can only interrupt paragraphs if there was a blank line before
+            // (Per Pandoc spec - lists need blank lines to start interrupting paragraphs)
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                if !has_blank_before {
+                    // List cannot interrupt paragraph without blank line - treat as paragraph content
+                    paragraphs::append_paragraph_line(
+                        &mut self.builder,
+                        line_to_append.unwrap_or(content),
+                    );
+                    self.pos += 1;
+                    return true;
+                }
+
+                // Blank line before - can interrupt paragraph
                 self.containers
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
@@ -1662,7 +1625,6 @@ mod tests {
     mod blanklines;
     mod blockquotes;
     mod code_blocks;
-    mod display_math;
     mod headings;
     mod helpers;
     mod lists;

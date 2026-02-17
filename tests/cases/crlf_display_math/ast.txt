@@ -9,13 +9,11 @@ ROOT@0..60
       NEWLINE@6..8 "\r\n"
     BlankLine@8..10
       BlankLine@8..10 "\r\n"
-    MathBlock@10..25
-      BlockMathMarker@10..12 "$$"
-      NEWLINE@12..14 "\r\n"
-      MathContent@14..21
-        TEXT@14..19 "x = y"
-        NEWLINE@19..21 "\r\n"
-      BlockMathMarker@21..23 "$$"
+    PARAGRAPH@10..25
+      DisplayMath@10..23
+        BlockMathMarker@10..12 "$$"
+        TEXT@12..21 "\r\nx = y\r\n"
+        BlockMathMarker@21..23 "$$"
       NEWLINE@23..25 "\r\n"
     BlankLine@25..27
       BlankLine@25..27 "\r\n"
@@ -24,12 +22,10 @@ ROOT@0..60
       NEWLINE@37..39 "\r\n"
     BlankLine@39..41
       BlankLine@39..41 "\r\n"
-    MathBlock@41..60
-      BlockMathMarker@41..43 "$$"
-      NEWLINE@43..45 "\r\n"
-      MathContent@45..56
-        TEXT@45..54 "a + b = c"
-        NEWLINE@54..56 "\r\n"
-      BlockMathMarker@56..58 "$$"
+    PARAGRAPH@41..60
+      DisplayMath@41..58
+        BlockMathMarker@41..43 "$$"
+        TEXT@43..56 "\r\na + b = c\r\n"
+        BlockMathMarker@56..58 "$$"
       NEWLINE@58..60 "\r\n"
 

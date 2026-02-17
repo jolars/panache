@@ -29,29 +29,11 @@ ROOT@0..398
       NEWLINE@188..189 "\n"
     BlankLine@189..190
       BlankLine@189..190 "\n"
-    MathBlock@190..245
-      BlockMathMarker@190..192 "\\["
-      NEWLINE@192..193 "\n"
-      MathContent@193..242
-        LatexCommand@193..197
-          TEXT@193..197 "\\int"
-        TEXT@197..198 "_"
-        TEXT@198..199 "0"
-        Superscript@199..209
-          SuperscriptMarker@199..200
-            SuperscriptMarker@199..200 "^"
-          LatexCommand@200..206
-            TEXT@200..206 "\\infty"
-          TEXT@206..208 " e"
-          SuperscriptMarker@208..209
-            SuperscriptMarker@208..209 "^"
-        TEXT@209..212 "{-x"
-        TEXT@212..213 "^"
-        TEXT@213..221 "2} dx = "
-        LatexCommand@221..241
-          TEXT@221..241 "\\frac{\\sqrt{\\pi}}{2}"
-        NEWLINE@241..242 "\n"
-      BlockMathMarker@242..244 "\\]"
+    PARAGRAPH@190..245
+      DisplayMath@190..244
+        BlockMathMarker@190..192 "\\["
+        TEXT@192..242 "\n\\int_0^\\infty e^{-x^ ..."
+        BlockMathMarker@242..244 "\\]"
       NEWLINE@244..245 "\n"
     BlankLine@245..246
       BlankLine@245..246 "\n"
@@ -75,13 +57,10 @@ ROOT@0..398
       NEWLINE@381..382 "\n"
     BlankLine@382..383
       BlankLine@382..383 "\n"
-    MathBlock@383..398
-      BlockMathMarker@383..385 "\\["
-      MathContent@385..395
-        TEXT@385..392 " e = mc"
-        TEXT@392..393 "^"
-        TEXT@393..394 "2"
-        NEWLINE@394..395 "\n"
-      BlockMathMarker@395..397 "\\]"
+    PARAGRAPH@383..398
+      DisplayMath@383..397
+        BlockMathMarker@383..385 "\\["
+        TEXT@385..395 " e = mc^2\n"
+        BlockMathMarker@395..397 "\\]"
       NEWLINE@397..398 "\n"
 

@@ -10,4 +10,4 @@ Adjacent math: $x$ and $y$ variables
 
 Complex: $\frac{n!}{k!(n-k)!}$
 
-Multiple dollars: $$\text{not display math}$$
+Multiple dollars: $$\text{display math}$$

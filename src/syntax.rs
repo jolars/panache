@@ -44,7 +44,7 @@ pub enum SyntaxKind {
     InlineMathMarker, // $
     BlockMathMarker,  // $$
     InlineMath,
-    MathBlock,
+    DisplayMath,
     MathContent,
 
     // Footnotes

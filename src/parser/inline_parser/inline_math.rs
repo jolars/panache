@@ -201,7 +201,7 @@ pub fn emit_double_backslash_inline_math(builder: &mut GreenNodeBuilder, content
 
 /// Emit a display math node to the builder (when occurring inline in paragraph).
 pub fn emit_display_math(builder: &mut GreenNodeBuilder, content: &str, dollar_count: usize) {
-    builder.start_node(SyntaxKind::InlineMath.into()); // Note: Using InlineMath for now
+    builder.start_node(SyntaxKind::DisplayMath.into());
 
     // Opening $$
     let marker = "$".repeat(dollar_count);
@@ -218,7 +218,7 @@ pub fn emit_display_math(builder: &mut GreenNodeBuilder, content: &str, dollar_c
 
 /// Emit a single backslash display math node: \[...\]
 pub fn emit_single_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
-    builder.start_node(SyntaxKind::InlineMath.into());
+    builder.start_node(SyntaxKind::DisplayMath.into());
 
     builder.token(SyntaxKind::BlockMathMarker.into(), r"\[");
     builder.token(SyntaxKind::TEXT.into(), content);
@@ -229,7 +229,7 @@ pub fn emit_single_backslash_display_math(builder: &mut GreenNodeBuilder, conten
 
 /// Emit a double backslash display math node: \\[...\\]
 pub fn emit_double_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
-    builder.start_node(SyntaxKind::InlineMath.into());
+    builder.start_node(SyntaxKind::DisplayMath.into());
 
     builder.token(SyntaxKind::BlockMathMarker.into(), r"\\[");
     builder.token(SyntaxKind::TEXT.into(), content);

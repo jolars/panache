@@ -12,7 +12,6 @@ pub fn is_block_element(kind: SyntaxKind) -> bool {
             | SyntaxKind::List
             | SyntaxKind::DefinitionList
             | SyntaxKind::BlockQuote
-            | SyntaxKind::MathBlock
             | SyntaxKind::CodeBlock
             | SyntaxKind::SimpleTable
             | SyntaxKind::MultilineTable
@@ -45,7 +44,6 @@ pub fn is_structural_block(kind: SyntaxKind) -> bool {
             | SyntaxKind::YamlMetadata
             | SyntaxKind::PandocTitleBlock
             | SyntaxKind::HtmlBlock
-            | SyntaxKind::MathBlock
             | SyntaxKind::BlankLine
             | SyntaxKind::ReferenceDefinition
             | SyntaxKind::FootnoteDefinition

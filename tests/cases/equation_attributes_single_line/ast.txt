@@ -1,0 +1,26 @@
+ROOT@0..91
+  DOCUMENT@0..91
+    PARAGRAPH@0..32
+      TEXT@0..31 "Single-line equation  ..."
+      NEWLINE@31..32 "\n"
+    BlankLine@32..33
+      BlankLine@32..33 "\n"
+    PARAGRAPH@33..63
+      DisplayMath@33..47
+        BlockMathMarker@33..35 "$$"
+        TEXT@35..45 " E = mc^2 "
+        BlockMathMarker@45..47 "$$"
+      WHITESPACE@47..48 " "
+      Attribute@48..62
+        Attribute@48..62 "{#eq-einstein}"
+      NEWLINE@62..63 "\n"
+    BlankLine@63..64
+      BlankLine@63..64 "\n"
+    PARAGRAPH@64..91
+      TEXT@64..77 "Reference to "
+      Citation@77..89
+        CitationMarker@77..78 "@"
+        CitationKey@78..89 "eq-einstein"
+      TEXT@89..90 "."
+      NEWLINE@90..91 "\n"
+

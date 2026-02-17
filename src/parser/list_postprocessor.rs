@@ -197,7 +197,6 @@ fn is_block_node(kind: SyntaxKind) -> bool {
         SyntaxKind::CodeBlock
             | SyntaxKind::List
             | SyntaxKind::BlockQuote
-            | SyntaxKind::MathBlock
             | SyntaxKind::SimpleTable
             | SyntaxKind::PipeTable
             | SyntaxKind::GridTable

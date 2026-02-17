@@ -1,0 +1,7 @@
+Single-line equation reference:
+
+$$
+E = mc^2
+$$ {#eq-einstein}
+
+Reference to @eq-einstein.

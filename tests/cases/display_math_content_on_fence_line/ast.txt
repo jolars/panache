@@ -14,12 +14,11 @@ ROOT@0..244
       NEWLINE@99..100 "\n"
     BlankLine@100..101
       BlankLine@100..101 "\n"
-    MathBlock@101..117
-      BlockMathMarker@101..103 "$$"
-      MathContent@103..114
-        TEXT@103..113 " x = y + z"
-        NEWLINE@113..114 "\n"
-      BlockMathMarker@114..116 "$$"
+    PARAGRAPH@101..117
+      DisplayMath@101..116
+        BlockMathMarker@101..103 "$$"
+        TEXT@103..114 " x = y + z\n"
+        BlockMathMarker@114..116 "$$"
       NEWLINE@116..117 "\n"
     BlankLine@117..118
       BlankLine@117..118 "\n"
@@ -28,12 +27,11 @@ ROOT@0..244
       NEWLINE@143..144 "\n"
     BlankLine@144..145
       BlankLine@144..145 "\n"
-    MathBlock@145..157
-      BlockMathMarker@145..147 "$$"
-      NEWLINE@147..148 "\n"
-      MathContent@148..154
-        TEXT@148..154 "a = b "
-      BlockMathMarker@154..156 "$$"
+    PARAGRAPH@145..157
+      DisplayMath@145..156
+        BlockMathMarker@145..147 "$$"
+        TEXT@147..154 "\na = b "
+        BlockMathMarker@154..156 "$$"
       NEWLINE@156..157 "\n"
     BlankLine@157..158
       BlankLine@157..158 "\n"
@@ -42,13 +40,11 @@ ROOT@0..244
       NEWLINE@176..177 "\n"
     BlankLine@177..178
       BlankLine@177..178 "\n"
-    MathBlock@178..193
-      BlockMathMarker@178..180 "$$"
-      MathContent@180..190
-        TEXT@180..187 " E = mc"
-        TEXT@187..188 "^"
-        TEXT@188..190 "2 "
-      BlockMathMarker@190..192 "$$"
+    PARAGRAPH@178..193
+      DisplayMath@178..192
+        BlockMathMarker@178..180 "$$"
+        TEXT@180..190 " E = mc^2 "
+        BlockMathMarker@190..192 "$$"
       NEWLINE@192..193 "\n"
     BlankLine@193..194
       BlankLine@193..194 "\n"
@@ -57,19 +53,10 @@ ROOT@0..244
       NEWLINE@212..213 "\n"
     BlankLine@213..214
       BlankLine@213..214 "\n"
-    MathBlock@214..244
-      BlockMathMarker@214..216 "\\["
-      MathContent@216..241
-        TEXT@216..217 " "
-        LatexCommand@217..223
-          TEXT@217..223 "\\alpha"
-        TEXT@223..226 " + "
-        LatexCommand@226..231
-          TEXT@226..231 "\\beta"
-        TEXT@231..234 " = "
-        LatexCommand@234..240
-          TEXT@234..240 "\\gamma"
-        NEWLINE@240..241 "\n"
-      BlockMathMarker@241..243 "\\]"
+    PARAGRAPH@214..244
+      DisplayMath@214..243
+        BlockMathMarker@214..216 "\\["
+        TEXT@216..241 " \\alpha + \\beta = \\ga ..."
+        BlockMathMarker@241..243 "\\]"
       NEWLINE@243..244 "\n"
 

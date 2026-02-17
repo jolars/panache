@@ -1,5 +1,5 @@
-ROOT@0..227
-  DOCUMENT@0..227
+ROOT@0..223
+  DOCUMENT@0..223
     Heading@0..14
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
@@ -59,11 +59,11 @@ ROOT@0..227
       NEWLINE@179..180 "\n"
     BlankLine@180..181
       BlankLine@180..181 "\n"
-    PARAGRAPH@181..227
+    PARAGRAPH@181..223
       TEXT@181..199 "Multiple dollars: "
-      InlineMath@199..226
+      DisplayMath@199..222
         BlockMathMarker@199..201 "$$"
-        TEXT@201..224 "\\text{not display math}"
-        BlockMathMarker@224..226 "$$"
-      NEWLINE@226..227 "\n"
+        TEXT@201..220 "\\text{display math}"
+        BlockMathMarker@220..222 "$$"
+      NEWLINE@222..223 "\n"
 

@@ -5,13 +5,11 @@ ROOT@0..292
       NEWLINE@30..31 "\n"
     BlankLine@31..32
       BlankLine@31..32 "\n"
-    MathBlock@32..50
-      BlockMathMarker@32..34 "$$"
-      NEWLINE@34..35 "\n"
-      MathContent@35..47
-        TEXT@35..46 "  x = y + z"
-        NEWLINE@46..47 "\n"
-      BlockMathMarker@47..49 "$$"
+    PARAGRAPH@32..50
+      DisplayMath@32..49
+        BlockMathMarker@32..34 "$$"
+        TEXT@34..47 "\n  x = y + z\n"
+        BlockMathMarker@47..49 "$$"
       NEWLINE@49..50 "\n"
     BlankLine@50..51
       BlankLine@50..51 "\n"
@@ -22,7 +20,7 @@ ROOT@0..292
       BlankLine@68..69 "\n"
     PARAGRAPH@69..149
       TEXT@69..97 "Here's inline display ..."
-      InlineMath@97..106
+      DisplayMath@97..106
         BlockMathMarker@97..99 "$$"
         TEXT@99..104 "a = b"
         BlockMathMarker@104..106 "$$"
@@ -35,15 +33,11 @@ ROOT@0..292
       NEWLINE@175..176 "\n"
     BlankLine@176..177
       BlankLine@176..177 "\n"
-    MathBlock@177..199
-      BlockMathMarker@177..179 "$$"
-      NEWLINE@179..180 "\n"
-      MathContent@180..196
-        LatexCommand@180..191
-          TEXT@180..191 "\\frac{a}{b}"
-        TEXT@191..195 " = c"
-        NEWLINE@195..196 "\n"
-      BlockMathMarker@196..198 "$$"
+    PARAGRAPH@177..199
+      DisplayMath@177..198
+        BlockMathMarker@177..179 "$$"
+        TEXT@179..196 "\n\\frac{a}{b} = c\n"
+        BlockMathMarker@196..198 "$$"
       NEWLINE@198..199 "\n"
     BlankLine@199..200
       BlankLine@199..200 "\n"

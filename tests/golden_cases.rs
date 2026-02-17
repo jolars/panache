@@ -155,8 +155,12 @@ golden_test_cases!(
     display_math_blank_line_termination,
     display_math_content_on_fence_line,
     display_math_escaped_dollar,
+    display_math_trailing_text,
     double_backslash_math,
     emphasis,
+    equation_attributes,
+    //equation_attributes_disabled, // TODO: re-enable once trailing text bug is fixed
+    equation_attributes_single_line,
     escapes,
     fenced_code,
     fenced_code_quarto,

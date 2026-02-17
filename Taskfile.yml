@@ -16,6 +16,11 @@ tasks:
     cmds:
       - cargo build --release
 
+  test:
+    desc: Run tests
+    cmds:
+      - cargo test
+
   test-debug:
     desc: Run tests with debug logging
     cmds:
