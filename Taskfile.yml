@@ -64,3 +64,14 @@ tasks:
     desc: Update golden test AST files
     cmds:
       - UPDATE_AST=1 cargo test --test golden_cases
+
+  coverage:
+    desc: Generate code coverage report
+    cmds:
+      - cargo llvm-cov --all-features --workspace --html
+      - echo "Coverage report generated at target/llvm-cov/html/index.html"
+
+  coverage-open:
+    desc: Generate and open coverage report in browser
+    cmds:
+      - cargo llvm-cov --all-features --workspace --open
