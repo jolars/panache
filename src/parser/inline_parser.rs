@@ -52,380 +52,153 @@ use strikeout::{emit_strikeout, try_parse_strikeout};
 use subscript::{emit_subscript, try_parse_subscript};
 use superscript::{emit_superscript, try_parse_superscript};
 
-/// A token stream that allows lookahead across TEXT and NEWLINE token boundaries.
-/// This is essential for parsing inline elements that can span multiple lines,
-/// such as display math: `$$\nx = y\n$$`
-///
-/// The TokenStream preserves the original token structure (TEXT vs NEWLINE) to
-/// maintain lossless parsing while providing convenient text extraction for
-/// pattern matching.
-pub struct TokenStream {
-    /// The tokens to iterate over (TEXT and NEWLINE tokens from a paragraph)
-    tokens: Vec<SyntaxToken>,
-    /// Current position in the token stream
-    position: usize,
-    /// Cumulative byte offset tracking (for source position mapping)
-    offset: usize,
-}
-
-impl TokenStream {
-    /// Create a new TokenStream from a vector of tokens
-    pub fn new(tokens: Vec<SyntaxToken>) -> Self {
-        Self {
-            tokens,
-            position: 0,
-            offset: 0,
-        }
-    }
-
-    /// Create a TokenStream from a single text string (for nested/recursive parsing)
-    /// This creates a single TEXT token internally
-    pub fn from_text(text: &str) -> Self {
-        if text.is_empty() {
-            return Self::new(Vec::new());
-        }
-
-        // We can't create a proper SyntaxToken without going through the builder,
-        // but for recursive cases we'll need a different approach.
-        // For now, mark this as TODO and we'll handle it in Phase 2.
-        unimplemented!("from_text will be implemented in Phase 2 for recursive parsing")
-    }
-
-    /// Peek at the current token without consuming it
-    pub fn peek(&self) -> Option<&SyntaxToken> {
-        self.tokens.get(self.position)
-    }
-
-    /// Peek at a token N positions ahead without consuming
-    pub fn peek_ahead(&self, n: usize) -> Option<&SyntaxToken> {
-        self.tokens.get(self.position + n)
-    }
-
-    /// Consume and return the current token, advancing the stream
-    pub fn advance(&mut self) -> Option<SyntaxToken> {
-        if self.position < self.tokens.len() {
-            let token = self.tokens[self.position].clone();
-            self.offset += token.text().len();
-            self.position += 1;
-            Some(token)
-        } else {
-            None
-        }
-    }
-
-    /// Get the current byte offset in the original source
-    pub fn current_offset(&self) -> usize {
-        self.offset
-    }
-
-    /// Check if we're at the end of the stream
-    pub fn is_at_end(&self) -> bool {
-        self.position >= self.tokens.len()
-    }
-
-    /// Collect text from current position up to N tokens ahead.
-    /// This concatenates TEXT and NEWLINE tokens into a single string for pattern matching.
-    /// Does not consume tokens.
-    pub fn peek_text_ahead(&self, token_count: usize) -> String {
-        let mut result = String::new();
-        for i in 0..token_count {
-            if let Some(token) = self.peek_ahead(i) {
-                result.push_str(token.text());
-            } else {
-                break;
-            }
-        }
-        result
-    }
-
-    /// Collect text from current position until a predicate returns false.
-    /// This is useful for collecting all TEXT/NEWLINE tokens in a sequence.
-    /// Does not consume tokens.
-    pub fn peek_text_while<F>(&self, mut predicate: F) -> String
-    where
-        F: FnMut(&SyntaxToken) -> bool,
-    {
-        let mut result = String::new();
-        let mut i = 0;
-        while let Some(token) = self.peek_ahead(i) {
-            if !predicate(token) {
-                break;
-            }
-            result.push_str(token.text());
-            i += 1;
-        }
-        result
-    }
-
-    /// Get remaining tokens count
-    pub fn remaining(&self) -> usize {
-        self.tokens.len().saturating_sub(self.position)
-    }
-
-    /// Consume exactly N bytes of text by consuming tokens.
-    /// Returns the consumed tokens. Used after a pattern match to consume
-    /// exactly the matched text.
-    ///
-    /// If byte_count ends in the middle of a token, that token is NOT consumed.
-    /// The caller must handle partial token consumption separately.
-    pub fn consume_bytes(&mut self, byte_count: usize) -> Vec<SyntaxToken> {
-        let mut consumed = Vec::new();
-        let mut bytes_consumed = 0;
-
-        while bytes_consumed < byte_count && !self.is_at_end() {
-            let next_token = self.peek();
-            if next_token.is_none() {
-                break;
-            }
-
-            let token = next_token.unwrap();
-            let token_len = token.text().len();
-
-            // If adding this entire token would exceed byte_count, stop
-            if bytes_consumed + token_len > byte_count {
-                break;
-            }
-
-            // Consume this token completely
-            let token = self.advance().unwrap();
-            bytes_consumed += token_len;
-            consumed.push(token);
-        }
-
-        consumed
-    }
-
-    /// Get the number of bytes that have been peeked but not yet consumed.
-    /// This is used to track partial token consumption scenarios.
-    pub fn bytes_until_position(&self) -> usize {
-        self.offset
-    }
-
-    /// Consume exactly N bytes from the current position, handling partial token consumption.
-    /// Returns (consumed_tokens, remaining_text_in_partial_token).
-    ///
-    /// This is used by inline math parsing to handle cases where a pattern match
-    /// ends in the middle of a TEXT token (e.g., "$$ some text" where we only want "$$").
-    ///
-    /// When there's a partial token, this function:
-    /// 1. Consumes all complete tokens
-    /// 2. Advances past the partial token (consuming it)
-    /// 3. Returns the unconsumed portion of that token for the caller to process
-    pub fn consume_bytes_with_partial(
-        &mut self,
-        byte_count: usize,
-    ) -> (Vec<SyntaxToken>, Option<String>) {
-        let mut consumed = Vec::new();
-        let mut bytes_consumed = 0;
-
-        while bytes_consumed < byte_count && !self.is_at_end() {
-            let next_token = self.peek();
-            if next_token.is_none() {
-                break;
-            }
-
-            let token_text = next_token.unwrap().text().to_string(); // Copy the text
-            let token_len = token_text.len();
-
-            // Check if we need partial consumption
-            if bytes_consumed + token_len > byte_count {
-                // We need to split this token
-                let bytes_needed = byte_count - bytes_consumed;
-                let remaining_part = token_text[bytes_needed..].to_string();
-
-                // Advance past this token (it's being consumed, even if only partially)
-                self.advance();
-
-                // Return the remaining part for the caller to process
-                return (consumed, Some(remaining_part));
-            }
-
-            // Consume this token completely
-            let token = self.advance().unwrap();
-            bytes_consumed += token_len;
-            consumed.push(token);
-        }
-
-        (consumed, None)
-    }
-}
-
-/// Parse inline elements from a token stream.
-/// This is the core inline parsing function that handles multi-line patterns
-/// like display math by looking ahead across TEXT/NEWLINE token boundaries.
+/// Parse inline elements from concatenated text that may include newlines.
+/// This function handles multi-line inline patterns (like display math) by checking for them first,
+/// then emits NEWLINE tokens to preserve losslessness for the remaining text.
+/// Used when parsing paragraphs and other blocks that concatenate TEXT/NEWLINE tokens.
 ///
 /// The `reference_registry` parameter is optional - when None, reference links/images
 /// won't be resolved (useful for nested contexts like link text).
-pub fn parse_inline_tokens(
+pub fn parse_inline_text_with_newlines(
     builder: &mut GreenNodeBuilder,
-    tokens: &mut TokenStream,
+    text: &str,
     config: &Config,
     reference_registry: Option<&crate::parser::block_parser::ReferenceRegistry>,
 ) {
     log::trace!(
-        "Parsing inline tokens: {} tokens remaining",
-        tokens.remaining(),
+        "Parsing inline text with newlines: {:?} ({} bytes)",
+        &text[..text.len().min(40)],
+        text.len(),
     );
 
-    // Process tokens one at a time, preserving NEWLINE vs TEXT distinction.
-    // Only collect text across tokens when checking for multi-line display math.
+    let mut pos = 0;
+    let bytes = text.as_bytes();
 
-    while !tokens.is_at_end() {
-        let current_token = tokens.peek();
-        if current_token.is_none() {
-            break;
-        }
+    while pos < text.len() {
+        // Check for multi-line display math patterns FIRST (before splitting on newlines)
+        // This handles: $$\n...\n$$, \[\n...\n\], \\[\n...\\]
+        let might_be_multiline_math = bytes[pos] == b'$'
+            || (bytes[pos] == b'\\' && pos + 1 < text.len() && bytes[pos + 1] == b'[')
+            || (bytes[pos] == b'\\'
+                && pos + 2 < text.len()
+                && bytes[pos + 1] == b'\\'
+                && bytes[pos + 2] == b'[');
 
-        let current = current_token.unwrap();
+        if might_be_multiline_math {
+            let remaining = &text[pos..];
 
-        // NEWLINE tokens always pass through as-is (losslessness)
-        if current.kind() == SyntaxKind::NEWLINE {
-            let newline = tokens.advance().unwrap();
-            builder.token(SyntaxKind::NEWLINE.into(), newline.text());
-            continue;
-        }
+            // Try $$...$$
+            if let Some((len, content)) = try_parse_display_math(remaining) {
+                let dollar_count = remaining.chars().take_while(|&c| c == '$').count();
+                log::debug!("Matched multi-line display math: {} bytes", len);
 
-        // For TEXT tokens, check if we should parse inline elements
-        if current.kind() == SyntaxKind::TEXT {
-            let text = current.text();
-
-            // Check if this TEXT token might start a multi-line display math
-            // by looking for $$ or \[ or \\[ at the beginning
-            let might_be_multiline_math =
-                text.starts_with("$$") || text.starts_with("\\[") || text.starts_with("\\\\[");
-
-            if might_be_multiline_math {
-                // Look ahead across ALL remaining tokens to find potential multi-line pattern
-                // Don't limit lookahead - let the parsing function decide when to stop
-                let lookahead = tokens.peek_text_ahead(tokens.remaining());
-
-                // Try to parse multi-line display math
-                let mut matched = false;
-
-                // Try $$...$$
-                if let Some((len, content)) = try_parse_display_math(&lookahead) {
-                    let dollar_count = lookahead.chars().take_while(|&c| c == '$').count();
-                    log::debug!("Matched multi-token display math: {} bytes", len);
-
-                    // Check for trailing attributes (Quarto cross-reference support)
-                    let after_math = &lookahead[len..];
-                    log::debug!(
-                        "After display math: {:?}, quarto_crossrefs={}",
-                        &after_math[..after_math.len().min(30)],
-                        config.extensions.quarto_crossrefs
-                    );
-                    let attr_len = if config.extensions.quarto_crossrefs {
-                        use crate::parser::block_parser::attributes::try_parse_trailing_attributes;
-                        if let Some((_attr_block, _)) = try_parse_trailing_attributes(after_math) {
-                            log::debug!("Found attributes after display math");
-                            // Find the position of { in after_math
-                            let trimmed_after = after_math.trim_start();
-                            if let Some(open_brace_pos) = trimmed_after.find('{') {
-                                // Calculate total attribute length including leading whitespace
-                                let ws_before_brace = after_math.len() - trimmed_after.len();
-                                let attr_text_len = trimmed_after[open_brace_pos..]
-                                    .find('}')
-                                    .map(|close| close + 1)
-                                    .unwrap_or(0);
-                                ws_before_brace + open_brace_pos + attr_text_len
-                            } else {
-                                0
-                            }
+                // Check for trailing attributes (Quarto cross-reference support)
+                let after_math = &remaining[len..];
+                let attr_len = if config.extensions.quarto_crossrefs {
+                    use crate::parser::block_parser::attributes::try_parse_trailing_attributes;
+                    if let Some((_attr_block, _)) = try_parse_trailing_attributes(after_math) {
+                        let trimmed_after = after_math.trim_start();
+                        if let Some(open_brace_pos) = trimmed_after.find('{') {
+                            let ws_before_brace = after_math.len() - trimmed_after.len();
+                            let attr_text_len = trimmed_after[open_brace_pos..]
+                                .find('}')
+                                .map(|close| close + 1)
+                                .unwrap_or(0);
+                            ws_before_brace + open_brace_pos + attr_text_len
                         } else {
-                            log::debug!("No attributes found after display math");
                             0
                         }
                     } else {
                         0
+                    }
+                } else {
+                    0
+                };
+
+                let total_len = len + attr_len;
+                emit_display_math(builder, content, dollar_count);
+
+                // Emit attributes if present
+                if attr_len > 0 {
+                    use crate::parser::block_parser::attributes::{
+                        emit_attributes, try_parse_trailing_attributes,
                     };
-
-                    let total_len = len + attr_len;
-                    let (_consumed_tokens, remaining_text) =
-                        tokens.consume_bytes_with_partial(total_len);
-
-                    // Emit the display math and attributes
-                    emit_display_math(builder, content, dollar_count);
-
-                    // Emit attributes if present
-                    if attr_len > 0 {
-                        use crate::parser::block_parser::attributes::{
-                            emit_attributes, try_parse_trailing_attributes,
-                        };
-                        let attr_text = &lookahead[len..total_len];
-                        if let Some((attr_block, _text_before)) =
-                            try_parse_trailing_attributes(attr_text)
-                        {
-                            // Emit whitespace before attributes
-                            let trimmed_after = attr_text.trim_start();
-                            let ws_len = attr_text.len() - trimmed_after.len();
-                            if ws_len > 0 {
-                                builder.token(SyntaxKind::WHITESPACE.into(), &attr_text[..ws_len]);
-                            }
-                            emit_attributes(builder, &attr_block);
-                        }
-                    }
-
-                    // If there's remaining text in a partially consumed token, process it
-                    if let Some(remaining) = remaining_text {
-                        log::debug!(
-                            "Processing remaining text after display math: {:?}",
-                            &remaining[..remaining.len().min(40)]
-                        );
-                        parse_inline_text(builder, &remaining, config, reference_registry);
-                    }
-                    matched = true;
-                }
-                // Try \[...\]
-                else if config.extensions.tex_math_single_backslash {
-                    if let Some((len, content)) =
-                        try_parse_single_backslash_display_math(&lookahead)
+                    let attr_text = &remaining[len..total_len];
+                    if let Some((attr_block, _text_before)) =
+                        try_parse_trailing_attributes(attr_text)
                     {
-                        log::debug!("Matched multi-token single backslash display math");
-                        let (_consumed_tokens, remaining_text) =
-                            tokens.consume_bytes_with_partial(len);
-                        emit_single_backslash_display_math(builder, content);
-
-                        // If there's remaining text in a partially consumed token, process it
-                        if let Some(remaining) = remaining_text {
-                            log::debug!(
-                                "Processing remaining text after single backslash display math"
-                            );
-                            parse_inline_text(builder, &remaining, config, reference_registry);
+                        let trimmed_after = attr_text.trim_start();
+                        let ws_len = attr_text.len() - trimmed_after.len();
+                        if ws_len > 0 {
+                            builder.token(SyntaxKind::WHITESPACE.into(), &attr_text[..ws_len]);
                         }
-                        matched = true;
+                        emit_attributes(builder, &attr_block);
                     }
                 }
-                // Try \\[...\\]
-                else if config.extensions.tex_math_double_backslash
-                    && let Some((len, content)) =
-                        try_parse_double_backslash_display_math(&lookahead)
-                {
-                    log::debug!("Matched multi-token double backslash display math");
-                    let (_consumed_tokens, remaining_text) = tokens.consume_bytes_with_partial(len);
-                    emit_double_backslash_display_math(builder, content);
 
-                    // If there's remaining text in a partially consumed token, process it
-                    if let Some(remaining) = remaining_text {
-                        log::debug!(
-                            "Processing remaining text after double backslash display math"
-                        );
-                        parse_inline_text(builder, &remaining, config, reference_registry);
-                    }
-                    matched = true;
-                }
-
-                if matched {
-                    continue;
-                }
+                pos += total_len;
+                continue;
             }
 
-            // No multi-line pattern matched, parse this TEXT token normally
-            let token = tokens.advance().unwrap();
-            parse_inline_text(builder, token.text(), config, reference_registry);
+            // Try \[...\]
+            if config.extensions.tex_math_single_backslash
+                && let Some((len, content)) = try_parse_single_backslash_display_math(remaining)
+            {
+                log::debug!("Matched multi-line single backslash display math");
+                emit_single_backslash_display_math(builder, content);
+                pos += len;
+                continue;
+            }
+
+            // Try \\[...\\]
+            if config.extensions.tex_math_double_backslash
+                && let Some((len, content)) = try_parse_double_backslash_display_math(remaining)
+            {
+                log::debug!("Matched multi-line double backslash display math");
+                emit_double_backslash_display_math(builder, content);
+                pos += len;
+                continue;
+            }
+        }
+
+        // Check for newlines (AFTER checking for multi-line patterns)
+        if bytes[pos] == b'\r' && pos + 1 < text.len() && bytes[pos + 1] == b'\n' {
+            builder.token(SyntaxKind::NEWLINE.into(), "\r\n");
+            pos += 2;
+            continue;
+        }
+
+        if bytes[pos] == b'\n' {
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            pos += 1;
+            continue;
+        }
+
+        // Find the next newline or multi-line math pattern
+        let mut text_end = pos + 1;
+        while text_end < text.len() {
+            if bytes[text_end] == b'\n'
+                || bytes[text_end] == b'\r'
+                || bytes[text_end] == b'$'
+                || (bytes[text_end] == b'\\'
+                    && text_end + 1 < text.len()
+                    && bytes[text_end + 1] == b'[')
+                || (bytes[text_end] == b'\\'
+                    && text_end + 2 < text.len()
+                    && bytes[text_end + 1] == b'\\'
+                    && bytes[text_end + 2] == b'[')
+            {
+                break;
+            }
+            text_end += 1;
+        }
+
+        // Parse this text segment
+        if text_end > pos {
+            parse_inline_text(builder, &text[pos..text_end], config, reference_registry);
+            pos = text_end;
         } else {
-            // Other token types pass through as-is
-            let token = tokens.advance().unwrap();
-            builder.token(token.kind().into(), token.text());
+            pos += 1;
         }
     }
 }
@@ -944,18 +717,22 @@ impl InlineParser {
     fn copy_node_to_builder(&self, builder: &mut GreenNodeBuilder, node: &SyntaxNode) {
         builder.start_node(node.kind().into());
 
-        // For nodes that contain inline content (like paragraphs), collect tokens
-        // and parse them together to handle multi-line patterns like display math
-        if self.should_use_token_stream(node) {
-            let tokens: Vec<SyntaxToken> = node
-                .children_with_tokens()
-                .filter_map(|child| child.into_token())
-                .collect();
+        // For nodes that contain inline content (like paragraphs), concatenate TEXT/NEWLINE tokens
+        // into a single string and parse it. This handles multi-line patterns like display math
+        // while being much simpler than the TokenStream approach.
+        if self.should_concatenate_for_parsing(node) {
+            let mut concatenated = String::new();
+            for child in node.children_with_tokens() {
+                if let Some(token) = child.into_token() {
+                    concatenated.push_str(token.text());
+                }
+            }
 
-            let mut token_stream = TokenStream::new(tokens);
-            parse_inline_tokens(
+            // Parse the concatenated string - parse_inline_text_with_newlines will emit NEWLINE tokens
+            // when it encounters newlines, preserving losslessness
+            parse_inline_text_with_newlines(
                 builder,
-                &mut token_stream,
+                &concatenated,
                 &self.config,
                 Some(&self.reference_registry),
             );
@@ -1027,10 +804,10 @@ impl InlineParser {
         builder.finish_node();
     }
 
-    /// Check if a node should use token-stream parsing (for multi-line inline patterns).
+    /// Check if a node should concatenate tokens for parsing (for multi-line inline patterns).
     /// Currently, this is enabled for PARAGRAPH nodes that contain potential multi-line
     /// patterns like display math ($$\n...\n$$).
-    fn should_use_token_stream(&self, node: &SyntaxNode) -> bool {
+    fn should_concatenate_for_parsing(&self, node: &SyntaxNode) -> bool {
         if node.kind() != SyntaxKind::PARAGRAPH {
             return false;
         }
@@ -1331,151 +1108,5 @@ mod inline_tests {
         let spans = find_nodes_by_kind(&inline_tree, SyntaxKind::BracketedSpan);
         assert_eq!(autolinks.len(), 1);
         assert_eq!(spans.len(), 1);
-    }
-
-    // TokenStream tests
-    mod token_stream_tests {
-        use super::*;
-        use rowan::GreenNodeBuilder;
-
-        fn create_test_tokens(parts: Vec<(&str, SyntaxKind)>) -> Vec<SyntaxToken> {
-            let mut builder = GreenNodeBuilder::new();
-            builder.start_node(SyntaxKind::DOCUMENT.into());
-
-            for (text, kind) in parts {
-                builder.token(kind.into(), text);
-            }
-
-            builder.finish_node();
-            let green = builder.finish();
-            let root = SyntaxNode::new_root(green);
-
-            root.children_with_tokens()
-                .filter_map(|child| child.into_token())
-                .collect()
-        }
-
-        #[test]
-        fn test_token_stream_peek() {
-            let tokens = create_test_tokens(vec![
-                ("hello", SyntaxKind::TEXT),
-                ("\n", SyntaxKind::NEWLINE),
-                ("world", SyntaxKind::TEXT),
-            ]);
-
-            let stream = TokenStream::new(tokens);
-            assert_eq!(stream.peek().unwrap().text(), "hello");
-            assert_eq!(stream.peek().unwrap().kind(), SyntaxKind::TEXT);
-        }
-
-        #[test]
-        fn test_token_stream_peek_ahead() {
-            let tokens = create_test_tokens(vec![
-                ("hello", SyntaxKind::TEXT),
-                ("\n", SyntaxKind::NEWLINE),
-                ("world", SyntaxKind::TEXT),
-            ]);
-
-            let stream = TokenStream::new(tokens);
-            assert_eq!(stream.peek_ahead(0).unwrap().text(), "hello");
-            assert_eq!(stream.peek_ahead(1).unwrap().text(), "\n");
-            assert_eq!(stream.peek_ahead(2).unwrap().text(), "world");
-            assert!(stream.peek_ahead(3).is_none());
-        }
-
-        #[test]
-        fn test_token_stream_advance() {
-            let tokens = create_test_tokens(vec![
-                ("hello", SyntaxKind::TEXT),
-                ("\n", SyntaxKind::NEWLINE),
-                ("world", SyntaxKind::TEXT),
-            ]);
-
-            let mut stream = TokenStream::new(tokens);
-
-            let token1 = stream.advance().unwrap();
-            assert_eq!(token1.text(), "hello");
-            assert_eq!(stream.current_offset(), 5);
-
-            let token2 = stream.advance().unwrap();
-            assert_eq!(token2.text(), "\n");
-            assert_eq!(stream.current_offset(), 6);
-
-            let token3 = stream.advance().unwrap();
-            assert_eq!(token3.text(), "world");
-            assert_eq!(stream.current_offset(), 11);
-
-            assert!(stream.advance().is_none());
-            assert!(stream.is_at_end());
-        }
-
-        #[test]
-        fn test_token_stream_peek_text_ahead() {
-            let tokens = create_test_tokens(vec![
-                ("$$", SyntaxKind::TEXT),
-                ("\n", SyntaxKind::NEWLINE),
-                ("x = y", SyntaxKind::TEXT),
-                ("\n", SyntaxKind::NEWLINE),
-                ("$$", SyntaxKind::TEXT),
-            ]);
-
-            let stream = TokenStream::new(tokens);
-
-            // Peek at first 3 tokens: "$$\nx = y"
-            let text = stream.peek_text_ahead(3);
-            assert_eq!(text, "$$\nx = y");
-
-            // Peek at all 5 tokens
-            let text = stream.peek_text_ahead(5);
-            assert_eq!(text, "$$\nx = y\n$$");
-        }
-
-        #[test]
-        fn test_token_stream_peek_text_while() {
-            let tokens = create_test_tokens(vec![
-                ("hello", SyntaxKind::TEXT),
-                ("\n", SyntaxKind::NEWLINE),
-                ("world", SyntaxKind::TEXT),
-                ("!", SyntaxKind::TEXT),
-            ]);
-
-            let stream = TokenStream::new(tokens);
-
-            // Collect TEXT and NEWLINE tokens (stop at anything else, but we only have TEXT/NEWLINE)
-            let text = stream.peek_text_while(|t| {
-                t.kind() == SyntaxKind::TEXT || t.kind() == SyntaxKind::NEWLINE
-            });
-            assert_eq!(text, "hello\nworld!");
-        }
-
-        #[test]
-        fn test_token_stream_remaining() {
-            let tokens = create_test_tokens(vec![
-                ("a", SyntaxKind::TEXT),
-                ("b", SyntaxKind::TEXT),
-                ("c", SyntaxKind::TEXT),
-            ]);
-
-            let mut stream = TokenStream::new(tokens);
-            assert_eq!(stream.remaining(), 3);
-
-            stream.advance();
-            assert_eq!(stream.remaining(), 2);
-
-            stream.advance();
-            assert_eq!(stream.remaining(), 1);
-
-            stream.advance();
-            assert_eq!(stream.remaining(), 0);
-        }
-
-        #[test]
-        fn test_token_stream_empty() {
-            let stream = TokenStream::new(Vec::new());
-            assert!(stream.peek().is_none());
-            assert!(stream.is_at_end());
-            assert_eq!(stream.remaining(), 0);
-            assert_eq!(stream.peek_text_ahead(10), "");
-        }
     }
 }
