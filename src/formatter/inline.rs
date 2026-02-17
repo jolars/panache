@@ -143,9 +143,9 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             result
         }
         SyntaxKind::InlineMath => {
-            // Check if this is display math (has BlockMathMarker)
+            // Check if this is display math (has DisplayMathMarker)
             let is_display_math = node.children_with_tokens().any(|t| {
-                matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BlockMathMarker)
+                matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DisplayMathMarker)
             });
 
             // Get the actual content (TEXT token, not node)
@@ -165,7 +165,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 .find_map(|t| match t {
                     NodeOrToken::Token(tok)
                         if tok.kind() == SyntaxKind::InlineMathMarker
-                            || tok.kind() == SyntaxKind::BlockMathMarker =>
+                            || tok.kind() == SyntaxKind::DisplayMathMarker =>
                     {
                         Some(tok.text().to_string())
                     }
@@ -227,7 +227,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
 
             for child in node.children_with_tokens() {
                 if let NodeOrToken::Token(tok) = child {
-                    if tok.kind() == SyntaxKind::BlockMathMarker {
+                    if tok.kind() == SyntaxKind::DisplayMathMarker {
                         if opening_marker.is_none() {
                             opening_marker = Some(tok.text().to_string());
                         } else {

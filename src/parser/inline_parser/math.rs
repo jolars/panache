@@ -311,13 +311,13 @@ pub fn emit_display_math(builder: &mut GreenNodeBuilder, content: &str, dollar_c
 
     // Opening $$
     let marker = "$".repeat(dollar_count);
-    builder.token(SyntaxKind::BlockMathMarker.into(), &marker);
+    builder.token(SyntaxKind::DisplayMathMarker.into(), &marker);
 
     // Math content
     builder.token(SyntaxKind::TEXT.into(), content);
 
     // Closing $$
-    builder.token(SyntaxKind::BlockMathMarker.into(), &marker);
+    builder.token(SyntaxKind::DisplayMathMarker.into(), &marker);
 
     builder.finish_node();
 }
@@ -326,9 +326,9 @@ pub fn emit_display_math(builder: &mut GreenNodeBuilder, content: &str, dollar_c
 pub fn emit_single_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
     builder.start_node(SyntaxKind::DisplayMath.into());
 
-    builder.token(SyntaxKind::BlockMathMarker.into(), r"\[");
+    builder.token(SyntaxKind::DisplayMathMarker.into(), r"\[");
     builder.token(SyntaxKind::TEXT.into(), content);
-    builder.token(SyntaxKind::BlockMathMarker.into(), r"\]");
+    builder.token(SyntaxKind::DisplayMathMarker.into(), r"\]");
 
     builder.finish_node();
 }
@@ -337,9 +337,9 @@ pub fn emit_single_backslash_display_math(builder: &mut GreenNodeBuilder, conten
 pub fn emit_double_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
     builder.start_node(SyntaxKind::DisplayMath.into());
 
-    builder.token(SyntaxKind::BlockMathMarker.into(), r"\\[");
+    builder.token(SyntaxKind::DisplayMathMarker.into(), r"\\[");
     builder.token(SyntaxKind::TEXT.into(), content);
-    builder.token(SyntaxKind::BlockMathMarker.into(), r"\\]");
+    builder.token(SyntaxKind::DisplayMathMarker.into(), r"\\]");
 
     builder.finish_node();
 }

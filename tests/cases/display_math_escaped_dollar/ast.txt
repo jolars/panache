@@ -16,18 +16,18 @@ ROOT@0..240
       BlankLine@101..102 "\n"
     PARAGRAPH@102..136
       DisplayMath@102..135
-        BlockMathMarker@102..104 "$$"
+        DisplayMathMarker@102..104 "$$"
         TEXT@104..133 "\n\\text{Price} = \\$100 ..."
-        BlockMathMarker@133..135 "$$"
+        DisplayMathMarker@133..135 "$$"
       NEWLINE@135..136 "\n"
     BlankLine@136..137
       BlankLine@136..137 "\n"
     PARAGRAPH@137..191
       TEXT@137..149 "And inline: "
       DisplayMath@149..172
-        BlockMathMarker@149..151 "$$"
+        DisplayMathMarker@149..151 "$$"
         TEXT@151..170 "\\text{Cost: } \\$200"
-        BlockMathMarker@170..172 "$$"
+        DisplayMathMarker@170..172 "$$"
       TEXT@172..190 " in the paragraph."
       NEWLINE@190..191 "\n"
     BlankLine@191..192
@@ -39,8 +39,8 @@ ROOT@0..240
       BlankLine@210..211 "\n"
     PARAGRAPH@211..240
       DisplayMath@211..239
-        BlockMathMarker@211..213 "$$"
+        DisplayMathMarker@211..213 "$$"
         TEXT@213..237 "\na = \\$x + \\$y \\neq \\$z\n"
-        BlockMathMarker@237..239 "$$"
+        DisplayMathMarker@237..239 "$$"
       NEWLINE@239..240 "\n"
 

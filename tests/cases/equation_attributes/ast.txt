@@ -13,9 +13,9 @@ ROOT@0..444
       BlankLine@142..143 "\n"
     PARAGRAPH@143..399
       DisplayMath@143..378
-        BlockMathMarker@143..145 "$$"
+        DisplayMathMarker@143..145 "$$"
         TEXT@145..376 "\n\\frac{\\partial \\math ..."
-        BlockMathMarker@376..378 "$$"
+        DisplayMathMarker@376..378 "$$"
       WHITESPACE@378..379 " "
       Attribute@379..398
         Attribute@379..398 "{#eq-black-scholes}"

@@ -11,9 +11,9 @@ ROOT@0..60
       BlankLine@8..10 "\r\n"
     PARAGRAPH@10..25
       DisplayMath@10..23
-        BlockMathMarker@10..12 "$$"
+        DisplayMathMarker@10..12 "$$"
         TEXT@12..21 "\r\nx = y\r\n"
-        BlockMathMarker@21..23 "$$"
+        DisplayMathMarker@21..23 "$$"
       NEWLINE@23..25 "\r\n"
     BlankLine@25..27
       BlankLine@25..27 "\r\n"
@@ -24,8 +24,8 @@ ROOT@0..60
       BlankLine@39..41 "\r\n"
     PARAGRAPH@41..60
       DisplayMath@41..58
-        BlockMathMarker@41..43 "$$"
+        DisplayMathMarker@41..43 "$$"
         TEXT@43..56 "\r\na + b = c\r\n"
-        BlockMathMarker@56..58 "$$"
+        DisplayMathMarker@56..58 "$$"
       NEWLINE@58..60 "\r\n"
 

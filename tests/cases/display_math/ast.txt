@@ -7,9 +7,9 @@ ROOT@0..292
       BlankLine@31..32 "\n"
     PARAGRAPH@32..50
       DisplayMath@32..49
-        BlockMathMarker@32..34 "$$"
+        DisplayMathMarker@32..34 "$$"
         TEXT@34..47 "\n  x = y + z\n"
-        BlockMathMarker@47..49 "$$"
+        DisplayMathMarker@47..49 "$$"
       NEWLINE@49..50 "\n"
     BlankLine@50..51
       BlankLine@50..51 "\n"
@@ -21,9 +21,9 @@ ROOT@0..292
     PARAGRAPH@69..149
       TEXT@69..97 "Here's inline display ..."
       DisplayMath@97..106
-        BlockMathMarker@97..99 "$$"
+        DisplayMathMarker@97..99 "$$"
         TEXT@99..104 "a = b"
-        BlockMathMarker@104..106 "$$"
+        DisplayMathMarker@104..106 "$$"
       TEXT@106..148 " that should be conve ..."
       NEWLINE@148..149 "\n"
     BlankLine@149..150
@@ -35,9 +35,9 @@ ROOT@0..292
       BlankLine@176..177 "\n"
     PARAGRAPH@177..199
       DisplayMath@177..198
-        BlockMathMarker@177..179 "$$"
+        DisplayMathMarker@177..179 "$$"
         TEXT@179..196 "\n\\frac{a}{b} = c\n"
-        BlockMathMarker@196..198 "$$"
+        DisplayMathMarker@196..198 "$$"
       NEWLINE@198..199 "\n"
     BlankLine@199..200
       BlankLine@199..200 "\n"

@@ -41,8 +41,8 @@ pub enum SyntaxKind {
     ReferenceTitle,      // "title" part
 
     // Math
-    InlineMathMarker, // $
-    BlockMathMarker,  // $$
+    InlineMathMarker,  // $
+    DisplayMathMarker, // $$
     InlineMath,
     DisplayMath,
     MathContent,

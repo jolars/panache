@@ -62,8 +62,8 @@ ROOT@0..223
     PARAGRAPH@181..223
       TEXT@181..199 "Multiple dollars: "
       DisplayMath@199..222
-        BlockMathMarker@199..201 "$$"
+        DisplayMathMarker@199..201 "$$"
         TEXT@201..220 "\\text{display math}"
-        BlockMathMarker@220..222 "$$"
+        DisplayMathMarker@220..222 "$$"
       NEWLINE@222..223 "\n"
 

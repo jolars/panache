@@ -990,9 +990,9 @@ impl Formatter {
             }
 
             SyntaxKind::InlineMath => {
-                // Check if this is display math (has BlockMathMarker)
+                // Check if this is display math (has DisplayMathMarker)
                 let is_display_math = node.children_with_tokens().any(|t| {
-                    matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BlockMathMarker)
+                    matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DisplayMathMarker)
                 });
 
                 // Get the actual content (TEXT token, not node)
@@ -1012,7 +1012,7 @@ impl Formatter {
                     .find_map(|t| match t {
                         NodeOrToken::Token(tok)
                             if tok.kind() == SyntaxKind::InlineMathMarker
-                                || tok.kind() == SyntaxKind::BlockMathMarker =>
+                                || tok.kind() == SyntaxKind::DisplayMathMarker =>
                         {
                             Some(tok.text().to_string())
                         }
@@ -1150,7 +1150,7 @@ impl Formatter {
 
                 for child in node.children_with_tokens() {
                     if let rowan::NodeOrToken::Token(t) = child {
-                        if t.kind() == SyntaxKind::BlockMathMarker {
+                        if t.kind() == SyntaxKind::DisplayMathMarker {
                             let marker_text = t.text().to_string();
                             if opening_marker.is_none() {
                                 opening_marker = Some(marker_text);

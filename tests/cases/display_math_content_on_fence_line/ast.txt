@@ -16,9 +16,9 @@ ROOT@0..244
       BlankLine@100..101 "\n"
     PARAGRAPH@101..117
       DisplayMath@101..116
-        BlockMathMarker@101..103 "$$"
+        DisplayMathMarker@101..103 "$$"
         TEXT@103..114 " x = y + z\n"
-        BlockMathMarker@114..116 "$$"
+        DisplayMathMarker@114..116 "$$"
       NEWLINE@116..117 "\n"
     BlankLine@117..118
       BlankLine@117..118 "\n"
@@ -29,9 +29,9 @@ ROOT@0..244
       BlankLine@144..145 "\n"
     PARAGRAPH@145..157
       DisplayMath@145..156
-        BlockMathMarker@145..147 "$$"
+        DisplayMathMarker@145..147 "$$"
         TEXT@147..154 "\na = b "
-        BlockMathMarker@154..156 "$$"
+        DisplayMathMarker@154..156 "$$"
       NEWLINE@156..157 "\n"
     BlankLine@157..158
       BlankLine@157..158 "\n"
@@ -42,9 +42,9 @@ ROOT@0..244
       BlankLine@177..178 "\n"
     PARAGRAPH@178..193
       DisplayMath@178..192
-        BlockMathMarker@178..180 "$$"
+        DisplayMathMarker@178..180 "$$"
         TEXT@180..190 " E = mc^2 "
-        BlockMathMarker@190..192 "$$"
+        DisplayMathMarker@190..192 "$$"
       NEWLINE@192..193 "\n"
     BlankLine@193..194
       BlankLine@193..194 "\n"
@@ -55,8 +55,8 @@ ROOT@0..244
       BlankLine@213..214 "\n"
     PARAGRAPH@214..244
       DisplayMath@214..243
-        BlockMathMarker@214..216 "\\["
+        DisplayMathMarker@214..216 "\\["
         TEXT@216..241 " \\alpha + \\beta = \\ga ..."
-        BlockMathMarker@241..243 "\\]"
+        DisplayMathMarker@241..243 "\\]"
       NEWLINE@243..244 "\n"
 

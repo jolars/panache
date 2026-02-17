@@ -31,9 +31,9 @@ ROOT@0..398
       BlankLine@189..190 "\n"
     PARAGRAPH@190..245
       DisplayMath@190..244
-        BlockMathMarker@190..192 "\\["
+        DisplayMathMarker@190..192 "\\["
         TEXT@192..242 "\n\\int_0^\\infty e^{-x^ ..."
-        BlockMathMarker@242..244 "\\]"
+        DisplayMathMarker@242..244 "\\]"
       NEWLINE@244..245 "\n"
     BlankLine@245..246
       BlankLine@245..246 "\n"
@@ -59,8 +59,8 @@ ROOT@0..398
       BlankLine@382..383 "\n"
     PARAGRAPH@383..398
       DisplayMath@383..397
-        BlockMathMarker@383..385 "\\["
+        DisplayMathMarker@383..385 "\\["
         TEXT@385..395 " e = mc^2\n"
-        BlockMathMarker@395..397 "\\]"
+        DisplayMathMarker@395..397 "\\]"
       NEWLINE@397..398 "\n"
 
