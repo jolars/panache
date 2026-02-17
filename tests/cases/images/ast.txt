@@ -1,5 +1,5 @@
-ROOT@0..219
-  DOCUMENT@0..219
+ROOT@0..254
+  DOCUMENT@0..254
     Heading@0..9
       AtxHeadingMarker@0..1
         AtxHeadingMarker@0..1 "#"
@@ -77,4 +77,22 @@ ROOT@0..219
         AutoLinkMarker@217..218
           AutoLinkMarker@217..218 ">"
       NEWLINE@218..219 "\n"
+    BlankLine@219..220
+      BlankLine@219..220 "\n"
+    PARAGRAPH@220..230
+      TEXT@220..229 "Separate:"
+      NEWLINE@229..230 "\n"
+    BlankLine@230..231
+      BlankLine@230..231 "\n"
+    Figure@231..254
+      ImageLink@231..253
+        ImageLinkStart@231..233
+          ImageLinkStart@231..233 "!["
+        ImageAlt@233..241
+          TEXT@233..241 "alt text"
+        TEXT@241..243 "]("
+        LinkDest@243..252
+          TEXT@243..252 "image.png"
+        TEXT@252..253 ")"
+      NEWLINE@253..254 "\n"
 

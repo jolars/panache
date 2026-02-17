@@ -698,11 +698,21 @@ impl Formatter {
                             }
                             self.output.push_str(line);
                         }
-
-                        if !self.output.ends_with('\n') {
-                            self.output.push('\n');
-                        }
                     }
+                }
+
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
+            }
+
+            SyntaxKind::Figure => {
+                // Figure is a standalone image - format the inline content directly
+                log::debug!("Formatting figure");
+                let text = self.format_inline_node(node);
+                self.output.push_str(text.trim());
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
                 }
             }
 

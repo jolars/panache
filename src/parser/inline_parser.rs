@@ -11,7 +11,7 @@ mod escapes;
 mod inline_footnotes;
 mod inline_math;
 mod latex;
-mod links;
+pub mod links; // Public for try_parse_inline_image used by block parser
 mod native_spans;
 mod raw_inline;
 mod shortcodes;

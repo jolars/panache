@@ -10,6 +10,7 @@ mod container_stack;
 mod definition_lists;
 mod display_math;
 mod fenced_divs;
+mod figures;
 mod headings;
 mod horizontal_rules;
 mod html_blocks;
@@ -29,6 +30,7 @@ use container_stack::{Container, ContainerStack, byte_index_at_column, leading_i
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
 use display_math::{parse_display_math_block, try_parse_math_fence_open};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
+use figures::{parse_figure, try_parse_figure};
 use headings::{emit_atx_heading, try_parse_atx_heading};
 use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use html_blocks::{parse_html_block, try_parse_html_block_start};
@@ -938,6 +940,30 @@ impl<'a> BlockParser<'a> {
                     heading_level
                 );
                 emit_atx_heading(&mut self.builder, content, heading_level);
+                self.pos += 1;
+                return true;
+            }
+
+            // Check for standalone figure (image on its own line)
+            if try_parse_figure(content) {
+                log::debug!("Parsed figure at line {}", self.pos);
+                // Close paragraph before creating figure
+                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                    self.containers
+                        .close_to(self.containers.depth() - 1, &mut self.builder);
+                }
+
+                // Get the full original line to preserve losslessness
+                let full_line = self.lines[self.pos];
+                // Build from original line with possible indent to preserve
+                let line_to_parse = if let Some(indent) = indent_to_emit {
+                    self.builder.token(SyntaxKind::WHITESPACE.into(), indent);
+                    &full_line[indent.len()..]
+                } else {
+                    full_line
+                };
+
+                parse_figure(&mut self.builder, line_to_parse);
                 self.pos += 1;
                 return true;
             }

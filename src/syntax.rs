@@ -118,6 +118,7 @@ pub enum SyntaxKind {
     LineBlockLine,
     LineBlockMarker, // |
     Comment,
+    Figure, // Standalone image (Pandoc figure)
 
     // HTML blocks
     HtmlBlock,        // Generic HTML block

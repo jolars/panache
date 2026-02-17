@@ -8,6 +8,7 @@ pub fn is_block_element(kind: SyntaxKind) -> bool {
     matches!(
         kind,
         SyntaxKind::PARAGRAPH
+            | SyntaxKind::Figure
             | SyntaxKind::List
             | SyntaxKind::DefinitionList
             | SyntaxKind::BlockQuote
@@ -26,6 +27,7 @@ pub fn is_structural_block(kind: SyntaxKind) -> bool {
     matches!(
         kind,
         SyntaxKind::PARAGRAPH
+            | SyntaxKind::Figure
             | SyntaxKind::Heading
             | SyntaxKind::CodeBlock
             | SyntaxKind::BlockQuote

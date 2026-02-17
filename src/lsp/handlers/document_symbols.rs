@@ -99,8 +99,25 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
                     }
                 }
             }
+            SyntaxKind::Figure => {
+                // Figure is a standalone image block
+                // Look for ImageLink child
+                for child in node.children() {
+                    if child.kind() == SyntaxKind::ImageLink
+                        && let Some(symbol) = extract_figure_symbol(&child, content)
+                    {
+                        // Add to current heading section or root
+                        if let Some((_, heading)) = heading_stack.last_mut() {
+                            heading.children.get_or_insert_with(Vec::new).push(symbol);
+                        } else {
+                            symbols.push(symbol);
+                        }
+                    }
+                }
+            }
             SyntaxKind::PARAGRAPH => {
                 // Check if paragraph contains an ImageLink (figure)
+                // This handles the old case where images were in paragraphs
                 for child in node.children() {
                     if child.kind() == SyntaxKind::ImageLink
                         && let Some(symbol) = extract_figure_symbol(&child, content)
