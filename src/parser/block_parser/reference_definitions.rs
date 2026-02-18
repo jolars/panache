@@ -184,7 +184,8 @@ pub fn try_parse_reference_definition(
         pos += 1;
         let url_content_start = pos;
         // Find closing >
-        while pos < bytes.len() && bytes[pos] != b'>' && bytes[pos] != b'\n' {
+        while pos < bytes.len() && bytes[pos] != b'>' && bytes[pos] != b'\n' && bytes[pos] != b'\r'
+        {
             pos += 1;
         }
         if pos >= bytes.len() || bytes[pos] != b'>' {
@@ -304,7 +305,7 @@ pub fn try_parse_footnote_marker(line: &str) -> Option<(String, usize)> {
 
     // Find the closing ] for the ID
     let mut pos = 2;
-    while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' {
+    while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
         pos += 1;
     }
 
@@ -360,7 +361,7 @@ pub fn try_parse_footnote_definition(
 
     // Find the closing ] for the ID
     let mut pos = 2;
-    while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' {
+    while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
         pos += 1;
     }
 
@@ -588,5 +589,48 @@ mod tests {
         assert_eq!(normalize_label("foo  bar"), "foo bar");
         assert_eq!(normalize_label("  foo  "), "foo");
         assert_eq!(normalize_label("foo\tbar"), "foo bar");
+    }
+
+    #[test]
+    fn test_footnote_definition_id_with_crlf() {
+        // Footnote definition IDs should not contain CRLF
+        // Note: try_parse_footnote_definition expects a line, which by definition
+        // won't contain line breaks, so this test verifies the function handles
+        // the case correctly even if called with invalid input
+        let input = "[^foo\r\nbar]: content";
+        let lines = vec![input];
+        let result = try_parse_footnote_definition(&lines, 0);
+
+        // Should fail to parse because ID contains line break
+        assert_eq!(
+            result, None,
+            "Should not parse footnote definition with CRLF in ID"
+        );
+    }
+
+    #[test]
+    fn test_reference_link_url_with_crlf() {
+        // Reference link URLs in angle brackets should not span lines with CRLF
+        let input = "[ref]: <http://example.com\r\n/path>";
+        let result = try_parse_reference_definition(input);
+
+        // Should fail to parse because URL contains line break
+        assert_eq!(
+            result, None,
+            "Should not parse reference with CRLF in angle-bracketed URL"
+        );
+    }
+
+    #[test]
+    fn test_reference_link_url_with_lf() {
+        // Reference link URLs in angle brackets should not span lines with LF
+        let input = "[ref]: <http://example.com\n/path>";
+        let result = try_parse_reference_definition(input);
+
+        // Should fail to parse because URL contains line break
+        assert_eq!(
+            result, None,
+            "Should not parse reference with LF in angle-bracketed URL"
+        );
     }
 }

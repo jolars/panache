@@ -19,8 +19,8 @@ ROOT@0..51
         TEXT@22..35 "Content here."
         NEWLINE@35..37 "\r\n"
       DIV_FENCE_CLOSE@37..42
-        TEXT@37..41 ":::\r"
-        NEWLINE@41..42 "\n"
+        TEXT@37..40 ":::"
+        NEWLINE@40..42 "\r\n"
     BLANK_LINE@42..44
       BLANK_LINE@42..44 "\r\n"
     PARAGRAPH@44..51

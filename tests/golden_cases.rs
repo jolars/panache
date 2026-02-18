@@ -146,6 +146,7 @@ golden_test_cases!(
     crlf_fenced_divs,
     crlf_headerless_table,
     crlf_horizontal_rules,
+    crlf_line_endings,
     crlf_raw_blocks,
     crlf_yaml_metadata,
     definition_list,

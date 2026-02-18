@@ -84,7 +84,7 @@ pub(crate) fn try_parse_footnote_reference(text: &str) -> Option<(usize, String)
 
     // Find the closing ]
     let mut pos = 2;
-    while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' {
+    while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
         pos += 1;
     }
 
@@ -172,5 +172,31 @@ mod tests {
     fn test_inline_footnote_with_code() {
         let result = try_parse_inline_footnote("^[Contains `code` inside]");
         assert_eq!(result, Some((25, "Contains `code` inside")));
+    }
+
+    #[test]
+    fn test_footnote_reference_with_crlf() {
+        // Footnote reference IDs should not span lines with CRLF
+        let input = "[^foo\r\nbar]";
+        let result = try_parse_footnote_reference(input);
+
+        // Should fail to parse because ID contains line break
+        assert_eq!(
+            result, None,
+            "Should not parse footnote reference with CRLF in ID"
+        );
+    }
+
+    #[test]
+    fn test_footnote_reference_with_lf() {
+        // Footnote reference IDs should not span lines with LF either
+        let input = "[^foo\nbar]";
+        let result = try_parse_footnote_reference(input);
+
+        // Should fail to parse because ID contains line break
+        assert_eq!(
+            result, None,
+            "Should not parse footnote reference with LF in ID"
+        );
     }
 }

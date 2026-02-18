@@ -552,7 +552,8 @@ pub fn try_parse_reference_image(
         let label_start = pos;
 
         // Find the end of the label (no nested brackets, no newlines)
-        while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' {
+        while pos < bytes.len() && bytes[pos] != b']' && bytes[pos] != b'\n' && bytes[pos] != b'\r'
+        {
             pos += 1;
         }
 
@@ -966,6 +967,32 @@ mod tests {
         assert_eq!(
             result,
             Some((25, "alt [nested] text", "ref".to_string(), false))
+        );
+    }
+
+    #[test]
+    fn test_reference_link_label_with_crlf() {
+        // Reference link labels should not span lines with CRLF
+        let input = "[foo\r\nbar]";
+        let result = try_parse_reference_link(input, false);
+
+        // Should fail to parse because label contains line break
+        assert_eq!(
+            result, None,
+            "Should not parse reference link with CRLF in label"
+        );
+    }
+
+    #[test]
+    fn test_reference_link_label_with_lf() {
+        // Reference link labels should not span lines with LF either
+        let input = "[foo\nbar]";
+        let result = try_parse_reference_link(input, false);
+
+        // Should fail to parse because label contains line break
+        assert_eq!(
+            result, None,
+            "Should not parse reference link with LF in label"
         );
     }
 }

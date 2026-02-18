@@ -1076,15 +1076,24 @@ impl<'a> BlockParser<'a> {
 
             // Get the full original line to preserve losslessness
             let full_line = self.lines[self.pos];
-            let content_without_newline = full_line.trim_end_matches('\n');
+
+            // Strip line ending (handle both CRLF and LF)
+            let (content_without_newline, line_ending) =
+                if let Some(content) = full_line.strip_suffix("\r\n") {
+                    (content, "\r\n")
+                } else if let Some(content) = full_line.strip_suffix('\n') {
+                    (content, "\n")
+                } else {
+                    (full_line, "")
+                };
 
             // Emit the reference definition content
             self.builder
                 .token(SyntaxKind::TEXT.into(), content_without_newline);
 
             // Emit newline separately if present
-            if full_line.ends_with('\n') {
-                self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            if !line_ending.is_empty() {
+                self.builder.token(SyntaxKind::NEWLINE.into(), line_ending);
             }
 
             self.builder.finish_node();
@@ -1244,14 +1253,22 @@ impl<'a> BlockParser<'a> {
                     .token(SyntaxKind::WHITESPACE.into(), &full_line[..leading_ws_len]);
             }
 
-            // Emit fence content without newline
-            let content_without_newline = trimmed.trim_end_matches('\n');
+            // Emit fence content without newline (handle both CRLF and LF)
+            let (content_without_newline, line_ending) =
+                if let Some(content) = trimmed.strip_suffix("\r\n") {
+                    (content, "\r\n")
+                } else if let Some(content) = trimmed.strip_suffix('\n') {
+                    (content, "\n")
+                } else {
+                    (trimmed, "")
+                };
+
             self.builder
                 .token(SyntaxKind::TEXT.into(), content_without_newline);
 
-            // Emit newline separately
-            if full_line.ends_with('\n') {
-                self.builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            // Emit newline separately if present
+            if !line_ending.is_empty() {
+                self.builder.token(SyntaxKind::NEWLINE.into(), line_ending);
             }
             self.builder.finish_node(); // DivFenceClose
 

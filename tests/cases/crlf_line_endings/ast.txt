@@ -1,0 +1,59 @@
+ROOT@0..217
+  DOCUMENT@0..217
+    HEADING@0..17
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
+      WHITESPACE@1..2 " "
+      HEADING_CONTENT@2..15
+        TEXT@2..15 "Test Document"
+      NEWLINE@15..17 "\r\n"
+    BLANK_LINE@17..19
+      BLANK_LINE@17..19 "\r\n"
+    PARAGRAPH@19..84
+      TEXT@19..82 "This paragraph has CR ..."
+      NEWLINE@82..84 "\r\n"
+    BLANK_LINE@84..86
+      BLANK_LINE@84..86 "\r\n"
+    FOOTNOTE_DEFINITION@86..113
+      FOOTNOTE_REFERENCE@86..92 "[^1]: "
+      PARAGRAPH@92..113
+        TEXT@92..111 "Footnote definition"
+        NEWLINE@111..113 "\r\n"
+    BLANK_LINE@113..115
+      BLANK_LINE@113..115 "\r\n"
+    REFERENCE_DEFINITION@115..143
+      LINK@115..120
+        LINK_START@115..116
+          LINK_START@115..116 "["
+        LINK_TEXT@116..119
+          TEXT@116..119 "ref"
+        TEXT@119..120 "]"
+      TEXT@120..141 ": https://example.com"
+      NEWLINE@141..143 "\r\n"
+    BLANK_LINE@143..145
+      BLANK_LINE@143..145 "\r\n"
+    PARAGRAPH@145..184
+      TEXT@145..170 "Here is a reference l ..."
+      LINK@170..181
+        LINK_START@170..171
+          LINK_START@170..171 "["
+        LINK_TEXT@171..175
+          TEXT@171..175 "text"
+        TEXT@175..176 "]"
+        TEXT@176..177 "["
+        LINK_REF@177..180
+          TEXT@177..180 "ref"
+        TEXT@180..181 "]"
+      TEXT@181..182 "."
+      NEWLINE@182..184 "\r\n"
+    BLANK_LINE@184..186
+      BLANK_LINE@184..186 "\r\n"
+    PARAGRAPH@186..217
+      TEXT@186..210 "And a footnote reference"
+      FOOTNOTE_REFERENCE@210..214
+        TEXT@210..212 "[^"
+        TEXT@212..213 "1"
+        TEXT@213..214 "]"
+      TEXT@214..215 "."
+      NEWLINE@215..217 "\r\n"
+
