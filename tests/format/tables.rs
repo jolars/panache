@@ -134,7 +134,7 @@ fn test_basic_grid_table() {
 #[test]
 fn test_grid_table_with_alignments() {
     let input = "+:------+-------:+:------:+\n| Left  | Right  | Center |\n+=======+========+========+\n| A     | B      | C      |\n+-------+--------+--------+";
-    let expected = "+:-----+------:+:------:+\n| Left | Right | Center |\n+======+=======+========+\n| A    |     B |   C    |\n+:-----+------:+:------:+\n";
+    let expected = "+------+-------+--------+\n| Left | Right | Center |\n+:=====+======:+:======:+\n| A    |     B |   C    |\n+------+-------+--------+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);

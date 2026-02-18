@@ -399,13 +399,17 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> TableData {
             SyntaxKind::TABLE_SEPARATOR => {
                 let separator_text = child.text().to_string();
 
-                // Always extract alignments from separators (if not already set)
-                // Grid tables have alignments in the first separator or header separator
-                if alignments.is_empty() {
-                    let extracted = extract_grid_alignments(&separator_text);
-                    if !extracted.is_empty() {
-                        alignments = extracted;
-                    }
+                // Extract alignments from separators that have them
+                // Grid tables have alignments in the first separator (headerless)
+                // or header separator (tables with headers)
+                // Priority: extract from any separator with colons, otherwise keep Default
+                let extracted = extract_grid_alignments(&separator_text);
+                if !extracted.is_empty() && extracted.iter().any(|a| *a != Alignment::Default) {
+                    // Found a separator with alignment info, use it
+                    alignments = extracted;
+                } else if alignments.is_empty() && !extracted.is_empty() {
+                    // No alignments yet, save these (even if all Default)
+                    alignments = extracted;
                 }
 
                 // Check if this is a header separator (contains =)
@@ -464,12 +468,9 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
             let fill_char = if is_header { '=' } else { '-' };
 
             // Create separator with alignment markers
-            // Note: Header separators (=) don't use alignment colons
+            // Per Pandoc spec: alignment colons go in header separator ONLY, not row separators
             let segment = if is_header {
-                // Header separator: no colons, just equals signs
-                fill_char.to_string().repeat(width + 2)
-            } else {
-                // Regular separator: include alignment colons if specified
+                // Header separator: include alignment colons if specified
                 match alignment {
                     Alignment::Left => {
                         let mut s = String::from(":");
@@ -490,6 +491,9 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
                     }
                     Alignment::Default => fill_char.to_string().repeat(width + 2),
                 }
+            } else {
+                // Row separator: no alignment colons
+                fill_char.to_string().repeat(width + 2)
             };
 
             line.push_str(&segment);
