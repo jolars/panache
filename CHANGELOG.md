@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.1](https://github.com/jolars/panache/compare/v2.5.0...v2.5.1) (2026-02-18)
+
+### Bug Fixes
+
+* **formatter:** properly handle grid table alignments ([56c5bba](https://github.com/jolars/panache/commit/56c5bbae206fc1eb7bfc343724e2cb244258c67a))
+* **parser:** fix issues with CRLF parsing ([6ec62f0](https://github.com/jolars/panache/commit/6ec62f07d7385549911ad90f0788dfd16393a413))
+
 ## [2.5.0](https://github.com/jolars/panache/compare/v2.4.0...v2.5.0) (2026-02-17)
 
 ### Features
