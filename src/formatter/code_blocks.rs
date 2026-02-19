@@ -101,6 +101,8 @@ pub(super) fn format_code_block(
         // Format the info string based on config and block type (traditional inline)
         let formatted_info = format_info_string(&info, config);
 
+        log::debug!("formatted_info = '{}'", formatted_info);
+
         // Output normalized code block
         for _ in 0..fence_length {
             output.push(fence_char);
@@ -141,7 +143,12 @@ fn determine_fence_length(content: &str, fence_char: char, min_length: usize) ->
 
 /// Format the info string based on block type and config preferences
 fn format_info_string(info: &InfoString, config: &Config) -> String {
-    // For Preserve mode, use the raw string as-is
+    log::debug!(
+        "format_info_string: block_type={:?}, attribute_style={:?}, raw='{}'",
+        info.block_type,
+        config.code_blocks.attribute_style,
+        info.raw
+    );
     if config.code_blocks.attribute_style == AttributeStyle::Preserve {
         return if info.raw.is_empty() {
             String::new()
@@ -156,7 +163,7 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
             if info.attributes.is_empty() {
                 String::new()
             } else {
-                format!(" {{{}}}", format_attributes(&info.attributes, false))
+                format!("{{{}}}", format_attributes(&info.attributes, false))
             }
         }
         CodeBlockType::DisplayShortcut { language } => {
@@ -316,6 +323,12 @@ fn format_code_block_hashpipe(
 /// For executable chunks, preserve unquoted values when they're safe identifiers
 /// (no spaces, no special chars). This preserves R/Julia/Python chunk semantics.
 fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool) -> String {
+    let separator = if preserve_unquoted {
+        ", " // Executable chunks use commas
+    } else {
+        " " // Display blocks use spaces
+    };
+
     attrs
         .iter()
         .map(|(k, v)| {
@@ -342,7 +355,7 @@ fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool
             }
         })
         .collect::<Vec<_>>()
-        .join(", ")
+        .join(separator)
 }
 
 /// Collect all code blocks and their info strings from the syntax tree.

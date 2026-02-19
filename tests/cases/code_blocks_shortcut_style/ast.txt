@@ -1,0 +1,99 @@
+ROOT@0..312
+  DOCUMENT@0..312
+    HEADING@0..34
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
+      WHITESPACE@1..2 " "
+      HEADING_CONTENT@2..33
+        TEXT@2..33 "Code Blocks with Shor ..."
+      NEWLINE@33..34 "\n"
+    BLANK_LINE@34..35
+      BLANK_LINE@34..35 "\n"
+    PARAGRAPH@35..70
+      TEXT@35..69 "Explicit syntax with  ..."
+      NEWLINE@69..70 "\n"
+    BLANK_LINE@70..71
+      BLANK_LINE@70..71 "\n"
+    CODE_BLOCK@71..104
+      CODE_FENCE_OPEN@71..85
+        CODE_FENCE_MARKER@71..74 "```"
+        WHITESPACE@74..75 " "
+        CODE_INFO@75..84
+          TEXT@75..76 "{"
+          TEXT@76..77 "."
+          CODE_LANGUAGE@77..83 "python"
+          TEXT@83..84 "}"
+        NEWLINE@84..85 "\n"
+      CODE_CONTENT@85..100
+        TEXT@85..99 "print(\"hello\")"
+        NEWLINE@99..100 "\n"
+      CODE_FENCE_CLOSE@100..104
+        CODE_FENCE_MARKER@100..103 "```"
+        NEWLINE@103..104 "\n"
+    BLANK_LINE@104..105
+      BLANK_LINE@104..105 "\n"
+    PARAGRAPH@105..131
+      TEXT@105..130 "Explicit with attribu ..."
+      NEWLINE@130..131 "\n"
+    BLANK_LINE@131..132
+      BLANK_LINE@131..132 "\n"
+    CODE_BLOCK@132..184
+      CODE_FENCE_OPEN@132..173
+        CODE_FENCE_MARKER@132..135 "```"
+        WHITESPACE@135..136 " "
+        CODE_INFO@136..172
+          TEXT@136..137 "{"
+          TEXT@137..138 "."
+          CODE_LANGUAGE@138..144 "python"
+          TEXT@144..172 " .numberLines startFr ..."
+        NEWLINE@172..173 "\n"
+      CODE_CONTENT@173..180
+        TEXT@173..179 "x = 42"
+        NEWLINE@179..180 "\n"
+      CODE_FENCE_CLOSE@180..184
+        CODE_FENCE_MARKER@180..183 "```"
+        NEWLINE@183..184 "\n"
+    BLANK_LINE@184..185
+      BLANK_LINE@184..185 "\n"
+    PARAGRAPH@185..208
+      TEXT@185..207 "Multiple classes only:"
+      NEWLINE@207..208 "\n"
+    BLANK_LINE@208..209
+      BLANK_LINE@208..209 "\n"
+    CODE_BLOCK@209..240
+      CODE_FENCE_OPEN@209..229
+        CODE_FENCE_MARKER@209..212 "```"
+        WHITESPACE@212..213 " "
+        CODE_INFO@213..228
+          TEXT@213..214 "{"
+          TEXT@214..215 "."
+          CODE_LANGUAGE@215..221 "python"
+          TEXT@221..228 " .dark}"
+        NEWLINE@228..229 "\n"
+      CODE_CONTENT@229..236
+        TEXT@229..235 "y = 10"
+        NEWLINE@235..236 "\n"
+      CODE_FENCE_CLOSE@236..240
+        CODE_FENCE_MARKER@236..239 "```"
+        NEWLINE@239..240 "\n"
+    BLANK_LINE@240..241
+      BLANK_LINE@240..241 "\n"
+    PARAGRAPH@241..272
+      TEXT@241..271 "Just attributes (no l ..."
+      NEWLINE@271..272 "\n"
+    BLANK_LINE@272..273
+      BLANK_LINE@272..273 "\n"
+    CODE_BLOCK@273..312
+      CODE_FENCE_OPEN@273..297
+        CODE_FENCE_MARKER@273..276 "```"
+        WHITESPACE@276..277 " "
+        CODE_INFO@277..296
+          TEXT@277..296 "{#myid key=\"value\"}"
+        NEWLINE@296..297 "\n"
+      CODE_CONTENT@297..308
+        TEXT@297..307 "plain text"
+        NEWLINE@307..308 "\n"
+      CODE_FENCE_CLOSE@308..312
+        CODE_FENCE_MARKER@308..311 "```"
+        NEWLINE@311..312 "\n"
+

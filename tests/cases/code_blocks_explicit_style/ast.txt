@@ -1,0 +1,97 @@
+ROOT@0..299
+  DOCUMENT@0..299
+    HEADING@0..34
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
+      WHITESPACE@1..2 " "
+      HEADING_CONTENT@2..33
+        TEXT@2..33 "Code Blocks with Expl ..."
+      NEWLINE@33..34 "\n"
+    BLANK_LINE@34..35
+      BLANK_LINE@34..35 "\n"
+    PARAGRAPH@35..58
+      TEXT@35..57 "Basic shortcut syntax:"
+      NEWLINE@57..58 "\n"
+    BLANK_LINE@58..59
+      BLANK_LINE@58..59 "\n"
+    CODE_BLOCK@59..88
+      CODE_FENCE_OPEN@59..69
+        CODE_FENCE_MARKER@59..62 "```"
+        CODE_INFO@62..68
+          CODE_LANGUAGE@62..68 "python"
+        NEWLINE@68..69 "\n"
+      CODE_CONTENT@69..84
+        TEXT@69..83 "print(\"hello\")"
+        NEWLINE@83..84 "\n"
+      CODE_FENCE_CLOSE@84..88
+        CODE_FENCE_MARKER@84..87 "```"
+        NEWLINE@87..88 "\n"
+    BLANK_LINE@88..89
+      BLANK_LINE@88..89 "\n"
+    PARAGRAPH@89..115
+      TEXT@89..114 "Shortcut with attribu ..."
+      NEWLINE@114..115 "\n"
+    BLANK_LINE@115..116
+      BLANK_LINE@115..116 "\n"
+    CODE_BLOCK@116..152
+      CODE_FENCE_OPEN@116..141
+        CODE_FENCE_MARKER@116..119 "```"
+        CODE_INFO@119..140
+          CODE_LANGUAGE@119..125 "python"
+          TEXT@125..140 " {.numberLines}"
+        NEWLINE@140..141 "\n"
+      CODE_CONTENT@141..148
+        TEXT@141..147 "x = 42"
+        NEWLINE@147..148 "\n"
+      CODE_FENCE_CLOSE@148..152
+        CODE_FENCE_MARKER@148..151 "```"
+        NEWLINE@151..152 "\n"
+    BLANK_LINE@152..153
+      BLANK_LINE@152..153 "\n"
+    PARAGRAPH@153..171
+      TEXT@153..170 "Already explicit:"
+      NEWLINE@170..171 "\n"
+    BLANK_LINE@171..172
+      BLANK_LINE@171..172 "\n"
+    CODE_BLOCK@172..213
+      CODE_FENCE_OPEN@172..195
+        CODE_FENCE_MARKER@172..175 "```"
+        WHITESPACE@175..176 " "
+        CODE_INFO@176..194
+          TEXT@176..177 "{"
+          TEXT@177..178 "."
+          CODE_LANGUAGE@178..185 "haskell"
+          TEXT@185..194 " #mycode}"
+        NEWLINE@194..195 "\n"
+      CODE_CONTENT@195..209
+        TEXT@195..208 "qsort [] = []"
+        NEWLINE@208..209 "\n"
+      CODE_FENCE_CLOSE@209..213
+        CODE_FENCE_MARKER@209..212 "```"
+        NEWLINE@212..213 "\n"
+    BLANK_LINE@213..214
+      BLANK_LINE@213..214 "\n"
+    PARAGRAPH@214..232
+      TEXT@214..231 "Multiple classes:"
+      NEWLINE@231..232 "\n"
+    BLANK_LINE@232..233
+      BLANK_LINE@232..233 "\n"
+    CODE_BLOCK@233..299
+      CODE_FENCE_OPEN@233..275
+        CODE_FENCE_MARKER@233..236 "```"
+        WHITESPACE@236..237 " "
+        CODE_INFO@237..274
+          TEXT@237..238 "{"
+          TEXT@238..239 "."
+          CODE_LANGUAGE@239..245 "python"
+          TEXT@245..274 " .numberLines startFr ..."
+        NEWLINE@274..275 "\n"
+      CODE_CONTENT@275..295
+        TEXT@275..285 "def foo():"
+        NEWLINE@285..286 "\n"
+        TEXT@286..294 "    pass"
+        NEWLINE@294..295 "\n"
+      CODE_FENCE_CLOSE@295..299
+        CODE_FENCE_MARKER@295..298 "```"
+        NEWLINE@298..299 "\n"
+

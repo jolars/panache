@@ -1,0 +1,30 @@
+# Executable Code Chunks
+
+Basic R chunk:
+
+```{r}
+x <- 42
+```
+
+With options:
+
+```{r}
+#| echo: false
+#| fig-width: 8
+plot(1:10)
+```
+
+Python chunk:
+
+```{python}
+#| eval: true
+import pandas as pd
+```
+
+Julia chunk with label:
+
+```{julia}
+#| label: fig-plot
+#| echo: false
+using Plots
+```

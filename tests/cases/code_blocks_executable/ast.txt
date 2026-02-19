@@ -1,0 +1,104 @@
+ROOT@0..283
+  DOCUMENT@0..283
+    HEADING@0..25
+      ATX_HEADING_MARKER@0..1
+        ATX_HEADING_MARKER@0..1 "#"
+      WHITESPACE@1..2 " "
+      HEADING_CONTENT@2..24
+        TEXT@2..24 "Executable Code Chunks"
+      NEWLINE@24..25 "\n"
+    BLANK_LINE@25..26
+      BLANK_LINE@25..26 "\n"
+    PARAGRAPH@26..41
+      TEXT@26..40 "Basic R chunk:"
+      NEWLINE@40..41 "\n"
+    BLANK_LINE@41..42
+      BLANK_LINE@41..42 "\n"
+    CODE_BLOCK@42..61
+      CODE_FENCE_OPEN@42..49
+        CODE_FENCE_MARKER@42..45 "```"
+        CODE_INFO@45..48
+          TEXT@45..46 "{"
+          CODE_LANGUAGE@46..47 "r"
+          TEXT@47..48 "}"
+        NEWLINE@48..49 "\n"
+      CODE_CONTENT@49..57
+        TEXT@49..56 "x <- 42"
+        NEWLINE@56..57 "\n"
+      CODE_FENCE_CLOSE@57..61
+        CODE_FENCE_MARKER@57..60 "```"
+        NEWLINE@60..61 "\n"
+    BLANK_LINE@61..62
+      BLANK_LINE@61..62 "\n"
+    PARAGRAPH@62..76
+      TEXT@62..75 "With options:"
+      NEWLINE@75..76 "\n"
+    BLANK_LINE@76..77
+      BLANK_LINE@76..77 "\n"
+    CODE_BLOCK@77..130
+      CODE_FENCE_OPEN@77..84
+        CODE_FENCE_MARKER@77..80 "```"
+        CODE_INFO@80..83
+          TEXT@80..81 "{"
+          CODE_LANGUAGE@81..82 "r"
+          TEXT@82..83 "}"
+        NEWLINE@83..84 "\n"
+      CODE_CONTENT@84..126
+        TEXT@84..98 "#| echo: false"
+        NEWLINE@98..99 "\n"
+        TEXT@99..114 "#| fig-width: 8"
+        NEWLINE@114..115 "\n"
+        TEXT@115..125 "plot(1:10)"
+        NEWLINE@125..126 "\n"
+      CODE_FENCE_CLOSE@126..130
+        CODE_FENCE_MARKER@126..129 "```"
+        NEWLINE@129..130 "\n"
+    BLANK_LINE@130..131
+      BLANK_LINE@130..131 "\n"
+    PARAGRAPH@131..145
+      TEXT@131..144 "Python chunk:"
+      NEWLINE@144..145 "\n"
+    BLANK_LINE@145..146
+      BLANK_LINE@145..146 "\n"
+    CODE_BLOCK@146..196
+      CODE_FENCE_OPEN@146..158
+        CODE_FENCE_MARKER@146..149 "```"
+        CODE_INFO@149..157
+          TEXT@149..150 "{"
+          CODE_LANGUAGE@150..156 "python"
+          TEXT@156..157 "}"
+        NEWLINE@157..158 "\n"
+      CODE_CONTENT@158..192
+        TEXT@158..171 "#| eval: true"
+        NEWLINE@171..172 "\n"
+        TEXT@172..191 "import pandas as pd"
+        NEWLINE@191..192 "\n"
+      CODE_FENCE_CLOSE@192..196
+        CODE_FENCE_MARKER@192..195 "```"
+        NEWLINE@195..196 "\n"
+    BLANK_LINE@196..197
+      BLANK_LINE@196..197 "\n"
+    PARAGRAPH@197..221
+      TEXT@197..220 "Julia chunk with label:"
+      NEWLINE@220..221 "\n"
+    BLANK_LINE@221..222
+      BLANK_LINE@221..222 "\n"
+    CODE_BLOCK@222..283
+      CODE_FENCE_OPEN@222..233
+        CODE_FENCE_MARKER@222..225 "```"
+        CODE_INFO@225..232
+          TEXT@225..226 "{"
+          CODE_LANGUAGE@226..231 "julia"
+          TEXT@231..232 "}"
+        NEWLINE@232..233 "\n"
+      CODE_CONTENT@233..279
+        TEXT@233..251 "#| label: fig-plot"
+        NEWLINE@251..252 "\n"
+        TEXT@252..266 "#| echo: false"
+        NEWLINE@266..267 "\n"
+        TEXT@267..278 "using Plots"
+        NEWLINE@278..279 "\n"
+      CODE_FENCE_CLOSE@279..283
+        CODE_FENCE_MARKER@279..282 "```"
+        NEWLINE@282..283 "\n"
+
