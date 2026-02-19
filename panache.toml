@@ -1,8 +1,6 @@
-[formatters.r]
-preset = "air"
-
-[formatters.yaml]
-preset = "yamlfmt"
+[formatters]
+r = "air"
+yaml = "yamlfmt"
 
 [linters]
 r = "jarl"
