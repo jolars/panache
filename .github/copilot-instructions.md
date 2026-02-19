@@ -124,20 +124,29 @@ panache lsp  # Starts LSP server on stdin/stdout for editor integration
 panache has comprehensive logging infrastructure for debugging:
 
 ```bash
-# Production: High-level metrics only (available in release builds)
-RUST_LOG=info panache format document.qmd
+# Development: See all parsing decisions (requires debug build via cargo run)
+# Works with any subcommand: format, parse, lint, lsp
+RUST_LOG=debug cargo run -- format document.qmd
+RUST_LOG=debug cargo run -- parse document.qmd
+RUST_LOG=debug cargo run -- lint document.qmd
 
-# Development: See all parsing decisions (debug builds only)
-RUST_LOG=debug panache format document.qmd
+# Detailed debugging: Every parsing step (requires debug build)
+RUST_LOG=trace cargo run -- parse document.qmd
 
-# Detailed debugging: Every parsing step (debug builds only)
-RUST_LOG=trace panache format document.qmd
+# Detailed debugging: Every formatting + parsing step (requires debug build)
+RUST_LOG=trace cargo run -- format document.qmd
 
 # Module-specific: Only inline parser debug logs
-RUST_LOG=panache::parser::inline_parser=debug panache format document.qmd
+RUST_LOG=panache::parser::inline_parser=debug cargo run -- format document.qmd
 
 # Multiple modules with different levels
-RUST_LOG=panache::parser::block_parser=trace,panache::formatter=debug panache format document.qmd
+RUST_LOG=panache::parser::block_parser=trace,panache::formatter=debug cargo run -- format document.qmd
+
+# Reading from stdin during development
+printf "# Test\n\nParagraph." | RUST_LOG=debug cargo run -- format
+
+# Using release build: INFO logs only (DEBUG/TRACE compiled out for performance)
+RUST_LOG=info ./target/release/panache format document.qmd
 ```
 
 **Log levels and content:**
@@ -330,11 +339,13 @@ matching rust-analyzer and other rowan-based parsers:
 
 - ✅ `HEADING`, `PARAGRAPH`, `CODE_BLOCK`, `LINK`, `IMAGE_LINK`
 - ✅ `ATX_HEADING_MARKER`, `FOOTNOTE_REFERENCE`, `TABLE_CAPTION`
-- ❌ ~~`Heading`~~, ~~`CodeBlock`~~, ~~`ImageLink`~~ (old UpperCamelCase - removed)
+- ❌ ~~`Heading`~~, ~~`CodeBlock`~~, ~~`ImageLink`~~ (old UpperCamelCase -
+  removed)
 
-**Rationale**: These are CST discriminants, not type names. The `#[allow(non_camel_case_types)]`
-attribute suppresses Rust's lint warning. Typed wrappers use UpperCamelCase
-(`Heading`, `Link`, etc.) to distinguish them from the raw discriminants.
+**Rationale**: These are CST discriminants, not type names. The
+`#[allow(non_camel_case_types)]` attribute suppresses Rust's lint warning. Typed
+wrappers use UpperCamelCase (`Heading`, `Link`, etc.) to distinguish them from
+the raw discriminants.
 
 ### Test Architecture
 
@@ -607,25 +618,15 @@ The `syntax` module provides typed wrappers following rust-analyzer's pattern:
 - **Benefits**: Type safety, ergonomic APIs, self-documenting code
 - **Usage**: Prefer wrappers in LSP handlers, optional in formatter
 - **Tier 1 implemented**: Heading, Link, Image, Table, Reference/Footnote types
-- **Future**: Tier 2 (CodeBlock, List, BlockQuote) and Tier 3 (inline formatting)
+- **Future**: Tier 2 (CodeBlock, List, BlockQuote) and Tier 3 (inline
+  formatting)
 
-Example:
-```rust
-// Without wrapper (manual tree traversal)
-if node.kind() == SyntaxKind::HEADING {
-    for child in node.children() {
-        if child.kind() == SyntaxKind::HEADING_CONTENT {
-            let text = child.text().to_string();
-        }
-    }
-}
+Example: ```rust // Without wrapper (manual tree traversal) if node.kind()
+== SyntaxKind::HEADING { for child in node.children() { if child.kind() ==
+SyntaxKind::HEADING_CONTENT { let text = child.text().to_string(); } } }
 
-// With wrapper (type-safe and clean)
-if let Some(heading) = Heading::cast(node) {
-    let text = heading.text();
-    let level = heading.level();
-}
-```
+// With wrapper (type-safe and clean) if let Some(heading) = Heading::cast(node)
+{ let text = heading.text(); let level = heading.level(); } ```
 
 **Testing:**
 
@@ -652,13 +653,15 @@ panache has comprehensive logging (~50 strategic log statements):
 
 - **Release builds**: INFO logs only (formatting metrics, config loading) - zero
   overhead for DEBUG/TRACE
-- **Debug builds**: Full DEBUG and TRACE logging available
+- **Debug builds**: Full DEBUG and TRACE logging available (via `cargo run`)
 - **Modules logged**: parser::block_parser, parser::inline_parser, formatter,
   config
-- **Usage**: `RUST_LOG=debug cargo run` or
-  `RUST_LOG=panache::parser::inline_parser=trace cargo run`
+- **Usage**: `RUST_LOG=debug cargo run -- format <file>` or
+  `RUST_LOG=panache::parser::inline_parser=trace cargo run -- format <file>`
 - **Purpose**: Debug parsing decisions, understand element matching, trace
   formatter behavior
+- **Important**: Must use `cargo run --` (not installed binary) for DEBUG/TRACE
+  logs
 
 Example log output (DEBUG level):
 
