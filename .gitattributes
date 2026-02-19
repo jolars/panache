@@ -12,7 +12,7 @@ tests/cases/line_ending_crlf/* -text
 tests/cases/line_ending_lf/* -text
 
 # AST files should always use LF endings (they contain literal string representations)
-tests/cases/*/ast.txt eol=lf
+tests/cases/*/cst.txt eol=lf
 
 # Other test cases can use LF (the default for most projects)
 # Individual test cases can override if needed
