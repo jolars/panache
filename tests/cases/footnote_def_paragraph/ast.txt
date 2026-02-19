@@ -1,43 +1,42 @@
-ROOT@0..95
-  DOCUMENT@0..95
-    HEADING@0..7
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..6
-        TEXT@2..6 "Test"
-      NEWLINE@6..7 "\n"
-    BLANK_LINE@7..8
-      BLANK_LINE@7..8 "\n"
-    PARAGRAPH@8..27
-      TEXT@8..21 "Text with ref"
-      FOOTNOTE_REFERENCE@21..25
-        TEXT@21..23 "[^"
-        TEXT@23..24 "1"
-        TEXT@24..25 "]"
-      TEXT@25..26 "."
-      NEWLINE@26..27 "\n"
-    BLANK_LINE@27..28
-      BLANK_LINE@27..28 "\n"
-    FOOTNOTE_DEFINITION@28..95
-      FOOTNOTE_REFERENCE@28..34 "[^1]: "
-      PARAGRAPH@34..48
-        TEXT@34..47 "Footnote text"
-        NEWLINE@47..48 "\n"
-      BLANK_LINE@48..49
-        BLANK_LINE@48..49 "\n"
-      DEFINITION_LIST@49..68
-        DEFINITION_ITEM@49..68
-          DEFINITION@49..68
-            WHITESPACE@49..53 "    "
-            DEFINITION_MARKER@53..54 ":"
-            WHITESPACE@54..57 "   "
-            PLAIN@57..68
-              TEXT@57..67 "Definition"
-              NEWLINE@67..68 "\n"
-      BLANK_LINE@68..69
-        BLANK_LINE@68..69 "\n"
-      PARAGRAPH@69..95
-        TEXT@69..94 "    Continuing paragr ..."
-        NEWLINE@94..95 "\n"
+DOCUMENT@0..95
+  HEADING@0..7
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..6
+      TEXT@2..6 "Test"
+    NEWLINE@6..7 "\n"
+  BLANK_LINE@7..8
+    BLANK_LINE@7..8 "\n"
+  PARAGRAPH@8..27
+    TEXT@8..21 "Text with ref"
+    FOOTNOTE_REFERENCE@21..25
+      TEXT@21..23 "[^"
+      TEXT@23..24 "1"
+      TEXT@24..25 "]"
+    TEXT@25..26 "."
+    NEWLINE@26..27 "\n"
+  BLANK_LINE@27..28
+    BLANK_LINE@27..28 "\n"
+  FOOTNOTE_DEFINITION@28..95
+    FOOTNOTE_REFERENCE@28..34 "[^1]: "
+    PARAGRAPH@34..48
+      TEXT@34..47 "Footnote text"
+      NEWLINE@47..48 "\n"
+    BLANK_LINE@48..49
+      BLANK_LINE@48..49 "\n"
+    DEFINITION_LIST@49..68
+      DEFINITION_ITEM@49..68
+        DEFINITION@49..68
+          WHITESPACE@49..53 "    "
+          DEFINITION_MARKER@53..54 ":"
+          WHITESPACE@54..57 "   "
+          PLAIN@57..68
+            TEXT@57..67 "Definition"
+            NEWLINE@67..68 "\n"
+    BLANK_LINE@68..69
+      BLANK_LINE@68..69 "\n"
+    PARAGRAPH@69..95
+      TEXT@69..94 "    Continuing paragr ..."
+      NEWLINE@94..95 "\n"
 

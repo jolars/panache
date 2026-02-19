@@ -17,12 +17,12 @@ pub fn find_all(node: &SyntaxNode, kind: SyntaxKind) -> Vec<SyntaxNode> {
 }
 
 pub fn get_blocks(node: &SyntaxNode) -> Vec<SyntaxNode> {
-    let document = node
-        .children()
-        .find(|n| n.kind() == SyntaxKind::DOCUMENT)
-        .unwrap();
-    let blocks: Vec<SyntaxNode> = document.children().collect();
-    blocks
+    // Root is now DOCUMENT directly
+    if node.kind() == SyntaxKind::DOCUMENT {
+        node.children().collect()
+    } else {
+        Vec::new()
+    }
 }
 
 pub fn assert_block_kinds(input: &str, expected: &[SyntaxKind]) {

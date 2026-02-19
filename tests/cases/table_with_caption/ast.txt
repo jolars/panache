@@ -1,25 +1,24 @@
-ROOT@0..243
-  DOCUMENT@0..243
-    SIMPLE_TABLE@0..243
-      TABLE_HEADER@0..40
-        TEXT@0..39 "  Right     Left      ..."
-        NEWLINE@39..40 "\n"
-      TABLE_SEPARATOR@40..80
-        TEXT@40..79 "-------     ------ -- ..."
-        NEWLINE@79..80 "\n"
-      TABLE_ROW@80..119
-        TEXT@80..118 "     12     12        ..."
-        NEWLINE@118..119 "\n"
-      TABLE_ROW@119..158
-        TEXT@119..157 "    123     123       ..."
-        NEWLINE@157..158 "\n"
-      TABLE_ROW@158..197
-        TEXT@158..196 "      1     1         ..."
-        NEWLINE@196..197 "\n"
-      BLANK_LINE@197..198
-        BLANK_LINE@197..198 "\n"
-      TABLE_CAPTION@198..243
-        TABLE_CAPTION_PREFIX@198..205 "Table: "
-        TEXT@205..242 "Demonstration of simp ..."
-        NEWLINE@242..243 "\n"
+DOCUMENT@0..243
+  SIMPLE_TABLE@0..243
+    TABLE_HEADER@0..40
+      TEXT@0..39 "  Right     Left      ..."
+      NEWLINE@39..40 "\n"
+    TABLE_SEPARATOR@40..80
+      TEXT@40..79 "-------     ------ -- ..."
+      NEWLINE@79..80 "\n"
+    TABLE_ROW@80..119
+      TEXT@80..118 "     12     12        ..."
+      NEWLINE@118..119 "\n"
+    TABLE_ROW@119..158
+      TEXT@119..157 "    123     123       ..."
+      NEWLINE@157..158 "\n"
+    TABLE_ROW@158..197
+      TEXT@158..196 "      1     1         ..."
+      NEWLINE@196..197 "\n"
+    BLANK_LINE@197..198
+      BLANK_LINE@197..198 "\n"
+    TABLE_CAPTION@198..243
+      TABLE_CAPTION_PREFIX@198..205 "Table: "
+      TEXT@205..242 "Demonstration of simp ..."
+      NEWLINE@242..243 "\n"
 

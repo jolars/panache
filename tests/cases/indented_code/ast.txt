@@ -1,18 +1,17 @@
-ROOT@0..93
-  DOCUMENT@0..93
-    PARAGRAPH@0..5
-      TEXT@0..4 "Test"
-      NEWLINE@4..5 "\n"
-    BLANK_LINE@5..6
-      BLANK_LINE@5..6 "\n"
-    CODE_BLOCK@6..15
-      CODE_CONTENT@6..15
-        WHITESPACE@6..10 "    "
-        TEXT@10..14 "code"
-        NEWLINE@14..15 "\n"
-    BLANK_LINE@15..16
-      BLANK_LINE@15..16 "\n"
-    PARAGRAPH@16..93
-      TEXT@16..92 "Again, I want to than ..."
-      NEWLINE@92..93 "\n"
+DOCUMENT@0..93
+  PARAGRAPH@0..5
+    TEXT@0..4 "Test"
+    NEWLINE@4..5 "\n"
+  BLANK_LINE@5..6
+    BLANK_LINE@5..6 "\n"
+  CODE_BLOCK@6..15
+    CODE_CONTENT@6..15
+      WHITESPACE@6..10 "    "
+      TEXT@10..14 "code"
+      NEWLINE@14..15 "\n"
+  BLANK_LINE@15..16
+    BLANK_LINE@15..16 "\n"
+  PARAGRAPH@16..93
+    TEXT@16..92 "Again, I want to than ..."
+    NEWLINE@92..93 "\n"
 

@@ -1,203 +1,202 @@
-ROOT@0..854
-  DOCUMENT@0..854
-    HEADING@0..25
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..24
-        TEXT@2..24 "Quarto Shortcodes Test"
-      NEWLINE@24..25 "\n"
-    BLANK_LINE@25..26
-      BLANK_LINE@25..26 "\n"
-    PARAGRAPH@26..87
-      TEXT@26..86 "This document tests Q ..."
-      NEWLINE@86..87 "\n"
-    BLANK_LINE@87..88
-      BLANK_LINE@87..88 "\n"
-    HEADING@88..108
-      ATX_HEADING_MARKER@88..90
-        ATX_HEADING_MARKER@88..90 "##"
-      WHITESPACE@90..91 " "
-      HEADING_CONTENT@91..107
-        TEXT@91..107 "Basic Shortcodes"
-      NEWLINE@107..108 "\n"
-    BLANK_LINE@108..109
-      BLANK_LINE@108..109 "\n"
-    PARAGRAPH@109..140
-      TEXT@109..122 "The title is "
-      SHORTCODE@122..138
-        SHORTCODE_MARKER_OPEN@122..125 "{{<"
-        SHORTCODE_CONTENT@125..135
-          TEXT@125..135 "meta title"
-        SHORTCODE_MARKER_CLOSE@135..138 ">}}"
-      TEXT@138..139 "."
-      NEWLINE@139..140 "\n"
-    BLANK_LINE@140..141
-      BLANK_LINE@140..141 "\n"
-    PARAGRAPH@141..180
-      TEXT@141..156 "The version is "
-      SHORTCODE@156..178
-        SHORTCODE_MARKER_OPEN@156..159 "{{<"
-        SHORTCODE_CONTENT@159..175
-          TEXT@159..175 "  var  version  "
-        SHORTCODE_MARKER_CLOSE@175..178 ">}}"
-      TEXT@178..179 "."
-      NEWLINE@179..180 "\n"
-    BLANK_LINE@180..181
-      BLANK_LINE@180..181 "\n"
-    PARAGRAPH@181..213
-      TEXT@181..195 "Current user: "
-      SHORTCODE@195..211
-        SHORTCODE_MARKER_OPEN@195..198 "{{<"
-        SHORTCODE_CONTENT@198..208
-          TEXT@198..208 " env USER "
-        SHORTCODE_MARKER_CLOSE@208..211 ">}}"
-      TEXT@211..212 "."
-      NEWLINE@212..213 "\n"
-    BLANK_LINE@213..214
-      BLANK_LINE@213..214 "\n"
-    HEADING@214..243
-      ATX_HEADING_MARKER@214..216
-        ATX_HEADING_MARKER@214..216 "##"
-      WHITESPACE@216..217 " "
-      HEADING_CONTENT@217..242
-        TEXT@217..242 "Shortcodes with Argum ..."
-      NEWLINE@242..243 "\n"
-    BLANK_LINE@243..244
-      BLANK_LINE@243..244 "\n"
-    PARAGRAPH@244..294
-      SHORTCODE@244..293
-        SHORTCODE_MARKER_OPEN@244..247 "{{<"
-        SHORTCODE_CONTENT@247..290
-          TEXT@247..290 " video src=\"https://e ..."
-        SHORTCODE_MARKER_CLOSE@290..293 ">}}"
-      NEWLINE@293..294 "\n"
-    BLANK_LINE@294..295
-      BLANK_LINE@294..295 "\n"
-    PARAGRAPH@295..327
-      SHORTCODE@295..326
-        SHORTCODE_MARKER_OPEN@295..298 "{{<"
-        SHORTCODE_CONTENT@298..323
-          TEXT@298..323 " env PATH \"default/pa ..."
-        SHORTCODE_MARKER_CLOSE@323..326 ">}}"
-      NEWLINE@326..327 "\n"
-    BLANK_LINE@327..328
-      BLANK_LINE@327..328 "\n"
-    PARAGRAPH@328..386
-      SHORTCODE@328..385
-        SHORTCODE_MARKER_OPEN@328..331 "{{<"
-        SHORTCODE_CONTENT@331..382
-          TEXT@331..382 " video src=\"movie.mp4 ..."
-        SHORTCODE_MARKER_CLOSE@382..385 ">}}"
-      NEWLINE@385..386 "\n"
-    BLANK_LINE@386..387
-      BLANK_LINE@386..387 "\n"
-    HEADING@387..403
-      ATX_HEADING_MARKER@387..389
-        ATX_HEADING_MARKER@387..389 "##"
-      WHITESPACE@389..390 " "
-      HEADING_CONTENT@390..402
-        TEXT@390..402 "Dot Notation"
-      NEWLINE@402..403 "\n"
-    BLANK_LINE@403..404
-      BLANK_LINE@403..404 "\n"
-    PARAGRAPH@404..440
-      TEXT@404..417 "Author name: "
-      SHORTCODE@417..438
-        SHORTCODE_MARKER_OPEN@417..420 "{{<"
-        SHORTCODE_CONTENT@420..435
-          TEXT@420..435 " meta author.1 "
-        SHORTCODE_MARKER_CLOSE@435..438 ">}}"
-      TEXT@438..439 "."
-      NEWLINE@439..440 "\n"
-    BLANK_LINE@440..441
-      BLANK_LINE@440..441 "\n"
-    PARAGRAPH@441..472
-      TEXT@441..448 "Email: "
-      SHORTCODE@448..470
-        SHORTCODE_MARKER_OPEN@448..451 "{{<"
-        SHORTCODE_CONTENT@451..467
-          TEXT@451..467 " var email.info "
-        SHORTCODE_MARKER_CLOSE@467..470 ">}}"
-      TEXT@470..471 "."
-      NEWLINE@471..472 "\n"
-    BLANK_LINE@472..473
-      BLANK_LINE@472..473 "\n"
-    PARAGRAPH@473..521
-      TEXT@473..487 "Escaped dots: "
-      SHORTCODE@487..519
-        SHORTCODE_MARKER_OPEN@487..490 "{{<"
-        SHORTCODE_CONTENT@490..516
-          TEXT@490..516 " meta field\\\\.with\\\\. ..."
-        SHORTCODE_MARKER_CLOSE@516..519 ">}}"
-      TEXT@519..520 "."
-      NEWLINE@520..521 "\n"
-    BLANK_LINE@521..522
-      BLANK_LINE@521..522 "\n"
-    HEADING@522..564
-      ATX_HEADING_MARKER@522..524
-        ATX_HEADING_MARKER@522..524 "##"
-      WHITESPACE@524..525 " "
-      HEADING_CONTENT@525..563
-        TEXT@525..563 "Escaped Shortcodes (f ..."
-      NEWLINE@563..564 "\n"
-    BLANK_LINE@564..565
-      BLANK_LINE@564..565 "\n"
-    PARAGRAPH@565..638
-      TEXT@565..616 "To show a shortcode l ..."
-      SHORTCODE@616..635
-        SHORTCODE_MARKER_OPEN@616..619 "{{<"
-        SHORTCODE_CONTENT@619..632
-          TEXT@619..632 " var version "
-        SHORTCODE_MARKER_CLOSE@632..635 ">}}"
-      TEXT@635..637 "}."
-      NEWLINE@637..638 "\n"
-    BLANK_LINE@638..639
-      BLANK_LINE@638..639 "\n"
-    PARAGRAPH@639..676
-      TEXT@639..657 "Another example: {"
-      SHORTCODE@657..673
-        SHORTCODE_MARKER_OPEN@657..660 "{{<"
-        SHORTCODE_CONTENT@660..670
-          TEXT@660..670 "meta title"
-        SHORTCODE_MARKER_CLOSE@670..673 ">}}"
-      TEXT@673..675 "}."
-      NEWLINE@675..676 "\n"
-    BLANK_LINE@676..677
-      BLANK_LINE@676..677 "\n"
-    HEADING@677..694
-      ATX_HEADING_MARKER@677..679
-        ATX_HEADING_MARKER@677..679 "##"
-      WHITESPACE@679..680 " "
-      HEADING_CONTENT@680..693
-        TEXT@680..693 "Mixed Content"
-      NEWLINE@693..694 "\n"
-    BLANK_LINE@694..695
-      BLANK_LINE@694..695 "\n"
-    PARAGRAPH@695..803
-      TEXT@695..714 "This paragraph has "
-      SHORTCODE@714..732
-        SHORTCODE_MARKER_OPEN@714..717 "{{<"
-        SHORTCODE_CONTENT@717..729
-          TEXT@717..729 " meta title "
-        SHORTCODE_MARKER_CLOSE@729..732 ">}}"
-      TEXT@732..765 " in the middle of tex ..."
-      SHORTCODE@765..784
-        SHORTCODE_MARKER_OPEN@765..768 "{{<"
-        SHORTCODE_CONTENT@768..781
-          TEXT@768..781 " var version "
-        SHORTCODE_MARKER_CLOSE@781..784 ">}}"
-      TEXT@784..802 " on the same line."
-      NEWLINE@802..803 "\n"
-    BLANK_LINE@803..804
-      BLANK_LINE@803..804 "\n"
-    PARAGRAPH@804..854
-      TEXT@804..808 "The "
-      SHORTCODE@808..822
-        SHORTCODE_MARKER_OPEN@808..811 "{{<"
-        SHORTCODE_CONTENT@811..819
-          TEXT@811..819 "env HOME"
-        SHORTCODE_MARKER_CLOSE@819..822 ">}}"
-      TEXT@822..853 " directory contains y ..."
-      NEWLINE@853..854 "\n"
+DOCUMENT@0..854
+  HEADING@0..25
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..24
+      TEXT@2..24 "Quarto Shortcodes Test"
+    NEWLINE@24..25 "\n"
+  BLANK_LINE@25..26
+    BLANK_LINE@25..26 "\n"
+  PARAGRAPH@26..87
+    TEXT@26..86 "This document tests Q ..."
+    NEWLINE@86..87 "\n"
+  BLANK_LINE@87..88
+    BLANK_LINE@87..88 "\n"
+  HEADING@88..108
+    ATX_HEADING_MARKER@88..90
+      ATX_HEADING_MARKER@88..90 "##"
+    WHITESPACE@90..91 " "
+    HEADING_CONTENT@91..107
+      TEXT@91..107 "Basic Shortcodes"
+    NEWLINE@107..108 "\n"
+  BLANK_LINE@108..109
+    BLANK_LINE@108..109 "\n"
+  PARAGRAPH@109..140
+    TEXT@109..122 "The title is "
+    SHORTCODE@122..138
+      SHORTCODE_MARKER_OPEN@122..125 "{{<"
+      SHORTCODE_CONTENT@125..135
+        TEXT@125..135 "meta title"
+      SHORTCODE_MARKER_CLOSE@135..138 ">}}"
+    TEXT@138..139 "."
+    NEWLINE@139..140 "\n"
+  BLANK_LINE@140..141
+    BLANK_LINE@140..141 "\n"
+  PARAGRAPH@141..180
+    TEXT@141..156 "The version is "
+    SHORTCODE@156..178
+      SHORTCODE_MARKER_OPEN@156..159 "{{<"
+      SHORTCODE_CONTENT@159..175
+        TEXT@159..175 "  var  version  "
+      SHORTCODE_MARKER_CLOSE@175..178 ">}}"
+    TEXT@178..179 "."
+    NEWLINE@179..180 "\n"
+  BLANK_LINE@180..181
+    BLANK_LINE@180..181 "\n"
+  PARAGRAPH@181..213
+    TEXT@181..195 "Current user: "
+    SHORTCODE@195..211
+      SHORTCODE_MARKER_OPEN@195..198 "{{<"
+      SHORTCODE_CONTENT@198..208
+        TEXT@198..208 " env USER "
+      SHORTCODE_MARKER_CLOSE@208..211 ">}}"
+    TEXT@211..212 "."
+    NEWLINE@212..213 "\n"
+  BLANK_LINE@213..214
+    BLANK_LINE@213..214 "\n"
+  HEADING@214..243
+    ATX_HEADING_MARKER@214..216
+      ATX_HEADING_MARKER@214..216 "##"
+    WHITESPACE@216..217 " "
+    HEADING_CONTENT@217..242
+      TEXT@217..242 "Shortcodes with Argum ..."
+    NEWLINE@242..243 "\n"
+  BLANK_LINE@243..244
+    BLANK_LINE@243..244 "\n"
+  PARAGRAPH@244..294
+    SHORTCODE@244..293
+      SHORTCODE_MARKER_OPEN@244..247 "{{<"
+      SHORTCODE_CONTENT@247..290
+        TEXT@247..290 " video src=\"https://e ..."
+      SHORTCODE_MARKER_CLOSE@290..293 ">}}"
+    NEWLINE@293..294 "\n"
+  BLANK_LINE@294..295
+    BLANK_LINE@294..295 "\n"
+  PARAGRAPH@295..327
+    SHORTCODE@295..326
+      SHORTCODE_MARKER_OPEN@295..298 "{{<"
+      SHORTCODE_CONTENT@298..323
+        TEXT@298..323 " env PATH \"default/pa ..."
+      SHORTCODE_MARKER_CLOSE@323..326 ">}}"
+    NEWLINE@326..327 "\n"
+  BLANK_LINE@327..328
+    BLANK_LINE@327..328 "\n"
+  PARAGRAPH@328..386
+    SHORTCODE@328..385
+      SHORTCODE_MARKER_OPEN@328..331 "{{<"
+      SHORTCODE_CONTENT@331..382
+        TEXT@331..382 " video src=\"movie.mp4 ..."
+      SHORTCODE_MARKER_CLOSE@382..385 ">}}"
+    NEWLINE@385..386 "\n"
+  BLANK_LINE@386..387
+    BLANK_LINE@386..387 "\n"
+  HEADING@387..403
+    ATX_HEADING_MARKER@387..389
+      ATX_HEADING_MARKER@387..389 "##"
+    WHITESPACE@389..390 " "
+    HEADING_CONTENT@390..402
+      TEXT@390..402 "Dot Notation"
+    NEWLINE@402..403 "\n"
+  BLANK_LINE@403..404
+    BLANK_LINE@403..404 "\n"
+  PARAGRAPH@404..440
+    TEXT@404..417 "Author name: "
+    SHORTCODE@417..438
+      SHORTCODE_MARKER_OPEN@417..420 "{{<"
+      SHORTCODE_CONTENT@420..435
+        TEXT@420..435 " meta author.1 "
+      SHORTCODE_MARKER_CLOSE@435..438 ">}}"
+    TEXT@438..439 "."
+    NEWLINE@439..440 "\n"
+  BLANK_LINE@440..441
+    BLANK_LINE@440..441 "\n"
+  PARAGRAPH@441..472
+    TEXT@441..448 "Email: "
+    SHORTCODE@448..470
+      SHORTCODE_MARKER_OPEN@448..451 "{{<"
+      SHORTCODE_CONTENT@451..467
+        TEXT@451..467 " var email.info "
+      SHORTCODE_MARKER_CLOSE@467..470 ">}}"
+    TEXT@470..471 "."
+    NEWLINE@471..472 "\n"
+  BLANK_LINE@472..473
+    BLANK_LINE@472..473 "\n"
+  PARAGRAPH@473..521
+    TEXT@473..487 "Escaped dots: "
+    SHORTCODE@487..519
+      SHORTCODE_MARKER_OPEN@487..490 "{{<"
+      SHORTCODE_CONTENT@490..516
+        TEXT@490..516 " meta field\\\\.with\\\\. ..."
+      SHORTCODE_MARKER_CLOSE@516..519 ">}}"
+    TEXT@519..520 "."
+    NEWLINE@520..521 "\n"
+  BLANK_LINE@521..522
+    BLANK_LINE@521..522 "\n"
+  HEADING@522..564
+    ATX_HEADING_MARKER@522..524
+      ATX_HEADING_MARKER@522..524 "##"
+    WHITESPACE@524..525 " "
+    HEADING_CONTENT@525..563
+      TEXT@525..563 "Escaped Shortcodes (f ..."
+    NEWLINE@563..564 "\n"
+  BLANK_LINE@564..565
+    BLANK_LINE@564..565 "\n"
+  PARAGRAPH@565..638
+    TEXT@565..616 "To show a shortcode l ..."
+    SHORTCODE@616..635
+      SHORTCODE_MARKER_OPEN@616..619 "{{<"
+      SHORTCODE_CONTENT@619..632
+        TEXT@619..632 " var version "
+      SHORTCODE_MARKER_CLOSE@632..635 ">}}"
+    TEXT@635..637 "}."
+    NEWLINE@637..638 "\n"
+  BLANK_LINE@638..639
+    BLANK_LINE@638..639 "\n"
+  PARAGRAPH@639..676
+    TEXT@639..657 "Another example: {"
+    SHORTCODE@657..673
+      SHORTCODE_MARKER_OPEN@657..660 "{{<"
+      SHORTCODE_CONTENT@660..670
+        TEXT@660..670 "meta title"
+      SHORTCODE_MARKER_CLOSE@670..673 ">}}"
+    TEXT@673..675 "}."
+    NEWLINE@675..676 "\n"
+  BLANK_LINE@676..677
+    BLANK_LINE@676..677 "\n"
+  HEADING@677..694
+    ATX_HEADING_MARKER@677..679
+      ATX_HEADING_MARKER@677..679 "##"
+    WHITESPACE@679..680 " "
+    HEADING_CONTENT@680..693
+      TEXT@680..693 "Mixed Content"
+    NEWLINE@693..694 "\n"
+  BLANK_LINE@694..695
+    BLANK_LINE@694..695 "\n"
+  PARAGRAPH@695..803
+    TEXT@695..714 "This paragraph has "
+    SHORTCODE@714..732
+      SHORTCODE_MARKER_OPEN@714..717 "{{<"
+      SHORTCODE_CONTENT@717..729
+        TEXT@717..729 " meta title "
+      SHORTCODE_MARKER_CLOSE@729..732 ">}}"
+    TEXT@732..765 " in the middle of tex ..."
+    SHORTCODE@765..784
+      SHORTCODE_MARKER_OPEN@765..768 "{{<"
+      SHORTCODE_CONTENT@768..781
+        TEXT@768..781 " var version "
+      SHORTCODE_MARKER_CLOSE@781..784 ">}}"
+    TEXT@784..802 " on the same line."
+    NEWLINE@802..803 "\n"
+  BLANK_LINE@803..804
+    BLANK_LINE@803..804 "\n"
+  PARAGRAPH@804..854
+    TEXT@804..808 "The "
+    SHORTCODE@808..822
+      SHORTCODE_MARKER_OPEN@808..811 "{{<"
+      SHORTCODE_CONTENT@811..819
+        TEXT@811..819 "env HOME"
+      SHORTCODE_MARKER_CLOSE@819..822 ">}}"
+    TEXT@822..853 " directory contains y ..."
+    NEWLINE@853..854 "\n"
 

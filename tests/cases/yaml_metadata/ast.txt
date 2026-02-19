@@ -1,68 +1,67 @@
-ROOT@0..348
-  DOCUMENT@0..348
-    YAML_METADATA@0..99
-      YAML_METADATA_DELIM@0..3 "---"
-      NEWLINE@3..4 "\n"
-      TEXT@4..26 "title: \"Test Document\""
-      NEWLINE@26..27 "\n"
-      TEXT@27..43 "author: John Doe"
-      NEWLINE@43..44 "\n"
-      TEXT@44..60 "date: 2024-01-01"
-      NEWLINE@60..61 "\n"
-      TEXT@61..70 "keywords:"
-      NEWLINE@70..71 "\n"
-      TEXT@71..83 "  - markdown"
-      NEWLINE@83..84 "\n"
-      TEXT@84..94 "  - quarto"
-      NEWLINE@94..95 "\n"
-      YAML_METADATA_DELIM@95..98 "---"
-      NEWLINE@98..99 "\n"
-    BLANK_LINE@99..100
-      BLANK_LINE@99..100 "\n"
-    HEADING@100..115
-      ATX_HEADING_MARKER@100..101
-        ATX_HEADING_MARKER@100..101 "#"
-      WHITESPACE@101..102 " "
-      HEADING_CONTENT@102..114
-        TEXT@102..114 "Introduction"
-      NEWLINE@114..115 "\n"
-    BLANK_LINE@115..116
-      BLANK_LINE@115..116 "\n"
-    PARAGRAPH@116..163
-      TEXT@116..162 "This is a test docume ..."
-      NEWLINE@162..163 "\n"
-    BLANK_LINE@163..164
-      BLANK_LINE@163..164 "\n"
-    PARAGRAPH@164..199
-      TEXT@164..198 "First paragraph with  ..."
-      NEWLINE@198..199 "\n"
-    BLANK_LINE@199..200
-      BLANK_LINE@199..200 "\n"
-    YAML_METADATA@200..243
-      YAML_METADATA_DELIM@200..203 "---"
-      NEWLINE@203..204 "\n"
-      TEXT@204..238 "subtitle: \"A subtitle ..."
-      NEWLINE@238..239 "\n"
-      YAML_METADATA_DELIM@239..242 "---"
-      NEWLINE@242..243 "\n"
-    BLANK_LINE@243..244
-      BLANK_LINE@243..244 "\n"
-    PARAGRAPH@244..286
-      TEXT@244..285 "Second section after  ..."
-      NEWLINE@285..286 "\n"
-    BLANK_LINE@286..287
-      BLANK_LINE@286..287 "\n"
-    PARAGRAPH@287..315
-      TEXT@287..314 "Para before horizonta ..."
-      NEWLINE@314..315 "\n"
-    BLANK_LINE@315..316
-      BLANK_LINE@315..316 "\n"
-    HORIZONTAL_RULE@316..320
-      HORIZONTAL_RULE@316..319 "---"
-      NEWLINE@319..320 "\n"
-    BLANK_LINE@320..321
-      BLANK_LINE@320..321 "\n"
-    PARAGRAPH@321..348
-      TEXT@321..347 "Para after horizontal ..."
-      NEWLINE@347..348 "\n"
+DOCUMENT@0..348
+  YAML_METADATA@0..99
+    YAML_METADATA_DELIM@0..3 "---"
+    NEWLINE@3..4 "\n"
+    TEXT@4..26 "title: \"Test Document\""
+    NEWLINE@26..27 "\n"
+    TEXT@27..43 "author: John Doe"
+    NEWLINE@43..44 "\n"
+    TEXT@44..60 "date: 2024-01-01"
+    NEWLINE@60..61 "\n"
+    TEXT@61..70 "keywords:"
+    NEWLINE@70..71 "\n"
+    TEXT@71..83 "  - markdown"
+    NEWLINE@83..84 "\n"
+    TEXT@84..94 "  - quarto"
+    NEWLINE@94..95 "\n"
+    YAML_METADATA_DELIM@95..98 "---"
+    NEWLINE@98..99 "\n"
+  BLANK_LINE@99..100
+    BLANK_LINE@99..100 "\n"
+  HEADING@100..115
+    ATX_HEADING_MARKER@100..101
+      ATX_HEADING_MARKER@100..101 "#"
+    WHITESPACE@101..102 " "
+    HEADING_CONTENT@102..114
+      TEXT@102..114 "Introduction"
+    NEWLINE@114..115 "\n"
+  BLANK_LINE@115..116
+    BLANK_LINE@115..116 "\n"
+  PARAGRAPH@116..163
+    TEXT@116..162 "This is a test docume ..."
+    NEWLINE@162..163 "\n"
+  BLANK_LINE@163..164
+    BLANK_LINE@163..164 "\n"
+  PARAGRAPH@164..199
+    TEXT@164..198 "First paragraph with  ..."
+    NEWLINE@198..199 "\n"
+  BLANK_LINE@199..200
+    BLANK_LINE@199..200 "\n"
+  YAML_METADATA@200..243
+    YAML_METADATA_DELIM@200..203 "---"
+    NEWLINE@203..204 "\n"
+    TEXT@204..238 "subtitle: \"A subtitle ..."
+    NEWLINE@238..239 "\n"
+    YAML_METADATA_DELIM@239..242 "---"
+    NEWLINE@242..243 "\n"
+  BLANK_LINE@243..244
+    BLANK_LINE@243..244 "\n"
+  PARAGRAPH@244..286
+    TEXT@244..285 "Second section after  ..."
+    NEWLINE@285..286 "\n"
+  BLANK_LINE@286..287
+    BLANK_LINE@286..287 "\n"
+  PARAGRAPH@287..315
+    TEXT@287..314 "Para before horizonta ..."
+    NEWLINE@314..315 "\n"
+  BLANK_LINE@315..316
+    BLANK_LINE@315..316 "\n"
+  HORIZONTAL_RULE@316..320
+    HORIZONTAL_RULE@316..319 "---"
+    NEWLINE@319..320 "\n"
+  BLANK_LINE@320..321
+    BLANK_LINE@320..321 "\n"
+  PARAGRAPH@321..348
+    TEXT@321..347 "Para after horizontal ..."
+    NEWLINE@347..348 "\n"
 

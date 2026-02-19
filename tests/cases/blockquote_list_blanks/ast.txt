@@ -1,51 +1,50 @@
-ROOT@0..156
-  DOCUMENT@0..156
-    HEADING@0..56
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..55
-        TEXT@2..55 "Test: Blockquoted lis ..."
-      NEWLINE@55..56 "\n"
-    BLANK_LINE@56..57
-      BLANK_LINE@56..57 "\n"
-    BLOCKQUOTE@57..68
-      BLOCKQUOTE_MARKER@57..58 ">"
-      WHITESPACE@58..59 " "
-      LIST@59..68
-        LIST_ITEM@59..68
-          LIST_MARKER@59..60 "-"
-          WHITESPACE@60..61 " "
-          PLAIN@61..68
-            TEXT@61..67 "item 1"
-            NEWLINE@67..68 "\n"
-    BLANK_LINE@68..69
-      BLANK_LINE@68..69 "\n"
-    BLOCKQUOTE@69..80
-      BLOCKQUOTE_MARKER@69..70 ">"
-      WHITESPACE@70..71 " "
-      LIST@71..80
-        LIST_ITEM@71..80
-          LIST_MARKER@71..72 "-"
-          WHITESPACE@72..73 " "
-          PLAIN@73..80
-            TEXT@73..79 "item 2"
-            NEWLINE@79..80 "\n"
-    BLANK_LINE@80..81
-      BLANK_LINE@80..81 "\n"
-    BLOCKQUOTE@81..92
-      BLOCKQUOTE_MARKER@81..82 ">"
-      WHITESPACE@82..83 " "
-      LIST@83..92
-        LIST_ITEM@83..92
-          LIST_MARKER@83..84 "-"
-          WHITESPACE@84..85 " "
-          PLAIN@85..92
-            TEXT@85..91 "item 3"
-            NEWLINE@91..92 "\n"
-    BLANK_LINE@92..93
-      BLANK_LINE@92..93 "\n"
-    PARAGRAPH@93..156
-      TEXT@93..155 "Should these remain i ..."
-      NEWLINE@155..156 "\n"
+DOCUMENT@0..156
+  HEADING@0..56
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..55
+      TEXT@2..55 "Test: Blockquoted lis ..."
+    NEWLINE@55..56 "\n"
+  BLANK_LINE@56..57
+    BLANK_LINE@56..57 "\n"
+  BLOCKQUOTE@57..68
+    BLOCKQUOTE_MARKER@57..58 ">"
+    WHITESPACE@58..59 " "
+    LIST@59..68
+      LIST_ITEM@59..68
+        LIST_MARKER@59..60 "-"
+        WHITESPACE@60..61 " "
+        PLAIN@61..68
+          TEXT@61..67 "item 1"
+          NEWLINE@67..68 "\n"
+  BLANK_LINE@68..69
+    BLANK_LINE@68..69 "\n"
+  BLOCKQUOTE@69..80
+    BLOCKQUOTE_MARKER@69..70 ">"
+    WHITESPACE@70..71 " "
+    LIST@71..80
+      LIST_ITEM@71..80
+        LIST_MARKER@71..72 "-"
+        WHITESPACE@72..73 " "
+        PLAIN@73..80
+          TEXT@73..79 "item 2"
+          NEWLINE@79..80 "\n"
+  BLANK_LINE@80..81
+    BLANK_LINE@80..81 "\n"
+  BLOCKQUOTE@81..92
+    BLOCKQUOTE_MARKER@81..82 ">"
+    WHITESPACE@82..83 " "
+    LIST@83..92
+      LIST_ITEM@83..92
+        LIST_MARKER@83..84 "-"
+        WHITESPACE@84..85 " "
+        PLAIN@85..92
+          TEXT@85..91 "item 3"
+          NEWLINE@91..92 "\n"
+  BLANK_LINE@92..93
+    BLANK_LINE@92..93 "\n"
+  PARAGRAPH@93..156
+    TEXT@93..155 "Should these remain i ..."
+    NEWLINE@155..156 "\n"
 

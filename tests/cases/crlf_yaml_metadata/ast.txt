@@ -1,34 +1,33 @@
-ROOT@0..86
-  DOCUMENT@0..86
-    YAML_METADATA@0..25
-      YAML_METADATA_DELIM@0..3 "---"
-      NEWLINE@3..5 "\r\n"
-      TEXT@5..18 "title: \"Test\""
-      NEWLINE@18..20 "\r\n"
-      YAML_METADATA_DELIM@20..23 "---"
-      NEWLINE@23..25 "\r\n"
-    BLANK_LINE@25..27
-      BLANK_LINE@25..27 "\r\n"
-    HEADING@27..38
-      ATX_HEADING_MARKER@27..28
-        ATX_HEADING_MARKER@27..28 "#"
-      WHITESPACE@28..29 " "
-      HEADING_CONTENT@29..36
-        TEXT@29..36 "Heading"
-      NEWLINE@36..38 "\r\n"
-    BLANK_LINE@38..40
-      BLANK_LINE@38..40 "\r\n"
-    PARAGRAPH@40..59
-      TEXT@40..57 "Text before rule."
-      NEWLINE@57..59 "\r\n"
-    BLANK_LINE@59..61
-      BLANK_LINE@59..61 "\r\n"
-    HORIZONTAL_RULE@61..66
-      HORIZONTAL_RULE@61..64 "---"
-      NEWLINE@64..66 "\r\n"
-    BLANK_LINE@66..68
-      BLANK_LINE@66..68 "\r\n"
-    PARAGRAPH@68..86
-      TEXT@68..84 "Text after rule."
-      NEWLINE@84..86 "\r\n"
+DOCUMENT@0..86
+  YAML_METADATA@0..25
+    YAML_METADATA_DELIM@0..3 "---"
+    NEWLINE@3..5 "\r\n"
+    TEXT@5..18 "title: \"Test\""
+    NEWLINE@18..20 "\r\n"
+    YAML_METADATA_DELIM@20..23 "---"
+    NEWLINE@23..25 "\r\n"
+  BLANK_LINE@25..27
+    BLANK_LINE@25..27 "\r\n"
+  HEADING@27..38
+    ATX_HEADING_MARKER@27..28
+      ATX_HEADING_MARKER@27..28 "#"
+    WHITESPACE@28..29 " "
+    HEADING_CONTENT@29..36
+      TEXT@29..36 "Heading"
+    NEWLINE@36..38 "\r\n"
+  BLANK_LINE@38..40
+    BLANK_LINE@38..40 "\r\n"
+  PARAGRAPH@40..59
+    TEXT@40..57 "Text before rule."
+    NEWLINE@57..59 "\r\n"
+  BLANK_LINE@59..61
+    BLANK_LINE@59..61 "\r\n"
+  HORIZONTAL_RULE@61..66
+    HORIZONTAL_RULE@61..64 "---"
+    NEWLINE@64..66 "\r\n"
+  BLANK_LINE@66..68
+    BLANK_LINE@66..68 "\r\n"
+  PARAGRAPH@68..86
+    TEXT@68..84 "Text after rule."
+    NEWLINE@84..86 "\r\n"
 

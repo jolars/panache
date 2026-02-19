@@ -81,9 +81,7 @@ impl<'a> BlockParser<'a> {
             init_logger();
         }
 
-        self.builder.start_node(SyntaxKind::ROOT.into());
         self.parse_document_stack();
-        self.builder.finish_node(); // ROOT
 
         let tree = SyntaxNode::new_root(self.builder.finish());
         (tree, self.reference_registry)

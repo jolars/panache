@@ -1,56 +1,55 @@
-ROOT@0..110
-  DOCUMENT@0..110
-    HEADING@0..20
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..18
-        TEXT@2..18 "Definition Lists"
-      NEWLINE@18..20 "\r\n"
-    BLANK_LINE@20..22
-      BLANK_LINE@20..22 "\r\n"
-    DEFINITION_LIST@22..50
-      DEFINITION_ITEM@22..50
-        TERM@22..30
-          TEXT@22..28 "Term 1"
-          NEWLINE@28..30 "\r\n"
-        BLANK_LINE@30..32
-          BLANK_LINE@30..32 "\r\n"
-        DEFINITION@32..50
-          DEFINITION_MARKER@32..33 ":"
-          WHITESPACE@33..36 "   "
-          PLAIN@36..50
-            TEXT@36..48 "Definition 1"
-            NEWLINE@48..50 "\r\n"
-    BLANK_LINE@50..52
-      BLANK_LINE@50..52 "\r\n"
-    DEFINITION_LIST@52..78
-      DEFINITION_ITEM@52..78
-        TERM@52..60
-          TEXT@52..58 "Term 2"
-          NEWLINE@58..60 "\r\n"
-        DEFINITION@60..78
-          DEFINITION_MARKER@60..61 ":"
-          WHITESPACE@61..64 "   "
-          PLAIN@64..78
-            TEXT@64..76 "Definition 2"
-            NEWLINE@76..78 "\r\n"
-    BLANK_LINE@78..80
-      BLANK_LINE@78..80 "\r\n"
-    PARAGRAPH@80..90
-      TEXT@80..88 "Compact:"
-      NEWLINE@88..90 "\r\n"
-    BLANK_LINE@90..92
-      BLANK_LINE@90..92 "\r\n"
-    DEFINITION_LIST@92..110
-      DEFINITION_ITEM@92..110
-        TERM@92..99
-          TEXT@92..97 "Apple"
-          NEWLINE@97..99 "\r\n"
-        DEFINITION@99..110
-          DEFINITION_MARKER@99..100 ":"
-          WHITESPACE@100..101 " "
-          PLAIN@101..110
-            TEXT@101..108 "A fruit"
-            NEWLINE@108..110 "\r\n"
+DOCUMENT@0..110
+  HEADING@0..20
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..18
+      TEXT@2..18 "Definition Lists"
+    NEWLINE@18..20 "\r\n"
+  BLANK_LINE@20..22
+    BLANK_LINE@20..22 "\r\n"
+  DEFINITION_LIST@22..50
+    DEFINITION_ITEM@22..50
+      TERM@22..30
+        TEXT@22..28 "Term 1"
+        NEWLINE@28..30 "\r\n"
+      BLANK_LINE@30..32
+        BLANK_LINE@30..32 "\r\n"
+      DEFINITION@32..50
+        DEFINITION_MARKER@32..33 ":"
+        WHITESPACE@33..36 "   "
+        PLAIN@36..50
+          TEXT@36..48 "Definition 1"
+          NEWLINE@48..50 "\r\n"
+  BLANK_LINE@50..52
+    BLANK_LINE@50..52 "\r\n"
+  DEFINITION_LIST@52..78
+    DEFINITION_ITEM@52..78
+      TERM@52..60
+        TEXT@52..58 "Term 2"
+        NEWLINE@58..60 "\r\n"
+      DEFINITION@60..78
+        DEFINITION_MARKER@60..61 ":"
+        WHITESPACE@61..64 "   "
+        PLAIN@64..78
+          TEXT@64..76 "Definition 2"
+          NEWLINE@76..78 "\r\n"
+  BLANK_LINE@78..80
+    BLANK_LINE@78..80 "\r\n"
+  PARAGRAPH@80..90
+    TEXT@80..88 "Compact:"
+    NEWLINE@88..90 "\r\n"
+  BLANK_LINE@90..92
+    BLANK_LINE@90..92 "\r\n"
+  DEFINITION_LIST@92..110
+    DEFINITION_ITEM@92..110
+      TERM@92..99
+        TEXT@92..97 "Apple"
+        NEWLINE@97..99 "\r\n"
+      DEFINITION@99..110
+        DEFINITION_MARKER@99..100 ":"
+        WHITESPACE@100..101 " "
+        PLAIN@101..110
+          TEXT@101..108 "A fruit"
+          NEWLINE@108..110 "\r\n"
 

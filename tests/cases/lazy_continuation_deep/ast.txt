@@ -1,57 +1,56 @@
-ROOT@0..295
-  DOCUMENT@0..295
-    HEADING@0..57
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..56
-        TEXT@2..56 "Test: Lazy continuati ..."
-      NEWLINE@56..57 "\n"
-    BLANK_LINE@57..58
-      BLANK_LINE@57..58 "\n"
-    BLOCKQUOTE@58..99
-      BLOCKQUOTE_MARKER@58..59 ">"
-      WHITESPACE@59..60 " "
-      LIST@60..99
-        LIST_ITEM@60..99
-          LIST_MARKER@60..61 "-"
-          WHITESPACE@61..62 " "
-          PLAIN@62..99
-            TEXT@62..98 "This is a blockquoted ..."
-            NEWLINE@98..99 "\n"
-    PARAGRAPH@99..140
-      TEXT@99..139 "lazy continuation acr ..."
-      NEWLINE@139..140 "\n"
-    BLOCKQUOTE@140..295
-      BLOCKQUOTE_MARKER@140..141 ">"
-      BLANK_LINE@141..142
-        BLANK_LINE@141..142 "\n"
-      BLOCKQUOTE_MARKER@142..143 ">"
-      WHITESPACE@143..144 " "
-      BLOCKQUOTE@144..207
-        BLOCKQUOTE_MARKER@144..145 ">"
-        WHITESPACE@145..146 " "
-        PARAGRAPH@146..207
-          TEXT@146..206 "And a nested blockquo ..."
-          NEWLINE@206..207 "\n"
-      BLOCKQUOTE_MARKER@207..208 ">"
-      BLANK_LINE@208..209
-        BLANK_LINE@208..209 "\n"
-      BLOCKQUOTE_MARKER@209..210 ">"
-      WHITESPACE@210..211 " "
-      PARAGRAPH@211..277
-        TEXT@211..276 "Back to the list item ..."
-        NEWLINE@276..277 "\n"
-      BLOCKQUOTE_MARKER@277..278 ">"
-      BLANK_LINE@278..279
-        BLANK_LINE@278..279 "\n"
-      BLOCKQUOTE_MARKER@279..280 ">"
-      WHITESPACE@280..281 " "
-      LIST@281..295
-        LIST_ITEM@281..295
-          LIST_MARKER@281..282 "-"
-          WHITESPACE@282..283 " "
-          PLAIN@283..295
-            TEXT@283..294 "Second item"
-            NEWLINE@294..295 "\n"
+DOCUMENT@0..295
+  HEADING@0..57
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..56
+      TEXT@2..56 "Test: Lazy continuati ..."
+    NEWLINE@56..57 "\n"
+  BLANK_LINE@57..58
+    BLANK_LINE@57..58 "\n"
+  BLOCKQUOTE@58..99
+    BLOCKQUOTE_MARKER@58..59 ">"
+    WHITESPACE@59..60 " "
+    LIST@60..99
+      LIST_ITEM@60..99
+        LIST_MARKER@60..61 "-"
+        WHITESPACE@61..62 " "
+        PLAIN@62..99
+          TEXT@62..98 "This is a blockquoted ..."
+          NEWLINE@98..99 "\n"
+  PARAGRAPH@99..140
+    TEXT@99..139 "lazy continuation acr ..."
+    NEWLINE@139..140 "\n"
+  BLOCKQUOTE@140..295
+    BLOCKQUOTE_MARKER@140..141 ">"
+    BLANK_LINE@141..142
+      BLANK_LINE@141..142 "\n"
+    BLOCKQUOTE_MARKER@142..143 ">"
+    WHITESPACE@143..144 " "
+    BLOCKQUOTE@144..207
+      BLOCKQUOTE_MARKER@144..145 ">"
+      WHITESPACE@145..146 " "
+      PARAGRAPH@146..207
+        TEXT@146..206 "And a nested blockquo ..."
+        NEWLINE@206..207 "\n"
+    BLOCKQUOTE_MARKER@207..208 ">"
+    BLANK_LINE@208..209
+      BLANK_LINE@208..209 "\n"
+    BLOCKQUOTE_MARKER@209..210 ">"
+    WHITESPACE@210..211 " "
+    PARAGRAPH@211..277
+      TEXT@211..276 "Back to the list item ..."
+      NEWLINE@276..277 "\n"
+    BLOCKQUOTE_MARKER@277..278 ">"
+    BLANK_LINE@278..279
+      BLANK_LINE@278..279 "\n"
+    BLOCKQUOTE_MARKER@279..280 ">"
+    WHITESPACE@280..281 " "
+    LIST@281..295
+      LIST_ITEM@281..295
+        LIST_MARKER@281..282 "-"
+        WHITESPACE@282..283 " "
+        PLAIN@283..295
+          TEXT@283..294 "Second item"
+          NEWLINE@294..295 "\n"
 

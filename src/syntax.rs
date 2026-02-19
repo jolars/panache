@@ -34,10 +34,10 @@ mod tests {
         let input = "# Hello World\n\nParagraph.";
         let tree = parse(input, Some(Config::default()));
 
-        // Find heading using typed wrapper
+        // Find heading using typed wrapper (root is now DOCUMENT directly)
         let heading = tree
             .children()
-            .find_map(|node| node.children().find_map(Heading::cast))
+            .find_map(Heading::cast)
             .expect("should find heading");
 
         assert_eq!(heading.level(), 1);

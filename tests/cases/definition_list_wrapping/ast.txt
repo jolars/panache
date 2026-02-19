@@ -1,22 +1,21 @@
-ROOT@0..115
-  DOCUMENT@0..115
-    DEFINITION_LIST@0..115
-      DEFINITION_ITEM@0..115
-        TERM@0..14
-          TEXT@0..13 "2024--present"
-          NEWLINE@13..14 "\n"
-        DEFINITION@14..115
-          DEFINITION_MARKER@14..15 ":"
-          WHITESPACE@15..18 "   "
-          PLAIN@18..115
-            STRONG@18..52
-              STRONG_MARKER@18..20 "**"
-              TEXT@20..50 "Thiele Postdoctoral R ..."
-              STRONG_MARKER@50..52 "**"
-            TEXT@52..54 ", "
-            EMPHASIS@54..114
-              EMPHASIS_MARKER@54..55 "*"
-              TEXT@55..113 "Department of Mathema ..."
-              EMPHASIS_MARKER@113..114 "*"
-            NEWLINE@114..115 "\n"
+DOCUMENT@0..115
+  DEFINITION_LIST@0..115
+    DEFINITION_ITEM@0..115
+      TERM@0..14
+        TEXT@0..13 "2024--present"
+        NEWLINE@13..14 "\n"
+      DEFINITION@14..115
+        DEFINITION_MARKER@14..15 ":"
+        WHITESPACE@15..18 "   "
+        PLAIN@18..115
+          STRONG@18..52
+            STRONG_MARKER@18..20 "**"
+            TEXT@20..50 "Thiele Postdoctoral R ..."
+            STRONG_MARKER@50..52 "**"
+          TEXT@52..54 ", "
+          EMPHASIS@54..114
+            EMPHASIS_MARKER@54..55 "*"
+            TEXT@55..113 "Department of Mathema ..."
+            EMPHASIS_MARKER@113..114 "*"
+          NEWLINE@114..115 "\n"
 

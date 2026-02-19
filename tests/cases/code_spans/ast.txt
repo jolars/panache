@@ -1,69 +1,68 @@
-ROOT@0..255
-  DOCUMENT@0..255
-    HEADING@0..13
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..12
-        TEXT@2..12 "Code Spans"
-      NEWLINE@12..13 "\n"
-    BLANK_LINE@13..14
-      BLANK_LINE@13..14 "\n"
-    PARAGRAPH@14..34
-      TEXT@14..27 "Simple code: "
-      CODE_SPAN@27..33
-        CODE_SPAN_MARKER@27..28 "`"
-        TEXT@28..32 "code"
-        CODE_SPAN_MARKER@32..33 "`"
-      NEWLINE@33..34 "\n"
-    BLANK_LINE@34..35
-      BLANK_LINE@34..35 "\n"
-    PARAGRAPH@35..69
-      TEXT@35..48 "With spaces: "
-      CODE_SPAN@48..68
-        CODE_SPAN_MARKER@48..49 "`"
-        TEXT@49..67 " code with spaces "
-        CODE_SPAN_MARKER@67..68 "`"
-      NEWLINE@68..69 "\n"
-    BLANK_LINE@69..70
-      BLANK_LINE@69..70 "\n"
-    PARAGRAPH@70..122
-      TEXT@70..90 "Multiple backticks: "
-      CODE_SPAN@90..121
-        CODE_SPAN_MARKER@90..92 "``"
-        TEXT@92..119 "code with `backtick`  ..."
-        CODE_SPAN_MARKER@119..121 "``"
-      NEWLINE@121..122 "\n"
-    BLANK_LINE@122..123
-      BLANK_LINE@122..123 "\n"
-    PARAGRAPH@123..167
-      TEXT@123..141 "Code in emphasis: "
-      EMPHASIS@141..166
-        EMPHASIS_MARKER@141..142 "*"
-        TEXT@142..165 "text with `code` inside"
-        EMPHASIS_MARKER@165..166 "*"
-      NEWLINE@166..167 "\n"
-    BLANK_LINE@167..168
-      BLANK_LINE@167..168 "\n"
-    PARAGRAPH@168..215
-      TEXT@168..183 "Adjacent code: "
-      CODE_SPAN@183..190
-        CODE_SPAN_MARKER@183..184 "`"
-        TEXT@184..189 "first"
-        CODE_SPAN_MARKER@189..190 "`"
-      TEXT@190..195 " and "
-      CODE_SPAN@195..203
-        CODE_SPAN_MARKER@195..196 "`"
-        TEXT@196..202 "second"
-        CODE_SPAN_MARKER@202..203 "`"
-      TEXT@203..214 " code spans"
-      NEWLINE@214..215 "\n"
-    BLANK_LINE@215..216
-      BLANK_LINE@215..216 "\n"
-    PARAGRAPH@216..255
-      TEXT@216..242 "Escaped backtick outs ..."
-      ESCAPED_CHAR@242..244 "\\`"
-      TEXT@244..252 "not code"
-      ESCAPED_CHAR@252..254 "\\`"
-      NEWLINE@254..255 "\n"
+DOCUMENT@0..255
+  HEADING@0..13
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..12
+      TEXT@2..12 "Code Spans"
+    NEWLINE@12..13 "\n"
+  BLANK_LINE@13..14
+    BLANK_LINE@13..14 "\n"
+  PARAGRAPH@14..34
+    TEXT@14..27 "Simple code: "
+    CODE_SPAN@27..33
+      CODE_SPAN_MARKER@27..28 "`"
+      TEXT@28..32 "code"
+      CODE_SPAN_MARKER@32..33 "`"
+    NEWLINE@33..34 "\n"
+  BLANK_LINE@34..35
+    BLANK_LINE@34..35 "\n"
+  PARAGRAPH@35..69
+    TEXT@35..48 "With spaces: "
+    CODE_SPAN@48..68
+      CODE_SPAN_MARKER@48..49 "`"
+      TEXT@49..67 " code with spaces "
+      CODE_SPAN_MARKER@67..68 "`"
+    NEWLINE@68..69 "\n"
+  BLANK_LINE@69..70
+    BLANK_LINE@69..70 "\n"
+  PARAGRAPH@70..122
+    TEXT@70..90 "Multiple backticks: "
+    CODE_SPAN@90..121
+      CODE_SPAN_MARKER@90..92 "``"
+      TEXT@92..119 "code with `backtick`  ..."
+      CODE_SPAN_MARKER@119..121 "``"
+    NEWLINE@121..122 "\n"
+  BLANK_LINE@122..123
+    BLANK_LINE@122..123 "\n"
+  PARAGRAPH@123..167
+    TEXT@123..141 "Code in emphasis: "
+    EMPHASIS@141..166
+      EMPHASIS_MARKER@141..142 "*"
+      TEXT@142..165 "text with `code` inside"
+      EMPHASIS_MARKER@165..166 "*"
+    NEWLINE@166..167 "\n"
+  BLANK_LINE@167..168
+    BLANK_LINE@167..168 "\n"
+  PARAGRAPH@168..215
+    TEXT@168..183 "Adjacent code: "
+    CODE_SPAN@183..190
+      CODE_SPAN_MARKER@183..184 "`"
+      TEXT@184..189 "first"
+      CODE_SPAN_MARKER@189..190 "`"
+    TEXT@190..195 " and "
+    CODE_SPAN@195..203
+      CODE_SPAN_MARKER@195..196 "`"
+      TEXT@196..202 "second"
+      CODE_SPAN_MARKER@202..203 "`"
+    TEXT@203..214 " code spans"
+    NEWLINE@214..215 "\n"
+  BLANK_LINE@215..216
+    BLANK_LINE@215..216 "\n"
+  PARAGRAPH@216..255
+    TEXT@216..242 "Escaped backtick outs ..."
+    ESCAPED_CHAR@242..244 "\\`"
+    TEXT@244..252 "not code"
+    ESCAPED_CHAR@252..254 "\\`"
+    NEWLINE@254..255 "\n"
 

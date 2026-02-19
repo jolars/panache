@@ -1,72 +1,71 @@
-ROOT@0..220
-  DOCUMENT@0..220
-    HEADING@0..43
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..42
-        TEXT@2..42 "Test: Changing blockq ..."
-      NEWLINE@42..43 "\n"
-    BLANK_LINE@43..44
-      BLANK_LINE@43..44 "\n"
-    BLOCKQUOTE@44..97
-      BLOCKQUOTE_MARKER@44..45 ">"
-      WHITESPACE@45..46 " "
-      LIST@46..97
-        LIST_ITEM@46..70
-          LIST_MARKER@46..47 "-"
-          WHITESPACE@47..48 " "
-          PLAIN@48..70
-            TEXT@48..69 "First item at depth 1"
-            NEWLINE@69..70 "\n"
-        BLOCKQUOTE_MARKER@70..71 ">"
-        WHITESPACE@71..72 " "
-        LIST_ITEM@72..97
-          LIST_MARKER@72..73 "-"
-          WHITESPACE@73..74 " "
-          PLAIN@74..97
-            TEXT@74..96 "Second item at depth 1"
-            NEWLINE@96..97 "\n"
-    BLANK_LINE@97..98
-      BLANK_LINE@97..98 "\n"
-    BLOCKQUOTE@98..152
-      BLOCKQUOTE_MARKER@98..99 ">"
-      WHITESPACE@99..100 " "
-      BLOCKQUOTE@100..152
-        BLOCKQUOTE_MARKER@100..101 ">"
-        WHITESPACE@101..102 " "
-        LIST@102..152
-          LIST_ITEM@102..127
-            LIST_MARKER@102..103 "-"
-            WHITESPACE@103..104 " "
-            PLAIN@104..127
-              TEXT@104..126 "Nested item at depth 2"
-              NEWLINE@126..127 "\n"
-          BLOCKQUOTE_MARKER@127..128 ">"
-          WHITESPACE@128..129 " "
-          BLOCKQUOTE_MARKER@129..130 ">"
-          WHITESPACE@130..131 " "
-          LIST_ITEM@131..152
-            LIST_MARKER@131..132 "-"
-            WHITESPACE@132..133 " "
-            PLAIN@133..152
-              TEXT@133..151 "Another at depth 2"
-              NEWLINE@151..152 "\n"
-    BLANK_LINE@152..153
-      BLANK_LINE@152..153 "\n"
-    BLOCKQUOTE@153..173
-      BLOCKQUOTE_MARKER@153..154 ">"
-      WHITESPACE@154..155 " "
-      LIST@155..173
-        LIST_ITEM@155..173
-          LIST_MARKER@155..156 "-"
-          WHITESPACE@156..157 " "
-          PLAIN@157..173
-            TEXT@157..172 "Back to depth 1"
-            NEWLINE@172..173 "\n"
-    BLANK_LINE@173..174
-      BLANK_LINE@173..174 "\n"
-    PARAGRAPH@174..220
-      TEXT@174..219 "How should the list s ..."
-      NEWLINE@219..220 "\n"
+DOCUMENT@0..220
+  HEADING@0..43
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..42
+      TEXT@2..42 "Test: Changing blockq ..."
+    NEWLINE@42..43 "\n"
+  BLANK_LINE@43..44
+    BLANK_LINE@43..44 "\n"
+  BLOCKQUOTE@44..97
+    BLOCKQUOTE_MARKER@44..45 ">"
+    WHITESPACE@45..46 " "
+    LIST@46..97
+      LIST_ITEM@46..70
+        LIST_MARKER@46..47 "-"
+        WHITESPACE@47..48 " "
+        PLAIN@48..70
+          TEXT@48..69 "First item at depth 1"
+          NEWLINE@69..70 "\n"
+      BLOCKQUOTE_MARKER@70..71 ">"
+      WHITESPACE@71..72 " "
+      LIST_ITEM@72..97
+        LIST_MARKER@72..73 "-"
+        WHITESPACE@73..74 " "
+        PLAIN@74..97
+          TEXT@74..96 "Second item at depth 1"
+          NEWLINE@96..97 "\n"
+  BLANK_LINE@97..98
+    BLANK_LINE@97..98 "\n"
+  BLOCKQUOTE@98..152
+    BLOCKQUOTE_MARKER@98..99 ">"
+    WHITESPACE@99..100 " "
+    BLOCKQUOTE@100..152
+      BLOCKQUOTE_MARKER@100..101 ">"
+      WHITESPACE@101..102 " "
+      LIST@102..152
+        LIST_ITEM@102..127
+          LIST_MARKER@102..103 "-"
+          WHITESPACE@103..104 " "
+          PLAIN@104..127
+            TEXT@104..126 "Nested item at depth 2"
+            NEWLINE@126..127 "\n"
+        BLOCKQUOTE_MARKER@127..128 ">"
+        WHITESPACE@128..129 " "
+        BLOCKQUOTE_MARKER@129..130 ">"
+        WHITESPACE@130..131 " "
+        LIST_ITEM@131..152
+          LIST_MARKER@131..132 "-"
+          WHITESPACE@132..133 " "
+          PLAIN@133..152
+            TEXT@133..151 "Another at depth 2"
+            NEWLINE@151..152 "\n"
+  BLANK_LINE@152..153
+    BLANK_LINE@152..153 "\n"
+  BLOCKQUOTE@153..173
+    BLOCKQUOTE_MARKER@153..154 ">"
+    WHITESPACE@154..155 " "
+    LIST@155..173
+      LIST_ITEM@155..173
+        LIST_MARKER@155..156 "-"
+        WHITESPACE@156..157 " "
+        PLAIN@157..173
+          TEXT@157..172 "Back to depth 1"
+          NEWLINE@172..173 "\n"
+  BLANK_LINE@173..174
+    BLANK_LINE@173..174 "\n"
+  PARAGRAPH@174..220
+    TEXT@174..219 "How should the list s ..."
+    NEWLINE@219..220 "\n"
 

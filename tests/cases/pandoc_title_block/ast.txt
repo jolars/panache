@@ -1,69 +1,68 @@
-ROOT@0..429
-  DOCUMENT@0..429
-    PANDOC_TITLE_BLOCK@0..89
-      TEXT@0..19 "% My Document Title"
-      NEWLINE@19..20 "\n"
-      TEXT@20..47 "  That Spans Multiple ..."
-      NEWLINE@47..48 "\n"
-      TEXT@48..72 "% Author One; Author Two"
-      NEWLINE@72..73 "\n"
-      TEXT@73..88 "% June 15, 2006"
-      NEWLINE@88..89 "\n"
-    BLANK_LINE@89..90
-      BLANK_LINE@89..90 "\n"
-    HEADING@90..105
-      ATX_HEADING_MARKER@90..91
-        ATX_HEADING_MARKER@90..91 "#"
-      WHITESPACE@91..92 " "
-      HEADING_CONTENT@92..104
-        TEXT@92..104 "Introduction"
-      NEWLINE@104..105 "\n"
-    BLANK_LINE@105..106
-      BLANK_LINE@105..106 "\n"
-    PARAGRAPH@106..186
-      TEXT@106..185 "This document demonst ..."
-      NEWLINE@185..186 "\n"
-    BLANK_LINE@186..187
-      BLANK_LINE@186..187 "\n"
-    PARAGRAPH@187..217
-      TEXT@187..216 "First paragraph with  ..."
-      NEWLINE@216..217 "\n"
-    BLANK_LINE@217..218
-      BLANK_LINE@217..218 "\n"
-    HEADING@218..237
-      ATX_HEADING_MARKER@218..220
-        ATX_HEADING_MARKER@218..220 "##"
-      WHITESPACE@220..221 " "
-      HEADING_CONTENT@221..236
-        TEXT@221..236 "Another Section"
-      NEWLINE@236..237 "\n"
-    BLANK_LINE@237..238
-      BLANK_LINE@237..238 "\n"
-    PARAGRAPH@238..257
-      TEXT@238..256 "More content here."
-      NEWLINE@256..257 "\n"
-    BLANK_LINE@257..258
-      BLANK_LINE@257..258 "\n"
-    HEADING@258..282
-      ATX_HEADING_MARKER@258..260
-        ATX_HEADING_MARKER@258..260 "##"
-      WHITESPACE@260..261 " "
-      HEADING_CONTENT@261..281
-        TEXT@261..281 "Blank Author Example"
-      NEWLINE@281..282 "\n"
-    BLANK_LINE@282..283
-      BLANK_LINE@282..283 "\n"
-    PARAGRAPH@283..333
-      TEXT@283..332 "In this example, we s ..."
-      NEWLINE@332..333 "\n"
-    BLANK_LINE@333..334
-      BLANK_LINE@333..334 "\n"
-    PARAGRAPH@334..411
-      TEXT@334..410 "% Signs in text (like ..."
-      NEWLINE@410..411 "\n"
-    BLANK_LINE@411..412
-      BLANK_LINE@411..412 "\n"
-    PARAGRAPH@412..429
-      TEXT@412..428 "Final paragraph."
-      NEWLINE@428..429 "\n"
+DOCUMENT@0..429
+  PANDOC_TITLE_BLOCK@0..89
+    TEXT@0..19 "% My Document Title"
+    NEWLINE@19..20 "\n"
+    TEXT@20..47 "  That Spans Multiple ..."
+    NEWLINE@47..48 "\n"
+    TEXT@48..72 "% Author One; Author Two"
+    NEWLINE@72..73 "\n"
+    TEXT@73..88 "% June 15, 2006"
+    NEWLINE@88..89 "\n"
+  BLANK_LINE@89..90
+    BLANK_LINE@89..90 "\n"
+  HEADING@90..105
+    ATX_HEADING_MARKER@90..91
+      ATX_HEADING_MARKER@90..91 "#"
+    WHITESPACE@91..92 " "
+    HEADING_CONTENT@92..104
+      TEXT@92..104 "Introduction"
+    NEWLINE@104..105 "\n"
+  BLANK_LINE@105..106
+    BLANK_LINE@105..106 "\n"
+  PARAGRAPH@106..186
+    TEXT@106..185 "This document demonst ..."
+    NEWLINE@185..186 "\n"
+  BLANK_LINE@186..187
+    BLANK_LINE@186..187 "\n"
+  PARAGRAPH@187..217
+    TEXT@187..216 "First paragraph with  ..."
+    NEWLINE@216..217 "\n"
+  BLANK_LINE@217..218
+    BLANK_LINE@217..218 "\n"
+  HEADING@218..237
+    ATX_HEADING_MARKER@218..220
+      ATX_HEADING_MARKER@218..220 "##"
+    WHITESPACE@220..221 " "
+    HEADING_CONTENT@221..236
+      TEXT@221..236 "Another Section"
+    NEWLINE@236..237 "\n"
+  BLANK_LINE@237..238
+    BLANK_LINE@237..238 "\n"
+  PARAGRAPH@238..257
+    TEXT@238..256 "More content here."
+    NEWLINE@256..257 "\n"
+  BLANK_LINE@257..258
+    BLANK_LINE@257..258 "\n"
+  HEADING@258..282
+    ATX_HEADING_MARKER@258..260
+      ATX_HEADING_MARKER@258..260 "##"
+    WHITESPACE@260..261 " "
+    HEADING_CONTENT@261..281
+      TEXT@261..281 "Blank Author Example"
+    NEWLINE@281..282 "\n"
+  BLANK_LINE@282..283
+    BLANK_LINE@282..283 "\n"
+  PARAGRAPH@283..333
+    TEXT@283..332 "In this example, we s ..."
+    NEWLINE@332..333 "\n"
+  BLANK_LINE@333..334
+    BLANK_LINE@333..334 "\n"
+  PARAGRAPH@334..411
+    TEXT@334..410 "% Signs in text (like ..."
+    NEWLINE@410..411 "\n"
+  BLANK_LINE@411..412
+    BLANK_LINE@411..412 "\n"
+  PARAGRAPH@412..429
+    TEXT@412..428 "Final paragraph."
+    NEWLINE@428..429 "\n"
 

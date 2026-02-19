@@ -1,56 +1,55 @@
-ROOT@0..154
-  DOCUMENT@0..154
-    HEADING@0..64
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..63
-        TEXT@2..63 "Test: Blockquote cont ..."
-      NEWLINE@63..64 "\n"
-    BLANK_LINE@64..65
-      BLANK_LINE@64..65 "\n"
-    BLOCKQUOTE@65..154
-      BLOCKQUOTE_MARKER@65..66 ">"
-      WHITESPACE@66..67 " "
-      LIST@67..87
-        LIST_ITEM@67..87
-          LIST_MARKER@67..68 "-"
-          WHITESPACE@68..69 " "
-          PLAIN@69..85
-            TEXT@69..84 "First list item"
-            NEWLINE@84..85 "\n"
-          BLOCKQUOTE_MARKER@85..86 ">"
-          BLANK_LINE@86..87
-            BLANK_LINE@86..87 "\n"
-      BLOCKQUOTE_MARKER@87..88 ">"
-      WHITESPACE@88..89 " "
-      BLANK_LINE@89..92
-        BLANK_LINE@89..92 "  \n"
-      BLOCKQUOTE_MARKER@92..93 ">"
-      BLANK_LINE@93..94
-        BLANK_LINE@93..94 "\n"
-      BLOCKQUOTE_MARKER@94..95 ">"
-      WHITESPACE@95..96 " "
-      PARAGRAPH@96..124
-        TEXT@96..123 "  Back to list item c ..."
-        NEWLINE@123..124 "\n"
-      BLOCKQUOTE_MARKER@124..125 ">"
-      BLANK_LINE@125..126
-        BLANK_LINE@125..126 "\n"
-      BLOCKQUOTE_MARKER@126..127 ">"
-      WHITESPACE@127..128 " "
-      LIST@128..149
-        LIST_ITEM@128..149
-          LIST_MARKER@128..129 "-"
-          WHITESPACE@129..130 " "
-          PLAIN@130..147
-            TEXT@130..146 "Second list item"
-            NEWLINE@146..147 "\n"
-          BLOCKQUOTE_MARKER@147..148 ">"
-          BLANK_LINE@148..149
-            BLANK_LINE@148..149 "\n"
-      BLOCKQUOTE_MARKER@149..150 ">"
-      WHITESPACE@150..151 " "
-      BLANK_LINE@151..154
-        BLANK_LINE@151..154 "  \n"
+DOCUMENT@0..154
+  HEADING@0..64
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..63
+      TEXT@2..63 "Test: Blockquote cont ..."
+    NEWLINE@63..64 "\n"
+  BLANK_LINE@64..65
+    BLANK_LINE@64..65 "\n"
+  BLOCKQUOTE@65..154
+    BLOCKQUOTE_MARKER@65..66 ">"
+    WHITESPACE@66..67 " "
+    LIST@67..87
+      LIST_ITEM@67..87
+        LIST_MARKER@67..68 "-"
+        WHITESPACE@68..69 " "
+        PLAIN@69..85
+          TEXT@69..84 "First list item"
+          NEWLINE@84..85 "\n"
+        BLOCKQUOTE_MARKER@85..86 ">"
+        BLANK_LINE@86..87
+          BLANK_LINE@86..87 "\n"
+    BLOCKQUOTE_MARKER@87..88 ">"
+    WHITESPACE@88..89 " "
+    BLANK_LINE@89..92
+      BLANK_LINE@89..92 "  \n"
+    BLOCKQUOTE_MARKER@92..93 ">"
+    BLANK_LINE@93..94
+      BLANK_LINE@93..94 "\n"
+    BLOCKQUOTE_MARKER@94..95 ">"
+    WHITESPACE@95..96 " "
+    PARAGRAPH@96..124
+      TEXT@96..123 "  Back to list item c ..."
+      NEWLINE@123..124 "\n"
+    BLOCKQUOTE_MARKER@124..125 ">"
+    BLANK_LINE@125..126
+      BLANK_LINE@125..126 "\n"
+    BLOCKQUOTE_MARKER@126..127 ">"
+    WHITESPACE@127..128 " "
+    LIST@128..149
+      LIST_ITEM@128..149
+        LIST_MARKER@128..129 "-"
+        WHITESPACE@129..130 " "
+        PLAIN@130..147
+          TEXT@130..146 "Second list item"
+          NEWLINE@146..147 "\n"
+        BLOCKQUOTE_MARKER@147..148 ">"
+        BLANK_LINE@148..149
+          BLANK_LINE@148..149 "\n"
+    BLOCKQUOTE_MARKER@149..150 ">"
+    WHITESPACE@150..151 " "
+    BLANK_LINE@151..154
+      BLANK_LINE@151..154 "  \n"
 

@@ -1,82 +1,81 @@
-ROOT@0..451
-  DOCUMENT@0..451
-    CODE_BLOCK@0..29
-      CODE_FENCE_OPEN@0..19
-        CODE_FENCE_MARKER@0..3 "```"
-        CODE_INFO@3..18
-          TEXT@3..4 "{"
-          CODE_LANGUAGE@4..5 "r"
-          TEXT@5..18 ", echo=FALSE}"
-        NEWLINE@18..19 "\n"
-      CODE_CONTENT@19..25
-        TEXT@19..24 "1 + 1"
-        NEWLINE@24..25 "\n"
-      CODE_FENCE_CLOSE@25..29
-        CODE_FENCE_MARKER@25..28 "```"
-        NEWLINE@28..29 "\n"
-    BLANK_LINE@29..30
-      BLANK_LINE@29..30 "\n"
-    PARAGRAPH@30..92
-      TEXT@30..91 "The following is a Qu ..."
-      NEWLINE@91..92 "\n"
-    BLANK_LINE@92..93
-      BLANK_LINE@92..93 "\n"
-    CODE_BLOCK@93..117
-      CODE_FENCE_OPEN@93..107
-        CODE_FENCE_MARKER@93..96 "```"
-        CODE_INFO@96..106
-          TEXT@96..97 "{"
-          CODE_LANGUAGE@97..105 "{python}"
-          TEXT@105..106 "}"
-        NEWLINE@106..107 "\n"
-      CODE_CONTENT@107..113
-        TEXT@107..112 "1 + 1"
-        NEWLINE@112..113 "\n"
-      CODE_FENCE_CLOSE@113..117
-        CODE_FENCE_MARKER@113..116 "```"
-        NEWLINE@116..117 "\n"
-    BLANK_LINE@117..118
-      BLANK_LINE@117..118 "\n"
-    PARAGRAPH@118..326
-      TEXT@118..194 "If you want to show a ..."
-      NEWLINE@194..195 "\n"
-      TEXT@195..248 "just enclose the enti ..."
-      TEXT@248..249 "`"
-      TEXT@249..250 "`"
-      TEXT@250..251 "`"
-      TEXT@251..252 "`"
-      TEXT@252..275 ") and use the two curly"
-      NEWLINE@275..276 "\n"
-      TEXT@276..325 "brace syntax for code ..."
-      NEWLINE@325..326 "\n"
-    BLANK_LINE@326..327
-      BLANK_LINE@326..327 "\n"
-    CODE_BLOCK@327..451
-      CODE_FENCE_OPEN@327..332
-        CODE_FENCE_MARKER@327..331 "````"
-        NEWLINE@331..332 "\n"
-      CODE_CONTENT@332..446
-        TEXT@332..335 "---"
-        NEWLINE@335..336 "\n"
-        TEXT@336..356 "title: \"My document\""
-        NEWLINE@356..357 "\n"
-        TEXT@357..360 "---"
-        NEWLINE@360..361 "\n"
-        NEWLINE@361..362 "\n"
-        TEXT@362..384 "Some markdown content."
-        NEWLINE@384..385 "\n"
-        NEWLINE@385..386 "\n"
-        TEXT@386..399 "```{{python}}"
-        NEWLINE@399..400 "\n"
-        TEXT@400..405 "1 + 1"
-        NEWLINE@405..406 "\n"
-        TEXT@406..409 "```"
-        NEWLINE@409..410 "\n"
-        NEWLINE@410..411 "\n"
-        TEXT@411..444 "Some additional markd ..."
-        NEWLINE@444..445 "\n"
-        NEWLINE@445..446 "\n"
-      CODE_FENCE_CLOSE@446..451
-        CODE_FENCE_MARKER@446..450 "````"
-        NEWLINE@450..451 "\n"
+DOCUMENT@0..451
+  CODE_BLOCK@0..29
+    CODE_FENCE_OPEN@0..19
+      CODE_FENCE_MARKER@0..3 "```"
+      CODE_INFO@3..18
+        TEXT@3..4 "{"
+        CODE_LANGUAGE@4..5 "r"
+        TEXT@5..18 ", echo=FALSE}"
+      NEWLINE@18..19 "\n"
+    CODE_CONTENT@19..25
+      TEXT@19..24 "1 + 1"
+      NEWLINE@24..25 "\n"
+    CODE_FENCE_CLOSE@25..29
+      CODE_FENCE_MARKER@25..28 "```"
+      NEWLINE@28..29 "\n"
+  BLANK_LINE@29..30
+    BLANK_LINE@29..30 "\n"
+  PARAGRAPH@30..92
+    TEXT@30..91 "The following is a Qu ..."
+    NEWLINE@91..92 "\n"
+  BLANK_LINE@92..93
+    BLANK_LINE@92..93 "\n"
+  CODE_BLOCK@93..117
+    CODE_FENCE_OPEN@93..107
+      CODE_FENCE_MARKER@93..96 "```"
+      CODE_INFO@96..106
+        TEXT@96..97 "{"
+        CODE_LANGUAGE@97..105 "{python}"
+        TEXT@105..106 "}"
+      NEWLINE@106..107 "\n"
+    CODE_CONTENT@107..113
+      TEXT@107..112 "1 + 1"
+      NEWLINE@112..113 "\n"
+    CODE_FENCE_CLOSE@113..117
+      CODE_FENCE_MARKER@113..116 "```"
+      NEWLINE@116..117 "\n"
+  BLANK_LINE@117..118
+    BLANK_LINE@117..118 "\n"
+  PARAGRAPH@118..326
+    TEXT@118..194 "If you want to show a ..."
+    NEWLINE@194..195 "\n"
+    TEXT@195..248 "just enclose the enti ..."
+    TEXT@248..249 "`"
+    TEXT@249..250 "`"
+    TEXT@250..251 "`"
+    TEXT@251..252 "`"
+    TEXT@252..275 ") and use the two curly"
+    NEWLINE@275..276 "\n"
+    TEXT@276..325 "brace syntax for code ..."
+    NEWLINE@325..326 "\n"
+  BLANK_LINE@326..327
+    BLANK_LINE@326..327 "\n"
+  CODE_BLOCK@327..451
+    CODE_FENCE_OPEN@327..332
+      CODE_FENCE_MARKER@327..331 "````"
+      NEWLINE@331..332 "\n"
+    CODE_CONTENT@332..446
+      TEXT@332..335 "---"
+      NEWLINE@335..336 "\n"
+      TEXT@336..356 "title: \"My document\""
+      NEWLINE@356..357 "\n"
+      TEXT@357..360 "---"
+      NEWLINE@360..361 "\n"
+      NEWLINE@361..362 "\n"
+      TEXT@362..384 "Some markdown content."
+      NEWLINE@384..385 "\n"
+      NEWLINE@385..386 "\n"
+      TEXT@386..399 "```{{python}}"
+      NEWLINE@399..400 "\n"
+      TEXT@400..405 "1 + 1"
+      NEWLINE@405..406 "\n"
+      TEXT@406..409 "```"
+      NEWLINE@409..410 "\n"
+      NEWLINE@410..411 "\n"
+      TEXT@411..444 "Some additional markd ..."
+      NEWLINE@444..445 "\n"
+      NEWLINE@445..446 "\n"
+    CODE_FENCE_CLOSE@446..451
+      CODE_FENCE_MARKER@446..450 "````"
+      NEWLINE@450..451 "\n"
 

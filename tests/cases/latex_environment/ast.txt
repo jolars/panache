@@ -1,38 +1,37 @@
-ROOT@0..249
-  DOCUMENT@0..249
-    HEADING@0..25
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..24
-        TEXT@2..24 "LaTeX Environment Test"
-      NEWLINE@24..25 "\n"
-    BLANK_LINE@25..26
-      BLANK_LINE@25..26 "\n"
-    PARAGRAPH@26..73
-      TEXT@26..72 "This document tests L ..."
-      NEWLINE@72..73 "\n"
-    BLANK_LINE@73..74
-      BLANK_LINE@73..74 "\n"
-    LATEX_ENVIRONMENT@74..198
-      LATEX_ENV_BEGIN@74..103
-        TEXT@74..102 "\\begin{tabular}{|l|l| ..."
-        NEWLINE@102..103 "\n"
-      LATEX_ENV_CONTENT@103..184
-        TEXT@103..128 "Age & Frequency \\\\ \\h ..."
-        NEWLINE@128..129 "\n"
-        TEXT@129..144 "18--25  & 15 \\\\"
-        NEWLINE@144..145 "\n"
-        TEXT@145..160 "26--35  & 33 \\\\"
-        NEWLINE@160..161 "\n"
-        TEXT@161..183 "36--45  & 22 \\\\ \\hline"
-        NEWLINE@183..184 "\n"
-      LATEX_ENV_END@184..198
-        TEXT@184..197 "\\end{tabular}"
-        NEWLINE@197..198 "\n"
-    BLANK_LINE@198..199
-      BLANK_LINE@198..199 "\n"
-    PARAGRAPH@199..249
-      TEXT@199..248 "The table above shoul ..."
-      NEWLINE@248..249 "\n"
+DOCUMENT@0..249
+  HEADING@0..25
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..24
+      TEXT@2..24 "LaTeX Environment Test"
+    NEWLINE@24..25 "\n"
+  BLANK_LINE@25..26
+    BLANK_LINE@25..26 "\n"
+  PARAGRAPH@26..73
+    TEXT@26..72 "This document tests L ..."
+    NEWLINE@72..73 "\n"
+  BLANK_LINE@73..74
+    BLANK_LINE@73..74 "\n"
+  LATEX_ENVIRONMENT@74..198
+    LATEX_ENV_BEGIN@74..103
+      TEXT@74..102 "\\begin{tabular}{|l|l| ..."
+      NEWLINE@102..103 "\n"
+    LATEX_ENV_CONTENT@103..184
+      TEXT@103..128 "Age & Frequency \\\\ \\h ..."
+      NEWLINE@128..129 "\n"
+      TEXT@129..144 "18--25  & 15 \\\\"
+      NEWLINE@144..145 "\n"
+      TEXT@145..160 "26--35  & 33 \\\\"
+      NEWLINE@160..161 "\n"
+      TEXT@161..183 "36--45  & 22 \\\\ \\hline"
+      NEWLINE@183..184 "\n"
+    LATEX_ENV_END@184..198
+      TEXT@184..197 "\\end{tabular}"
+      NEWLINE@197..198 "\n"
+  BLANK_LINE@198..199
+    BLANK_LINE@198..199 "\n"
+  PARAGRAPH@199..249
+    TEXT@199..248 "The table above shoul ..."
+    NEWLINE@248..249 "\n"
 

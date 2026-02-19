@@ -12,7 +12,7 @@ fn test_parse_stdin() {
         .write_stdin("# Heading\n\nParagraph.")
         .assert()
         .success()
-        .stdout(predicate::str::contains("ROOT"))
+        .stdout(predicate::str::contains("DOCUMENT"))
         .stdout(predicate::str::contains("HEADING"));
 }
 
@@ -26,7 +26,7 @@ fn test_parse_simple_file() {
         .args(["parse", test_file.to_str().unwrap()])
         .assert()
         .success()
-        .stdout(predicate::str::contains("ROOT"))
+        .stdout(predicate::str::contains("DOCUMENT"))
         .stdout(predicate::str::contains("HEADING"))
         .stdout(predicate::str::contains("PARAGRAPH"));
 }
@@ -53,7 +53,7 @@ fn test_parse_with_config() {
         ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("ROOT"));
+        .stdout(predicate::str::contains("DOCUMENT"));
 }
 
 #[test]
@@ -83,5 +83,5 @@ fn test_parse_handles_complex_syntax() {
         .write_stdin("# Heading\n\n```python\ncode\n```\n\n$$\nx^2\n$$")
         .assert()
         .success()
-        .stdout(predicate::str::contains("ROOT"));
+        .stdout(predicate::str::contains("DOCUMENT"));
 }

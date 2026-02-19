@@ -1,68 +1,67 @@
-ROOT@0..243
-  DOCUMENT@0..243
-    HEADING@0..10
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..9
-        TEXT@2..9 "Escapes"
-      NEWLINE@9..10 "\n"
-    BLANK_LINE@10..11
-      BLANK_LINE@10..11 "\n"
-    PARAGRAPH@11..47
-      TEXT@11..30 "Escaped asterisks: "
-      ESCAPED_CHAR@30..32 "\\*"
-      TEXT@32..44 "not emphasis"
-      ESCAPED_CHAR@44..46 "\\*"
-      NEWLINE@46..47 "\n"
-    BLANK_LINE@47..48
-      BLANK_LINE@47..48 "\n"
-    PARAGRAPH@48..86
-      TEXT@48..69 "Escaped underscores: "
-      ESCAPED_CHAR@69..71 "\\_"
-      TEXT@71..83 "not emphasis"
-      ESCAPED_CHAR@83..85 "\\_"
-      NEWLINE@85..86 "\n"
-    BLANK_LINE@86..87
-      BLANK_LINE@86..87 "\n"
-    PARAGRAPH@87..119
-      TEXT@87..106 "Escaped backticks: "
-      ESCAPED_CHAR@106..108 "\\`"
-      TEXT@108..116 "not code"
-      ESCAPED_CHAR@116..118 "\\`"
-      NEWLINE@118..119 "\n"
-    BLANK_LINE@119..120
-      BLANK_LINE@119..120 "\n"
-    PARAGRAPH@120..158
-      TEXT@120..138 "Escaped brackets: "
-      ESCAPED_CHAR@138..140 "\\["
-      TEXT@140..150 "not a link"
-      ESCAPED_CHAR@150..152 "\\]"
-      TEXT@152..157 "(url)"
-      NEWLINE@157..158 "\n"
-    BLANK_LINE@158..159
-      BLANK_LINE@158..159 "\n"
-    PARAGRAPH@159..189
-      TEXT@159..176 "Escaped dollars: "
-      ESCAPED_CHAR@176..178 "\\$"
-      TEXT@178..186 "not math"
-      ESCAPED_CHAR@186..188 "\\$"
-      NEWLINE@188..189 "\n"
-    BLANK_LINE@189..190
-      BLANK_LINE@189..190 "\n"
-    PARAGRAPH@190..215
-      TEXT@190..208 "Backslash itself: "
-      ESCAPED_CHAR@208..210 "\\\\"
-      TEXT@210..214 "text"
-      NEWLINE@214..215 "\n"
-    BLANK_LINE@215..216
-      BLANK_LINE@215..216 "\n"
-    PARAGRAPH@216..243
-      TEXT@216..226 "Multiple: "
-      ESCAPED_CHAR@226..228 "\\*"
-      ESCAPED_CHAR@228..230 "\\*"
-      TEXT@230..238 "not bold"
-      ESCAPED_CHAR@238..240 "\\*"
-      ESCAPED_CHAR@240..242 "\\*"
-      NEWLINE@242..243 "\n"
+DOCUMENT@0..243
+  HEADING@0..10
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..9
+      TEXT@2..9 "Escapes"
+    NEWLINE@9..10 "\n"
+  BLANK_LINE@10..11
+    BLANK_LINE@10..11 "\n"
+  PARAGRAPH@11..47
+    TEXT@11..30 "Escaped asterisks: "
+    ESCAPED_CHAR@30..32 "\\*"
+    TEXT@32..44 "not emphasis"
+    ESCAPED_CHAR@44..46 "\\*"
+    NEWLINE@46..47 "\n"
+  BLANK_LINE@47..48
+    BLANK_LINE@47..48 "\n"
+  PARAGRAPH@48..86
+    TEXT@48..69 "Escaped underscores: "
+    ESCAPED_CHAR@69..71 "\\_"
+    TEXT@71..83 "not emphasis"
+    ESCAPED_CHAR@83..85 "\\_"
+    NEWLINE@85..86 "\n"
+  BLANK_LINE@86..87
+    BLANK_LINE@86..87 "\n"
+  PARAGRAPH@87..119
+    TEXT@87..106 "Escaped backticks: "
+    ESCAPED_CHAR@106..108 "\\`"
+    TEXT@108..116 "not code"
+    ESCAPED_CHAR@116..118 "\\`"
+    NEWLINE@118..119 "\n"
+  BLANK_LINE@119..120
+    BLANK_LINE@119..120 "\n"
+  PARAGRAPH@120..158
+    TEXT@120..138 "Escaped brackets: "
+    ESCAPED_CHAR@138..140 "\\["
+    TEXT@140..150 "not a link"
+    ESCAPED_CHAR@150..152 "\\]"
+    TEXT@152..157 "(url)"
+    NEWLINE@157..158 "\n"
+  BLANK_LINE@158..159
+    BLANK_LINE@158..159 "\n"
+  PARAGRAPH@159..189
+    TEXT@159..176 "Escaped dollars: "
+    ESCAPED_CHAR@176..178 "\\$"
+    TEXT@178..186 "not math"
+    ESCAPED_CHAR@186..188 "\\$"
+    NEWLINE@188..189 "\n"
+  BLANK_LINE@189..190
+    BLANK_LINE@189..190 "\n"
+  PARAGRAPH@190..215
+    TEXT@190..208 "Backslash itself: "
+    ESCAPED_CHAR@208..210 "\\\\"
+    TEXT@210..214 "text"
+    NEWLINE@214..215 "\n"
+  BLANK_LINE@215..216
+    BLANK_LINE@215..216 "\n"
+  PARAGRAPH@216..243
+    TEXT@216..226 "Multiple: "
+    ESCAPED_CHAR@226..228 "\\*"
+    ESCAPED_CHAR@228..230 "\\*"
+    TEXT@230..238 "not bold"
+    ESCAPED_CHAR@238..240 "\\*"
+    ESCAPED_CHAR@240..242 "\\*"
+    NEWLINE@242..243 "\n"
 

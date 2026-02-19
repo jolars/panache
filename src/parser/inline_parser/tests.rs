@@ -617,7 +617,7 @@ mod reference_tests {
 
         eprintln!("Has img-ref: {}", registry.get("img-ref").is_some());
 
-        let para = block_tree.first_child().unwrap().first_child().unwrap();
+        let para = block_tree.first_child().unwrap();
         eprintln!("\nParagraph children:");
         for child in para.children_with_tokens() {
             match child {

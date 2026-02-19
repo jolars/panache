@@ -40,17 +40,15 @@ pub async fn folding_range(
 fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
     let mut ranges = Vec::new();
 
-    // Find DOCUMENT node
-    let document = root.children().find(|n| n.kind() == SyntaxKind::DOCUMENT);
-    let document = match document {
-        Some(d) => d,
-        None => return ranges,
-    };
+    // Root is now DOCUMENT node directly
+    if root.kind() != SyntaxKind::DOCUMENT {
+        return ranges;
+    }
 
     // Track heading positions for folding sections
     let mut heading_positions: Vec<(usize, usize)> = Vec::new();
 
-    for node in document.children() {
+    for node in root.children() {
         match node.kind() {
             SyntaxKind::HEADING => {
                 let level = get_heading_level(&node);

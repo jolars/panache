@@ -1,177 +1,176 @@
-ROOT@0..1070
-  DOCUMENT@0..1070
-    HEADING@0..24
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..23
-        TEXT@2..23 "Complex Chunk Options"
-      NEWLINE@23..24 "\n"
-    BLANK_LINE@24..25
-      BLANK_LINE@24..25 "\n"
-    PARAGRAPH@25..96
-      TEXT@25..95 "Test parsing and form ..."
-      NEWLINE@95..96 "\n"
-    BLANK_LINE@96..97
-      BLANK_LINE@96..97 "\n"
-    HEADING@97..115
-      ATX_HEADING_MARKER@97..99
-        ATX_HEADING_MARKER@97..99 "##"
-      WHITESPACE@99..100 " "
-      HEADING_CONTENT@100..114
-        TEXT@100..114 "Simple Options"
-      NEWLINE@114..115 "\n"
-    BLANK_LINE@115..116
-      BLANK_LINE@115..116 "\n"
-    CODE_BLOCK@116..221
-      CODE_FENCE_OPEN@116..162
-        CODE_FENCE_MARKER@116..119 "```"
-        CODE_INFO@119..161
-          TEXT@119..120 "{"
-          CODE_LANGUAGE@120..121 "r"
-          TEXT@121..161 " simple-chunk, echo=T ..."
-        NEWLINE@161..162 "\n"
-      CODE_CONTENT@162..217
-        TEXT@162..205 "# Simple options shou ..."
-        NEWLINE@205..206 "\n"
-        TEXT@206..216 "plot(1:10)"
-        NEWLINE@216..217 "\n"
-      CODE_FENCE_CLOSE@217..221
-        CODE_FENCE_MARKER@217..220 "```"
-        NEWLINE@220..221 "\n"
-    BLANK_LINE@221..222
-      BLANK_LINE@221..222 "\n"
-    HEADING@222..247
-      ATX_HEADING_MARKER@222..224
-        ATX_HEADING_MARKER@222..224 "##"
-      WHITESPACE@224..225 " "
-      HEADING_CONTENT@225..246
-        TEXT@225..246 "Nested Function Calls"
-      NEWLINE@246..247 "\n"
-    BLANK_LINE@247..248
-      BLANK_LINE@247..248 "\n"
-    CODE_BLOCK@248..395
-      CODE_FENCE_OPEN@248..293
-        CODE_FENCE_MARKER@248..251 "```"
-        CODE_INFO@251..292
-          TEXT@251..252 "{"
-          CODE_LANGUAGE@252..253 "r"
-          TEXT@253..292 " deps-chunk, dependso ..."
-        NEWLINE@292..293 "\n"
-      CODE_CONTENT@293..391
-        TEXT@293..357 "# Complex R function  ..."
-        NEWLINE@357..358 "\n"
-        TEXT@358..390 "result <- combine_dat ..."
-        NEWLINE@390..391 "\n"
-      CODE_FENCE_CLOSE@391..395
-        CODE_FENCE_MARKER@391..394 "```"
-        NEWLINE@394..395 "\n"
-    BLANK_LINE@395..396
-      BLANK_LINE@395..396 "\n"
-    HEADING@396..410
-      ATX_HEADING_MARKER@396..398
-        ATX_HEADING_MARKER@396..398 "##"
-      WHITESPACE@398..399 " "
-      HEADING_CONTENT@399..409
-        TEXT@399..409 "File Paths"
-      NEWLINE@409..410 "\n"
-    BLANK_LINE@410..411
-      BLANK_LINE@410..411 "\n"
-    CODE_BLOCK@411..536
-      CODE_FENCE_OPEN@411..471
-        CODE_FENCE_MARKER@411..414 "```"
-        CODE_INFO@414..470
-          TEXT@414..415 "{"
-          CODE_LANGUAGE@415..416 "r"
-          TEXT@416..470 " cache-chunk, cache.p ..."
-        NEWLINE@470..471 "\n"
-      CODE_CONTENT@471..532
-        TEXT@471..507 "# Function calls with ..."
-        NEWLINE@507..508 "\n"
-        TEXT@508..531 "expensive_computation()"
-        NEWLINE@531..532 "\n"
-      CODE_FENCE_CLOSE@532..536
-        CODE_FENCE_MARKER@532..535 "```"
-        NEWLINE@535..536 "\n"
-    BLANK_LINE@536..537
-      BLANK_LINE@536..537 "\n"
-    HEADING@537..554
-      ATX_HEADING_MARKER@537..539
-        ATX_HEADING_MARKER@537..539 "##"
-      WHITESPACE@539..540 " "
-      HEADING_CONTENT@540..553
-        TEXT@540..553 "Deeply Nested"
-      NEWLINE@553..554 "\n"
-    BLANK_LINE@554..555
-      BLANK_LINE@554..555 "\n"
-    CODE_BLOCK@555..658
-      CODE_FENCE_OPEN@555..606
-        CODE_FENCE_MARKER@555..558 "```"
-        CODE_INFO@558..605
-          TEXT@558..559 "{"
-          CODE_LANGUAGE@559..560 "r"
-          TEXT@560..605 " nested-chunk, data=l ..."
-        NEWLINE@605..606 "\n"
-      CODE_CONTENT@606..654
-        TEXT@606..634 "# Multiple levels of  ..."
-        NEWLINE@634..635 "\n"
-        TEXT@635..653 "process_data(data)"
-        NEWLINE@653..654 "\n"
-      CODE_FENCE_CLOSE@654..658
-        CODE_FENCE_MARKER@654..657 "```"
-        NEWLINE@657..658 "\n"
-    BLANK_LINE@658..659
-      BLANK_LINE@658..659 "\n"
-    HEADING@659..687
-      ATX_HEADING_MARKER@659..661
-        ATX_HEADING_MARKER@659..661 "##"
-      WHITESPACE@661..662 " "
-      HEADING_CONTENT@662..686
-        TEXT@662..686 "Mixed Simple and Complex"
-      NEWLINE@686..687 "\n"
-    BLANK_LINE@687..688
-      BLANK_LINE@687..688 "\n"
-    CODE_BLOCK@688..879
-      CODE_FENCE_OPEN@688..787
-        CODE_FENCE_MARKER@688..691 "```"
-        CODE_INFO@691..786
-          TEXT@691..692 "{"
-          CODE_LANGUAGE@692..693 "r"
-          TEXT@693..786 " mixed-chunk, echo=TR ..."
-        NEWLINE@786..787 "\n"
-      CODE_CONTENT@787..875
-        TEXT@787..842 "# Mix of simple (hash ..."
-        NEWLINE@842..843 "\n"
-        TEXT@843..874 "final_result <- analy ..."
-        NEWLINE@874..875 "\n"
-      CODE_FENCE_CLOSE@875..879
-        CODE_FENCE_MARKER@875..878 "```"
-        NEWLINE@878..879 "\n"
-    BLANK_LINE@879..880
-      BLANK_LINE@879..880 "\n"
-    HEADING@880..903
-      ATX_HEADING_MARKER@880..882
-        ATX_HEADING_MARKER@880..882 "##"
-      WHITESPACE@882..883 " "
-      HEADING_CONTENT@883..902
-        TEXT@883..902 "Brackets and Braces"
-      NEWLINE@902..903 "\n"
-    BLANK_LINE@903..904
-      BLANK_LINE@903..904 "\n"
-    CODE_BLOCK@904..1070
-      CODE_FENCE_OPEN@904..978
-        CODE_FENCE_MARKER@904..907 "```"
-        CODE_INFO@907..977
-          TEXT@907..908 "{"
-          CODE_LANGUAGE@908..909 "r"
-          TEXT@909..977 " bracket-chunk, rows= ..."
-        NEWLINE@977..978 "\n"
-      CODE_CONTENT@978..1066
-        TEXT@978..1035 "# Different bracket t ..."
-        NEWLINE@1035..1036 "\n"
-        TEXT@1036..1065 "subset_analysis(rows, ..."
-        NEWLINE@1065..1066 "\n"
-      CODE_FENCE_CLOSE@1066..1070
-        CODE_FENCE_MARKER@1066..1069 "```"
-        NEWLINE@1069..1070 "\n"
+DOCUMENT@0..1070
+  HEADING@0..24
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..23
+      TEXT@2..23 "Complex Chunk Options"
+    NEWLINE@23..24 "\n"
+  BLANK_LINE@24..25
+    BLANK_LINE@24..25 "\n"
+  PARAGRAPH@25..96
+    TEXT@25..95 "Test parsing and form ..."
+    NEWLINE@95..96 "\n"
+  BLANK_LINE@96..97
+    BLANK_LINE@96..97 "\n"
+  HEADING@97..115
+    ATX_HEADING_MARKER@97..99
+      ATX_HEADING_MARKER@97..99 "##"
+    WHITESPACE@99..100 " "
+    HEADING_CONTENT@100..114
+      TEXT@100..114 "Simple Options"
+    NEWLINE@114..115 "\n"
+  BLANK_LINE@115..116
+    BLANK_LINE@115..116 "\n"
+  CODE_BLOCK@116..221
+    CODE_FENCE_OPEN@116..162
+      CODE_FENCE_MARKER@116..119 "```"
+      CODE_INFO@119..161
+        TEXT@119..120 "{"
+        CODE_LANGUAGE@120..121 "r"
+        TEXT@121..161 " simple-chunk, echo=T ..."
+      NEWLINE@161..162 "\n"
+    CODE_CONTENT@162..217
+      TEXT@162..205 "# Simple options shou ..."
+      NEWLINE@205..206 "\n"
+      TEXT@206..216 "plot(1:10)"
+      NEWLINE@216..217 "\n"
+    CODE_FENCE_CLOSE@217..221
+      CODE_FENCE_MARKER@217..220 "```"
+      NEWLINE@220..221 "\n"
+  BLANK_LINE@221..222
+    BLANK_LINE@221..222 "\n"
+  HEADING@222..247
+    ATX_HEADING_MARKER@222..224
+      ATX_HEADING_MARKER@222..224 "##"
+    WHITESPACE@224..225 " "
+    HEADING_CONTENT@225..246
+      TEXT@225..246 "Nested Function Calls"
+    NEWLINE@246..247 "\n"
+  BLANK_LINE@247..248
+    BLANK_LINE@247..248 "\n"
+  CODE_BLOCK@248..395
+    CODE_FENCE_OPEN@248..293
+      CODE_FENCE_MARKER@248..251 "```"
+      CODE_INFO@251..292
+        TEXT@251..252 "{"
+        CODE_LANGUAGE@252..253 "r"
+        TEXT@253..292 " deps-chunk, dependso ..."
+      NEWLINE@292..293 "\n"
+    CODE_CONTENT@293..391
+      TEXT@293..357 "# Complex R function  ..."
+      NEWLINE@357..358 "\n"
+      TEXT@358..390 "result <- combine_dat ..."
+      NEWLINE@390..391 "\n"
+    CODE_FENCE_CLOSE@391..395
+      CODE_FENCE_MARKER@391..394 "```"
+      NEWLINE@394..395 "\n"
+  BLANK_LINE@395..396
+    BLANK_LINE@395..396 "\n"
+  HEADING@396..410
+    ATX_HEADING_MARKER@396..398
+      ATX_HEADING_MARKER@396..398 "##"
+    WHITESPACE@398..399 " "
+    HEADING_CONTENT@399..409
+      TEXT@399..409 "File Paths"
+    NEWLINE@409..410 "\n"
+  BLANK_LINE@410..411
+    BLANK_LINE@410..411 "\n"
+  CODE_BLOCK@411..536
+    CODE_FENCE_OPEN@411..471
+      CODE_FENCE_MARKER@411..414 "```"
+      CODE_INFO@414..470
+        TEXT@414..415 "{"
+        CODE_LANGUAGE@415..416 "r"
+        TEXT@416..470 " cache-chunk, cache.p ..."
+      NEWLINE@470..471 "\n"
+    CODE_CONTENT@471..532
+      TEXT@471..507 "# Function calls with ..."
+      NEWLINE@507..508 "\n"
+      TEXT@508..531 "expensive_computation()"
+      NEWLINE@531..532 "\n"
+    CODE_FENCE_CLOSE@532..536
+      CODE_FENCE_MARKER@532..535 "```"
+      NEWLINE@535..536 "\n"
+  BLANK_LINE@536..537
+    BLANK_LINE@536..537 "\n"
+  HEADING@537..554
+    ATX_HEADING_MARKER@537..539
+      ATX_HEADING_MARKER@537..539 "##"
+    WHITESPACE@539..540 " "
+    HEADING_CONTENT@540..553
+      TEXT@540..553 "Deeply Nested"
+    NEWLINE@553..554 "\n"
+  BLANK_LINE@554..555
+    BLANK_LINE@554..555 "\n"
+  CODE_BLOCK@555..658
+    CODE_FENCE_OPEN@555..606
+      CODE_FENCE_MARKER@555..558 "```"
+      CODE_INFO@558..605
+        TEXT@558..559 "{"
+        CODE_LANGUAGE@559..560 "r"
+        TEXT@560..605 " nested-chunk, data=l ..."
+      NEWLINE@605..606 "\n"
+    CODE_CONTENT@606..654
+      TEXT@606..634 "# Multiple levels of  ..."
+      NEWLINE@634..635 "\n"
+      TEXT@635..653 "process_data(data)"
+      NEWLINE@653..654 "\n"
+    CODE_FENCE_CLOSE@654..658
+      CODE_FENCE_MARKER@654..657 "```"
+      NEWLINE@657..658 "\n"
+  BLANK_LINE@658..659
+    BLANK_LINE@658..659 "\n"
+  HEADING@659..687
+    ATX_HEADING_MARKER@659..661
+      ATX_HEADING_MARKER@659..661 "##"
+    WHITESPACE@661..662 " "
+    HEADING_CONTENT@662..686
+      TEXT@662..686 "Mixed Simple and Complex"
+    NEWLINE@686..687 "\n"
+  BLANK_LINE@687..688
+    BLANK_LINE@687..688 "\n"
+  CODE_BLOCK@688..879
+    CODE_FENCE_OPEN@688..787
+      CODE_FENCE_MARKER@688..691 "```"
+      CODE_INFO@691..786
+        TEXT@691..692 "{"
+        CODE_LANGUAGE@692..693 "r"
+        TEXT@693..786 " mixed-chunk, echo=TR ..."
+      NEWLINE@786..787 "\n"
+    CODE_CONTENT@787..875
+      TEXT@787..842 "# Mix of simple (hash ..."
+      NEWLINE@842..843 "\n"
+      TEXT@843..874 "final_result <- analy ..."
+      NEWLINE@874..875 "\n"
+    CODE_FENCE_CLOSE@875..879
+      CODE_FENCE_MARKER@875..878 "```"
+      NEWLINE@878..879 "\n"
+  BLANK_LINE@879..880
+    BLANK_LINE@879..880 "\n"
+  HEADING@880..903
+    ATX_HEADING_MARKER@880..882
+      ATX_HEADING_MARKER@880..882 "##"
+    WHITESPACE@882..883 " "
+    HEADING_CONTENT@883..902
+      TEXT@883..902 "Brackets and Braces"
+    NEWLINE@902..903 "\n"
+  BLANK_LINE@903..904
+    BLANK_LINE@903..904 "\n"
+  CODE_BLOCK@904..1070
+    CODE_FENCE_OPEN@904..978
+      CODE_FENCE_MARKER@904..907 "```"
+      CODE_INFO@907..977
+        TEXT@907..908 "{"
+        CODE_LANGUAGE@908..909 "r"
+        TEXT@909..977 " bracket-chunk, rows= ..."
+      NEWLINE@977..978 "\n"
+    CODE_CONTENT@978..1066
+      TEXT@978..1035 "# Different bracket t ..."
+      NEWLINE@1035..1036 "\n"
+      TEXT@1036..1065 "subset_analysis(rows, ..."
+      NEWLINE@1065..1066 "\n"
+    CODE_FENCE_CLOSE@1066..1070
+      CODE_FENCE_MARKER@1066..1069 "```"
+      NEWLINE@1069..1070 "\n"
 

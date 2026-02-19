@@ -1,15 +1,14 @@
-ROOT@0..35
-  DOCUMENT@0..35
-    HEADING@0..11
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..9
-        TEXT@2..9 "Heading"
-      NEWLINE@9..11 "\r\n"
-    BLANK_LINE@11..13
-      BLANK_LINE@11..13 "\r\n"
-    PARAGRAPH@13..35
-      TEXT@13..33 "Paragraph with CRLF."
-      NEWLINE@33..35 "\r\n"
+DOCUMENT@0..35
+  HEADING@0..11
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..9
+      TEXT@2..9 "Heading"
+    NEWLINE@9..11 "\r\n"
+  BLANK_LINE@11..13
+    BLANK_LINE@11..13 "\r\n"
+  PARAGRAPH@13..35
+    TEXT@13..33 "Paragraph with CRLF."
+    NEWLINE@33..35 "\r\n"
 

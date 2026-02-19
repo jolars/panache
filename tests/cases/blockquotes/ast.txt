@@ -1,189 +1,188 @@
-ROOT@0..1418
-  DOCUMENT@0..1418
-    PARAGRAPH@0..60
-      TEXT@0..59 "Markdown uses email c ..."
-      NEWLINE@59..60 "\n"
-    BLANK_LINE@60..61
-      BLANK_LINE@60..61 "\n"
-    BLOCKQUOTE@61..178
-      BLOCKQUOTE_MARKER@61..62 ">"
-      PARAGRAPH@62..116
-        TEXT@62..89 "This is a block quote ..."
-        NEWLINE@89..90 "\n"
-        BLOCKQUOTE_MARKER@90..91 ">"
-        TEXT@91..115 "paragraph has two lines."
-        NEWLINE@115..116 "\n"
-      BLOCKQUOTE_MARKER@116..117 ">"
-      BLANK_LINE@117..118
-        BLANK_LINE@117..118 "\n"
-      BLOCKQUOTE_MARKER@118..119 ">"
-      WHITESPACE@119..120 " "
-      LIST@120..178
-        LIST_ITEM@120..160
-          LIST_MARKER@120..122 "1."
-          WHITESPACE@122..123 " "
-          PLAIN@123..160
-            TEXT@123..159 "This is a list inside ..."
-            NEWLINE@159..160 "\n"
-        BLOCKQUOTE_MARKER@160..161 ">"
-        WHITESPACE@161..162 " "
-        LIST_ITEM@162..178
-          LIST_MARKER@162..164 "2."
-          WHITESPACE@164..165 " "
-          PLAIN@165..178
-            TEXT@165..177 "Second item."
-            NEWLINE@177..178 "\n"
-    BLANK_LINE@178..179
-      BLANK_LINE@178..179 "\n"
-    PARAGRAPH@179..282
-      TEXT@179..213 "A \"lazy\" form, which  ..."
-      CODE_SPAN@213..216
-        CODE_SPAN_MARKER@213..214 "`"
-        TEXT@214..215 ">"
-        CODE_SPAN_MARKER@215..216 "`"
-      TEXT@216..257 " character only on th ..."
-      NEWLINE@257..258 "\n"
-      TEXT@258..281 "block, is also allowed:"
-      NEWLINE@281..282 "\n"
-    BLANK_LINE@282..283
-      BLANK_LINE@282..283 "\n"
-    BLOCKQUOTE@283..338
-      BLOCKQUOTE_MARKER@283..284 ">"
-      WHITESPACE@284..285 " "
-      PARAGRAPH@285..338
-        TEXT@285..312 "This is a block quote ..."
-        NEWLINE@312..313 "\n"
-        TEXT@313..337 "paragraph has two lines."
-        NEWLINE@337..338 "\n"
-    BLANK_LINE@338..339
-      BLANK_LINE@338..339 "\n"
-    BLOCKQUOTE@339..397
-      BLOCKQUOTE_MARKER@339..340 ">"
-      WHITESPACE@340..341 " "
-      LIST@341..397
-        LIST_ITEM@341..381
-          LIST_MARKER@341..343 "1."
-          WHITESPACE@343..344 " "
-          PLAIN@344..381
-            TEXT@344..380 "This is a list inside ..."
-            NEWLINE@380..381 "\n"
-        LIST_ITEM@381..397
-          LIST_MARKER@381..383 "2."
-          WHITESPACE@383..384 " "
-          PLAIN@384..397
-            TEXT@384..396 "Second item."
-            NEWLINE@396..397 "\n"
-    BLANK_LINE@397..398
-      BLANK_LINE@397..398 "\n"
-    PARAGRAPH@398..523
-      TEXT@398..477 "Among the block eleme ..."
-      NEWLINE@477..478 "\n"
-      TEXT@478..522 "quotes. That is, bloc ..."
-      NEWLINE@522..523 "\n"
-    BLANK_LINE@523..524
-      BLANK_LINE@523..524 "\n"
-    BLOCKQUOTE@524..591
-      BLOCKQUOTE_MARKER@524..525 ">"
-      WHITESPACE@525..526 " "
-      PARAGRAPH@526..549
-        TEXT@526..548 "This is a block quote."
-        NEWLINE@548..549 "\n"
-      BLOCKQUOTE_MARKER@549..550 ">"
-      BLANK_LINE@550..551
-        BLANK_LINE@550..551 "\n"
-      BLOCKQUOTE_MARKER@551..552 ">"
-      WHITESPACE@552..553 " "
-      BLOCKQUOTE@553..591
-        BLOCKQUOTE_MARKER@553..554 ">"
-        WHITESPACE@554..555 " "
-        PARAGRAPH@555..591
-          TEXT@555..590 "A block quote within  ..."
-          NEWLINE@590..591 "\n"
-    BLANK_LINE@591..592
-      BLANK_LINE@591..592 "\n"
-    PARAGRAPH@592..848
-      TEXT@592..599 "If the "
-      CODE_SPAN@599..602
-        CODE_SPAN_MARKER@599..600 "`"
-        TEXT@600..601 ">"
-        CODE_SPAN_MARKER@601..602 "`"
-      TEXT@602..665 " character is followe ..."
-      NEWLINE@665..666 "\n"
-      TEXT@666..742 "considered part of th ..."
-      NEWLINE@742..743 "\n"
-      TEXT@743..820 "the contents.  Thus,  ..."
-      NEWLINE@820..821 "\n"
-      TEXT@821..843 "five spaces after the "
-      CODE_SPAN@843..846
-        CODE_SPAN_MARKER@843..844 "`"
-        TEXT@844..845 ">"
-        CODE_SPAN_MARKER@845..846 "`"
-      TEXT@846..847 ":"
-      NEWLINE@847..848 "\n"
-    BLANK_LINE@848..849
-      BLANK_LINE@848..849 "\n"
-    BLOCKQUOTE@849..860
-      BLOCKQUOTE_MARKER@849..850 ">"
-      WHITESPACE@850..851 " "
-      CODE_BLOCK@851..860
-        CODE_CONTENT@851..860
-          WHITESPACE@851..855 "    "
-          TEXT@855..859 "code"
-          NEWLINE@859..860 "\n"
-    BLANK_LINE@860..861
-      BLANK_LINE@860..861 "\n"
-    HEADING@861..902
-      ATX_HEADING_MARKER@861..864
-        ATX_HEADING_MARKER@861..864 "###"
-      WHITESPACE@864..865 " "
-      HEADING_CONTENT@865..901
-        TEXT@865..876 "Extension: "
-        CODE_SPAN@876..901
-          CODE_SPAN_MARKER@876..877 "`"
-          TEXT@877..900 "blank_before_blockquote"
-          CODE_SPAN_MARKER@900..901 "`"
-      NEWLINE@901..902 "\n"
-    BLANK_LINE@902..903
-      BLANK_LINE@902..903 "\n"
-    PARAGRAPH@903..1322
-      TEXT@903..979 "Original Markdown syn ..."
-      NEWLINE@979..980 "\n"
-      TEXT@980..1059 "Pandoc does require t ..."
-      NEWLINE@1059..1060 "\n"
-      TEXT@1060..1124 "The reason for the re ..."
-      CODE_SPAN@1124..1127
-        CODE_SPAN_MARKER@1124..1125 "`"
-        TEXT@1125..1126 ">"
-        CODE_SPAN_MARKER@1126..1127 "`"
-      TEXT@1127..1137 " to end up"
-      NEWLINE@1137..1138 "\n"
-      TEXT@1138..1213 "at the beginning of a ..."
-      NEWLINE@1213..1214 "\n"
-      TEXT@1214..1225 "unless the "
-      CODE_SPAN@1225..1242
-        CODE_SPAN_MARKER@1225..1226 "`"
-        TEXT@1226..1241 "markdown_strict"
-        CODE_SPAN_MARKER@1241..1242 "`"
-      TEXT@1242..1291 " format is used, the  ..."
-      NEWLINE@1291..1292 "\n"
-      TEXT@1292..1321 "nested block quote in ..."
-      NEWLINE@1321..1322 "\n"
-    BLANK_LINE@1322..1323
-      BLANK_LINE@1322..1323 "\n"
-    BLOCKQUOTE@1323..1417
-      BLOCKQUOTE_MARKER@1323..1324 ">"
-      WHITESPACE@1324..1325 " "
-      PARAGRAPH@1325..1417
-        TEXT@1325..1347 "This is a block quote."
-        NEWLINE@1347..1348 "\n"
-        BLOCKQUOTE_MARKER@1348..1349 ">"
-        TEXT@1349..1369 "> Not nested, since "
-        CODE_SPAN@1369..1394
-          CODE_SPAN_MARKER@1369..1370 "`"
-          TEXT@1370..1393 "blank_before_blockquote"
-          CODE_SPAN_MARKER@1393..1394 "`"
-        TEXT@1394..1416 " is enabled by default"
-        NEWLINE@1416..1417 "\n"
-    BLANK_LINE@1417..1418
-      BLANK_LINE@1417..1418 "\n"
+DOCUMENT@0..1418
+  PARAGRAPH@0..60
+    TEXT@0..59 "Markdown uses email c ..."
+    NEWLINE@59..60 "\n"
+  BLANK_LINE@60..61
+    BLANK_LINE@60..61 "\n"
+  BLOCKQUOTE@61..178
+    BLOCKQUOTE_MARKER@61..62 ">"
+    PARAGRAPH@62..116
+      TEXT@62..89 "This is a block quote ..."
+      NEWLINE@89..90 "\n"
+      BLOCKQUOTE_MARKER@90..91 ">"
+      TEXT@91..115 "paragraph has two lines."
+      NEWLINE@115..116 "\n"
+    BLOCKQUOTE_MARKER@116..117 ">"
+    BLANK_LINE@117..118
+      BLANK_LINE@117..118 "\n"
+    BLOCKQUOTE_MARKER@118..119 ">"
+    WHITESPACE@119..120 " "
+    LIST@120..178
+      LIST_ITEM@120..160
+        LIST_MARKER@120..122 "1."
+        WHITESPACE@122..123 " "
+        PLAIN@123..160
+          TEXT@123..159 "This is a list inside ..."
+          NEWLINE@159..160 "\n"
+      BLOCKQUOTE_MARKER@160..161 ">"
+      WHITESPACE@161..162 " "
+      LIST_ITEM@162..178
+        LIST_MARKER@162..164 "2."
+        WHITESPACE@164..165 " "
+        PLAIN@165..178
+          TEXT@165..177 "Second item."
+          NEWLINE@177..178 "\n"
+  BLANK_LINE@178..179
+    BLANK_LINE@178..179 "\n"
+  PARAGRAPH@179..282
+    TEXT@179..213 "A \"lazy\" form, which  ..."
+    CODE_SPAN@213..216
+      CODE_SPAN_MARKER@213..214 "`"
+      TEXT@214..215 ">"
+      CODE_SPAN_MARKER@215..216 "`"
+    TEXT@216..257 " character only on th ..."
+    NEWLINE@257..258 "\n"
+    TEXT@258..281 "block, is also allowed:"
+    NEWLINE@281..282 "\n"
+  BLANK_LINE@282..283
+    BLANK_LINE@282..283 "\n"
+  BLOCKQUOTE@283..338
+    BLOCKQUOTE_MARKER@283..284 ">"
+    WHITESPACE@284..285 " "
+    PARAGRAPH@285..338
+      TEXT@285..312 "This is a block quote ..."
+      NEWLINE@312..313 "\n"
+      TEXT@313..337 "paragraph has two lines."
+      NEWLINE@337..338 "\n"
+  BLANK_LINE@338..339
+    BLANK_LINE@338..339 "\n"
+  BLOCKQUOTE@339..397
+    BLOCKQUOTE_MARKER@339..340 ">"
+    WHITESPACE@340..341 " "
+    LIST@341..397
+      LIST_ITEM@341..381
+        LIST_MARKER@341..343 "1."
+        WHITESPACE@343..344 " "
+        PLAIN@344..381
+          TEXT@344..380 "This is a list inside ..."
+          NEWLINE@380..381 "\n"
+      LIST_ITEM@381..397
+        LIST_MARKER@381..383 "2."
+        WHITESPACE@383..384 " "
+        PLAIN@384..397
+          TEXT@384..396 "Second item."
+          NEWLINE@396..397 "\n"
+  BLANK_LINE@397..398
+    BLANK_LINE@397..398 "\n"
+  PARAGRAPH@398..523
+    TEXT@398..477 "Among the block eleme ..."
+    NEWLINE@477..478 "\n"
+    TEXT@478..522 "quotes. That is, bloc ..."
+    NEWLINE@522..523 "\n"
+  BLANK_LINE@523..524
+    BLANK_LINE@523..524 "\n"
+  BLOCKQUOTE@524..591
+    BLOCKQUOTE_MARKER@524..525 ">"
+    WHITESPACE@525..526 " "
+    PARAGRAPH@526..549
+      TEXT@526..548 "This is a block quote."
+      NEWLINE@548..549 "\n"
+    BLOCKQUOTE_MARKER@549..550 ">"
+    BLANK_LINE@550..551
+      BLANK_LINE@550..551 "\n"
+    BLOCKQUOTE_MARKER@551..552 ">"
+    WHITESPACE@552..553 " "
+    BLOCKQUOTE@553..591
+      BLOCKQUOTE_MARKER@553..554 ">"
+      WHITESPACE@554..555 " "
+      PARAGRAPH@555..591
+        TEXT@555..590 "A block quote within  ..."
+        NEWLINE@590..591 "\n"
+  BLANK_LINE@591..592
+    BLANK_LINE@591..592 "\n"
+  PARAGRAPH@592..848
+    TEXT@592..599 "If the "
+    CODE_SPAN@599..602
+      CODE_SPAN_MARKER@599..600 "`"
+      TEXT@600..601 ">"
+      CODE_SPAN_MARKER@601..602 "`"
+    TEXT@602..665 " character is followe ..."
+    NEWLINE@665..666 "\n"
+    TEXT@666..742 "considered part of th ..."
+    NEWLINE@742..743 "\n"
+    TEXT@743..820 "the contents.  Thus,  ..."
+    NEWLINE@820..821 "\n"
+    TEXT@821..843 "five spaces after the "
+    CODE_SPAN@843..846
+      CODE_SPAN_MARKER@843..844 "`"
+      TEXT@844..845 ">"
+      CODE_SPAN_MARKER@845..846 "`"
+    TEXT@846..847 ":"
+    NEWLINE@847..848 "\n"
+  BLANK_LINE@848..849
+    BLANK_LINE@848..849 "\n"
+  BLOCKQUOTE@849..860
+    BLOCKQUOTE_MARKER@849..850 ">"
+    WHITESPACE@850..851 " "
+    CODE_BLOCK@851..860
+      CODE_CONTENT@851..860
+        WHITESPACE@851..855 "    "
+        TEXT@855..859 "code"
+        NEWLINE@859..860 "\n"
+  BLANK_LINE@860..861
+    BLANK_LINE@860..861 "\n"
+  HEADING@861..902
+    ATX_HEADING_MARKER@861..864
+      ATX_HEADING_MARKER@861..864 "###"
+    WHITESPACE@864..865 " "
+    HEADING_CONTENT@865..901
+      TEXT@865..876 "Extension: "
+      CODE_SPAN@876..901
+        CODE_SPAN_MARKER@876..877 "`"
+        TEXT@877..900 "blank_before_blockquote"
+        CODE_SPAN_MARKER@900..901 "`"
+    NEWLINE@901..902 "\n"
+  BLANK_LINE@902..903
+    BLANK_LINE@902..903 "\n"
+  PARAGRAPH@903..1322
+    TEXT@903..979 "Original Markdown syn ..."
+    NEWLINE@979..980 "\n"
+    TEXT@980..1059 "Pandoc does require t ..."
+    NEWLINE@1059..1060 "\n"
+    TEXT@1060..1124 "The reason for the re ..."
+    CODE_SPAN@1124..1127
+      CODE_SPAN_MARKER@1124..1125 "`"
+      TEXT@1125..1126 ">"
+      CODE_SPAN_MARKER@1126..1127 "`"
+    TEXT@1127..1137 " to end up"
+    NEWLINE@1137..1138 "\n"
+    TEXT@1138..1213 "at the beginning of a ..."
+    NEWLINE@1213..1214 "\n"
+    TEXT@1214..1225 "unless the "
+    CODE_SPAN@1225..1242
+      CODE_SPAN_MARKER@1225..1226 "`"
+      TEXT@1226..1241 "markdown_strict"
+      CODE_SPAN_MARKER@1241..1242 "`"
+    TEXT@1242..1291 " format is used, the  ..."
+    NEWLINE@1291..1292 "\n"
+    TEXT@1292..1321 "nested block quote in ..."
+    NEWLINE@1321..1322 "\n"
+  BLANK_LINE@1322..1323
+    BLANK_LINE@1322..1323 "\n"
+  BLOCKQUOTE@1323..1417
+    BLOCKQUOTE_MARKER@1323..1324 ">"
+    WHITESPACE@1324..1325 " "
+    PARAGRAPH@1325..1417
+      TEXT@1325..1347 "This is a block quote."
+      NEWLINE@1347..1348 "\n"
+      BLOCKQUOTE_MARKER@1348..1349 ">"
+      TEXT@1349..1369 "> Not nested, since "
+      CODE_SPAN@1369..1394
+        CODE_SPAN_MARKER@1369..1370 "`"
+        TEXT@1370..1393 "blank_before_blockquote"
+        CODE_SPAN_MARKER@1393..1394 "`"
+      TEXT@1394..1416 " is enabled by default"
+      NEWLINE@1416..1417 "\n"
+  BLANK_LINE@1417..1418
+    BLANK_LINE@1417..1418 "\n"
 

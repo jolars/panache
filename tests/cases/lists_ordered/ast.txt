@@ -1,47 +1,46 @@
-ROOT@0..125
-  DOCUMENT@0..125
-    PARAGRAPH@0..17
-      TEXT@0..16 "An ordered list:"
-      NEWLINE@16..17 "\n"
-    BLANK_LINE@17..18
-      BLANK_LINE@17..18 "\n"
-    LIST@18..61
-      LIST_ITEM@18..32
-        LIST_MARKER@18..20 "1."
-        WHITESPACE@20..21 " "
-        PLAIN@21..32
-          TEXT@21..31 "First item"
-          NEWLINE@31..32 "\n"
-      LIST_ITEM@32..47
-        LIST_MARKER@32..34 "2."
-        WHITESPACE@34..35 " "
-        PLAIN@35..47
-          TEXT@35..46 "Second item"
-          NEWLINE@46..47 "\n"
-      LIST_ITEM@47..61
-        LIST_MARKER@47..49 "3."
-        WHITESPACE@49..50 " "
-        PLAIN@50..61
-          TEXT@50..60 "Third item"
-          NEWLINE@60..61 "\n"
-    BLANK_LINE@61..62
-      BLANK_LINE@61..62 "\n"
-    PARAGRAPH@62..82
-      TEXT@62..81 "Using hash markers:"
-      NEWLINE@81..82 "\n"
-    BLANK_LINE@82..83
-      BLANK_LINE@82..83 "\n"
-    LIST@83..125
-      LIST_ITEM@83..104
-        LIST_MARKER@83..85 "#."
-        WHITESPACE@85..86 " "
-        PLAIN@86..104
-          TEXT@86..103 "Auto-numbered one"
-          NEWLINE@103..104 "\n"
-      LIST_ITEM@104..125
-        LIST_MARKER@104..106 "#."
-        WHITESPACE@106..107 " "
-        PLAIN@107..125
-          TEXT@107..124 "Auto-numbered two"
-          NEWLINE@124..125 "\n"
+DOCUMENT@0..125
+  PARAGRAPH@0..17
+    TEXT@0..16 "An ordered list:"
+    NEWLINE@16..17 "\n"
+  BLANK_LINE@17..18
+    BLANK_LINE@17..18 "\n"
+  LIST@18..61
+    LIST_ITEM@18..32
+      LIST_MARKER@18..20 "1."
+      WHITESPACE@20..21 " "
+      PLAIN@21..32
+        TEXT@21..31 "First item"
+        NEWLINE@31..32 "\n"
+    LIST_ITEM@32..47
+      LIST_MARKER@32..34 "2."
+      WHITESPACE@34..35 " "
+      PLAIN@35..47
+        TEXT@35..46 "Second item"
+        NEWLINE@46..47 "\n"
+    LIST_ITEM@47..61
+      LIST_MARKER@47..49 "3."
+      WHITESPACE@49..50 " "
+      PLAIN@50..61
+        TEXT@50..60 "Third item"
+        NEWLINE@60..61 "\n"
+  BLANK_LINE@61..62
+    BLANK_LINE@61..62 "\n"
+  PARAGRAPH@62..82
+    TEXT@62..81 "Using hash markers:"
+    NEWLINE@81..82 "\n"
+  BLANK_LINE@82..83
+    BLANK_LINE@82..83 "\n"
+  LIST@83..125
+    LIST_ITEM@83..104
+      LIST_MARKER@83..85 "#."
+      WHITESPACE@85..86 " "
+      PLAIN@86..104
+        TEXT@86..103 "Auto-numbered one"
+        NEWLINE@103..104 "\n"
+    LIST_ITEM@104..125
+      LIST_MARKER@104..106 "#."
+      WHITESPACE@106..107 " "
+      PLAIN@107..125
+        TEXT@107..124 "Auto-numbered two"
+        NEWLINE@124..125 "\n"
 

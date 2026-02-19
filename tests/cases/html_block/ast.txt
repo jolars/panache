@@ -1,62 +1,61 @@
-ROOT@0..256
-  DOCUMENT@0..256
-    HEADING@0..18
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..17
-        TEXT@2..17 "HTML Block Test"
-      NEWLINE@17..18 "\n"
-    BLANK_LINE@18..19
-      BLANK_LINE@18..19 "\n"
-    PARAGRAPH@19..59
-      TEXT@19..58 "This document tests H ..."
-      NEWLINE@58..59 "\n"
-    BLANK_LINE@59..60
-      BLANK_LINE@59..60 "\n"
-    HTML_BLOCK@60..82
-      HTML_BLOCK_TAG@60..82
-        TEXT@60..81 "<!-- HTML comment -->"
-        NEWLINE@81..82 "\n"
-    BLANK_LINE@82..83
-      BLANK_LINE@82..83 "\n"
-    PARAGRAPH@83..108
-      TEXT@83..107 "Some text after comment."
-      NEWLINE@107..108 "\n"
-    BLANK_LINE@108..109
-      BLANK_LINE@108..109 "\n"
-    HTML_BLOCK@109..159
-      HTML_BLOCK_TAG@109..133
-        TEXT@109..132 "<div class=\"container\">"
-        NEWLINE@132..133 "\n"
-      HTML_BLOCK_CONTENT@133..152
-        TEXT@133..151 "Content inside div"
-        NEWLINE@151..152 "\n"
-      HTML_BLOCK_TAG@152..159
-        TEXT@152..158 "</div>"
-        NEWLINE@158..159 "\n"
-    BLANK_LINE@159..160
-      BLANK_LINE@159..160 "\n"
-    PARAGRAPH@160..181
-      TEXT@160..180 "Paragraph after div."
-      NEWLINE@180..181 "\n"
-    BLANK_LINE@181..182
-      BLANK_LINE@181..182 "\n"
-    HTML_BLOCK@182..238
-      HTML_BLOCK_TAG@182..191
-        TEXT@182..190 "<script>"
-        NEWLINE@190..191 "\n"
-      HTML_BLOCK_CONTENT@191..228
-        TEXT@191..206 "alert('Hello');"
-        NEWLINE@206..207 "\n"
-        TEXT@207..227 "console.log('test');"
-        NEWLINE@227..228 "\n"
-      HTML_BLOCK_TAG@228..238
-        TEXT@228..237 "</script>"
-        NEWLINE@237..238 "\n"
-    BLANK_LINE@238..239
-      BLANK_LINE@238..239 "\n"
-    PARAGRAPH@239..256
-      TEXT@239..255 "Final paragraph."
-      NEWLINE@255..256 "\n"
+DOCUMENT@0..256
+  HEADING@0..18
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..17
+      TEXT@2..17 "HTML Block Test"
+    NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  PARAGRAPH@19..59
+    TEXT@19..58 "This document tests H ..."
+    NEWLINE@58..59 "\n"
+  BLANK_LINE@59..60
+    BLANK_LINE@59..60 "\n"
+  HTML_BLOCK@60..82
+    HTML_BLOCK_TAG@60..82
+      TEXT@60..81 "<!-- HTML comment -->"
+      NEWLINE@81..82 "\n"
+  BLANK_LINE@82..83
+    BLANK_LINE@82..83 "\n"
+  PARAGRAPH@83..108
+    TEXT@83..107 "Some text after comment."
+    NEWLINE@107..108 "\n"
+  BLANK_LINE@108..109
+    BLANK_LINE@108..109 "\n"
+  HTML_BLOCK@109..159
+    HTML_BLOCK_TAG@109..133
+      TEXT@109..132 "<div class=\"container\">"
+      NEWLINE@132..133 "\n"
+    HTML_BLOCK_CONTENT@133..152
+      TEXT@133..151 "Content inside div"
+      NEWLINE@151..152 "\n"
+    HTML_BLOCK_TAG@152..159
+      TEXT@152..158 "</div>"
+      NEWLINE@158..159 "\n"
+  BLANK_LINE@159..160
+    BLANK_LINE@159..160 "\n"
+  PARAGRAPH@160..181
+    TEXT@160..180 "Paragraph after div."
+    NEWLINE@180..181 "\n"
+  BLANK_LINE@181..182
+    BLANK_LINE@181..182 "\n"
+  HTML_BLOCK@182..238
+    HTML_BLOCK_TAG@182..191
+      TEXT@182..190 "<script>"
+      NEWLINE@190..191 "\n"
+    HTML_BLOCK_CONTENT@191..228
+      TEXT@191..206 "alert('Hello');"
+      NEWLINE@206..207 "\n"
+      TEXT@207..227 "console.log('test');"
+      NEWLINE@227..228 "\n"
+    HTML_BLOCK_TAG@228..238
+      TEXT@228..237 "</script>"
+      NEWLINE@237..238 "\n"
+  BLANK_LINE@238..239
+    BLANK_LINE@238..239 "\n"
+  PARAGRAPH@239..256
+    TEXT@239..255 "Final paragraph."
+    NEWLINE@255..256 "\n"
 

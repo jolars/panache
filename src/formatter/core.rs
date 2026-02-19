@@ -58,7 +58,7 @@ impl Formatter {
         }
     }
 
-    /// Check if we should process a direct child of ROOT/DOCUMENT
+    /// Check if we should process a direct child of DOCUMENT
     /// When range filtering is active, only process nodes that overlap with the range
     fn should_process_top_level_node(&self, node: &SyntaxNode) -> bool {
         // If no range specified, process everything
@@ -66,8 +66,8 @@ impl Formatter {
             return true;
         }
 
-        // Always process ROOT and DOCUMENT nodes (containers)
-        if node.kind() == SyntaxKind::ROOT || node.kind() == SyntaxKind::DOCUMENT {
+        // Always process DOCUMENT node (container)
+        if node.kind() == SyntaxKind::DOCUMENT {
             return true;
         }
 
@@ -166,7 +166,7 @@ impl Formatter {
         let line_width = self.config.line_width;
 
         match node.kind() {
-            SyntaxKind::ROOT | SyntaxKind::DOCUMENT => {
+            SyntaxKind::DOCUMENT => {
                 for el in node.children_with_tokens() {
                     match el {
                         rowan::NodeOrToken::Node(n) => {

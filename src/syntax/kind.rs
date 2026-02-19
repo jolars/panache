@@ -102,7 +102,6 @@ pub enum SyntaxKind {
     SUBSCRIPT_MARKER,   // ~ (for subscript)
 
     // Composite nodes
-    ROOT,
     DOCUMENT,
     YAML_METADATA,
     PANDOC_TITLE_BLOCK,

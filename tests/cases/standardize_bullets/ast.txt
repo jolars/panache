@@ -1,338 +1,337 @@
-ROOT@0..1226
-  DOCUMENT@0..1226
-    HEADING@0..35
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..34
-        TEXT@2..34 "Bullet List Standardi ..."
-      NEWLINE@34..35 "\n"
-    BLANK_LINE@35..36
-      BLANK_LINE@35..36 "\n"
-    PARAGRAPH@36..92
-      TEXT@36..91 "This document tests b ..."
-      NEWLINE@91..92 "\n"
-    BLANK_LINE@92..93
-      BLANK_LINE@92..93 "\n"
-    HEADING@93..115
-      ATX_HEADING_MARKER@93..95
-        ATX_HEADING_MARKER@93..95 "##"
-      WHITESPACE@95..96 " "
-      HEADING_CONTENT@96..114
-        TEXT@96..114 "Single-Level Lists"
-      NEWLINE@114..115 "\n"
-    BLANK_LINE@115..116
-      BLANK_LINE@115..116 "\n"
-    PARAGRAPH@116..135
-      TEXT@116..134 "Different markers:"
-      NEWLINE@134..135 "\n"
-    BLANK_LINE@135..136
-      BLANK_LINE@135..136 "\n"
-    LIST@136..234
-      LIST_ITEM@136..154
-        LIST_MARKER@136..137 "*"
-        WHITESPACE@137..138 " "
-        PARAGRAPH@138..154
-          TEXT@138..153 "Asterisk item 1"
-          NEWLINE@153..154 "\n"
-      LIST_ITEM@154..172
-        LIST_MARKER@154..155 "*"
-        WHITESPACE@155..156 " "
-        PARAGRAPH@156..172
-          TEXT@156..171 "Asterisk item 2"
-          NEWLINE@171..172 "\n"
-      BLANK_LINE@172..173
-        BLANK_LINE@172..173 "\n"
-      LIST_ITEM@173..187
-        LIST_MARKER@173..174 "+"
-        WHITESPACE@174..175 " "
-        PARAGRAPH@175..187
-          TEXT@175..186 "Plus item 1"
-          NEWLINE@186..187 "\n"
-      LIST_ITEM@187..201
-        LIST_MARKER@187..188 "+"
-        WHITESPACE@188..189 " "
-        PARAGRAPH@189..201
-          TEXT@189..200 "Plus item 2"
-          NEWLINE@200..201 "\n"
-      BLANK_LINE@201..202
-        BLANK_LINE@201..202 "\n"
-      LIST_ITEM@202..218
-        LIST_MARKER@202..203 "-"
-        WHITESPACE@203..204 " "
-        PARAGRAPH@204..218
-          TEXT@204..217 "Hyphen item 1"
-          NEWLINE@217..218 "\n"
-      LIST_ITEM@218..234
-        LIST_MARKER@218..219 "-"
-        WHITESPACE@219..220 " "
-        PARAGRAPH@220..234
-          TEXT@220..233 "Hyphen item 2"
-          NEWLINE@233..234 "\n"
-    BLANK_LINE@234..235
-      BLANK_LINE@234..235 "\n"
-    HEADING@235..251
-      ATX_HEADING_MARKER@235..237
-        ATX_HEADING_MARKER@235..237 "##"
-      WHITESPACE@237..238 " "
-      HEADING_CONTENT@238..250
-        TEXT@238..250 "Nested Lists"
-      NEWLINE@250..251 "\n"
-    BLANK_LINE@251..252
-      BLANK_LINE@251..252 "\n"
-    PARAGRAPH@252..287
-      TEXT@252..286 "Mixed markers at diff ..."
-      NEWLINE@286..287 "\n"
-    BLANK_LINE@287..288
-      BLANK_LINE@287..288 "\n"
-    LIST@288..409
-      LIST_ITEM@288..409
-        LIST_MARKER@288..289 "*"
-        WHITESPACE@289..290 " "
-        PLAIN@290..314
-          TEXT@290..313 "Top level with asterisk"
-          NEWLINE@313..314 "\n"
-        LIST@314..409
-          LIST_ITEM@314..409
-            PLAIN@314..316
-              WHITESPACE@314..316 "  "
-            LIST_MARKER@316..317 "+"
-            WHITESPACE@317..318 " "
-            PLAIN@318..341
-              TEXT@318..340 "Second level with plus"
-              NEWLINE@340..341 "\n"
-            LIST@341..409
-              LIST_ITEM@341..409
-                PLAIN@341..345
-                  WHITESPACE@341..345 "    "
-                LIST_MARKER@345..346 "-"
-                WHITESPACE@346..347 " "
-                PLAIN@347..371
-                  TEXT@347..370 "Third level with hyphen"
-                  NEWLINE@370..371 "\n"
-                LIST@371..409
-                  LIST_ITEM@371..409
-                    PLAIN@371..377
-                      WHITESPACE@371..377 "      "
-                    LIST_MARKER@377..378 "*"
-                    WHITESPACE@378..379 " "
-                    PLAIN@379..409
-                      TEXT@379..408 "Fourth level back to  ..."
-                      NEWLINE@408..409 "\n"
-    BLANK_LINE@409..410
-      BLANK_LINE@409..410 "\n"
-    HEADING@410..424
-      ATX_HEADING_MARKER@410..412
-        ATX_HEADING_MARKER@410..412 "##"
-      WHITESPACE@412..413 " "
-      HEADING_CONTENT@413..423
-        TEXT@413..423 "Task Lists"
-      NEWLINE@423..424 "\n"
-    BLANK_LINE@424..425
-      BLANK_LINE@424..425 "\n"
-    PARAGRAPH@425..460
-      TEXT@425..459 "Task lists with diffe ..."
-      NEWLINE@459..460 "\n"
-    BLANK_LINE@460..461
-      BLANK_LINE@460..461 "\n"
-    LIST@461..635
-      LIST_ITEM@461..491
-        LIST_MARKER@461..462 "*"
-        WHITESPACE@462..463 " "
-        TASK_CHECKBOX@463..466 "[ ]"
-        PLAIN@466..491
-          TEXT@466..490 " Unchecked with asterisk"
-          NEWLINE@490..491 "\n"
-      LIST_ITEM@491..519
-        LIST_MARKER@491..492 "*"
-        WHITESPACE@492..493 " "
-        TASK_CHECKBOX@493..496 "[x]"
-        PLAIN@496..519
-          TEXT@496..518 " Checked with asterisk"
-          NEWLINE@518..519 "\n"
-      LIST_ITEM@519..545
-        LIST_MARKER@519..520 "+"
-        WHITESPACE@520..521 " "
-        TASK_CHECKBOX@521..524 "[ ]"
-        PLAIN@524..545
-          TEXT@524..544 " Unchecked with plus"
-          NEWLINE@544..545 "\n"
-      LIST_ITEM@545..581
-        LIST_MARKER@545..546 "+"
-        WHITESPACE@546..547 " "
-        TASK_CHECKBOX@547..550 "[X]"
-        PLAIN@550..581
-          TEXT@550..580 " Checked with plus (c ..."
-          NEWLINE@580..581 "\n"
-      LIST_ITEM@581..609
-        LIST_MARKER@581..582 "-"
-        WHITESPACE@582..583 " "
-        TASK_CHECKBOX@583..586 "[ ]"
-        PLAIN@586..609
-          TEXT@586..608 " Unchecked with hyphen"
-          NEWLINE@608..609 "\n"
-      LIST_ITEM@609..635
-        LIST_MARKER@609..610 "-"
-        WHITESPACE@610..611 " "
-        TASK_CHECKBOX@611..614 "[x]"
-        PLAIN@614..635
-          TEXT@614..634 " Checked with hyphen"
-          NEWLINE@634..635 "\n"
-    BLANK_LINE@635..636
-      BLANK_LINE@635..636 "\n"
-    HEADING@636..653
-      ATX_HEADING_MARKER@636..638
-        ATX_HEADING_MARKER@636..638 "##"
-      WHITESPACE@638..639 " "
-      HEADING_CONTENT@639..652
-        TEXT@639..652 "Mixed Content"
-      NEWLINE@652..653 "\n"
-    BLANK_LINE@653..654
-      BLANK_LINE@653..654 "\n"
-    PARAGRAPH@654..697
-      TEXT@654..696 "Lists with code block ..."
-      NEWLINE@696..697 "\n"
-    BLANK_LINE@697..698
-      BLANK_LINE@697..698 "\n"
-    LIST@698..954
-      LIST_ITEM@698..729
-        LIST_MARKER@698..699 "*"
-        WHITESPACE@699..700 " "
-        PARAGRAPH@700..729
-          TEXT@700..715 "List item with "
-          CODE_SPAN@715..728
-            CODE_SPAN_MARKER@715..716 "`"
-            TEXT@716..727 "inline code"
-            CODE_SPAN_MARKER@727..728 "`"
-          NEWLINE@728..729 "\n"
-      LIST_ITEM@729..911
-        LIST_MARKER@729..730 "*"
-        WHITESPACE@730..731 " "
-        PARAGRAPH@731..821
-          TEXT@731..805 "List item with more t ..."
-          NEWLINE@805..806 "\n"
-          TEXT@806..820 "  processes it"
-          NEWLINE@820..821 "\n"
-        BLANK_LINE@821..824
-          BLANK_LINE@821..824 "  \n"
-        PARAGRAPH@824..862
-          TEXT@824..861 "  Continuation paragr ..."
-          NEWLINE@861..862 "\n"
-        BLANK_LINE@862..865
-          BLANK_LINE@862..865 "  \n"
-        CODE_BLOCK@865..911
-          WHITESPACE@865..867 "  "
-          CODE_FENCE_OPEN@867..877
-            CODE_FENCE_MARKER@867..870 "```"
-            CODE_INFO@870..876
-              CODE_LANGUAGE@870..876 "python"
-            NEWLINE@876..877 "\n"
-          CODE_CONTENT@877..905
-            WHITESPACE@877..879 "  "
-            TEXT@879..893 "def example():"
-            NEWLINE@893..894 "\n"
-            WHITESPACE@894..896 "  "
-            TEXT@896..904 "    pass"
-            NEWLINE@904..905 "\n"
-          WHITESPACE@905..907 "  "
-          CODE_FENCE_CLOSE@907..911
-            CODE_FENCE_MARKER@907..910 "```"
-            NEWLINE@910..911 "\n"
-      BLANK_LINE@911..912
-        BLANK_LINE@911..912 "\n"
-      LIST_ITEM@912..954
-        LIST_MARKER@912..913 "+"
-        WHITESPACE@913..914 " "
-        PARAGRAPH@914..954
-          TEXT@914..953 "Another list item wit ..."
-          NEWLINE@953..954 "\n"
-    BLANK_LINE@954..955
-      BLANK_LINE@954..955 "\n"
-    HEADING@955..989
-      ATX_HEADING_MARKER@955..957
-        ATX_HEADING_MARKER@955..957 "##"
-      WHITESPACE@957..958 " "
-      HEADING_CONTENT@958..988
-        TEXT@958..988 "Combination with Orde ..."
-      NEWLINE@988..989 "\n"
-    BLANK_LINE@989..990
-      BLANK_LINE@989..990 "\n"
-    PARAGRAPH@990..1031
-      TEXT@990..1030 "Bullet lists and orde ..."
-      NEWLINE@1030..1031 "\n"
-    BLANK_LINE@1031..1032
-      BLANK_LINE@1031..1032 "\n"
-    LIST@1032..1064
-      LIST_ITEM@1032..1048
-        LIST_MARKER@1032..1033 "*"
-        WHITESPACE@1033..1034 " "
-        PLAIN@1034..1048
-          TEXT@1034..1047 "Bullet item 1"
-          NEWLINE@1047..1048 "\n"
-      LIST_ITEM@1048..1064
-        LIST_MARKER@1048..1049 "*"
-        WHITESPACE@1049..1050 " "
-        PLAIN@1050..1064
-          TEXT@1050..1063 "Bullet item 2"
-          NEWLINE@1063..1064 "\n"
-    BLANK_LINE@1064..1065
-      BLANK_LINE@1064..1065 "\n"
-    LIST@1065..1101
-      LIST_ITEM@1065..1083
-        LIST_MARKER@1065..1067 "1."
-        WHITESPACE@1067..1068 " "
-        PLAIN@1068..1083
-          TEXT@1068..1082 "Ordered item 1"
-          NEWLINE@1082..1083 "\n"
-      LIST_ITEM@1083..1101
-        LIST_MARKER@1083..1085 "2."
-        WHITESPACE@1085..1086 " "
-        PLAIN@1086..1101
-          TEXT@1086..1100 "Ordered item 2"
-          NEWLINE@1100..1101 "\n"
-    BLANK_LINE@1101..1102
-      BLANK_LINE@1101..1102 "\n"
-    LIST@1102..1142
-      LIST_ITEM@1102..1122
-        LIST_MARKER@1102..1103 "+"
-        WHITESPACE@1103..1104 " "
-        PLAIN@1104..1122
-          TEXT@1104..1121 "More bullet items"
-          NEWLINE@1121..1122 "\n"
-      LIST_ITEM@1122..1142
-        LIST_MARKER@1122..1123 "+"
-        WHITESPACE@1123..1124 " "
-        PLAIN@1124..1142
-          TEXT@1124..1141 "With plus markers"
-          NEWLINE@1141..1142 "\n"
-    BLANK_LINE@1142..1143
-      BLANK_LINE@1142..1143 "\n"
-    LIST@1143..1183
-      LIST_ITEM@1143..1166
-        LIST_MARKER@1143..1145 "a."
-        WHITESPACE@1145..1146 " "
-        PLAIN@1146..1166
-          TEXT@1146..1165 "Lower alpha ordered"
-          NEWLINE@1165..1166 "\n"
-      LIST_ITEM@1166..1183
-        LIST_MARKER@1166..1168 "b."
-        WHITESPACE@1168..1169 " "
-        PLAIN@1169..1183
-          TEXT@1169..1182 "Another alpha"
-          NEWLINE@1182..1183 "\n"
-    BLANK_LINE@1183..1184
-      BLANK_LINE@1183..1184 "\n"
-    LIST@1184..1226
-      LIST_ITEM@1184..1202
-        LIST_MARKER@1184..1185 "*"
-        WHITESPACE@1185..1186 " "
-        PLAIN@1186..1202
-          TEXT@1186..1201 "Back to bullets"
-          NEWLINE@1201..1202 "\n"
-      LIST_ITEM@1202..1226
-        LIST_MARKER@1202..1203 "*"
-        WHITESPACE@1203..1204 " "
-        PLAIN@1204..1226
-          TEXT@1204..1225 "With asterisk markers"
-          NEWLINE@1225..1226 "\n"
+DOCUMENT@0..1226
+  HEADING@0..35
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..34
+      TEXT@2..34 "Bullet List Standardi ..."
+    NEWLINE@34..35 "\n"
+  BLANK_LINE@35..36
+    BLANK_LINE@35..36 "\n"
+  PARAGRAPH@36..92
+    TEXT@36..91 "This document tests b ..."
+    NEWLINE@91..92 "\n"
+  BLANK_LINE@92..93
+    BLANK_LINE@92..93 "\n"
+  HEADING@93..115
+    ATX_HEADING_MARKER@93..95
+      ATX_HEADING_MARKER@93..95 "##"
+    WHITESPACE@95..96 " "
+    HEADING_CONTENT@96..114
+      TEXT@96..114 "Single-Level Lists"
+    NEWLINE@114..115 "\n"
+  BLANK_LINE@115..116
+    BLANK_LINE@115..116 "\n"
+  PARAGRAPH@116..135
+    TEXT@116..134 "Different markers:"
+    NEWLINE@134..135 "\n"
+  BLANK_LINE@135..136
+    BLANK_LINE@135..136 "\n"
+  LIST@136..234
+    LIST_ITEM@136..154
+      LIST_MARKER@136..137 "*"
+      WHITESPACE@137..138 " "
+      PARAGRAPH@138..154
+        TEXT@138..153 "Asterisk item 1"
+        NEWLINE@153..154 "\n"
+    LIST_ITEM@154..172
+      LIST_MARKER@154..155 "*"
+      WHITESPACE@155..156 " "
+      PARAGRAPH@156..172
+        TEXT@156..171 "Asterisk item 2"
+        NEWLINE@171..172 "\n"
+    BLANK_LINE@172..173
+      BLANK_LINE@172..173 "\n"
+    LIST_ITEM@173..187
+      LIST_MARKER@173..174 "+"
+      WHITESPACE@174..175 " "
+      PARAGRAPH@175..187
+        TEXT@175..186 "Plus item 1"
+        NEWLINE@186..187 "\n"
+    LIST_ITEM@187..201
+      LIST_MARKER@187..188 "+"
+      WHITESPACE@188..189 " "
+      PARAGRAPH@189..201
+        TEXT@189..200 "Plus item 2"
+        NEWLINE@200..201 "\n"
+    BLANK_LINE@201..202
+      BLANK_LINE@201..202 "\n"
+    LIST_ITEM@202..218
+      LIST_MARKER@202..203 "-"
+      WHITESPACE@203..204 " "
+      PARAGRAPH@204..218
+        TEXT@204..217 "Hyphen item 1"
+        NEWLINE@217..218 "\n"
+    LIST_ITEM@218..234
+      LIST_MARKER@218..219 "-"
+      WHITESPACE@219..220 " "
+      PARAGRAPH@220..234
+        TEXT@220..233 "Hyphen item 2"
+        NEWLINE@233..234 "\n"
+  BLANK_LINE@234..235
+    BLANK_LINE@234..235 "\n"
+  HEADING@235..251
+    ATX_HEADING_MARKER@235..237
+      ATX_HEADING_MARKER@235..237 "##"
+    WHITESPACE@237..238 " "
+    HEADING_CONTENT@238..250
+      TEXT@238..250 "Nested Lists"
+    NEWLINE@250..251 "\n"
+  BLANK_LINE@251..252
+    BLANK_LINE@251..252 "\n"
+  PARAGRAPH@252..287
+    TEXT@252..286 "Mixed markers at diff ..."
+    NEWLINE@286..287 "\n"
+  BLANK_LINE@287..288
+    BLANK_LINE@287..288 "\n"
+  LIST@288..409
+    LIST_ITEM@288..409
+      LIST_MARKER@288..289 "*"
+      WHITESPACE@289..290 " "
+      PLAIN@290..314
+        TEXT@290..313 "Top level with asterisk"
+        NEWLINE@313..314 "\n"
+      LIST@314..409
+        LIST_ITEM@314..409
+          PLAIN@314..316
+            WHITESPACE@314..316 "  "
+          LIST_MARKER@316..317 "+"
+          WHITESPACE@317..318 " "
+          PLAIN@318..341
+            TEXT@318..340 "Second level with plus"
+            NEWLINE@340..341 "\n"
+          LIST@341..409
+            LIST_ITEM@341..409
+              PLAIN@341..345
+                WHITESPACE@341..345 "    "
+              LIST_MARKER@345..346 "-"
+              WHITESPACE@346..347 " "
+              PLAIN@347..371
+                TEXT@347..370 "Third level with hyphen"
+                NEWLINE@370..371 "\n"
+              LIST@371..409
+                LIST_ITEM@371..409
+                  PLAIN@371..377
+                    WHITESPACE@371..377 "      "
+                  LIST_MARKER@377..378 "*"
+                  WHITESPACE@378..379 " "
+                  PLAIN@379..409
+                    TEXT@379..408 "Fourth level back to  ..."
+                    NEWLINE@408..409 "\n"
+  BLANK_LINE@409..410
+    BLANK_LINE@409..410 "\n"
+  HEADING@410..424
+    ATX_HEADING_MARKER@410..412
+      ATX_HEADING_MARKER@410..412 "##"
+    WHITESPACE@412..413 " "
+    HEADING_CONTENT@413..423
+      TEXT@413..423 "Task Lists"
+    NEWLINE@423..424 "\n"
+  BLANK_LINE@424..425
+    BLANK_LINE@424..425 "\n"
+  PARAGRAPH@425..460
+    TEXT@425..459 "Task lists with diffe ..."
+    NEWLINE@459..460 "\n"
+  BLANK_LINE@460..461
+    BLANK_LINE@460..461 "\n"
+  LIST@461..635
+    LIST_ITEM@461..491
+      LIST_MARKER@461..462 "*"
+      WHITESPACE@462..463 " "
+      TASK_CHECKBOX@463..466 "[ ]"
+      PLAIN@466..491
+        TEXT@466..490 " Unchecked with asterisk"
+        NEWLINE@490..491 "\n"
+    LIST_ITEM@491..519
+      LIST_MARKER@491..492 "*"
+      WHITESPACE@492..493 " "
+      TASK_CHECKBOX@493..496 "[x]"
+      PLAIN@496..519
+        TEXT@496..518 " Checked with asterisk"
+        NEWLINE@518..519 "\n"
+    LIST_ITEM@519..545
+      LIST_MARKER@519..520 "+"
+      WHITESPACE@520..521 " "
+      TASK_CHECKBOX@521..524 "[ ]"
+      PLAIN@524..545
+        TEXT@524..544 " Unchecked with plus"
+        NEWLINE@544..545 "\n"
+    LIST_ITEM@545..581
+      LIST_MARKER@545..546 "+"
+      WHITESPACE@546..547 " "
+      TASK_CHECKBOX@547..550 "[X]"
+      PLAIN@550..581
+        TEXT@550..580 " Checked with plus (c ..."
+        NEWLINE@580..581 "\n"
+    LIST_ITEM@581..609
+      LIST_MARKER@581..582 "-"
+      WHITESPACE@582..583 " "
+      TASK_CHECKBOX@583..586 "[ ]"
+      PLAIN@586..609
+        TEXT@586..608 " Unchecked with hyphen"
+        NEWLINE@608..609 "\n"
+    LIST_ITEM@609..635
+      LIST_MARKER@609..610 "-"
+      WHITESPACE@610..611 " "
+      TASK_CHECKBOX@611..614 "[x]"
+      PLAIN@614..635
+        TEXT@614..634 " Checked with hyphen"
+        NEWLINE@634..635 "\n"
+  BLANK_LINE@635..636
+    BLANK_LINE@635..636 "\n"
+  HEADING@636..653
+    ATX_HEADING_MARKER@636..638
+      ATX_HEADING_MARKER@636..638 "##"
+    WHITESPACE@638..639 " "
+    HEADING_CONTENT@639..652
+      TEXT@639..652 "Mixed Content"
+    NEWLINE@652..653 "\n"
+  BLANK_LINE@653..654
+    BLANK_LINE@653..654 "\n"
+  PARAGRAPH@654..697
+    TEXT@654..696 "Lists with code block ..."
+    NEWLINE@696..697 "\n"
+  BLANK_LINE@697..698
+    BLANK_LINE@697..698 "\n"
+  LIST@698..954
+    LIST_ITEM@698..729
+      LIST_MARKER@698..699 "*"
+      WHITESPACE@699..700 " "
+      PARAGRAPH@700..729
+        TEXT@700..715 "List item with "
+        CODE_SPAN@715..728
+          CODE_SPAN_MARKER@715..716 "`"
+          TEXT@716..727 "inline code"
+          CODE_SPAN_MARKER@727..728 "`"
+        NEWLINE@728..729 "\n"
+    LIST_ITEM@729..911
+      LIST_MARKER@729..730 "*"
+      WHITESPACE@730..731 " "
+      PARAGRAPH@731..821
+        TEXT@731..805 "List item with more t ..."
+        NEWLINE@805..806 "\n"
+        TEXT@806..820 "  processes it"
+        NEWLINE@820..821 "\n"
+      BLANK_LINE@821..824
+        BLANK_LINE@821..824 "  \n"
+      PARAGRAPH@824..862
+        TEXT@824..861 "  Continuation paragr ..."
+        NEWLINE@861..862 "\n"
+      BLANK_LINE@862..865
+        BLANK_LINE@862..865 "  \n"
+      CODE_BLOCK@865..911
+        WHITESPACE@865..867 "  "
+        CODE_FENCE_OPEN@867..877
+          CODE_FENCE_MARKER@867..870 "```"
+          CODE_INFO@870..876
+            CODE_LANGUAGE@870..876 "python"
+          NEWLINE@876..877 "\n"
+        CODE_CONTENT@877..905
+          WHITESPACE@877..879 "  "
+          TEXT@879..893 "def example():"
+          NEWLINE@893..894 "\n"
+          WHITESPACE@894..896 "  "
+          TEXT@896..904 "    pass"
+          NEWLINE@904..905 "\n"
+        WHITESPACE@905..907 "  "
+        CODE_FENCE_CLOSE@907..911
+          CODE_FENCE_MARKER@907..910 "```"
+          NEWLINE@910..911 "\n"
+    BLANK_LINE@911..912
+      BLANK_LINE@911..912 "\n"
+    LIST_ITEM@912..954
+      LIST_MARKER@912..913 "+"
+      WHITESPACE@913..914 " "
+      PARAGRAPH@914..954
+        TEXT@914..953 "Another list item wit ..."
+        NEWLINE@953..954 "\n"
+  BLANK_LINE@954..955
+    BLANK_LINE@954..955 "\n"
+  HEADING@955..989
+    ATX_HEADING_MARKER@955..957
+      ATX_HEADING_MARKER@955..957 "##"
+    WHITESPACE@957..958 " "
+    HEADING_CONTENT@958..988
+      TEXT@958..988 "Combination with Orde ..."
+    NEWLINE@988..989 "\n"
+  BLANK_LINE@989..990
+    BLANK_LINE@989..990 "\n"
+  PARAGRAPH@990..1031
+    TEXT@990..1030 "Bullet lists and orde ..."
+    NEWLINE@1030..1031 "\n"
+  BLANK_LINE@1031..1032
+    BLANK_LINE@1031..1032 "\n"
+  LIST@1032..1064
+    LIST_ITEM@1032..1048
+      LIST_MARKER@1032..1033 "*"
+      WHITESPACE@1033..1034 " "
+      PLAIN@1034..1048
+        TEXT@1034..1047 "Bullet item 1"
+        NEWLINE@1047..1048 "\n"
+    LIST_ITEM@1048..1064
+      LIST_MARKER@1048..1049 "*"
+      WHITESPACE@1049..1050 " "
+      PLAIN@1050..1064
+        TEXT@1050..1063 "Bullet item 2"
+        NEWLINE@1063..1064 "\n"
+  BLANK_LINE@1064..1065
+    BLANK_LINE@1064..1065 "\n"
+  LIST@1065..1101
+    LIST_ITEM@1065..1083
+      LIST_MARKER@1065..1067 "1."
+      WHITESPACE@1067..1068 " "
+      PLAIN@1068..1083
+        TEXT@1068..1082 "Ordered item 1"
+        NEWLINE@1082..1083 "\n"
+    LIST_ITEM@1083..1101
+      LIST_MARKER@1083..1085 "2."
+      WHITESPACE@1085..1086 " "
+      PLAIN@1086..1101
+        TEXT@1086..1100 "Ordered item 2"
+        NEWLINE@1100..1101 "\n"
+  BLANK_LINE@1101..1102
+    BLANK_LINE@1101..1102 "\n"
+  LIST@1102..1142
+    LIST_ITEM@1102..1122
+      LIST_MARKER@1102..1103 "+"
+      WHITESPACE@1103..1104 " "
+      PLAIN@1104..1122
+        TEXT@1104..1121 "More bullet items"
+        NEWLINE@1121..1122 "\n"
+    LIST_ITEM@1122..1142
+      LIST_MARKER@1122..1123 "+"
+      WHITESPACE@1123..1124 " "
+      PLAIN@1124..1142
+        TEXT@1124..1141 "With plus markers"
+        NEWLINE@1141..1142 "\n"
+  BLANK_LINE@1142..1143
+    BLANK_LINE@1142..1143 "\n"
+  LIST@1143..1183
+    LIST_ITEM@1143..1166
+      LIST_MARKER@1143..1145 "a."
+      WHITESPACE@1145..1146 " "
+      PLAIN@1146..1166
+        TEXT@1146..1165 "Lower alpha ordered"
+        NEWLINE@1165..1166 "\n"
+    LIST_ITEM@1166..1183
+      LIST_MARKER@1166..1168 "b."
+      WHITESPACE@1168..1169 " "
+      PLAIN@1169..1183
+        TEXT@1169..1182 "Another alpha"
+        NEWLINE@1182..1183 "\n"
+  BLANK_LINE@1183..1184
+    BLANK_LINE@1183..1184 "\n"
+  LIST@1184..1226
+    LIST_ITEM@1184..1202
+      LIST_MARKER@1184..1185 "*"
+      WHITESPACE@1185..1186 " "
+      PLAIN@1186..1202
+        TEXT@1186..1201 "Back to bullets"
+        NEWLINE@1201..1202 "\n"
+    LIST_ITEM@1202..1226
+      LIST_MARKER@1202..1203 "*"
+      WHITESPACE@1203..1204 " "
+      PLAIN@1204..1226
+        TEXT@1204..1225 "With asterisk markers"
+        NEWLINE@1225..1226 "\n"
 

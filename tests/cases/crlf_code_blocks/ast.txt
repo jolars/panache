@@ -1,36 +1,35 @@
-ROOT@0..67
-  DOCUMENT@0..67
-    HEADING@0..13
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..11
-        TEXT@2..11 "Test CRLF"
-      NEWLINE@11..13 "\r\n"
-    BLANK_LINE@13..15
-      BLANK_LINE@13..15 "\r\n"
-    CODE_BLOCK@15..41
-      CODE_FENCE_OPEN@15..24
-        CODE_FENCE_MARKER@15..18 "```"
-        CODE_INFO@18..22
-          CODE_LANGUAGE@18..22 "bash"
-        NEWLINE@22..24 "\r\n"
-      CODE_CONTENT@24..36
-        TEXT@24..34 "echo hello"
-        NEWLINE@34..36 "\r\n"
-      CODE_FENCE_CLOSE@36..41
-        CODE_FENCE_MARKER@36..39 "```"
-        NEWLINE@39..41 "\r\n"
-    BLANK_LINE@41..43
-      BLANK_LINE@41..43 "\r\n"
-    CODE_BLOCK@43..67
-      CODE_FENCE_OPEN@43..52
-        CODE_FENCE_MARKER@43..50 "~~~~~~~"
-        NEWLINE@50..52 "\r\n"
-      CODE_CONTENT@52..58
-        TEXT@52..56 "code"
-        NEWLINE@56..58 "\r\n"
-      CODE_FENCE_CLOSE@58..67
-        CODE_FENCE_MARKER@58..65 "~~~~~~~"
-        NEWLINE@65..67 "\r\n"
+DOCUMENT@0..67
+  HEADING@0..13
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..11
+      TEXT@2..11 "Test CRLF"
+    NEWLINE@11..13 "\r\n"
+  BLANK_LINE@13..15
+    BLANK_LINE@13..15 "\r\n"
+  CODE_BLOCK@15..41
+    CODE_FENCE_OPEN@15..24
+      CODE_FENCE_MARKER@15..18 "```"
+      CODE_INFO@18..22
+        CODE_LANGUAGE@18..22 "bash"
+      NEWLINE@22..24 "\r\n"
+    CODE_CONTENT@24..36
+      TEXT@24..34 "echo hello"
+      NEWLINE@34..36 "\r\n"
+    CODE_FENCE_CLOSE@36..41
+      CODE_FENCE_MARKER@36..39 "```"
+      NEWLINE@39..41 "\r\n"
+  BLANK_LINE@41..43
+    BLANK_LINE@41..43 "\r\n"
+  CODE_BLOCK@43..67
+    CODE_FENCE_OPEN@43..52
+      CODE_FENCE_MARKER@43..50 "~~~~~~~"
+      NEWLINE@50..52 "\r\n"
+    CODE_CONTENT@52..58
+      TEXT@52..56 "code"
+      NEWLINE@56..58 "\r\n"
+    CODE_FENCE_CLOSE@58..67
+      CODE_FENCE_MARKER@58..65 "~~~~~~~"
+      NEWLINE@65..67 "\r\n"
 

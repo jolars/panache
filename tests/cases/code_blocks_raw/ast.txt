@@ -1,79 +1,78 @@
-ROOT@0..293
-  DOCUMENT@0..293
-    HEADING@0..18
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..17
-        TEXT@2..17 "Raw Code Blocks"
-      NEWLINE@17..18 "\n"
-    BLANK_LINE@18..19
-      BLANK_LINE@18..19 "\n"
-    PARAGRAPH@19..35
-      TEXT@19..34 "HTML raw block:"
-      NEWLINE@34..35 "\n"
-    BLANK_LINE@35..36
-      BLANK_LINE@35..36 "\n"
-    CODE_BLOCK@36..121
-      CODE_FENCE_OPEN@36..47
-        CODE_FENCE_MARKER@36..39 "```"
-        CODE_INFO@39..46
-          TEXT@39..46 "{=html}"
-        NEWLINE@46..47 "\n"
-      CODE_CONTENT@47..117
-        TEXT@47..63 "<video controls>"
-        NEWLINE@63..64 "\n"
-        TEXT@64..107 "  <source src=\"video. ..."
-        NEWLINE@107..108 "\n"
-        TEXT@108..116 "</video>"
-        NEWLINE@116..117 "\n"
-      CODE_FENCE_CLOSE@117..121
-        CODE_FENCE_MARKER@117..120 "```"
-        NEWLINE@120..121 "\n"
-    BLANK_LINE@121..122
-      BLANK_LINE@121..122 "\n"
-    PARAGRAPH@122..139
-      TEXT@122..138 "LaTeX raw block:"
-      NEWLINE@138..139 "\n"
-    BLANK_LINE@139..140
-      BLANK_LINE@139..140 "\n"
-    CODE_BLOCK@140..199
-      CODE_FENCE_OPEN@140..152
-        CODE_FENCE_MARKER@140..143 "```"
-        CODE_INFO@143..151
-          TEXT@143..151 "{=latex}"
-        NEWLINE@151..152 "\n"
-      CODE_CONTENT@152..195
-        TEXT@152..168 "\\begin{equation}"
-        NEWLINE@168..169 "\n"
-        TEXT@169..179 "  E = mc^2"
-        NEWLINE@179..180 "\n"
-        TEXT@180..194 "\\end{equation}"
-        NEWLINE@194..195 "\n"
-      CODE_FENCE_CLOSE@195..199
-        CODE_FENCE_MARKER@195..198 "```"
-        NEWLINE@198..199 "\n"
-    BLANK_LINE@199..200
-      BLANK_LINE@199..200 "\n"
-    PARAGRAPH@200..219
-      TEXT@200..218 "OpenXML raw block:"
-      NEWLINE@218..219 "\n"
-    BLANK_LINE@219..220
-      BLANK_LINE@219..220 "\n"
-    CODE_BLOCK@220..293
-      CODE_FENCE_OPEN@220..234
-        CODE_FENCE_MARKER@220..223 "```"
-        CODE_INFO@223..233
-          TEXT@223..233 "{=openxml}"
-        NEWLINE@233..234 "\n"
-      CODE_CONTENT@234..289
-        TEXT@234..239 "<w:p>"
-        NEWLINE@239..240 "\n"
-        TEXT@240..281 "  <w:r><w:t>Custom fo ..."
-        NEWLINE@281..282 "\n"
-        TEXT@282..288 "</w:p>"
-        NEWLINE@288..289 "\n"
-      CODE_FENCE_CLOSE@289..293
-        CODE_FENCE_MARKER@289..292 "```"
-        NEWLINE@292..293 "\n"
+DOCUMENT@0..293
+  HEADING@0..18
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..17
+      TEXT@2..17 "Raw Code Blocks"
+    NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  PARAGRAPH@19..35
+    TEXT@19..34 "HTML raw block:"
+    NEWLINE@34..35 "\n"
+  BLANK_LINE@35..36
+    BLANK_LINE@35..36 "\n"
+  CODE_BLOCK@36..121
+    CODE_FENCE_OPEN@36..47
+      CODE_FENCE_MARKER@36..39 "```"
+      CODE_INFO@39..46
+        TEXT@39..46 "{=html}"
+      NEWLINE@46..47 "\n"
+    CODE_CONTENT@47..117
+      TEXT@47..63 "<video controls>"
+      NEWLINE@63..64 "\n"
+      TEXT@64..107 "  <source src=\"video. ..."
+      NEWLINE@107..108 "\n"
+      TEXT@108..116 "</video>"
+      NEWLINE@116..117 "\n"
+    CODE_FENCE_CLOSE@117..121
+      CODE_FENCE_MARKER@117..120 "```"
+      NEWLINE@120..121 "\n"
+  BLANK_LINE@121..122
+    BLANK_LINE@121..122 "\n"
+  PARAGRAPH@122..139
+    TEXT@122..138 "LaTeX raw block:"
+    NEWLINE@138..139 "\n"
+  BLANK_LINE@139..140
+    BLANK_LINE@139..140 "\n"
+  CODE_BLOCK@140..199
+    CODE_FENCE_OPEN@140..152
+      CODE_FENCE_MARKER@140..143 "```"
+      CODE_INFO@143..151
+        TEXT@143..151 "{=latex}"
+      NEWLINE@151..152 "\n"
+    CODE_CONTENT@152..195
+      TEXT@152..168 "\\begin{equation}"
+      NEWLINE@168..169 "\n"
+      TEXT@169..179 "  E = mc^2"
+      NEWLINE@179..180 "\n"
+      TEXT@180..194 "\\end{equation}"
+      NEWLINE@194..195 "\n"
+    CODE_FENCE_CLOSE@195..199
+      CODE_FENCE_MARKER@195..198 "```"
+      NEWLINE@198..199 "\n"
+  BLANK_LINE@199..200
+    BLANK_LINE@199..200 "\n"
+  PARAGRAPH@200..219
+    TEXT@200..218 "OpenXML raw block:"
+    NEWLINE@218..219 "\n"
+  BLANK_LINE@219..220
+    BLANK_LINE@219..220 "\n"
+  CODE_BLOCK@220..293
+    CODE_FENCE_OPEN@220..234
+      CODE_FENCE_MARKER@220..223 "```"
+      CODE_INFO@223..233
+        TEXT@223..233 "{=openxml}"
+      NEWLINE@233..234 "\n"
+    CODE_CONTENT@234..289
+      TEXT@234..239 "<w:p>"
+      NEWLINE@239..240 "\n"
+      TEXT@240..281 "  <w:r><w:t>Custom fo ..."
+      NEWLINE@281..282 "\n"
+      TEXT@282..288 "</w:p>"
+      NEWLINE@288..289 "\n"
+    CODE_FENCE_CLOSE@289..293
+      CODE_FENCE_MARKER@289..292 "```"
+      NEWLINE@292..293 "\n"
 

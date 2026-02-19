@@ -1,97 +1,96 @@
-ROOT@0..599
-  DOCUMENT@0..599
-    GRID_TABLE@0..231
-      TABLE_SEPARATOR@0..33
-        TEXT@0..32 "+--------+----------+ ..."
-        NEWLINE@32..33 "\n"
-      TABLE_HEADER@33..66
-        TEXT@33..65 "| Header | Column 2 | ..."
-        NEWLINE@65..66 "\n"
-      TABLE_SEPARATOR@66..99
-        TEXT@66..98 "+========+==========+ ..."
-        NEWLINE@98..99 "\n"
-      TABLE_ROW@99..132
-        TEXT@99..131 "| A      | B        | ..."
-        NEWLINE@131..132 "\n"
-      TABLE_SEPARATOR@132..165
-        TEXT@132..164 "+--------+----------+ ..."
-        NEWLINE@164..165 "\n"
-      TABLE_ROW@165..198
-        TEXT@165..197 "| Data   | More     | ..."
-        NEWLINE@197..198 "\n"
-      TABLE_SEPARATOR@198..231
-        TEXT@198..230 "+--------+----------+ ..."
-        NEWLINE@230..231 "\n"
-    BLANK_LINE@231..232
-      BLANK_LINE@231..232 "\n"
-    PARAGRAPH@232..255
-      TEXT@232..254 "Table with alignments:"
-      NEWLINE@254..255 "\n"
-    BLANK_LINE@255..256
-      BLANK_LINE@255..256 "\n"
-    GRID_TABLE@256..452
-      TABLE_SEPARATOR@256..284
-        TEXT@256..283 "+-------+--------+--- ..."
-        NEWLINE@283..284 "\n"
-      TABLE_HEADER@284..312
-        TEXT@284..311 "| Left  | Right  | Ce ..."
-        NEWLINE@311..312 "\n"
-      TABLE_SEPARATOR@312..340
-        TEXT@312..339 "+:======+=======:+:== ..."
-        NEWLINE@339..340 "\n"
-      TABLE_ROW@340..368
-        TEXT@340..367 "| A     |      B |    ..."
-        NEWLINE@367..368 "\n"
-      TABLE_SEPARATOR@368..396
-        TEXT@368..395 "+-------+--------+--- ..."
-        NEWLINE@395..396 "\n"
-      TABLE_ROW@396..424
-        TEXT@396..423 "| Short | Longer |  M ..."
-        NEWLINE@423..424 "\n"
-      TABLE_SEPARATOR@424..452
-        TEXT@424..451 "+-------+--------+--- ..."
-        NEWLINE@451..452 "\n"
-    BLANK_LINE@452..453
-      BLANK_LINE@452..453 "\n"
-    PARAGRAPH@453..488
-      TEXT@453..465 "With inline "
-      EMPHASIS@465..475
-        EMPHASIS_MARKER@465..466 "*"
-        TEXT@466..474 "emphasis"
-        EMPHASIS_MARKER@474..475 "*"
-      TEXT@475..480 " and "
-      CODE_SPAN@480..486
-        CODE_SPAN_MARKER@480..481 "`"
-        TEXT@481..485 "code"
-        CODE_SPAN_MARKER@485..486 "`"
-      TEXT@486..487 ":"
-      NEWLINE@487..488 "\n"
-    BLANK_LINE@488..489
-      BLANK_LINE@488..489 "\n"
-    GRID_TABLE@489..599
-      TABLE_SEPARATOR@489..511
-        TEXT@489..510 "+--------+----------+"
-        NEWLINE@510..511 "\n"
-      TABLE_HEADER@511..533
-        TEXT@511..513 "| "
-        EMPHASIS@513..519
-          EMPHASIS_MARKER@513..514 "*"
-          TEXT@514..518 "Bold"
-          EMPHASIS_MARKER@518..519 "*"
-        TEXT@519..522 " | "
-        CODE_SPAN@522..530
-          CODE_SPAN_MARKER@522..523 "`"
-          TEXT@523..529 "inline"
-          CODE_SPAN_MARKER@529..530 "`"
-        TEXT@530..532 " |"
-        NEWLINE@532..533 "\n"
-      TABLE_SEPARATOR@533..555
-        TEXT@533..554 "+========+==========+"
-        NEWLINE@554..555 "\n"
-      TABLE_ROW@555..577
-        TEXT@555..576 "| Normal | text     |"
-        NEWLINE@576..577 "\n"
-      TABLE_SEPARATOR@577..599
-        TEXT@577..598 "+--------+----------+"
-        NEWLINE@598..599 "\n"
+DOCUMENT@0..599
+  GRID_TABLE@0..231
+    TABLE_SEPARATOR@0..33
+      TEXT@0..32 "+--------+----------+ ..."
+      NEWLINE@32..33 "\n"
+    TABLE_HEADER@33..66
+      TEXT@33..65 "| Header | Column 2 | ..."
+      NEWLINE@65..66 "\n"
+    TABLE_SEPARATOR@66..99
+      TEXT@66..98 "+========+==========+ ..."
+      NEWLINE@98..99 "\n"
+    TABLE_ROW@99..132
+      TEXT@99..131 "| A      | B        | ..."
+      NEWLINE@131..132 "\n"
+    TABLE_SEPARATOR@132..165
+      TEXT@132..164 "+--------+----------+ ..."
+      NEWLINE@164..165 "\n"
+    TABLE_ROW@165..198
+      TEXT@165..197 "| Data   | More     | ..."
+      NEWLINE@197..198 "\n"
+    TABLE_SEPARATOR@198..231
+      TEXT@198..230 "+--------+----------+ ..."
+      NEWLINE@230..231 "\n"
+  BLANK_LINE@231..232
+    BLANK_LINE@231..232 "\n"
+  PARAGRAPH@232..255
+    TEXT@232..254 "Table with alignments:"
+    NEWLINE@254..255 "\n"
+  BLANK_LINE@255..256
+    BLANK_LINE@255..256 "\n"
+  GRID_TABLE@256..452
+    TABLE_SEPARATOR@256..284
+      TEXT@256..283 "+-------+--------+--- ..."
+      NEWLINE@283..284 "\n"
+    TABLE_HEADER@284..312
+      TEXT@284..311 "| Left  | Right  | Ce ..."
+      NEWLINE@311..312 "\n"
+    TABLE_SEPARATOR@312..340
+      TEXT@312..339 "+:======+=======:+:== ..."
+      NEWLINE@339..340 "\n"
+    TABLE_ROW@340..368
+      TEXT@340..367 "| A     |      B |    ..."
+      NEWLINE@367..368 "\n"
+    TABLE_SEPARATOR@368..396
+      TEXT@368..395 "+-------+--------+--- ..."
+      NEWLINE@395..396 "\n"
+    TABLE_ROW@396..424
+      TEXT@396..423 "| Short | Longer |  M ..."
+      NEWLINE@423..424 "\n"
+    TABLE_SEPARATOR@424..452
+      TEXT@424..451 "+-------+--------+--- ..."
+      NEWLINE@451..452 "\n"
+  BLANK_LINE@452..453
+    BLANK_LINE@452..453 "\n"
+  PARAGRAPH@453..488
+    TEXT@453..465 "With inline "
+    EMPHASIS@465..475
+      EMPHASIS_MARKER@465..466 "*"
+      TEXT@466..474 "emphasis"
+      EMPHASIS_MARKER@474..475 "*"
+    TEXT@475..480 " and "
+    CODE_SPAN@480..486
+      CODE_SPAN_MARKER@480..481 "`"
+      TEXT@481..485 "code"
+      CODE_SPAN_MARKER@485..486 "`"
+    TEXT@486..487 ":"
+    NEWLINE@487..488 "\n"
+  BLANK_LINE@488..489
+    BLANK_LINE@488..489 "\n"
+  GRID_TABLE@489..599
+    TABLE_SEPARATOR@489..511
+      TEXT@489..510 "+--------+----------+"
+      NEWLINE@510..511 "\n"
+    TABLE_HEADER@511..533
+      TEXT@511..513 "| "
+      EMPHASIS@513..519
+        EMPHASIS_MARKER@513..514 "*"
+        TEXT@514..518 "Bold"
+        EMPHASIS_MARKER@518..519 "*"
+      TEXT@519..522 " | "
+      CODE_SPAN@522..530
+        CODE_SPAN_MARKER@522..523 "`"
+        TEXT@523..529 "inline"
+        CODE_SPAN_MARKER@529..530 "`"
+      TEXT@530..532 " |"
+      NEWLINE@532..533 "\n"
+    TABLE_SEPARATOR@533..555
+      TEXT@533..554 "+========+==========+"
+      NEWLINE@554..555 "\n"
+    TABLE_ROW@555..577
+      TEXT@555..576 "| Normal | text     |"
+      NEWLINE@576..577 "\n"
+    TABLE_SEPARATOR@577..599
+      TEXT@577..598 "+--------+----------+"
+      NEWLINE@598..599 "\n"
 

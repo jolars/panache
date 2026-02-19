@@ -52,20 +52,13 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
 
     log::debug!("build_document_symbols: root kind = {:?}", root.kind());
 
-    // Find DOCUMENT node
-    let document = root.children().find(|n| n.kind() == SyntaxKind::DOCUMENT);
-    let document = match document {
-        Some(d) => {
-            log::debug!("Found DOCUMENT node with {} children", d.children().count());
-            d
-        }
-        None => {
-            log::warn!("No DOCUMENT node found in syntax tree");
-            return symbols;
-        }
-    };
+    // Root is now DOCUMENT node directly
+    if root.kind() != SyntaxKind::DOCUMENT {
+        log::warn!("Root is not a DOCUMENT node: {:?}", root.kind());
+        return symbols;
+    }
 
-    for node in document.children() {
+    for node in root.children() {
         match node.kind() {
             SyntaxKind::HEADING => {
                 if let Some(symbol) = extract_heading_symbol(&node, content) {

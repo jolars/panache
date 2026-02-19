@@ -1,32 +1,31 @@
-ROOT@0..444
-  DOCUMENT@0..444
-    PARAGRAPH@0..142
-      TEXT@0..15 "Black-Scholes ("
-      CITATION@15..32
-        CITATION_MARKER@15..16 "@"
-        CITATION_KEY@16..32 "eq-black-scholes"
-      TEXT@32..79 ") is a mathematical m ..."
-      NEWLINE@79..80 "\n"
-      TEXT@80..141 "the behavior of finan ..."
-      NEWLINE@141..142 "\n"
-    BLANK_LINE@142..143
-      BLANK_LINE@142..143 "\n"
-    PARAGRAPH@143..399
-      DISPLAY_MATH@143..378
-        DISPLAY_MATH_MARKER@143..145 "$$"
-        TEXT@145..376 "\n\\frac{\\partial \\math ..."
-        DISPLAY_MATH_MARKER@376..378 "$$"
-      WHITESPACE@378..379 " "
-      ATTRIBUTE@379..398
-        ATTRIBUTE@379..398 "{#eq-black-scholes}"
-      NEWLINE@398..399 "\n"
-    BLANK_LINE@399..400
-      BLANK_LINE@399..400 "\n"
-    PARAGRAPH@400..444
-      TEXT@400..413 "Reference to "
-      CITATION@413..430
-        CITATION_MARKER@413..414 "@"
-        CITATION_KEY@414..430 "eq-black-scholes"
-      TEXT@430..443 " in the text."
-      NEWLINE@443..444 "\n"
+DOCUMENT@0..444
+  PARAGRAPH@0..142
+    TEXT@0..15 "Black-Scholes ("
+    CITATION@15..32
+      CITATION_MARKER@15..16 "@"
+      CITATION_KEY@16..32 "eq-black-scholes"
+    TEXT@32..79 ") is a mathematical m ..."
+    NEWLINE@79..80 "\n"
+    TEXT@80..141 "the behavior of finan ..."
+    NEWLINE@141..142 "\n"
+  BLANK_LINE@142..143
+    BLANK_LINE@142..143 "\n"
+  PARAGRAPH@143..399
+    DISPLAY_MATH@143..378
+      DISPLAY_MATH_MARKER@143..145 "$$"
+      TEXT@145..376 "\n\\frac{\\partial \\math ..."
+      DISPLAY_MATH_MARKER@376..378 "$$"
+    WHITESPACE@378..379 " "
+    ATTRIBUTE@379..398
+      ATTRIBUTE@379..398 "{#eq-black-scholes}"
+    NEWLINE@398..399 "\n"
+  BLANK_LINE@399..400
+    BLANK_LINE@399..400 "\n"
+  PARAGRAPH@400..444
+    TEXT@400..413 "Reference to "
+    CITATION@413..430
+      CITATION_MARKER@413..414 "@"
+      CITATION_KEY@414..430 "eq-black-scholes"
+    TEXT@430..443 " in the text."
+    NEWLINE@443..444 "\n"
 

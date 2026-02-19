@@ -1,31 +1,30 @@
-ROOT@0..60
-  DOCUMENT@0..60
-    HEADING@0..8
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..6
-        TEXT@2..6 "Math"
-      NEWLINE@6..8 "\r\n"
-    BLANK_LINE@8..10
-      BLANK_LINE@8..10 "\r\n"
-    PARAGRAPH@10..25
-      DISPLAY_MATH@10..23
-        DISPLAY_MATH_MARKER@10..12 "$$"
-        TEXT@12..21 "\r\nx = y\r\n"
-        DISPLAY_MATH_MARKER@21..23 "$$"
-      NEWLINE@23..25 "\r\n"
-    BLANK_LINE@25..27
-      BLANK_LINE@25..27 "\r\n"
-    PARAGRAPH@27..39
-      TEXT@27..37 "More text."
-      NEWLINE@37..39 "\r\n"
-    BLANK_LINE@39..41
-      BLANK_LINE@39..41 "\r\n"
-    PARAGRAPH@41..60
-      DISPLAY_MATH@41..58
-        DISPLAY_MATH_MARKER@41..43 "$$"
-        TEXT@43..56 "\r\na + b = c\r\n"
-        DISPLAY_MATH_MARKER@56..58 "$$"
-      NEWLINE@58..60 "\r\n"
+DOCUMENT@0..60
+  HEADING@0..8
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..6
+      TEXT@2..6 "Math"
+    NEWLINE@6..8 "\r\n"
+  BLANK_LINE@8..10
+    BLANK_LINE@8..10 "\r\n"
+  PARAGRAPH@10..25
+    DISPLAY_MATH@10..23
+      DISPLAY_MATH_MARKER@10..12 "$$"
+      TEXT@12..21 "\r\nx = y\r\n"
+      DISPLAY_MATH_MARKER@21..23 "$$"
+    NEWLINE@23..25 "\r\n"
+  BLANK_LINE@25..27
+    BLANK_LINE@25..27 "\r\n"
+  PARAGRAPH@27..39
+    TEXT@27..37 "More text."
+    NEWLINE@37..39 "\r\n"
+  BLANK_LINE@39..41
+    BLANK_LINE@39..41 "\r\n"
+  PARAGRAPH@41..60
+    DISPLAY_MATH@41..58
+      DISPLAY_MATH_MARKER@41..43 "$$"
+      TEXT@43..56 "\r\na + b = c\r\n"
+      DISPLAY_MATH_MARKER@56..58 "$$"
+    NEWLINE@58..60 "\r\n"
 

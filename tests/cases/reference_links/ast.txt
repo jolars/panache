@@ -1,203 +1,202 @@
-ROOT@0..610
-  DOCUMENT@0..610
-    HEADING@0..18
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..17
-        TEXT@2..17 "Reference Links"
-      NEWLINE@17..18 "\n"
-    BLANK_LINE@18..19
-      BLANK_LINE@18..19 "\n"
-    PARAGRAPH@19..71
-      TEXT@19..39 "Explicit reference: "
-      LINK@39..56
-        LINK_START@39..40
-          LINK_START@39..40 "["
-        LINK_TEXT@40..49
-          TEXT@40..49 "link text"
-        TEXT@49..50 "]"
-        TEXT@50..51 "["
-        LINK_REF@51..55
-          TEXT@51..55 "ref1"
-        TEXT@55..56 "]"
-      TEXT@56..70 " in paragraph."
-      NEWLINE@70..71 "\n"
-    BLANK_LINE@71..72
-      BLANK_LINE@71..72 "\n"
-    PARAGRAPH@72..118
-      TEXT@72..92 "Implicit reference: "
-      LINK@92..102
-        LINK_START@92..93
-          LINK_START@92..93 "["
-        LINK_TEXT@93..99
-          TEXT@93..99 "GitHub"
-        TEXT@99..100 "]"
-        TEXT@100..101 "["
-        LINK_REF@101..101
-        TEXT@101..102 "]"
-      TEXT@102..117 " is a platform."
-      NEWLINE@117..118 "\n"
-    BLANK_LINE@118..119
-      BLANK_LINE@118..119 "\n"
-    PARAGRAPH@119..162
-      TEXT@119..139 "Shortcut reference: "
-      LINK@139..150
-        LINK_START@139..140
-          LINK_START@139..140 "["
-        LINK_TEXT@140..149
-          TEXT@140..149 "Wikipedia"
-        TEXT@149..150 "]"
-      TEXT@150..161 " works too."
-      NEWLINE@161..162 "\n"
-    BLANK_LINE@162..163
-      BLANK_LINE@162..163 "\n"
-    PARAGRAPH@163..227
-      TEXT@163..190 "Multiple refs in one  ..."
-      LINK@190..200
-        LINK_START@190..191
-          LINK_START@190..191 "["
-        LINK_TEXT@191..196
-          TEXT@191..196 "first"
-        TEXT@196..197 "]"
-        TEXT@197..198 "["
-        LINK_REF@198..199
-          TEXT@198..199 "1"
-        TEXT@199..200 "]"
-      TEXT@200..205 " and "
-      LINK@205..216
-        LINK_START@205..206
-          LINK_START@205..206 "["
-        LINK_TEXT@206..212
-          TEXT@206..212 "second"
-        TEXT@212..213 "]"
-        TEXT@213..214 "["
-        LINK_REF@214..215
-          TEXT@214..215 "2"
-        TEXT@215..216 "]"
-      TEXT@216..226 " together."
-      NEWLINE@226..227 "\n"
-    BLANK_LINE@227..228
-      BLANK_LINE@227..228 "\n"
-    PARAGRAPH@228..291
-      TEXT@228..250 "Unresolved reference: "
-      LINK@250..277
-        LINK_START@250..251
-          LINK_START@250..251 "["
-        LINK_TEXT@251..263
-          TEXT@251..263 "missing link"
-        TEXT@263..264 "]"
-        TEXT@264..265 "["
-        LINK_REF@265..276
-          TEXT@265..276 "nonexistent"
-        TEXT@276..277 "]"
-      TEXT@277..290 " stays as-is."
-      NEWLINE@290..291 "\n"
-    BLANK_LINE@291..292
-      BLANK_LINE@291..292 "\n"
-    PARAGRAPH@292..354
-      TEXT@292..310 "Case insensitive: "
-      LINK@310..323
-        LINK_START@310..311
-          LINK_START@310..311 "["
-        LINK_TEXT@311..315
-          TEXT@311..315 "CASE"
-        TEXT@315..316 "]"
-        TEXT@316..317 "["
-        LINK_REF@317..322
-          TEXT@317..322 "myref"
-        TEXT@322..323 "]"
-      TEXT@323..353 " matches lowercase de ..."
-      NEWLINE@353..354 "\n"
-    BLANK_LINE@354..355
-      BLANK_LINE@354..355 "\n"
-    PARAGRAPH@355..426
-      TEXT@355..370 "With emphasis: "
-      LINK@370..395
-        LINK_START@370..371
-          LINK_START@370..371 "["
-        LINK_TEXT@371..388
-          EMPHASIS@371..383
-            EMPHASIS_MARKER@371..372 "*"
-            TEXT@372..382 "emphasized"
-            EMPHASIS_MARKER@382..383 "*"
-          TEXT@383..388 " text"
-        TEXT@388..389 "]"
-        TEXT@389..390 "["
-        LINK_REF@390..394
-          TEXT@390..394 "ref1"
-        TEXT@394..395 "]"
-      TEXT@395..400 " and "
-      LINK@400..424
-        LINK_START@400..401
-          LINK_START@400..401 "["
-        LINK_TEXT@401..417
-          TEXT@401..411 "text with "
-          CODE_SPAN@411..417
-            CODE_SPAN_MARKER@411..412 "`"
-            TEXT@412..416 "code"
-            CODE_SPAN_MARKER@416..417 "`"
-        TEXT@417..418 "]"
-        TEXT@418..419 "["
-        LINK_REF@419..423
-          TEXT@419..423 "ref1"
-        TEXT@423..424 "]"
-      TEXT@424..425 "."
-      NEWLINE@425..426 "\n"
-    BLANK_LINE@426..427
-      BLANK_LINE@426..427 "\n"
-    REFERENCE_DEFINITION@427..470
-      LINK@427..433
-        LINK_START@427..428
-          LINK_START@427..428 "["
-        LINK_TEXT@428..432
-          TEXT@428..432 "ref1"
-        TEXT@432..433 "]"
-      TEXT@433..469 ": https://example.com ..."
-      NEWLINE@469..470 "\n"
-    REFERENCE_DEFINITION@470..499
-      LINK@470..478
-        LINK_START@470..471
-          LINK_START@470..471 "["
-        LINK_TEXT@471..477
-          TEXT@471..477 "github"
-        TEXT@477..478 "]"
-      TEXT@478..498 ": https://github.com"
-      NEWLINE@498..499 "\n"
-    REFERENCE_DEFINITION@499..534
-      LINK@499..510
-        LINK_START@499..500
-          LINK_START@499..500 "["
-        LINK_TEXT@500..509
-          TEXT@500..509 "Wikipedia"
-        TEXT@509..510 "]"
-      TEXT@510..533 ": https://wikipedia.org"
-      NEWLINE@533..534 "\n"
-    REFERENCE_DEFINITION@534..557
-      LINK@534..537
-        LINK_START@534..535
-          LINK_START@534..535 "["
-        LINK_TEXT@535..536
-          TEXT@535..536 "1"
-        TEXT@536..537 "]"
-      TEXT@537..556 ": https://first.com"
-      NEWLINE@556..557 "\n"
-    REFERENCE_DEFINITION@557..581
-      LINK@557..560
-        LINK_START@557..558
-          LINK_START@557..558 "["
-        LINK_TEXT@558..559
-          TEXT@558..559 "2"
-        TEXT@559..560 "]"
-      TEXT@560..580 ": https://second.com"
-      NEWLINE@580..581 "\n"
-    REFERENCE_DEFINITION@581..610
-      LINK@581..588
-        LINK_START@581..582
-          LINK_START@581..582 "["
-        LINK_TEXT@582..587
-          TEXT@582..587 "myref"
-        TEXT@587..588 "]"
-      TEXT@588..609 ": https://matched.com"
-      NEWLINE@609..610 "\n"
+DOCUMENT@0..610
+  HEADING@0..18
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..17
+      TEXT@2..17 "Reference Links"
+    NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  PARAGRAPH@19..71
+    TEXT@19..39 "Explicit reference: "
+    LINK@39..56
+      LINK_START@39..40
+        LINK_START@39..40 "["
+      LINK_TEXT@40..49
+        TEXT@40..49 "link text"
+      TEXT@49..50 "]"
+      TEXT@50..51 "["
+      LINK_REF@51..55
+        TEXT@51..55 "ref1"
+      TEXT@55..56 "]"
+    TEXT@56..70 " in paragraph."
+    NEWLINE@70..71 "\n"
+  BLANK_LINE@71..72
+    BLANK_LINE@71..72 "\n"
+  PARAGRAPH@72..118
+    TEXT@72..92 "Implicit reference: "
+    LINK@92..102
+      LINK_START@92..93
+        LINK_START@92..93 "["
+      LINK_TEXT@93..99
+        TEXT@93..99 "GitHub"
+      TEXT@99..100 "]"
+      TEXT@100..101 "["
+      LINK_REF@101..101
+      TEXT@101..102 "]"
+    TEXT@102..117 " is a platform."
+    NEWLINE@117..118 "\n"
+  BLANK_LINE@118..119
+    BLANK_LINE@118..119 "\n"
+  PARAGRAPH@119..162
+    TEXT@119..139 "Shortcut reference: "
+    LINK@139..150
+      LINK_START@139..140
+        LINK_START@139..140 "["
+      LINK_TEXT@140..149
+        TEXT@140..149 "Wikipedia"
+      TEXT@149..150 "]"
+    TEXT@150..161 " works too."
+    NEWLINE@161..162 "\n"
+  BLANK_LINE@162..163
+    BLANK_LINE@162..163 "\n"
+  PARAGRAPH@163..227
+    TEXT@163..190 "Multiple refs in one  ..."
+    LINK@190..200
+      LINK_START@190..191
+        LINK_START@190..191 "["
+      LINK_TEXT@191..196
+        TEXT@191..196 "first"
+      TEXT@196..197 "]"
+      TEXT@197..198 "["
+      LINK_REF@198..199
+        TEXT@198..199 "1"
+      TEXT@199..200 "]"
+    TEXT@200..205 " and "
+    LINK@205..216
+      LINK_START@205..206
+        LINK_START@205..206 "["
+      LINK_TEXT@206..212
+        TEXT@206..212 "second"
+      TEXT@212..213 "]"
+      TEXT@213..214 "["
+      LINK_REF@214..215
+        TEXT@214..215 "2"
+      TEXT@215..216 "]"
+    TEXT@216..226 " together."
+    NEWLINE@226..227 "\n"
+  BLANK_LINE@227..228
+    BLANK_LINE@227..228 "\n"
+  PARAGRAPH@228..291
+    TEXT@228..250 "Unresolved reference: "
+    LINK@250..277
+      LINK_START@250..251
+        LINK_START@250..251 "["
+      LINK_TEXT@251..263
+        TEXT@251..263 "missing link"
+      TEXT@263..264 "]"
+      TEXT@264..265 "["
+      LINK_REF@265..276
+        TEXT@265..276 "nonexistent"
+      TEXT@276..277 "]"
+    TEXT@277..290 " stays as-is."
+    NEWLINE@290..291 "\n"
+  BLANK_LINE@291..292
+    BLANK_LINE@291..292 "\n"
+  PARAGRAPH@292..354
+    TEXT@292..310 "Case insensitive: "
+    LINK@310..323
+      LINK_START@310..311
+        LINK_START@310..311 "["
+      LINK_TEXT@311..315
+        TEXT@311..315 "CASE"
+      TEXT@315..316 "]"
+      TEXT@316..317 "["
+      LINK_REF@317..322
+        TEXT@317..322 "myref"
+      TEXT@322..323 "]"
+    TEXT@323..353 " matches lowercase de ..."
+    NEWLINE@353..354 "\n"
+  BLANK_LINE@354..355
+    BLANK_LINE@354..355 "\n"
+  PARAGRAPH@355..426
+    TEXT@355..370 "With emphasis: "
+    LINK@370..395
+      LINK_START@370..371
+        LINK_START@370..371 "["
+      LINK_TEXT@371..388
+        EMPHASIS@371..383
+          EMPHASIS_MARKER@371..372 "*"
+          TEXT@372..382 "emphasized"
+          EMPHASIS_MARKER@382..383 "*"
+        TEXT@383..388 " text"
+      TEXT@388..389 "]"
+      TEXT@389..390 "["
+      LINK_REF@390..394
+        TEXT@390..394 "ref1"
+      TEXT@394..395 "]"
+    TEXT@395..400 " and "
+    LINK@400..424
+      LINK_START@400..401
+        LINK_START@400..401 "["
+      LINK_TEXT@401..417
+        TEXT@401..411 "text with "
+        CODE_SPAN@411..417
+          CODE_SPAN_MARKER@411..412 "`"
+          TEXT@412..416 "code"
+          CODE_SPAN_MARKER@416..417 "`"
+      TEXT@417..418 "]"
+      TEXT@418..419 "["
+      LINK_REF@419..423
+        TEXT@419..423 "ref1"
+      TEXT@423..424 "]"
+    TEXT@424..425 "."
+    NEWLINE@425..426 "\n"
+  BLANK_LINE@426..427
+    BLANK_LINE@426..427 "\n"
+  REFERENCE_DEFINITION@427..470
+    LINK@427..433
+      LINK_START@427..428
+        LINK_START@427..428 "["
+      LINK_TEXT@428..432
+        TEXT@428..432 "ref1"
+      TEXT@432..433 "]"
+    TEXT@433..469 ": https://example.com ..."
+    NEWLINE@469..470 "\n"
+  REFERENCE_DEFINITION@470..499
+    LINK@470..478
+      LINK_START@470..471
+        LINK_START@470..471 "["
+      LINK_TEXT@471..477
+        TEXT@471..477 "github"
+      TEXT@477..478 "]"
+    TEXT@478..498 ": https://github.com"
+    NEWLINE@498..499 "\n"
+  REFERENCE_DEFINITION@499..534
+    LINK@499..510
+      LINK_START@499..500
+        LINK_START@499..500 "["
+      LINK_TEXT@500..509
+        TEXT@500..509 "Wikipedia"
+      TEXT@509..510 "]"
+    TEXT@510..533 ": https://wikipedia.org"
+    NEWLINE@533..534 "\n"
+  REFERENCE_DEFINITION@534..557
+    LINK@534..537
+      LINK_START@534..535
+        LINK_START@534..535 "["
+      LINK_TEXT@535..536
+        TEXT@535..536 "1"
+      TEXT@536..537 "]"
+    TEXT@537..556 ": https://first.com"
+    NEWLINE@556..557 "\n"
+  REFERENCE_DEFINITION@557..581
+    LINK@557..560
+      LINK_START@557..558
+        LINK_START@557..558 "["
+      LINK_TEXT@558..559
+        TEXT@558..559 "2"
+      TEXT@559..560 "]"
+    TEXT@560..580 ": https://second.com"
+    NEWLINE@580..581 "\n"
+  REFERENCE_DEFINITION@581..610
+    LINK@581..588
+      LINK_START@581..582
+        LINK_START@581..582 "["
+      LINK_TEXT@582..587
+        TEXT@582..587 "myref"
+      TEXT@587..588 "]"
+    TEXT@588..609 ": https://matched.com"
+    NEWLINE@609..610 "\n"
 

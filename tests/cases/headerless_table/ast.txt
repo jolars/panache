@@ -1,19 +1,18 @@
-ROOT@0..200
-  DOCUMENT@0..200
-    SIMPLE_TABLE@0..200
-      TABLE_SEPARATOR@0..40
-        TEXT@0..39 "-------     ------ -- ..."
-        NEWLINE@39..40 "\n"
-      TABLE_ROW@40..80
-        TEXT@40..79 "     12     12        ..."
-        NEWLINE@79..80 "\n"
-      TABLE_ROW@80..120
-        TEXT@80..119 "    123     123       ..."
-        NEWLINE@119..120 "\n"
-      TABLE_ROW@120..160
-        TEXT@120..159 "      1     1         ..."
-        NEWLINE@159..160 "\n"
-      TABLE_ROW@160..200
-        TEXT@160..199 "-------     ------ -- ..."
-        NEWLINE@199..200 "\n"
+DOCUMENT@0..200
+  SIMPLE_TABLE@0..200
+    TABLE_SEPARATOR@0..40
+      TEXT@0..39 "-------     ------ -- ..."
+      NEWLINE@39..40 "\n"
+    TABLE_ROW@40..80
+      TEXT@40..79 "     12     12        ..."
+      NEWLINE@79..80 "\n"
+    TABLE_ROW@80..120
+      TEXT@80..119 "    123     123       ..."
+      NEWLINE@119..120 "\n"
+    TABLE_ROW@120..160
+      TEXT@120..159 "      1     1         ..."
+      NEWLINE@159..160 "\n"
+    TABLE_ROW@160..200
+      TEXT@160..199 "-------     ------ -- ..."
+      NEWLINE@199..200 "\n"
 

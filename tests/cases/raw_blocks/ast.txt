@@ -1,152 +1,151 @@
-ROOT@0..494
-  DOCUMENT@0..494
-    HEADING@0..18
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..17
-        TEXT@2..17 "Raw Blocks Test"
-      NEWLINE@17..18 "\n"
-    BLANK_LINE@18..19
-      BLANK_LINE@18..19 "\n"
-    PARAGRAPH@19..59
-      TEXT@19..37 "This tests the raw"
-      TEXT@37..38 "_"
-      TEXT@38..58 "attribute extension."
-      NEWLINE@58..59 "\n"
-    BLANK_LINE@59..60
-      BLANK_LINE@59..60 "\n"
-    HEADING@60..78
-      ATX_HEADING_MARKER@60..62
-        ATX_HEADING_MARKER@60..62 "##"
-      WHITESPACE@62..63 " "
-      HEADING_CONTENT@63..77
-        TEXT@63..77 "HTML Raw Block"
-      NEWLINE@77..78 "\n"
-    BLANK_LINE@78..79
-      BLANK_LINE@78..79 "\n"
-    CODE_BLOCK@79..162
-      CODE_FENCE_OPEN@79..90
-        CODE_FENCE_MARKER@79..82 "```"
-        CODE_INFO@82..89
-          TEXT@82..89 "{=html}"
-        NEWLINE@89..90 "\n"
-      CODE_CONTENT@90..158
-        TEXT@90..110 "<div class=\"custom\">"
-        NEWLINE@110..111 "\n"
-        TEXT@111..150 "  <p>This should stay ..."
-        NEWLINE@150..151 "\n"
-        TEXT@151..157 "</div>"
-        NEWLINE@157..158 "\n"
-      CODE_FENCE_CLOSE@158..162
-        CODE_FENCE_MARKER@158..161 "```"
-        NEWLINE@161..162 "\n"
-    BLANK_LINE@162..163
-      BLANK_LINE@162..163 "\n"
-    HEADING@163..182
-      ATX_HEADING_MARKER@163..165
-        ATX_HEADING_MARKER@163..165 "##"
-      WHITESPACE@165..166 " "
-      HEADING_CONTENT@166..181
-        TEXT@166..181 "LaTeX Raw Block"
-      NEWLINE@181..182 "\n"
-    BLANK_LINE@182..183
-      BLANK_LINE@182..183 "\n"
-    CODE_BLOCK@183..242
-      CODE_FENCE_OPEN@183..195
-        CODE_FENCE_MARKER@183..186 "```"
-        CODE_INFO@186..194
-          TEXT@186..194 "{=latex}"
-        NEWLINE@194..195 "\n"
-      CODE_CONTENT@195..238
-        TEXT@195..211 "\\begin{equation}"
-        NEWLINE@211..212 "\n"
-        TEXT@212..222 "  E = mc^2"
-        NEWLINE@222..223 "\n"
-        TEXT@223..237 "\\end{equation}"
-        NEWLINE@237..238 "\n"
-      CODE_FENCE_CLOSE@238..242
-        CODE_FENCE_MARKER@238..241 "```"
-        NEWLINE@241..242 "\n"
-    BLANK_LINE@242..243
-      BLANK_LINE@242..243 "\n"
-    HEADING@243..264
-      ATX_HEADING_MARKER@243..245
-        ATX_HEADING_MARKER@243..245 "##"
-      WHITESPACE@245..246 " "
-      HEADING_CONTENT@246..263
-        TEXT@246..263 "OpenXML Raw Block"
-      NEWLINE@263..264 "\n"
-    BLANK_LINE@264..265
-      BLANK_LINE@264..265 "\n"
-    CODE_BLOCK@265..339
-      CODE_FENCE_OPEN@265..279
-        CODE_FENCE_MARKER@265..268 "```"
-        CODE_INFO@268..278
-          TEXT@268..278 "{=openxml}"
-        NEWLINE@278..279 "\n"
-      CODE_CONTENT@279..335
-        TEXT@279..284 "<w:p>"
-        NEWLINE@284..285 "\n"
-        TEXT@285..292 "  <w:r>"
-        NEWLINE@292..293 "\n"
-        TEXT@293..318 "    <w:br w:type=\"pag ..."
-        NEWLINE@318..319 "\n"
-        TEXT@319..327 "  </w:r>"
-        NEWLINE@327..328 "\n"
-        TEXT@328..334 "</w:p>"
-        NEWLINE@334..335 "\n"
-      CODE_FENCE_CLOSE@335..339
-        CODE_FENCE_MARKER@335..338 "```"
-        NEWLINE@338..339 "\n"
-    BLANK_LINE@339..340
-      BLANK_LINE@339..340 "\n"
-    HEADING@340..362
-      ATX_HEADING_MARKER@340..342
-        ATX_HEADING_MARKER@340..342 "##"
-      WHITESPACE@342..343 " "
-      HEADING_CONTENT@343..361
-        TEXT@343..361 "Groff MS Raw Block"
-      NEWLINE@361..362 "\n"
-    BLANK_LINE@362..363
-      BLANK_LINE@362..363 "\n"
-    CODE_BLOCK@363..411
-      CODE_FENCE_OPEN@363..372
-        CODE_FENCE_MARKER@363..366 "```"
-        CODE_INFO@366..371
-          TEXT@366..371 "{=ms}"
-        NEWLINE@371..372 "\n"
-      CODE_CONTENT@372..407
-        TEXT@372..380 ".MYMACRO"
-        NEWLINE@380..381 "\n"
-        TEXT@381..390 "blah blah"
-        NEWLINE@390..391 "\n"
-        TEXT@391..396 ".NH 1"
-        NEWLINE@396..397 "\n"
-        TEXT@397..406 "A Section"
-        NEWLINE@406..407 "\n"
-      CODE_FENCE_CLOSE@407..411
-        CODE_FENCE_MARKER@407..410 "```"
-        NEWLINE@410..411 "\n"
-    BLANK_LINE@411..412
-      BLANK_LINE@411..412 "\n"
-    PARAGRAPH@412..447
-      TEXT@412..446 "Regular code block fo ..."
-      NEWLINE@446..447 "\n"
-    BLANK_LINE@447..448
-      BLANK_LINE@447..448 "\n"
-    CODE_BLOCK@448..494
-      CODE_FENCE_OPEN@448..458
-        CODE_FENCE_MARKER@448..451 "```"
-        CODE_INFO@451..457
-          CODE_LANGUAGE@451..457 "python"
-        NEWLINE@457..458 "\n"
-      CODE_CONTENT@458..490
-        TEXT@458..470 "def hello():"
-        NEWLINE@470..471 "\n"
-        TEXT@471..489 "    print(\"world\")"
-        NEWLINE@489..490 "\n"
-      CODE_FENCE_CLOSE@490..494
-        CODE_FENCE_MARKER@490..493 "```"
-        NEWLINE@493..494 "\n"
+DOCUMENT@0..494
+  HEADING@0..18
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..17
+      TEXT@2..17 "Raw Blocks Test"
+    NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  PARAGRAPH@19..59
+    TEXT@19..37 "This tests the raw"
+    TEXT@37..38 "_"
+    TEXT@38..58 "attribute extension."
+    NEWLINE@58..59 "\n"
+  BLANK_LINE@59..60
+    BLANK_LINE@59..60 "\n"
+  HEADING@60..78
+    ATX_HEADING_MARKER@60..62
+      ATX_HEADING_MARKER@60..62 "##"
+    WHITESPACE@62..63 " "
+    HEADING_CONTENT@63..77
+      TEXT@63..77 "HTML Raw Block"
+    NEWLINE@77..78 "\n"
+  BLANK_LINE@78..79
+    BLANK_LINE@78..79 "\n"
+  CODE_BLOCK@79..162
+    CODE_FENCE_OPEN@79..90
+      CODE_FENCE_MARKER@79..82 "```"
+      CODE_INFO@82..89
+        TEXT@82..89 "{=html}"
+      NEWLINE@89..90 "\n"
+    CODE_CONTENT@90..158
+      TEXT@90..110 "<div class=\"custom\">"
+      NEWLINE@110..111 "\n"
+      TEXT@111..150 "  <p>This should stay ..."
+      NEWLINE@150..151 "\n"
+      TEXT@151..157 "</div>"
+      NEWLINE@157..158 "\n"
+    CODE_FENCE_CLOSE@158..162
+      CODE_FENCE_MARKER@158..161 "```"
+      NEWLINE@161..162 "\n"
+  BLANK_LINE@162..163
+    BLANK_LINE@162..163 "\n"
+  HEADING@163..182
+    ATX_HEADING_MARKER@163..165
+      ATX_HEADING_MARKER@163..165 "##"
+    WHITESPACE@165..166 " "
+    HEADING_CONTENT@166..181
+      TEXT@166..181 "LaTeX Raw Block"
+    NEWLINE@181..182 "\n"
+  BLANK_LINE@182..183
+    BLANK_LINE@182..183 "\n"
+  CODE_BLOCK@183..242
+    CODE_FENCE_OPEN@183..195
+      CODE_FENCE_MARKER@183..186 "```"
+      CODE_INFO@186..194
+        TEXT@186..194 "{=latex}"
+      NEWLINE@194..195 "\n"
+    CODE_CONTENT@195..238
+      TEXT@195..211 "\\begin{equation}"
+      NEWLINE@211..212 "\n"
+      TEXT@212..222 "  E = mc^2"
+      NEWLINE@222..223 "\n"
+      TEXT@223..237 "\\end{equation}"
+      NEWLINE@237..238 "\n"
+    CODE_FENCE_CLOSE@238..242
+      CODE_FENCE_MARKER@238..241 "```"
+      NEWLINE@241..242 "\n"
+  BLANK_LINE@242..243
+    BLANK_LINE@242..243 "\n"
+  HEADING@243..264
+    ATX_HEADING_MARKER@243..245
+      ATX_HEADING_MARKER@243..245 "##"
+    WHITESPACE@245..246 " "
+    HEADING_CONTENT@246..263
+      TEXT@246..263 "OpenXML Raw Block"
+    NEWLINE@263..264 "\n"
+  BLANK_LINE@264..265
+    BLANK_LINE@264..265 "\n"
+  CODE_BLOCK@265..339
+    CODE_FENCE_OPEN@265..279
+      CODE_FENCE_MARKER@265..268 "```"
+      CODE_INFO@268..278
+        TEXT@268..278 "{=openxml}"
+      NEWLINE@278..279 "\n"
+    CODE_CONTENT@279..335
+      TEXT@279..284 "<w:p>"
+      NEWLINE@284..285 "\n"
+      TEXT@285..292 "  <w:r>"
+      NEWLINE@292..293 "\n"
+      TEXT@293..318 "    <w:br w:type=\"pag ..."
+      NEWLINE@318..319 "\n"
+      TEXT@319..327 "  </w:r>"
+      NEWLINE@327..328 "\n"
+      TEXT@328..334 "</w:p>"
+      NEWLINE@334..335 "\n"
+    CODE_FENCE_CLOSE@335..339
+      CODE_FENCE_MARKER@335..338 "```"
+      NEWLINE@338..339 "\n"
+  BLANK_LINE@339..340
+    BLANK_LINE@339..340 "\n"
+  HEADING@340..362
+    ATX_HEADING_MARKER@340..342
+      ATX_HEADING_MARKER@340..342 "##"
+    WHITESPACE@342..343 " "
+    HEADING_CONTENT@343..361
+      TEXT@343..361 "Groff MS Raw Block"
+    NEWLINE@361..362 "\n"
+  BLANK_LINE@362..363
+    BLANK_LINE@362..363 "\n"
+  CODE_BLOCK@363..411
+    CODE_FENCE_OPEN@363..372
+      CODE_FENCE_MARKER@363..366 "```"
+      CODE_INFO@366..371
+        TEXT@366..371 "{=ms}"
+      NEWLINE@371..372 "\n"
+    CODE_CONTENT@372..407
+      TEXT@372..380 ".MYMACRO"
+      NEWLINE@380..381 "\n"
+      TEXT@381..390 "blah blah"
+      NEWLINE@390..391 "\n"
+      TEXT@391..396 ".NH 1"
+      NEWLINE@396..397 "\n"
+      TEXT@397..406 "A Section"
+      NEWLINE@406..407 "\n"
+    CODE_FENCE_CLOSE@407..411
+      CODE_FENCE_MARKER@407..410 "```"
+      NEWLINE@410..411 "\n"
+  BLANK_LINE@411..412
+    BLANK_LINE@411..412 "\n"
+  PARAGRAPH@412..447
+    TEXT@412..446 "Regular code block fo ..."
+    NEWLINE@446..447 "\n"
+  BLANK_LINE@447..448
+    BLANK_LINE@447..448 "\n"
+  CODE_BLOCK@448..494
+    CODE_FENCE_OPEN@448..458
+      CODE_FENCE_MARKER@448..451 "```"
+      CODE_INFO@451..457
+        CODE_LANGUAGE@451..457 "python"
+      NEWLINE@457..458 "\n"
+    CODE_CONTENT@458..490
+      TEXT@458..470 "def hello():"
+      NEWLINE@470..471 "\n"
+      TEXT@471..489 "    print(\"world\")"
+      NEWLINE@489..490 "\n"
+    CODE_FENCE_CLOSE@490..494
+      CODE_FENCE_MARKER@490..493 "```"
+      NEWLINE@493..494 "\n"
 

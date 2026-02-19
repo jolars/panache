@@ -1,46 +1,45 @@
-ROOT@0..240
-  DOCUMENT@0..240
-    HEADING@0..36
-      ATX_HEADING_MARKER@0..1
-        ATX_HEADING_MARKER@0..1 "#"
-      WHITESPACE@1..2 " "
-      HEADING_CONTENT@2..35
-        TEXT@2..35 "Display Math with Esc ..."
-      NEWLINE@35..36 "\n"
-    BLANK_LINE@36..37
-      BLANK_LINE@36..37 "\n"
-    PARAGRAPH@37..101
-      TEXT@37..100 "Testing that escaped  ..."
-      NEWLINE@100..101 "\n"
-    BLANK_LINE@101..102
-      BLANK_LINE@101..102 "\n"
-    PARAGRAPH@102..136
-      DISPLAY_MATH@102..135
-        DISPLAY_MATH_MARKER@102..104 "$$"
-        TEXT@104..133 "\n\\text{Price} = \\$100 ..."
-        DISPLAY_MATH_MARKER@133..135 "$$"
-      NEWLINE@135..136 "\n"
-    BLANK_LINE@136..137
-      BLANK_LINE@136..137 "\n"
-    PARAGRAPH@137..191
-      TEXT@137..149 "And inline: "
-      DISPLAY_MATH@149..172
-        DISPLAY_MATH_MARKER@149..151 "$$"
-        TEXT@151..170 "\\text{Cost: } \\$200"
-        DISPLAY_MATH_MARKER@170..172 "$$"
-      TEXT@172..190 " in the paragraph."
-      NEWLINE@190..191 "\n"
-    BLANK_LINE@191..192
-      BLANK_LINE@191..192 "\n"
-    PARAGRAPH@192..210
-      TEXT@192..209 "Multiple escapes:"
-      NEWLINE@209..210 "\n"
-    BLANK_LINE@210..211
-      BLANK_LINE@210..211 "\n"
-    PARAGRAPH@211..240
-      DISPLAY_MATH@211..239
-        DISPLAY_MATH_MARKER@211..213 "$$"
-        TEXT@213..237 "\na = \\$x + \\$y \\neq \\$z\n"
-        DISPLAY_MATH_MARKER@237..239 "$$"
-      NEWLINE@239..240 "\n"
+DOCUMENT@0..240
+  HEADING@0..36
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..35
+      TEXT@2..35 "Display Math with Esc ..."
+    NEWLINE@35..36 "\n"
+  BLANK_LINE@36..37
+    BLANK_LINE@36..37 "\n"
+  PARAGRAPH@37..101
+    TEXT@37..100 "Testing that escaped  ..."
+    NEWLINE@100..101 "\n"
+  BLANK_LINE@101..102
+    BLANK_LINE@101..102 "\n"
+  PARAGRAPH@102..136
+    DISPLAY_MATH@102..135
+      DISPLAY_MATH_MARKER@102..104 "$$"
+      TEXT@104..133 "\n\\text{Price} = \\$100 ..."
+      DISPLAY_MATH_MARKER@133..135 "$$"
+    NEWLINE@135..136 "\n"
+  BLANK_LINE@136..137
+    BLANK_LINE@136..137 "\n"
+  PARAGRAPH@137..191
+    TEXT@137..149 "And inline: "
+    DISPLAY_MATH@149..172
+      DISPLAY_MATH_MARKER@149..151 "$$"
+      TEXT@151..170 "\\text{Cost: } \\$200"
+      DISPLAY_MATH_MARKER@170..172 "$$"
+    TEXT@172..190 " in the paragraph."
+    NEWLINE@190..191 "\n"
+  BLANK_LINE@191..192
+    BLANK_LINE@191..192 "\n"
+  PARAGRAPH@192..210
+    TEXT@192..209 "Multiple escapes:"
+    NEWLINE@209..210 "\n"
+  BLANK_LINE@210..211
+    BLANK_LINE@210..211 "\n"
+  PARAGRAPH@211..240
+    DISPLAY_MATH@211..239
+      DISPLAY_MATH_MARKER@211..213 "$$"
+      TEXT@213..237 "\na = \\$x + \\$y \\neq \\$z\n"
+      DISPLAY_MATH_MARKER@237..239 "$$"
+    NEWLINE@239..240 "\n"
 

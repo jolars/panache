@@ -1,100 +1,99 @@
-ROOT@0..187
-  DOCUMENT@0..187
-    PARAGRAPH@0..14
-      TEXT@0..13 "Nested lists:"
-      NEWLINE@13..14 "\n"
-    BLANK_LINE@14..15
-      BLANK_LINE@14..15 "\n"
-    LIST@15..93
-      LIST_ITEM@15..57
-        LIST_MARKER@15..16 "*"
-        WHITESPACE@16..17 " "
-        PLAIN@17..24
-          TEXT@17..23 "Fruits"
-          NEWLINE@23..24 "\n"
-        LIST@24..57
-          LIST_ITEM@24..35
-            PLAIN@24..26
-              WHITESPACE@24..26 "  "
-            LIST_MARKER@26..27 "+"
-            WHITESPACE@27..28 " "
-            PLAIN@28..35
-              TEXT@28..34 "Apples"
-              NEWLINE@34..35 "\n"
-          LIST_ITEM@35..45
-            PLAIN@35..37
-              WHITESPACE@35..37 "  "
-            LIST_MARKER@37..38 "+"
-            WHITESPACE@38..39 " "
-            PLAIN@39..45
-              TEXT@39..44 "Pears"
-              NEWLINE@44..45 "\n"
-          LIST_ITEM@45..57
-            PLAIN@45..47
-              WHITESPACE@45..47 "  "
-            LIST_MARKER@47..48 "+"
-            WHITESPACE@48..49 " "
-            PLAIN@49..57
-              TEXT@49..56 "Peaches"
-              NEWLINE@56..57 "\n"
-      LIST_ITEM@57..93
-        LIST_MARKER@57..58 "*"
-        WHITESPACE@58..59 " "
-        PLAIN@59..70
-          TEXT@59..69 "Vegetables"
-          NEWLINE@69..70 "\n"
-        LIST@70..93
-          LIST_ITEM@70..83
-            PLAIN@70..72
-              WHITESPACE@70..72 "  "
-            LIST_MARKER@72..73 "+"
-            WHITESPACE@73..74 " "
-            PLAIN@74..83
-              TEXT@74..82 "Broccoli"
-              NEWLINE@82..83 "\n"
-          LIST_ITEM@83..93
-            PLAIN@83..85
-              WHITESPACE@83..85 "  "
-            LIST_MARKER@85..86 "+"
-            WHITESPACE@86..87 " "
-            PLAIN@87..93
-              TEXT@87..92 "Chard"
-              NEWLINE@92..93 "\n"
-    BLANK_LINE@93..94
-      BLANK_LINE@93..94 "\n"
-    PARAGRAPH@94..109
-      TEXT@94..108 "Mixed nesting:"
-      NEWLINE@108..109 "\n"
-    BLANK_LINE@109..110
-      BLANK_LINE@109..110 "\n"
-    LIST@110..187
-      LIST_ITEM@110..164
-        LIST_MARKER@110..112 "1."
-        WHITESPACE@112..113 " "
-        PLAIN@113..125
-          TEXT@113..124 "First level"
-          NEWLINE@124..125 "\n"
-        LIST@125..164
-          LIST_ITEM@125..144
-            PLAIN@125..128
-              WHITESPACE@125..128 "   "
-            LIST_MARKER@128..129 "*"
-            WHITESPACE@129..130 " "
-            PLAIN@130..144
-              TEXT@130..143 "Nested bullet"
-              NEWLINE@143..144 "\n"
-          LIST_ITEM@144..164
-            PLAIN@144..147
-              WHITESPACE@144..147 "   "
-            LIST_MARKER@147..148 "*"
-            WHITESPACE@148..149 " "
-            PLAIN@149..164
-              TEXT@149..163 "Another nested"
-              NEWLINE@163..164 "\n"
-      LIST_ITEM@164..187
-        LIST_MARKER@164..166 "2."
-        WHITESPACE@166..167 " "
-        PLAIN@167..187
-          TEXT@167..186 "Back to first level"
-          NEWLINE@186..187 "\n"
+DOCUMENT@0..187
+  PARAGRAPH@0..14
+    TEXT@0..13 "Nested lists:"
+    NEWLINE@13..14 "\n"
+  BLANK_LINE@14..15
+    BLANK_LINE@14..15 "\n"
+  LIST@15..93
+    LIST_ITEM@15..57
+      LIST_MARKER@15..16 "*"
+      WHITESPACE@16..17 " "
+      PLAIN@17..24
+        TEXT@17..23 "Fruits"
+        NEWLINE@23..24 "\n"
+      LIST@24..57
+        LIST_ITEM@24..35
+          PLAIN@24..26
+            WHITESPACE@24..26 "  "
+          LIST_MARKER@26..27 "+"
+          WHITESPACE@27..28 " "
+          PLAIN@28..35
+            TEXT@28..34 "Apples"
+            NEWLINE@34..35 "\n"
+        LIST_ITEM@35..45
+          PLAIN@35..37
+            WHITESPACE@35..37 "  "
+          LIST_MARKER@37..38 "+"
+          WHITESPACE@38..39 " "
+          PLAIN@39..45
+            TEXT@39..44 "Pears"
+            NEWLINE@44..45 "\n"
+        LIST_ITEM@45..57
+          PLAIN@45..47
+            WHITESPACE@45..47 "  "
+          LIST_MARKER@47..48 "+"
+          WHITESPACE@48..49 " "
+          PLAIN@49..57
+            TEXT@49..56 "Peaches"
+            NEWLINE@56..57 "\n"
+    LIST_ITEM@57..93
+      LIST_MARKER@57..58 "*"
+      WHITESPACE@58..59 " "
+      PLAIN@59..70
+        TEXT@59..69 "Vegetables"
+        NEWLINE@69..70 "\n"
+      LIST@70..93
+        LIST_ITEM@70..83
+          PLAIN@70..72
+            WHITESPACE@70..72 "  "
+          LIST_MARKER@72..73 "+"
+          WHITESPACE@73..74 " "
+          PLAIN@74..83
+            TEXT@74..82 "Broccoli"
+            NEWLINE@82..83 "\n"
+        LIST_ITEM@83..93
+          PLAIN@83..85
+            WHITESPACE@83..85 "  "
+          LIST_MARKER@85..86 "+"
+          WHITESPACE@86..87 " "
+          PLAIN@87..93
+            TEXT@87..92 "Chard"
+            NEWLINE@92..93 "\n"
+  BLANK_LINE@93..94
+    BLANK_LINE@93..94 "\n"
+  PARAGRAPH@94..109
+    TEXT@94..108 "Mixed nesting:"
+    NEWLINE@108..109 "\n"
+  BLANK_LINE@109..110
+    BLANK_LINE@109..110 "\n"
+  LIST@110..187
+    LIST_ITEM@110..164
+      LIST_MARKER@110..112 "1."
+      WHITESPACE@112..113 " "
+      PLAIN@113..125
+        TEXT@113..124 "First level"
+        NEWLINE@124..125 "\n"
+      LIST@125..164
+        LIST_ITEM@125..144
+          PLAIN@125..128
+            WHITESPACE@125..128 "   "
+          LIST_MARKER@128..129 "*"
+          WHITESPACE@129..130 " "
+          PLAIN@130..144
+            TEXT@130..143 "Nested bullet"
+            NEWLINE@143..144 "\n"
+        LIST_ITEM@144..164
+          PLAIN@144..147
+            WHITESPACE@144..147 "   "
+          LIST_MARKER@147..148 "*"
+          WHITESPACE@148..149 " "
+          PLAIN@149..164
+            TEXT@149..163 "Another nested"
+            NEWLINE@163..164 "\n"
+    LIST_ITEM@164..187
+      LIST_MARKER@164..166 "2."
+      WHITESPACE@166..167 " "
+      PLAIN@167..187
+        TEXT@167..186 "Back to first level"
+        NEWLINE@186..187 "\n"
 

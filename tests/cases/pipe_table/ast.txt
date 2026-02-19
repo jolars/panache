@@ -1,25 +1,24 @@
-ROOT@0..219
-  DOCUMENT@0..219
-    PIPE_TABLE@0..219
-      TABLE_HEADER@0..36
-        TEXT@0..35 "| Right | Left | Defa ..."
-        NEWLINE@35..36 "\n"
-      TABLE_SEPARATOR@36..72
-        TEXT@36..71 "|------:|:-----|----- ..."
-        NEWLINE@71..72 "\n"
-      TABLE_ROW@72..108
-        TEXT@72..107 "|   12  |  12  |    1 ..."
-        NEWLINE@107..108 "\n"
-      TABLE_ROW@108..144
-        TEXT@108..143 "|  123  |  123 |   12 ..."
-        NEWLINE@143..144 "\n"
-      TABLE_ROW@144..180
-        TEXT@144..179 "|    1  |    1 |      ..."
-        NEWLINE@179..180 "\n"
-      BLANK_LINE@180..181
-        BLANK_LINE@180..181 "\n"
-      TABLE_CAPTION@181..219
-        TABLE_CAPTION_PREFIX@181..183 ": "
-        TEXT@183..218 "Demonstration of pipe ..."
-        NEWLINE@218..219 "\n"
+DOCUMENT@0..219
+  PIPE_TABLE@0..219
+    TABLE_HEADER@0..36
+      TEXT@0..35 "| Right | Left | Defa ..."
+      NEWLINE@35..36 "\n"
+    TABLE_SEPARATOR@36..72
+      TEXT@36..71 "|------:|:-----|----- ..."
+      NEWLINE@71..72 "\n"
+    TABLE_ROW@72..108
+      TEXT@72..107 "|   12  |  12  |    1 ..."
+      NEWLINE@107..108 "\n"
+    TABLE_ROW@108..144
+      TEXT@108..143 "|  123  |  123 |   12 ..."
+      NEWLINE@143..144 "\n"
+    TABLE_ROW@144..180
+      TEXT@144..179 "|    1  |    1 |      ..."
+      NEWLINE@179..180 "\n"
+    BLANK_LINE@180..181
+      BLANK_LINE@180..181 "\n"
+    TABLE_CAPTION@181..219
+      TABLE_CAPTION_PREFIX@181..183 ": "
+      TEXT@183..218 "Demonstration of pipe ..."
+      NEWLINE@218..219 "\n"
 

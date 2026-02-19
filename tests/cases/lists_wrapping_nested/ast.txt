@@ -1,216 +1,215 @@
-ROOT@0..2266
-  DOCUMENT@0..2266
-    YAML_METADATA@0..44
-      YAML_METADATA_DELIM@0..3 "---"
-      NEWLINE@3..4 "\n"
-      TEXT@4..39 "title: \"Nested List W ..."
-      NEWLINE@39..40 "\n"
-      YAML_METADATA_DELIM@40..43 "---"
-      NEWLINE@43..44 "\n"
-    BLANK_LINE@44..45
-      BLANK_LINE@44..45 "\n"
-    HEADING@45..77
-      ATX_HEADING_MARKER@45..47
-        ATX_HEADING_MARKER@45..47 "##"
-      WHITESPACE@47..48 " "
-      HEADING_CONTENT@48..76
-        TEXT@48..76 "Deep Nesting with Lon ..."
-      NEWLINE@76..77 "\n"
-    BLANK_LINE@77..78
-      BLANK_LINE@77..78 "\n"
-    LIST@78..1229
-      LIST_ITEM@78..834
-        LIST_MARKER@78..79 "-"
-        WHITESPACE@79..80 " "
-        PLAIN@80..248
-          TEXT@80..247 "Top level item with a ..."
-          NEWLINE@247..248 "\n"
-        LIST@248..834
-          LIST_ITEM@248..626
-            PLAIN@248..250
-              WHITESPACE@248..250 "  "
-            LIST_MARKER@250..251 "-"
-            WHITESPACE@251..252 " "
-            PLAIN@252..410
-              TEXT@252..409 "Second level nested i ..."
-              NEWLINE@409..410 "\n"
-            LIST@410..626
-              LIST_ITEM@410..626
-                PLAIN@410..414
-                  WHITESPACE@410..414 "    "
-                LIST_MARKER@414..415 "-"
-                WHITESPACE@415..416 " "
-                PLAIN@416..546
-                  TEXT@416..545 "Third level item with ..."
-                  NEWLINE@545..546 "\n"
-                LIST@546..626
-                  LIST_ITEM@546..626
-                    PLAIN@546..552
-                      WHITESPACE@546..552 "      "
-                    LIST_MARKER@552..553 "-"
-                    WHITESPACE@553..554 " "
-                    PLAIN@554..626
-                      TEXT@554..625 "Fourth level with mor ..."
-                      NEWLINE@625..626 "\n"
-          LIST_ITEM@626..834
-            PLAIN@626..628
-              WHITESPACE@626..628 "  "
-            LIST_MARKER@628..629 "-"
-            WHITESPACE@629..630 " "
-            PLAIN@630..834
-              TEXT@630..833 "Back to second level  ..."
-              NEWLINE@833..834 "\n"
-      LIST_ITEM@834..1229
-        LIST_MARKER@834..835 "-"
-        WHITESPACE@835..836 " "
-        PLAIN@836..859
-          TEXT@836..858 "Another top level item"
-          NEWLINE@858..859 "\n"
-        LIST@859..1229
-          LIST_ITEM@859..953
-            PLAIN@859..861
-              WHITESPACE@859..861 "  "
-            LIST_MARKER@861..863 "1."
-            WHITESPACE@863..864 " "
-            PLAIN@864..953
-              TEXT@864..952 "Nested ordered list w ..."
-              NEWLINE@952..953 "\n"
-          LIST_ITEM@953..1176
-            PLAIN@953..955
-              WHITESPACE@953..955 "  "
-            LIST_MARKER@955..957 "2."
-            WHITESPACE@957..958 " "
-            PLAIN@958..992
-              TEXT@958..991 "Second ordered item a ..."
-              NEWLINE@991..992 "\n"
-            LIST@992..1176
-              LIST_ITEM@992..1070
-                PLAIN@992..997
-                  WHITESPACE@992..997 "     "
-                LIST_MARKER@997..998 "-"
-                WHITESPACE@998..999 " "
-                PLAIN@999..1070
-                  TEXT@999..1069 "Bullet inside ordered ..."
-                  NEWLINE@1069..1070 "\n"
-              LIST_ITEM@1070..1176
-                PLAIN@1070..1075
-                  WHITESPACE@1070..1075 "     "
-                LIST_MARKER@1075..1076 "-"
-                WHITESPACE@1076..1077 " "
-                PLAIN@1077..1176
-                  TEXT@1077..1175 "Another bullet with e ..."
-                  NEWLINE@1175..1176 "\n"
-          LIST_ITEM@1176..1229
-            PLAIN@1176..1178
-              WHITESPACE@1176..1178 "  "
-            LIST_MARKER@1178..1180 "3."
-            WHITESPACE@1180..1181 " "
-            PLAIN@1181..1229
-              TEXT@1181..1228 "Third ordered item re ..."
-              NEWLINE@1228..1229 "\n"
-    BLANK_LINE@1229..1230
-      BLANK_LINE@1229..1230 "\n"
-    HEADING@1230..1262
-      ATX_HEADING_MARKER@1230..1232
-        ATX_HEADING_MARKER@1230..1232 "##"
-      WHITESPACE@1232..1233 " "
-      HEADING_CONTENT@1233..1261
-        TEXT@1233..1261 "Task Lists with Deep  ..."
-      NEWLINE@1261..1262 "\n"
-    BLANK_LINE@1262..1263
-      BLANK_LINE@1262..1263 "\n"
-    LIST@1263..1792
-      LIST_ITEM@1263..1753
-        LIST_MARKER@1263..1264 "-"
-        WHITESPACE@1264..1265 " "
-        TASK_CHECKBOX@1265..1268 "[ ]"
-        PLAIN@1268..1412
-          TEXT@1268..1411 " Top level unchecked  ..."
-          NEWLINE@1411..1412 "\n"
-        LIST@1412..1753
-          LIST_ITEM@1412..1609
-            PLAIN@1412..1414
-              WHITESPACE@1412..1414 "  "
-            LIST_MARKER@1414..1415 "-"
-            WHITESPACE@1415..1416 " "
-            TASK_CHECKBOX@1416..1419 "[ ]"
-            PLAIN@1419..1494
-              TEXT@1419..1493 " Nested unchecked tas ..."
-              NEWLINE@1493..1494 "\n"
-            LIST@1494..1609
-              LIST_ITEM@1494..1609
-                PLAIN@1494..1498
-                  WHITESPACE@1494..1498 "    "
-                LIST_MARKER@1498..1499 "-"
-                WHITESPACE@1499..1500 " "
-                TASK_CHECKBOX@1500..1503 "[x]"
-                PLAIN@1503..1609
-                  TEXT@1503..1608 " Deeply nested comple ..."
-                  NEWLINE@1608..1609 "\n"
-          LIST_ITEM@1609..1753
-            PLAIN@1609..1611
-              WHITESPACE@1609..1611 "  "
-            LIST_MARKER@1611..1612 "-"
-            WHITESPACE@1612..1613 " "
-            TASK_CHECKBOX@1613..1616 "[x]"
-            PLAIN@1616..1753
-              TEXT@1616..1752 " Back to second level ..."
-              NEWLINE@1752..1753 "\n"
-      LIST_ITEM@1753..1792
-        LIST_MARKER@1753..1754 "-"
-        WHITESPACE@1754..1755 " "
-        TASK_CHECKBOX@1755..1758 "[x]"
-        PLAIN@1758..1792
-          TEXT@1758..1791 " Another top level co ..."
-          NEWLINE@1791..1792 "\n"
-    BLANK_LINE@1792..1793
-      BLANK_LINE@1792..1793 "\n"
-    HEADING@1793..1825
-      ATX_HEADING_MARKER@1793..1795
-        ATX_HEADING_MARKER@1793..1795 "##"
-      WHITESPACE@1795..1796 " "
-      HEADING_CONTENT@1796..1824
-        TEXT@1796..1824 "Roman Numerals with W ..."
-      NEWLINE@1824..1825 "\n"
-    BLANK_LINE@1825..1826
-      BLANK_LINE@1825..1826 "\n"
-    LIST@1826..2266
-      LIST_ITEM@1826..1934
-        PLAIN@1826..1828
-          WHITESPACE@1826..1828 "  "
-        LIST_MARKER@1828..1830 "i."
-        WHITESPACE@1830..1831 " "
-        PLAIN@1831..1934
-          TEXT@1831..1933 "First Roman numeral i ..."
-          NEWLINE@1933..1934 "\n"
-      LIST_ITEM@1934..1951
-        PLAIN@1934..1935
-          WHITESPACE@1934..1935 " "
-        LIST_MARKER@1935..1938 "ii."
-        WHITESPACE@1938..1939 " "
-        PLAIN@1939..1951
-          TEXT@1939..1950 "Second item"
-          NEWLINE@1950..1951 "\n"
-      LIST_ITEM@1951..2084
-        LIST_MARKER@1951..1955 "iii."
-        WHITESPACE@1955..1956 " "
-        PLAIN@1956..2084
-          TEXT@1956..2083 "Third item with anoth ..."
-          NEWLINE@2083..2084 "\n"
-      LIST_ITEM@2084..2136
-        PLAIN@2084..2085
-          WHITESPACE@2084..2085 " "
-        LIST_MARKER@2085..2088 "iv."
-        WHITESPACE@2088..2089 " "
-        PLAIN@2089..2136
-          TEXT@2089..2135 "Fourth item with a mo ..."
-          NEWLINE@2135..2136 "\n"
-      LIST_ITEM@2136..2266
-        PLAIN@2136..2138
-          WHITESPACE@2136..2138 "  "
-        LIST_MARKER@2138..2140 "v."
-        WHITESPACE@2140..2141 " "
-        PLAIN@2141..2266
-          TEXT@2141..2265 "Fifth item with the l ..."
-          NEWLINE@2265..2266 "\n"
+DOCUMENT@0..2266
+  YAML_METADATA@0..44
+    YAML_METADATA_DELIM@0..3 "---"
+    NEWLINE@3..4 "\n"
+    TEXT@4..39 "title: \"Nested List W ..."
+    NEWLINE@39..40 "\n"
+    YAML_METADATA_DELIM@40..43 "---"
+    NEWLINE@43..44 "\n"
+  BLANK_LINE@44..45
+    BLANK_LINE@44..45 "\n"
+  HEADING@45..77
+    ATX_HEADING_MARKER@45..47
+      ATX_HEADING_MARKER@45..47 "##"
+    WHITESPACE@47..48 " "
+    HEADING_CONTENT@48..76
+      TEXT@48..76 "Deep Nesting with Lon ..."
+    NEWLINE@76..77 "\n"
+  BLANK_LINE@77..78
+    BLANK_LINE@77..78 "\n"
+  LIST@78..1229
+    LIST_ITEM@78..834
+      LIST_MARKER@78..79 "-"
+      WHITESPACE@79..80 " "
+      PLAIN@80..248
+        TEXT@80..247 "Top level item with a ..."
+        NEWLINE@247..248 "\n"
+      LIST@248..834
+        LIST_ITEM@248..626
+          PLAIN@248..250
+            WHITESPACE@248..250 "  "
+          LIST_MARKER@250..251 "-"
+          WHITESPACE@251..252 " "
+          PLAIN@252..410
+            TEXT@252..409 "Second level nested i ..."
+            NEWLINE@409..410 "\n"
+          LIST@410..626
+            LIST_ITEM@410..626
+              PLAIN@410..414
+                WHITESPACE@410..414 "    "
+              LIST_MARKER@414..415 "-"
+              WHITESPACE@415..416 " "
+              PLAIN@416..546
+                TEXT@416..545 "Third level item with ..."
+                NEWLINE@545..546 "\n"
+              LIST@546..626
+                LIST_ITEM@546..626
+                  PLAIN@546..552
+                    WHITESPACE@546..552 "      "
+                  LIST_MARKER@552..553 "-"
+                  WHITESPACE@553..554 " "
+                  PLAIN@554..626
+                    TEXT@554..625 "Fourth level with mor ..."
+                    NEWLINE@625..626 "\n"
+        LIST_ITEM@626..834
+          PLAIN@626..628
+            WHITESPACE@626..628 "  "
+          LIST_MARKER@628..629 "-"
+          WHITESPACE@629..630 " "
+          PLAIN@630..834
+            TEXT@630..833 "Back to second level  ..."
+            NEWLINE@833..834 "\n"
+    LIST_ITEM@834..1229
+      LIST_MARKER@834..835 "-"
+      WHITESPACE@835..836 " "
+      PLAIN@836..859
+        TEXT@836..858 "Another top level item"
+        NEWLINE@858..859 "\n"
+      LIST@859..1229
+        LIST_ITEM@859..953
+          PLAIN@859..861
+            WHITESPACE@859..861 "  "
+          LIST_MARKER@861..863 "1."
+          WHITESPACE@863..864 " "
+          PLAIN@864..953
+            TEXT@864..952 "Nested ordered list w ..."
+            NEWLINE@952..953 "\n"
+        LIST_ITEM@953..1176
+          PLAIN@953..955
+            WHITESPACE@953..955 "  "
+          LIST_MARKER@955..957 "2."
+          WHITESPACE@957..958 " "
+          PLAIN@958..992
+            TEXT@958..991 "Second ordered item a ..."
+            NEWLINE@991..992 "\n"
+          LIST@992..1176
+            LIST_ITEM@992..1070
+              PLAIN@992..997
+                WHITESPACE@992..997 "     "
+              LIST_MARKER@997..998 "-"
+              WHITESPACE@998..999 " "
+              PLAIN@999..1070
+                TEXT@999..1069 "Bullet inside ordered ..."
+                NEWLINE@1069..1070 "\n"
+            LIST_ITEM@1070..1176
+              PLAIN@1070..1075
+                WHITESPACE@1070..1075 "     "
+              LIST_MARKER@1075..1076 "-"
+              WHITESPACE@1076..1077 " "
+              PLAIN@1077..1176
+                TEXT@1077..1175 "Another bullet with e ..."
+                NEWLINE@1175..1176 "\n"
+        LIST_ITEM@1176..1229
+          PLAIN@1176..1178
+            WHITESPACE@1176..1178 "  "
+          LIST_MARKER@1178..1180 "3."
+          WHITESPACE@1180..1181 " "
+          PLAIN@1181..1229
+            TEXT@1181..1228 "Third ordered item re ..."
+            NEWLINE@1228..1229 "\n"
+  BLANK_LINE@1229..1230
+    BLANK_LINE@1229..1230 "\n"
+  HEADING@1230..1262
+    ATX_HEADING_MARKER@1230..1232
+      ATX_HEADING_MARKER@1230..1232 "##"
+    WHITESPACE@1232..1233 " "
+    HEADING_CONTENT@1233..1261
+      TEXT@1233..1261 "Task Lists with Deep  ..."
+    NEWLINE@1261..1262 "\n"
+  BLANK_LINE@1262..1263
+    BLANK_LINE@1262..1263 "\n"
+  LIST@1263..1792
+    LIST_ITEM@1263..1753
+      LIST_MARKER@1263..1264 "-"
+      WHITESPACE@1264..1265 " "
+      TASK_CHECKBOX@1265..1268 "[ ]"
+      PLAIN@1268..1412
+        TEXT@1268..1411 " Top level unchecked  ..."
+        NEWLINE@1411..1412 "\n"
+      LIST@1412..1753
+        LIST_ITEM@1412..1609
+          PLAIN@1412..1414
+            WHITESPACE@1412..1414 "  "
+          LIST_MARKER@1414..1415 "-"
+          WHITESPACE@1415..1416 " "
+          TASK_CHECKBOX@1416..1419 "[ ]"
+          PLAIN@1419..1494
+            TEXT@1419..1493 " Nested unchecked tas ..."
+            NEWLINE@1493..1494 "\n"
+          LIST@1494..1609
+            LIST_ITEM@1494..1609
+              PLAIN@1494..1498
+                WHITESPACE@1494..1498 "    "
+              LIST_MARKER@1498..1499 "-"
+              WHITESPACE@1499..1500 " "
+              TASK_CHECKBOX@1500..1503 "[x]"
+              PLAIN@1503..1609
+                TEXT@1503..1608 " Deeply nested comple ..."
+                NEWLINE@1608..1609 "\n"
+        LIST_ITEM@1609..1753
+          PLAIN@1609..1611
+            WHITESPACE@1609..1611 "  "
+          LIST_MARKER@1611..1612 "-"
+          WHITESPACE@1612..1613 " "
+          TASK_CHECKBOX@1613..1616 "[x]"
+          PLAIN@1616..1753
+            TEXT@1616..1752 " Back to second level ..."
+            NEWLINE@1752..1753 "\n"
+    LIST_ITEM@1753..1792
+      LIST_MARKER@1753..1754 "-"
+      WHITESPACE@1754..1755 " "
+      TASK_CHECKBOX@1755..1758 "[x]"
+      PLAIN@1758..1792
+        TEXT@1758..1791 " Another top level co ..."
+        NEWLINE@1791..1792 "\n"
+  BLANK_LINE@1792..1793
+    BLANK_LINE@1792..1793 "\n"
+  HEADING@1793..1825
+    ATX_HEADING_MARKER@1793..1795
+      ATX_HEADING_MARKER@1793..1795 "##"
+    WHITESPACE@1795..1796 " "
+    HEADING_CONTENT@1796..1824
+      TEXT@1796..1824 "Roman Numerals with W ..."
+    NEWLINE@1824..1825 "\n"
+  BLANK_LINE@1825..1826
+    BLANK_LINE@1825..1826 "\n"
+  LIST@1826..2266
+    LIST_ITEM@1826..1934
+      PLAIN@1826..1828
+        WHITESPACE@1826..1828 "  "
+      LIST_MARKER@1828..1830 "i."
+      WHITESPACE@1830..1831 " "
+      PLAIN@1831..1934
+        TEXT@1831..1933 "First Roman numeral i ..."
+        NEWLINE@1933..1934 "\n"
+    LIST_ITEM@1934..1951
+      PLAIN@1934..1935
+        WHITESPACE@1934..1935 " "
+      LIST_MARKER@1935..1938 "ii."
+      WHITESPACE@1938..1939 " "
+      PLAIN@1939..1951
+        TEXT@1939..1950 "Second item"
+        NEWLINE@1950..1951 "\n"
+    LIST_ITEM@1951..2084
+      LIST_MARKER@1951..1955 "iii."
+      WHITESPACE@1955..1956 " "
+      PLAIN@1956..2084
+        TEXT@1956..2083 "Third item with anoth ..."
+        NEWLINE@2083..2084 "\n"
+    LIST_ITEM@2084..2136
+      PLAIN@2084..2085
+        WHITESPACE@2084..2085 " "
+      LIST_MARKER@2085..2088 "iv."
+      WHITESPACE@2088..2089 " "
+      PLAIN@2089..2136
+        TEXT@2089..2135 "Fourth item with a mo ..."
+        NEWLINE@2135..2136 "\n"
+    LIST_ITEM@2136..2266
+      PLAIN@2136..2138
+        WHITESPACE@2136..2138 "  "
+      LIST_MARKER@2138..2140 "v."
+      WHITESPACE@2140..2141 " "
+      PLAIN@2141..2266
+        TEXT@2141..2265 "Fifth item with the l ..."
+        NEWLINE@2265..2266 "\n"
 
