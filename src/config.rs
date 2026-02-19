@@ -455,7 +455,7 @@ impl Extensions {
 }
 
 /// Configuration for code block formatting.
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 #[serde(rename_all = "kebab-case")]
 pub struct CodeBlockConfig {
@@ -470,7 +470,7 @@ pub struct CodeBlockConfig {
 }
 
 /// Fence character preference for code blocks.
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum FenceStyle {
     /// Use backticks (```)
@@ -482,7 +482,7 @@ pub enum FenceStyle {
 }
 
 /// Attribute syntax preference for code blocks.
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum AttributeStyle {
     /// Use shortcut form: ```python or ```python {.numberLines}
@@ -522,6 +522,40 @@ impl CodeBlockConfig {
                 normalize_indented: false,
             },
         }
+    }
+
+    /// Merge user-specified code block config with flavor defaults.
+    ///
+    /// This allows partial overrides - if a user only specifies `attribute_style`,
+    /// other fields (fence_style, min_fence_length, etc.) will use flavor defaults.
+    pub fn merge_with_flavor(partial: CodeBlockConfig, flavor: Flavor) -> Self {
+        use serde_json::Value;
+
+        // Start with flavor defaults
+        let defaults = Self::for_flavor(flavor);
+        let defaults_value =
+            serde_json::to_value(&defaults).expect("Failed to serialize flavor defaults");
+
+        // Get user overrides
+        let partial_value =
+            serde_json::to_value(&partial).expect("Failed to serialize partial config");
+
+        let mut merged = if let Value::Object(obj) = defaults_value {
+            obj
+        } else {
+            serde_json::Map::new()
+        };
+
+        // Apply user overrides (only non-null fields from partial)
+        if let Value::Object(user_fields) = partial_value {
+            for (key, value) in user_fields {
+                merged.insert(key, value);
+            }
+        }
+
+        // Deserialize back to CodeBlockConfig
+        serde_json::from_value(Value::Object(merged))
+            .expect("Failed to deserialize merged code_blocks config")
     }
 }
 
@@ -743,9 +777,10 @@ impl RawConfig {
                 || Extensions::for_flavor(self.flavor),
                 |user_overrides| Extensions::merge_with_flavor(user_overrides, self.flavor),
             ),
-            code_blocks: self
-                .code_blocks
-                .unwrap_or_else(|| CodeBlockConfig::for_flavor(self.flavor)),
+            code_blocks: self.code_blocks.map_or_else(
+                || CodeBlockConfig::for_flavor(self.flavor),
+                |partial| CodeBlockConfig::merge_with_flavor(partial, self.flavor),
+            ),
             line_ending: self.line_ending.or(Some(LineEnding::Auto)),
             wrap: self.wrap.or(Some(WrapMode::Reflow)),
             flavor: self.flavor,
@@ -1420,5 +1455,64 @@ mod field_name_test {
 
         let cfg_crlf: Config = toml::from_str(r#"line-ending = "crlf""#).unwrap();
         assert_eq!(cfg_crlf.line_ending, Some(LineEnding::Crlf));
+    }
+}
+
+#[cfg(test)]
+mod code_blocks_config_test {
+    use super::*;
+
+    #[test]
+    fn test_partial_code_blocks_override() {
+        // User overrides only attribute_style, other fields should use flavor defaults
+        let toml_str = r#"
+            flavor = "pandoc"
+            
+            [code-blocks]
+            attribute-style = "explicit"
+        "#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+
+        // User override should apply
+        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
+
+        // Flavor defaults should fill in other fields
+        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
+        assert_eq!(cfg.code_blocks.min_fence_length, 3);
+        assert!(!cfg.code_blocks.normalize_indented);
+    }
+
+    #[test]
+    fn test_multiple_code_blocks_overrides() {
+        let toml_str = r#"
+            flavor = "quarto"
+            
+            [code-blocks]
+            attribute-style = "explicit"
+            min-fence-length = 5
+        "#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+
+        // User overrides
+        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
+        assert_eq!(cfg.code_blocks.min_fence_length, 5);
+
+        // Flavor defaults (Quarto uses Shortcut by default, but overridden)
+        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
+        assert!(!cfg.code_blocks.normalize_indented);
+    }
+
+    #[test]
+    fn test_no_code_blocks_override_uses_flavor_defaults() {
+        let toml_str = r#"
+            flavor = "quarto"
+        "#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+
+        // Should use Quarto defaults
+        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Shortcut);
+        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
+        assert_eq!(cfg.code_blocks.min_fence_length, 3);
+        assert!(!cfg.code_blocks.normalize_indented);
     }
 }
