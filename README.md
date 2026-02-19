@@ -90,7 +90,9 @@ integration.
 
 - Document formatting (full document and range)
 - Live diagnostics with quick fixes
-- Code actions for refactoring (e.g., convert between loose/compact lists)
+- Code actions for refactoring
+  - Convert between loose/compact lists
+  - Convert between inline/reference footnotes
 - Document symbols/outline
 - Folding ranges
 - Go to definition for references and footnotes

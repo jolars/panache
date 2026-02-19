@@ -22,7 +22,10 @@ provides document formatting capabilities for editors and IDEs.
   blocks, fenced divs, YAML frontmatter
 - Live diagnostics (`textDocument/publishDiagnostics`) - linting errors and
   warnings
-- Code actions (`textDocument/codeAction`) - quick fixes for lint issues
+- Code actions (`textDocument/codeAction`) - quick fixes and refactorings
+  - Auto-fix lint issues (e.g., heading hierarchy corrections)
+  - Convert list styles (loose ↔ compact)
+  - Convert footnote styles (inline ↔ reference)
 - Document tracking (`textDocument/didOpen/didChange/didClose`)
 - Configuration discovery from workspace root
 - Format on save support

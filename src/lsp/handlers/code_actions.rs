@@ -12,7 +12,7 @@ use crate::syntax::{AstNode, List};
 
 use super::super::conversions::{convert_diagnostic, offset_to_position, position_to_offset};
 use super::super::helpers::get_document_and_config;
-use super::list_conversion;
+use super::{footnote_conversion, list_conversion};
 
 /// Handle textDocument/codeAction request
 pub(crate) async fn code_action(
@@ -123,6 +123,62 @@ pub(crate) async fn code_action(
 
                     actions.push(CodeActionOrCommand::CodeAction(action));
                 }
+            }
+        }
+    }
+
+    // Add footnote conversion code actions (refactoring)
+    if let Some(offset) = position_to_offset(&text, params.range.start) {
+        let tree = crate::parse(&text, Some(config.clone()));
+
+        // Check for reference footnote at cursor
+        if let Some(ref_node) =
+            footnote_conversion::find_footnote_reference_at_position(&tree, offset)
+        {
+            // Only offer conversion if the definition is simple
+            if footnote_conversion::can_convert_to_inline(&ref_node, &tree) {
+                let edits = footnote_conversion::convert_to_inline(&ref_node, &tree, &text);
+                if !edits.is_empty() {
+                    let mut changes = HashMap::new();
+                    changes.insert(uri.clone(), edits);
+
+                    let action = CodeAction {
+                        title: "Convert to inline footnote".to_string(),
+                        kind: Some(CodeActionKind::REFACTOR),
+                        diagnostics: None,
+                        edit: Some(WorkspaceEdit {
+                            changes: Some(changes),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    };
+
+                    actions.push(CodeActionOrCommand::CodeAction(action));
+                }
+            }
+        }
+
+        // Check for inline footnote at cursor
+        if let Some(inline_node) =
+            footnote_conversion::find_inline_footnote_at_position(&tree, offset)
+        {
+            let edits = footnote_conversion::convert_to_reference(&inline_node, &tree, &text);
+            if !edits.is_empty() {
+                let mut changes = HashMap::new();
+                changes.insert(uri.clone(), edits);
+
+                let action = CodeAction {
+                    title: "Convert to reference footnote".to_string(),
+                    kind: Some(CodeActionKind::REFACTOR),
+                    diagnostics: None,
+                    edit: Some(WorkspaceEdit {
+                        changes: Some(changes),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                actions.push(CodeActionOrCommand::CodeAction(action));
             }
         }
     }

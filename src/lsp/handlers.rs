@@ -2,6 +2,7 @@ pub(crate) mod code_actions;
 pub(crate) mod diagnostics;
 pub(crate) mod document_symbols;
 pub(crate) mod folding_ranges;
+pub(crate) mod footnote_conversion;
 pub(crate) mod formatting;
 pub(crate) mod goto_definition;
 pub(crate) mod hover;

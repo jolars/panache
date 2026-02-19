@@ -178,6 +178,7 @@ golden_test_cases!(
     html_block,
     images,
     indented_code,
+    inline_footnotes,
     inline_math,
     grid_table,
     latex_environment,

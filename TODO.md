@@ -39,7 +39,7 @@ This document tracks implementation status for panache's features.
   formatting (DONE: LSP code action available via cursor on list)
 - ❌ **Convert table** - Convert between table styles (simple, pipe, grid)
 - ❌ **Convert link styles** - Convert between inline/reference links
-- ❌ **Convert footnote styles** - Convert between inline/reference footnotes
+- ✅ **Convert footnote styles** - Convert between inline/reference footnotes
 
 #### Navigation & Symbols
 
@@ -49,7 +49,8 @@ This document tracks implementation status for panache's features.
   fenced divs, YAML frontmatter
 - ✅ **Go to definition** - Jump to reference link/footnote definitions
   (reference links, images, footnotes)
-- ❌ Go to definition for citations - Jump to bibliography entry for `@cite` keys
+- ❌ Go to definition for citations - Jump to bibliography entry for `@cite`
+  keys
 - ❌ **Find references** - Find all uses of a reference link/footnote/citation
 
 #### Completion
@@ -333,7 +334,7 @@ Non-default extensions are tracked separately for future consideration.
 - ✅ Code spans containing backticks
 - ✅ Proper whitespace preservation in code spans
 - ✅ Fenced code blocks (``` and ~~~)
-- ✅ Indented code blocks\*\* (4 spaces or 1 tab)
+- ✅ Indented code blocks
 
 ### Links ✅
 
@@ -513,7 +514,7 @@ for initial implementation.
 ## Quarto Shortcodes
 
 - ✅ Parser support for `{{< name args >}}` syntax
-- ✅ Parser support for `{{{< name args >}}}` escape syntax  
+- ✅ Parser support for `{{{< name args >}}}` escape syntax
 - ✅ Formatter with normalized spacing
 - ✅ Extension flag `quarto_shortcodes` (enabled for Quarto flavor)
 - ✅ Golden test coverage
