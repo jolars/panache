@@ -329,22 +329,16 @@ fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool
         .iter()
         .map(|(k, v)| {
             if let Some(val) = v {
-                // Check if value needs quotes
-                let needs_quotes = if preserve_unquoted {
-                    // For executable chunks, only quote if value contains spaces or special chars
-                    val.is_empty()
-                        || val
-                            .chars()
-                            .any(|c| c.is_whitespace() || c == '"' || c == '\\')
+                // For executable chunks with preserve_unquoted=true, never add quotes
+                // The value is either a literal R expression (like `c("foo", "bar")`)
+                // or a simple identifier (like `TRUE`), both of which should be unquoted
+                if preserve_unquoted {
+                    format!("{}={}", k, val)
                 } else {
                     // For display blocks, always quote
-                    true
-                };
-
-                if needs_quotes {
-                    format!("{}=\"{}\"", k, val)
-                } else {
-                    format!("{}={}", k, val)
+                    // Escape internal quotes and backslashes
+                    let escaped_val = val.replace('\\', "\\\\").replace('"', "\\\"");
+                    format!("{}=\"{}\"", k, escaped_val)
                 }
             } else {
                 k.clone()

@@ -50,6 +50,8 @@ fn is_simple_string(s: &str) -> bool {
     // If it contains R expression characters, it's complex
     if s.contains('(')
         || s.contains(')')
+        || s.contains('{')
+        || s.contains('}')
         || s.contains('$')
         || s.contains('[')
         || s.contains(']')

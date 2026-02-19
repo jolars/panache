@@ -852,6 +852,8 @@ impl InlineParser {
         if let Some(parent) = token.parent() {
             match parent.kind() {
                 SyntaxKind::CODE_BLOCK
+                | SyntaxKind::CODE_FENCE_OPEN
+                | SyntaxKind::CODE_INFO
                 | SyntaxKind::CODE_CONTENT
                 | SyntaxKind::LATEX_ENVIRONMENT
                 | SyntaxKind::LATEX_ENV_BEGIN

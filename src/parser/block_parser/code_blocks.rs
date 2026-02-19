@@ -347,12 +347,68 @@ impl InfoString {
                     }
                     val
                 } else {
-                    // Unquoted value - read until comma, space, or tab
+                    // Unquoted value - read until comma, space, or tab at depth 0
+                    // Track nesting depth for (), [], {} and quote state
                     let mut val = String::new();
+                    let mut depth = 0; // Track parentheses/brackets/braces depth
+                    let mut in_quote: Option<char> = None; // Track if inside ' or "
+                    let mut escaped = false; // Track if previous char was backslash
+
                     while let Some(&ch) = chars.peek() {
-                        if ch == ' ' || ch == '\t' || ch == ',' {
+                        // Handle escape sequences
+                        if escaped {
+                            val.push(ch);
+                            chars.next();
+                            escaped = false;
+                            continue;
+                        }
+
+                        if ch == '\\' {
+                            val.push(ch);
+                            chars.next();
+                            escaped = true;
+                            continue;
+                        }
+
+                        // Handle quotes
+                        if let Some(quote_char) = in_quote {
+                            val.push(ch);
+                            chars.next();
+                            if ch == quote_char {
+                                in_quote = None; // Close quote
+                            }
+                            continue;
+                        }
+
+                        // Not in a quote - check for quote start
+                        if ch == '"' || ch == '\'' {
+                            in_quote = Some(ch);
+                            val.push(ch);
+                            chars.next();
+                            continue;
+                        }
+
+                        // Track nesting depth (only when not in quotes)
+                        if ch == '(' || ch == '[' || ch == '{' {
+                            depth += 1;
+                            val.push(ch);
+                            chars.next();
+                            continue;
+                        }
+
+                        if ch == ')' || ch == ']' || ch == '}' {
+                            depth -= 1;
+                            val.push(ch);
+                            chars.next();
+                            continue;
+                        }
+
+                        // Check for delimiters - only break at depth 0
+                        if depth == 0 && (ch == ' ' || ch == '\t' || ch == ',') {
                             break;
                         }
+
+                        // Regular character
                         val.push(ch);
                         chars.next();
                     }
@@ -1016,6 +1072,98 @@ mod tests {
         assert_eq!(attrs[0], ("python".to_string(), None));
         assert_eq!(attrs[1], ("echo".to_string(), Some("False".to_string())));
         assert_eq!(attrs[2], ("warning".to_string(), Some("True".to_string())));
+    }
+
+    #[test]
+    fn test_parse_chunk_options_nested_function_call() {
+        // R function calls with nested commas should be treated as single value
+        let attrs = InfoString::parse_chunk_options(r#"r pep-cg, dependson=c("foo", "bar")"#);
+        assert_eq!(attrs.len(), 3);
+        assert_eq!(attrs[0], ("r".to_string(), None));
+        assert_eq!(attrs[1], ("pep-cg".to_string(), None));
+        assert_eq!(
+            attrs[2],
+            (
+                "dependson".to_string(),
+                Some(r#"c("foo", "bar")"#.to_string())
+            )
+        );
+    }
+
+    #[test]
+    fn test_parse_chunk_options_nested_with_spaces() {
+        // Function call with spaces inside
+        let attrs = InfoString::parse_chunk_options(r#"r, cache.path=file.path("cache", "dir")"#);
+        assert_eq!(attrs.len(), 2);
+        assert_eq!(attrs[0], ("r".to_string(), None));
+        assert_eq!(
+            attrs[1],
+            (
+                "cache.path".to_string(),
+                Some(r#"file.path("cache", "dir")"#.to_string())
+            )
+        );
+    }
+
+    #[test]
+    fn test_parse_chunk_options_deeply_nested() {
+        // Multiple levels of nesting
+        let attrs = InfoString::parse_chunk_options(r#"r, x=list(a=c(1,2), b=c(3,4))"#);
+        assert_eq!(attrs.len(), 2);
+        assert_eq!(attrs[0], ("r".to_string(), None));
+        assert_eq!(
+            attrs[1],
+            (
+                "x".to_string(),
+                Some(r#"list(a=c(1,2), b=c(3,4))"#.to_string())
+            )
+        );
+    }
+
+    #[test]
+    fn test_parse_chunk_options_brackets_and_braces() {
+        // Test all bracket types
+        let attrs = InfoString::parse_chunk_options(r#"r, data=df[rows, cols], config={a:1, b:2}"#);
+        assert_eq!(attrs.len(), 3);
+        assert_eq!(attrs[0], ("r".to_string(), None));
+        assert_eq!(
+            attrs[1],
+            ("data".to_string(), Some("df[rows, cols]".to_string()))
+        );
+        assert_eq!(
+            attrs[2],
+            ("config".to_string(), Some("{a:1, b:2}".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_parse_chunk_options_quotes_with_parens() {
+        // Parentheses inside quoted strings shouldn't affect depth tracking
+        // Note: The parser strips outer quotes from quoted values
+        let attrs = InfoString::parse_chunk_options(r#"r, label="test (with parens)", echo=TRUE"#);
+        assert_eq!(attrs.len(), 3);
+        assert_eq!(attrs[0], ("r".to_string(), None));
+        assert_eq!(
+            attrs[1],
+            ("label".to_string(), Some("test (with parens)".to_string()))
+        );
+        assert_eq!(attrs[2], ("echo".to_string(), Some("TRUE".to_string())));
+    }
+
+    #[test]
+    fn test_parse_chunk_options_escaped_quotes() {
+        // Escaped quotes inside string values
+        // Note: The parser strips outer quotes and processes escapes
+        let attrs = InfoString::parse_chunk_options(r#"r, label="has \"quoted\" text""#);
+        assert_eq!(attrs.len(), 2);
+        assert_eq!(attrs[0], ("r".to_string(), None));
+        assert_eq!(
+            attrs[1],
+            (
+                "label".to_string(),
+                Some(r#"has "quoted" text"#.to_string())
+            )
+        );
     }
 
     #[test]

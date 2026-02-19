@@ -80,11 +80,7 @@ ROOT@0..507
         CODE_INFO@280..325
           TEXT@280..281 "{"
           CODE_LANGUAGE@281..282 "r"
-          TEXT@282..314 ", label=analysis-chun ..."
-          TEXT@314..315 "_"
-          TEXT@315..320 "cache"
-          TEXT@320..321 "_"
-          TEXT@321..325 "var}"
+          TEXT@282..325 ", label=analysis-chun ..."
         NEWLINE@325..326 "\n"
       CODE_CONTENT@326..433
         TEXT@326..340 "#| echo: false"

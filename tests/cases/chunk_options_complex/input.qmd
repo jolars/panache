@@ -1,0 +1,45 @@
+# Complex Chunk Options
+
+Test parsing and formatting of complex R expressions in chunk options.
+
+## Simple Options
+
+```{r simple-chunk, echo=TRUE, warning=FALSE}
+# Simple options should convert to hashpipe
+plot(1:10)
+```
+
+## Nested Function Calls
+
+```{r deps-chunk, dependson=c("foo", "bar")}
+# Complex R function calls with commas inside should stay inline
+result <- combine_data(foo, bar)
+```
+
+## File Paths
+
+```{r cache-chunk, cache.path=file.path("cache", "subdir")}
+# Function calls with nested strings
+expensive_computation()
+```
+
+## Deeply Nested
+
+```{r nested-chunk, data=list(a=c(1,2), b=c(3,4))}
+# Multiple levels of nesting
+process_data(data)
+```
+
+## Mixed Simple and Complex
+
+```{r mixed-chunk, echo=TRUE, eval=FALSE, dependson=c("deps-chunk", "cache-chunk"), warning=FALSE}
+# Mix of simple (hashpipe) and complex (inline) options
+final_result <- analyze(result)
+```
+
+## Brackets and Braces
+
+```{r bracket-chunk, rows=df[1:10, ], config=list(timeout=30, retries=3)}
+# Different bracket types: indexing and list construction
+subset_analysis(rows, config)
+```
