@@ -733,6 +733,49 @@ pub enum MathDelimiterStyle {
     Backslash,
 }
 
+/// Formatting style configuration.
+/// Groups all style-related settings together.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(default)]
+#[serde(rename_all = "kebab-case")]
+pub struct StyleConfig {
+    /// Text wrapping mode
+    pub wrap: Option<WrapMode>,
+    /// Blank line handling between blocks
+    pub blank_lines: BlankLines,
+    /// Math delimiter style preference
+    pub math_delimiter_style: MathDelimiterStyle,
+    /// Math indentation (spaces)
+    pub math_indent: usize,
+    /// Code block formatting preferences
+    pub code_blocks: Option<CodeBlockConfig>,
+}
+
+impl Default for StyleConfig {
+    fn default() -> Self {
+        Self {
+            wrap: Some(WrapMode::Reflow),
+            blank_lines: BlankLines::Collapse,
+            math_delimiter_style: MathDelimiterStyle::default(),
+            math_indent: 0,
+            code_blocks: None, // Will be filled by flavor defaults
+        }
+    }
+}
+
+impl StyleConfig {
+    /// Get the default style config for a given flavor.
+    pub fn for_flavor(flavor: Flavor) -> Self {
+        Self {
+            wrap: Some(WrapMode::Reflow),
+            blank_lines: BlankLines::Collapse,
+            math_delimiter_style: MathDelimiterStyle::default(),
+            math_indent: 0,
+            code_blocks: Some(CodeBlockConfig::for_flavor(flavor)),
+        }
+    }
+}
+
 /// Internal deserialization struct that allows for optional fields
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -745,6 +788,12 @@ struct RawConfig {
     line_ending: Option<LineEnding>,
     #[serde(default = "default_line_width")]
     line_width: usize,
+
+    // New preferred style section
+    #[serde(default)]
+    style: Option<StyleConfig>,
+
+    // DEPRECATED: Old top-level style fields (kept for backwards compatibility)
     #[serde(default)]
     math_indent: usize,
     #[serde(default)]
@@ -755,6 +804,7 @@ struct RawConfig {
     blank_lines: BlankLines,
     #[serde(default)]
     code_blocks: Option<CodeBlockConfig>,
+
     #[serde(default)]
     formatters: HashMap<String, FormatterConfig>,
     #[serde(default)]
@@ -772,22 +822,74 @@ fn default_blank_lines() -> BlankLines {
 impl RawConfig {
     /// Finalize into Config, applying flavor-based defaults where needed
     fn finalize(self) -> Config {
+        // Check for deprecated top-level style fields
+        let has_deprecated_fields = self.wrap.is_some()
+            || self.code_blocks.is_some()
+            || self.math_indent != 0
+            || self.math_delimiter_style != MathDelimiterStyle::default()
+            || self.blank_lines != default_blank_lines();
+
+        if has_deprecated_fields && self.style.is_none() {
+            eprintln!(
+                "Warning: top-level style fields (wrap, code-blocks, math-indent, etc.) \
+                 are deprecated. Please move them under [style] section. \
+                 See documentation for the new format."
+            );
+        }
+
+        // Merge style config: prefer new [style] section, fall back to old fields
+        let style = if let Some(mut style_config) = self.style {
+            // New [style] section exists - use it, but warn if both formats present
+            if has_deprecated_fields {
+                eprintln!(
+                    "Warning: Both [style] section and top-level style fields found. \
+                     Using [style] section and ignoring top-level fields."
+                );
+            }
+
+            // Fill in missing fields with flavor defaults
+            if style_config.code_blocks.is_none() {
+                style_config.code_blocks = Some(CodeBlockConfig::for_flavor(self.flavor));
+            } else {
+                // Merge partial code_blocks config with flavor defaults
+                style_config.code_blocks = Some(CodeBlockConfig::merge_with_flavor(
+                    style_config.code_blocks.unwrap(),
+                    self.flavor,
+                ));
+            }
+
+            style_config
+        } else {
+            // Old format - construct StyleConfig from top-level fields
+            let code_blocks = self.code_blocks.map_or_else(
+                || CodeBlockConfig::for_flavor(self.flavor),
+                |partial| CodeBlockConfig::merge_with_flavor(partial, self.flavor),
+            );
+
+            StyleConfig {
+                wrap: self.wrap.or(Some(WrapMode::Reflow)),
+                blank_lines: self.blank_lines,
+                math_delimiter_style: self.math_delimiter_style,
+                math_indent: self.math_indent,
+                code_blocks: Some(code_blocks),
+            }
+        };
+
         Config {
             extensions: self.extensions.map_or_else(
                 || Extensions::for_flavor(self.flavor),
                 |user_overrides| Extensions::merge_with_flavor(user_overrides, self.flavor),
             ),
-            code_blocks: self.code_blocks.map_or_else(
-                || CodeBlockConfig::for_flavor(self.flavor),
-                |partial| CodeBlockConfig::merge_with_flavor(partial, self.flavor),
-            ),
             line_ending: self.line_ending.or(Some(LineEnding::Auto)),
-            wrap: self.wrap.or(Some(WrapMode::Reflow)),
             flavor: self.flavor,
             line_width: self.line_width,
-            math_indent: self.math_indent,
-            math_delimiter_style: self.math_delimiter_style,
-            blank_lines: self.blank_lines,
+            wrap: style.wrap,
+            blank_lines: style.blank_lines,
+            math_delimiter_style: style.math_delimiter_style,
+            math_indent: style.math_indent,
+            code_blocks: style
+                .code_blocks
+                .unwrap_or_else(|| CodeBlockConfig::for_flavor(self.flavor)),
             formatters: self.formatters, // Use user config as-is (no defaults merged)
             linters: self.linters,
         }
@@ -1393,6 +1495,87 @@ mod tests {
         // Other Quarto defaults should remain
         assert!(cfg.extensions.quarto_callouts);
         assert!(cfg.extensions.quarto_shortcodes);
+    }
+
+    #[test]
+    fn style_section_new_format() {
+        let toml_str = r#"
+            flavor = "quarto"
+            
+            [style]
+            wrap = "reflow"
+            blank-lines = "collapse"
+            math-delimiter-style = "dollars"
+            math-indent = 2
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert_eq!(cfg.wrap, Some(WrapMode::Reflow));
+        assert_eq!(cfg.blank_lines, BlankLines::Collapse);
+        assert_eq!(cfg.math_delimiter_style, MathDelimiterStyle::Dollars);
+        assert_eq!(cfg.math_indent, 2);
+
+        // code-blocks should get flavor defaults
+        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
+        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Shortcut);
+    }
+
+    #[test]
+    fn style_section_with_code_blocks() {
+        let toml_str = r#"
+            flavor = "pandoc"
+            
+            [style]
+            wrap = "preserve"
+            
+            [style.code-blocks]
+            fence-style = "tilde"
+            attribute-style = "explicit"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert_eq!(cfg.wrap, Some(WrapMode::Preserve));
+        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Tilde);
+        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
+    }
+
+    #[test]
+    fn backwards_compat_old_format_still_works() {
+        let toml_str = r#"
+            flavor = "quarto"
+            wrap = "reflow"
+            math-indent = 4
+            
+            [code-blocks]
+            fence-style = "backtick"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // Old format should still work
+        assert_eq!(cfg.wrap, Some(WrapMode::Reflow));
+        assert_eq!(cfg.math_indent, 4);
+        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
+    }
+
+    #[test]
+    fn style_section_takes_precedence() {
+        let toml_str = r#"
+            flavor = "quarto"
+            
+            # Old format (should be ignored)
+            wrap = "preserve"
+            math-indent = 10
+            
+            # New format (should take precedence)
+            [style]
+            wrap = "reflow"
+            math-indent = 2
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // New [style] section should win
+        assert_eq!(cfg.wrap, Some(WrapMode::Reflow));
+        assert_eq!(cfg.math_indent, 2);
     }
 }
 

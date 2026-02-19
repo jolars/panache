@@ -189,6 +189,9 @@ panache looks for a configuration in:
 flavor = "quarto"
 line-width = 80
 line-ending = "auto"
+
+# Formatting style
+[style]
 wrap = "reflow"
 
 # External code formatters (opt-in)

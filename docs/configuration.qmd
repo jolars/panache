@@ -38,11 +38,17 @@ Set the maximum line width for wrapping:
 line_width = 80  # Default: 80
 ```
 
+## Formatting Style
+
+Formatting style preferences are organized under the `[style]` section. This
+keeps all style-related settings together.
+
 ### Wrapping Mode
 
 Control how text is wrapped:
 
 ```toml
+[style]
 wrap = "reflow"  # Options: "reflow", "preserve"
 ```
 
@@ -54,11 +60,72 @@ wrap = "reflow"  # Options: "reflow", "preserve"
 Control blank line handling:
 
 ```toml
-blank_lines = "collapse"  # Options: "collapse", "preserve"
+[style]
+blank-lines = "collapse"  # Options: "collapse", "preserve"
 ```
 
 - `collapse` (default): Collapse multiple blank lines into one
 - `preserve`: Keep all existing blank lines
+
+### Math Formatting
+
+Configure how math delimiters are formatted:
+
+```toml
+[style]
+math-delimiter-style = "preserve"  # Options: "preserve", "dollars", "backslash"
+math-indent = 0  # Indentation for display math blocks
+```
+
+- `preserve` (default): Keep original delimiter style
+- `dollars`: Normalize to `$...$` and `$$...$$`
+- `backslash`: Normalize to `\(...\)` and `\[...\]`
+
+### Code Block Style
+
+Configure code block formatting preferences:
+
+```toml
+[style.code-blocks]
+fence-style = "backtick"       # Options: "backtick", "tilde", "preserve"
+attribute-style = "shortcut"   # Options: "shortcut", "explicit", "preserve"
+min-fence-length = 3           # Minimum fence length (default: 3)
+normalize-indented = false     # Convert indented code to fenced blocks (default: false)
+```
+
+**Fence style:**
+
+- `backtick`: Use `` ``` `` fences
+- `tilde`: Use `~~~` fences
+- `preserve` (default for Pandoc): Keep original fence style
+
+**Attribute style:**
+
+- `shortcut` (default for Quarto/RMarkdown): `` ```python ``
+- `explicit`: `` ```{.python} ``
+- `preserve` (default for Pandoc): Keep original style
+
+**Note:** These defaults vary by flavor. Quarto uses `backtick` and `shortcut`,
+while Pandoc preserves original formatting.
+
+### Backwards Compatibility
+
+For backwards compatibility, style options can still be specified at the
+top-level (deprecated):
+
+```toml
+# OLD FORMAT (deprecated, but still works)
+wrap = "reflow"
+blank-lines = "collapse"
+
+# NEW FORMAT (preferred)
+[style]
+wrap = "reflow"
+blank-lines = "collapse"
+```
+
+If both formats are present, the `[style]` section takes precedence. A warning
+will be logged when using the deprecated top-level format.
 
 ## Extensions
 
@@ -437,8 +504,17 @@ Complete example with all common options:
 # Markdown flavor and basic settings
 flavor = "quarto"
 line_width = 80
+
+# Formatting style (NEW: organized under [style] section)
+[style]
 wrap = "reflow"
-blank_lines = "collapse"
+blank-lines = "collapse"
+math-delimiter-style = "preserve"
+math-indent = 0
+
+[style.code-blocks]
+fence-style = "backtick"
+attribute-style = "shortcut"
 
 # Extension overrides
 [extensions]
