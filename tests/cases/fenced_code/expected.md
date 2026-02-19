@@ -8,7 +8,7 @@ if (a > 3) {
 }
 ```
 
-```{#mycode .haskell .numberLines startFrom="100"}
+```haskell {.numberLines #mycode startFrom="100"}
 qsort []     = []
 qsort (x:xs) = qsort (filter (< x) xs) ++ [x] ++
                 qsort (filter (>= x) xs)
@@ -18,7 +18,7 @@ qsort (x:xs) = qsort (filter (< x) xs) ++ [x] ++
 qsort [] = []
 ```
 
-```{.haskell}
+```haskell
 qsort [] = []
 ```
 
@@ -26,6 +26,6 @@ qsort [] = []
 qsort [] = []
 ```
 
-```{.haskell .numberLines}
+```haskell {.numberLines}
 qsort [] = []
 ```

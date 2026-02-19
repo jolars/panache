@@ -495,67 +495,12 @@ pub enum AttributeStyle {
 
 impl Default for CodeBlockConfig {
     fn default() -> Self {
-        Self::for_flavor(Flavor::default())
-    }
-}
-
-impl CodeBlockConfig {
-    /// Get the default code block config for a given flavor.
-    pub fn for_flavor(flavor: Flavor) -> Self {
-        match flavor {
-            Flavor::Quarto | Flavor::RMarkdown => Self {
-                fence_style: FenceStyle::Backtick,
-                attribute_style: AttributeStyle::Shortcut,
-                min_fence_length: 3,
-                normalize_indented: false,
-            },
-            Flavor::Pandoc => Self {
-                fence_style: FenceStyle::Backtick,
-                attribute_style: AttributeStyle::Preserve,
-                min_fence_length: 3,
-                normalize_indented: false,
-            },
-            Flavor::Gfm | Flavor::CommonMark => Self {
-                fence_style: FenceStyle::Backtick,
-                attribute_style: AttributeStyle::Preserve,
-                min_fence_length: 3,
-                normalize_indented: false,
-            },
+        Self {
+            fence_style: FenceStyle::Backtick,
+            attribute_style: AttributeStyle::Shortcut,
+            min_fence_length: 3,
+            normalize_indented: false,
         }
-    }
-
-    /// Merge user-specified code block config with flavor defaults.
-    ///
-    /// This allows partial overrides - if a user only specifies `attribute_style`,
-    /// other fields (fence_style, min_fence_length, etc.) will use flavor defaults.
-    pub fn merge_with_flavor(partial: CodeBlockConfig, flavor: Flavor) -> Self {
-        use serde_json::Value;
-
-        // Start with flavor defaults
-        let defaults = Self::for_flavor(flavor);
-        let defaults_value =
-            serde_json::to_value(&defaults).expect("Failed to serialize flavor defaults");
-
-        // Get user overrides
-        let partial_value =
-            serde_json::to_value(&partial).expect("Failed to serialize partial config");
-
-        let mut merged = if let Value::Object(obj) = defaults_value {
-            obj
-        } else {
-            serde_json::Map::new()
-        };
-
-        // Apply user overrides (only non-null fields from partial)
-        if let Value::Object(user_fields) = partial_value {
-            for (key, value) in user_fields {
-                merged.insert(key, value);
-            }
-        }
-
-        // Deserialize back to CodeBlockConfig
-        serde_json::from_value(Value::Object(merged))
-            .expect("Failed to deserialize merged code_blocks config")
     }
 }
 
@@ -805,22 +750,13 @@ impl Default for StyleConfig {
             blank_lines: BlankLines::Collapse,
             math_delimiter_style: MathDelimiterStyle::default(),
             math_indent: 0,
-            code_blocks: None, // Will be filled by flavor defaults
+            code_blocks: None,
         }
     }
 }
 
 impl StyleConfig {
-    /// Get the default style config for a given flavor.
-    pub fn for_flavor(flavor: Flavor) -> Self {
-        Self {
-            wrap: Some(WrapMode::Reflow),
-            blank_lines: BlankLines::Collapse,
-            math_delimiter_style: MathDelimiterStyle::default(),
-            math_indent: 0,
-            code_blocks: Some(CodeBlockConfig::for_flavor(flavor)),
-        }
-    }
+    // No flavor-specific defaults needed - just use field defaults
 }
 
 /// Internal deserialization struct that allows for optional fields
@@ -1037,24 +973,15 @@ impl RawConfig {
                 );
             }
 
-            // Fill in missing fields with flavor defaults
+            // Fill in missing fields with defaults
             if style_config.code_blocks.is_none() {
-                style_config.code_blocks = Some(CodeBlockConfig::for_flavor(self.flavor));
-            } else {
-                // Merge partial code_blocks config with flavor defaults
-                style_config.code_blocks = Some(CodeBlockConfig::merge_with_flavor(
-                    style_config.code_blocks.unwrap(),
-                    self.flavor,
-                ));
+                style_config.code_blocks = Some(CodeBlockConfig::default());
             }
 
             style_config
         } else {
             // Old format - construct StyleConfig from top-level fields
-            let code_blocks = self.code_blocks.map_or_else(
-                || CodeBlockConfig::for_flavor(self.flavor),
-                |partial| CodeBlockConfig::merge_with_flavor(partial, self.flavor),
-            );
+            let code_blocks = self.code_blocks.unwrap_or_default();
 
             StyleConfig {
                 wrap: self.wrap.or(Some(WrapMode::Reflow)),
@@ -1077,9 +1004,7 @@ impl RawConfig {
             blank_lines: style.blank_lines,
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
-            code_blocks: style
-                .code_blocks
-                .unwrap_or_else(|| CodeBlockConfig::for_flavor(self.flavor)),
+            code_blocks: style.code_blocks.unwrap_or_default(),
             formatters: resolve_formatters(self.formatters),
             linters: self.linters,
         }
@@ -1291,7 +1216,7 @@ impl Default for Config {
             math_delimiter_style: MathDelimiterStyle::default(),
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
-            code_blocks: CodeBlockConfig::for_flavor(flavor),
+            code_blocks: CodeBlockConfig::default(),
             formatters: HashMap::new(), // Opt-in: empty by default
             linters: HashMap::new(),    // Opt-in: empty by default
         }
@@ -1474,7 +1399,6 @@ pub fn load(
             cfg.flavor = flavor;
             // Update extensions to match the detected flavor
             cfg.extensions = Extensions::for_flavor(flavor);
-            cfg.code_blocks = CodeBlockConfig::for_flavor(flavor);
         }
     }
 
@@ -1683,37 +1607,35 @@ mod tests {
 
     #[test]
     fn code_blocks_flavor_defaults() {
-        // When explicitly creating configs programmatically, need to build properly
-        // The Default trait uses Pandoc flavor
+        // CodeBlockConfig no longer varies by flavor - it has simple defaults
         let default_cfg = Config::default();
         assert_eq!(default_cfg.flavor, Flavor::Pandoc);
         assert_eq!(default_cfg.code_blocks.fence_style, FenceStyle::Backtick);
         assert_eq!(
             default_cfg.code_blocks.attribute_style,
-            AttributeStyle::Preserve
+            AttributeStyle::Shortcut
         );
 
-        // To get flavor-specific code block config, it needs to be set explicitly
-        // or loaded via from_toml which handles the flavor field
+        // All flavors get the same code block defaults
         let toml_str = r#"
             flavor = "quarto"
         "#;
         let quarto_cfg = toml::from_str::<Config>(toml_str).unwrap();
         assert_eq!(quarto_cfg.flavor, Flavor::Quarto);
-        // But code_blocks still uses Default::default() from serde
-        // This is a known limitation - users must explicitly set code-blocks if needed
+        assert_eq!(
+            quarto_cfg.code_blocks.attribute_style,
+            AttributeStyle::Shortcut
+        );
     }
 
     #[test]
-    fn code_blocks_config_for_flavor() {
-        // Test the for_flavor method directly
-        let quarto_cb = CodeBlockConfig::for_flavor(Flavor::Quarto);
-        assert_eq!(quarto_cb.fence_style, FenceStyle::Backtick);
-        assert_eq!(quarto_cb.attribute_style, AttributeStyle::Shortcut);
-
-        let pandoc_cb = CodeBlockConfig::for_flavor(Flavor::Pandoc);
-        assert_eq!(pandoc_cb.fence_style, FenceStyle::Backtick);
-        assert_eq!(pandoc_cb.attribute_style, AttributeStyle::Preserve);
+    fn code_blocks_config_default() {
+        // Test the Default impl
+        let cb = CodeBlockConfig::default();
+        assert_eq!(cb.fence_style, FenceStyle::Backtick);
+        assert_eq!(cb.attribute_style, AttributeStyle::Shortcut);
+        assert_eq!(cb.min_fence_length, 3);
+        assert!(!cb.normalize_indented);
     }
 
     #[test]

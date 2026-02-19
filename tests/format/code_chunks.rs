@@ -1,5 +1,5 @@
 use panache::{
-    config::{CodeBlockConfig, Config, Extensions, Flavor},
+    config::{AttributeStyle, Config, Extensions, Flavor},
     format,
 };
 
@@ -8,7 +8,6 @@ fn quarto_config() -> Config {
     Config {
         flavor,
         extensions: Extensions::for_flavor(flavor),
-        code_blocks: CodeBlockConfig::for_flavor(flavor),
         ..Default::default()
     }
 }
@@ -107,9 +106,12 @@ fn display_block_vs_executable_chunk() {
 
 #[test]
 fn preserve_mode_keeps_original() {
-    // Default config uses Preserve mode
+    // Create config with Preserve mode
+    let mut config = Config::default();
+    config.code_blocks.attribute_style = AttributeStyle::Preserve;
+
     let input = "```{r,echo=FALSE}\n1 + 1\n```\n";
-    let output = format(input, None, None);
+    let output = format(input, Some(config), None);
 
     // In preserve mode, should keep original format exactly
     assert!(output.contains("{r,echo=FALSE}"));

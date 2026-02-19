@@ -54,7 +54,6 @@ pub(crate) async fn load_config(
             if let Some(flavor) = detected_flavor {
                 config.flavor = flavor;
                 config.extensions = crate::config::Extensions::for_flavor(flavor);
-                config.code_blocks = crate::config::CodeBlockConfig::for_flavor(flavor);
             }
         }
         return config;
