@@ -35,6 +35,24 @@ impl PanacheLsp {
             workspace_root: Arc::new(Mutex::new(None)),
         }
     }
+
+    /// Get access to the document map for testing purposes.
+    ///
+    /// This method is only available when the `lsp` feature is enabled
+    /// and is intended for use in integration tests.
+    #[doc(hidden)]
+    pub fn document_map(&self) -> Arc<Mutex<HashMap<String, DocumentState>>> {
+        Arc::clone(&self.document_map)
+    }
+
+    /// Get access to the workspace root for testing purposes.
+    ///
+    /// This method is only available when the `lsp` feature is enabled
+    /// and is intended for use in integration tests.
+    #[doc(hidden)]
+    pub fn workspace_root(&self) -> Arc<Mutex<Option<PathBuf>>> {
+        Arc::clone(&self.workspace_root)
+    }
 }
 
 pub async fn run() -> std::io::Result<()> {
