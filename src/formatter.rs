@@ -174,6 +174,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     };
 
     // Step 1b: Run YAML frontmatter formatter synchronously if configured (uses same config as yaml code blocks)
+    #[cfg(not(target_arch = "wasm32"))]
     let formatted_yaml = if let Some(yaml_configs) = config.formatters.get("yaml") {
         if !yaml_configs.is_empty() {
             if let Some(yaml_content) = metadata::collect_yaml_metadata(tree) {
@@ -228,6 +229,9 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     } else {
         None
     };
+
+    #[cfg(target_arch = "wasm32")]
+    let formatted_yaml: Option<(String, String)> = None;
 
     // Step 2: Format markdown with formatted code blocks
     let mut output = Formatter::new(config.clone(), formatted_code.clone(), range).format(tree);
