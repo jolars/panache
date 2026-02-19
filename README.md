@@ -231,6 +231,7 @@ typescript = "prettier"  # Reuse same formatter
 - **Opt-in by design** - No surprises, explicit configuration
 - **Built-in presets** - Quick setup with sensible defaults
 - **Preset inheritance** - Override only specific fields, inherit the rest
+- **Incremental arg modification** - Add args with `append_args`/`prepend_args`
 - **Sequential formatting** - Run multiple formatters in order:
   `python = ["isort", "black"]`
 - **Reusable definitions** - Define once, use for multiple languages
@@ -248,6 +249,10 @@ javascript = "prettier"
 # Partial override - inherits cmd/stdin from built-in "air" preset
 [formatters.air]
 args = ["format", "--custom-flag", "{}"]  # Only override args
+
+# Incremental modification - add args without full override
+[formatters.ruff]
+append_args = ["--line-length", "100"]  # Adds to preset args
 
 # Full custom formatter
 [formatters.prettier]
@@ -267,6 +272,32 @@ r = "air"
 
 [formatters.air]
 args = ["format", "--preset=tidyverse"]  # cmd and stdin inherited from built-in
+```
+
+**Incremental argument modification:**
+
+Use `append_args` and `prepend_args` to add arguments without completely
+overriding the base args (from preset or explicit `args` field):
+
+```toml
+[formatters]
+r = "air"
+
+[formatters.air]
+# Base args from preset: ["format", "{}"]
+append_args = ["-i", "2"]
+# Final args: ["format", "{}", "-i", "2"]
+```
+
+Both modifiers work together and with explicit args:
+
+```toml
+[formatters.custom]
+cmd = "shfmt"
+args = ["-filename", "$FILENAME"]
+prepend_args = ["--verbose"]
+append_args = ["-i", "2"]
+# Final: ["--verbose", "-filename", "$FILENAME", "-i", "2"]
 ```
 
 **Additional details:**

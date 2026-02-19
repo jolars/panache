@@ -408,6 +408,60 @@ args = ["--fast"]
 stdin = false
 ```
 
+### Incremental Argument Modification
+
+Instead of completely overriding `args`, you can add arguments incrementally
+using `append_args` and `prepend_args`:
+
+```toml
+[formatters]
+r = "air"
+
+# Add arguments to preset's base args
+[formatters.air]
+# Base args from preset: ["format", "{}"]
+append_args = ["-i", "2"]
+# Final args: ["format", "{}", "-i", "2"]
+```
+
+**Field descriptions:**
+
+- `prepend_args`: Arguments added **before** base args
+- `append_args`: Arguments added **after** base args
+- Base args come from either the preset or explicit `args` field
+
+**Multiple modifiers:**
+
+```toml
+[formatters.air]
+prepend_args = ["--verbose"]
+append_args = ["-i", "2", "--check"]
+# Final: ["--verbose", "format", "{}", "-i", "2", "--check"]
+```
+
+**With explicit args (no preset):**
+
+Modifiers work with custom formatters too:
+
+```toml
+[formatters.shfmt]
+cmd = "shfmt"
+args = ["-filename", "$FILENAME"]
+append_args = ["-i", "2", "-bn"]
+# Final: ["-filename", "$FILENAME", "-i", "2", "-bn"]
+```
+
+**Both modifiers together:**
+
+```toml
+[formatters.custom]
+cmd = "formatter"
+args = ["--input"]
+prepend_args = ["--config", "cfg.toml"]
+append_args = ["--output", "result.txt"]
+# Final: ["--config", "cfg.toml", "--input", "--output", "result.txt"]
+```
+
 ### File-Based Formatters
 
 For formatters that modify files in place:

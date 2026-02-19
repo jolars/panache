@@ -592,6 +592,13 @@ pub enum FormatterValue {
 /// [formatters.air]
 /// args = ["format", "--custom"]  # Overrides args, inherits cmd/stdin from built-in "air"
 /// ```
+///
+/// Additionally, you can modify arguments incrementally using `prepend_args` and `append_args`:
+///
+/// ```toml
+/// [formatters.air]
+/// append_args = ["-i", "2"]  # Adds args to end: ["format", "{}", "-i", "2"]
+/// ```
 #[derive(Debug, Clone, Deserialize, PartialEq, Default)]
 #[serde(default)]
 pub struct FormatterDefinition {
@@ -602,6 +609,10 @@ pub struct FormatterDefinition {
     pub cmd: Option<String>,
     /// Arguments to pass (None = inherit from preset if name matches)
     pub args: Option<Vec<String>>,
+    /// Arguments to prepend to base args (from preset or explicit args)
+    pub prepend_args: Option<Vec<String>>,
+    /// Arguments to append to base args (from preset or explicit args)
+    pub append_args: Option<Vec<String>>,
     /// Whether the formatter reads from stdin (None = inherit from preset if name matches)
     pub stdin: Option<bool>,
     /// DEPRECATED: Whether formatter is enabled (old format only)
@@ -876,6 +887,10 @@ fn default_blank_lines() -> BlankLines {
 /// [formatters.air]
 /// args = ["format", "--custom"]
 ///
+/// # Append args to preset - final: ["format", "{}", "-i", "2"]
+/// [formatters.air]
+/// append_args = ["-i", "2"]
+///
 /// # Full custom - no preset match, requires cmd
 /// [formatters.custom-fmt]
 /// cmd = "my-formatter"
@@ -917,15 +932,26 @@ fn resolve_formatter_name(
                 if let Some(stdin) = definition.stdin {
                     base_config.stdin = stdin;
                 }
+
+                // Apply prepend_args and append_args modifiers
+                apply_arg_modifiers(&mut base_config.args, definition);
+
                 Ok(base_config)
             }
             // Case 2: No preset, but cmd specified - full custom formatter
-            (None, Some(cmd)) => Ok(FormatterConfig {
-                cmd: cmd.clone(),
-                args: definition.args.clone().unwrap_or_default(),
-                enabled: true,
-                stdin: definition.stdin.unwrap_or(true),
-            }),
+            (None, Some(cmd)) => {
+                let mut args = definition.args.clone().unwrap_or_default();
+
+                // Apply prepend_args and append_args modifiers
+                apply_arg_modifiers(&mut args, definition);
+
+                Ok(FormatterConfig {
+                    cmd: cmd.clone(),
+                    args,
+                    enabled: true,
+                    stdin: definition.stdin.unwrap_or(true),
+                })
+            }
             // Case 3: No preset, no cmd - error
             (None, None) => Err(format!(
                 "Formatter '{}': must specify 'cmd' field (not a known preset)",
@@ -941,6 +967,24 @@ fn resolve_formatter_name(
                 name, name
             )
         })
+    }
+}
+
+/// Apply prepend_args and append_args modifiers to an argument list.
+///
+/// Modifiers are applied in order: prepend_args + base_args + append_args
+/// If no base args exist, they're treated as empty (user responsibility).
+fn apply_arg_modifiers(args: &mut Vec<String>, definition: &FormatterDefinition) {
+    // Prepend args if specified
+    if let Some(prepend) = &definition.prepend_args {
+        let mut new_args = prepend.clone();
+        new_args.append(args);
+        *args = new_args;
+    }
+
+    // Append args if specified
+    if let Some(append) = &definition.append_args {
+        args.extend_from_slice(append);
     }
 }
 
@@ -2262,5 +2306,161 @@ mod code_blocks_config_test {
         assert_eq!(r_fmts[0].cmd, "my-custom-formatter");
         assert_eq!(r_fmts[0].args, vec!["--flag"]);
         assert!(r_fmts[0].stdin); // default
+    }
+
+    // ===== Tests for append_args and prepend_args =====
+
+    #[test]
+    fn append_args_with_preset_inheritance() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            append_args = ["-i", "2"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // Preset args: ["format", "{}"]
+        // After append: ["format", "{}", "-i", "2"]
+        assert_eq!(r_fmts[0].cmd, "air");
+        assert_eq!(r_fmts[0].args, vec!["format", "{}", "-i", "2"]);
+        assert!(!r_fmts[0].stdin);
+    }
+
+    #[test]
+    fn prepend_args_with_preset_inheritance() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            prepend_args = ["--verbose"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // Preset args: ["format", "{}"]
+        // After prepend: ["--verbose", "format", "{}"]
+        assert_eq!(r_fmts[0].cmd, "air");
+        assert_eq!(r_fmts[0].args, vec!["--verbose", "format", "{}"]);
+        assert!(!r_fmts[0].stdin);
+    }
+
+    #[test]
+    fn both_prepend_and_append_args() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            prepend_args = ["--verbose"]
+            append_args = ["-i", "2"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // Preset args: ["format", "{}"]
+        // After prepend + append: ["--verbose", "format", "{}", "-i", "2"]
+        assert_eq!(r_fmts[0].args, vec!["--verbose", "format", "{}", "-i", "2"]);
+    }
+
+    #[test]
+    fn append_args_with_explicit_args() {
+        let toml_str = r#"
+            [formatters]
+            r = "custom"
+            
+            [formatters.custom]
+            cmd = "shfmt"
+            args = ["-filename", "$FILENAME"]
+            append_args = ["-i", "2"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // Explicit args with append: ["-filename", "$FILENAME", "-i", "2"]
+        assert_eq!(r_fmts[0].cmd, "shfmt");
+        assert_eq!(r_fmts[0].args, vec!["-filename", "$FILENAME", "-i", "2"]);
+    }
+
+    #[test]
+    fn prepend_args_with_explicit_args() {
+        let toml_str = r#"
+            [formatters]
+            r = "custom"
+            
+            [formatters.custom]
+            cmd = "formatter"
+            args = ["input.txt"]
+            prepend_args = ["--config", "cfg.toml"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // Explicit args with prepend: ["--config", "cfg.toml", "input.txt"]
+        assert_eq!(r_fmts[0].args, vec!["--config", "cfg.toml", "input.txt"]);
+    }
+
+    #[test]
+    fn args_override_with_append_still_applies() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            args = ["custom", "override"]
+            append_args = ["--extra"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // Overridden args + append: ["custom", "override", "--extra"]
+        assert_eq!(r_fmts[0].args, vec!["custom", "override", "--extra"]);
+    }
+
+    #[test]
+    fn empty_append_prepend_arrays() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            prepend_args = []
+            append_args = []
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // Empty modifiers = no-op, preset args unchanged
+        assert_eq!(r_fmts[0].args, vec!["format", "{}"]);
+    }
+
+    #[test]
+    fn modifiers_without_base_args() {
+        let toml_str = r#"
+            [formatters]
+            r = "custom"
+            
+            [formatters.custom]
+            cmd = "formatter"
+            prepend_args = ["--flag"]
+            append_args = ["--other"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // No base args (no preset, no explicit args), modifiers create args from scratch
+        // Result: ["--flag", "--other"]
+        assert_eq!(r_fmts[0].args, vec!["--flag", "--other"]);
     }
 }
