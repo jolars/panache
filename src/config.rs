@@ -465,8 +465,6 @@ pub struct CodeBlockConfig {
     pub attribute_style: AttributeStyle,
     /// Minimum fence length (default: 3)
     pub min_fence_length: usize,
-    /// Whether to normalize indented code blocks to fenced blocks (risky, default: false)
-    pub normalize_indented: bool,
 }
 
 /// Fence character preference for code blocks.
@@ -499,7 +497,6 @@ impl Default for CodeBlockConfig {
             fence_style: FenceStyle::Backtick,
             attribute_style: AttributeStyle::Shortcut,
             min_fence_length: 3,
-            normalize_indented: false,
         }
     }
 }
@@ -1635,7 +1632,6 @@ mod tests {
         assert_eq!(cb.fence_style, FenceStyle::Backtick);
         assert_eq!(cb.attribute_style, AttributeStyle::Shortcut);
         assert_eq!(cb.min_fence_length, 3);
-        assert!(!cb.normalize_indented);
     }
 
     #[test]
@@ -1647,14 +1643,12 @@ mod tests {
             fence-style = "tilde"
             attribute-style = "explicit"
             min-fence-length = 4
-            normalize-indented = true
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Tilde);
         assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
         assert_eq!(cfg.code_blocks.min_fence_length, 4);
-        assert!(cfg.code_blocks.normalize_indented);
     }
 
     #[test]
@@ -1670,9 +1664,8 @@ mod tests {
         // Note: Due to serde defaults, partial override uses Default impl, not flavor defaults
         // This is expected behavior - users can explicitly set all values if needed
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Preserve);
-        // These come from CodeBlockConfig::default(), not flavor-specific
+        // These come from CodeBlockConfig::default()
         assert_eq!(cfg.code_blocks.min_fence_length, 3);
-        assert!(!cfg.code_blocks.normalize_indented);
     }
 
     #[test]
@@ -1937,10 +1930,9 @@ mod code_blocks_config_test {
         // User override should apply
         assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
 
-        // Flavor defaults should fill in other fields
+        // Defaults should fill in other fields
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
         assert_eq!(cfg.code_blocks.min_fence_length, 3);
-        assert!(!cfg.code_blocks.normalize_indented);
     }
 
     #[test]
@@ -1958,23 +1950,21 @@ mod code_blocks_config_test {
         assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
         assert_eq!(cfg.code_blocks.min_fence_length, 5);
 
-        // Flavor defaults (Quarto uses Shortcut by default, but overridden)
+        // Defaults
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
-        assert!(!cfg.code_blocks.normalize_indented);
     }
 
     #[test]
-    fn test_no_code_blocks_override_uses_flavor_defaults() {
+    fn test_no_code_blocks_override_uses_defaults() {
         let toml_str = r#"
             flavor = "quarto"
         "#;
         let cfg: Config = toml::from_str(toml_str).unwrap();
 
-        // Should use Quarto defaults
+        // Should use defaults
         assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Shortcut);
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
         assert_eq!(cfg.code_blocks.min_fence_length, 3);
-        assert!(!cfg.code_blocks.normalize_indented);
     }
 
     // ===== New Formatter Format Tests =====
