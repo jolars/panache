@@ -84,35 +84,39 @@ pub(super) fn format_code_block(
         && matches!(&info.block_type, CodeBlockType::Executable { .. });
 
     if use_hashpipe {
-        // Format as hashpipe with YAML-style options
-        format_code_block_hashpipe(
+        // Try to format as hashpipe with YAML-style options
+        // Falls back to inline format if language comment syntax is unknown
+        if format_code_block_hashpipe(
             &info,
             final_content,
             fence_char,
             fence_length,
             config,
             output,
-        );
-    } else {
-        // Format the info string based on config and block type (traditional inline)
-        let formatted_info = format_info_string(&info, config);
-
-        log::debug!("formatted_info = '{}'", formatted_info);
-
-        // Output normalized code block
-        for _ in 0..fence_length {
-            output.push(fence_char);
+        ) {
+            return; // Successfully formatted as hashpipe
         }
-        if !formatted_info.is_empty() {
-            output.push_str(&formatted_info);
-        }
-        output.push('\n');
-        output.push_str(final_content);
-        for _ in 0..fence_length {
-            output.push(fence_char);
-        }
-        output.push('\n');
+        // Fall through to traditional inline format for unknown languages
     }
+
+    // Format the info string based on config and block type (traditional inline)
+    let formatted_info = format_info_string(&info, config);
+
+    log::debug!("formatted_info = '{}'", formatted_info);
+
+    // Output normalized code block
+    for _ in 0..fence_length {
+        output.push(fence_char);
+    }
+    if !formatted_info.is_empty() {
+        output.push_str(&formatted_info);
+    }
+    output.push('\n');
+    output.push_str(final_content);
+    for _ in 0..fence_length {
+        output.push(fence_char);
+    }
+    output.push('\n');
 }
 
 /// Determine the minimum fence length needed to avoid conflicts with content
@@ -268,6 +272,7 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
 ///
 /// Converts simple inline options to hashpipe format with YAML syntax,
 /// while keeping complex expressions in the inline position.
+/// If the language's comment syntax is unknown, returns None to fall back to inline format.
 fn format_code_block_hashpipe(
     info: &InfoString,
     content: &str,
@@ -275,7 +280,7 @@ fn format_code_block_hashpipe(
     fence_length: usize,
     config: &Config,
     output: &mut String,
-) {
+) -> bool {
     let language = match &info.block_type {
         CodeBlockType::Executable { language } => language,
         _ => unreachable!("hashpipe only for executable chunks"),
@@ -283,6 +288,12 @@ fn format_code_block_hashpipe(
 
     // Classify options into simple (hashpipe) vs complex (inline)
     let (simple, complex) = hashpipe::split_options(&info.attributes);
+
+    // Try to get hashpipe lines - returns None for unknown languages
+    let hashpipe_lines = match hashpipe::format_as_hashpipe(language, &simple, config.line_width) {
+        Some(lines) => lines,
+        None => return false, // Unknown language - fall back to inline format
+    };
 
     // Open fence with language and any complex options
     for _ in 0..fence_length {
@@ -298,7 +309,6 @@ fn format_code_block_hashpipe(
     output.push('\n');
 
     // Add hashpipe options
-    let hashpipe_lines = hashpipe::format_as_hashpipe(language, &simple, config.line_width);
     for line in hashpipe_lines {
         output.push_str(&line);
         output.push('\n');
@@ -312,6 +322,8 @@ fn format_code_block_hashpipe(
         output.push(fence_char);
     }
     output.push('\n');
+
+    true // Successfully formatted as hashpipe
 }
 
 /// Format attribute key-value pairs

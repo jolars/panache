@@ -38,17 +38,21 @@ const OPTION_NAME_OVERRIDES: &[(&str, &str)] = &[
 
 /// Get the comment prefix for hashpipe options based on the chunk language.
 ///
+/// Returns None for unknown languages to avoid using incorrect comment syntax.
+///
 /// Different languages use different comment syntax:
-/// - R, Python, Julia, Bash: `#|`
-/// - C, C++, Java, JavaScript, Rust, Go: `//|`
-/// - SQL: `--|`
-pub fn get_comment_prefix(language: &str) -> &'static str {
+/// - R, Python, Julia, Bash, Ruby, Perl: `#|`
+/// - C, C++, Java, JavaScript, Rust, Go, etc.: `//|`
+/// - SQL dialects: `--|`
+pub fn get_comment_prefix(language: &str) -> Option<&'static str> {
     match language.to_lowercase().as_str() {
-        "r" | "python" | "julia" | "bash" | "shell" | "sh" => "#|",
+        "r" | "python" | "julia" | "bash" | "shell" | "sh" | "ruby" | "perl" => Some("#|"),
         "c" | "cpp" | "c++" | "java" | "javascript" | "js" | "typescript" | "ts" | "rust"
-        | "go" | "swift" | "kotlin" => "//|",
-        "sql" | "mysql" | "postgres" | "postgresql" | "sqlite" => "--|",
-        _ => "#|", // Default to #| for unknown languages
+        | "go" | "swift" | "kotlin" | "scala" | "csharp" | "c#" | "php" | "ojs" => Some("//|"),
+        "sql" | "mysql" | "postgres" | "postgresql" | "sqlite" => Some("--|"),
+
+        // Unknown language - don't convert to hashpipe
+        _ => None,
     }
 }
 
@@ -176,13 +180,14 @@ pub fn format_hashpipe_option_with_wrap(
 /// Format chunk options as hashpipe lines.
 ///
 /// Only formats simple values; complex expressions are filtered out.
-/// Returns a vector of formatted hashpipe lines.
+/// Returns None if the language's comment syntax is unknown.
+/// Returns Some(Vec<String>) with formatted hashpipe lines for known languages.
 pub fn format_as_hashpipe(
     language: &str,
     options: &[ClassifiedOption],
     line_width: usize,
-) -> Vec<String> {
-    let prefix = get_comment_prefix(language);
+) -> Option<Vec<String>> {
+    let prefix = get_comment_prefix(language)?; // Return None if unknown language
     let mut output = Vec::new();
 
     for (key, value) in options {
@@ -203,7 +208,7 @@ pub fn format_as_hashpipe(
         }
     }
 
-    output
+    Some(output)
 }
 
 /// Classify options and split into simple (convertible) and complex (inline-only).
@@ -253,32 +258,34 @@ mod tests {
 
     #[test]
     fn test_get_comment_prefix_r() {
-        assert_eq!(get_comment_prefix("r"), "#|");
-        assert_eq!(get_comment_prefix("R"), "#|");
+        assert_eq!(get_comment_prefix("r"), Some("#|"));
+        assert_eq!(get_comment_prefix("R"), Some("#|"));
     }
 
     #[test]
     fn test_get_comment_prefix_python() {
-        assert_eq!(get_comment_prefix("python"), "#|");
-        assert_eq!(get_comment_prefix("Python"), "#|");
+        assert_eq!(get_comment_prefix("python"), Some("#|"));
+        assert_eq!(get_comment_prefix("Python"), Some("#|"));
     }
 
     #[test]
     fn test_get_comment_prefix_cpp() {
-        assert_eq!(get_comment_prefix("cpp"), "//|");
-        assert_eq!(get_comment_prefix("c++"), "//|");
-        assert_eq!(get_comment_prefix("C++"), "//|");
+        assert_eq!(get_comment_prefix("cpp"), Some("//|"));
+        assert_eq!(get_comment_prefix("c++"), Some("//|"));
+        assert_eq!(get_comment_prefix("C++"), Some("//|"));
     }
 
     #[test]
     fn test_get_comment_prefix_sql() {
-        assert_eq!(get_comment_prefix("sql"), "--|");
-        assert_eq!(get_comment_prefix("SQL"), "--|");
+        assert_eq!(get_comment_prefix("sql"), Some("--|"));
+        assert_eq!(get_comment_prefix("SQL"), Some("--|"));
     }
 
     #[test]
     fn test_get_comment_prefix_unknown() {
-        assert_eq!(get_comment_prefix("unknown"), "#|");
+        assert_eq!(get_comment_prefix("unknown"), None);
+        assert_eq!(get_comment_prefix("fortran"), None);
+        assert_eq!(get_comment_prefix("matlab"), None);
     }
 
     #[test]
@@ -347,7 +354,7 @@ mod tests {
             ),
         ];
 
-        let lines = format_as_hashpipe("r", &options, 80);
+        let lines = format_as_hashpipe("r", &options, 80).unwrap();
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0], "#| echo: true");
         assert_eq!(lines[1], "#| fig-width: 7");
@@ -366,9 +373,21 @@ mod tests {
             ),
         ];
 
-        let lines = format_as_hashpipe("r", &options, 80);
+        let lines = format_as_hashpipe("r", &options, 80).unwrap();
         assert_eq!(lines.len(), 1); // Only echo, label skipped
         assert_eq!(lines[0], "#| echo: true");
+    }
+
+    #[test]
+    fn test_format_as_hashpipe_unknown_language() {
+        let options = vec![(
+            "echo".to_string(),
+            ChunkOptionValue::Simple("TRUE".to_string()),
+        )];
+
+        // Unknown language should return None
+        let result = format_as_hashpipe("fortran", &options, 80);
+        assert!(result.is_none());
     }
 
     #[test]
