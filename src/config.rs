@@ -584,42 +584,28 @@ pub enum FormatterValue {
 
 /// NEW: Named formatter definition (formatters.NAME sections in new format)
 /// OLD: Language-specific formatter config (formatters.LANG sections in old format)
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+///
+/// In new format, if the definition name matches a built-in preset, unspecified fields
+/// will inherit from that preset. This allows partial overrides like:
+///
+/// ```toml
+/// [formatters.air]
+/// args = ["format", "--custom"]  # Overrides args, inherits cmd/stdin from built-in "air"
+/// ```
+#[derive(Debug, Clone, Deserialize, PartialEq, Default)]
 #[serde(default)]
 pub struct FormatterDefinition {
     /// Reference to a built-in preset (e.g., "air", "black") - OLD FORMAT ONLY
     /// In new format, presets are referenced directly in [formatters] mapping
     pub preset: Option<String>,
-    /// Custom command to execute
+    /// Custom command to execute (None = inherit from preset if name matches)
     pub cmd: Option<String>,
-    /// Arguments to pass
+    /// Arguments to pass (None = inherit from preset if name matches)
     pub args: Option<Vec<String>>,
-    /// Whether the formatter reads from stdin
-    #[serde(default = "default_stdin")]
-    pub stdin: bool,
+    /// Whether the formatter reads from stdin (None = inherit from preset if name matches)
+    pub stdin: Option<bool>,
     /// DEPRECATED: Whether formatter is enabled (old format only)
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-}
-
-fn default_stdin() -> bool {
-    true
-}
-
-fn default_enabled() -> bool {
-    true
-}
-
-impl Default for FormatterDefinition {
-    fn default() -> Self {
-        Self {
-            preset: None,
-            cmd: None,
-            args: None,
-            stdin: true,
-            enabled: true,
-        }
-    }
+    pub enabled: Option<bool>,
 }
 
 /// Internal struct for deserializing FormatterConfig with preset support.
@@ -874,10 +860,27 @@ fn default_blank_lines() -> BlankLines {
 
 /// Resolve a single formatter name to a FormatterConfig.
 ///
+/// Resolve a formatter name to a FormatterConfig.
+///
 /// Resolution order:
 /// 1. Check if it's a named definition in formatter_definitions
-/// 2. Fall back to built-in preset
+///    - If name matches a built-in preset, inherit unspecified fields from preset
+///    - If name doesn't match preset, require full cmd specification
+/// 2. Fall back to built-in preset (no custom definition)
 /// 3. Error if neither found
+///
+/// # Examples
+///
+/// ```toml
+/// # Partial override - inherits cmd/stdin from built-in "air"
+/// [formatters.air]
+/// args = ["format", "--custom"]
+///
+/// # Full custom - no preset match, requires cmd
+/// [formatters.custom-fmt]
+/// cmd = "my-formatter"
+/// args = ["--flag"]
+/// ```
 fn resolve_formatter_name(
     name: &str,
     formatter_definitions: &HashMap<String, FormatterDefinition>,
@@ -895,17 +898,39 @@ fn resolve_formatter_name(
             ));
         }
 
-        // Must have cmd for custom formatter
-        if let Some(cmd) = &definition.cmd {
-            Ok(FormatterConfig {
+        // Try to load built-in preset as base (if name matches)
+        let preset = get_formatter_preset(name);
+
+        // Build config by applying overrides to preset (or requiring cmd if no preset)
+        match (preset, &definition.cmd) {
+            // Case 1: Preset exists - use as base and apply overrides
+            (Some(mut base_config), _) => {
+                // Override cmd if specified
+                if let Some(cmd) = &definition.cmd {
+                    base_config.cmd = cmd.clone();
+                }
+                // Override args if specified
+                if let Some(args) = &definition.args {
+                    base_config.args = args.clone();
+                }
+                // Override stdin if specified
+                if let Some(stdin) = definition.stdin {
+                    base_config.stdin = stdin;
+                }
+                Ok(base_config)
+            }
+            // Case 2: No preset, but cmd specified - full custom formatter
+            (None, Some(cmd)) => Ok(FormatterConfig {
                 cmd: cmd.clone(),
                 args: definition.args.clone().unwrap_or_default(),
                 enabled: true,
-                stdin: definition.stdin,
-            })
-        } else {
-            // No cmd - incomplete definition
-            Err(format!("Formatter '{}': must specify 'cmd' field", name))
+                stdin: definition.stdin.unwrap_or(true),
+            }),
+            // Case 3: No preset, no cmd - error
+            (None, None) => Err(format!(
+                "Formatter '{}': must specify 'cmd' field (not a known preset)",
+                name
+            )),
         }
     } else {
         // Not a named definition - check built-in presets
@@ -1127,7 +1152,8 @@ fn resolve_old_format_formatters(
         match definition {
             Ok(def) => {
                 // Skip if disabled (old format only)
-                if !def.enabled {
+                // enabled is Option<bool> now, so check for Some(false)
+                if def.enabled == Some(false) {
                     continue;
                 }
 
@@ -1177,7 +1203,7 @@ fn resolve_old_format_definition(
             cmd: cmd.clone(),
             args: definition.args.clone().unwrap_or_default(),
             enabled: true,
-            stdin: definition.stdin,
+            stdin: definition.stdin.unwrap_or(true),
         })
     } else {
         Err("must specify either 'preset' or 'cmd'".to_string())
@@ -2077,5 +2103,164 @@ mod code_blocks_config_test {
             assert_eq!(fmts[0].cmd, "prettier");
             assert_eq!(fmts[0].args, vec!["--print-width=100"]);
         }
+    }
+
+    // ===== Preset inheritance tests =====
+
+    #[test]
+    fn preset_inheritance_override_only_args() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            args = ["format", "--custom-flag", "{}"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // cmd and stdin inherited from built-in "air" preset
+        assert_eq!(r_fmts[0].cmd, "air");
+        assert!(!r_fmts[0].stdin);
+        // args overridden
+        assert_eq!(r_fmts[0].args, vec!["format", "--custom-flag", "{}"]);
+    }
+
+    #[test]
+    fn preset_inheritance_override_only_cmd() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            cmd = "custom-air"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // cmd overridden
+        assert_eq!(r_fmts[0].cmd, "custom-air");
+        // args and stdin inherited from built-in "air" preset
+        assert_eq!(r_fmts[0].args, vec!["format", "{}"]);
+        assert!(!r_fmts[0].stdin);
+    }
+
+    #[test]
+    fn preset_inheritance_override_only_stdin() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            stdin = true
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // cmd and args inherited from built-in "air" preset
+        assert_eq!(r_fmts[0].cmd, "air");
+        assert_eq!(r_fmts[0].args, vec!["format", "{}"]);
+        // stdin overridden
+        assert!(r_fmts[0].stdin);
+    }
+
+    #[test]
+    fn preset_inheritance_override_multiple_fields() {
+        let toml_str = r#"
+            [formatters]
+            python = "black"
+            
+            [formatters.black]
+            args = ["--line-length=100"]
+            stdin = false
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let py_fmts = cfg.formatters.get("python").unwrap();
+        assert_eq!(py_fmts.len(), 1);
+        // cmd inherited
+        assert_eq!(py_fmts[0].cmd, "black");
+        // args and stdin overridden
+        assert_eq!(py_fmts[0].args, vec!["--line-length=100"]);
+        assert!(!py_fmts[0].stdin);
+    }
+
+    #[test]
+    fn preset_inheritance_override_all_fields() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            cmd = "totally-different"
+            args = ["custom"]
+            stdin = true
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // All fields overridden (complete replacement)
+        assert_eq!(r_fmts[0].cmd, "totally-different");
+        assert_eq!(r_fmts[0].args, vec!["custom"]);
+        assert!(r_fmts[0].stdin);
+    }
+
+    #[test]
+    fn preset_inheritance_empty_definition_uses_preset() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            
+            [formatters.air]
+            # Empty definition - should use preset as-is
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // All fields from built-in preset
+        assert_eq!(r_fmts[0].cmd, "air");
+        assert_eq!(r_fmts[0].args, vec!["format", "{}"]);
+        assert!(!r_fmts[0].stdin);
+    }
+
+    #[test]
+    fn preset_inheritance_unknown_name_without_cmd_errors() {
+        let toml_str = r#"
+            [formatters]
+            r = "unknown-formatter"
+            
+            [formatters.unknown-formatter]
+            args = ["--flag"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // Should fail to resolve - unknown preset and no cmd
+        // Error logged, formatter not included in map
+        assert!(!cfg.formatters.contains_key("r"));
+    }
+
+    #[test]
+    fn preset_inheritance_unknown_name_with_cmd_works() {
+        let toml_str = r#"
+            [formatters]
+            r = "unknown-formatter"
+            
+            [formatters.unknown-formatter]
+            cmd = "my-custom-formatter"
+            args = ["--flag"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        // Should work - has cmd even though name doesn't match preset
+        assert_eq!(r_fmts[0].cmd, "my-custom-formatter");
+        assert_eq!(r_fmts[0].args, vec!["--flag"]);
+        assert!(r_fmts[0].stdin); // default
     }
 }

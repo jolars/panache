@@ -230,6 +230,7 @@ typescript = "prettier"  # Reuse same formatter
 
 - **Opt-in by design** - No surprises, explicit configuration
 - **Built-in presets** - Quick setup with sensible defaults
+- **Preset inheritance** - Override only specific fields, inherit the rest
 - **Sequential formatting** - Run multiple formatters in order:
   `python = ["isort", "black"]`
 - **Reusable definitions** - Define once, use for multiple languages
@@ -244,12 +245,28 @@ typescript = "prettier"  # Reuse same formatter
 python = ["isort", "black"]
 javascript = "prettier"
 
-[formatters.prettier]
-args = ["--print-width=100"]
+# Partial override - inherits cmd/stdin from built-in "air" preset
+[formatters.air]
+args = ["format", "--custom-flag", "{}"]  # Only override args
 
-[formatters.isort]
-cmd = "isort"
-args = ["-"]
+# Full custom formatter
+[formatters.prettier]
+cmd = "prettier"
+args = ["--print-width=100"]
+stdin = true
+```
+
+**Preset inheritance:**
+
+When a `[formatters.NAME]` section matches a built-in preset name (like `air`,
+`black`, `ruff`), unspecified fields are inherited from the preset:
+
+```toml
+[formatters]
+r = "air"
+
+[formatters.air]
+args = ["format", "--preset=tidyverse"]  # cmd and stdin inherited from built-in
 ```
 
 **Additional details:**

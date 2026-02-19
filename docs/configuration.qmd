@@ -348,9 +348,11 @@ Define custom formatter configurations with the `[formatters.NAME]` syntax:
 python = ["isort", "black"]
 javascript = "prettier"
 
-# Override prettier's default args
+# Full custom formatter
 [formatters.prettier]
+cmd = "prettier"
 args = ["--parser=babel", "--print-width=100"]
+stdin = true
 
 # Custom formatter not in presets
 [formatters.isort]
@@ -361,9 +363,50 @@ stdin = true  # Default
 
 **Formatter definition fields:**
 
-- `cmd`: Command to execute (required)
+- `cmd`: Command to execute (required for custom formatters)
 - `args`: Command-line arguments (optional, defaults to `[]`)
 - `stdin`: Use stdin/stdout mode (default: `true`) or file-based mode (`false`)
+
+### Preset Inheritance
+
+When a `[formatters.NAME]` section matches a built-in preset name, unspecified
+fields are automatically inherited from the preset. This allows partial
+overrides:
+
+```toml
+[formatters]
+r = "air"
+
+# Partial override - only customize args
+[formatters.air]
+args = ["format", "--preset=tidyverse"]
+# cmd and stdin are inherited from built-in "air" preset
+```
+
+**How it works:**
+
+- If the formatter name matches a built-in preset (`air`, `black`, `ruff`,
+  etc.), that preset's defaults are used as a base
+- Any fields you specify (`cmd`, `args`, `stdin`) override the preset defaults
+- Unspecified fields keep the preset values
+
+**Examples:**
+
+```toml
+# Override only args (inherits cmd="air", stdin=false)
+[formatters.air]
+args = ["format", "--custom-flag", "{}"]
+
+# Override only cmd (inherits args=["format"], stdin=true)
+[formatters.ruff]
+cmd = "ruff-custom"
+
+# Override everything (complete replacement)
+[formatters.black]
+cmd = "my-black"
+args = ["--fast"]
+stdin = false
+```
 
 ### File-Based Formatters
 
