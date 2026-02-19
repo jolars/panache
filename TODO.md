@@ -35,8 +35,8 @@ This document tracks implementation status for panache's features.
 #### Code Actions
 
 - ❌ **Convert lists** - Convert between bullet/ordered lists
-- ❌ **Convert loose/compact lists** - Toggle between loose and compact list
-  formatting
+- ✅ **Convert loose/compact lists** - Toggle between loose and compact list
+  formatting (DONE: LSP code action available via cursor on list)
 - ❌ **Convert table** - Convert between table styles (simple, pipe, grid)
 - ❌ **Convert link styles** - Convert between inline/reference links
 - ❌ **Convert footnote styles** - Convert between inline/reference footnotes

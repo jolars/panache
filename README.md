@@ -86,6 +86,15 @@ panache lint .
 panache includes a built-in Language Server Protocol implementation for editor
 integration.
 
+**Features:**
+
+- Document formatting (full document and range)
+- Live diagnostics with quick fixes
+- Code actions for refactoring (e.g., convert between loose/compact lists)
+- Document symbols/outline
+- Folding ranges
+- Go to definition for references and footnotes
+
 **Start the server:**
 
 ```bash

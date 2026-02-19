@@ -8,9 +8,11 @@ use tower_lsp_server::ls_types::*;
 
 use crate::linter;
 use crate::lsp::DocumentState;
+use crate::syntax::{AstNode, List};
 
-use super::super::conversions::{convert_diagnostic, offset_to_position};
+use super::super::conversions::{convert_diagnostic, offset_to_position, position_to_offset};
 use super::super::helpers::get_document_and_config;
+use super::list_conversion;
 
 /// Handle textDocument/codeAction request
 pub(crate) async fn code_action(
@@ -30,15 +32,17 @@ pub(crate) async fn code_action(
 
     // Run linter
     let text_clone = text.clone();
+    let config_clone = config.clone();
     let diagnostics = tokio::task::spawn_blocking(move || {
-        let tree = crate::parse(&text_clone, Some(config.clone()));
-        linter::lint(&tree, &text_clone, &config)
+        let tree = crate::parse(&text_clone, Some(config_clone.clone()));
+        linter::lint(&tree, &text_clone, &config_clone)
     })
     .await
     .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
 
-    // Convert fixes to code actions
     let mut actions = Vec::new();
+
+    // Add lint fix code actions
     for diag in diagnostics {
         if let Some(ref fix) = diag.fix {
             let mut changes = HashMap::new();
@@ -69,6 +73,57 @@ pub(crate) async fn code_action(
             };
 
             actions.push(CodeActionOrCommand::CodeAction(action));
+        }
+    }
+
+    // Add list conversion code actions (refactoring)
+    // Parse tree synchronously (SyntaxNode is not Send, can't use spawn_blocking)
+    if let Some(offset) = position_to_offset(&text, params.range.start) {
+        let tree = crate::parse(&text, Some(config.clone()));
+        if let Some(list_node) = list_conversion::find_list_at_position(&tree, offset)
+            && let Some(list) = List::cast(list_node.clone())
+        {
+            if list.is_loose() {
+                // Offer to convert to compact
+                let edits = list_conversion::convert_to_compact(&list_node, &text);
+                if !edits.is_empty() {
+                    let mut changes = HashMap::new();
+                    changes.insert(uri.clone(), edits);
+
+                    let action = CodeAction {
+                        title: "Convert to compact list".to_string(),
+                        kind: Some(CodeActionKind::REFACTOR),
+                        diagnostics: None,
+                        edit: Some(WorkspaceEdit {
+                            changes: Some(changes),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    };
+
+                    actions.push(CodeActionOrCommand::CodeAction(action));
+                }
+            } else {
+                // Offer to convert to loose
+                let edits = list_conversion::convert_to_loose(&list_node, &text);
+                if !edits.is_empty() {
+                    let mut changes = HashMap::new();
+                    changes.insert(uri.clone(), edits);
+
+                    let action = CodeAction {
+                        title: "Convert to loose list".to_string(),
+                        kind: Some(CodeActionKind::REFACTOR),
+                        diagnostics: None,
+                        edit: Some(WorkspaceEdit {
+                            changes: Some(changes),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    };
+
+                    actions.push(CodeActionOrCommand::CodeAction(action));
+                }
+            }
         }
     }
 

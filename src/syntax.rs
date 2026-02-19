@@ -8,6 +8,7 @@ mod ast;
 mod headings;
 mod kind;
 mod links;
+mod lists;
 mod references;
 mod tables;
 
@@ -15,6 +16,7 @@ pub use ast::*;
 pub use headings::*;
 pub use kind::*;
 pub use links::*;
+pub use lists::*;
 pub use references::*;
 pub use tables::*;
 
