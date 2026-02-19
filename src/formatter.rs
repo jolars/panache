@@ -56,20 +56,51 @@ pub async fn format_tree_async(
     };
 
     // Step 1b: Spawn YAML frontmatter formatter if configured (uses same config as yaml code blocks)
-    let formatted_yaml_future = if let Some(yaml_config) = config.formatters.get("yaml")
-        && yaml_config.enabled
-        && !yaml_config.cmd.is_empty()
-    {
-        if let Some(yaml_content) = metadata::collect_yaml_metadata(tree) {
-            log::debug!("Found YAML metadata, spawning formatter...");
-            let yaml_config = yaml_config.clone();
-            Some(tokio::spawn(async move {
-                use crate::external_formatters::format_code_async;
-                use std::time::Duration;
-                let timeout = Duration::from_secs(30);
-                log::info!("Formatting YAML metadata with {}", yaml_config.cmd);
-                format_code_async(&yaml_content, &yaml_config, timeout).await
-            }))
+    let formatted_yaml_future = if let Some(yaml_configs) = config.formatters.get("yaml") {
+        if !yaml_configs.is_empty() {
+            if let Some(yaml_content) = metadata::collect_yaml_metadata(tree) {
+                log::debug!("Found YAML metadata, spawning formatter...");
+                let yaml_configs = yaml_configs.clone();
+                Some(tokio::spawn(async move {
+                    use crate::external_formatters::format_code_async;
+                    use std::time::Duration;
+                    let timeout = Duration::from_secs(30);
+
+                    // Format sequentially through YAML formatter chain
+                    let mut current_yaml = yaml_content.clone();
+
+                    for (idx, yaml_config) in yaml_configs.iter().enumerate() {
+                        if yaml_config.cmd.is_empty() {
+                            continue;
+                        }
+
+                        log::info!(
+                            "Formatting YAML metadata with {} ({}/{} in chain)",
+                            yaml_config.cmd,
+                            idx + 1,
+                            yaml_configs.len()
+                        );
+
+                        match format_code_async(&current_yaml, yaml_config, timeout).await {
+                            Ok(formatted) => {
+                                current_yaml = formatted;
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "Warning: YAML formatter '{}' failed: {}. Using original content.",
+                                    yaml_config.cmd, e
+                                );
+                                // Stop chain on error
+                                return Err(e);
+                            }
+                        }
+                    }
+
+                    Ok(current_yaml)
+                }))
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -143,22 +174,53 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     };
 
     // Step 1b: Run YAML frontmatter formatter synchronously if configured (uses same config as yaml code blocks)
-    let formatted_yaml = if let Some(yaml_config) = config.formatters.get("yaml")
-        && yaml_config.enabled
-        && !yaml_config.cmd.is_empty()
-    {
-        if let Some(yaml_content) = metadata::collect_yaml_metadata(tree) {
-            log::debug!("Found YAML metadata, spawning formatter...");
-            use crate::external_formatters_sync::format_code_sync;
-            use std::time::Duration;
-            let timeout = Duration::from_secs(30);
-            log::info!("Formatting YAML metadata with {}", yaml_config.cmd);
-            match format_code_sync(&yaml_content, yaml_config, timeout) {
-                Ok(formatted) => Some((yaml_content, formatted)),
-                Err(e) => {
-                    log::warn!("Failed to format YAML metadata: {}", e);
+    let formatted_yaml = if let Some(yaml_configs) = config.formatters.get("yaml") {
+        if !yaml_configs.is_empty() {
+            if let Some(yaml_content) = metadata::collect_yaml_metadata(tree) {
+                log::debug!("Found YAML metadata, running formatter chain...");
+                use crate::external_formatters_sync::format_code_sync;
+                use std::time::Duration;
+                let timeout = Duration::from_secs(30);
+
+                // Format sequentially through YAML formatter chain
+                let mut current_yaml = yaml_content.clone();
+                let mut success = true;
+
+                for (idx, yaml_config) in yaml_configs.iter().enumerate() {
+                    if yaml_config.cmd.is_empty() {
+                        continue;
+                    }
+
+                    log::info!(
+                        "Formatting YAML metadata with {} ({}/{} in chain)",
+                        yaml_config.cmd,
+                        idx + 1,
+                        yaml_configs.len()
+                    );
+
+                    match format_code_sync(&current_yaml, yaml_config, timeout) {
+                        Ok(formatted) => {
+                            current_yaml = formatted;
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "YAML formatter '{}' failed: {}. Using original content.",
+                                yaml_config.cmd,
+                                e
+                            );
+                            success = false;
+                            break;
+                        }
+                    }
+                }
+
+                if success && current_yaml != yaml_content {
+                    Some((yaml_content, current_yaml))
+                } else {
                     None
                 }
+            } else {
+                None
             }
         } else {
             None

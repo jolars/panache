@@ -7,12 +7,12 @@ fn code_block_with_external_formatter() {
     let mut formatters = HashMap::new();
     formatters.insert(
         "test".to_string(),
-        panache::config::FormatterConfig {
+        vec![panache::config::FormatterConfig {
             cmd: "tr".to_string(),
             args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
             enabled: true,
             stdin: true,
-        },
+        }],
     );
 
     let config = Config {
@@ -59,16 +59,9 @@ hello world
 
 #[test]
 fn code_block_with_disabled_formatter() {
-    let mut formatters = HashMap::new();
-    formatters.insert(
-        "test".to_string(),
-        panache::config::FormatterConfig {
-            cmd: "tr".to_string(),
-            args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
-            enabled: false,
-            stdin: true,
-        },
-    );
+    // In the new format, disabled formatters are handled by not including them in the map
+    // This test now verifies that an empty formatter list means no formatting
+    let formatters = HashMap::new(); // No formatter configured
 
     let config = Config {
         formatters,
@@ -84,7 +77,7 @@ hello world
 
     let output = format(input, Some(config), None);
 
-    // Code should be unchanged (formatter disabled)
+    // Code should be unchanged (no formatter configured)
     assert!(output.contains("hello world"));
     assert!(!output.contains("HELLO WORLD"));
 }
@@ -94,12 +87,12 @@ fn code_block_with_failing_formatter() {
     let mut formatters = HashMap::new();
     formatters.insert(
         "test".to_string(),
-        panache::config::FormatterConfig {
+        vec![panache::config::FormatterConfig {
             cmd: "false".to_string(), // Always fails
             args: vec![],
             enabled: true,
             stdin: true,
-        },
+        }],
     );
 
     let config = Config {

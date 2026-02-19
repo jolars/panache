@@ -195,22 +195,16 @@ line-ending = "auto"
 wrap = "reflow"
 
 # External code formatters (opt-in)
-# Enable R formatting with preset
-[formatters.r]
-preset = "air"  # Quick setup
+[formatters]
+python = ["isort", "black"]  # Sequential formatting
+r = "air"                    # Built-in preset
+javascript = "prettier"      # Reusable definitions
+typescript = "prettier"
+yaml = "yamlfmt"             # Formats both code blocks AND frontmatter
 
-# Or use full custom configuration
-[formatters.python]
-cmd = "black"
-args = ["-", "--line-length=88"]
-
-# Add formatters for other languages
-[formatters.rust]
-cmd = "rustfmt"
-
-# YAML formatter (formats both code blocks AND frontmatter)
-[formatters.yaml]
-preset = "yamlfmt"  # Available: "yamlfmt", "prettier"
+# Customize formatters (optional)
+[formatters.prettier]
+args = ["--print-width=100"]
 
 # External code linters (opt-in)
 [linters]
@@ -225,35 +219,37 @@ panache supports external formatters for code blocks—**opt-in and easy to
 enable**:
 
 ```toml
-# Enable R formatting with preset
-[formatters.r]
-preset = "air"  # Available: "air", "styler"
-
-# Enable Python formatting with preset
-[formatters.python]
-preset = "ruff"  # Available: "ruff", "black"
+[formatters]
+r = "air"           # Available presets: "air", "styler"
+python = "ruff"     # Available presets: "ruff", "black"
+javascript = "prettier"
+typescript = "prettier"  # Reuse same formatter
 ```
 
 **Key features:**
 
 - **Opt-in by design** - No surprises, explicit configuration
-- **Preset shortcuts** - Quick setup with sensible defaults
-- **Parallel execution** - Formatters run concurrently with markdown formatting
+- **Built-in presets** - Quick setup with sensible defaults
+- **Sequential formatting** - Run multiple formatters in order:
+  `python = ["isort", "black"]`
+- **Reusable definitions** - Define once, use for multiple languages
+- **Parallel execution** - Formatters run concurrently across languages
 - **Graceful fallback** - Missing tools preserve original code (no errors)
 - **Custom config** - Full control with `cmd`, `args`, `stdin` fields
 
-**Full custom configuration:**
+**Custom formatter definitions:**
 
 ```toml
-# Custom Python formatter
-[formatters.python]
-cmd = "black"
-args = ["-", "--line-length=88"]
-stdin = true
+[formatters]
+python = ["isort", "black"]
+javascript = "prettier"
 
-# Add formatters for other languages
-[formatters.rust]
-cmd = "rustfmt"
+[formatters.prettier]
+args = ["--print-width=100"]
+
+[formatters.isort]
+cmd = "isort"
+args = ["-"]
 ```
 
 **Additional details:**
@@ -261,7 +257,7 @@ cmd = "rustfmt"
 - Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
   etc.)
 - Support both stdin/stdout and file-based formatters
-- 30 second timeout per formatter invocation
+- 30 second timeout per formatter
 
 ### External Code Linters
 

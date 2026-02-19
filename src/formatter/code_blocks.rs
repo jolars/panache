@@ -384,20 +384,50 @@ pub async fn spawn_and_await_formatters(
     let mut tasks = Vec::new();
     let timeout = Duration::from_secs(30);
 
-    // Spawn all formatter tasks immediately
+    // Spawn all formatter tasks immediately (one task per language)
     for (lang, code) in blocks {
-        if let Some(formatter_cfg) = config.formatters.get(&lang)
-            && formatter_cfg.enabled
-            && !formatter_cfg.cmd.is_empty()
-        {
-            let formatter_cfg = formatter_cfg.clone();
+        if let Some(formatter_configs) = config.formatters.get(&lang) {
+            if formatter_configs.is_empty() {
+                continue; // Empty formatter list means no formatting
+            }
+
+            let formatter_configs = formatter_configs.clone();
             let code = code.clone();
             let lang = lang.clone();
 
             let task = tokio::spawn(async move {
-                log::info!("Formatting {} code with {}", lang, formatter_cfg.cmd);
-                let result = format_code_async(&code, &formatter_cfg, timeout).await;
-                (lang, code, result)
+                // Format sequentially through the formatter chain
+                let mut current_code = code.clone();
+
+                for (idx, formatter_cfg) in formatter_configs.iter().enumerate() {
+                    if formatter_cfg.cmd.is_empty() {
+                        continue;
+                    }
+
+                    log::info!(
+                        "Formatting {} code with {} ({}/{} in chain)",
+                        lang,
+                        formatter_cfg.cmd,
+                        idx + 1,
+                        formatter_configs.len()
+                    );
+
+                    match format_code_async(&current_code, formatter_cfg, timeout).await {
+                        Ok(formatted) => {
+                            current_code = formatted;
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "Warning: {} formatter '{}' failed: {}. Using original code.",
+                                lang, formatter_cfg.cmd, e
+                            );
+                            // Stop the chain on error and return original
+                            return (lang, code, Err(e));
+                        }
+                    }
+                }
+
+                (lang, code, Ok(current_code))
             });
 
             tasks.push(task);

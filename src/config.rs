@@ -566,10 +566,60 @@ pub struct FormatterConfig {
     pub cmd: String,
     /// Arguments to pass to the command (e.g., ["-", "--line-length=80"])
     pub args: Vec<String>,
-    /// Whether this formatter is enabled
+    /// Whether this formatter is enabled (deprecated, kept for backwards compatibility)
     pub enabled: bool,
     /// Whether the formatter reads from stdin (true) or requires a file path (false)
     pub stdin: bool,
+}
+
+/// NEW: Language → Formatter mapping value (single formatter or chain)
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum FormatterValue {
+    /// Single formatter: r = "air"
+    Single(String),
+    /// Multiple formatters (sequential): python = ["isort", "black"]
+    Multiple(Vec<String>),
+}
+
+/// NEW: Named formatter definition (formatters.NAME sections in new format)
+/// OLD: Language-specific formatter config (formatters.LANG sections in old format)
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct FormatterDefinition {
+    /// Reference to a built-in preset (e.g., "air", "black") - OLD FORMAT ONLY
+    /// In new format, presets are referenced directly in [formatters] mapping
+    pub preset: Option<String>,
+    /// Custom command to execute
+    pub cmd: Option<String>,
+    /// Arguments to pass
+    pub args: Option<Vec<String>>,
+    /// Whether the formatter reads from stdin
+    #[serde(default = "default_stdin")]
+    pub stdin: bool,
+    /// DEPRECATED: Whether formatter is enabled (old format only)
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+fn default_stdin() -> bool {
+    true
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+impl Default for FormatterDefinition {
+    fn default() -> Self {
+        Self {
+            preset: None,
+            cmd: None,
+            args: None,
+            stdin: true,
+            enabled: true,
+        }
+    }
 }
 
 /// Internal struct for deserializing FormatterConfig with preset support.
@@ -805,8 +855,11 @@ struct RawConfig {
     #[serde(default)]
     code_blocks: Option<CodeBlockConfig>,
 
+    // NEW: Language → Formatter(s) mapping
+    // This will be a raw Value that we'll parse manually to handle both formats
     #[serde(default)]
-    formatters: HashMap<String, FormatterConfig>,
+    formatters: Option<toml::Value>,
+
     #[serde(default)]
     linters: HashMap<String, String>,
 }
@@ -817,6 +870,74 @@ fn default_line_width() -> usize {
 
 fn default_blank_lines() -> BlankLines {
     BlankLines::Collapse
+}
+
+/// Resolve a single formatter name to a FormatterConfig.
+///
+/// Resolution order:
+/// 1. Check if it's a named definition in formatter_definitions
+/// 2. Fall back to built-in preset
+/// 3. Error if neither found
+fn resolve_formatter_name(
+    name: &str,
+    formatter_definitions: &HashMap<String, FormatterDefinition>,
+) -> Result<FormatterConfig, String> {
+    // Check for named definition first
+    if let Some(definition) = formatter_definitions.get(name) {
+        // Named definition exists - resolve it
+
+        // NEW FORMAT: preset field not allowed in named definitions
+        // (Use direct preset reference in [formatters] mapping instead)
+        if definition.preset.is_some() {
+            return Err(format!(
+                "Formatter '{}': 'preset' field not allowed in named definitions. Use [formatters] mapping instead (e.g., `lang = \"{}\"`).",
+                name, name
+            ));
+        }
+
+        // Must have cmd for custom formatter
+        if let Some(cmd) = &definition.cmd {
+            Ok(FormatterConfig {
+                cmd: cmd.clone(),
+                args: definition.args.clone().unwrap_or_default(),
+                enabled: true,
+                stdin: definition.stdin,
+            })
+        } else {
+            // No cmd - incomplete definition
+            Err(format!("Formatter '{}': must specify 'cmd' field", name))
+        }
+    } else {
+        // Not a named definition - check built-in presets
+        get_formatter_preset(name).ok_or_else(|| {
+            format!(
+                "Unknown formatter '{}': not a named definition or built-in preset. \
+                 Define it in [formatters.{}] section or use a known preset.",
+                name, name
+            )
+        })
+    }
+}
+
+/// Resolve a language's formatter value (single or multiple) to a list of FormatterConfigs.
+fn resolve_language_formatters(
+    lang: &str,
+    value: &FormatterValue,
+    formatter_definitions: &HashMap<String, FormatterDefinition>,
+) -> Result<Vec<FormatterConfig>, String> {
+    let formatter_names = match value {
+        FormatterValue::Single(name) => vec![name.as_str()],
+        FormatterValue::Multiple(names) => names.iter().map(|s| s.as_str()).collect(),
+    };
+
+    // Resolve each formatter name
+    formatter_names
+        .into_iter()
+        .map(|name| {
+            resolve_formatter_name(name, formatter_definitions)
+                .map_err(|e| format!("Language '{}': {}", lang, e))
+        })
+        .collect()
 }
 
 impl RawConfig {
@@ -890,9 +1011,176 @@ impl RawConfig {
             code_blocks: style
                 .code_blocks
                 .unwrap_or_else(|| CodeBlockConfig::for_flavor(self.flavor)),
-            formatters: self.formatters, // Use user config as-is (no defaults merged)
+            formatters: resolve_formatters(self.formatters),
             linters: self.linters,
         }
+    }
+}
+
+/// Resolve formatter configuration from both old and new formats.
+/// Returns HashMap<String, Vec<FormatterConfig>> for language → formatter(s) mapping.
+fn resolve_formatters(
+    raw_formatters: Option<toml::Value>,
+) -> HashMap<String, Vec<FormatterConfig>> {
+    let Some(value) = raw_formatters else {
+        return HashMap::new();
+    };
+
+    // Try to determine which format this is
+    let toml::Value::Table(table) = value else {
+        eprintln!("Warning: Invalid formatters configuration - expected table");
+        return HashMap::new();
+    };
+
+    // Strategy: Detect old format vs new format
+    // Old format: ALL entries are tables with preset/cmd/args (language-specific configs)
+    // New format: Mix of strings/arrays (language mappings) and optionally tables (named definitions)
+
+    let has_string_or_array = table
+        .values()
+        .any(|v| matches!(v, toml::Value::String(_) | toml::Value::Array(_)));
+
+    if has_string_or_array {
+        // New format detected (has language mappings as strings/arrays)
+        resolve_new_format_formatters(table)
+    } else {
+        // Old format (all entries are tables)
+        resolve_old_format_formatters(table)
+    }
+}
+
+/// Resolve new format: [formatters] = { r = "air", python = ["isort", "black"] }
+/// Plus optional [formatters.air] and [formatters.isort] definitions.
+fn resolve_new_format_formatters(
+    table: toml::map::Map<String, toml::Value>,
+) -> HashMap<String, Vec<FormatterConfig>> {
+    let mut mappings = HashMap::new();
+    let mut definitions = HashMap::new();
+
+    // First pass: separate mappings from definitions
+    for (key, value) in table {
+        match &value {
+            toml::Value::String(_) | toml::Value::Array(_) => {
+                // This is a language mapping
+                let formatter_value: Result<FormatterValue, _> = value.try_into();
+                match formatter_value {
+                    Ok(fv) => {
+                        mappings.insert(key, fv);
+                    }
+                    Err(e) => {
+                        eprintln!("Error parsing formatter value for '{}': {}", key, e);
+                    }
+                }
+            }
+            toml::Value::Table(_) => {
+                // This is a named formatter definition
+                let definition: Result<FormatterDefinition, _> = value.try_into();
+                match definition {
+                    Ok(def) => {
+                        definitions.insert(key, def);
+                    }
+                    Err(e) => {
+                        eprintln!("Error parsing formatter definition '{}': {}", key, e);
+                    }
+                }
+            }
+            _ => {
+                eprintln!(
+                    "Warning: Invalid formatter entry '{}' - must be string, array, or table",
+                    key
+                );
+            }
+        }
+    }
+
+    // Second pass: resolve mappings using definitions
+    let mut resolved = HashMap::new();
+    for (lang, value) in mappings {
+        match resolve_language_formatters(&lang, &value, &definitions) {
+            Ok(configs) if !configs.is_empty() => {
+                resolved.insert(lang, configs);
+            }
+            Ok(_) => {} // Empty list
+            Err(e) => {
+                eprintln!("Error resolving formatters for language '{}': {}", lang, e);
+                eprintln!("Skipping formatter for '{}'", lang);
+            }
+        }
+    }
+
+    resolved
+}
+
+/// Resolve old format: [formatters.r] with preset/cmd fields directly.
+fn resolve_old_format_formatters(
+    table: toml::map::Map<String, toml::Value>,
+) -> HashMap<String, Vec<FormatterConfig>> {
+    eprintln!(
+        "Warning: Old formatter configuration format detected. \
+         Please migrate to the new format with [formatters] section. \
+         See documentation for the new format."
+    );
+
+    let mut resolved = HashMap::new();
+    for (lang, value) in table {
+        let definition: Result<FormatterDefinition, _> = value.try_into();
+        match definition {
+            Ok(def) => {
+                // Skip if disabled (old format only)
+                if !def.enabled {
+                    continue;
+                }
+
+                match resolve_old_format_definition(&lang, &def) {
+                    Ok(config) => {
+                        resolved.insert(lang, vec![config]);
+                    }
+                    Err(e) => {
+                        eprintln!("Error in old formatter config for '{}': {}", lang, e);
+                        eprintln!("Skipping formatter for '{}'", lang);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Error parsing old formatter config for '{}': {}", lang, e);
+            }
+        }
+    }
+
+    resolved
+}
+
+/// Resolve old-format formatter definition (inline preset/cmd in formatters.LANG).
+fn resolve_old_format_definition(
+    _lang: &str,
+    definition: &FormatterDefinition,
+) -> Result<FormatterConfig, String> {
+    // Check for conflicts
+    if definition.preset.is_some() && definition.cmd.is_some() {
+        return Err("'preset' and 'cmd' are mutually exclusive".to_string());
+    }
+
+    if let Some(preset_name) = &definition.preset {
+        // Resolve preset
+        let preset = get_formatter_preset(preset_name)
+            .ok_or_else(|| format!("Unknown formatter preset '{}'", preset_name))?;
+
+        Ok(FormatterConfig {
+            cmd: preset.cmd,
+            args: definition.args.clone().unwrap_or(preset.args),
+            enabled: true, // enabled field checked by caller
+            stdin: preset.stdin,
+        })
+    } else if let Some(cmd) = &definition.cmd {
+        // Custom command
+        Ok(FormatterConfig {
+            cmd: cmd.clone(),
+            args: definition.args.clone().unwrap_or_default(),
+            enabled: true,
+            stdin: definition.stdin,
+        })
+    } else {
+        Err("must specify either 'preset' or 'cmd'".to_string())
     }
 }
 
@@ -907,7 +1195,8 @@ pub struct Config {
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
     pub code_blocks: CodeBlockConfig,
-    pub formatters: HashMap<String, FormatterConfig>,
+    /// Language → Formatter(s) mapping (supports multiple formatters per language)
+    pub formatters: HashMap<String, Vec<FormatterConfig>>,
     pub linters: HashMap<String, String>,
 }
 
@@ -1146,7 +1435,7 @@ mod tests {
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
-        let python_fmt = cfg.formatters.get("python").unwrap();
+        let python_fmt = &cfg.formatters.get("python").unwrap()[0];
         assert_eq!(python_fmt.cmd, "black");
         assert_eq!(python_fmt.args, vec!["-"]);
         assert!(python_fmt.enabled);
@@ -1169,20 +1458,20 @@ mod tests {
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
-        assert_eq!(cfg.formatters.len(), 3);
+        // Old format detected - should have 2 formatters (rust disabled)
+        assert_eq!(cfg.formatters.len(), 2);
 
-        let r_fmt = cfg.formatters.get("r").unwrap();
+        let r_fmt = &cfg.formatters.get("r").unwrap()[0];
         assert_eq!(r_fmt.cmd, "air");
         assert_eq!(r_fmt.args, vec!["--preset=tidyverse"]);
         assert!(r_fmt.enabled);
 
-        let py_fmt = cfg.formatters.get("python").unwrap();
+        let py_fmt = &cfg.formatters.get("python").unwrap()[0];
         assert_eq!(py_fmt.cmd, "black");
         assert_eq!(py_fmt.args.len(), 2);
 
-        let rust_fmt = cfg.formatters.get("rust").unwrap();
-        assert_eq!(rust_fmt.cmd, "rustfmt");
-        assert!(!rust_fmt.enabled);
+        // rust is disabled in old format, so it shouldn't be in the map
+        assert!(!cfg.formatters.contains_key("rust"));
     }
 
     #[test]
@@ -1193,7 +1482,7 @@ mod tests {
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
-        let fmt = cfg.formatters.get("rustfmt").unwrap();
+        let fmt = &cfg.formatters.get("rustfmt").unwrap()[0];
         assert_eq!(fmt.cmd, "rustfmt");
         assert!(fmt.args.is_empty());
         assert!(fmt.enabled);
@@ -1208,7 +1497,7 @@ mod tests {
             cmd = ""
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
-        let fmt = cfg.formatters.get("test").unwrap();
+        let fmt = &cfg.formatters.get("test").unwrap()[0];
         assert_eq!(fmt.cmd, "");
     }
 
@@ -1219,7 +1508,7 @@ mod tests {
             preset = "air"
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
-        let r_fmt = cfg.formatters.get("r").unwrap();
+        let r_fmt = &cfg.formatters.get("r").unwrap()[0];
         assert_eq!(r_fmt.cmd, "air");
         assert_eq!(r_fmt.args, vec!["format", "{}"]);
         assert!(!r_fmt.stdin);
@@ -1233,7 +1522,7 @@ mod tests {
             preset = "ruff"
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
-        let py_fmt = cfg.formatters.get("python").unwrap();
+        let py_fmt = &cfg.formatters.get("python").unwrap()[0];
         assert_eq!(py_fmt.cmd, "ruff");
         assert_eq!(py_fmt.args, vec!["format"]);
         assert!(py_fmt.stdin);
@@ -1247,7 +1536,7 @@ mod tests {
             preset = "black"
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
-        let py_fmt = cfg.formatters.get("python").unwrap();
+        let py_fmt = &cfg.formatters.get("python").unwrap()[0];
         assert_eq!(py_fmt.cmd, "black");
         assert_eq!(py_fmt.args, vec!["-"]);
         assert!(py_fmt.stdin);
@@ -1260,10 +1549,9 @@ mod tests {
             preset = "air"
             cmd = "styler"
         "#;
-        let result = toml::from_str::<Config>(toml_str);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("mutually exclusive"));
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        // The formatter should be skipped (error logged), so r shouldn't be in the map
+        assert!(!cfg.formatters.contains_key("r"));
     }
 
     #[test]
@@ -1272,10 +1560,9 @@ mod tests {
             [formatters.r]
             preset = "nonexistent"
         "#;
-        let result = toml::from_str::<Config>(toml_str);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("Unknown formatter preset"));
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        // The formatter should be skipped (error logged), so r shouldn't be in the map
+        assert!(!cfg.formatters.contains_key("r"));
     }
 
     #[test]
@@ -1296,7 +1583,7 @@ mod tests {
 
         // Only R should be configured
         assert_eq!(cfg.formatters.len(), 1);
-        let r_fmt = cfg.formatters.get("r").unwrap();
+        let r_fmt = &cfg.formatters.get("r").unwrap()[0];
         assert_eq!(r_fmt.cmd, "custom");
         assert_eq!(r_fmt.args, vec!["--flag"]);
     }
@@ -1320,9 +1607,8 @@ mod tests {
             enabled = false
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
-        let r_fmt = cfg.formatters.get("r").unwrap();
-        assert_eq!(r_fmt.cmd, "air");
-        assert!(!r_fmt.enabled);
+        // Old format with enabled=false should not include the formatter
+        assert!(!cfg.formatters.contains_key("r"));
     }
 
     #[test]
@@ -1697,5 +1983,99 @@ mod code_blocks_config_test {
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
         assert_eq!(cfg.code_blocks.min_fence_length, 3);
         assert!(!cfg.code_blocks.normalize_indented);
+    }
+
+    // ===== New Formatter Format Tests =====
+
+    #[test]
+    fn new_format_single_formatter() {
+        let toml_str = r#"
+            [formatters]
+            r = "air"
+            python = "black"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert_eq!(cfg.formatters.len(), 2);
+
+        // Check R formatter (resolved from built-in preset)
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        assert_eq!(r_fmts[0].cmd, "air");
+        assert_eq!(r_fmts[0].args, vec!["format", "{}"]);
+
+        // Check Python formatter (resolved from built-in preset)
+        let py_fmts = cfg.formatters.get("python").unwrap();
+        assert_eq!(py_fmts.len(), 1);
+        assert_eq!(py_fmts[0].cmd, "black");
+    }
+
+    #[test]
+    fn new_format_multiple_formatters() {
+        let toml_str = r#"
+            [formatters]
+            python = ["ruff", "black"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let py_fmts = cfg.formatters.get("python").unwrap();
+        assert_eq!(py_fmts.len(), 2);
+        assert_eq!(py_fmts[0].cmd, "ruff");
+        assert_eq!(py_fmts[1].cmd, "black");
+    }
+
+    #[test]
+    fn new_format_with_custom_definition() {
+        let toml_str = r#"
+            [formatters]
+            r = "custom-air"
+            
+            [formatters.custom-air]
+            cmd = "air"
+            args = ["format", "--custom-flag"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        let r_fmts = cfg.formatters.get("r").unwrap();
+        assert_eq!(r_fmts.len(), 1);
+        assert_eq!(r_fmts[0].cmd, "air");
+        assert_eq!(r_fmts[0].args, vec!["format", "--custom-flag"]);
+    }
+
+    #[test]
+    fn new_format_empty_array() {
+        let toml_str = r#"
+            [formatters]
+            r = []
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        // Empty array means no formatting for this language
+        assert!(!cfg.formatters.contains_key("r"));
+    }
+
+    #[test]
+    fn new_format_reusable_definition() {
+        let toml_str = r#"
+            [formatters]
+            javascript = "prettier"
+            typescript = "prettier"
+            json = "prettier"
+            
+            [formatters.prettier]
+            cmd = "prettier"
+            args = ["--print-width=100"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert_eq!(cfg.formatters.len(), 3);
+
+        // All should use the same prettier config
+        for lang in ["javascript", "typescript", "json"] {
+            let fmts = cfg.formatters.get(lang).unwrap();
+            assert_eq!(fmts.len(), 1);
+            assert_eq!(fmts[0].cmd, "prettier");
+            assert_eq!(fmts[0].args, vec!["--print-width=100"]);
+        }
     }
 }

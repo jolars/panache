@@ -8,12 +8,12 @@ fn test_yaml_frontmatter_with_external_formatter() {
     let mut formatters = HashMap::new();
     formatters.insert(
         "yaml".to_string(),
-        panache::config::FormatterConfig {
+        vec![panache::config::FormatterConfig {
             cmd: "tr".to_string(),
             args: vec!["-d".to_string(), "\\n\\r\\t ".to_string()],
             enabled: true,
             stdin: true,
-        },
+        }],
     );
 
     let config = Config {

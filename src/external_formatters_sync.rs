@@ -223,7 +223,7 @@ fn format_with_file(
 /// HashMap of original code -> formatted code (only successful formats)
 pub fn run_formatters_parallel(
     blocks: Vec<(String, String)>,
-    formatters: &std::collections::HashMap<String, FormatterConfig>,
+    formatters: &std::collections::HashMap<String, Vec<FormatterConfig>>,
     timeout: Duration,
 ) -> std::collections::HashMap<String, String> {
     use std::collections::HashMap;
@@ -234,26 +234,53 @@ pub fn run_formatters_parallel(
         let mut handles = Vec::new();
 
         for (lang, code) in blocks {
-            if let Some(formatter_cfg) = formatters.get(&lang)
-                && formatter_cfg.enabled
-                && !formatter_cfg.cmd.is_empty()
-            {
-                let formatter_cfg = formatter_cfg.clone();
+            if let Some(formatter_configs) = formatters.get(&lang) {
+                if formatter_configs.is_empty() {
+                    continue; // Empty list means no formatting
+                }
+
+                let formatter_configs = formatter_configs.clone();
                 let code = code.clone();
                 let lang = lang.clone();
                 let results = Arc::clone(&results);
 
                 let handle = s.spawn(move || {
-                    log::info!("Formatting {} code with {}", lang, formatter_cfg.cmd);
-                    match format_code_sync(&code, &formatter_cfg, timeout) {
-                        Ok(formatted) => {
-                            if formatted != code {
-                                results.lock().unwrap().insert(code, formatted);
+                    // Format sequentially through the formatter chain
+                    let mut current_code = code.clone();
+
+                    for (idx, formatter_cfg) in formatter_configs.iter().enumerate() {
+                        if formatter_cfg.cmd.is_empty() {
+                            continue;
+                        }
+
+                        log::info!(
+                            "Formatting {} code with {} ({}/{} in chain)",
+                            lang,
+                            formatter_cfg.cmd,
+                            idx + 1,
+                            formatter_configs.len()
+                        );
+
+                        match format_code_sync(&current_code, formatter_cfg, timeout) {
+                            Ok(formatted) => {
+                                current_code = formatted;
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "{} formatter '{}' failed: {}. Using original code.",
+                                    lang,
+                                    formatter_cfg.cmd,
+                                    e
+                                );
+                                // Stop chain on error, use original
+                                return;
                             }
                         }
-                        Err(e) => {
-                            log::warn!("Failed to format {} code: {}", lang, e);
-                        }
+                    }
+
+                    // Only store if content changed
+                    if current_code != code {
+                        results.lock().unwrap().insert(code, current_code);
                     }
                 });
 

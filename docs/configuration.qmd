@@ -305,112 +305,91 @@ quarto_crossrefs = true          # @fig-id, @tbl-id
 panache can invoke external formatters for code blocks—**but they're opt-in**.
 You choose what gets formatted.
 
-### Quick Start with Presets
+### Basic Usage
 
-Enable formatters using convenient presets:
+Map languages to formatters using built-in presets:
 
 ```toml
-# Enable R formatting with air (fast)
-[formatters.r]
-preset = "air"
-
-# Enable Python formatting with ruff (fast)
-[formatters.python]
-preset = "ruff"
+[formatters]
+r = "air"           # Single formatter
+python = "ruff"     # Single formatter
+javascript = "prettier"
+typescript = "prettier"  # Reuse same formatter
 ```
 
 **Available presets:**
 
-| Language | Preset   | Command                    | Notes                     |
-| -------- | -------- | -------------------------- | ------------------------- |
-| `r`      | `air`    | `air format {}`            | Fast, modern              |
-| `r`      | `styler` | `Rscript -e "styler::..."` | Requires styler R package |
-| `python` | `ruff`   | `ruff format`              | Fast, modern              |
-| `python` | `black`  | `black -`                  | Popular alternative       |
+| Language | Preset     | Command                    | Notes                      |
+| -------- | ---------- | -------------------------- | -------------------------- |
+| `r`      | `air`      | `air format {}`            | Fast, modern               |
+| `r`      | `styler`   | `Rscript -e "styler::..."` | Requires styler R package  |
+| `python` | `ruff`     | `ruff format`              | Fast, modern               |
+| `python` | `black`    | `black -`                  | Popular alternative        |
+| `yaml`   | `yamlfmt`  | `yamlfmt -`                | YAML formatter             |
+| `yaml`   | `prettier` | `prettier --parser=yaml`   | Alternative YAML formatter |
 
-Formatters execute in parallel with panache's markdown formatting. If the tool
-isn't installed, code is preserved unchanged (no errors).
+### Sequential Formatting
 
-**Disabling formatters:**
+Run multiple formatters in order by using an array:
 
 ```toml
-[formatters.r]
-enabled = false  # Disable R formatting
-
-[formatters.python]
-enabled = false  # Disable Python formatting
+[formatters]
+python = ["isort", "black"]  # isort first, then black
 ```
 
-### Custom Configuration
+Output from the first formatter is piped to the second.
 
-For full control, define formatters manually. External formatters support two
-modes: **stdin/stdout** or **file-based**.
+### Custom Formatters
 
-#### Stdin Mode (Default)
-
-For formatters that read from stdin and write to stdout:
+Define custom formatter configurations with the `[formatters.NAME]` syntax:
 
 ```toml
-# Custom Python formatter (overrides built-in ruff default)
-[formatters.python]
-cmd = "black"
-args = ["-", "--line-length=88"]
+[formatters]
+python = ["isort", "black"]
+javascript = "prettier"
+
+# Override prettier's default args
+[formatters.prettier]
+args = ["--parser=babel", "--print-width=100"]
+
+# Custom formatter not in presets
+[formatters.isort]
+cmd = "isort"
+args = ["-"]
 stdin = true  # Default
-
-# Add formatters for new languages
-[formatters.rust]
-cmd = "rustfmt"
-stdin = true
-
-[formatters.javascript]
-cmd = "prettier"
-args = ["--parser=babel"]
-stdin = true
 ```
 
-**Note:** When you define a `[formatters.X]` section with `cmd`, it completely
-replaces the built-in default for that language (if any). Other languages keep
-their defaults.
+**Formatter definition fields:**
 
-#### File-Based Mode
+- `cmd`: Command to execute (required)
+- `args`: Command-line arguments (optional, defaults to `[]`)
+- `stdin`: Use stdin/stdout mode (default: `true`) or file-based mode (`false`)
+
+### File-Based Formatters
 
 For formatters that modify files in place:
 
 ```toml
-[formatters.r]
-cmd = "air"
-args = ["format"]
-stdin = false  # File-based mode
+[formatters]
+r = "air-file"
 
-[formatters.go]
-cmd = "gofmt"
-args = ["-w"]  # -w writes to file
+[formatters.air-file]
+cmd = "air"
+args = ["format", "{}"]  # {} = file path placeholder
 stdin = false
 ```
 
-**File path placeholder:** Use `{}` in args to control where the file path is
-inserted. If omitted, it's appended at the end.
-
-```toml
-[formatters.r]
-cmd = "air"
-args = ["format", "{}"]  # Explicit: air format /tmp/file.tmp
-stdin = false
-
-[formatters.custom]
-cmd = "myformatter"
-args = ["--input", "{}", "--output", "{}"]  # Multiple uses
-stdin = false
-```
+The `{}` placeholder controls where the file path is inserted. If omitted, it's
+appended at the end.
 
 ### Behavior
 
 - **Language matching:** Code block language (e.g., `` ```python ``) is matched
   to formatter key (case-insensitive)
 - **Parallel execution:** All formatters run concurrently for speed
+- **Sequential chains:** Multiple formatters per language run in order
 - **Error handling:** Failed formatters preserve original code with a warning
-- **Timeout:** 30 seconds per formatter invocation
-- **Optional:** Set `enabled = false` to disable a formatter
+- **Timeout:** 30 seconds per formatter (not per chain)
 - Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
   etc.)
 
@@ -418,20 +397,14 @@ stdin = false
 
 Any CLI tool that reads stdin and writes stdout works:
 
-- **R**: `styler`, `formatR`
-- **Python**: `black`, `ruff format`, `autopep8`
+- **R**: `air`, `styler`, `formatR`
+- **Python**: `black`, `ruff format`, `autopep8`, `isort`
 - **Rust**: `rustfmt`
 - **JavaScript/TypeScript**: `prettier`, `deno fmt`
-- **JSON**: `jq`
-- **YAML**: `yamlfmt`
+- **JSON**: `jq`, `prettier`
+- **YAML**: `yamlfmt`, `prettier`
 - **Go**: `gofmt`
 - **SQL**: `sqlformat`, `pg_format`
-
-### Performance
-
-Formatters run in **true parallel**. If you have 3 code blocks and each
-formatter takes 1 second, all 3 complete in ~1 second (not 3 seconds
-sequentially).
 
 ## External Code Linters
 
@@ -524,23 +497,20 @@ task_lists = true
 emoji = false
 
 # External formatters (opt-in)
-# Option 1: Use presets
-[formatters.r]
-preset = "air"
+[formatters]
+python = ["isort", "black"]  # Sequential: isort then black
+r = "air"                    # Built-in preset
+javascript = "prettier"      # Reusable definition
+typescript = "prettier"
+rust = "rustfmt"
 
-# Option 2: Full custom configuration
-[formatters.python]
-cmd = "black"
-args = ["-", "--line-length=88"]
+# Customize formatters (optional)
+[formatters.prettier]
+args = ["--print-width=100"]
 
-# Option 3: Add new formatters for other languages
-[formatters.rust]
-cmd = "rustfmt"
-args = []
-
-[formatters.javascript]
-cmd = "prettier"
-args = ["--parser=babel", "--stdin-filepath=file.js"]
+[formatters.isort]
+cmd = "isort"
+args = ["-"]
 
 # External linters (opt-in)
 [linters]
