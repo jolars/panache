@@ -84,10 +84,10 @@ printf "# Test\n\nThis is a very long line that should be wrapped." | ./target/r
 # Expected: Line wrapping at ~80 characters with proper Markdown formatting
 ```
 
-### Parsing the AST for Debugging
+### Parsing the CST for Debugging
 
 ```bash
-# Parse subcommand shows AST structure
+# Parse subcommand shows CST structure
 printf "# Heading\n\nParagraph with *emphasis* and `code`." | ./target/release/panache parse
 
 # Parse with config to respect extension flags
@@ -106,7 +106,7 @@ panache format < document.qmd # writes to stdout
 panache format --check document.qmd       # Check if formatted
 panache format --config cfg.toml file.qmd # Custom config
 
-# Parse (show AST for debugging)
+# Parse (show CST for debugging)
 panache parse document.qmd
 panache parse --config cfg.toml file.qmd  # Config affects parsing
 
@@ -179,6 +179,19 @@ red-green tree structure for efficient syntax tree manipulation. It is vital
 that the parser preserves **every byte** of the input in the syntax tree,
 including structural markers like `>` for blockquotes, to ensure lossless
 parsing so that LSP and linting features can accurately map source locations.
+
+**CST vs AST Distinction**:
+
+- **CST (Concrete Syntax Tree)**: The rowan tree preserves every byte including
+  whitespace, markers, and structural tokens. This is what `SyntaxNode` provides
+  and what the `cst.txt` snapshot files contain. Example: includes
+  `ATX_HEADING_MARKER@0..1 "#"`, `WHITESPACE@1..2 " "`, etc.
+- **AST (Abstract Syntax Tree)**: The typed wrappers provide an abstract view
+  that hides syntactic details. Example: `Heading::cast(node).level()` returns
+  `1` without exposing the `#` markers.
+
+The parser builds the CST, and typed wrappers (see **Typed AST Wrappers**
+section below) provide convenient AST-like access for LSP and other features.
 
 **Typed AST Wrappers**: The CST provides low-level access via `SyntaxNode`, but
 for ergonomic use (especially in LSP), panache provides typed wrapper structs
@@ -354,7 +367,7 @@ tests/
 ├── golden_cases.rs      # Main integration tests using test case directories
 ├── cases/              # Input/expected output pairs (60+ test scenarios)
 │   ├── wrap_paragraph/
-│   │   ├── ast.txt      # AST snapshot of input for debugging
+│   │   ├── cst.txt      # CST snapshot of input for debugging
 │   │   ├── panache.toml # Optional config for this test case
 │   │   ├── input.md     # Raw input (can be .md, .qmd, .Rmd)
 │   │   └── expected.md  # Expected formatted output (can be .md, .qmd, .Rmd)
@@ -467,9 +480,9 @@ The project uses snapshot testing via `tests/golden_cases.rs`:
 - Tests verify formatting is idempotent (format twice = format once)
 - Use `UPDATE_EXPECTED=1 cargo test` to update expected formatted outputs (BE
   CAREFUL)
-- Use `UPDATE_AST=1 cargo test` to update expected AST outputs (BE CAREFUL)
+- Use `UPDATE_CST=1 cargo test` to update expected CST outputs (BE CAREFUL)
 - Use both flags together to update both:
-  `UPDATE_EXPECTED=1 UPDATE_AST=1 cargo test`
+  `UPDATE_EXPECTED=1 UPDATE_CST=1 cargo test`
 - New features should have corresponding test cases added to cover new
   formatting scenarios.
 - **DO NOT** update expected outputs without verifying that the change is
@@ -748,7 +761,7 @@ The `docs/playground/` contains a WASM-based web interface:
 - Consider idempotency - formatting twice should equal formatting once
 - Update golden test expectations (CAREFULLY!):
   - `UPDATE_EXPECTED=1 cargo test` for formatted outputs
-  - `UPDATE_AST=1 cargo test` for AST snapshots
+  - `UPDATE_CST=1 cargo test` for CST snapshots
   - Both flags can be combined if needed
 
 ### DON'T:

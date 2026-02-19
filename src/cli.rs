@@ -25,7 +25,7 @@ EXAMPLES:
     # Use custom config
     panache format --config custom.toml document.qmd
 
-    # Parse and inspect AST
+    # Parse and inspect CST
     panache parse document.qmd
 
 CONFIGURATION:
@@ -125,29 +125,23 @@ EXAMPLES:
         )]
         range: Option<String>,
     },
-    /// Parse and display the AST tree for debugging
+    /// Parse and display the CST tree for debugging
     #[command(
-        long_about = "Parse a document and display its Abstract Syntax Tree (AST) for debugging \
-        and understanding how panache interprets the document structure. The AST shows all block \
+        long_about = "Parse a document and display its Concrete Syntax Tree (CST) for debugging \
+        and understanding how panache interprets the document structure. The CST shows all block \
         and inline elements detected by the parser."
     )]
     #[command(after_help = "\
 EXAMPLES:
 
-    # Parse a file and show AST
+    # Parse a file and show CST
     panache parse document.qmd
 
     # Parse from stdin
     echo '# Heading' | panache parse
 
     # Parse with custom config (affects extension parsing)
-    panache parse --config .panache.toml document.qmd
-
-The AST output shows the concrete syntax tree built by the parser, including:
-  - Block elements (headings, paragraphs, code blocks, lists, tables)
-  - Inline elements (emphasis, code, math, links, footnotes)
-  - Container blocks (blockquotes, fenced divs)
-  - Metadata (YAML/TOML frontmatter)")]
+    panache parse --config .panache.toml document.qmd")]
     Parse {
         /// Input file (stdin if not provided)
         #[arg(help = "Input file path")]

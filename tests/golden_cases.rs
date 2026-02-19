@@ -3,12 +3,12 @@
 //! Each test case is a directory under `tests/cases/` containing:
 //! - `input.*` - Source file (`.md`, `.qmd`, or `.Rmd`)
 //! - `expected.*` - Expected formatted output (same extension as input)
-//! - `ast.txt` - (Optional) Expected AST structure for parse regression testing
+//! - `cst.txt` - (Optional) Expected CST structure for parse regression testing
 //! - `panache.toml` - (Optional) Config to test specific flavors/extensions
 //!
 //! Run with `UPDATE_EXPECTED=1 cargo test` to regenerate expected outputs.
-//! Run with `UPDATE_AST=1 cargo test` to regenerate AST files.
-//! Run with both flags to update both: `UPDATE_EXPECTED=1 UPDATE_AST=1 cargo test`.
+//! Run with `UPDATE_CST=1 cargo test` to regenerate CST files.
+//! Run with both flags to update both: `UPDATE_EXPECTED=1 UPDATE_CST=1 cargo test`.
 
 use panache::{Config, format, parse};
 use std::{
@@ -46,7 +46,7 @@ fn run_golden_case(case_name: &str) {
         .join(case_name);
 
     let update_expected = std::env::var_os("UPDATE_EXPECTED").is_some();
-    let update_ast = std::env::var_os("UPDATE_AST").is_some();
+    let update_cst = std::env::var_os("UPDATE_CST").is_some();
 
     // Find input file with any supported extension
     let input_path = find_file_with_extension(&dir, "input")
@@ -59,7 +59,7 @@ fn run_golden_case(case_name: &str) {
         .unwrap_or("qmd");
     let expected_path = dir.join(format!("expected.{}", input_ext));
 
-    let ast_path = dir.join("ast.txt");
+    let cst_path = dir.join("cst.txt");
 
     // Load optional config
     let config = load_test_config(&dir);
@@ -88,16 +88,16 @@ fn run_golden_case(case_name: &str) {
     let output_twice = format(&output, config.clone(), None);
     similar_asserts::assert_eq!(output, output_twice, "idempotency: {}", case_name);
 
-    // Test AST parsing (if ast.txt exists or we're updating AST)
-    if ast_path.exists() || update_ast {
-        let ast_output = format!("{:#?}\n", ast);
+    // Test CST parsing (if cst.txt exists or we're updating CST)
+    if cst_path.exists() || update_cst {
+        let cst_output = format!("{:#?}\n", ast);
 
-        if update_ast {
-            fs::write(&ast_path, &ast_output).unwrap();
+        if update_cst {
+            fs::write(&cst_path, &cst_output).unwrap();
         } else {
-            let expected_ast = fs::read_to_string(&ast_path)
-                .unwrap_or_else(|_| panic!("Failed to read ast.txt in {}", case_name));
-            similar_asserts::assert_eq!(expected_ast, ast_output, "AST mismatch: {}", case_name);
+            let expected_cst = fs::read_to_string(&cst_path)
+                .unwrap_or_else(|_| panic!("Failed to read cst.txt in {}", case_name));
+            similar_asserts::assert_eq!(expected_cst, cst_output, "CST mismatch: {}", case_name);
         }
     }
 

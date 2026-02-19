@@ -353,7 +353,7 @@ syntax.
 - Full LSP implementation for editor integration
 - Linting as part of LSP but also available as a standalone CLI command
 - Support Quarto, Pandoc, and Markdown syntax
-- Fast lossless parsing and formatting (no AST changes if already formatted)
+- Fast lossless parsing and formatting (no CST changes if already formatted)
 - Be configurable, but have sane defaults (that most people can agree on)
 - Format math
 - Hook into external formatters for code blocks (e.g. `air` for R, `ruff` for

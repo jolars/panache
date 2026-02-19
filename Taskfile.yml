@@ -65,10 +65,10 @@ tasks:
     cmds:
       - UPDATE_EXPECTED=1 cargo test --test golden_cases
 
-  update-golden-ast:
-    desc: Update golden test AST files
+  update-golden-cst:
+    desc: Update golden test CST files
     cmds:
-      - UPDATE_AST=1 cargo test --test golden_cases
+      - UPDATE_CST=1 cargo test --test golden_cases
 
   coverage:
     desc: Generate code coverage report

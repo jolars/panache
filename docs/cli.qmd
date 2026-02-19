@@ -26,7 +26,7 @@ EXAMPLES:
     # Use custom config
     panache format --config custom.toml document.qmd
 
-    # Parse and inspect AST
+    # Parse and inspect CST
     panache parse document.qmd
 
 CONFIGURATION:
@@ -51,7 +51,7 @@ For more information, visit: https://github.com/jolars/panache
 ###### **Subcommands:**
 
 * `format` — Format a Quarto, Pandoc, or Markdown document
-* `parse` — Parse and display the AST tree for debugging
+* `parse` — Parse and display the CST tree for debugging
 * `lsp` — Start the Language Server Protocol server
 * `lint` — Lint a Quarto, Pandoc, or Markdown document
 
@@ -103,13 +103,13 @@ EXAMPLES:
 
 ## `panache parse`
 
-Parse a document and display its Abstract Syntax Tree (AST) for debugging and understanding how panache interprets the document structure. The AST shows all block and inline elements detected by the parser.
+Parse a document and display its Concrete Syntax Tree (CST) for debugging and understanding how panache interprets the document structure. The CST shows all block and inline elements detected by the parser.
 
 **Usage:** `panache parse [FILE]`
 
 EXAMPLES:
 
-    # Parse a file and show AST
+    # Parse a file and show CST
     panache parse document.qmd
 
     # Parse from stdin
@@ -117,12 +117,6 @@ EXAMPLES:
 
     # Parse with custom config (affects extension parsing)
     panache parse --config .panache.toml document.qmd
-
-The AST output shows the concrete syntax tree built by the parser, including:
-  - Block elements (headings, paragraphs, code blocks, lists, tables)
-  - Inline elements (emphasis, code, math, links, footnotes)
-  - Container blocks (blockquotes, fenced divs)
-  - Metadata (YAML/TOML frontmatter)
 
 ###### **Arguments:**
 
