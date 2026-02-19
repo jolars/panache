@@ -130,4 +130,90 @@ impl FootnoteDefinition {
             })
             .unwrap_or_default()
     }
+
+    /// Extracts the content of the footnote definition.
+    /// Returns the text content after the `[^id]:` marker.
+    pub fn content(&self) -> String {
+        // Skip the FOOTNOTE_REFERENCE token and collect all other content
+        self.0
+            .children()
+            .filter(|child| child.kind() != SyntaxKind::FOOTNOTE_REFERENCE)
+            .map(|child| child.text().to_string())
+            .collect::<Vec<_>>()
+            .join("")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parse;
+
+    #[test]
+    fn test_footnote_definition_single_line() {
+        let input = "[^1]: This is a simple footnote.";
+        let root = parse(input, None);
+        let def = root
+            .descendants()
+            .find_map(FootnoteDefinition::cast)
+            .expect("Should find FootnoteDefinition");
+
+        assert_eq!(def.id(), "1");
+        assert_eq!(def.content().trim(), "This is a simple footnote.");
+    }
+
+    #[test]
+    fn test_footnote_definition_multiline() {
+        let input = "[^1]: First line\n    Second line";
+        let root = parse(input, None);
+        let def = root
+            .descendants()
+            .find_map(FootnoteDefinition::cast)
+            .expect("Should find FootnoteDefinition");
+
+        assert_eq!(def.id(), "1");
+        let content = def.content();
+        assert!(content.contains("First line"));
+        assert!(content.contains("Second line"));
+    }
+
+    #[test]
+    fn test_footnote_definition_with_formatting() {
+        let input = "[^note]: Text with *emphasis* and `code`.";
+        let root = parse(input, None);
+        let def = root
+            .descendants()
+            .find_map(FootnoteDefinition::cast)
+            .expect("Should find FootnoteDefinition");
+
+        assert_eq!(def.id(), "note");
+        let content = def.content();
+        assert!(content.contains("*emphasis*"));
+        assert!(content.contains("`code`"));
+    }
+
+    #[test]
+    fn test_footnote_definition_empty() {
+        let input = "[^1]: ";
+        let root = parse(input, None);
+        let def = root
+            .descendants()
+            .find_map(FootnoteDefinition::cast)
+            .expect("Should find FootnoteDefinition");
+
+        assert_eq!(def.id(), "1");
+        assert!(def.content().trim().is_empty());
+    }
+
+    #[test]
+    fn test_footnote_reference_id() {
+        let input = "[^test]";
+        let root = parse(input, None);
+        let ref_node = root
+            .descendants()
+            .find_map(FootnoteReference::cast)
+            .expect("Should find FootnoteReference");
+
+        assert_eq!(ref_node.id(), "test");
+    }
 }

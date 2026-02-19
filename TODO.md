@@ -74,7 +74,7 @@ This document tracks implementation status for panache's features.
 - ❌ **Link preview** - `textDocument/hover` to show link target
 - ❌ **Reference preview** - Show reference definition on hover
 - ❌ **Citation preview** - Show bibliography entry for citation
-- ❌ **Footnote preview** - Show footnote content inline
+- ✅ **Footnote preview** - Show footnote content inline
 
 #### Advanced
 

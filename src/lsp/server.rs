@@ -38,6 +38,7 @@ impl LanguageServer for PanacheLsp {
                 document_symbol_provider: Some(OneOf::Left(true)),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -142,6 +143,16 @@ impl LanguageServer for PanacheLsp {
         params: GotoDefinitionParams,
     ) -> Result<Option<GotoDefinitionResponse>> {
         handlers::goto_definition::goto_definition(
+            &self.client,
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await
+    }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        handlers::hover::hover(
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
