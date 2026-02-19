@@ -36,6 +36,7 @@ This document tracks implementation status for panache's features.
 
 - ❌ **Convert lists** - Convert between bullet/ordered lists
 - ✅ **Convert loose/compact lists** - Toggle between loose and compact list
+- ❌ Convert bullet list to task list - Convert `- item` to `- [ ] item`
   formatting (DONE: LSP code action available via cursor on list)
 - ❌ **Convert table** - Convert between table styles (simple, pipe, grid)
 - ❌ **Convert link styles** - Convert between inline/reference links
