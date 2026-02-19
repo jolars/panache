@@ -947,7 +947,21 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::SIMPLE_TABLE | SyntaxKind::MULTILINE_TABLE => {
+            SyntaxKind::SIMPLE_TABLE => {
+                log::trace!("Formatting simple table");
+                let formatted = tables::format_simple_table(node, &self.config);
+                self.output.push_str(&formatted);
+
+                // Ensure blank line after if followed by block element
+                if let Some(next) = node.next_sibling()
+                    && is_block_element(next.kind())
+                    && !self.output.ends_with("\n\n")
+                {
+                    self.output.push('\n');
+                }
+            }
+
+            SyntaxKind::MULTILINE_TABLE => {
                 // Handle table with proper caption formatting
                 for child in node.children() {
                     match child.kind() {

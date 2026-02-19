@@ -217,7 +217,7 @@ panache lint --config cfg.toml      # Custom config
 
 ### Tables
 
-- ❌ **Simple tables** - Support for formatting tables
+- ✅ **Simple tables** - Support for formatting tables (preserves column positions and alignment)
 - ✅ **Pipe tables** - Support for formatting GitHub-style tables
 - ✅ **Grid tables** - Support for formatting grid-style tables
 - ❌ **Multiline tables** - Support for formatting tables with multiline cells
