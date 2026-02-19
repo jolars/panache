@@ -47,9 +47,15 @@ const OPTION_NAME_OVERRIDES: &[(&str, &str)] = &[
 pub fn get_comment_prefix(language: &str) -> Option<&'static str> {
     match language.to_lowercase().as_str() {
         "r" | "python" | "julia" | "bash" | "shell" | "sh" | "ruby" | "perl" => Some("#|"),
+
         "c" | "cpp" | "c++" | "java" | "javascript" | "js" | "typescript" | "ts" | "rust"
-        | "go" | "swift" | "kotlin" | "scala" | "csharp" | "c#" | "php" | "ojs" => Some("//|"),
+        | "go" | "swift" | "kotlin" | "scala" | "csharp" | "c#" | "php" | "ojs" | "dot" => {
+            Some("//|")
+        }
+
         "sql" | "mysql" | "postgres" | "postgresql" | "sqlite" => Some("--|"),
+
+        "mermaid" => Some("%%|"),
 
         // Unknown language - don't convert to hashpipe
         _ => None,
