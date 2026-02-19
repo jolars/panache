@@ -30,7 +30,7 @@ This document tracks implementation status for panache's features.
   consistency)
 - ❌ **Link validation** - Check for broken internal links/references
 - ❌ **Citation validation** - Validate citation keys against bibliography
-- ❌ **Footnote validation** - Check for undefined footnotes
+- ❌ **Footnote validation** - Check for undefined footnotes (also in linter)
 
 #### Code Actions
 
@@ -83,7 +83,7 @@ This document tracks implementation status for panache's features.
 - ✅ **Range formatting** - `textDocument/rangeFormatting` for selected text
   only
 - ❌ **On-type formatting** - `textDocument/onTypeFormatting` for
-  auto-formatting triggers
+  auto-formatting triggers (not sure about this)
 - ❌ **Document links** - `textDocument/documentLink` for clickable links
 - ❌ **Semantic tokens** - Syntax highlighting via LSP
 - ❌ **Rename** - Rename reference links/footnotes/citations across document
