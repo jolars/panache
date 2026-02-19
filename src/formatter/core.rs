@@ -962,34 +962,9 @@ impl Formatter {
             }
 
             SyntaxKind::MULTILINE_TABLE => {
-                // Handle table with proper caption formatting
-                for child in node.children() {
-                    match child.kind() {
-                        SyntaxKind::TABLE_CAPTION => {
-                            // Normalize caption prefix to "Table: "
-                            for caption_child in child.children_with_tokens() {
-                                match caption_child {
-                                    rowan::NodeOrToken::Token(token)
-                                        if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
-                                    {
-                                        // Always emit normalized "Table: " prefix
-                                        self.output.push_str("Table: ");
-                                    }
-                                    rowan::NodeOrToken::Token(token) => {
-                                        self.output.push_str(token.text());
-                                    }
-                                    rowan::NodeOrToken::Node(node) => {
-                                        self.output.push_str(&node.text().to_string());
-                                    }
-                                }
-                            }
-                        }
-                        _ => {
-                            // For other table parts, preserve as-is
-                            self.output.push_str(&child.text().to_string());
-                        }
-                    }
-                }
+                // Format multiline table with proper alignment and column widths
+                let formatted = tables::format_multiline_table(node, &self.config);
+                self.output.push_str(&formatted);
             }
 
             SyntaxKind::PIPE_TABLE => {

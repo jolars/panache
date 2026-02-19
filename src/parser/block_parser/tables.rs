@@ -222,8 +222,8 @@ pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -
 }
 
 /// Find caption before table (if any).
-/// Returns the position where caption starts, or None.
-fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<usize> {
+/// Returns (caption_start, caption_end) positions, or None.
+fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usize, usize)> {
     if table_start == 0 {
         return None;
     }
@@ -240,13 +240,34 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<usize
         pos -= 1;
     }
 
-    // Check if this line is a caption
-    if is_table_caption_start(lines[pos]) {
-        // For now, assume caption is single line
-        // Multi-line captions are more complex to detect backwards
-        Some(pos)
-    } else {
+    // Now pos points to the last non-blank line before the table
+    // This could be the last line of a multiline caption, or a single-line caption
+    let caption_end = pos + 1; // End is exclusive
+
+    // If this line is NOT a caption start, it might be a continuation line
+    // Scan backward through non-blank lines to find the caption start
+    if !is_table_caption_start(lines[pos]) {
+        // Not a caption start - check if there's a caption start above
+        let mut scan_pos = pos;
+        while scan_pos > 0 {
+            scan_pos -= 1;
+            let line = lines[scan_pos];
+
+            // If we hit a blank line, we've gone too far
+            if line.trim().is_empty() {
+                return None;
+            }
+
+            // If we find a caption start, this is the beginning of the multiline caption
+            if is_table_caption_start(line) {
+                return Some((scan_pos, caption_end));
+            }
+        }
+        // Scanned to beginning without finding caption start
         None
+    } else {
+        // This line is a caption start - return the range
+        Some((pos, caption_end))
     }
 }
 
@@ -439,8 +460,8 @@ pub(crate) fn try_parse_simple_table(
     builder.start_node(SyntaxKind::SIMPLE_TABLE.into());
 
     // Emit caption before if present
-    if let Some(caption_pos) = caption_before {
-        emit_table_caption(builder, lines, caption_pos, caption_pos + 1);
+    if let Some((cap_start, cap_end)) = caption_before {
+        emit_table_caption(builder, lines, cap_start, cap_end);
     }
 
     // Emit header if present
@@ -477,11 +498,13 @@ pub(crate) fn try_parse_simple_table(
     builder.finish_node(); // SimpleTable
 
     // Calculate lines consumed (including captions)
-    let table_start = caption_before.unwrap_or(if has_header {
+    let table_start = if let Some((cap_start, _)) = caption_before {
+        cap_start
+    } else if has_header {
         separator_pos - 1
     } else {
         separator_pos
-    });
+    };
 
     let table_end = if let Some((_, cap_end)) = caption_after {
         cap_end
@@ -710,7 +733,7 @@ pub(crate) fn try_parse_pipe_table(
 
     // Check for caption before table (only if we didn't already detect it)
     let caption_before = if has_caption_before {
-        Some(start_pos)
+        Some((start_pos, start_pos + 1)) // Single-line caption detected earlier
     } else {
         find_caption_before_table(lines, actual_start)
     };
@@ -722,11 +745,11 @@ pub(crate) fn try_parse_pipe_table(
     builder.start_node(SyntaxKind::PIPE_TABLE.into());
 
     // Emit caption before if present
-    if let Some(caption_pos) = caption_before {
-        emit_table_caption(builder, lines, caption_pos, caption_pos + 1);
+    if let Some((cap_start, cap_end)) = caption_before {
+        emit_table_caption(builder, lines, cap_start, cap_end);
         // Emit blank line between caption and table if present
-        if caption_pos + 1 < actual_start {
-            for line in lines.iter().take(actual_start).skip(caption_pos + 1) {
+        if cap_end < actual_start {
+            for line in lines.iter().take(actual_start).skip(cap_end) {
                 if line.trim().is_empty() {
                     builder.start_node(SyntaxKind::BLANK_LINE.into());
                     builder.token(SyntaxKind::BLANK_LINE.into(), line);
@@ -767,7 +790,9 @@ pub(crate) fn try_parse_pipe_table(
     builder.finish_node(); // PipeTable
 
     // Calculate lines consumed
-    let table_start = caption_before.unwrap_or(actual_start);
+    let table_start = caption_before
+        .map(|(start, _)| start)
+        .unwrap_or(actual_start);
     let table_end = if let Some((_, cap_end)) = caption_after {
         cap_end
     } else {
@@ -1197,9 +1222,9 @@ pub(crate) fn try_parse_grid_table(
     // Last consumed line should be a separator for a well-formed table
     // But we'll be lenient and accept tables ending with content rows
 
-    // Check for caption before table (only if we didn't already detect it)
+    // Check for caption before table (only if we didn't already detected it)
     let caption_before = if has_caption_before {
-        Some(start_pos)
+        Some((start_pos, start_pos + 1)) // Single-line caption detected earlier
     } else {
         find_caption_before_table(lines, actual_start)
     };
@@ -1211,11 +1236,11 @@ pub(crate) fn try_parse_grid_table(
     builder.start_node(SyntaxKind::GRID_TABLE.into());
 
     // Emit caption before if present
-    if let Some(caption_pos) = caption_before {
-        emit_table_caption(builder, lines, caption_pos, caption_pos + 1);
+    if let Some((cap_start, cap_end)) = caption_before {
+        emit_table_caption(builder, lines, cap_start, cap_end);
         // Emit blank line between caption and table if present
-        if caption_pos + 1 < actual_start {
-            for line in lines.iter().take(actual_start).skip(caption_pos + 1) {
+        if cap_end < actual_start {
+            for line in lines.iter().take(actual_start).skip(cap_end) {
                 if line.trim().is_empty() {
                     builder.start_node(SyntaxKind::BLANK_LINE.into());
                     builder.token(SyntaxKind::BLANK_LINE.into(), line);
@@ -1285,7 +1310,9 @@ pub(crate) fn try_parse_grid_table(
     builder.finish_node(); // GRID_TABLE
 
     // Calculate lines consumed
-    let table_start = caption_before.unwrap_or(actual_start);
+    let table_start = caption_before
+        .map(|(start, _)| start)
+        .unwrap_or(actual_start);
     let table_end = if let Some((_, cap_end)) = caption_after {
         cap_end
     } else {
@@ -1632,8 +1659,19 @@ pub(crate) fn try_parse_multiline_table(
     builder.start_node(SyntaxKind::MULTILINE_TABLE.into());
 
     // Emit caption before if present
-    if let Some(caption_pos) = caption_before {
-        emit_table_caption(builder, lines, caption_pos, caption_pos + 1);
+    if let Some((cap_start, cap_end)) = caption_before {
+        emit_table_caption(builder, lines, cap_start, cap_end);
+
+        // Emit blank line between caption and table if present
+        if cap_end < start_pos {
+            for line in lines.iter().take(start_pos).skip(cap_end) {
+                if line.trim().is_empty() {
+                    builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
+                    builder.finish_node();
+                }
+            }
+        }
     }
 
     // Emit opening separator
@@ -1726,7 +1764,7 @@ pub(crate) fn try_parse_multiline_table(
     builder.finish_node(); // MultilineTable
 
     // Calculate lines consumed
-    let table_start = caption_before.unwrap_or(start_pos);
+    let table_start = caption_before.map(|(start, _)| start).unwrap_or(start_pos);
     let table_end = if let Some((_, cap_end)) = caption_after {
         cap_end
     } else {

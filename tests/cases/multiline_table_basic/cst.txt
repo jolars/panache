@@ -1,0 +1,31 @@
+DOCUMENT@0..550
+  MULTILINE_TABLE@0..550
+    TABLE_SEPARATOR@0..62
+      TEXT@0..61 "--------------------- ..."
+      NEWLINE@61..62 "\n"
+    TABLE_HEADER@62..147
+      TEXT@62..102 " Centered   Default   ..."
+      NEWLINE@102..103 "\n"
+      TEXT@103..146 "  Header    Aligned   ..."
+      NEWLINE@146..147 "\n"
+    TABLE_SEPARATOR@147..209
+      TEXT@147..208 "----------- ------- - ..."
+      NEWLINE@208..209 "\n"
+    TABLE_ROW@209..325
+      TEXT@209..266 "   First    row       ..."
+      NEWLINE@266..267 "\n"
+      TEXT@267..324 "                      ..."
+      NEWLINE@324..325 "\n"
+    BLANK_LINE@325..326
+      BLANK_LINE@325..326 "\n"
+    TABLE_ROW@326..488
+      TEXT@326..386 "  Second    row       ..."
+      NEWLINE@386..387 "\n"
+      TEXT@387..445 "                      ..."
+      NEWLINE@445..446 "\n"
+      TEXT@446..487 "                      ..."
+      NEWLINE@487..488 "\n"
+    TABLE_SEPARATOR@488..550
+      TEXT@488..549 "--------------------- ..."
+      NEWLINE@549..550 "\n"
+

@@ -29,7 +29,7 @@ fn format_cell_content(node: &SyntaxNode, config: &Config) -> String {
     for child in node.children_with_tokens() {
         match child {
             NodeOrToken::Token(token) => {
-                if token.kind() == SyntaxKind::TEXT {
+                if token.kind() == SyntaxKind::TEXT || token.kind() == SyntaxKind::NEWLINE {
                     result.push_str(token.text());
                 }
             }
@@ -1090,6 +1090,363 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
     {
         output.push('\n');
         output.push_str(caption_text);
+        output.push('\n');
+    }
+
+    output
+}
+
+/// Extract column information from multiline table separator line
+fn extract_multiline_columns(separator_line: &str) -> Vec<(usize, usize)> {
+    // Strip leading/trailing whitespace - column positions are relative to trimmed line
+    let trimmed = separator_line.trim();
+
+    let mut columns = Vec::new();
+    let mut in_dashes = false;
+    let mut col_start = 0;
+
+    for (i, ch) in trimmed.char_indices() {
+        match ch {
+            '-' => {
+                if !in_dashes {
+                    col_start = i;
+                    in_dashes = true;
+                }
+            }
+            ' ' => {
+                if in_dashes {
+                    columns.push((col_start, i));
+                    in_dashes = false;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Handle last column
+    if in_dashes {
+        columns.push((col_start, trimmed.len()));
+    }
+
+    columns
+}
+
+/// Determine alignment for a column based on header text position
+fn determine_multiline_alignment(header_text: &str, col_start: usize, col_end: usize) -> Alignment {
+    if header_text.is_empty() {
+        return Alignment::Default;
+    }
+
+    // Use first non-empty line of header to determine alignment
+    let first_line = header_text
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("");
+
+    // Extract text within this column using original line (not normalized)
+    let header_in_col = if col_end <= first_line.len() {
+        &first_line[col_start..col_end]
+    } else if col_start < first_line.len() {
+        &first_line[col_start..]
+    } else {
+        return Alignment::Default;
+    };
+
+    let text_start = header_in_col.len() - header_in_col.trim_start().len();
+    let trimmed_text = header_in_col.trim();
+    let text_end = text_start + trimmed_text.len();
+
+    let col_width = col_end - col_start;
+    let flush_left = text_start == 0;
+    let flush_right = text_end == col_width;
+
+    match (flush_left, flush_right) {
+        (true, true) => Alignment::Default,
+        (true, false) => Alignment::Left,
+        (false, true) => Alignment::Right,
+        (false, false) => Alignment::Center,
+    }
+}
+
+/// Represents a multiline table with cells that can span multiple lines
+struct MultilineTableData {
+    /// Rows of cells, where each cell is a vector of lines
+    rows: Vec<Vec<Vec<String>>>,
+    alignments: Vec<Alignment>,
+    caption: Option<String>,
+    column_positions: Vec<(usize, usize)>,
+    has_header: bool,
+}
+
+/// Extract multiline cell content from a text block  
+fn extract_multiline_cells(text: &str, column_positions: &[(usize, usize)]) -> Vec<Vec<String>> {
+    let lines: Vec<&str> = text.lines().collect();
+    let num_cols = column_positions.len();
+
+    // Initialize cells - each cell is a vec of lines
+    let mut cells: Vec<Vec<String>> = vec![Vec::new(); num_cols];
+
+    for line in lines {
+        // Keep line as-is without normalization - column positions should work on original text
+        for (col_idx, &(col_start, col_end)) in column_positions.iter().enumerate() {
+            let cell_line = if col_end <= line.len() {
+                line[col_start..col_end].trim()
+            } else if col_start < line.len() {
+                line[col_start..].trim()
+            } else {
+                ""
+            };
+            cells[col_idx].push(cell_line.to_string());
+        }
+    }
+
+    cells
+}
+
+/// Extract structured data from multiline table AST node
+fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> MultilineTableData {
+    let mut rows: Vec<Vec<Vec<String>>> = Vec::new();
+    let mut column_positions: Vec<(usize, usize)> = Vec::new();
+    let mut alignments = Vec::new();
+    let mut caption = None;
+    let mut has_header = false;
+    let mut header_text = String::new();
+    let mut separator_count = 0;
+
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::TABLE_CAPTION => {
+                // Build normalized caption: "Table: " + caption text (without prefix)
+                let mut caption_text = String::from("Table: ");
+
+                for caption_child in child.children_with_tokens() {
+                    match caption_child {
+                        rowan::NodeOrToken::Token(token)
+                            if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
+                        {
+                            // Skip the original prefix - we're using ": " prefix
+                        }
+                        rowan::NodeOrToken::Token(token) => {
+                            caption_text.push_str(token.text());
+                        }
+                        rowan::NodeOrToken::Node(node) => {
+                            caption_text.push_str(&node.text().to_string());
+                        }
+                    }
+                }
+
+                caption = Some(caption_text.trim().to_string());
+            }
+            SyntaxKind::TABLE_SEPARATOR => {
+                separator_count += 1;
+                let sep_text = child.text().to_string();
+
+                // For headerless tables: first separator defines columns
+                // For tables with headers: second separator (after header) defines columns
+                // We extract from first separator and will overwrite if we see a second one
+                if separator_count == 1 || (separator_count == 2 && has_header) {
+                    column_positions = extract_multiline_columns(&sep_text);
+                }
+            }
+            SyntaxKind::TABLE_HEADER => {
+                has_header = true;
+                // Collect all header text (may span multiple lines)
+                header_text = child.text().to_string();
+            }
+            SyntaxKind::TABLE_ROW => {
+                // Format cell content and split into cells
+                let row_content = format_cell_content(&child, config);
+
+                // Extract multiline cells
+                let cells = extract_multiline_cells(&row_content, &column_positions);
+                rows.push(cells);
+            }
+            _ => {}
+        }
+    }
+
+    // Add header as first row if present
+    if has_header && !column_positions.is_empty() {
+        let header_cells = extract_multiline_cells(&header_text, &column_positions);
+        rows.insert(0, header_cells);
+
+        // Determine alignments from header
+        for &(col_start, col_end) in &column_positions {
+            let alignment = determine_multiline_alignment(&header_text, col_start, col_end);
+            alignments.push(alignment);
+        }
+    } else {
+        // No header - use default alignment
+        alignments = vec![Alignment::Default; column_positions.len()];
+    }
+
+    MultilineTableData {
+        rows,
+        alignments,
+        caption,
+        column_positions,
+        has_header,
+    }
+}
+
+/// Format a multiline table preserving column widths and structure
+pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
+    let table_data = extract_multiline_table_data(node, config);
+    let mut output = String::new();
+
+    // Early return if no rows or no column info
+    if table_data.rows.is_empty() || table_data.column_positions.is_empty() {
+        return node.text().to_string();
+    }
+
+    let positions = &table_data.column_positions;
+
+    // Calculate total table width
+    let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
+
+    // Emit caption before if present
+    if let Some(ref caption_text) = table_data.caption {
+        output.push_str(caption_text);
+        output.push_str("\n\n"); // Blank line between caption and table
+    }
+
+    // Emit opening separator
+    if table_data.has_header {
+        // With header: opening separator is full-width dashes
+        output.push_str(&"-".repeat(last_col_end));
+        output.push('\n');
+    } else {
+        // Headerless: opening separator shows column boundaries
+        let mut sep_chars: Vec<char> = vec![' '; last_col_end];
+        for &(col_start, col_end) in positions {
+            for i in col_start..col_end {
+                sep_chars[i] = '-';
+            }
+        }
+        output.push_str(&sep_chars.iter().collect::<String>());
+        output.push('\n');
+    }
+
+    // Emit header if present
+    if table_data.has_header && !table_data.rows.is_empty() {
+        let header_row = &table_data.rows[0];
+
+        // Determine max number of lines across all header cells
+        let max_lines = header_row.iter().map(|cell| cell.len()).max().unwrap_or(0);
+
+        // Emit each line of the header
+        for line_idx in 0..max_lines {
+            let mut line_chars: Vec<char> = vec![' '; last_col_end];
+
+            for (col_idx, cell_lines) in header_row.iter().enumerate() {
+                if let Some(&(col_start, col_end)) = positions.get(col_idx) {
+                    let cell_text = cell_lines.get(line_idx).map(|s| s.as_str()).unwrap_or("");
+                    let alignment = table_data
+                        .alignments
+                        .get(col_idx)
+                        .copied()
+                        .unwrap_or(Alignment::Default);
+
+                    let col_width = col_end - col_start;
+                    let cell_width = cell_text.trim_end().width();
+                    let total_padding = col_width.saturating_sub(cell_width);
+
+                    // Calculate text start position based on alignment
+                    let text_start_in_col = match alignment {
+                        Alignment::Left | Alignment::Default => 0,
+                        Alignment::Right => total_padding,
+                        Alignment::Center => total_padding / 2,
+                    };
+
+                    // Place characters
+                    for (i, ch) in cell_text.trim_end().chars().enumerate() {
+                        let target_pos = col_start + text_start_in_col + i;
+                        if target_pos < line_chars.len() {
+                            line_chars[target_pos] = ch;
+                        }
+                    }
+                }
+            }
+
+            output.push_str(&line_chars.iter().collect::<String>().trim_end());
+            output.push('\n');
+        }
+
+        // Emit column separator (no indent)
+        let mut sep_chars: Vec<char> = vec![' '; last_col_end];
+        for &(col_start, col_end) in positions {
+            for i in col_start..col_end {
+                sep_chars[i] = '-';
+            }
+        }
+        output.push_str(&sep_chars.iter().collect::<String>());
+        output.push('\n');
+    }
+
+    // Emit body rows
+    let start_row = if table_data.has_header { 1 } else { 0 };
+    for (row_idx, row) in table_data.rows.iter().enumerate().skip(start_row) {
+        // Determine max number of lines across all cells in this row
+        let max_lines = row.iter().map(|cell| cell.len()).max().unwrap_or(0);
+
+        // Emit each line of the row
+        for line_idx in 0..max_lines {
+            let mut line_chars: Vec<char> = vec![' '; last_col_end];
+
+            for (col_idx, cell_lines) in row.iter().enumerate() {
+                if let Some(&(col_start, col_end)) = positions.get(col_idx) {
+                    let cell_text = cell_lines.get(line_idx).map(|s| s.as_str()).unwrap_or("");
+                    let alignment = table_data
+                        .alignments
+                        .get(col_idx)
+                        .copied()
+                        .unwrap_or(Alignment::Default);
+
+                    let col_width = col_end - col_start;
+                    let cell_width = cell_text.trim_end().width();
+                    let total_padding = col_width.saturating_sub(cell_width);
+
+                    // Calculate text start position based on alignment
+                    let text_start_in_col = match alignment {
+                        Alignment::Left | Alignment::Default => 0,
+                        Alignment::Right => total_padding,
+                        Alignment::Center => total_padding / 2,
+                    };
+
+                    // Place characters
+                    for (i, ch) in cell_text.trim_end().chars().enumerate() {
+                        let target_pos = col_start + text_start_in_col + i;
+                        if target_pos < line_chars.len() {
+                            line_chars[target_pos] = ch;
+                        }
+                    }
+                }
+            }
+
+            output.push_str(&line_chars.iter().collect::<String>().trim_end());
+            output.push('\n');
+        }
+
+        // Emit blank line between rows (except after last row)
+        if row_idx < table_data.rows.len() - 1 {
+            output.push('\n');
+        }
+    }
+
+    // Emit closing separator
+    if table_data.has_header {
+        // With header: closing separator is full-width dashes
+        output.push_str(&"-".repeat(last_col_end));
+        output.push('\n');
+    } else {
+        // Headerless: closing separator shows column boundaries
+        let mut sep_chars: Vec<char> = vec![' '; last_col_end];
+        for &(col_start, col_end) in positions {
+            for i in col_start..col_end {
+                sep_chars[i] = '-';
+            }
+        }
+        output.push_str(&sep_chars.iter().collect::<String>());
         output.push('\n');
     }
 

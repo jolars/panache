@@ -1,0 +1,35 @@
+DOCUMENT@0..506
+  MULTILINE_TABLE@0..506
+    TABLE_CAPTION@0..61
+      TABLE_CAPTION_PREFIX@0..7 "Table: "
+      TEXT@7..44 "Here's the caption. I ..."
+      NEWLINE@44..45 "\n"
+      TEXT@45..60 "multiple lines."
+      NEWLINE@60..61 "\n"
+    BLANK_LINE@61..62
+      BLANK_LINE@61..62 "\n"
+    TABLE_SEPARATOR@62..124
+      TEXT@62..123 "--------------------- ..."
+      NEWLINE@123..124 "\n"
+    TABLE_HEADER@124..209
+      TEXT@124..164 " Centered   Default   ..."
+      NEWLINE@164..165 "\n"
+      TEXT@165..208 "  Header    Aligned   ..."
+      NEWLINE@208..209 "\n"
+    TABLE_SEPARATOR@209..271
+      TEXT@209..270 "----------- ------- - ..."
+      NEWLINE@270..271 "\n"
+    TABLE_ROW@271..387
+      TEXT@271..328 "   First    row       ..."
+      NEWLINE@328..329 "\n"
+      TEXT@329..386 "                      ..."
+      NEWLINE@386..387 "\n"
+    BLANK_LINE@387..388
+      BLANK_LINE@387..388 "\n"
+    TABLE_ROW@388..444
+      TEXT@388..443 "  Second    row       ..."
+      NEWLINE@443..444 "\n"
+    TABLE_SEPARATOR@444..506
+      TEXT@444..505 "--------------------- ..."
+      NEWLINE@505..506 "\n"
+
