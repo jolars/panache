@@ -463,8 +463,6 @@ pub struct CodeBlockConfig {
     pub fence_style: FenceStyle,
     /// Attribute style: "shortcut", "explicit", or "preserve"
     pub attribute_style: AttributeStyle,
-    /// Minimum fence length (default: 3)
-    pub min_fence_length: usize,
 }
 
 /// Fence character preference for code blocks.
@@ -496,7 +494,6 @@ impl Default for CodeBlockConfig {
         Self {
             fence_style: FenceStyle::Backtick,
             attribute_style: AttributeStyle::Shortcut,
-            min_fence_length: 3,
         }
     }
 }
@@ -1631,7 +1628,6 @@ mod tests {
         let cb = CodeBlockConfig::default();
         assert_eq!(cb.fence_style, FenceStyle::Backtick);
         assert_eq!(cb.attribute_style, AttributeStyle::Shortcut);
-        assert_eq!(cb.min_fence_length, 3);
     }
 
     #[test]
@@ -1642,13 +1638,11 @@ mod tests {
             [code-blocks]
             fence-style = "tilde"
             attribute-style = "explicit"
-            min-fence-length = 4
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Tilde);
         assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
-        assert_eq!(cfg.code_blocks.min_fence_length, 4);
     }
 
     #[test]
@@ -1661,11 +1655,9 @@ mod tests {
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
-        // Note: Due to serde defaults, partial override uses Default impl, not flavor defaults
-        // This is expected behavior - users can explicitly set all values if needed
+        // Partial override uses Default impl for unspecified fields
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Preserve);
-        // These come from CodeBlockConfig::default()
-        assert_eq!(cfg.code_blocks.min_fence_length, 3);
+        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Shortcut);
     }
 
     #[test]
@@ -1932,7 +1924,6 @@ mod code_blocks_config_test {
 
         // Defaults should fill in other fields
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
-        assert_eq!(cfg.code_blocks.min_fence_length, 3);
     }
 
     #[test]
@@ -1942,13 +1933,11 @@ mod code_blocks_config_test {
             
             [code-blocks]
             attribute-style = "explicit"
-            min-fence-length = 5
         "#;
         let cfg: Config = toml::from_str(toml_str).unwrap();
 
         // User overrides
         assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
-        assert_eq!(cfg.code_blocks.min_fence_length, 5);
 
         // Defaults
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
@@ -1964,7 +1953,6 @@ mod code_blocks_config_test {
         // Should use defaults
         assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Shortcut);
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
-        assert_eq!(cfg.code_blocks.min_fence_length, 3);
     }
 
     // ===== New Formatter Format Tests =====

@@ -77,11 +77,7 @@ pub(super) fn format_code_block(
     };
 
     // Determine fence length (check for nested fences in content)
-    let fence_length = determine_fence_length(
-        final_content,
-        fence_char,
-        config.code_blocks.min_fence_length,
-    );
+    let fence_length = determine_fence_length(final_content, fence_char);
 
     // Check if we should use hashpipe format for Quarto executable chunks
     let use_hashpipe = matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown)
@@ -120,7 +116,7 @@ pub(super) fn format_code_block(
 }
 
 /// Determine the minimum fence length needed to avoid conflicts with content
-fn determine_fence_length(content: &str, fence_char: char, min_length: usize) -> usize {
+fn determine_fence_length(content: &str, fence_char: char) -> usize {
     let mut max_sequence = 0;
     let mut current_sequence = 0;
 
@@ -137,8 +133,8 @@ fn determine_fence_length(content: &str, fence_char: char, min_length: usize) ->
         }
     }
 
-    // Use at least one more than the longest sequence in content
-    (max_sequence + 1).max(min_length)
+    // Use at least one more than the longest sequence in content, minimum 3 per spec
+    (max_sequence + 1).max(3)
 }
 
 /// Format the info string based on block type and config preferences
