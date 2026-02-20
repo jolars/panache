@@ -11,6 +11,7 @@
     pkgs.llvmPackages.bintools
     pkgs.bashInteractive
     pkgs.cmark
+    pkgs.shfmt
     pkgs.pandoc
     pkgs.jarl
     pkgs.air

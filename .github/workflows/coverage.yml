@@ -42,6 +42,9 @@ jobs:
       - name: Build binary
         run: cargo build --verbose
 
+      - name: Install shfmt for external formatter tests
+        run: sudo apt-get update && sudo apt-get install -y shfmt
+
       - name: Generate coverage
         run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
 

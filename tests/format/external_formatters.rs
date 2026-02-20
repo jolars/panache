@@ -2,6 +2,44 @@ use panache::{Config, format};
 use std::collections::HashMap;
 
 #[test]
+fn code_block_with_shfmt() {
+    // Skip if shfmt not available
+    if which::which("shfmt").is_err() {
+        println!("Skipping shfmt test - shfmt not installed");
+        return;
+    }
+
+    let mut formatters = HashMap::new();
+    formatters.insert(
+        "sh".to_string(),
+        vec![panache::config::FormatterConfig {
+            cmd: "shfmt".to_string(),
+            args: vec![],
+            enabled: true,
+            stdin: true,
+        }],
+    );
+
+    let config = Config {
+        formatters,
+        ..Default::default()
+    };
+
+    let input = r#"
+```sh
+if true; then echo ok; fi
+```
+"#
+    .trim_start();
+
+    let output = format(input, Some(config), None);
+
+    // shfmt should format the shell code (expands one-liner)
+    assert!(output.contains("```sh"));
+    assert!(output.contains("if true; then"));
+}
+
+#[test]
 fn code_block_with_external_formatter() {
     // Use 'tr' to uppercase as a simple mock formatter
     let mut formatters = HashMap::new();
