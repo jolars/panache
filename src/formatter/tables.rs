@@ -1098,14 +1098,15 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
 
 /// Extract column information from multiline table separator line
 fn extract_multiline_columns(separator_line: &str) -> Vec<(usize, usize)> {
-    // Strip leading/trailing whitespace - column positions are relative to trimmed line
-    let trimmed = separator_line.trim();
+    // DO NOT trim - we need to preserve leading spaces for column alignment
+    // Column positions must be relative to the original line positions
+    let line = separator_line.trim_end(); // Only remove trailing whitespace/newline
 
     let mut columns = Vec::new();
     let mut in_dashes = false;
     let mut col_start = 0;
 
-    for (i, ch) in trimmed.char_indices() {
+    for (i, ch) in line.char_indices() {
         match ch {
             '-' => {
                 if !in_dashes {
@@ -1125,7 +1126,7 @@ fn extract_multiline_columns(separator_line: &str) -> Vec<(usize, usize)> {
 
     // Handle last column
     if in_dashes {
-        columns.push((col_start, trimmed.len()));
+        columns.push((col_start, line.len()));
     }
 
     columns
@@ -1319,8 +1320,8 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
         // Headerless: opening separator shows column boundaries
         let mut sep_chars: Vec<char> = vec![' '; last_col_end];
         for &(col_start, col_end) in positions {
-            for i in col_start..col_end {
-                sep_chars[i] = '-';
+            for item in sep_chars.iter_mut().take(col_end).skip(col_start) {
+                *item = '-';
             }
         }
         output.push_str(&sep_chars.iter().collect::<String>());
@@ -1368,15 +1369,15 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
                 }
             }
 
-            output.push_str(&line_chars.iter().collect::<String>().trim_end());
+            output.push_str(line_chars.iter().collect::<String>().trim_end());
             output.push('\n');
         }
 
         // Emit column separator (no indent)
         let mut sep_chars: Vec<char> = vec![' '; last_col_end];
         for &(col_start, col_end) in positions {
-            for i in col_start..col_end {
-                sep_chars[i] = '-';
+            for item in sep_chars.iter_mut().take(col_end).skip(col_start) {
+                *item = '-';
             }
         }
         output.push_str(&sep_chars.iter().collect::<String>());
@@ -1423,14 +1424,21 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
                 }
             }
 
-            output.push_str(&line_chars.iter().collect::<String>().trim_end());
+            output.push_str(line_chars.iter().collect::<String>().trim_end());
             output.push('\n');
         }
 
-        // Emit blank line between rows (except after last row)
+        // Emit blank line between rows
         if row_idx < table_data.rows.len() - 1 {
             output.push('\n');
         }
+    }
+
+    // For single-row tables, emit blank line before closing separator
+    // (required by Pandoc spec to distinguish from simple tables)
+    let num_body_rows = table_data.rows.len() - if table_data.has_header { 1 } else { 0 };
+    if num_body_rows == 1 {
+        output.push('\n');
     }
 
     // Emit closing separator
@@ -1442,8 +1450,8 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
         // Headerless: closing separator shows column boundaries
         let mut sep_chars: Vec<char> = vec![' '; last_col_end];
         for &(col_start, col_end) in positions {
-            for i in col_start..col_end {
-                sep_chars[i] = '-';
+            for item in sep_chars.iter_mut().take(col_end).skip(col_start) {
+                *item = '-';
             }
         }
         output.push_str(&sep_chars.iter().collect::<String>());
