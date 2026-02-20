@@ -1,10 +1,10 @@
--------------------------------------------------------------
- Column     Bold            Code           Link
-  One       Two             Three          Four
------------ ------- --------------- -------------------------
-   First    **bold**        `code`         [link](url)
-            text            spans
+---------------------------------------------------------------------
+  Column    Bold                   Code                 Link
+    One     Two                    Three                Four
+----------- --------------- ------------------- ---------------------
+   First    **bold**           `code` spans          [link](url)
+            text
 
-  Second    *emphasis*      more `code`    another
-            row                            [link](url2)
--------------------------------------------------------------
+  Second    *emphasis*          more `code`            another
+            row                                     [link](url2)
+---------------------------------------------------------------------

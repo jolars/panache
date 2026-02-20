@@ -199,7 +199,7 @@ golden_test_cases!(
     multiline_table_caption,
     multiline_table_caption_after,
     multiline_table_headerless,
-    // multiline_table_inline_formatting,// TODO: re-enable once multiline_table_caption is fixed
+    multiline_table_inline_formatting,
     multiline_table_single_row,
     pandoc_title_block,
     paragraph_wrapping,

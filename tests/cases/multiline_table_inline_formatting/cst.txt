@@ -1,0 +1,67 @@
+DOCUMENT@0..542
+  MULTILINE_TABLE@0..542
+    TABLE_SEPARATOR@0..70
+      TEXT@0..69 "--------------------- ..."
+      NEWLINE@69..70 "\n"
+    TABLE_HEADER@70..182
+      TEXT@70..125 " Column     Bold      ..."
+      NEWLINE@125..126 "\n"
+      TEXT@126..181 "  One       Two       ..."
+      NEWLINE@181..182 "\n"
+    TABLE_SEPARATOR@182..252
+      TEXT@182..251 "----------- --------- ..."
+      NEWLINE@251..252 "\n"
+    TABLE_ROW@252..348
+      TEXT@252..264 "   First    "
+      STRONG@264..272
+        STRONG_MARKER@264..266 "**"
+        TEXT@266..270 "bold"
+        STRONG_MARKER@270..272 "**"
+      TEXT@272..284 "            "
+      CODE_SPAN@284..290
+        CODE_SPAN_MARKER@284..285 "`"
+        TEXT@285..289 "code"
+        CODE_SPAN_MARKER@289..290 "`"
+      TEXT@290..303 " spans       "
+      LINK@303..314
+        LINK_START@303..304
+          LINK_START@303..304 "["
+        LINK_TEXT@304..308
+          TEXT@304..308 "link"
+        TEXT@308..310 "]("
+        LINK_DEST@310..313
+          TEXT@310..313 "url"
+        TEXT@313..314 ")"
+      NEWLINE@314..315 "\n"
+      TEXT@315..331 "            text"
+      HARD_LINE_BREAK@331..348 "                \n"
+    BLANK_LINE@348..349
+      BLANK_LINE@348..349 "\n"
+    TABLE_ROW@349..472
+      TEXT@349..361 "  Second    "
+      EMPHASIS@361..371
+        EMPHASIS_MARKER@361..362 "*"
+        TEXT@362..370 "emphasis"
+        EMPHASIS_MARKER@370..371 "*"
+      TEXT@371..386 "          more "
+      CODE_SPAN@386..392
+        CODE_SPAN_MARKER@386..387 "`"
+        TEXT@387..391 "code"
+        CODE_SPAN_MARKER@391..392 "`"
+      TEXT@392..407 "        another"
+      NEWLINE@407..408 "\n"
+      TEXT@408..459 "            row       ..."
+      LINK@459..471
+        LINK_START@459..460
+          LINK_START@459..460 "["
+        LINK_TEXT@460..464
+          TEXT@460..464 "link"
+        TEXT@464..466 "]("
+        LINK_DEST@466..470
+          TEXT@466..470 "url2"
+        TEXT@470..471 ")"
+      NEWLINE@471..472 "\n"
+    TABLE_SEPARATOR@472..542
+      TEXT@472..541 "--------------------- ..."
+      NEWLINE@541..542 "\n"
+
