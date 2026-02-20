@@ -17,3 +17,7 @@ when the body contains an explicit return statement.
 implemented, and arguments can be passed to the function by position as well 
 as by name.
 -   Functions should do a single well defined computation and be well tested.
+
+A list needs a blankline before. This is not a list:
+- One
+- Two

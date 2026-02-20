@@ -1,4 +1,4 @@
-DOCUMENT@0..693
+DOCUMENT@0..759
   PARAGRAPH@0..22
     TEXT@0..21 "A simple bullet list:"
     NEWLINE@21..22 "\n"
@@ -77,4 +77,13 @@ DOCUMENT@0..693
       PARAGRAPH@619..693
         TEXT@619..692 "Functions should do a ..."
         NEWLINE@692..693 "\n"
+  BLANK_LINE@693..694
+    BLANK_LINE@693..694 "\n"
+  PARAGRAPH@694..759
+    TEXT@694..746 "A list needs a blankl ..."
+    NEWLINE@746..747 "\n"
+    TEXT@747..752 "- One"
+    NEWLINE@752..753 "\n"
+    TEXT@753..758 "- Two"
+    NEWLINE@758..759 "\n"
 
