@@ -1,6 +1,6 @@
 [package]
 name = "panache"
-version = "2.5.1"
+version = "2.6.0"
 edition = "2024"
 readme = "README.md"
 description = "An LSP, formatter, and linter for Pandoc markdown, Quarto, and RMarkdown"

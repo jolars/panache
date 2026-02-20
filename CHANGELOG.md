@@ -1,5 +1,40 @@
 # Changelog
 
+## [2.6.0](https://github.com/jolars/panache/compare/v2.5.1...v2.6.0) (2026-02-20)
+
+### Features
+
+* **config:** add `[style]` section, deprecate old version ([2b83231](https://github.com/jolars/panache/commit/2b83231fb98db153f442268a4613a6a63aa6f6d6))
+* **config:** add `append_args` and `prepend_args` ([56cb4c1](https://github.com/jolars/panache/commit/56cb4c10debdcbf784e284d5cea953e7ab3307b5))
+* **config:** allow partial overrides ([d53e1d0](https://github.com/jolars/panache/commit/d53e1d0c7c59f2a580a0806de34d985aa1c98e16))
+* **config:** flavor-independent code block styling ([5c14f2f](https://github.com/jolars/panache/commit/5c14f2f4173c9beee5f89724bcd5c38c38dce486))
+* **config:** remove pointless `min_fence_length` ([4204ed5](https://github.com/jolars/panache/commit/4204ed5d21aebdb8644c9e37f5e35aa60eedca26))
+* **config:** remove unused `normalize_indented` ([da087e4](https://github.com/jolars/panache/commit/da087e4d7245aa753c9b87fe6270759100c4ffa3))
+* **config:** use `[formatters.<formatter]` style ([7d91023](https://github.com/jolars/panache/commit/7d91023527f2704213b26b496e42f5484a11efbf))
+* **formatter:** don't assume `#|` for unknown language ([b50f3ab](https://github.com/jolars/panache/commit/b50f3aba386431c3c4757482867213e70ee83075))
+* **formatter:** format simple tables ([5d048c6](https://github.com/jolars/panache/commit/5d048c6de1daa8c20864a4af967bd4b5f9fbdc02))
+* **formatter:** support ojs, mermaid, dot in hashpipe conversion ([8695ae2](https://github.com/jolars/panache/commit/8695ae2ea99f1e54ad838c7e342b9b0cd82518b4))
+* **formatter:** trim trailing blanklines ([6e7cd61](https://github.com/jolars/panache/commit/6e7cd614e8f3a9373ff8e0017a05227beba65916))
+* **linter:** add rule for duplicate references ([97fbc8a](https://github.com/jolars/panache/commit/97fbc8ab7dfbda1f4ac567e4586dbcb4c6286101))
+* **lsp:** add convert to loose/compact list code action ([a63c104](https://github.com/jolars/panache/commit/a63c104d3199bef7aa2c35f0a575d38daaf6fabe))
+* **lsp:** convert between footnote styles ([2fe5030](https://github.com/jolars/panache/commit/2fe50308a1dfa27a2268b8b0af44f814801fbdc2))
+* **lsp:** enable footnote preview on hover ([d25c74a](https://github.com/jolars/panache/commit/d25c74a09f39efbb25360b60fcb8d829166f1c1b))
+* **parser:** drop `ROOT` node from AST tree ([6c9bd8f](https://github.com/jolars/panache/commit/6c9bd8f1ffc8c480d8adf435b23b981072acae7a))
+* **parser:** parse `](` in links and images ([73a8da0](https://github.com/jolars/panache/commit/73a8da0a02cee020470edf052b2805bb76197c41))
+* update wasm build ([ff6acd9](https://github.com/jolars/panache/commit/ff6acd9cf40d2c16bba6b88de17f8db32ac02ff1))
+
+### Bug Fixes
+
+* **config:** override code block flavor defaults ([4023e29](https://github.com/jolars/panache/commit/4023e29ca64ae19cd070cb062a16996c33e28ab7))
+* **formatter:** concatenate successive blanklines ([5e1c06a](https://github.com/jolars/panache/commit/5e1c06a5b568e8b00ef48746707d3615b15b31fb))
+* **formatter:** correct alignment in multline tables ([04c9ad6](https://github.com/jolars/panache/commit/04c9ad6d5625af89b5624617fdf545ffca59e817))
+* **formatter:** fix idempotency issue in table formatting ([fe4af95](https://github.com/jolars/panache/commit/fe4af958915a4c1c17fcadc0d2b157eaf68d9194))
+* **formatter:** handle attributes correctly in code blocks ([6228182](https://github.com/jolars/panache/commit/6228182e192cf58293de5d22d6cdc495a3a2591a))
+* **parser:** avoid parsing expressions ([69bea2b](https://github.com/jolars/panache/commit/69bea2b68a67b00846f6c14fc37bffbe8715979a))
+* **parser:** correctly parse multiline captions before table ([c8389d4](https://github.com/jolars/panache/commit/c8389d47945d886472d641692bf40e9e46c71b4d))
+* **parser:** don't parse links in `CODE_INFO` ([2f10b8b](https://github.com/jolars/panache/commit/2f10b8b8ec909ff585a19fc89a75c8c11cf7aa39))
+* **wasm:** guard yaml formatter behind wasm flag ([063143c](https://github.com/jolars/panache/commit/063143cde61edaa877f2d1ba5e201667c08770f5))
+
 ## [2.5.1](https://github.com/jolars/panache/compare/v2.5.0...v2.5.1) (2026-02-18)
 
 ### Bug Fixes
