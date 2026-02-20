@@ -1276,8 +1276,21 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
             let alignment = determine_multiline_alignment(&header_text, col_start, col_end);
             alignments.push(alignment);
         }
+    } else if !rows.is_empty() && !column_positions.is_empty() {
+        // No header - determine alignment from first body row (per Pandoc spec)
+        let first_row_text = format_cell_content(
+            &node
+                .children()
+                .find(|c| c.kind() == SyntaxKind::TABLE_ROW)
+                .unwrap(),
+            config,
+        );
+        for &(col_start, col_end) in &column_positions {
+            let alignment = determine_multiline_alignment(&first_row_text, col_start, col_end);
+            alignments.push(alignment);
+        }
     } else {
-        // No header - use default alignment
+        // Fallback - use default alignment
         alignments = vec![Alignment::Default; column_positions.len()];
     }
 
