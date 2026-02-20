@@ -220,6 +220,36 @@ panache lint --config cfg.toml      # Custom config
 
 ## Parser - Comprehensive Pandoc Feature Coverage
 
+### Known Differences from Pandoc
+
+#### Reference Link Parsing
+
+**Status**: 🤔 **Deferred architectural decision**
+
+**Issue**: Our CST structure differs from Pandoc's AST for undefined reference links.
+
+**Current behavior**:
+- `[undefined]` (no definition exists) → Parsed as LINK node in CST
+- Pandoc behavior: `[undefined]` → Parsed as literal text `Str "[undefined]"`
+- **Formatting output is correct** (both produce `[undefined]`)
+
+**Impact**: 
+- ✅ No impact on formatting (our primary use case)
+- ✅ No impact on LSP features (uses CST traversal)
+- ✅ No impact on linting (uses CST traversal)
+- ⚠️ CST structure differs from Pandoc's AST (only matters for library users inspecting CST)
+
+**Possible solutions** (if needed):
+1. CST traversal during inline parsing to check if definition exists (O(n) cost per reference)
+2. Minimal registry with `HashSet<String>` of definition labels (O(1) lookup)
+3. Two-pass parsing (parse blocks first, then inline with definition knowledge)
+
+**Decision**: Accept current behavior until a real-world use case requires matching Pandoc's AST structure exactly.
+
+---
+
+## Parser - Comprehensive Pandoc Feature Coverage
+
 This section tracks implementation status of Pandoc Markdown features based on
 the spec files in `assets/pandoc-spec/`.
 
