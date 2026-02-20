@@ -7,6 +7,7 @@
 **Syntax Reference**: `assets/pandoc-spec.md` contains comprehensive Pandoc syntax specification with individual spec files in `assets/pandoc-spec/`. This is the definitive reference for parser implementation.
 
 **Key Facts:**
+
 - **Language**: Rust 2024 edition, stable toolchain
 - **Architecture**: Binary crate + WASM workspace for web playground
 - **Status**: Early development - breaking changes expected
@@ -15,11 +16,13 @@
 ## Essential Commands
 
 **Development workflow** (always run before making changes):
+
 ```bash
 cargo check && cargo test && cargo clippy -- -D warnings && cargo fmt -- --check
 ```
 
 **CLI testing:**
+
 ```bash
 # Format (writes to stdout or file in-place)
 printf "[link](url)" | cargo run -- format
@@ -37,6 +40,7 @@ cargo run -- lsp
 ```
 
 **Debugging with logging:**
+
 ```bash
 # Debug parsing decisions (requires debug build via cargo run)
 RUST_LOG=debug cargo run -- format document.qmd
@@ -50,6 +54,7 @@ RUST_LOG=info ./target/release/panache format document.qmd
 ```
 
 **Golden test system:**
+
 ```bash
 # Update expected formatted outputs (BE CAREFUL - verify changes!)
 UPDATE_EXPECTED=1 cargo test
@@ -62,6 +67,7 @@ UPDATE_EXPECTED=1 UPDATE_CST=1 cargo test
 ```
 
 **Shell command debugging tips:**
+
 - Sync commands (default) return output directly - don't use `read_bash` on completed commands
 - Only use `read_bash` if command is still running after `initial_wait`
 - Use `mode="async"` for interactive sessions (REPL, debuggers)
@@ -71,11 +77,13 @@ UPDATE_EXPECTED=1 UPDATE_CST=1 cargo test
 ### CST vs AST
 
 **CST (Concrete Syntax Tree)**: 
+
 - Built with `rowan` crate - preserves **every byte** including whitespace and markers
 - Essential for lossless parsing and LSP features
 - Example: `ATX_HEADING_MARKER@0..1 "#"`, `WHITESPACE@1..2 " "`
 
 **AST (Abstract Syntax Tree)**:
+
 - Typed wrappers (`Heading`, `Link`, `Table`) hide syntactic details
 - Pattern borrowed from rust-analyzer
 - Example: `Heading::cast(node).level()` returns `1` without exposing `#` markers
@@ -84,12 +92,14 @@ UPDATE_EXPECTED=1 UPDATE_CST=1 cargo test
 ### Two-Stage Parsing
 
 1. **Block Parser** (`src/parser/block_parser/`):
+
    - First pass: Parse flat block structures (headings, code blocks, paragraphs)
    - Second pass: Resolve containers (blockquotes, lists) from flat structure
    - Each block type isolated in own module
    - Config-aware (respects flavor and extension flags)
 
 2. **Inline Parser** (`src/parser/inline_parser/`):
+
    - Runs after block parser on text content
    - Delimiter-based with proper precedence (CommonMark spec)
    - Recursive for nested elements (e.g., emphasis in links)
@@ -100,6 +110,7 @@ UPDATE_EXPECTED=1 UPDATE_CST=1 cargo test
 ### Formatter Architecture
 
 Located in `src/formatter/`:
+
 - `core.rs`: Orchestration via `format_node_sync`
 - `wrapping.rs`: Word-breaking and line-wrapping logic  
 - Specialized modules: `paragraphs.rs`, `inline.rs`, `headings.rs`, `lists.rs`, `tables.rs`, etc.
@@ -213,21 +224,25 @@ panache lint --fix document.qmd    # Apply auto-fixes
 Instead of listing every file, understand the patterns:
 
 **Parser modules** (`src/parser/block_parser/`, `src/parser/inline_parser/`):
+
 - One module per syntax element type
 - Example: `headings.rs`, `links.rs`, `tables.rs`, `emphasis.rs`
 - Each module exports `try_parse_*()` and `emit_*()` functions
 
 **Formatter modules** (`src/formatter/`):
+
 - Split by concern: wrapping, inline, paragraphs, headings, lists, tables, etc.
 - Core orchestration in `core.rs`
 - Public API limited to `format_tree()` and `format_tree_async()`
 
 **Syntax modules** (`src/syntax/`):
+
 - `kind.rs`: SyntaxKind enum
 - `ast.rs`: AstNode trait
 - Typed wrappers: `{headings,links,tables,references}.rs`
 
 **Tests** (`tests/`):
+
 - `cases/*/`: Golden test scenarios (use `view` to explore)
 - `cli/`: CLI integration tests
 - `format/`: Feature-specific unit tests
@@ -242,6 +257,7 @@ Instead of listing every file, understand the patterns:
 - Verify CST snapshots before updating: `UPDATE_CST=1 cargo test`
 
 ### DON'T:
+
 - Break the hierarchical config system
 - Format code in the parser (parser preserves bytes, formatter applies rules)
 - Change core formatting without extensive golden test verification
@@ -251,11 +267,13 @@ Instead of listing every file, understand the patterns:
 ## Logging Infrastructure
 
 **Log levels:**
+
 - **INFO**: Formatting lifecycle, config loading (available in release builds)
 - **DEBUG**: Parsing decisions, element matches, table detection
 - **TRACE**: Text previews, container operations, detailed steps
 
 **Key modules with logging:**
+
 - `panache::parser::block_parser`
 - `panache::parser::inline_parser`
 - `panache::formatter`
