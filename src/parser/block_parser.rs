@@ -161,8 +161,7 @@ impl<'a> BlockParser<'a> {
                 // Open blockquotes
                 for _ in current_bq_depth..bq_depth {
                     self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
-                    self.containers
-                        .push(Container::BlockQuote { content_col: 0 });
+                    self.containers.push(Container::BlockQuote {});
                 }
             } else if bq_depth < current_bq_depth {
                 // Close blockquotes down to bq_depth
@@ -347,8 +346,7 @@ impl<'a> BlockParser<'a> {
                     );
                 }
 
-                self.containers
-                    .push(Container::BlockQuote { content_col: 0 });
+                self.containers.push(Container::BlockQuote {});
             }
 
             // Now parse the inner content
@@ -1107,10 +1105,8 @@ impl<'a> BlockParser<'a> {
             // The first line can start right after the marker, but subsequent lines
             // need at least 4 spaces of indentation
             let content_col = 4;
-            self.containers.push(Container::FootnoteDefinition {
-                id: id.clone(),
-                content_col,
-            });
+            self.containers
+                .push(Container::FootnoteDefinition { content_col });
 
             // Parse the first line content (if any)
             let first_line_content = &content[content_start..];
@@ -1533,9 +1529,7 @@ impl<'a> BlockParser<'a> {
                 Some(Container::DefinitionItem { .. })
             ) {
                 self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
-                self.containers.push(Container::DefinitionItem {
-                    in_definition: true,
-                });
+                self.containers.push(Container::DefinitionItem {});
             }
 
             // Start Definition node
@@ -1620,9 +1614,7 @@ impl<'a> BlockParser<'a> {
 
             // Start new definition item
             self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
-            self.containers.push(Container::DefinitionItem {
-                in_definition: false,
-            });
+            self.containers.push(Container::DefinitionItem {});
 
             // Emit term
             emit_term(&mut self.builder, content);

@@ -2,10 +2,9 @@ use crate::parser::block_parser::lists::ListMarker;
 use rowan::GreenNodeBuilder;
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub(crate) enum Container {
     BlockQuote {
-        content_col: usize,
+        // No special tracking needed
     },
     FencedDiv {
         // No special tracking needed - closed by fence marker
@@ -21,18 +20,16 @@ pub(crate) enum Container {
         // Definition lists don't need special tracking
     },
     DefinitionItem {
-        // Track if we're in a term or definition
-        in_definition: bool,
+        // No special tracking needed
     },
     Definition {
         content_col: usize,
         plain_open: bool,
     },
     Paragraph {
-        content_col: usize,
+        // No special tracking needed
     },
     FootnoteDefinition {
-        id: String,
         content_col: usize,
     },
 }
@@ -52,11 +49,6 @@ impl ContainerStack {
 
     pub(crate) fn last(&self) -> Option<&Container> {
         self.stack.last()
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn get(&self, idx: usize) -> Option<&Container> {
-        self.stack.get(idx)
     }
 
     pub(crate) fn push(&mut self, c: Container) {

@@ -15,9 +15,8 @@ pub(super) fn start_paragraph_if_needed(
     builder: &mut GreenNodeBuilder<'static>,
 ) {
     if !matches!(containers.last(), Some(Container::Paragraph { .. })) {
-        let content_col = current_content_col(containers);
         builder.start_node(SyntaxKind::PARAGRAPH.into());
-        containers.push(Container::Paragraph { content_col });
+        containers.push(Container::Paragraph {});
     }
 }
 

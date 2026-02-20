@@ -249,16 +249,3 @@ pub fn try_parse_footnote_marker(line: &str) -> Option<(String, usize)> {
 
     Some((id.to_string(), pos))
 }
-
-/// Try to parse a complete footnote definition from the current line.
-/// Returns Some((id, content)) if successful.
-/// This is used for single-line footnote definitions.
-#[allow(dead_code)] // May be useful for future features
-pub fn try_parse_footnote_definition(line: &str) -> Option<(String, String)> {
-    let (id, content_start) = try_parse_footnote_marker(line)?;
-
-    // Extract content (rest of the line after marker)
-    let content = line[content_start..].trim_end().to_string();
-
-    Some((id, content))
-}
