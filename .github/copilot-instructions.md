@@ -170,6 +170,30 @@ RUST_LOG=info ./target/release/panache format document.qmd
 - `cargo build --release`: ~25 seconds
 - `cargo check`: ~1 second
 
+### Debugging with Shell Commands
+
+When using the bash tool for testing and debugging:
+
+**For quick commands (compile, test, format):**
+- Use `mode="sync"` (default) with appropriate `initial_wait` (30-60 seconds)
+- Output is returned directly in the response
+- **Don't use `read_bash` on completed sync commands** - they don't create persistent sessions
+- Only use `read_bash` if the command is still running after `initial_wait`
+
+**Example - correct usage:**
+```bash
+# Sync command returns output directly
+cargo run -- format test.md  # Output appears in response, no read_bash needed
+
+# If a long command needs more time, use read_bash only while it's running
+cargo build --release  # initial_wait=60, then read_bash if still running
+```
+
+**For interactive debugging:**
+- Use `mode="async"` for REPL sessions, debuggers, or interactive tools
+- Use `write_bash` to send input to the async session
+- Use `read_bash` to get more output from the async session
+
 ## Project Architecture and Layout
 
 The project is designed to first parse the document into a concrete syntax tree
