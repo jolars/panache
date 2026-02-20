@@ -145,7 +145,9 @@ pub async fn format_tree_async(
     }
 
     log::info!("Formatting complete: {} bytes output", output.len());
-    output
+
+    // Ensure exactly one trailing newline
+    output.trim_end().to_string() + "\n"
 }
 
 pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usize)>) -> String {
@@ -260,5 +262,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     }
 
     log::info!("Formatting complete: {} bytes output", output.len());
-    output
+
+    // Ensure exactly one trailing newline
+    output.trim_end().to_string() + "\n"
 }
