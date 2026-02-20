@@ -173,6 +173,8 @@ You need to update the list of tests in `tests/golden_cases.rs` when adding new 
 
 - Unit tests: Embedded in source modules
 - Integration tests: `tests/` directory (CLI, LSP, format scenarios)
+  - **Linting tests**: `tests/linting/*.md` with focused assertions in `tests/linting.rs`
+  - **Formatting tests**: `tests/golden_cases.rs` with CST snapshots (use `UPDATE_EXPECTED=1` or `UPDATE_CST=1`)
 - Architecture tests: `inline_parser/architecture_tests.rs` verifies nesting
 - 60+ golden test scenarios covering all syntax elements
 

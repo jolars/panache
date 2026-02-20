@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
 use crate::syntax::SyntaxNode;
 
+pub mod duplicate_references;
 pub mod heading_hierarchy;
 
 pub trait Rule {

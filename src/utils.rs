@@ -145,3 +145,16 @@ pub fn offset_to_line(input: &str, offset: usize) -> usize {
     // Line number is newlines + 1
     newline_count + 1
 }
+
+/// Normalize a label for case-insensitive matching.
+/// Collapses whitespace and converts to lowercase.
+///
+/// Used for reference definitions and footnote IDs to ensure
+/// case-insensitive and whitespace-normalized matching.
+pub fn normalize_label(label: &str) -> String {
+    label
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}

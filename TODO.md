@@ -185,7 +185,7 @@ panache lint --config cfg.toml      # Custom config
 - ✅ Inconsistent heading hierarchy (skip levels)
 - ❌ Multiple top-level headings
 - ❌ Empty links/images
-- ❌ Duplicate reference labels
+- ✅ Duplicate reference labels
 - ❌ Unused reference definitions
 - ❌ Hard-wrapped text in code blocks
 

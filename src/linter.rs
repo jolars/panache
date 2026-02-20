@@ -45,5 +45,8 @@ pub async fn lint_with_external(
 fn default_registry() -> RuleRegistry {
     let mut registry = RuleRegistry::new();
     registry.register(Box::new(rules::heading_hierarchy::HeadingHierarchyRule));
+    registry.register(Box::new(
+        rules::duplicate_references::DuplicateReferencesRule,
+    ));
     registry
 }

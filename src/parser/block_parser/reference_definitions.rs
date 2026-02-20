@@ -17,6 +17,8 @@
 
 use std::collections::HashMap;
 
+use crate::utils::normalize_label;
+
 /// A reference definition that maps a label to a URL and optional title.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReferenceDefinition {
@@ -87,16 +89,6 @@ impl ReferenceRegistry {
         let normalized = normalize_label(id);
         self.footnotes.contains_key(&normalized)
     }
-}
-
-/// Normalize a label for case-insensitive matching.
-/// Collapses whitespace and converts to lowercase.
-fn normalize_label(label: &str) -> String {
-    label
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
 }
 
 /// Try to parse a reference definition starting at the current position.
