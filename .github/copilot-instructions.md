@@ -18,7 +18,7 @@
 **Development workflow** (always run before making changes):
 
 ```bash
-cargo check && cargo test && cargo clippy -- -D warnings && cargo fmt -- --check
+cargo check && cargo test && cargo clippy --all-targets --all-features -- -D warnings && cargo fmt -- --check
 ```
 
 **CLI testing:**
