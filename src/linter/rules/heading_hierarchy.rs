@@ -107,8 +107,8 @@ mod tests {
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
-        let (tree, refs) = BlockParser::new(input, &config).parse();
-        let tree = InlineParser::new(tree, config.clone(), refs).parse();
+        let tree = BlockParser::new(input, &config).parse();
+        let tree = InlineParser::new(tree, config.clone()).parse();
 
         let rule = HeadingHierarchyRule;
         rule.check(&tree, input, &config)

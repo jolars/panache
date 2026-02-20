@@ -8,7 +8,7 @@ pub mod inline_parser;
 pub mod list_postprocessor;
 
 // Re-export commonly used types
-pub use block_parser::{BlockParser, ReferenceRegistry};
+pub use block_parser::BlockParser;
 pub use inline_parser::{InlineParser, parse_inline_text};
 
 /// Parses a Quarto document string into a syntax tree.
@@ -33,8 +33,8 @@ pub use inline_parser::{InlineParser, parse_inline_text};
 /// * `config` - Optional configuration. If None, uses default config.
 pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
     let config = config.unwrap_or_default();
-    let (block_tree, reference_registry) = BlockParser::new(input, &config).parse();
-    let inline_tree = InlineParser::new(block_tree, config, reference_registry).parse();
+    let block_tree = BlockParser::new(input, &config).parse();
+    let inline_tree = InlineParser::new(block_tree, config).parse();
 
     // Post-process to wrap list item content in Plain/PARAGRAPH blocks
     let green = list_postprocessor::wrap_list_item_content(inline_tree);

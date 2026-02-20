@@ -4,8 +4,7 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub fn parse_blocks(input: &str) -> SyntaxNode {
     let config = Config::default();
-    let (tree, _registry) = BlockParser::new(input, &config).parse();
-    tree
+    BlockParser::new(input, &config).parse()
 }
 
 pub fn find_first(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxNode> {

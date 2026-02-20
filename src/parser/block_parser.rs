@@ -20,7 +20,7 @@ mod lists;
 mod marker_utils;
 mod metadata;
 mod paragraphs;
-pub mod reference_definitions; // Public for use in inline_parser
+mod reference_links; // Reference definition and footnote parsing
 mod tables;
 mod utils;
 
@@ -38,10 +38,7 @@ use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{markers_match, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
-pub use reference_definitions::{
-    ReferenceRegistry, try_parse_footnote_definition, try_parse_footnote_marker,
-    try_parse_reference_definition,
-};
+use reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
 use tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
@@ -57,7 +54,6 @@ pub struct BlockParser<'a> {
     pos: usize,
     builder: GreenNodeBuilder<'static>,
     containers: ContainerStack,
-    reference_registry: ReferenceRegistry,
     config: &'a Config,
 }
 
@@ -70,12 +66,11 @@ impl<'a> BlockParser<'a> {
             pos: 0,
             builder: GreenNodeBuilder::new(),
             containers: ContainerStack::new(),
-            reference_registry: ReferenceRegistry::new(),
             config,
         }
     }
 
-    pub fn parse(mut self) -> (SyntaxNode, ReferenceRegistry) {
+    pub fn parse(mut self) -> SyntaxNode {
         #[cfg(debug_assertions)]
         {
             init_logger();
@@ -83,8 +78,7 @@ impl<'a> BlockParser<'a> {
 
         self.parse_document_stack();
 
-        let tree = SyntaxNode::new_root(self.builder.finish());
-        (tree, self.reference_registry)
+        SyntaxNode::new_root(self.builder.finish())
     }
 
     fn parse_document_stack(&mut self) {
@@ -1131,14 +1125,12 @@ impl<'a> BlockParser<'a> {
 
         // Check for reference definition: [label]: url "title"
         // These can appear anywhere in the document
-        if let Some((_len, label, url, title)) = try_parse_reference_definition(content) {
+        if let Some((_len, label, _url, _title)) = try_parse_reference_definition(content) {
             log::debug!(
                 "Parsed reference definition at line {}: [{}]",
                 self.pos,
                 label
             );
-            // Store in registry
-            self.reference_registry.add(label, url, title);
 
             // Emit as a node - preserve original text including newline
             self.builder

@@ -10,8 +10,8 @@ mod emphasis_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     fn find_emphasis(node: &crate::syntax::SyntaxNode) -> Vec<String> {
@@ -149,8 +149,8 @@ mod code_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     fn find_code_spans(node: &crate::syntax::SyntaxNode) -> Vec<String> {
@@ -213,8 +213,8 @@ mod math_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     fn find_inline_math(node: &crate::syntax::SyntaxNode) -> Vec<String> {
@@ -287,8 +287,8 @@ mod escape_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     fn count_nodes_of_kind(node: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
@@ -354,8 +354,8 @@ mod escape_tests {
         let mut config = Config::default();
         config.extensions.escaped_line_breaks = false;
 
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        let tree = InlineParser::new(block_tree, config, registry).parse();
+        let block_tree = BlockParser::new(input, &config).parse();
+        let tree = InlineParser::new(block_tree, config).parse();
 
         let hard_break = count_nodes_of_kind(&tree, SyntaxKind::HARD_LINE_BREAK);
         assert_eq!(
@@ -435,8 +435,8 @@ mod footnote_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     fn find_footnotes(node: &crate::syntax::SyntaxNode) -> Vec<String> {
@@ -521,8 +521,8 @@ mod bracketed_span_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     fn assert_has_kind(tree: &crate::syntax::SyntaxNode, kind: SyntaxKind) {
@@ -602,8 +602,8 @@ mod reference_tests {
 
     fn parse_with_refs(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     #[test]
@@ -613,9 +613,7 @@ mod reference_tests {
 [img-ref]: image.jpg \"Image Title\"";
 
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-
-        eprintln!("Has img-ref: {}", registry.get("img-ref").is_some());
+        let block_tree = BlockParser::new(input, &config).parse();
 
         let para = block_tree.first_child().unwrap();
         eprintln!("\nParagraph children:");
@@ -630,7 +628,7 @@ mod reference_tests {
             }
         }
 
-        let parsed = InlineParser::new(block_tree, config, registry).parse();
+        let parsed = InlineParser::new(block_tree, config).parse();
 
         let para = parsed.first_child().expect("paragraph");
 
@@ -702,13 +700,13 @@ mod raw_inline_tests {
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     fn parse_inline_with_config(input: &str, config: Config) -> crate::syntax::SyntaxNode {
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     fn find_raw_inline(node: &crate::syntax::SyntaxNode) -> Vec<String> {

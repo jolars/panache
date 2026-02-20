@@ -56,14 +56,11 @@ use superscript::{emit_superscript, try_parse_superscript};
 /// This function handles multi-line inline patterns (like display math) by checking for them first,
 /// then emits NEWLINE tokens to preserve losslessness for the remaining text.
 /// Used when parsing paragraphs and other blocks that concatenate TEXT/NEWLINE tokens.
-///
-/// The `reference_registry` parameter is optional - when None, reference links/images
-/// won't be resolved (useful for nested contexts like link text).
 pub fn parse_inline_text_with_newlines(
     builder: &mut GreenNodeBuilder,
     text: &str,
     config: &Config,
-    reference_registry: Option<&crate::parser::block_parser::ReferenceRegistry>,
+    allow_reference_links: bool,
 ) {
     log::trace!(
         "Parsing inline text with newlines: {:?} ({} bytes)",
@@ -195,7 +192,7 @@ pub fn parse_inline_text_with_newlines(
 
         // Parse this text segment
         if text_end > pos {
-            parse_inline_text(builder, &text[pos..text_end], config, reference_registry);
+            parse_inline_text(builder, &text[pos..text_end], config, allow_reference_links);
             pos = text_end;
         } else {
             pos += 1;
@@ -207,13 +204,13 @@ pub fn parse_inline_text_with_newlines(
 /// This is a standalone function used by both the main inline parser
 /// and by nested contexts like link text.
 ///
-/// The `reference_registry` parameter is optional - when None, reference links/images
-/// won't be resolved (useful for nested contexts like link text).
+/// The `allow_reference_links` parameter controls whether reference links/images should be parsed.
+/// Set to `false` in nested contexts (inside link text, image alt, spans) to prevent recursive parsing.
 pub fn parse_inline_text(
     builder: &mut GreenNodeBuilder,
     text: &str,
     config: &Config,
-    reference_registry: Option<&crate::parser::block_parser::ReferenceRegistry>,
+    allow_reference_links: bool,
 ) {
     log::trace!(
         "Parsing inline text: {:?} ({} bytes), tex_math_single_backslash={}",
@@ -503,12 +500,12 @@ pub fn parse_inline_text(
         }
 
         // Try to parse reference image (after inline image check)
-        // Only if we have a registry and reference_links extension is enabled
+        // Only if reference_links extension is enabled and we allow them in this context
         if pos + 1 < text.len()
             && bytes[pos] == b'!'
             && bytes[pos + 1] == b'['
             && config.extensions.reference_links
-            && let Some(_registry) = reference_registry
+            && allow_reference_links
         {
             let allow_shortcut = config.extensions.shortcut_reference_links;
             if let Some((len, alt_text, label, is_shortcut)) =
@@ -558,11 +555,8 @@ pub fn parse_inline_text(
         }
 
         // Try to parse reference link (after inline link check)
-        // Only if we have a registry and reference_links extension is enabled
-        if bytes[pos] == b'['
-            && config.extensions.reference_links
-            && let Some(_registry) = reference_registry
-        {
+        // Only if reference_links extension is enabled and we allow them in this context
+        if bytes[pos] == b'[' && config.extensions.reference_links && allow_reference_links {
             let allow_shortcut = config.extensions.shortcut_reference_links;
             if let Some((len, link_text, label, is_shortcut)) =
                 try_parse_reference_link(&text[pos..], allow_shortcut)
@@ -681,22 +675,12 @@ fn find_next_inline_start(text: &str) -> usize {
 /// with properly parsed inline elements (emphasis, links, math, etc.).
 pub struct InlineParser {
     root: SyntaxNode,
-    #[allow(dead_code)] // TODO: Will be used for reference link/image resolution
-    reference_registry: crate::parser::block_parser::ReferenceRegistry,
     config: Config,
 }
 
 impl InlineParser {
-    pub fn new(
-        root: SyntaxNode,
-        config: Config,
-        reference_registry: crate::parser::block_parser::ReferenceRegistry,
-    ) -> Self {
-        Self {
-            root,
-            reference_registry,
-            config,
-        }
+    pub fn new(root: SyntaxNode, config: Config) -> Self {
+        Self { root, config }
     }
 
     /// Parse inline elements within the block-level CST.
@@ -730,12 +714,7 @@ impl InlineParser {
 
             // Parse the concatenated string - parse_inline_text_with_newlines will emit NEWLINE tokens
             // when it encounters newlines, preserving losslessness
-            parse_inline_text_with_newlines(
-                builder,
-                &concatenated,
-                &self.config,
-                Some(&self.reference_registry),
-            );
+            parse_inline_text_with_newlines(builder, &concatenated, &self.config, true);
         } else {
             // For other nodes, recursively process children as before
             let mut children = node.children_with_tokens().peekable();
@@ -837,7 +816,7 @@ impl InlineParser {
     /// Parse inline text with reference link/image resolution support.
     fn parse_text_with_refs(&self, builder: &mut GreenNodeBuilder, text: &str) {
         // Pass the reference registry for reference link/image resolution
-        parse_inline_text(builder, text, &self.config, Some(&self.reference_registry));
+        parse_inline_text(builder, text, &self.config, true);
     }
 
     /// Check if a token should be parsed for inline elements.
@@ -891,8 +870,8 @@ mod inline_tests {
 
     fn parse_inline(input: &str) -> SyntaxNode {
         let config = Config::default();
-        let (block_tree, registry) = BlockParser::new(input, &config).parse();
-        InlineParser::new(block_tree, config, registry).parse()
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
     }
 
     #[test]

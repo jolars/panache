@@ -136,7 +136,7 @@ pub fn emit_inline_image(
     builder.start_node(SyntaxKind::IMAGE_ALT.into());
     // Use the standalone parse_inline_text function for recursive parsing
     // Note: nested contexts don't resolve references
-    crate::parser::inline_parser::parse_inline_text(builder, alt_text, config, None);
+    crate::parser::inline_parser::parse_inline_text(builder, alt_text, config, false);
     builder.finish_node();
 
     // Closing ]
@@ -338,7 +338,7 @@ pub fn emit_inline_link(
     // Link text (recursively parse inline elements)
     builder.start_node(SyntaxKind::LINK_TEXT.into());
     // Use the standalone parse_inline_text function for recursive parsing
-    crate::parser::inline_parser::parse_inline_text(builder, link_text, config, None);
+    crate::parser::inline_parser::parse_inline_text(builder, link_text, config, false);
     builder.finish_node();
 
     // Closing ]
@@ -492,7 +492,7 @@ pub fn emit_reference_link(
 
     // Link text (recursively parse inline elements)
     builder.start_node(SyntaxKind::LINK_TEXT.into());
-    crate::parser::inline_parser::parse_inline_text(builder, link_text, config, None);
+    crate::parser::inline_parser::parse_inline_text(builder, link_text, config, false);
     builder.finish_node();
 
     // Closing ] and reference label
@@ -614,7 +614,7 @@ pub fn emit_reference_image(
 
     // Alt text (recursively parse inline elements)
     builder.start_node(SyntaxKind::IMAGE_ALT.into());
-    parse_inline_text(builder, alt_text, config, None);
+    parse_inline_text(builder, alt_text, config, false);
     builder.finish_node();
 
     // Closing ] and reference label

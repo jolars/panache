@@ -76,7 +76,7 @@ pub fn emit_superscript(builder: &mut GreenNodeBuilder, inner_text: &str, config
     builder.finish_node();
 
     // Parse inner content recursively for nested inline elements
-    super::parse_inline_text(builder, inner_text, config, None);
+    super::parse_inline_text(builder, inner_text, config, false);
 
     // Closing marker
     builder.start_node(SyntaxKind::SUPERSCRIPT_MARKER.into());

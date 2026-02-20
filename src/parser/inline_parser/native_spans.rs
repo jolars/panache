@@ -130,7 +130,7 @@ pub(crate) fn emit_native_span(
 
     // Parse the content recursively for inline markdown
     builder.start_node(SyntaxKind::SPAN_CONTENT.into());
-    parse_inline_text(builder, content, config, None);
+    parse_inline_text(builder, content, config, false);
     builder.finish_node();
 
     // Closing tag
