@@ -46,23 +46,28 @@ DOCUMENT@0..367
     BLANK_LINE@147..148 "\n"
   PARAGRAPH@148..188
     TEXT@148..158 "Combined: "
-    STRONG@158..186
+    STRONG@158..187
       STRONG_MARKER@158..160 "**"
-      TEXT@160..184 "bold with *nested italic"
-      STRONG_MARKER@184..186 "**"
-    TEXT@186..187 "*"
+      TEXT@160..170 "bold with "
+      EMPHASIS@170..185
+        EMPHASIS_MARKER@170..171 "*"
+        TEXT@171..184 "nested italic"
+        EMPHASIS_MARKER@184..185 "*"
+      STRONG_MARKER@185..187 "**"
     NEWLINE@187..188 "\n"
   BLANK_LINE@188..189
     BLANK_LINE@188..189 "\n"
   PARAGRAPH@189..234
     TEXT@189..204 "Mixed markers: "
-    EMPHASIS@204..224
+    EMPHASIS@204..233
       EMPHASIS_MARKER@204..205 "*"
-      TEXT@205..223 "italic with **bold"
-      EMPHASIS_MARKER@223..224 "*"
-    TEXT@224..225 "*"
-    TEXT@225..232 " inside"
-    TEXT@232..233 "*"
+      TEXT@205..217 "italic with "
+      STRONG@217..225
+        STRONG_MARKER@217..219 "**"
+        TEXT@219..223 "bold"
+        STRONG_MARKER@223..225 "**"
+      TEXT@225..232 " inside"
+      EMPHASIS_MARKER@232..233 "*"
     NEWLINE@233..234 "\n"
   BLANK_LINE@234..235
     BLANK_LINE@234..235 "\n"
@@ -87,11 +92,9 @@ DOCUMENT@0..367
     TEXT@290..298 "frigging"
     TEXT@298..299 "*"
     TEXT@299..316 "believable and un"
-    TEXT@316..317 "*"
-    TEXT@317..318 "*"
+    TEXT@316..318 "**"
     TEXT@318..326 "frigging"
-    TEXT@326..327 "*"
-    TEXT@327..328 "*"
+    TEXT@326..328 "**"
     TEXT@328..338 "believable"
     NEWLINE@338..339 "\n"
   BLANK_LINE@339..340

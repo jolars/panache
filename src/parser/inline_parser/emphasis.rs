@@ -23,14 +23,15 @@ use rowan::GreenNodeBuilder;
 
 /// A delimiter in the delimiter stack
 #[derive(Debug, Clone)]
-struct Delimiter {
-    char: char,            // * or _
-    count: usize,          // remaining delimiter characters
-    original_count: usize, // original count (for rule of 3s)
-    start_pos: usize,      // byte position in text
-    can_open: bool,
-    can_close: bool,
-    active: bool, // false if this delimiter has been fully consumed
+pub struct Delimiter {
+    pub char: char,            // * or _
+    pub count: usize,          // remaining delimiter characters
+    pub original_count: usize, // original count (for rule of 3s)
+    pub start_pos: usize,      // byte position in text
+    pub can_open: bool,
+    pub can_close: bool,
+    pub active: bool,         // false if this delimiter has been fully consumed
+    pub element_index: usize, // index in the element list (for resolver)
 }
 
 /// A matched emphasis span
@@ -55,7 +56,9 @@ fn is_punctuation(c: char) -> bool {
 }
 
 /// Determine if a delimiter run can open/close emphasis based on flanking rules.
-fn analyze_delimiter_run(
+///
+/// This is made public so the collector can use it to analyze delimiter runs.
+pub fn analyze_delimiter_run(
     text: &str,
     run_start: usize,
     run_char: char,
@@ -103,8 +106,9 @@ fn analyze_delimiter_run(
 }
 
 /// Scan text for all delimiter runs
-#[allow(dead_code)]
-fn scan_delimiters(text: &str) -> Vec<Delimiter> {
+///
+/// Made public so other modules can use it if needed.
+pub fn scan_delimiters(text: &str) -> Vec<Delimiter> {
     let mut delimiters = Vec::new();
     let bytes = text.as_bytes();
     let mut pos = 0;
@@ -129,6 +133,7 @@ fn scan_delimiters(text: &str) -> Vec<Delimiter> {
                 can_open,
                 can_close,
                 active: true,
+                element_index: 0, // Not used by scan_delimiters
             });
         } else {
             pos += 1;
@@ -139,10 +144,12 @@ fn scan_delimiters(text: &str) -> Vec<Delimiter> {
 }
 
 /// Process the delimiter stack to find all emphasis matches.
-/// Implements the CommonMark "process emphasis" algorithm.
-#[allow(dead_code)]
-fn process_emphasis(delimiters: &mut [Delimiter]) -> Vec<EmphasisMatch> {
+/// Implements Pandoc's emphasis algorithm (stricter than CommonMark).
+///
+/// Made public so the resolver can use it.
+pub fn process_emphasis(delimiters: &mut [Delimiter]) -> Vec<EmphasisMatch> {
     let mut matches = Vec::new();
+    let mut match_counter = 0;
 
     // Process each potential closer from left to right
     let mut closer_idx = 0;
@@ -205,29 +212,98 @@ fn process_emphasis(delimiters: &mut [Delimiter]) -> Vec<EmphasisMatch> {
             };
             let level = use_count as u8;
 
+            // PANDOC RULE: Reject certain patterns that CommonMark accepts
+            // Research shows Pandoc rejects:
+            // 1. **foo* (opener=2, closer=1) → would use 1, differ by 1
+            // 2. *foo** (opener=1, closer=2) → would use 1, differ by 1
+            // 3. ****foo**** (both=4) → both >=4 and equal
+            //
+            // But ACCEPTS:
+            // 1. ***foo** (opener=3, closer=2) → uses 2, differ by >1 ✓
+            // 2. **foo*** (opener=2, closer=3) → uses 2, differ by >1 ✓
+            //
+            // The rule: Reject if:
+            // - Both counts >=4 and equal, OR
+            // - use_count would be 1 (emphasis not strong) AND counts differ by exactly 1
+            let counts_equal_and_large = opener_count == closer_count && opener_count >= 4;
+            let asymmetric_single = use_count == 1 && opener_count.abs_diff(closer_count) == 1;
+
+            if counts_equal_and_large || asymmetric_single {
+                log::debug!(
+                    "Rejecting Pandoc-invalid match: opener={}, closer={}, use={}, large_equal={}, asym_single={}",
+                    opener_count,
+                    closer_count,
+                    use_count,
+                    counts_equal_and_large,
+                    asymmetric_single
+                );
+                // Don't create this match, move to next closer
+                closer_idx += 1;
+                continue;
+            }
+
             // Calculate positions
-            // Opening delimiter ends at: start_pos + (original_count - count) + use_count
-            // Wait, we need to track where the "used" delimiters are
-            // The used opener delims are the LAST `use_count` of the remaining opener
-            // The used closer delims are the FIRST `use_count` of the remaining closer
+            // CORRECTED ALGORITHM:
+            // - Openers: consume from RIGHT (last N), leaving unconsumed at LEFT
+            // - Closers: consume from LEFT (first N), leaving unconsumed at RIGHT
+            //
+            // Example `***foo**`:
+            //   Opener `***` at 0-3, uses LAST 2 (bytes 1-2), leaving byte 0
+            //   Content `foo` at 3-6
+            //   Closer `**` at 6-8, uses FIRST 2 (bytes 6-7), all consumed
+            //   Result: "*" + Strong[foo]
+            //
+            // Example `**foo***`:
+            //   Opener `**` at 0-2, uses LAST 2 (bytes 0-1), all consumed
+            //   Content `foo` at 2-5
+            //   Closer `***` at 5-8, uses FIRST 2 (bytes 5-6), leaving byte 7
+            //   Result: Strong[foo] + "*"
 
             let opener_start = delimiters[j].start_pos;
-            let opener_remaining_start =
-                opener_start + (delimiters[j].original_count - delimiters[j].count);
-            let opener_used_start = opener_remaining_start + (delimiters[j].count - use_count);
+            let opener_count = delimiters[j].count;
+            // Consume from the RIGHT (last use_count)
+            let opener_used_start = opener_start + (opener_count - use_count);
 
             let closer_start = delimiters[closer_idx].start_pos;
-            let closer_remaining_start = closer_start
-                + (delimiters[closer_idx].original_count - delimiters[closer_idx].count);
+            // Consume from the LEFT (first use_count)
+            let closer_used_start = closer_start;
 
             let em = EmphasisMatch {
                 start: opener_used_start,
-                end: closer_remaining_start + use_count,
+                end: closer_used_start + use_count,
                 content_start: opener_used_start + use_count,
-                content_end: closer_remaining_start,
+                content_end: closer_used_start,
                 level,
                 delim_char: closer_char,
             };
+            match_counter += 1;
+            log::debug!(
+                "Creating match #{}: level={}, start={}, end={}, content={}..{}",
+                match_counter,
+                level,
+                em.start,
+                em.end,
+                em.content_start,
+                em.content_end
+            );
+            log::debug!(
+                "  Opener: pos={}, orig_count={}, curr_count={}, used_start={}, consumed={}..{}",
+                delimiters[j].start_pos,
+                delimiters[j].original_count,
+                delimiters[j].count,
+                opener_used_start,
+                opener_used_start,
+                opener_used_start + use_count
+            );
+            log::debug!(
+                "  Closer: pos={}, orig_count={}, curr_count={}, used_start={}, consumed={}..{}",
+                delimiters[closer_idx].start_pos,
+                delimiters[closer_idx].original_count,
+                delimiters[closer_idx].count,
+                closer_used_start,
+                closer_used_start,
+                closer_used_start + use_count
+            );
             matches.push(em);
 
             // Consume the delimiters
@@ -250,13 +326,26 @@ fn process_emphasis(delimiters: &mut [Delimiter]) -> Vec<EmphasisMatch> {
         }
     }
 
-    // Sort matches by start position for proper nesting order
-    matches.sort_by_key(|m| m.start);
+    // Don't sort or reverse - keep matches in creation order
+    // For Pandoc: first match created should be outer (processed first in tree building)
+    log::debug!("Matches in creation order (Pandoc nesting):");
+    for (i, m) in matches.iter().enumerate() {
+        log::debug!(
+            "  Match {}: level={}, start={}, end={}, content={}..{}, width={}",
+            i,
+            m.level,
+            m.start,
+            m.end,
+            m.content_start,
+            m.content_end,
+            m.end - m.start
+        );
+    }
+
     matches
 }
 
 /// Parse all emphasis in text and return matches
-#[allow(dead_code)]
 pub fn parse_emphasis(text: &str) -> Vec<EmphasisMatch> {
     let mut delimiters = scan_delimiters(text);
     process_emphasis(&mut delimiters)
@@ -389,6 +478,60 @@ pub fn emit_emphasis(
             builder.start_node(SyntaxKind::EMPHASIS.into());
             builder.token(SyntaxKind::EMPHASIS_MARKER.into(), inner_delim);
             builder.token(SyntaxKind::TEXT.into(), inner_text);
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), inner_delim);
+            builder.finish_node();
+
+            builder.token(SyntaxKind::STRONG_MARKER.into(), outer_delim);
+            builder.finish_node();
+        }
+    }
+}
+
+/// Emit emphasis match with recursive inline parsing of content
+/// This is used by the delimiter stack algorithm
+pub fn emit_emphasis_match(
+    builder: &mut GreenNodeBuilder,
+    em_match: &EmphasisMatch,
+    text: &str,
+    config: &Config,
+) {
+    let delim_count = em_match.level as usize;
+    let delim_str = &text[em_match.start..em_match.start + delim_count];
+    let content = &text[em_match.content_start..em_match.content_end];
+
+    match em_match.level {
+        1 => {
+            builder.start_node(SyntaxKind::EMPHASIS.into());
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), delim_str);
+            // Recursively parse inline elements within the emphasis
+            super::parse_inline_text(builder, content, config, true);
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), delim_str);
+            builder.finish_node();
+        }
+        2 => {
+            builder.start_node(SyntaxKind::STRONG.into());
+            builder.token(SyntaxKind::STRONG_MARKER.into(), delim_str);
+            // Recursively parse inline elements within the strong
+            super::parse_inline_text(builder, content, config, true);
+            builder.token(SyntaxKind::STRONG_MARKER.into(), delim_str);
+            builder.finish_node();
+        }
+        _ => {
+            // This shouldn't happen with the delimiter stack algorithm
+            // as it only produces level 1 or 2. But handle it anyway.
+            let inner_delim = if em_match.delim_char == '_' { "_" } else { "*" };
+            let outer_delim = if em_match.delim_char == '_' {
+                "__"
+            } else {
+                "**"
+            };
+
+            builder.start_node(SyntaxKind::STRONG.into());
+            builder.token(SyntaxKind::STRONG_MARKER.into(), outer_delim);
+
+            builder.start_node(SyntaxKind::EMPHASIS.into());
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), inner_delim);
+            super::parse_inline_text(builder, content, config, true);
             builder.token(SyntaxKind::EMPHASIS_MARKER.into(), inner_delim);
             builder.finish_node();
 

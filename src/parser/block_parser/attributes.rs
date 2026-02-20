@@ -13,7 +13,7 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct AttributeBlock {
     pub identifier: Option<String>,
     pub classes: Vec<String>,
