@@ -24,9 +24,14 @@ cargo check && cargo test && cargo clippy --all-targets --all-features -- -D war
 **CLI testing:**
 
 ```bash
-# Format
-printf "[link](url)" | cargo run -- format
+# Format in place
 cargo run -- format document.qmd
+
+# Format from file to stdout
+cargo run -- format < document.qmd
+
+# Format from stdin to stdout
+cat document.qmd | cargo run -- format 
 
 # Parse (show CST for debugging)
 printf "# Test" | cargo run -- parse
