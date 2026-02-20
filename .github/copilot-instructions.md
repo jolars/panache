@@ -24,7 +24,7 @@ cargo check && cargo test && cargo clippy --all-targets --all-features -- -D war
 **CLI testing:**
 
 ```bash
-# Format (writes to stdout or file in-place)
+# Format
 printf "[link](url)" | cargo run -- format
 cargo run -- format document.qmd
 
@@ -253,7 +253,8 @@ Instead of listing every file, understand the patterns:
 
 ### DO:
 - Run full test suite after changes: `cargo test`
-- Ensure clippy passes: `cargo clippy -- -D warnings`
+- Ensure clippy passes: `cargo clippy --all-targets --all-features -- -D warnings`
+- Auto-fix clippy warnings when possible: `cargo clippy --fix`
 - Test CLI with release binary after building
 - Consider idempotency - formatting twice should equal formatting once
 - Verify CST snapshots before updating: `UPDATE_CST=1 cargo test`
