@@ -149,6 +149,8 @@ Each `tests/cases/*/` directory contains:
 - `cst.txt` - CST snapshot for debugging
 - `panache.toml` - optional test-specific config
 
+You need to update the list of tests in `tests/golden_cases.rs` when adding new a new directory.
+
 **Test verification:**
 - Formatting is idempotent
 - CST structure matches snapshot
