@@ -30,10 +30,16 @@ pub enum SyntaxKind {
     LINK_START,           // [
     LINK,                 // [text](url)
     LINK_TEXT,            // text part of link
+    LINK_TEXT_END,        // ] closing link text
+    LINK_DEST_START,      // ( opening link destination
     LINK_DEST,            // (url) or (url "title")
+    LINK_DEST_END,        // ) closing link destination
     LINK_REF,             // [ref] in reference links
     IMAGE_LINK,           // ![alt](url)
     IMAGE_ALT,            // alt text in image
+    IMAGE_ALT_END,        // ] closing image alt
+    IMAGE_DEST_START,     // ( opening image destination
+    IMAGE_DEST_END,       // ) closing image destination
     AUTO_LINK,            // <http://example.com>
     AUTO_LINK_MARKER,     // < and >
     REFERENCE_DEFINITION, // [label]: url "title"

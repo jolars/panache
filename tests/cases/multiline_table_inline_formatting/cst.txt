@@ -28,10 +28,11 @@ DOCUMENT@0..542
           LINK_START@303..304 "["
         LINK_TEXT@304..308
           TEXT@304..308 "link"
-        TEXT@308..310 "]("
+        LINK_TEXT_END@308..309 "]"
+        LINK_DEST_START@309..310 "("
         LINK_DEST@310..313
           TEXT@310..313 "url"
-        TEXT@313..314 ")"
+        LINK_DEST_END@313..314 ")"
       NEWLINE@314..315 "\n"
       TEXT@315..331 "            text"
       HARD_LINE_BREAK@331..348 "                \n"
@@ -56,10 +57,11 @@ DOCUMENT@0..542
           LINK_START@459..460 "["
         LINK_TEXT@460..464
           TEXT@460..464 "link"
-        TEXT@464..466 "]("
+        LINK_TEXT_END@464..465 "]"
+        LINK_DEST_START@465..466 "("
         LINK_DEST@466..470
           TEXT@466..470 "url2"
-        TEXT@470..471 ")"
+        LINK_DEST_END@470..471 ")"
       NEWLINE@471..472 "\n"
     TABLE_SEPARATOR@472..542
       TEXT@472..541 "--------------------- ..."

@@ -196,8 +196,18 @@ pub(super) fn build_words<'a>(
                                     _ => {}
                                 },
                                 NodeOrToken::Token(t) => {
-                                    if past_link_text && t.kind() == SyntaxKind::TEXT {
-                                        closing.push_str(t.text());
+                                    if past_link_text {
+                                        match t.kind() {
+                                            SyntaxKind::LINK_TEXT_END
+                                            | SyntaxKind::LINK_DEST_START
+                                            | SyntaxKind::LINK_DEST_END => {
+                                                closing.push_str(t.text());
+                                            }
+                                            SyntaxKind::TEXT => {
+                                                closing.push_str(t.text());
+                                            }
+                                            _ => {}
+                                        }
                                     }
                                 }
                             }
@@ -237,8 +247,18 @@ pub(super) fn build_words<'a>(
                                     _ => {}
                                 },
                                 NodeOrToken::Token(t) => {
-                                    if past_image_alt && t.kind() == SyntaxKind::TEXT {
-                                        closing.push_str(t.text());
+                                    if past_image_alt {
+                                        match t.kind() {
+                                            SyntaxKind::IMAGE_ALT_END
+                                            | SyntaxKind::IMAGE_DEST_START
+                                            | SyntaxKind::IMAGE_DEST_END => {
+                                                closing.push_str(t.text());
+                                            }
+                                            SyntaxKind::TEXT => {
+                                                closing.push_str(t.text());
+                                            }
+                                            _ => {}
+                                        }
                                     }
                                 }
                             }

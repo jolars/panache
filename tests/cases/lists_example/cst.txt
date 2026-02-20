@@ -180,10 +180,11 @@ DOCUMENT@0..879
             LINK_START@750..751 "["
           LINK_TEXT@751..757
             TEXT@751..757 "a link"
-          TEXT@757..759 "]("
+          LINK_TEXT_END@757..758 "]"
+          LINK_DEST_START@758..759 "("
           LINK_DEST@759..778
             TEXT@759..778 "https://example.com"
-          TEXT@778..779 ")"
+          LINK_DEST_END@778..779 ")"
         NEWLINE@779..780 "\n"
   BLANK_LINE@780..781
     BLANK_LINE@780..781 "\n"

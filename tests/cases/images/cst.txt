@@ -15,10 +15,11 @@ DOCUMENT@0..254
         IMAGE_LINK_START@24..26 "!["
       IMAGE_ALT@26..34
         TEXT@26..34 "alt text"
-      TEXT@34..36 "]("
+      IMAGE_ALT_END@34..35 "]"
+      IMAGE_DEST_START@35..36 "("
       LINK_DEST@36..45
         TEXT@36..45 "image.png"
-      TEXT@45..46 ")"
+      IMAGE_DEST_END@45..46 ")"
     NEWLINE@46..47 "\n"
   BLANK_LINE@47..48
     BLANK_LINE@47..48 "\n"
@@ -29,10 +30,11 @@ DOCUMENT@0..254
         IMAGE_LINK_START@60..62 "!["
       IMAGE_ALT@62..70
         TEXT@62..70 "alt text"
-      TEXT@70..72 "]("
+      IMAGE_ALT_END@70..71 "]"
+      IMAGE_DEST_START@71..72 "("
       LINK_DEST@72..89
         TEXT@72..89 "image.png \"Title\""
-      TEXT@89..90 ")"
+      IMAGE_DEST_END@89..90 ")"
     NEWLINE@90..91 "\n"
   BLANK_LINE@91..92
     BLANK_LINE@91..92 "\n"
@@ -42,10 +44,11 @@ DOCUMENT@0..254
       IMAGE_LINK_START@103..105
         IMAGE_LINK_START@103..105 "!["
       IMAGE_ALT@105..105
-      TEXT@105..107 "]("
+      IMAGE_ALT_END@105..106 "]"
+      IMAGE_DEST_START@106..107 "("
       LINK_DEST@107..116
         TEXT@107..116 "image.png"
-      TEXT@116..117 ")"
+      IMAGE_DEST_END@116..117 ")"
     NEWLINE@117..118 "\n"
   BLANK_LINE@118..119
     BLANK_LINE@118..119 "\n"
@@ -60,10 +63,11 @@ DOCUMENT@0..254
           TEXT@136..140 "bold"
           STRONG_MARKER@140..142 "**"
         TEXT@142..151 " alt text"
-      TEXT@151..153 "]("
+      IMAGE_ALT_END@151..152 "]"
+      IMAGE_DEST_START@152..153 "("
       LINK_DEST@153..162
         TEXT@153..162 "image.png"
-      TEXT@162..163 ")"
+      IMAGE_DEST_END@162..163 ")"
     NEWLINE@163..164 "\n"
   BLANK_LINE@164..165
     BLANK_LINE@164..165 "\n"
@@ -89,9 +93,10 @@ DOCUMENT@0..254
         IMAGE_LINK_START@231..233 "!["
       IMAGE_ALT@233..241
         TEXT@233..241 "alt text"
-      TEXT@241..243 "]("
+      IMAGE_ALT_END@241..242 "]"
+      IMAGE_DEST_START@242..243 "("
       LINK_DEST@243..252
         TEXT@243..252 "image.png"
-      TEXT@252..253 ")"
+      IMAGE_DEST_END@252..253 ")"
     NEWLINE@253..254 "\n"
 

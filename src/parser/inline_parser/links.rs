@@ -139,8 +139,11 @@ pub fn emit_inline_image(
     crate::parser::inline_parser::parse_inline_text(builder, alt_text, config, None);
     builder.finish_node();
 
-    // Closing ] and opening (
-    builder.token(SyntaxKind::TEXT.into(), "](");
+    // Closing ]
+    builder.token(SyntaxKind::IMAGE_ALT_END.into(), "]");
+
+    // Opening (
+    builder.token(SyntaxKind::IMAGE_DEST_START.into(), "(");
 
     // Destination
     builder.start_node(SyntaxKind::LINK_DEST.into());
@@ -148,7 +151,7 @@ pub fn emit_inline_image(
     builder.finish_node();
 
     // Closing )
-    builder.token(SyntaxKind::TEXT.into(), ")");
+    builder.token(SyntaxKind::IMAGE_DEST_END.into(), ")");
 
     // Emit raw attributes if present (preserve original formatting)
     if let Some(raw_attrs) = raw_attributes {
@@ -338,8 +341,11 @@ pub fn emit_inline_link(
     crate::parser::inline_parser::parse_inline_text(builder, link_text, config, None);
     builder.finish_node();
 
-    // Closing ] and opening (
-    builder.token(SyntaxKind::TEXT.into(), "](");
+    // Closing ]
+    builder.token(SyntaxKind::LINK_TEXT_END.into(), "]");
+
+    // Opening (
+    builder.token(SyntaxKind::LINK_DEST_START.into(), "(");
 
     // Destination
     builder.start_node(SyntaxKind::LINK_DEST.into());
@@ -347,7 +353,7 @@ pub fn emit_inline_link(
     builder.finish_node();
 
     // Closing )
-    builder.token(SyntaxKind::TEXT.into(), ")");
+    builder.token(SyntaxKind::LINK_DEST_END.into(), ")");
 
     // Emit raw attributes if present (preserve original formatting)
     if let Some(raw_attrs) = raw_attributes {

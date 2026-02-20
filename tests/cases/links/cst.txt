@@ -10,10 +10,11 @@ DOCUMENT@0..122
           TEXT@73..74 "p"
           INLINE_MATH_MARKER@74..75 "$"
         TEXT@75..76 "."
-      TEXT@76..78 "]("
+      LINK_TEXT_END@76..77 "]"
+      LINK_DEST_START@77..78 "("
       LINK_DEST@78..102
         TEXT@78..102 "../images/networkfig.png"
-      TEXT@102..103 ")"
+      LINK_DEST_END@102..103 ")"
       ATTRIBUTE@103..114
         ATTRIBUTE@103..114 "{width=70%}"
     NEWLINE@114..115 "\n"

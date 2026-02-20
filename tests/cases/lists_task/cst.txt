@@ -134,10 +134,11 @@ DOCUMENT@0..734
             LINK_START@387..388 "["
           LINK_TEXT@388..394
             TEXT@388..394 "a link"
-          TEXT@394..396 "]("
+          LINK_TEXT_END@394..395 "]"
+          LINK_DEST_START@395..396 "("
           LINK_DEST@396..415
             TEXT@396..415 "https://example.com"
-          TEXT@415..416 ")"
+          LINK_DEST_END@415..416 ")"
         NEWLINE@416..417 "\n"
   BLANK_LINE@417..418
     BLANK_LINE@417..418 "\n"

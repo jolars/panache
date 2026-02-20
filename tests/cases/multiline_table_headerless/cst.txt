@@ -1,0 +1,23 @@
+DOCUMENT@0..403
+  MULTILINE_TABLE@0..403
+    TABLE_SEPARATOR@0..62
+      TEXT@0..61 "----------- ------- - ..."
+      NEWLINE@61..62 "\n"
+    TABLE_ROW@62..178
+      TEXT@62..119 "   First    row       ..."
+      NEWLINE@119..120 "\n"
+      TEXT@120..177 "                      ..."
+      NEWLINE@177..178 "\n"
+    BLANK_LINE@178..179
+      BLANK_LINE@178..179 "\n"
+    TABLE_ROW@179..341
+      TEXT@179..239 "  Second    row       ..."
+      NEWLINE@239..240 "\n"
+      TEXT@240..298 "                      ..."
+      NEWLINE@298..299 "\n"
+      TEXT@299..340 "                      ..."
+      NEWLINE@340..341 "\n"
+    TABLE_SEPARATOR@341..403
+      TEXT@341..402 "----------- ------- - ..."
+      NEWLINE@402..403 "\n"
+
