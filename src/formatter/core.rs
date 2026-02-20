@@ -1206,8 +1206,11 @@ impl Formatter {
             SyntaxKind::BLANK_LINE => {
                 // BlankLine nodes preserve exact whitespace in the CST for losslessness
                 // But when formatting, we normalize to just newlines (no trailing spaces)
-                self.output.push('\n');
-                self.consecutive_blank_lines += 1;
+                // Limit consecutive blank lines to 1
+                if self.consecutive_blank_lines < 1 {
+                    self.output.push('\n');
+                    self.consecutive_blank_lines += 1;
+                }
             }
 
             SyntaxKind::EMPHASIS => {

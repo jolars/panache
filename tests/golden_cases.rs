@@ -133,6 +133,7 @@ macro_rules! golden_test_cases {
 // 1. Create a new directory under tests/cases/
 // 2. Add the directory name to this list
 golden_test_cases!(
+    blankline_concatenation,
     blockquote_depth_change,
     blockquote_list_blanks,
     blockquote_list_blockquote,
