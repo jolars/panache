@@ -19,7 +19,8 @@ DOCUMENT@0..283
       CODE_INFO@45..48
         TEXT@45..46 "{"
         CODE_LANGUAGE@46..47 "r"
-        TEXT@47..48 "}"
+        CHUNK_OPTIONS@47..48
+          TEXT@47..48 "}"
       NEWLINE@48..49 "\n"
     CODE_CONTENT@49..57
       TEXT@49..56 "x <- 42"
@@ -40,7 +41,8 @@ DOCUMENT@0..283
       CODE_INFO@80..83
         TEXT@80..81 "{"
         CODE_LANGUAGE@81..82 "r"
-        TEXT@82..83 "}"
+        CHUNK_OPTIONS@82..83
+          TEXT@82..83 "}"
       NEWLINE@83..84 "\n"
     CODE_CONTENT@84..126
       TEXT@84..98 "#| echo: false"
@@ -65,7 +67,8 @@ DOCUMENT@0..283
       CODE_INFO@149..157
         TEXT@149..150 "{"
         CODE_LANGUAGE@150..156 "python"
-        TEXT@156..157 "}"
+        CHUNK_OPTIONS@156..157
+          TEXT@156..157 "}"
       NEWLINE@157..158 "\n"
     CODE_CONTENT@158..192
       TEXT@158..171 "#| eval: true"
@@ -88,7 +91,8 @@ DOCUMENT@0..283
       CODE_INFO@225..232
         TEXT@225..226 "{"
         CODE_LANGUAGE@226..231 "julia"
-        TEXT@231..232 "}"
+        CHUNK_OPTIONS@231..232
+          TEXT@231..232 "}"
       NEWLINE@232..233 "\n"
     CODE_CONTENT@233..279
       TEXT@233..251 "#| label: fig-plot"

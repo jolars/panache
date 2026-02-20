@@ -4,12 +4,90 @@
 //! line wrapping and language-specific comment prefixes.
 
 use crate::parser::block_parser::chunk_options::ChunkOptionValue;
+use crate::syntax::{AstNode, ChunkLabel, ChunkOption, SyntaxKind, SyntaxNode};
 
 /// A chunk option with a classified value (simple or expression).
 type ClassifiedOption = (String, ChunkOptionValue);
 
-/// A raw chunk option from the parser (key with optional string value).
-type RawOption = (String, Option<String>);
+/// An option extracted from CST: (key, value, is_quoted).
+/// For labels, key is None.
+type CstOption = (Option<String>, Option<String>, bool);
+
+/// Value types that can appear in chunk options.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ValueType {
+    Boolean,
+    Numeric,
+    String,           // Accepts quoted strings and simple barewords
+    QuotedStringOnly, // Only accepts quoted strings, not barewords
+}
+
+/// Allowlist of chunk options safe for hashpipe conversion.
+///
+/// Each entry maps an option name to the value types it accepts in hashpipe format.
+/// Options not in this list will stay inline to avoid unknown type restrictions.
+///
+/// Based on knitr documentation: https://yihui.org/knitr/options/
+const HASHPIPE_SAFE_OPTIONS: &[(&str, &[ValueType])] = &[
+    // Chunk identification
+    ("label", &[ValueType::QuotedStringOnly]), // Chunk label/name - only quoted to be safe
+    // Code evaluation
+    ("eval", &[ValueType::Boolean]), // Can also be numeric vector, but keep those inline
+    // Text output
+    ("echo", &[ValueType::Boolean]), // Can also be numeric vector, but keep those inline
+    ("results", &[ValueType::String]), // "markup", "asis", "hold", "hide"
+    ("collapse", &[ValueType::Boolean]),
+    ("warning", &[ValueType::Boolean]), // Can also be NA or numeric, but keep those inline
+    ("message", &[ValueType::Boolean]),
+    ("error", &[ValueType::Boolean]), // Can also be numeric 0/1/2, but keep those inline
+    ("include", &[ValueType::Boolean]),
+    ("strip-white", &[ValueType::Boolean]),
+    // Code decoration
+    ("comment", &[ValueType::String]),
+    ("highlight", &[ValueType::Boolean]),
+    ("prompt", &[ValueType::Boolean]),
+    ("size", &[ValueType::String]),       // LaTeX font sizes
+    ("background", &[ValueType::String]), // Color values
+    // Cache
+    ("cache", &[ValueType::Boolean]), // Can also be path, but keep those inline
+    ("cache-path", &[ValueType::String]),
+    ("cache-lazy", &[ValueType::Boolean]),
+    ("cache-comments", &[ValueType::Boolean]),
+    ("cache-rebuild", &[ValueType::Boolean]),
+    ("autodep", &[ValueType::Boolean]),
+    // Plots
+    ("fig-path", &[ValueType::String]),
+    ("fig-keep", &[ValueType::String]), // "high", "none", "all", "first", "last"
+    ("fig-show", &[ValueType::String]), // "asis", "hold", "animate", "hide"
+    ("dev", &[ValueType::String]),      // "png", "pdf", "svg", etc.
+    // Figure dimensions and layout
+    ("fig-width", &[ValueType::Numeric]),
+    ("fig-height", &[ValueType::Numeric]),
+    ("fig-asp", &[ValueType::Numeric]),  // Aspect ratio
+    ("fig-dim", &[ValueType::Numeric]),  // Can be vector, but single numeric values work
+    ("out-width", &[ValueType::String]), // "50%", "300px", etc.
+    ("out-height", &[ValueType::String]),
+    ("fig-align", &[ValueType::String]), // "left", "center", "right", "default"
+    ("fig-env", &[ValueType::String]),
+    ("fig-pos", &[ValueType::String]),
+    ("fig-scap", &[ValueType::String]),
+    // Figure captions and alt text
+    ("fig-cap", &[ValueType::String]),
+    ("fig-alt", &[ValueType::String]),
+    ("fig-subcap", &[ValueType::String]),
+    // Plot parameters
+    ("dpi", &[ValueType::Numeric]),
+    // Animation
+    ("aniopts", &[ValueType::String]),
+    ("ffmpeg-format", &[ValueType::String]),
+    // Quarto-specific code display
+    ("code-fold", &[ValueType::Boolean, ValueType::String]), // true/false or "show"/"hide"
+    ("code-summary", &[ValueType::String]),
+    ("code-overflow", &[ValueType::String]), // "wrap" or "scroll"
+    ("code-line-numbers", &[ValueType::Boolean]),
+    // Output classes/attributes
+    ("classes", &[ValueType::String]),
+];
 
 /// Mapping of common chunk option names from R dot-notation to YAML dash-notation.
 ///
@@ -80,42 +158,104 @@ pub fn normalize_option_name(name: &str) -> String {
 /// Normalize a chunk option value for YAML syntax.
 ///
 /// Converts R boolean literals to lowercase YAML booleans.
-/// Adds quotes around string values that need them (contain spaces, special chars).
+/// For quoted strings, preserves the quotes.
 pub fn normalize_value(value: &str) -> String {
     match value {
         "TRUE" | "T" => "true".to_string(),
         "FALSE" | "F" => "false".to_string(),
-        _ => {
-            // Check if value is numeric (doesn't need quotes)
-            use crate::parser::block_parser::chunk_options::is_numeric_literal;
-            if is_numeric_literal(value) {
-                value.to_string()
-            } else if needs_yaml_quotes(value) {
-                // Add quotes for strings with spaces or special chars
-                format!("\"{}\"", value.replace('\"', "\\\""))
-            } else {
-                value.to_string()
-            }
-        }
+        _ => value.to_string(),
     }
 }
 
-/// Check if a value needs quotes in YAML.
+/// Extract chunk options from CST and classify into hashpipe-safe vs inline-only.
 ///
-/// Returns true for values with spaces or special YAML characters.
-fn needs_yaml_quotes(s: &str) -> bool {
-    s.is_empty()
-        || s.contains(' ')
-        || s.contains(':')
-        || s.contains('#')
-        || s.contains('[')
-        || s.contains(']')
-        || s.contains('{')
-        || s.contains('}')
-        || s.contains(',')
-        || s.starts_with('-')
-        || s.starts_with('>')
-        || s.starts_with('|')
+/// Returns (simple_options, complex_options) where simple_options can be converted
+/// to hashpipe format and complex_options must stay inline.
+pub fn split_options_from_cst(info_node: &SyntaxNode) -> (Vec<ClassifiedOption>, Vec<CstOption>) {
+    let mut simple = Vec::new();
+    let mut complex = Vec::new();
+
+    // Find CHUNK_OPTIONS node
+    for child in info_node.children() {
+        if child.kind() == SyntaxKind::CHUNK_OPTIONS {
+            // Iterate through options and labels
+            for opt_or_label in child.children() {
+                if let Some(label) = ChunkLabel::cast(opt_or_label.clone()) {
+                    // Label converts to #| label: value
+                    simple.push(("label".to_string(), ChunkOptionValue::Simple(label.text())));
+                } else if let Some(opt) = ChunkOption::cast(opt_or_label) {
+                    // Regular option with key=value
+                    if let (Some(key), Some(value)) = (opt.key(), opt.value()) {
+                        let is_quoted = opt.is_quoted();
+                        let normalized_key = normalize_option_name(&key);
+
+                        // Classify the option
+                        if let Some(classified_value) =
+                            classify_option_for_hashpipe(&normalized_key, &value, is_quoted)
+                        {
+                            simple.push((normalized_key, classified_value));
+                        } else {
+                            // Keep inline with original key
+                            complex.push((Some(key), Some(value), is_quoted));
+                        }
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    (simple, complex)
+}
+
+/// Classify an option value for hashpipe conversion.
+///
+/// Returns Some(ClassifiedValue) if the option is safe for hashpipe, None otherwise.
+fn classify_option_for_hashpipe(
+    key: &str,
+    value: &str,
+    is_quoted: bool,
+) -> Option<ChunkOptionValue> {
+    use crate::parser::block_parser::chunk_options::{is_boolean_literal, is_numeric_literal};
+
+    // Find allowed value types for this option
+    let allowed_types = HASHPIPE_SAFE_OPTIONS
+        .iter()
+        .find(|(name, _)| *name == key)
+        .map(|(_, types)| *types)?;
+
+    // Check if value type matches allowed types
+    if is_quoted {
+        // Quoted string - safe if String or QuotedStringOnly is allowed
+        if allowed_types.contains(&ValueType::String)
+            || allowed_types.contains(&ValueType::QuotedStringOnly)
+        {
+            return Some(ChunkOptionValue::Simple(format!("\"{}\"", value)));
+        }
+    } else {
+        // Unquoted - check boolean, numeric, or simple bareword
+        if is_boolean_literal(value) && allowed_types.contains(&ValueType::Boolean) {
+            return Some(ChunkOptionValue::Simple(value.to_lowercase()));
+        }
+        if is_numeric_literal(value) && allowed_types.contains(&ValueType::Numeric) {
+            return Some(ChunkOptionValue::Simple(value.to_string()));
+        }
+        // Unquoted string (bareword) - only if String is allowed (not QuotedStringOnly)
+        if allowed_types.contains(&ValueType::String) && is_simple_bareword(value) {
+            return Some(ChunkOptionValue::Simple(value.to_string()));
+        }
+    }
+
+    // Doesn't match allowed types or is complex expression - keep inline
+    None
+}
+
+/// Check if a value is a simple bareword (identifier), not an expression.
+///
+/// Always returns false - we don't convert barewords to be safe.
+/// Inline format requires quotes for string values (e.g., results="asis" not results=asis).
+fn is_simple_bareword(_s: &str) -> bool {
+    false
 }
 
 /// Format a single hashpipe option line with wrapping support.
@@ -215,46 +355,6 @@ pub fn format_as_hashpipe(
     }
 
     Some(output)
-}
-
-/// Classify options and split into simple (convertible) and complex (inline-only).
-///
-/// Returns (simple_options, complex_options) where simple options can be
-/// converted to hashpipe and complex options must stay inline.
-///
-/// Special case: `label` option is always treated as simple, even for barewords,
-/// because labels are identifiers, not R expressions.
-pub fn split_options(options: &[RawOption]) -> (Vec<ClassifiedOption>, Vec<RawOption>) {
-    use crate::parser::block_parser::chunk_options::classify_value;
-
-    let mut simple = Vec::new();
-    let mut complex = Vec::new();
-
-    for (key, value) in options {
-        // Special case: label is always simple (it's an identifier, not an expression)
-        if key == "label" {
-            if let Some(v) = value {
-                simple.push((key.clone(), ChunkOptionValue::Simple(v.clone())));
-            } else {
-                simple.push((key.clone(), ChunkOptionValue::Simple(String::new())));
-            }
-            continue;
-        }
-
-        let classified = classify_value(value);
-        log::debug!("Classifying {key}={value:?} -> {classified:?}");
-        match classified {
-            ChunkOptionValue::Simple(_) => {
-                simple.push((key.clone(), classified));
-            }
-            ChunkOptionValue::Expression(_) => {
-                complex.push((key.clone(), value.clone()));
-            }
-        }
-    }
-
-    log::debug!("Split: {} simple, {} complex", simple.len(), complex.len());
-    (simple, complex)
 }
 
 #[cfg(test)]
@@ -395,33 +495,4 @@ mod tests {
         let result = format_as_hashpipe("fortran", &options, 80);
         assert!(result.is_none());
     }
-
-    #[test]
-    fn test_split_options() {
-        let options = vec![
-            ("echo".to_string(), Some("TRUE".to_string())),
-            ("fig.width".to_string(), Some("7".to_string())),
-            ("label".to_string(), Some("my_var".to_string())), // label is always simple
-        ];
-
-        let (simple, complex) = split_options(&options);
-
-        // All three should be simple now (label gets special treatment)
-        assert_eq!(simple.len(), 3);
-        assert_eq!(complex.len(), 0);
-    }
-}
-
-#[test]
-fn test_split_with_quoted_string_containing_spaces() {
-    let options = vec![
-        ("label".to_string(), Some("\"my chunk\"".to_string())),
-        ("echo".to_string(), Some("FALSE".to_string())),
-    ];
-
-    let (simple, complex) = split_options(&options);
-
-    // Both should be simple
-    assert_eq!(simple.len(), 2, "Both options should be simple");
-    assert_eq!(complex.len(), 0, "No complex options");
 }

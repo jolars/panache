@@ -28,7 +28,21 @@ DOCUMENT@0..1070
       CODE_INFO@119..161
         TEXT@119..120 "{"
         CODE_LANGUAGE@120..121 "r"
-        TEXT@121..161 " simple-chunk, echo=T ..."
+        CHUNK_OPTIONS@121..161
+          TEXT@121..122 " "
+          CHUNK_LABEL@122..134
+            TEXT@122..134 "simple-chunk"
+          TEXT@134..136 ", "
+          CHUNK_OPTION@136..145
+            CHUNK_OPTION_KEY@136..140 "echo"
+            TEXT@140..141 "="
+            CHUNK_OPTION_VALUE@141..145 "TRUE"
+          TEXT@145..147 ", "
+          CHUNK_OPTION@147..160
+            CHUNK_OPTION_KEY@147..154 "warning"
+            TEXT@154..155 "="
+            CHUNK_OPTION_VALUE@155..160 "FALSE"
+          TEXT@160..161 "}"
       NEWLINE@161..162 "\n"
     CODE_CONTENT@162..217
       TEXT@162..205 "# Simple options shou ..."
@@ -55,7 +69,16 @@ DOCUMENT@0..1070
       CODE_INFO@251..292
         TEXT@251..252 "{"
         CODE_LANGUAGE@252..253 "r"
-        TEXT@253..292 " deps-chunk, dependso ..."
+        CHUNK_OPTIONS@253..292
+          TEXT@253..254 " "
+          CHUNK_LABEL@254..264
+            TEXT@254..264 "deps-chunk"
+          TEXT@264..266 ", "
+          CHUNK_OPTION@266..291
+            CHUNK_OPTION_KEY@266..275 "dependson"
+            TEXT@275..276 "="
+            CHUNK_OPTION_VALUE@276..291 "c(\"foo\", \"bar\")"
+          TEXT@291..292 "}"
       NEWLINE@292..293 "\n"
     CODE_CONTENT@293..391
       TEXT@293..357 "# Complex R function  ..."
@@ -82,7 +105,16 @@ DOCUMENT@0..1070
       CODE_INFO@414..470
         TEXT@414..415 "{"
         CODE_LANGUAGE@415..416 "r"
-        TEXT@416..470 " cache-chunk, cache.p ..."
+        CHUNK_OPTIONS@416..470
+          TEXT@416..417 " "
+          CHUNK_LABEL@417..428
+            TEXT@417..428 "cache-chunk"
+          TEXT@428..430 ", "
+          CHUNK_OPTION@430..469
+            CHUNK_OPTION_KEY@430..440 "cache.path"
+            TEXT@440..441 "="
+            CHUNK_OPTION_VALUE@441..469 "file.path(\"cache\", \"s ..."
+          TEXT@469..470 "}"
       NEWLINE@470..471 "\n"
     CODE_CONTENT@471..532
       TEXT@471..507 "# Function calls with ..."
@@ -109,7 +141,16 @@ DOCUMENT@0..1070
       CODE_INFO@558..605
         TEXT@558..559 "{"
         CODE_LANGUAGE@559..560 "r"
-        TEXT@560..605 " nested-chunk, data=l ..."
+        CHUNK_OPTIONS@560..605
+          TEXT@560..561 " "
+          CHUNK_LABEL@561..573
+            TEXT@561..573 "nested-chunk"
+          TEXT@573..575 ", "
+          CHUNK_OPTION@575..604
+            CHUNK_OPTION_KEY@575..579 "data"
+            TEXT@579..580 "="
+            CHUNK_OPTION_VALUE@580..604 "list(a=c(1,2), b=c(3,4))"
+          TEXT@604..605 "}"
       NEWLINE@605..606 "\n"
     CODE_CONTENT@606..654
       TEXT@606..634 "# Multiple levels of  ..."
@@ -136,7 +177,31 @@ DOCUMENT@0..1070
       CODE_INFO@691..786
         TEXT@691..692 "{"
         CODE_LANGUAGE@692..693 "r"
-        TEXT@693..786 " mixed-chunk, echo=TR ..."
+        CHUNK_OPTIONS@693..786
+          TEXT@693..694 " "
+          CHUNK_LABEL@694..705
+            TEXT@694..705 "mixed-chunk"
+          TEXT@705..707 ", "
+          CHUNK_OPTION@707..716
+            CHUNK_OPTION_KEY@707..711 "echo"
+            TEXT@711..712 "="
+            CHUNK_OPTION_VALUE@712..716 "TRUE"
+          TEXT@716..718 ", "
+          CHUNK_OPTION@718..728
+            CHUNK_OPTION_KEY@718..722 "eval"
+            TEXT@722..723 "="
+            CHUNK_OPTION_VALUE@723..728 "FALSE"
+          TEXT@728..730 ", "
+          CHUNK_OPTION@730..770
+            CHUNK_OPTION_KEY@730..739 "dependson"
+            TEXT@739..740 "="
+            CHUNK_OPTION_VALUE@740..770 "c(\"deps-chunk\", \"cach ..."
+          TEXT@770..772 ", "
+          CHUNK_OPTION@772..785
+            CHUNK_OPTION_KEY@772..779 "warning"
+            TEXT@779..780 "="
+            CHUNK_OPTION_VALUE@780..785 "FALSE"
+          TEXT@785..786 "}"
       NEWLINE@786..787 "\n"
     CODE_CONTENT@787..875
       TEXT@787..842 "# Mix of simple (hash ..."
@@ -163,7 +228,21 @@ DOCUMENT@0..1070
       CODE_INFO@907..977
         TEXT@907..908 "{"
         CODE_LANGUAGE@908..909 "r"
-        TEXT@909..977 " bracket-chunk, rows= ..."
+        CHUNK_OPTIONS@909..977
+          TEXT@909..910 " "
+          CHUNK_LABEL@910..923
+            TEXT@910..923 "bracket-chunk"
+          TEXT@923..925 ", "
+          CHUNK_OPTION@925..940
+            CHUNK_OPTION_KEY@925..929 "rows"
+            TEXT@929..930 "="
+            CHUNK_OPTION_VALUE@930..940 "df[1:10, ]"
+          TEXT@940..942 ", "
+          CHUNK_OPTION@942..976
+            CHUNK_OPTION_KEY@942..948 "config"
+            TEXT@948..949 "="
+            CHUNK_OPTION_VALUE@949..976 "list(timeout=30, retr ..."
+          TEXT@976..977 "}"
       NEWLINE@977..978 "\n"
     CODE_CONTENT@978..1066
       TEXT@978..1035 "# Different bracket t ..."

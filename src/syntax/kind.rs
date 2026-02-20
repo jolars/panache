@@ -164,6 +164,15 @@ pub enum SyntaxKind {
     CODE_FENCE_CLOSE,
     CODE_INFO,     // Raw info string (preserved for lossless formatting)
     CODE_LANGUAGE, // Parsed language identifier (r, python, etc.)
+
+    // Chunk options (for executable chunks like {r, echo=TRUE})
+    CHUNK_OPTIONS,      // Container for all chunk options
+    CHUNK_OPTION,       // Single option (key=value pair)
+    CHUNK_OPTION_KEY,   // Option name (e.g., echo, fig.cap)
+    CHUNK_OPTION_VALUE, // Option value (e.g., TRUE, "text")
+    CHUNK_OPTION_QUOTE, // Quote character (" or ') if present
+    CHUNK_LABEL,        // Special case: unlabeled first option in {r mylabel}
+
     CODE_CONTENT,
 
     // Div parts

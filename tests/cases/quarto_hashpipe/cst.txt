@@ -1,4 +1,4 @@
-DOCUMENT@0..507
+DOCUMENT@0..670
   HEADING@0..35
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -23,7 +23,22 @@ DOCUMENT@0..507
       CODE_INFO@57..90
         TEXT@57..58 "{"
         CODE_LANGUAGE@58..59 "r"
-        TEXT@59..90 ", echo = FALSE, warni ..."
+        CHUNK_OPTIONS@59..90
+          TEXT@59..61 ", "
+          CHUNK_OPTION@61..73
+            CHUNK_OPTION_KEY@61..65 "echo"
+            TEXT@65..66 " "
+            TEXT@66..67 "="
+            TEXT@67..68 " "
+            CHUNK_OPTION_VALUE@68..73 "FALSE"
+          TEXT@73..75 ", "
+          CHUNK_OPTION@75..89
+            CHUNK_OPTION_KEY@75..82 "warning"
+            TEXT@82..83 " "
+            TEXT@83..84 "="
+            TEXT@84..85 " "
+            CHUNK_OPTION_VALUE@85..89 "TRUE"
+          TEXT@89..90 "}"
       NEWLINE@90..91 "\n"
     CODE_CONTENT@91..111
       TEXT@91..101 "x <- 1 + 1"
@@ -50,7 +65,15 @@ DOCUMENT@0..507
       CODE_INFO@149..175
         TEXT@149..150 "{"
         CODE_LANGUAGE@150..151 "r"
-        TEXT@151..175 ", fig-cap=\"A nice plot\"}"
+        CHUNK_OPTIONS@151..175
+          TEXT@151..153 ", "
+          CHUNK_OPTION@153..174
+            CHUNK_OPTION_KEY@153..160 "fig.cap"
+            TEXT@160..161 "="
+            CHUNK_OPTION_QUOTE@161..162 "\""
+            CHUNK_OPTION_VALUE@162..173 "A nice plot"
+            CHUNK_OPTION_QUOTE@173..174 "\""
+          TEXT@174..175 "}"
       NEWLINE@175..176 "\n"
     CODE_CONTENT@176..233
       TEXT@176..191 "#| fig-width: 7"
@@ -79,7 +102,18 @@ DOCUMENT@0..507
       CODE_INFO@280..325
         TEXT@280..281 "{"
         CODE_LANGUAGE@281..282 "r"
-        TEXT@282..325 ", label=analysis-chun ..."
+        CHUNK_OPTIONS@282..325
+          TEXT@282..284 ", "
+          CHUNK_OPTION@284..304
+            CHUNK_OPTION_KEY@284..289 "label"
+            TEXT@289..290 "="
+            CHUNK_OPTION_VALUE@290..304 "analysis-chunk"
+          TEXT@304..306 ", "
+          CHUNK_OPTION@306..324
+            CHUNK_OPTION_KEY@306..311 "cache"
+            TEXT@311..312 "="
+            CHUNK_OPTION_VALUE@312..324 "my_cache_var"
+          TEXT@324..325 "}"
       NEWLINE@325..326 "\n"
     CODE_CONTENT@326..433
       TEXT@326..340 "#| echo: false"
@@ -110,7 +144,11 @@ DOCUMENT@0..507
       CODE_INFO@462..473
         TEXT@462..463 "{"
         CODE_LANGUAGE@463..464 "r"
-        TEXT@464..473 " mylabel}"
+        CHUNK_OPTIONS@464..473
+          TEXT@464..465 " "
+          CHUNK_LABEL@465..472
+            TEXT@465..472 "mylabel"
+          TEXT@472..473 "}"
       NEWLINE@473..474 "\n"
     CODE_CONTENT@474..503
       TEXT@474..488 "#| echo: false"
@@ -120,4 +158,94 @@ DOCUMENT@0..507
     CODE_FENCE_CLOSE@503..507
       CODE_FENCE_MARKER@503..506 "```"
       NEWLINE@506..507 "\n"
+  BLANK_LINE@507..508
+    BLANK_LINE@507..508 "\n"
+  HEADING@508..538
+    ATX_HEADING_MARKER@508..510
+      ATX_HEADING_MARKER@508..510 "##"
+    WHITESPACE@510..511 " "
+    HEADING_CONTENT@511..537
+      TEXT@511..537 "Chunk with Echo Expre ..."
+    NEWLINE@537..538 "\n"
+  BLANK_LINE@538..539
+    BLANK_LINE@538..539 "\n"
+  CODE_BLOCK@539..587
+    CODE_FENCE_OPEN@539..562
+      CODE_FENCE_MARKER@539..542 "```"
+      CODE_INFO@542..561
+        TEXT@542..543 "{"
+        CODE_LANGUAGE@543..544 "r"
+        CHUNK_OPTIONS@544..561
+          TEXT@544..545 " "
+          CHUNK_LABEL@545..550
+            TEXT@545..550 "vMsim"
+          TEXT@550..552 ", "
+          CHUNK_OPTION@552..560
+            CHUNK_OPTION_KEY@552..556 "echo"
+            TEXT@556..557 "="
+            CHUNK_OPTION_VALUE@557..560 "1:2"
+          TEXT@560..561 "}"
+      NEWLINE@561..562 "\n"
+    CODE_CONTENT@562..583
+      TEXT@562..568 "x <- 1"
+      NEWLINE@568..569 "\n"
+      TEXT@569..575 "a <- 2"
+      NEWLINE@575..576 "\n"
+      TEXT@576..582 "b <- 3"
+      NEWLINE@582..583 "\n"
+    CODE_FENCE_CLOSE@583..587
+      CODE_FENCE_MARKER@583..586 "```"
+      NEWLINE@586..587 "\n"
+  BLANK_LINE@587..588
+    BLANK_LINE@587..588 "\n"
+  CODE_BLOCK@588..628
+    CODE_FENCE_OPEN@588..603
+      CODE_FENCE_MARKER@588..591 "```"
+      CODE_INFO@591..602
+        TEXT@591..592 "{"
+        CODE_LANGUAGE@592..593 "r"
+        CHUNK_OPTIONS@593..602
+          TEXT@593..595 ", "
+          CHUNK_OPTION@595..601
+            CHUNK_OPTION_KEY@595..599 "echo"
+            TEXT@599..600 "="
+            CHUNK_OPTION_VALUE@600..601 "2"
+          TEXT@601..602 "}"
+      NEWLINE@602..603 "\n"
+    CODE_CONTENT@603..624
+      TEXT@603..609 "x <- 1"
+      NEWLINE@609..610 "\n"
+      TEXT@610..616 "a <- 2"
+      NEWLINE@616..617 "\n"
+      TEXT@617..623 "b <- 3"
+      NEWLINE@623..624 "\n"
+    CODE_FENCE_CLOSE@624..628
+      CODE_FENCE_MARKER@624..627 "```"
+      NEWLINE@627..628 "\n"
+  BLANK_LINE@628..629
+    BLANK_LINE@628..629 "\n"
+  CODE_BLOCK@629..670
+    CODE_FENCE_OPEN@629..645
+      CODE_FENCE_MARKER@629..632 "```"
+      CODE_INFO@632..644
+        TEXT@632..633 "{"
+        CODE_LANGUAGE@633..634 "r"
+        CHUNK_OPTIONS@634..644
+          TEXT@634..636 ", "
+          CHUNK_OPTION@636..643
+            CHUNK_OPTION_KEY@636..640 "echo"
+            TEXT@640..641 "="
+            CHUNK_OPTION_VALUE@641..643 "-2"
+          TEXT@643..644 "}"
+      NEWLINE@644..645 "\n"
+    CODE_CONTENT@645..666
+      TEXT@645..651 "x <- 1"
+      NEWLINE@651..652 "\n"
+      TEXT@652..658 "a <- 2"
+      NEWLINE@658..659 "\n"
+      TEXT@659..665 "b <- 3"
+      NEWLINE@665..666 "\n"
+    CODE_FENCE_CLOSE@666..670
+      CODE_FENCE_MARKER@666..669 "```"
+      NEWLINE@669..670 "\n"
 

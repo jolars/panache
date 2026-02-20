@@ -62,6 +62,7 @@ fn is_simple_string(s: &str) -> bool {
         || s.contains('<')
         || s.contains('>')
         || s.contains('!')
+        || s.contains(':')
     {
         return false;
     }

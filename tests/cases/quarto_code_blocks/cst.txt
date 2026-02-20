@@ -5,7 +5,13 @@ DOCUMENT@0..451
       CODE_INFO@3..18
         TEXT@3..4 "{"
         CODE_LANGUAGE@4..5 "r"
-        TEXT@5..18 ", echo=FALSE}"
+        CHUNK_OPTIONS@5..18
+          TEXT@5..7 ", "
+          CHUNK_OPTION@7..17
+            CHUNK_OPTION_KEY@7..11 "echo"
+            TEXT@11..12 "="
+            CHUNK_OPTION_VALUE@12..17 "FALSE"
+          TEXT@17..18 "}"
       NEWLINE@18..19 "\n"
     CODE_CONTENT@19..25
       TEXT@19..24 "1 + 1"
@@ -26,7 +32,8 @@ DOCUMENT@0..451
       CODE_INFO@96..106
         TEXT@96..97 "{"
         CODE_LANGUAGE@97..105 "{python}"
-        TEXT@105..106 "}"
+        CHUNK_OPTIONS@105..106
+          TEXT@105..106 "}"
       NEWLINE@106..107 "\n"
     CODE_CONTENT@107..113
       TEXT@107..112 "1 + 1"

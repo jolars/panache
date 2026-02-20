@@ -2,7 +2,7 @@ use crate::config::{AttributeStyle, Config, FenceStyle, Flavor};
 #[cfg(feature = "lsp")]
 use crate::external_formatters::format_code_async;
 use crate::parser::block_parser::code_blocks::{CodeBlockType, InfoString};
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, SyntaxKind, SyntaxNode};
 use crate::utils;
 use rowan::NodeOrToken;
 use std::collections::HashMap;
@@ -18,20 +18,20 @@ pub(super) fn format_code_block(
     formatted_code: &HashMap<String, String>,
     output: &mut String,
 ) {
-    let mut info_string_raw = String::new();
+    let mut info_node: Option<SyntaxNode> = None;
     let mut content = String::new();
 
-    // Extract info string and content from the AST
+    // Extract info node and content from the AST
     for child in node.children_with_tokens() {
         if let NodeOrToken::Node(n) = child {
             match n.kind() {
                 SyntaxKind::CODE_FENCE_OPEN => {
                     // Find the info string - now it's a node, not a token
                     for child_token in n.children_with_tokens() {
-                        if let NodeOrToken::Node(info_node) = child_token
-                            && info_node.kind() == SyntaxKind::CODE_INFO
+                        if let NodeOrToken::Node(node) = child_token
+                            && node.kind() == SyntaxKind::CODE_INFO
                         {
-                            info_string_raw = info_node.text().to_string();
+                            info_node = Some(node);
                         }
                     }
                 }
@@ -59,7 +59,27 @@ pub(super) fn format_code_block(
         }
     }
 
-    // Parse the info string
+    let info_node = match info_node {
+        Some(node) => node,
+        None => {
+            // No info string, just output basic fence
+            let fence_char = match config.code_blocks.fence_style {
+                FenceStyle::Backtick => '`',
+                FenceStyle::Tilde => '~',
+                FenceStyle::Preserve => '`',
+            };
+            let fence_length = determine_fence_length(&content, fence_char);
+            output.push_str(&fence_char.to_string().repeat(fence_length));
+            output.push('\n');
+            output.push_str(&content);
+            output.push_str(&fence_char.to_string().repeat(fence_length));
+            output.push('\n');
+            return;
+        }
+    };
+
+    // Parse the info string to get block type
+    let info_string_raw = info_node.text().to_string();
     let info = InfoString::parse(&info_string_raw);
 
     // Check if we have formatted version from external formatter
@@ -87,6 +107,7 @@ pub(super) fn format_code_block(
         // Try to format as hashpipe with YAML-style options
         // Falls back to inline format if language comment syntax is unknown
         if format_code_block_hashpipe(
+            &info_node,
             &info,
             final_content,
             fence_char,
@@ -100,7 +121,7 @@ pub(super) fn format_code_block(
     }
 
     // Format the info string based on config and block type (traditional inline)
-    let formatted_info = format_info_string(&info, config);
+    let formatted_info = format_info_string(&info_node, &info, config);
 
     log::debug!("formatted_info = '{}'", formatted_info);
 
@@ -141,8 +162,65 @@ fn determine_fence_length(content: &str, fence_char: char) -> usize {
     (max_sequence + 1).max(3)
 }
 
+/// Extract chunk options from CST CHUNK_OPTIONS node.
+/// Returns (label, options) where label is the first unlabeled option if any.
+fn extract_chunk_options_from_cst(
+    info_node: &SyntaxNode,
+) -> Vec<(Option<String>, Option<String>, bool)> {
+    use crate::syntax::{ChunkLabel, ChunkOption};
+
+    let mut options = Vec::new();
+
+    // Find CHUNK_OPTIONS node
+    for child in info_node.children() {
+        if child.kind() == SyntaxKind::CHUNK_OPTIONS {
+            // Iterate through options and labels
+            for opt_or_label in child.children() {
+                if let Some(label) = ChunkLabel::cast(opt_or_label.clone()) {
+                    // Label (no key, just value)
+                    options.push((None, Some(label.text()), false));
+                } else if let Some(opt) = ChunkOption::cast(opt_or_label) {
+                    // Regular option with key=value
+                    if let (Some(key), Some(value)) = (opt.key(), opt.value()) {
+                        options.push((Some(key), Some(value), opt.is_quoted()));
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    options
+}
+
+/// Format chunk options for inline display: label, key=value, key="quoted value"
+fn format_chunk_options_inline(options: &[(Option<String>, Option<String>, bool)]) -> String {
+    let mut parts = Vec::new();
+
+    for (key, value, is_quoted) in options {
+        match (key, value) {
+            (None, Some(val)) => {
+                // Label
+                parts.push(val.clone());
+            }
+            (Some(k), Some(v)) => {
+                // Key=value
+                if *is_quoted {
+                    // Re-add quotes
+                    parts.push(format!("{}=\"{}\"", k, v));
+                } else {
+                    parts.push(format!("{}={}", k, v));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    parts.join(", ")
+}
+
 /// Format the info string based on block type and config preferences
-fn format_info_string(info: &InfoString, config: &Config) -> String {
+fn format_info_string(info_node: &SyntaxNode, info: &InfoString, config: &Config) -> String {
     log::debug!(
         "format_info_string: block_type={:?}, attribute_style={:?}, raw='{}'",
         info.block_type,
@@ -248,15 +326,16 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
             }
         }
         CodeBlockType::Executable { language } => {
-            // Executable chunk: preserve unquoted values (booleans/numbers/identifiers)
+            // Executable chunk: extract options from CST nodes
             // Always keep as {language} with attributes
-            if info.attributes.is_empty() {
+            let options = extract_chunk_options_from_cst(info_node);
+            if options.is_empty() {
                 format!("{{{}}}", language)
             } else {
                 format!(
                     "{{{}, {}}}",
                     language,
-                    format_attributes(&info.attributes, true)
+                    format_chunk_options_inline(&options)
                 )
             }
         }
@@ -272,8 +351,9 @@ fn format_info_string(info: &InfoString, config: &Config) -> String {
 ///
 /// Converts simple inline options to hashpipe format with YAML syntax,
 /// while keeping complex expressions in the inline position.
-/// If the language's comment syntax is unknown, returns None to fall back to inline format.
+/// If the language's comment syntax is unknown, returns false to fall back to inline format.
 fn format_code_block_hashpipe(
+    info_node: &SyntaxNode,
     info: &InfoString,
     content: &str,
     fence_char: char,
@@ -287,7 +367,8 @@ fn format_code_block_hashpipe(
     };
 
     // Classify options into simple (hashpipe) vs complex (inline)
-    let (simple, complex) = hashpipe::split_options(&info.attributes);
+    // Extract from CST nodes
+    let (simple, complex) = hashpipe::split_options_from_cst(info_node);
 
     // Try to get hashpipe lines - returns None for unknown languages
     let hashpipe_lines = match hashpipe::format_as_hashpipe(language, &simple, config.line_width) {
@@ -303,7 +384,7 @@ fn format_code_block_hashpipe(
     output.push_str(language);
     if !complex.is_empty() {
         output.push_str(", ");
-        output.push_str(&format_attributes(&complex, true));
+        output.push_str(&format_chunk_options_inline(&complex));
     }
     output.push('}');
     output.push('\n');
@@ -341,11 +422,23 @@ fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool
         .iter()
         .map(|(k, v)| {
             if let Some(val) = v {
-                // For executable chunks with preserve_unquoted=true, never add quotes
-                // The value is either a literal R expression (like `c("foo", "bar")`)
-                // or a simple identifier (like `TRUE`), both of which should be unquoted
                 if preserve_unquoted {
-                    format!("{}={}", k, val)
+                    // For executable chunks, we need to preserve R syntax
+                    // Add quotes if the value contains spaces or commas (needs quoting)
+                    // but don't quote if it already looks like an R expression
+                    let needs_quotes = (val.contains(' ') || val.contains(','))
+                        && !val.contains('(')
+                        && !val.contains('[')
+                        && !val.contains('{');
+
+                    if needs_quotes {
+                        // Quote and escape
+                        let escaped_val = val.replace('\\', "\\\\").replace('"', "\\\"");
+                        format!("{}=\"{}\"", k, escaped_val)
+                    } else {
+                        // Keep as-is (R expression or simple identifier)
+                        format!("{}={}", k, val)
+                    }
                 } else {
                     // For display blocks, always quote
                     // Escape internal quotes and backslashes

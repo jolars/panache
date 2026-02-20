@@ -20,8 +20,7 @@ plot(1:10, main="Test")
 
 ## Chunk with Label and Mixed Options
 
-```{r, cache=my_cache_var}
-#| label: analysis-chunk
+```{r, label=analysis-chunk, cache=my_cache_var}
 #| echo: false
 #| message: true
 # This has a complex expression that stays inline
@@ -34,4 +33,25 @@ result <- analyze_data()
 #| label: mylabel
 #| echo: false
 summary(data)
+```
+
+## Chunk with Echo Expression
+
+```{r, echo=1:2}
+#| label: vMsim
+x <- 1
+a <- 2
+b <- 3
+```
+
+```{r, echo=2}
+x <- 1
+a <- 2
+b <- 3
+```
+
+```{r, echo=-2}
+x <- 1
+a <- 2
+b <- 3
 ```

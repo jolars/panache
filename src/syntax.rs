@@ -5,6 +5,7 @@
 //! the red-green tree pattern for efficient incremental parsing.
 
 mod ast;
+mod chunk_options;
 mod headings;
 mod kind;
 mod links;
@@ -13,6 +14,7 @@ mod references;
 mod tables;
 
 pub use ast::*;
+pub use chunk_options::*;
 pub use headings::*;
 pub use kind::*;
 pub use links::*;

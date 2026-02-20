@@ -496,6 +496,196 @@ pub(crate) fn is_closing_fence(content: &str, fence: &FenceInfo) -> bool {
     trimmed[closing_count..].trim().is_empty()
 }
 
+/// Emit chunk options as structured CST nodes while preserving all bytes.
+/// This parses {r, echo=TRUE, fig.cap="text"} into CHUNK_OPTIONS with individual CHUNK_OPTION nodes.
+fn emit_chunk_options(builder: &mut GreenNodeBuilder<'static>, content: &str) {
+    if content.trim().is_empty() {
+        builder.token(SyntaxKind::TEXT.into(), content);
+        return;
+    }
+
+    builder.start_node(SyntaxKind::CHUNK_OPTIONS.into());
+
+    let mut pos = 0;
+    let bytes = content.as_bytes();
+
+    while pos < bytes.len() {
+        // Emit leading whitespace/commas as TEXT
+        let ws_start = pos;
+        while pos < bytes.len() {
+            let ch = bytes[pos] as char;
+            if ch != ' ' && ch != '\t' && ch != ',' {
+                break;
+            }
+            pos += 1;
+        }
+        if pos > ws_start {
+            builder.token(SyntaxKind::TEXT.into(), &content[ws_start..pos]);
+        }
+
+        if pos >= bytes.len() {
+            break;
+        }
+
+        // Check if this is a closing brace
+        if bytes[pos] as char == '}' {
+            builder.token(SyntaxKind::TEXT.into(), &content[pos..pos + 1]);
+            break;
+        }
+
+        // Read key
+        let key_start = pos;
+        while pos < bytes.len() {
+            let ch = bytes[pos] as char;
+            if ch == '=' || ch == ' ' || ch == '\t' || ch == ',' || ch == '}' {
+                break;
+            }
+            pos += 1;
+        }
+
+        if pos == key_start {
+            // No key found, emit rest as TEXT
+            if pos < bytes.len() {
+                builder.token(SyntaxKind::TEXT.into(), &content[pos..]);
+            }
+            break;
+        }
+
+        let key = &content[key_start..pos];
+
+        // Check for whitespace before '='
+        let ws_before_eq_start = pos;
+        while pos < bytes.len() && matches!(bytes[pos] as char, ' ' | '\t') {
+            pos += 1;
+        }
+
+        // Check if there's a value (=)
+        if pos < bytes.len() && bytes[pos] as char == '=' {
+            // Has value - emit as CHUNK_OPTION
+            builder.start_node(SyntaxKind::CHUNK_OPTION.into());
+            builder.token(SyntaxKind::CHUNK_OPTION_KEY.into(), key);
+
+            // Emit whitespace before '=' if any
+            if pos > ws_before_eq_start {
+                builder.token(SyntaxKind::TEXT.into(), &content[ws_before_eq_start..pos]);
+            }
+
+            builder.token(SyntaxKind::TEXT.into(), "=");
+            pos += 1; // consume '='
+
+            // Emit whitespace after '='
+            let ws_after_eq_start = pos;
+            while pos < bytes.len() && matches!(bytes[pos] as char, ' ' | '\t') {
+                pos += 1;
+            }
+            if pos > ws_after_eq_start {
+                builder.token(SyntaxKind::TEXT.into(), &content[ws_after_eq_start..pos]);
+            }
+
+            // Parse value (might be quoted)
+            if pos < bytes.len() {
+                let quote_char = bytes[pos] as char;
+                if quote_char == '"' || quote_char == '\'' {
+                    // Quoted value
+                    builder.token(
+                        SyntaxKind::CHUNK_OPTION_QUOTE.into(),
+                        &content[pos..pos + 1],
+                    );
+                    pos += 1; // consume opening quote
+
+                    let val_start = pos;
+                    let mut escaped = false;
+                    while pos < bytes.len() {
+                        let ch = bytes[pos] as char;
+                        if !escaped && ch == quote_char {
+                            break;
+                        }
+                        escaped = !escaped && ch == '\\';
+                        pos += 1;
+                    }
+
+                    if pos > val_start {
+                        builder.token(
+                            SyntaxKind::CHUNK_OPTION_VALUE.into(),
+                            &content[val_start..pos],
+                        );
+                    }
+
+                    // Emit closing quote
+                    if pos < bytes.len() && bytes[pos] as char == quote_char {
+                        builder.token(
+                            SyntaxKind::CHUNK_OPTION_QUOTE.into(),
+                            &content[pos..pos + 1],
+                        );
+                        pos += 1;
+                    }
+                } else {
+                    // Unquoted value - read until comma, space, closing brace, or balanced delimiter
+                    let val_start = pos;
+                    let mut depth = 0;
+
+                    while pos < bytes.len() {
+                        let ch = bytes[pos] as char;
+                        match ch {
+                            '(' | '[' | '{' => depth += 1,
+                            ')' | ']' => {
+                                if depth > 0 {
+                                    depth -= 1;
+                                } else {
+                                    break;
+                                }
+                            }
+                            '}' => {
+                                if depth > 0 {
+                                    depth -= 1;
+                                } else {
+                                    break; // End of chunk options
+                                }
+                            }
+                            ',' => {
+                                if depth == 0 {
+                                    break; // Next option
+                                }
+                            }
+                            ' ' | '\t' => {
+                                if depth == 0 {
+                                    break; // Space separator
+                                }
+                            }
+                            _ => {}
+                        }
+                        pos += 1;
+                    }
+
+                    if pos > val_start {
+                        builder.token(
+                            SyntaxKind::CHUNK_OPTION_VALUE.into(),
+                            &content[val_start..pos],
+                        );
+                    }
+                }
+            }
+
+            builder.finish_node(); // CHUNK_OPTION
+        } else {
+            // No '=' - this is a label or bareword option
+            // Emit any whitespace we skipped as TEXT
+            if pos > ws_before_eq_start {
+                builder.start_node(SyntaxKind::CHUNK_LABEL.into());
+                builder.token(SyntaxKind::TEXT.into(), key);
+                builder.finish_node(); // CHUNK_LABEL
+                builder.token(SyntaxKind::TEXT.into(), &content[ws_before_eq_start..pos]);
+            } else {
+                builder.start_node(SyntaxKind::CHUNK_LABEL.into());
+                builder.token(SyntaxKind::TEXT.into(), key);
+                builder.finish_node(); // CHUNK_LABEL
+            }
+        }
+    }
+
+    builder.finish_node(); // CHUNK_OPTIONS
+}
+
 /// Helper to parse info string and emit CodeInfo node with parsed components.
 /// This breaks down the info string into its logical parts while preserving all bytes.
 fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &str) {
@@ -519,11 +709,11 @@ fn emit_code_info_node(builder: &mut GreenNodeBuilder<'static>, info_string: &st
             builder.token(SyntaxKind::TEXT.into(), "{");
             builder.token(SyntaxKind::CODE_LANGUAGE.into(), language);
 
-            // Everything after language
+            // Parse and emit chunk options
             let start_offset = 1 + language.len(); // Skip "{r"
             if start_offset < info_string.len() {
                 let rest = &info_string[start_offset..];
-                builder.token(SyntaxKind::TEXT.into(), rest);
+                emit_chunk_options(builder, rest);
             }
         }
         CodeBlockType::DisplayExplicit { classes } => {

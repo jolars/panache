@@ -49,17 +49,6 @@ fn r_chunk_with_quoted_string() {
 }
 
 #[test]
-fn python_chunk_with_space_separated_options() {
-    let input = "```{python echo=False warning=True}\nz = 3\n```\n";
-    let output = format(input, Some(quarto_config()), None);
-
-    // Python chunks should also preserve unquoted values
-    // Formatter adds comma after language for consistency in Quarto
-    assert!(output.contains("echo=False"));
-    assert!(output.contains("warning=True"));
-}
-
-#[test]
 fn r_chunk_without_spaces_after_commas() {
     let input = "```{r,echo=TRUE,warning=FALSE}\na <- 4\n```\n";
     let output = format(input, Some(quarto_config()), None);

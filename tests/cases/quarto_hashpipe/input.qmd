@@ -9,7 +9,7 @@ print(x)
 
 ## Chunk with Figure Options
 
-```{r, fig-cap="A nice plot"}
+```{r, fig.cap="A nice plot"}
 #| fig-width: 7
 #| fig-height: 5
 plot(1:10, main="Test")
@@ -29,4 +29,24 @@ result <- analyze_data()
 ```{r mylabel}
 #| echo: false
 summary(data)
+```
+
+## Chunk with Echo Expression
+
+```{r vMsim, echo=1:2}
+x <- 1
+a <- 2
+b <- 3
+```
+
+```{r, echo=2}
+x <- 1
+a <- 2
+b <- 3
+```
+
+```{r, echo=-2}
+x <- 1
+a <- 2
+b <- 3
 ```
