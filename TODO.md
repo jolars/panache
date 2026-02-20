@@ -9,8 +9,6 @@ This document tracks implementation status for panache's features.
 - ❌ **Not Implemented** - Feature not yet started
 - ⏹️ **Won't Implement** - Feature intentionally not implemented
 
----
-
 ## Language Server Protocol (LSP)
 
 ### Core LSP Capabilities
@@ -37,7 +35,6 @@ This document tracks implementation status for panache's features.
 - ❌ **Convert lists** - Convert between bullet/ordered lists
 - ✅ **Convert loose/compact lists** - Toggle between loose and compact list
 - ❌ Convert bullet list to task list - Convert `- item` to `- [ ] item`
-  formatting (DONE: LSP code action available via cursor on list)
 - ❌ **Convert table** - Convert between table styles (simple, pipe, grid)
 - ❌ **Convert link styles** - Convert between inline/reference links
 - ✅ **Convert footnote styles** - Convert between inline/reference footnotes
@@ -64,7 +61,7 @@ This document tracks implementation status for panache's features.
 - ❌ **Attribute completion** - Complete class names and attributes in
   `{.class #id}`
 
-#### Inlay Hints
+#### Inlay Hints (low priority)
 
 - ❌ **Link target hints** - Show link targets as inlay hints
 - ❌ **Reference definition hints** - Show reference definitions as inlay hints
@@ -83,10 +80,10 @@ This document tracks implementation status for panache's features.
 - ✅ **Range formatting** - `textDocument/rangeFormatting` for selected text
   only
 - ❌ **On-type formatting** - `textDocument/onTypeFormatting` for
-  auto-formatting triggers (not sure about this)
+  auto-formatting triggers (not sure about this, low priority)
 - ❌ **Document links** - `textDocument/documentLink` for clickable links
 - ❌ **Semantic tokens** - Syntax highlighting via LSP
-- ❌ **Rename** - Rename reference links/footnotes/citations across document
+- ❌ **Rename** - Rename reference links/footnotes/citations across document and bibliography
 - ❌ **Workspace symbols** - Search for headings across all workspace documents
 - ❌ **Configuration via LSP** - `workspace/didChangeConfiguration` to reload
   config
@@ -124,8 +121,6 @@ This document tracks implementation status for panache's features.
     as Pandoc)
   - Could potentially extend to per-pattern extension overrides:
     `[pattern_overrides."docs/**/*.md".extensions]`
-
----
 
 ## Linter
 
@@ -218,18 +213,19 @@ panache lint --config cfg.toml      # Custom config
 
 ### Tables
 
-- ✅ **Simple tables** - Support for formatting tables
-- ✅ **Pipe tables** - Support for formatting GitHub-style tables
-- ✅ **Grid tables** - Support for formatting grid-style tables
-- ❌ **Multiline tables** - Support for formatting tables with multiline cells
+- ✅ Simple tables
+- ✅ Pipe tables
+- ✅ Grid tables
+- ✅ Multiline tables
 
-Parser - Comprehensive Pandoc Feature Coverage
+## Parser - Comprehensive Pandoc Feature Coverage
 
 This section tracks implementation status of Pandoc Markdown features based on
 the spec files in `assets/pandoc-spec/`.
 
-**Focus**: Initial development prioritizes **default Pandoc extensions**.
-Non-default extensions are tracked separately for future consideration.
+**Focus**: Prioritize **default Pandoc extensions**. Non-default extensions are
+lower priority and may be deferred until after core formatting features are
+implemented.
 
 ### Block-Level Elements
 
@@ -267,7 +263,7 @@ Non-default extensions are tracked separately for future consideration.
 - ✅ Ordered lists (`1.`, `2.`, etc.)
 - ✅ Nested lists
 - ✅ List item continuation
-- 🚧 Complex nested mixed lists (fragile, needs parser structure improvement)
+- ✅ Complex nested mixed lists
 - ✅ Extension: `fancy_lists` - Roman numerals, letters `(a)`, `A)`, etc.
 - ❌ Extension: `startnum` - Start ordered lists at arbitrary number (low
   priority)
@@ -310,8 +306,6 @@ Non-default extensions are tracked separately for future consideration.
 ### Line Blocks ✅
 
 - ✅ Extension: `line_blocks` - Poetry/verse with `|` prefix
-
----
 
 ## Inline Elements
 
@@ -390,8 +384,6 @@ Non-default extensions are tracked separately for future consideration.
 - ✅ Extension: `yaml_metadata_block` - YAML frontmatter
 - ✅ Extension: `pandoc_title_block` - Title/author/date at top
 
----
-
 ## Raw Content & Special Syntax
 
 ### Raw HTML ✅
@@ -413,8 +405,6 @@ Non-default extensions are tracked separately for future consideration.
 - ✅ Extension: `raw_attribute` - Generic raw blocks `{=format}` (blocks ✅,
   inline spans ✅)
 
----
-
 ## Escapes & Special Characters
 
 ### Backslash Escapes ✅
@@ -426,8 +416,6 @@ Non-default extensions are tracked separately for future consideration.
 ### Line Breaks ✅
 
 - ✅ Extension: `escaped_line_breaks` - Backslash at line end = `<br>`
-
----
 
 ## Non-Default Extensions (Future Consideration)
 
@@ -483,7 +471,6 @@ for initial implementation.
 
 - ✅ Quarto executable code cells with output
 - ❌ Quarto cross-references `@fig-id`, `@tbl-id`
-- ❌ Quarto callout blocks (`.callout-note`, etc.)
 
 ### Non-Default: RMarkdown-Specific
 
