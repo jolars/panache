@@ -1,48 +1,8 @@
-//! Parsing for emphasis (*italic*, **bold**) using the CommonMark delimiter stack algorithm
-//!
-//! This implements the full CommonMark delimiter matching algorithm with Pandoc extensions:
-//! - Extension: `intraword_underscores` - underscores inside words don't trigger emphasis
-//!
-//! The algorithm processes text in two phases:
-//! 1. Scan phase: Find all delimiter runs and determine their open/close potential
-//! 2. Match phase: Process closers left-to-right, matching with openers using a stack
-//!
-//! Key rules from CommonMark spec:
-//! - "Rule of 3s": If opener+closer lengths sum to multiple of 3 and both can open AND close,
-//!   they don't match (prevents `***foo**` from matching as bold)
-//! - Strong (2 delims) takes precedence over emphasis (1 delim) when possible
-//! - Delimiters must match by character (* with *, _ with _)
+//! Parsing for emphasis
 
 use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
-
-// The following structures and functions implement the full CommonMark delimiter stack
-// algorithm for complex cases. Currently we use the simpler try_parse_emphasis for
-// basic cases. These will be used when we need to handle complex nested emphasis.
-
-/// A delimiter in the delimiter stack
-#[derive(Debug, Clone)]
-struct Delimiter {
-    char: char,            // * or _
-    count: usize,          // remaining delimiter characters
-    original_count: usize, // original count (for rule of 3s)
-    start_pos: usize,      // byte position in text
-    can_open: bool,
-    can_close: bool,
-    active: bool, // false if this delimiter has been fully consumed
-}
-
-/// A matched emphasis span
-#[derive(Debug, Clone, PartialEq)]
-pub struct EmphasisMatch {
-    pub start: usize,         // byte position of opening delimiter
-    pub end: usize,           // byte position after closing delimiter
-    pub content_start: usize, // byte position of content start
-    pub content_end: usize,   // byte position of content end
-    pub level: u8,            // 1 = em, 2 = strong
-    pub delim_char: char,
-}
 
 /// Check if a character is Unicode whitespace
 fn is_whitespace(c: char) -> bool {
@@ -95,171 +55,11 @@ fn analyze_delimiter_run(
         let can_close = right_flanking && !followed_by_alnum;
         (can_open, can_close)
     } else {
-        // Asterisks: standard CommonMark rules
+        // Asterisks
         let can_open = left_flanking && (!right_flanking || preceded_by_punctuation);
         let can_close = right_flanking && (!left_flanking || followed_by_punctuation);
         (can_open, can_close)
     }
-}
-
-/// Scan text for all delimiter runs
-#[allow(dead_code)]
-fn scan_delimiters(text: &str) -> Vec<Delimiter> {
-    let mut delimiters = Vec::new();
-    let bytes = text.as_bytes();
-    let mut pos = 0;
-
-    while pos < bytes.len() {
-        let ch = bytes[pos] as char;
-        if ch == '*' || ch == '_' {
-            let start = pos;
-            let mut count = 0;
-            while pos < bytes.len() && bytes[pos] == ch as u8 {
-                count += 1;
-                pos += 1;
-            }
-
-            let (can_open, can_close) = analyze_delimiter_run(text, start, ch, count);
-
-            delimiters.push(Delimiter {
-                char: ch,
-                count,
-                original_count: count,
-                start_pos: start,
-                can_open,
-                can_close,
-                active: true,
-            });
-        } else {
-            pos += 1;
-        }
-    }
-
-    delimiters
-}
-
-/// Process the delimiter stack to find all emphasis matches.
-/// Implements the CommonMark "process emphasis" algorithm.
-#[allow(dead_code)]
-fn process_emphasis(delimiters: &mut [Delimiter]) -> Vec<EmphasisMatch> {
-    let mut matches = Vec::new();
-
-    // Process each potential closer from left to right
-    let mut closer_idx = 0;
-    while closer_idx < delimiters.len() {
-        if !delimiters[closer_idx].can_close
-            || !delimiters[closer_idx].active
-            || delimiters[closer_idx].count == 0
-        {
-            closer_idx += 1;
-            continue;
-        }
-
-        let closer = &delimiters[closer_idx];
-        let closer_char = closer.char;
-
-        // Look backwards for a matching opener
-        let mut opener_idx = None;
-        for j in (0..closer_idx).rev() {
-            let opener = &delimiters[j];
-            if !opener.active || opener.count == 0 || !opener.can_open {
-                continue;
-            }
-            if opener.char != closer_char {
-                continue;
-            }
-
-            // Rule of 3s (CommonMark spec):
-            // If one of the delimiters can both open AND close, then the sum of
-            // the lengths must not be a multiple of 3 UNLESS both lengths are
-            // multiples of 3.
-            let opener_orig = opener.original_count;
-            let closer_orig = delimiters[closer_idx].original_count;
-            let opener_both = opener.can_open && opener.can_close;
-            let closer_both = delimiters[closer_idx].can_open && delimiters[closer_idx].can_close;
-
-            if opener_both || closer_both {
-                let sum = opener_orig + closer_orig;
-                if sum.is_multiple_of(3)
-                    && !(opener_orig.is_multiple_of(3) && closer_orig.is_multiple_of(3))
-                {
-                    // Skip this opener, try the next one
-                    continue;
-                }
-            }
-
-            opener_idx = Some(j);
-            break;
-        }
-
-        if let Some(j) = opener_idx {
-            // Determine how many delimiters to use (1 for em, 2 for strong)
-            let opener_count = delimiters[j].count;
-            let closer_count = delimiters[closer_idx].count;
-
-            // Use 2 if both have >= 2, otherwise use 1
-            let use_count = if opener_count >= 2 && closer_count >= 2 {
-                2
-            } else {
-                1
-            };
-            let level = use_count as u8;
-
-            // Calculate positions
-            // Opening delimiter ends at: start_pos + (original_count - count) + use_count
-            // Wait, we need to track where the "used" delimiters are
-            // The used opener delims are the LAST `use_count` of the remaining opener
-            // The used closer delims are the FIRST `use_count` of the remaining closer
-
-            let opener_start = delimiters[j].start_pos;
-            let opener_remaining_start =
-                opener_start + (delimiters[j].original_count - delimiters[j].count);
-            let opener_used_start = opener_remaining_start + (delimiters[j].count - use_count);
-
-            let closer_start = delimiters[closer_idx].start_pos;
-            let closer_remaining_start = closer_start
-                + (delimiters[closer_idx].original_count - delimiters[closer_idx].count);
-
-            let em = EmphasisMatch {
-                start: opener_used_start,
-                end: closer_remaining_start + use_count,
-                content_start: opener_used_start + use_count,
-                content_end: closer_remaining_start,
-                level,
-                delim_char: closer_char,
-            };
-            matches.push(em);
-
-            // Consume the delimiters
-            delimiters[j].count -= use_count;
-            delimiters[closer_idx].count -= use_count;
-
-            // Deactivate any delimiters between opener and closer
-            for delim in delimiters.iter_mut().take(closer_idx).skip(j + 1) {
-                delim.active = false;
-            }
-
-            // If closer still has delimiters, continue processing it
-            if delimiters[closer_idx].count == 0 {
-                closer_idx += 1;
-            }
-            // Otherwise, stay at same closer_idx to process remaining
-        } else {
-            // No opener found, move to next potential closer
-            closer_idx += 1;
-        }
-    }
-
-    // Sort matches by start position for proper nesting order
-    matches.sort_by_key(|m| m.start);
-    matches
-}
-
-/// Parse all emphasis in text and return matches
-#[allow(dead_code)]
-pub fn parse_emphasis(text: &str) -> Vec<EmphasisMatch> {
-    let mut delimiters = scan_delimiters(text);
-    process_emphasis(&mut delimiters)
 }
 
 /// Try to parse emphasis starting at the given position.
@@ -444,32 +244,6 @@ mod tests {
         assert!(can_close);
     }
 
-    // === Scan tests ===
-
-    #[test]
-    fn test_scan_delimiters_simple() {
-        let delimiters = scan_delimiters("*hello*");
-        assert_eq!(delimiters.len(), 2);
-        assert_eq!(delimiters[0].count, 1);
-        assert!(delimiters[0].can_open);
-        assert_eq!(delimiters[1].count, 1);
-        assert!(delimiters[1].can_close);
-    }
-
-    #[test]
-    fn test_scan_delimiters_double() {
-        let delimiters = scan_delimiters("**bold**");
-        assert_eq!(delimiters.len(), 2);
-        assert_eq!(delimiters[0].count, 2);
-        assert_eq!(delimiters[1].count, 2);
-    }
-
-    #[test]
-    fn test_scan_delimiters_mixed() {
-        let delimiters = scan_delimiters("*italic* and **bold**");
-        assert_eq!(delimiters.len(), 4);
-    }
-
     // === Full parsing tests ===
 
     #[test]
@@ -513,55 +287,5 @@ mod tests {
     fn test_try_parse_not_opener() {
         let result = try_parse_emphasis("* hello");
         assert_eq!(result, None);
-    }
-
-    // === Complex cases ===
-
-    #[test]
-    fn test_overlapping_emphasis() {
-        // *foo **bar* baz** - this is a tricky case
-        // CommonMark: *foo **bar* becomes <em>foo **bar</em> baz**
-        // The ** inside doesn't match because of rule of 3s
-        let matches = parse_emphasis("*foo **bar* baz**");
-        // Should have at least one match
-        assert!(!matches.is_empty());
-    }
-
-    #[test]
-    fn test_nested_strong_em() {
-        // **foo *bar* baz** - strong containing emphasis
-        let matches = parse_emphasis("**foo *bar* baz**");
-        assert!(!matches.is_empty());
-    }
-
-    #[test]
-    fn test_adjacent_emphasis() {
-        // *foo**bar* - CommonMark example 420
-        // Should parse as <em>foo</em><em>bar</em> (two separate emphasis)
-        // Actually per spec this is <em>foo**bar</em>
-        let matches = parse_emphasis("*foo**bar*");
-        assert!(!matches.is_empty());
-    }
-
-    #[test]
-    fn test_rule_of_threes() {
-        // ***bar*** - 3+3=6, multiple of 3, but both are multiples of 3
-        // So they CAN match (exception to rule of 3s)
-        let matches = parse_emphasis("***bar***");
-        assert!(!matches.is_empty(), "Triple asterisks should match");
-    }
-
-    #[test]
-    fn test_rule_of_threes_prevents_match() {
-        // **foo* - 2+1=3, multiple of 3, but neither is multiple of 3
-        // First * can both open and close (right-flanking at end)
-        // So rule of 3s should prevent matching
-        // Actually this depends on exact context. Let's use a clearer example.
-
-        // The rule of 3s prevents things like:
-        // *foo**bar**baz* from being parsed incorrectly
-        let matches = parse_emphasis("*foo**bar**baz*");
-        // Should get some valid parsing
-        assert!(!matches.is_empty());
     }
 }
