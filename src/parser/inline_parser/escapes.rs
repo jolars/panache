@@ -58,8 +58,8 @@ pub fn emit_escape(builder: &mut GreenNodeBuilder, ch: char, escape_type: Escape
             builder.token(SyntaxKind::NONBREAKING_SPACE.into(), "\u{00A0}");
         }
         EscapeType::HardLineBreak => {
-            // Emit as a special hard line break token
-            builder.token(SyntaxKind::HARD_LINE_BREAK.into(), "\n");
+            // Emit as a special hard line break token - include backslash for losslessness
+            builder.token(SyntaxKind::HARD_LINE_BREAK.into(), "\\\n");
         }
         EscapeType::Literal => {
             // Emit the full escape sequence (backslash + character) for losslessness

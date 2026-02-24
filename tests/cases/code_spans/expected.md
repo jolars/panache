@@ -2,7 +2,7 @@
 
 Simple code: `code`
 
-With spaces: ` code with spaces `
+With spaces: `code with spaces`
 
 Multiple backticks: ``code with `backtick` inside``
 

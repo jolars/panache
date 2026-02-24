@@ -1,4 +1,5 @@
-```{r, echo=FALSE}
+```{r}
+#| echo: false
 1 + 1
 ```
 
@@ -9,8 +10,8 @@ The following is a Quarto code block with execution disabled.
 ```
 
 If you want to show an example with multiple code blocks and other markdown,
-just enclose the entire example in 4 backticks (e.g. ````) and use the two curly
-brace syntax for code blocks within. For example:
+just enclose the entire example in 4 backticks (e.g. \`\`\`\`) and use the two
+curly brace syntax for code blocks within. For example:
 
 ````
 ---

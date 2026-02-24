@@ -35,7 +35,7 @@ use html_blocks::{parse_html_block, try_parse_html_block_start};
 use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
 use line_blocks::{parse_line_block, try_parse_line_block_start};
-use lists::{markers_match, try_parse_list_marker};
+use lists::{is_content_nested_bullet_marker, markers_match, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 use reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
@@ -379,15 +379,32 @@ impl<'a> BlockParser<'a> {
                             &mut self.builder,
                             level,
                         );
-                        lists::add_list_item(
-                            &mut self.containers,
-                            &mut self.builder,
-                            line,
-                            marker_len,
-                            spaces_after,
-                            indent_cols,
-                            indent_bytes,
-                        );
+
+                        // Check if content is a nested bullet marker
+                        if let Some(nested_marker) =
+                            is_content_nested_bullet_marker(line, marker_len, spaces_after)
+                        {
+                            lists::add_list_item_with_nested_empty_list(
+                                &mut self.containers,
+                                &mut self.builder,
+                                line,
+                                marker_len,
+                                spaces_after,
+                                indent_cols,
+                                indent_bytes,
+                                nested_marker,
+                            );
+                        } else {
+                            lists::add_list_item(
+                                &mut self.containers,
+                                &mut self.builder,
+                                line,
+                                marker_len,
+                                spaces_after,
+                                indent_cols,
+                                indent_bytes,
+                            );
+                        }
                         self.pos += 1;
                         return true;
                     }
@@ -507,15 +524,32 @@ impl<'a> BlockParser<'a> {
                     lists::find_matching_list_level(&self.containers, &marker, indent_cols)
                 {
                     lists::continue_list_at_level(&mut self.containers, &mut self.builder, level);
-                    lists::add_list_item(
-                        &mut self.containers,
-                        &mut self.builder,
-                        line,
-                        marker_len,
-                        spaces_after,
-                        indent_cols,
-                        indent_bytes,
-                    );
+
+                    // Check if content is a nested bullet marker
+                    if let Some(nested_marker) =
+                        is_content_nested_bullet_marker(line, marker_len, spaces_after)
+                    {
+                        lists::add_list_item_with_nested_empty_list(
+                            &mut self.containers,
+                            &mut self.builder,
+                            line,
+                            marker_len,
+                            spaces_after,
+                            indent_cols,
+                            indent_bytes,
+                            nested_marker,
+                        );
+                    } else {
+                        lists::add_list_item(
+                            &mut self.containers,
+                            &mut self.builder,
+                            line,
+                            marker_len,
+                            spaces_after,
+                            indent_cols,
+                            indent_bytes,
+                        );
+                    }
                     self.pos += 1;
                     return true;
                 }
@@ -1050,25 +1084,80 @@ impl<'a> BlockParser<'a> {
             content
         };
 
-        if has_blank_before && let Some(fence) = try_parse_fence_open(content_for_fence_check) {
-            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
-            log::debug!(
-                "Parsed fenced code block at line {}: {} fence",
-                self.pos,
-                fence.fence_char
+        // Fenced code blocks can interrupt paragraphs without a blank line
+        // This is standard Pandoc/CommonMark behavior
+        // EXCEPT:
+        // 1. Executable chunks (```{r}, ```{python}) in Pandoc/CommonMark/GFM should be inline code
+        // 2. Bare fences (```) without info string might be inline code delimiters, so require blank line
+        let can_interrupt_paragraph =
+            if let Some(fence) = try_parse_fence_open(content_for_fence_check) {
+                let info = code_blocks::InfoString::parse(&fence.info_string);
+                let is_executable = matches!(
+                    info.block_type,
+                    code_blocks::CodeBlockType::Executable { .. }
+                );
+                let is_pandoc_like = matches!(
+                    self.config.flavor,
+                    crate::config::Flavor::Pandoc
+                        | crate::config::Flavor::CommonMark
+                        | crate::config::Flavor::Gfm
+                );
+
+                // Don't allow interrupt if:
+                // - It's an executable chunk in Pandoc-like flavors, OR
+                // - It has no info string (might be inline code delimiter)
+                let has_info = !fence.info_string.trim().is_empty();
+                !(is_executable && is_pandoc_like) && has_info
+            } else {
+                false
+            };
+
+        if (has_blank_before || can_interrupt_paragraph)
+            && let Some(fence) = try_parse_fence_open(content_for_fence_check)
+        {
+            // In Pandoc/CommonMark/GFM, don't treat ```{r} as code blocks
+            // They should be parsed as inline code instead
+            let info = code_blocks::InfoString::parse(&fence.info_string);
+            let skip_executable_in_pandoc = matches!(
+                self.config.flavor,
+                crate::config::Flavor::Pandoc
+                    | crate::config::Flavor::CommonMark
+                    | crate::config::Flavor::Gfm
+            ) && matches!(
+                info.block_type,
+                code_blocks::CodeBlockType::Executable { .. }
             );
-            // Pass total indent (footnote + list) to the parser
-            let total_indent = content_indent + list_indent_stripped;
-            let new_pos = parse_fenced_code_block(
-                &mut self.builder,
-                &self.lines,
-                self.pos,
-                fence,
-                bq_depth,
-                total_indent,
-            );
-            self.pos = new_pos;
-            return true;
+
+            if skip_executable_in_pandoc {
+                // Don't parse as code block - let it fall through to paragraph/inline code
+            } else {
+                // Close paragraph before opening code block
+                if can_interrupt_paragraph
+                    && matches!(self.containers.last(), Some(Container::Paragraph { .. }))
+                {
+                    self.containers
+                        .close_to(self.containers.depth() - 1, &mut self.builder);
+                }
+
+                let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
+                log::debug!(
+                    "Parsed fenced code block at line {}: {} fence",
+                    self.pos,
+                    fence.fence_char
+                );
+                // Pass total indent (footnote + list) to the parser
+                let total_indent = content_indent + list_indent_stripped;
+                let new_pos = parse_fenced_code_block(
+                    &mut self.builder,
+                    &self.lines,
+                    self.pos,
+                    fence,
+                    bq_depth,
+                    total_indent,
+                );
+                self.pos = new_pos;
+                return true;
+            }
         }
 
         // Check for footnote definition: [^id]: content
@@ -1432,15 +1521,32 @@ impl<'a> BlockParser<'a> {
                             self.builder
                                 .token(SyntaxKind::WHITESPACE.into(), indent_str);
                         }
-                        lists::add_list_item(
-                            &mut self.containers,
-                            &mut self.builder,
-                            content,
-                            marker_len,
-                            spaces_after,
-                            indent_cols,
-                            indent_bytes,
-                        );
+
+                        // Check if content is a nested bullet marker
+                        if let Some(nested_marker) =
+                            is_content_nested_bullet_marker(content, marker_len, spaces_after)
+                        {
+                            lists::add_list_item_with_nested_empty_list(
+                                &mut self.containers,
+                                &mut self.builder,
+                                content,
+                                marker_len,
+                                spaces_after,
+                                indent_cols,
+                                indent_bytes,
+                                nested_marker,
+                            );
+                        } else {
+                            lists::add_list_item(
+                                &mut self.containers,
+                                &mut self.builder,
+                                content,
+                                marker_len,
+                                spaces_after,
+                                indent_cols,
+                                indent_bytes,
+                            );
+                        }
                         self.pos += 1;
                         return true;
                     }
@@ -1469,15 +1575,32 @@ impl<'a> BlockParser<'a> {
                     self.builder
                         .token(SyntaxKind::WHITESPACE.into(), indent_str);
                 }
-                lists::add_list_item(
-                    &mut self.containers,
-                    &mut self.builder,
-                    content,
-                    marker_len,
-                    spaces_after,
-                    indent_cols,
-                    indent_bytes,
-                );
+
+                // Check if content is a nested bullet marker
+                if let Some(nested_marker) =
+                    is_content_nested_bullet_marker(content, marker_len, spaces_after)
+                {
+                    lists::add_list_item_with_nested_empty_list(
+                        &mut self.containers,
+                        &mut self.builder,
+                        content,
+                        marker_len,
+                        spaces_after,
+                        indent_cols,
+                        indent_bytes,
+                        nested_marker,
+                    );
+                } else {
+                    lists::add_list_item(
+                        &mut self.containers,
+                        &mut self.builder,
+                        content,
+                        marker_len,
+                        spaces_after,
+                        indent_cols,
+                        indent_bytes,
+                    );
+                }
                 self.pos += 1;
                 return true;
             }
@@ -1490,15 +1613,32 @@ impl<'a> BlockParser<'a> {
                 indent_cols,
                 indent_to_emit,
             );
-            lists::add_list_item(
-                &mut self.containers,
-                &mut self.builder,
-                content,
-                marker_len,
-                spaces_after,
-                indent_cols,
-                indent_bytes,
-            );
+
+            // Check if content is a nested bullet marker (e.g., "- *")
+            if let Some(nested_marker) =
+                is_content_nested_bullet_marker(content, marker_len, spaces_after)
+            {
+                lists::add_list_item_with_nested_empty_list(
+                    &mut self.containers,
+                    &mut self.builder,
+                    content,
+                    marker_len,
+                    spaces_after,
+                    indent_cols,
+                    indent_bytes,
+                    nested_marker,
+                );
+            } else {
+                lists::add_list_item(
+                    &mut self.containers,
+                    &mut self.builder,
+                    content,
+                    marker_len,
+                    spaces_after,
+                    indent_cols,
+                    indent_bytes,
+                );
+            }
             self.pos += 1;
             return true;
         }

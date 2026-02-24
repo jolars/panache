@@ -17,7 +17,6 @@ DOCUMENT@0..122
       LINK_DEST_END@102..103 ")"
       ATTRIBUTE@103..114
         ATTRIBUTE@103..114 "{width=70%}"
-    NEWLINE@114..115 "\n"
-    TEXT@115..121 "A word"
+    TEXT@114..121 " A word"
     NEWLINE@121..122 "\n"
 

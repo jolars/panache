@@ -1,9 +1,26 @@
-use crate::config::Config;
+use crate::config::{Config, Flavor};
 use crate::parser::block_parser::BlockParser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub fn parse_blocks(input: &str) -> SyntaxNode {
     let config = Config::default();
+    BlockParser::new(input, &config).parse()
+}
+
+pub fn parse_blocks_quarto(input: &str) -> SyntaxNode {
+    let config = Config {
+        flavor: Flavor::Quarto,
+        ..Default::default()
+    };
+    BlockParser::new(input, &config).parse()
+}
+
+#[allow(dead_code)]
+pub fn parse_blocks_rmarkdown(input: &str) -> SyntaxNode {
+    let config = Config {
+        flavor: Flavor::RMarkdown,
+        ..Default::default()
+    };
     BlockParser::new(input, &config).parse()
 }
 
@@ -26,7 +43,11 @@ pub fn get_blocks(node: &SyntaxNode) -> Vec<SyntaxNode> {
 
 pub fn assert_block_kinds(input: &str, expected: &[SyntaxKind]) {
     let node = parse_blocks(input);
-    let blocks = get_blocks(&node);
+    assert_block_kinds_for_node(&node, expected, input);
+}
+
+pub fn assert_block_kinds_for_node(node: &SyntaxNode, expected: &[SyntaxKind], input: &str) {
+    let blocks = get_blocks(node);
     let actual: Vec<_> = blocks.iter().map(|n| n.kind()).collect();
     assert_eq!(
         actual, expected,

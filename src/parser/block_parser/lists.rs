@@ -799,6 +799,64 @@ fn detects_example_list_markers() {
     );
 }
 
+#[test]
+fn parses_nested_bullet_list_from_single_marker() {
+    use crate::parse;
+    use crate::syntax::SyntaxKind;
+
+    let config = Config::default();
+
+    // Test all three bullet marker combinations as nested lists
+    for (input, desc) in [("- *\n", "- *"), ("- +\n", "- +"), ("- -\n", "- -")] {
+        let tree = parse(input, Some(config.clone()));
+
+        // tree IS the DOCUMENT node
+        assert_eq!(
+            tree.kind(),
+            SyntaxKind::DOCUMENT,
+            "{desc}: root should be DOCUMENT"
+        );
+
+        // Should have a LIST as first child of DOCUMENT
+        let outer_list = tree
+            .children()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .unwrap_or_else(|| panic!("{desc}: should have outer LIST node"));
+
+        // Outer list should have a LIST_ITEM
+        let outer_item = outer_list
+            .children()
+            .find(|n| n.kind() == SyntaxKind::LIST_ITEM)
+            .unwrap_or_else(|| panic!("{desc}: should have outer LIST_ITEM"));
+
+        // Outer list item should contain a nested LIST (not PLAIN with TEXT)
+        let nested_list = outer_item
+            .children()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .unwrap_or_else(|| {
+                panic!(
+                    "{desc}: outer LIST_ITEM should contain nested LIST, got: {:?}",
+                    outer_item.children().map(|n| n.kind()).collect::<Vec<_>>()
+                )
+            });
+
+        // Nested list should have a LIST_ITEM
+        let nested_item = nested_list
+            .children()
+            .find(|n| n.kind() == SyntaxKind::LIST_ITEM)
+            .unwrap_or_else(|| panic!("{desc}: nested LIST should have LIST_ITEM"));
+
+        // Nested list item should be empty (no PLAIN or TEXT content)
+        let has_plain = nested_item
+            .children()
+            .any(|n| n.kind() == SyntaxKind::PLAIN);
+        assert!(
+            !has_plain,
+            "{desc}: nested LIST_ITEM should not have PLAIN node (should be empty)"
+        );
+    }
+}
+
 // Helper functions for list management in BlockParser
 
 use super::container_stack::{Container, ContainerStack};
@@ -931,18 +989,19 @@ pub(super) fn start_nested_list(
     indent_bytes: usize,
     indent_to_emit: Option<&str>,
 ) {
-    if matches!(containers.last(), Some(Container::Paragraph { .. })) {
-        containers.close_to(containers.depth() - 1, builder);
-    }
-    builder.start_node(SyntaxKind::LIST.into());
-    // Emit footnote/definition indent for losslessness
+    // Emit the indent if needed
     if let Some(indent_str) = indent_to_emit {
         builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
     }
+
+    // Start nested list
+    builder.start_node(SyntaxKind::LIST.into());
     containers.push(Container::List {
         marker: marker.clone(),
         base_indent_cols: indent_cols,
     });
+
+    // Add the nested list item
     let content_col = emit_list_item(
         builder,
         content,
@@ -951,6 +1010,98 @@ pub(super) fn start_nested_list(
         indent_cols,
         indent_bytes,
     );
+    containers.push(Container::ListItem { content_col });
+}
+
+/// Checks if the content after a list marker is exactly another bullet marker.
+/// Returns the nested bullet marker character if detected.
+pub(super) fn is_content_nested_bullet_marker(
+    content: &str,
+    marker_len: usize,
+    spaces_after: usize,
+) -> Option<char> {
+    let indent_bytes = content.len() - content.trim_start().len();
+    let content_start = indent_bytes + marker_len + spaces_after;
+
+    if content_start >= content.len() {
+        return None;
+    }
+
+    let remaining = &content[content_start..];
+    let (text_part, _) = strip_newline(remaining);
+    let trimmed = text_part.trim();
+
+    // Check if it's exactly one of the bullet marker characters
+    if trimmed.len() == 1 {
+        let ch = trimmed.chars().next().unwrap();
+        if matches!(ch, '*' | '+' | '-') {
+            return Some(ch);
+        }
+    }
+
+    None
+}
+
+/// Add a list item that contains a nested empty list (for cases like `- *`).
+/// This creates: LIST_ITEM (outer) -> LIST (nested) -> LIST_ITEM (empty inner)
+#[allow(clippy::too_many_arguments)]
+pub(super) fn add_list_item_with_nested_empty_list(
+    containers: &mut ContainerStack,
+    builder: &mut GreenNodeBuilder<'static>,
+    content: &str,
+    marker_len: usize,
+    spaces_after: usize,
+    indent_cols: usize,
+    indent_bytes: usize,
+    nested_marker: char,
+) {
+    // First, emit the outer list item (just marker + whitespace)
+    builder.start_node(SyntaxKind::LIST_ITEM.into());
+
+    // Emit leading indentation for lossless parsing
+    if indent_bytes > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &content[..indent_bytes]);
+    }
+
+    let marker_text = &content[indent_bytes..indent_bytes + marker_len];
+    builder.token(SyntaxKind::LIST_MARKER.into(), marker_text);
+
+    if spaces_after > 0 {
+        let space_start = indent_bytes + marker_len;
+        let space_end = space_start + spaces_after;
+        if space_end <= content.len() {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &content[space_start..space_end],
+            );
+        }
+    }
+
+    // Now start the nested list inside this item
+    builder.start_node(SyntaxKind::LIST.into());
+
+    // Add empty list item to the nested list
+    builder.start_node(SyntaxKind::LIST_ITEM.into());
+    builder.token(SyntaxKind::LIST_MARKER.into(), &nested_marker.to_string());
+
+    // Extract and emit the newline from original content (lossless)
+    let content_start = indent_bytes + marker_len + spaces_after;
+    if content_start < content.len() {
+        let remaining = &content[content_start..];
+        // Skip the nested marker character (1 byte) and get the newline
+        if remaining.len() > 1 {
+            let (_, newline_str) = strip_newline(&remaining[1..]);
+            if !newline_str.is_empty() {
+                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+            }
+        }
+    }
+
+    builder.finish_node(); // Close nested LIST_ITEM
+    builder.finish_node(); // Close nested LIST
+
+    // Push container for the outer list item
+    let content_col = indent_cols + marker_len + spaces_after;
     containers.push(Container::ListItem { content_col });
 }
 

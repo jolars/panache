@@ -44,6 +44,7 @@ pub fn concatenate_with_blanks(blocks: &[CodeBlock]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{Config, Flavor};
     use crate::parse;
     use crate::utils::{CodeBlock, collect_code_blocks, offset_to_line};
 
@@ -206,7 +207,11 @@ x <- 1
 ```
 "#;
 
-        let tree = parse(input, None);
+        let config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
+        let tree = parse(input, Some(config));
         let blocks = collect_code_blocks(&tree, input);
 
         assert_eq!(blocks.len(), 1);
@@ -226,7 +231,11 @@ x <- 1
 ```
 "#;
 
-        let tree = parse(input, None);
+        let config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
+        let tree = parse(input, Some(config));
         let blocks = collect_code_blocks(&tree, input);
 
         assert_eq!(blocks.len(), 1);
@@ -259,7 +268,11 @@ d <- 4
 ```
 "#;
 
-        let tree = parse(input, None);
+        let config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
+        let tree = parse(input, Some(config));
         let blocks = collect_code_blocks(&tree, input);
 
         assert_eq!(blocks.len(), 2);

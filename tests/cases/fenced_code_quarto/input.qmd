@@ -2,3 +2,9 @@ Some text:
 ```{r backbone}
 a <- 1
 ```
+
+A code block, with blankline:
+
+```{r backbone}
+a <- 1
+```

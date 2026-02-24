@@ -16,15 +16,13 @@ DOCUMENT@0..476
   PARAGRAPH@284..354
     TEXT@284..326 "Here is a paragraph w ..."
     HARD_LINE_BREAK@326..328 "\\\n"
-    TEXT@328..352 "It should not be wrapped"
-    TEXT@352..353 "!"
+    TEXT@328..353 "It should not be wrap ..."
     NEWLINE@353..354 "\n"
   BLANK_LINE@354..355
     BLANK_LINE@354..355 "\n"
   PARAGRAPH@355..476
     TEXT@355..414 "Here is a paragraph w ..."
     HARD_LINE_BREAK@414..417 "  \n"
-    TEXT@417..474 "This is also a hard l ..."
-    TEXT@474..475 "!"
+    TEXT@417..475 "This is also a hard l ..."
     NEWLINE@475..476 "\n"
 

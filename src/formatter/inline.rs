@@ -9,7 +9,6 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
     match node.kind() {
         SyntaxKind::CODE_SPAN => {
             let mut content = String::new();
-            let mut backtick_count = 1;
             let mut attributes = String::new();
 
             for child in node.children_with_tokens() {
@@ -18,9 +17,9 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         attributes = n.text().to_string();
                     }
                     NodeOrToken::Token(t) => {
-                        if t.kind() == SyntaxKind::CODE_SPAN_MARKER {
-                            backtick_count = t.text().len();
-                        } else if t.kind() != SyntaxKind::ATTRIBUTE {
+                        if t.kind() != SyntaxKind::CODE_SPAN_MARKER
+                            && t.kind() != SyntaxKind::ATTRIBUTE
+                        {
                             content.push_str(t.text());
                         }
                     }
@@ -28,11 +27,37 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 }
             }
 
+            // Normalize content: replace newlines with spaces and trim
+            // Pandoc strips leading/trailing spaces from code spans
+            let normalized_content = content.replace('\n', " ").trim().to_string();
+
+            // Calculate minimal backtick count needed
+            // Need enough backticks so the content doesn't contain that many consecutive backticks
+            let mut min_backticks = 1;
+            if normalized_content.contains('`') {
+                // Find the longest run of backticks in content
+                let mut max_run = 0;
+                let mut current_run = 0;
+                for ch in normalized_content.chars() {
+                    if ch == '`' {
+                        current_run += 1;
+                        max_run = max_run.max(current_run);
+                    } else {
+                        current_run = 0;
+                    }
+                }
+                min_backticks = max_run + 1;
+            }
+
+            // Use the minimum of the original count and the calculated minimum
+            // (but at least the calculated minimum)
+            let final_backtick_count = min_backticks.max(1);
+
             format!(
                 "{}{}{}{}",
-                "`".repeat(backtick_count),
-                content,
-                "`".repeat(backtick_count),
+                "`".repeat(final_backtick_count),
+                normalized_content,
+                "`".repeat(final_backtick_count),
                 attributes
             )
         }
@@ -78,6 +103,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                     }
                 }
             }
+            // Trim leading and trailing whitespace from emphasis content
+            let content = content.trim();
             format!("*{}*", content)
         }
         SyntaxKind::STRONG => {
@@ -92,6 +119,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                     }
                 }
             }
+            // Trim leading and trailing whitespace from strong emphasis content
+            let content = content.trim();
             format!("**{}**", content)
         }
         SyntaxKind::BRACKETED_SPAN => {

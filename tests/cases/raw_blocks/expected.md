@@ -1,6 +1,6 @@
 # Raw Blocks Test
 
-This tests the raw_attribute extension.
+This tests the `raw_attribute` extension.
 
 ## HTML Raw Block
 

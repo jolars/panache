@@ -1,1 +1,13 @@
-Some text: ```{r backbone} a <- 1 ```
+Some text:
+
+```{r}
+#| label: backbone
+a <- 1
+```
+
+A code block, with blankline:
+
+```{r}
+#| label: backbone
+a <- 1
+```

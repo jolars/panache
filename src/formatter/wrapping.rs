@@ -3,6 +3,76 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use textwrap::wrap_algorithms::WrapAlgorithm;
 
+/// Escape special characters in text to prevent ambiguous parsing.
+///
+/// # Arguments
+/// * `text` - The text to escape
+/// * `skip_emphasis_delim` - Whether to skip escaping * and _ (when direct child of EMPHASIS/STRONG)
+/// * `prev_is_text` - Whether the previous token was TEXT (for intraword underscore detection)
+/// * `next_is_text` - Whether the next token is TEXT (for intraword underscore detection)
+fn escape_special_chars(
+    text: &str,
+    skip_emphasis_delim: bool,
+    prev_is_text: bool,
+    next_is_text: bool,
+) -> String {
+    let mut result = String::with_capacity(text.len() * 2);
+    let chars: Vec<char> = text.chars().collect();
+
+    for (i, &ch) in chars.iter().enumerate() {
+        match ch {
+            '*' => {
+                // Only escape asterisks when NOT a direct child of EMPHASIS/STRONG
+                if !skip_emphasis_delim {
+                    result.push('\\');
+                }
+                result.push(ch);
+            }
+            '_' => {
+                // For underscores, only escape at word boundaries
+                // Intraword underscores like foo_bar are left unescaped
+                let at_start = i == 0;
+                let at_end = i == chars.len() - 1;
+
+                // If the entire text is just "_", always escape it (not intraword)
+                if text == "_" {
+                    if !skip_emphasis_delim {
+                        result.push('\\');
+                    }
+                    result.push(ch);
+                    continue;
+                }
+
+                // If underscore is at start and previous token was TEXT, it's intraword
+                let intraword_start = at_start && prev_is_text;
+                // If underscore is at end and next token is TEXT, it's intraword
+                let intraword_end = at_end && next_is_text;
+
+                let is_intraword = intraword_start || intraword_end;
+
+                if !skip_emphasis_delim && !is_intraword {
+                    result.push('\\');
+                }
+                result.push(ch);
+            }
+            // Escape special syntax characters
+            '`' | '[' | '~' => {
+                result.push('\\');
+                result.push(ch);
+            }
+            '\\' => {
+                // Keep backslash as-is
+                result.push(ch);
+            }
+            _ => {
+                result.push(ch);
+            }
+        }
+    }
+
+    result
+}
+
 pub(super) fn build_words<'a>(
     _config: &Config,
     node: &SyntaxNode,
@@ -15,6 +85,7 @@ pub(super) fn build_words<'a>(
         whitespace_after: Vec<bool>,
         last_piece_pos: Option<usize>,
         pending_space: bool,
+        skip_next_leading_whitespace: bool,
     }
 
     impl<'a> Builder<'a> {
@@ -25,6 +96,7 @@ pub(super) fn build_words<'a>(
                 whitespace_after: Vec::new(),
                 last_piece_pos: None,
                 pending_space: false,
+                skip_next_leading_whitespace: false,
             }
         }
 
@@ -71,11 +143,41 @@ pub(super) fn build_words<'a>(
         }
     }
 
+    /// Check if a node's first TEXT content starts with whitespace
+    fn node_starts_with_whitespace(node: &SyntaxNode) -> bool {
+        for child in node.children_with_tokens() {
+            match child {
+                NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
+                    return t.text().starts_with(char::is_whitespace);
+                }
+                NodeOrToken::Token(t)
+                    if matches!(
+                        t.kind(),
+                        SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER
+                    ) =>
+                {
+                    // Skip markers, continue looking
+                    continue;
+                }
+                NodeOrToken::Node(n) => {
+                    // Recurse into child nodes
+                    if node_starts_with_whitespace(&n) {
+                        return true;
+                    }
+                }
+                _ => continue,
+            }
+        }
+        false
+    }
+
     fn process_node_recursive<F>(node: &SyntaxNode, b: &mut Builder, format_inline_fn: &F)
     where
         F: Fn(&SyntaxNode) -> String,
     {
-        for el in node.children_with_tokens() {
+        let children: Vec<_> = node.children_with_tokens().collect();
+
+        for (idx, el) in children.iter().enumerate() {
             match el {
                 NodeOrToken::Token(t) => match t.kind() {
                     SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
@@ -94,22 +196,45 @@ pub(super) fn build_words<'a>(
                     SyntaxKind::TEXT => {
                         let text = t.text();
 
+                        // Check if prev/next siblings are TEXT (for intraword underscore detection)
+                        let prev_is_text = idx > 0
+                            && matches!(
+                                &children[idx - 1],
+                                NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::TEXT
+                            );
+                        let next_is_text = idx + 1 < children.len()
+                            && matches!(
+                                &children[idx + 1],
+                                NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::TEXT
+                            );
+
                         // Split TEXT tokens on whitespace to create separate words
                         // Note: We don't preserve leading spaces here since list item continuations
                         // will be re-indented by the formatter
 
                         // Check if text starts with whitespace
+                        let mut text_to_process = text;
                         if !text.is_empty() && text.starts_with(char::is_whitespace) {
-                            b.pending_space = true;
+                            if b.skip_next_leading_whitespace {
+                                // Skip the leading whitespace - it's been moved outside the emphasis/strong
+                                text_to_process = text.trim_start();
+                                b.skip_next_leading_whitespace = false;
+                            } else {
+                                b.pending_space = true;
+                            }
                         }
 
-                        let words: Vec<&str> = text.split_whitespace().collect();
+                        let words: Vec<&str> = text_to_process.split_whitespace().collect();
 
                         for (i, word) in words.iter().enumerate() {
                             if i > 0 {
                                 b.pending_space = true;
                             }
-                            b.push_piece(word);
+                            // Always escape special characters in TEXT tokens
+                            // ESCAPED_CHAR tokens are handled separately and preserve their backslashes
+                            let processed_word =
+                                escape_special_chars(word, false, prev_is_text, next_is_text);
+                            b.push_piece(&processed_word);
                         }
 
                         // If text ends with whitespace, mark pending space for next piece
@@ -142,22 +267,48 @@ pub(super) fn build_words<'a>(
                             // True continuation paragraph - skip in wrapping, format separately
                         } else {
                             // Lazy continuation - include in wrapping
-                            process_node_recursive(&n, b, format_inline_fn);
+                            process_node_recursive(n, b, format_inline_fn);
                         }
                     }
                     SyntaxKind::PARAGRAPH => {
                         // Recursively process PARAGRAPH content instead of treating it as a unit
-                        process_node_recursive(&n, b, format_inline_fn);
+                        process_node_recursive(n, b, format_inline_fn);
                     }
                     SyntaxKind::EMPHASIS => {
+                        // Check if content starts with whitespace - if so, preserve it before opening marker
+                        if node_starts_with_whitespace(n) {
+                            b.pending_space = true;
+                            b.skip_next_leading_whitespace = true;
+                        }
                         b.push_piece("*");
-                        process_node_recursive(&n, b, format_inline_fn);
+                        process_node_recursive(n, b, format_inline_fn); // Inside emphasis now
+                        // Reset the flag (it should have been consumed by first TEXT, but just in case)
+                        b.skip_next_leading_whitespace = false;
+                        // Save pending space state (from trailing whitespace in content)
+                        let had_pending_space = b.pending_space;
+                        // Clear pending space before closing marker (trim trailing whitespace)
+                        b.pending_space = false;
                         b.push_piece("*");
+                        // Restore pending space state for next sibling
+                        b.pending_space = had_pending_space;
                     }
                     SyntaxKind::STRONG => {
+                        // Check if content starts with whitespace - if so, preserve it before opening marker
+                        if node_starts_with_whitespace(n) {
+                            b.pending_space = true;
+                            b.skip_next_leading_whitespace = true;
+                        }
                         b.push_piece("**");
-                        process_node_recursive(&n, b, format_inline_fn);
+                        process_node_recursive(n, b, format_inline_fn); // Inside emphasis now
+                        // Reset the flag (it should have been consumed by first TEXT, but just in case)
+                        b.skip_next_leading_whitespace = false;
+                        // Save pending space state (from trailing whitespace in content)
+                        let had_pending_space = b.pending_space;
+                        // Clear pending space before closing marker (trim trailing whitespace)
+                        b.pending_space = false;
                         b.push_piece("**");
+                        // Restore pending space state for next sibling
+                        b.pending_space = had_pending_space;
                     }
                     SyntaxKind::LINK => {
                         // Links can wrap at whitespace boundaries in link text
@@ -268,7 +419,7 @@ pub(super) fn build_words<'a>(
                     }
                     _ => {
                         // For other inline nodes, format and push as single piece
-                        let text = format_inline_fn(&n);
+                        let text = format_inline_fn(n);
                         b.push_piece(&text);
                     }
                 },
@@ -277,7 +428,7 @@ pub(super) fn build_words<'a>(
     }
 
     let mut b = Builder::new(arena);
-    process_node_recursive(node, &mut b, &format_inline_fn);
+    process_node_recursive(node, &mut b, &format_inline_fn); // Start outside emphasis
 
     let mut words: Vec<textwrap::core::Word<'a>> = Vec::with_capacity(b.piece_idx.len());
     for (i, &idx) in b.piece_idx.iter().enumerate() {

@@ -109,6 +109,19 @@ fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeB
         SyntaxKind::PLAIN
     };
 
+    // Check if this is an empty list item (only marker + whitespace/newline, no text content)
+    let is_empty_item = !item.children_with_tokens().any(|child| {
+        match child {
+            rowan::NodeOrToken::Token(token) => {
+                matches!(token.kind(), SyntaxKind::TEXT | SyntaxKind::ESCAPED_CHAR)
+            }
+            rowan::NodeOrToken::Node(node) => {
+                // Has actual content nodes (not just nested lists)
+                !is_block_node(node.kind())
+            }
+        }
+    });
+
     let mut in_content_wrapper = false;
     let mut after_marker = false;
 
@@ -138,13 +151,23 @@ fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeB
                 } else if kind == SyntaxKind::TEXT
                     || kind == SyntaxKind::NEWLINE
                     || kind == SyntaxKind::WHITESPACE
+                    || kind == SyntaxKind::ESCAPED_CHAR
                 {
-                    // Start wrapper if not started
-                    if !in_content_wrapper {
-                        builder.start_node(wrapper_kind.into());
-                        in_content_wrapper = true;
+                    // For empty items, don't wrap the trailing newline
+                    if is_empty_item && kind == SyntaxKind::NEWLINE {
+                        if in_content_wrapper {
+                            builder.finish_node();
+                            in_content_wrapper = false;
+                        }
+                        builder.token(kind.into(), token.text());
+                    } else {
+                        // Start wrapper if not started
+                        if !in_content_wrapper {
+                            builder.start_node(wrapper_kind.into());
+                            in_content_wrapper = true;
+                        }
+                        builder.token(kind.into(), token.text());
                     }
-                    builder.token(kind.into(), token.text());
                 } else {
                     // Other tokens (like HardLineBreak, etc.)
                     // These might need wrapping or not depending on context

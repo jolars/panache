@@ -6,26 +6,34 @@
 
 use panache::{parse, syntax::SyntaxKind};
 
-/// Helper to get all nodes of a specific kind from a syntax tree.
+/// Helper to get all nodes/tokens of a specific kind from a syntax tree.
 fn find_nodes(tree: &panache::SyntaxNode, kind: SyntaxKind) -> Vec<panache::SyntaxNode> {
-    let mut nodes = Vec::new();
-
-    fn collect(node: &panache::SyntaxNode, kind: SyntaxKind, nodes: &mut Vec<panache::SyntaxNode>) {
-        if node.kind() == kind {
-            nodes.push(node.clone());
-        }
-        for child in node.children() {
-            collect(&child, kind, nodes);
-        }
-    }
-
-    collect(tree, kind, &mut nodes);
-    nodes
+    tree.descendants_with_tokens()
+        .filter_map(|element| {
+            if element.kind() == kind {
+                // Try to convert to node; if it's a token, we skip it for Vec<SyntaxNode>
+                match element {
+                    rowan::NodeOrToken::Node(n) => Some(n),
+                    rowan::NodeOrToken::Token(_) => None,
+                }
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
-/// Helper to check if a node contains a specific child kind.
+/// Helper to count nodes OR tokens of a specific kind.
+fn count_elements(tree: &panache::SyntaxNode, kind: SyntaxKind) -> usize {
+    tree.descendants_with_tokens()
+        .filter(|element| element.kind() == kind)
+        .count()
+}
+
+/// Helper to check if a node contains a specific child kind (node or token).
 fn has_child(node: &panache::SyntaxNode, kind: SyntaxKind) -> bool {
-    node.children().any(|child| child.kind() == kind)
+    node.children_with_tokens()
+        .any(|child| child.kind() == kind)
 }
 
 /// Helper to count nodes of a specific kind.
@@ -253,7 +261,7 @@ fn triple_matched() {
     let emphasis_nodes = find_nodes(&tree, SyntaxKind::EMPHASIS);
 
     assert!(
-        strong_nodes.len() >= 1 || emphasis_nodes.len() >= 1,
+        !strong_nodes.is_empty() || !emphasis_nodes.is_empty(),
         "Should parse emphasis/strong from triple delimiters"
     );
 }
@@ -265,8 +273,8 @@ fn four_or_more_delimiters_literal() {
     let tree = parse(input, None);
 
     // Should NOT create emphasis or strong nodes
-    let emphasis_count = count_nodes(&tree, SyntaxKind::EMPHASIS);
-    let strong_count = count_nodes(&tree, SyntaxKind::STRONG);
+    let _emphasis_count = count_nodes(&tree, SyntaxKind::EMPHASIS);
+    let _strong_count = count_nodes(&tree, SyntaxKind::STRONG);
 
     // Expecting this to remain literal - current parser may differ
     // This documents the Pandoc-compliant behavior we want
@@ -286,23 +294,31 @@ fn overlapping_emphasis_strong() {
     // Should have one STRONG node for "bar* baz"
     let strong_nodes = find_nodes(&tree, SyntaxKind::STRONG);
     assert!(
-        strong_nodes.len() >= 1,
+        !strong_nodes.is_empty(),
         "Should parse at least one strong node"
     );
 }
 
 #[test]
 fn overlapping_strong_emphasis() {
-    // **foo *bar** baz* should produce: Strong("foo *bar") + literal " baz*"
+    // **foo *bar** baz* - Pandoc produces ALL literal text (no emphasis or strong)
+    // The ** at start can't find a valid closer because:
+    // - The * at pos 6 starts emphasis that consumes the trailing *
+    // - No ** closer remains for the outer strong
     let input = "**foo *bar** baz*\n";
     let tree = parse(input, None);
 
-    // Should have one STRONG node
+    // Pandoc: no strong or emphasis - all literal
+    // We accept either Pandoc-exact (no strong) or a reasonable interpretation
     let strong_nodes = find_nodes(&tree, SyntaxKind::STRONG);
-    assert!(
-        strong_nodes.len() >= 1,
-        "Should parse at least one strong node"
-    );
+    let emphasis_nodes = find_nodes(&tree, SyntaxKind::EMPHASIS);
+
+    // Verify the text is preserved (lossless)
+    assert_eq!(tree.text().to_string(), input, "Should be lossless");
+
+    // Note: Pandoc produces all literal. If we produce emphasis, that's acceptable
+    // as long as we're lossless. The key is we don't crash or produce invalid trees.
+    let _ = (strong_nodes, emphasis_nodes);
 }
 
 // =============================================================================
@@ -311,14 +327,18 @@ fn overlapping_strong_emphasis() {
 
 #[test]
 fn adjacent_emphasis() {
-    // *foo**bar* could be: Emph("foo") + Emph("bar") (adjacent emphasis)
-    // OR: Emph("foo**bar") depending on parsing strategy
+    // *foo**bar* - In Pandoc, when parsing `*`, encountering `**` tries to parse
+    // as strong. When strong fails (no ** closer), the entire `*` parse fails.
+    // Result: all literal text, no emphasis nodes.
     let input = "*foo**bar*\n";
     let tree = parse(input, None);
 
     let emphasis_nodes = find_nodes(&tree, SyntaxKind::EMPHASIS);
-    // Should have at least one emphasis node
-    assert!(emphasis_nodes.len() >= 1, "Should parse emphasis");
+    // Per Pandoc: should parse as literal text, no emphasis
+    assert!(
+        emphasis_nodes.is_empty(),
+        "Adjacent ** should prevent * from matching"
+    );
 }
 
 #[test]
@@ -329,7 +349,7 @@ fn adjacent_strong() {
     let tree = parse(input, None);
 
     let strong_nodes = find_nodes(&tree, SyntaxKind::STRONG);
-    assert!(strong_nodes.len() >= 1, "Should parse strong emphasis");
+    assert!(!strong_nodes.is_empty(), "Should parse strong emphasis");
 }
 
 // =============================================================================
@@ -381,16 +401,17 @@ fn whitespace_flanking_opener() {
 
 #[test]
 fn whitespace_flanking_closer() {
-    // "*foo *" - closer has leading space, should not match
+    // "*foo *" - Pandoc DOES parse this as emphasis (asterisk closers don't require right-flanking)
+    // See Markdown.hs ender function: for asterisks, only underscore closers need right-flanking
     let input = "*foo *\n";
     let tree = parse(input, None);
 
     let emphasis_nodes = find_nodes(&tree, SyntaxKind::EMPHASIS);
-    // Should NOT parse as emphasis (closer not right-flanking)
+    // Should parse as emphasis (Pandoc behavior)
     assert_eq!(
         emphasis_nodes.len(),
-        0,
-        "Should not parse emphasis with space before closer"
+        1,
+        "Asterisk emphasis should allow space before closer (Pandoc behavior)"
     );
 }
 
@@ -411,9 +432,9 @@ fn escaped_opener() {
         "Should not parse emphasis when opener is escaped"
     );
 
-    // Should have an ESCAPED_CHAR node
-    let escape_nodes = find_nodes(&tree, SyntaxKind::ESCAPED_CHAR);
-    assert!(escape_nodes.len() >= 1, "Should have escape node");
+    // Should have an ESCAPED_CHAR token
+    let escape_count = count_elements(&tree, SyntaxKind::ESCAPED_CHAR);
+    assert!(escape_count >= 1, "Should have escape node");
 }
 
 #[test]
@@ -460,7 +481,7 @@ fn unclosed_code_in_emphasis() {
     // When code span fails to close, backtick becomes literal,
     // and * could be a valid closer candidate
     let input = "*text `unclosed code end*\n";
-    let tree = parse(input, None);
+    let _tree = parse(input, None);
 
     // Current behavior may vary - documenting that this is an edge case
     // Pandoc would parse this as emphasis with literal backtick inside
@@ -639,5 +660,64 @@ fn lossless_unclosed() {
     assert_eq!(
         input, output,
         "Parser should be lossless for unclosed emphasis"
+    );
+}
+
+// =============================================================================
+// Pandoc-Exact Tests (Strict Compliance)
+// =============================================================================
+// These tests require exact Pandoc behavior, not just losslessness.
+
+#[test]
+fn pandoc_overlapping_strong_emphasis_all_literal() {
+    // **foo *bar** baz* - Pandoc produces ALL literal text (no emphasis or strong)
+    // The ** opener can't find a valid ** closer because the * at position 6
+    // would create improper nesting. Unlike our lenient test above, this one
+    // requires Pandoc-exact behavior.
+    //
+    // Pandoc output: [ Str "**foo" , Space , Str "*bar**" , Space , Str "baz*" ]
+    let input = "**foo *bar** baz*\n";
+    let tree = parse(input, None);
+
+    let strong_nodes = find_nodes(&tree, SyntaxKind::STRONG);
+    let emphasis_nodes = find_nodes(&tree, SyntaxKind::EMPHASIS);
+
+    assert_eq!(
+        strong_nodes.len(),
+        0,
+        "Pandoc: **foo *bar** baz* should have NO strong nodes (all literal)"
+    );
+    assert_eq!(
+        emphasis_nodes.len(),
+        0,
+        "Pandoc: **foo *bar** baz* should have NO emphasis nodes (all literal)"
+    );
+}
+
+#[test]
+fn pandoc_escaped_star_then_emphasis() {
+    // \**not bold\** - Pandoc produces: * (literal) + Emph["not bold*"]
+    // The first \* is an escaped asterisk (literal *), leaving *not bold\**
+    // The second * opens emphasis, \* inside is escaped, final * closes emphasis.
+    //
+    // Pandoc output: [ Str "*" , Emph [ Str "not" , Space , Str "bold*" ] ]
+    let input = "\\**not bold\\**\n";
+    let tree = parse(input, None);
+
+    let emphasis_nodes = find_nodes(&tree, SyntaxKind::EMPHASIS);
+
+    assert_eq!(
+        emphasis_nodes.len(),
+        1,
+        "Pandoc: \\**not bold\\** should produce exactly ONE emphasis node"
+    );
+
+    // The emphasis content should include "not bold" and the escaped *
+    let emphasis = &emphasis_nodes[0];
+    let emph_text = emphasis.text().to_string();
+    assert!(
+        emph_text.contains("not bold"),
+        "Emphasis should contain 'not bold', got: {}",
+        emph_text
     );
 }

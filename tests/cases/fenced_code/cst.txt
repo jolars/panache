@@ -1,4 +1,4 @@
-DOCUMENT@0..463
+DOCUMENT@0..702
   CODE_BLOCK@0..32
     CODE_FENCE_OPEN@0..8
       CODE_FENCE_MARKER@0..3 "```"
@@ -114,4 +114,46 @@ DOCUMENT@0..463
     CODE_FENCE_CLOSE@459..463
       CODE_FENCE_MARKER@459..462 "```"
       NEWLINE@462..463 "\n"
+  BLANK_LINE@463..464
+    BLANK_LINE@463..464 "\n"
+  PARAGRAPH@464..508
+    TEXT@464..507 "A quarto fenced code  ..."
+    NEWLINE@507..508 "\n"
+  BLANK_LINE@508..509
+    BLANK_LINE@508..509 "\n"
+  PARAGRAPH@509..527
+    CODE_SPAN@509..526
+      CODE_SPAN_MARKER@509..512 "```"
+      TEXT@512..523 "{r}\na <- 1\n"
+      CODE_SPAN_MARKER@523..526 "```"
+    NEWLINE@526..527 "\n"
+  BLANK_LINE@527..528
+    BLANK_LINE@527..528 "\n"
+  PARAGRAPH@528..593
+    TEXT@528..574 "A quarto fenced code  ..."
+    NEWLINE@574..575 "\n"
+    CODE_SPAN@575..592
+      CODE_SPAN_MARKER@575..578 "```"
+      TEXT@578..589 "{r}\na <- 1\n"
+      CODE_SPAN_MARKER@589..592 "```"
+    NEWLINE@592..593 "\n"
+  BLANK_LINE@593..594
+    BLANK_LINE@593..594 "\n"
+  PARAGRAPH@594..679
+    TEXT@594..678 "A fenced code block s ..."
+    NEWLINE@678..679 "\n"
+  CODE_BLOCK@679..702
+    CODE_FENCE_OPEN@679..684
+      CODE_FENCE_MARKER@679..682 "```"
+      CODE_INFO@682..683
+        CODE_LANGUAGE@682..683 "r"
+      NEWLINE@683..684 "\n"
+    CODE_CONTENT@684..698
+      TEXT@684..690 "a <- 1"
+      NEWLINE@690..691 "\n"
+      TEXT@691..697 "b <- 2"
+      NEWLINE@697..698 "\n"
+    CODE_FENCE_CLOSE@698..702
+      CODE_FENCE_MARKER@698..701 "```"
+      NEWLINE@701..702 "\n"
 

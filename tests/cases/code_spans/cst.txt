@@ -39,7 +39,12 @@ DOCUMENT@0..255
     TEXT@123..141 "Code in emphasis: "
     EMPHASIS@141..166
       EMPHASIS_MARKER@141..142 "*"
-      TEXT@142..165 "text with `code` inside"
+      TEXT@142..152 "text with "
+      CODE_SPAN@152..158
+        CODE_SPAN_MARKER@152..153 "`"
+        TEXT@153..157 "code"
+        CODE_SPAN_MARKER@157..158 "`"
+      TEXT@158..165 " inside"
       EMPHASIS_MARKER@165..166 "*"
     NEWLINE@166..167 "\n"
   BLANK_LINE@167..168

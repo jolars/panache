@@ -29,7 +29,12 @@ DOCUMENT@0..223
     TEXT@65..83 "Math in emphasis: "
     EMPHASIS@83..109
       EMPHASIS_MARKER@83..84 "*"
-      TEXT@84..108 "equation $E = mc^2$ here"
+      TEXT@84..93 "equation "
+      INLINE_MATH@93..103
+        INLINE_MATH_MARKER@93..94 "$"
+        TEXT@94..102 "E = mc^2"
+        INLINE_MATH_MARKER@102..103 "$"
+      TEXT@103..108 " here"
       EMPHASIS_MARKER@108..109 "*"
     NEWLINE@109..110 "\n"
   BLANK_LINE@110..111

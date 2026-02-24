@@ -46,12 +46,7 @@ DOCUMENT@0..451
   PARAGRAPH@118..326
     TEXT@118..194 "If you want to show a ..."
     NEWLINE@194..195 "\n"
-    TEXT@195..248 "just enclose the enti ..."
-    TEXT@248..249 "`"
-    TEXT@249..250 "`"
-    TEXT@250..251 "`"
-    TEXT@251..252 "`"
-    TEXT@252..275 ") and use the two curly"
+    TEXT@195..275 "just enclose the enti ..."
     NEWLINE@275..276 "\n"
     TEXT@276..325 "brace syntax for code ..."
     NEWLINE@325..326 "\n"

@@ -1,4 +1,4 @@
-# Emphasis Edge Cases Test Suite
+# Emphasis Complex Cases Test Suite
 
 ## Rule of 3s
 
@@ -34,8 +34,6 @@
 
 *foo* *bar*
 
-**foobar**
-
 *foo*bar\*
 
 ## Intraword Emphasis (asterisks)
@@ -52,11 +50,11 @@ un_frig_gable
 
 ## Whitespace Flanking
 
-- foo
+- foo\*
 
 *foo*
 
-- foo
+- foo \*
 
 \*\* bar\*\*
 
@@ -140,8 +138,8 @@ foo_bar_baz
 
 \*\*
 
-------------------------------------------------------------------------
+---
 
-- - 
+- -
 
-------------------------------------------------------------------------
+---

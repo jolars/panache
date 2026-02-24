@@ -106,15 +106,20 @@ impl ChunkLabel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{Config, Flavor};
     use crate::parse;
 
     #[test]
     fn test_chunk_option_quoted() {
+        let config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
         let tree = parse(
             r#"```{r, fig.cap="A nice plot"}
 x <- 1
 ```"#,
-            None,
+            Some(config),
         );
 
         let option = tree
@@ -130,7 +135,11 @@ x <- 1
 
     #[test]
     fn test_chunk_option_unquoted() {
-        let tree = parse("```{r, echo=TRUE}\nx <- 1\n```", None);
+        let config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
+        let tree = parse("```{r, echo=TRUE}\nx <- 1\n```", Some(config));
 
         let option = tree
             .descendants()
@@ -144,7 +153,11 @@ x <- 1
 
     #[test]
     fn test_chunk_label() {
-        let tree = parse("```{r mylabel}\nx <- 1\n```", None);
+        let config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
+        let tree = parse("```{r mylabel}\nx <- 1\n```", Some(config));
 
         let label = tree
             .descendants()

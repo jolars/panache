@@ -98,15 +98,18 @@ pub fn try_parse_inline_image(text: &str) -> Option<(usize, &str, &str, Option<&
     let after_paren = dest_start + close_paren + 1;
     let after_close = &text[after_paren..];
 
-    if let Some((_attrs, _)) = try_parse_trailing_attributes(after_close) {
-        // Attributes must start immediately after closing paren (no space)
-        if after_close.starts_with('{') {
-            // Calculate total length including attributes
-            let attr_len = after_close.find('}').map(|i| i + 1).unwrap_or(0);
-            let total_len = after_paren + attr_len;
-            // Return raw attribute string for lossless parsing
-            let raw_attrs = &after_close[..attr_len];
-            return Some((total_len, alt_text, dest_content, Some(raw_attrs)));
+    // Attributes must start immediately after closing paren (no whitespace/newlines)
+    if after_close.starts_with('{') {
+        // Find the closing brace
+        if let Some(close_brace_pos) = after_close.find('}') {
+            let attr_text = &after_close[..=close_brace_pos];
+            // Try to parse as attributes to validate
+            if let Some((_attrs, _)) = try_parse_trailing_attributes(attr_text) {
+                let total_len = after_paren + close_brace_pos + 1;
+                // Return raw attribute string for lossless parsing
+                let raw_attrs = attr_text;
+                return Some((total_len, alt_text, dest_content, Some(raw_attrs)));
+            }
         }
     }
 
@@ -301,15 +304,18 @@ pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str, Option<&s
     let after_paren = dest_start + close_paren + 1;
     let after_close = &text[after_paren..];
 
-    if let Some((_attrs, _)) = try_parse_trailing_attributes(after_close) {
-        // Attributes must start immediately after closing paren (no space)
-        if after_close.starts_with('{') {
-            // Calculate total length including attributes
-            let attr_len = after_close.find('}').map(|i| i + 1).unwrap_or(0);
-            let total_len = after_paren + attr_len;
-            // Return raw attribute string for lossless parsing
-            let raw_attrs = &after_close[..attr_len];
-            return Some((total_len, link_text, dest_content, Some(raw_attrs)));
+    // Attributes must start immediately after closing paren (no whitespace/newlines)
+    if after_close.starts_with('{') {
+        // Find the closing brace
+        if let Some(close_brace_pos) = after_close.find('}') {
+            let attr_text = &after_close[..=close_brace_pos];
+            // Try to parse as attributes to validate
+            if let Some((_attrs, _)) = try_parse_trailing_attributes(attr_text) {
+                let total_len = after_paren + close_brace_pos + 1;
+                // Return raw attribute string for lossless parsing
+                let raw_attrs = attr_text;
+                return Some((total_len, link_text, dest_content, Some(raw_attrs)));
+            }
         }
     }
 
@@ -999,6 +1005,79 @@ mod tests {
         assert_eq!(
             result, None,
             "Should not parse reference link with LF in label"
+        );
+    }
+
+    // Multiline link text tests
+    #[test]
+    fn test_parse_inline_link_multiline_text() {
+        // Per Pandoc spec, link text CAN contain newlines (soft breaks)
+        let input = "[text on\nline two](url)";
+        let result = try_parse_inline_link(input);
+        assert_eq!(
+            result,
+            Some((23, "text on\nline two", "url", None)),
+            "Link text should allow newlines"
+        );
+    }
+
+    #[test]
+    fn test_parse_inline_link_multiline_with_formatting() {
+        // Link text with newlines and other inline elements
+        let input =
+            "[A network graph. Different edges\nwith probability](../images/networkfig.png)";
+        let result = try_parse_inline_link(input);
+        assert!(result.is_some(), "Link text with newlines should parse");
+        let (len, text, _dest, _attrs) = result.unwrap();
+        assert!(text.contains('\n'), "Link text should preserve newline");
+        assert_eq!(len, input.len());
+    }
+
+    #[test]
+    fn test_parse_inline_image_multiline_alt() {
+        // Per Pandoc spec, image alt text CAN contain newlines
+        let input = "![alt on\nline two](img.png)";
+        let result = try_parse_inline_image(input);
+        assert_eq!(
+            result,
+            Some((27, "alt on\nline two", "img.png", None)),
+            "Image alt text should allow newlines"
+        );
+    }
+
+    #[test]
+    fn test_parse_inline_image_multiline_with_attributes() {
+        // Image with multiline alt text and attributes
+        let input = "![network graph\ndiagram](../images/fig.png){width=70%}";
+        let result = try_parse_inline_image(input);
+        assert!(
+            result.is_some(),
+            "Image alt with newlines and attributes should parse"
+        );
+        let (len, alt, dest, attrs) = result.unwrap();
+        assert!(alt.contains('\n'), "Alt text should preserve newline");
+        assert_eq!(dest, "../images/fig.png");
+        assert_eq!(attrs, Some("{width=70%}"));
+        assert_eq!(len, input.len());
+    }
+
+    #[test]
+    fn test_parse_inline_link_with_attributes_after_newline() {
+        // Test for regression: when text is concatenated with newlines,
+        // attributes after ) should still be recognized
+        let input = "[A network graph.](../images/networkfig.png){width=70%}\nA word\n";
+        let result = try_parse_inline_link(input);
+        assert!(
+            result.is_some(),
+            "Link with attributes should parse even with following text"
+        );
+        let (len, text, dest, attrs) = result.unwrap();
+        assert_eq!(text, "A network graph.");
+        assert_eq!(dest, "../images/networkfig.png");
+        assert_eq!(attrs, Some("{width=70%}"), "Attributes should be captured");
+        assert_eq!(
+            len, 55,
+            "Length should include attributes (up to closing brace)"
         );
     }
 }

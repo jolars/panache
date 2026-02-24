@@ -1,3 +1,8 @@
+//! Inline element parsing for panache.
+//!
+//! This module handles parsing of inline elements within block-level content.
+//! Uses a recursive approach
+
 use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::{GreenNode, GreenNodeBuilder};
@@ -6,7 +11,7 @@ mod architecture_tests;
 mod bracketed_spans;
 mod citations;
 mod code_spans;
-mod emphasis;
+mod core;
 mod escapes;
 mod inline_footnotes;
 mod latex;
@@ -20,38 +25,6 @@ mod subscript;
 mod superscript;
 mod tests;
 
-use bracketed_spans::{emit_bracketed_span, try_parse_bracketed_span};
-use citations::{
-    emit_bare_citation, emit_bracketed_citation, try_parse_bare_citation,
-    try_parse_bracketed_citation,
-};
-use code_spans::{emit_code_span, try_parse_code_span};
-use emphasis::{emit_emphasis, try_parse_emphasis};
-use escapes::{emit_escape, try_parse_escape};
-use inline_footnotes::{
-    emit_footnote_reference, emit_inline_footnote, try_parse_footnote_reference,
-    try_parse_inline_footnote,
-};
-use latex::{parse_latex_command, try_parse_latex_command};
-use links::{
-    emit_autolink, emit_inline_image, emit_inline_link, emit_reference_image, emit_reference_link,
-    try_parse_autolink, try_parse_inline_image, try_parse_inline_link, try_parse_reference_image,
-    try_parse_reference_link,
-};
-use math::{
-    emit_display_math, emit_double_backslash_display_math, emit_double_backslash_inline_math,
-    emit_inline_math, emit_single_backslash_display_math, emit_single_backslash_inline_math,
-    try_parse_display_math, try_parse_double_backslash_display_math,
-    try_parse_double_backslash_inline_math, try_parse_inline_math,
-    try_parse_single_backslash_display_math, try_parse_single_backslash_inline_math,
-};
-use native_spans::{emit_native_span, try_parse_native_span};
-use raw_inline::{emit_raw_inline, is_raw_inline};
-use shortcodes::{emit_shortcode, try_parse_shortcode};
-use strikeout::{emit_strikeout, try_parse_strikeout};
-use subscript::{emit_subscript, try_parse_subscript};
-use superscript::{emit_superscript, try_parse_superscript};
-
 /// Parse inline elements from concatenated text that may include newlines.
 /// This function handles multi-line inline patterns (like display math) by checking for them first,
 /// then emits NEWLINE tokens to preserve losslessness for the remaining text.
@@ -60,7 +33,7 @@ pub fn parse_inline_text_with_newlines(
     builder: &mut GreenNodeBuilder,
     text: &str,
     config: &Config,
-    allow_reference_links: bool,
+    _allow_reference_links: bool,
 ) {
     log::trace!(
         "Parsing inline text with newlines: {:?} ({} bytes)",
@@ -68,136 +41,10 @@ pub fn parse_inline_text_with_newlines(
         text.len(),
     );
 
-    let mut pos = 0;
-    let bytes = text.as_bytes();
-
-    while pos < text.len() {
-        // Check for multi-line display math patterns FIRST (before splitting on newlines)
-        // This handles: $$\n...\n$$, \[\n...\n\], \\[\n...\\]
-        let might_be_multiline_math = bytes[pos] == b'$'
-            || (bytes[pos] == b'\\' && pos + 1 < text.len() && bytes[pos + 1] == b'[')
-            || (bytes[pos] == b'\\'
-                && pos + 2 < text.len()
-                && bytes[pos + 1] == b'\\'
-                && bytes[pos + 2] == b'[');
-
-        if might_be_multiline_math {
-            let remaining = &text[pos..];
-
-            // Try $$...$$
-            if let Some((len, content)) = try_parse_display_math(remaining) {
-                let dollar_count = remaining.chars().take_while(|&c| c == '$').count();
-                log::debug!("Matched multi-line display math: {} bytes", len);
-
-                // Check for trailing attributes (Quarto cross-reference support)
-                let after_math = &remaining[len..];
-                let attr_len = if config.extensions.quarto_crossrefs {
-                    use crate::parser::block_parser::attributes::try_parse_trailing_attributes;
-                    if let Some((_attr_block, _)) = try_parse_trailing_attributes(after_math) {
-                        let trimmed_after = after_math.trim_start();
-                        if let Some(open_brace_pos) = trimmed_after.find('{') {
-                            let ws_before_brace = after_math.len() - trimmed_after.len();
-                            let attr_text_len = trimmed_after[open_brace_pos..]
-                                .find('}')
-                                .map(|close| close + 1)
-                                .unwrap_or(0);
-                            ws_before_brace + open_brace_pos + attr_text_len
-                        } else {
-                            0
-                        }
-                    } else {
-                        0
-                    }
-                } else {
-                    0
-                };
-
-                let total_len = len + attr_len;
-                emit_display_math(builder, content, dollar_count);
-
-                // Emit attributes if present
-                if attr_len > 0 {
-                    use crate::parser::block_parser::attributes::{
-                        emit_attributes, try_parse_trailing_attributes,
-                    };
-                    let attr_text = &remaining[len..total_len];
-                    if let Some((attr_block, _text_before)) =
-                        try_parse_trailing_attributes(attr_text)
-                    {
-                        let trimmed_after = attr_text.trim_start();
-                        let ws_len = attr_text.len() - trimmed_after.len();
-                        if ws_len > 0 {
-                            builder.token(SyntaxKind::WHITESPACE.into(), &attr_text[..ws_len]);
-                        }
-                        emit_attributes(builder, &attr_block);
-                    }
-                }
-
-                pos += total_len;
-                continue;
-            }
-
-            // Try \[...\]
-            if config.extensions.tex_math_single_backslash
-                && let Some((len, content)) = try_parse_single_backslash_display_math(remaining)
-            {
-                log::debug!("Matched multi-line single backslash display math");
-                emit_single_backslash_display_math(builder, content);
-                pos += len;
-                continue;
-            }
-
-            // Try \\[...\\]
-            if config.extensions.tex_math_double_backslash
-                && let Some((len, content)) = try_parse_double_backslash_display_math(remaining)
-            {
-                log::debug!("Matched multi-line double backslash display math");
-                emit_double_backslash_display_math(builder, content);
-                pos += len;
-                continue;
-            }
-        }
-
-        // Check for newlines (AFTER checking for multi-line patterns)
-        if bytes[pos] == b'\r' && pos + 1 < text.len() && bytes[pos + 1] == b'\n' {
-            builder.token(SyntaxKind::NEWLINE.into(), "\r\n");
-            pos += 2;
-            continue;
-        }
-
-        if bytes[pos] == b'\n' {
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
-            pos += 1;
-            continue;
-        }
-
-        // Find the next newline or multi-line math pattern
-        let mut text_end = pos + 1;
-        while text_end < text.len() {
-            if bytes[text_end] == b'\n'
-                || bytes[text_end] == b'\r'
-                || bytes[text_end] == b'$'
-                || (bytes[text_end] == b'\\'
-                    && text_end + 1 < text.len()
-                    && bytes[text_end + 1] == b'[')
-                || (bytes[text_end] == b'\\'
-                    && text_end + 2 < text.len()
-                    && bytes[text_end + 1] == b'\\'
-                    && bytes[text_end + 2] == b'[')
-            {
-                break;
-            }
-            text_end += 1;
-        }
-
-        // Parse this text segment
-        if text_end > pos {
-            parse_inline_text(builder, &text[pos..text_end], config, allow_reference_links);
-            pos = text_end;
-        } else {
-            pos += 1;
-        }
-    }
+    // Use the recursive parser which handles newlines as part of the inline content stream
+    // It will emit NEWLINE tokens to preserve losslessness, and properly handles multi-line
+    // constructs like emphasis, links, and display math
+    core::parse_inline_text_recursive(builder, text, config);
 }
 
 /// Parse inline elements from text content.
@@ -206,468 +53,23 @@ pub fn parse_inline_text_with_newlines(
 ///
 /// The `allow_reference_links` parameter controls whether reference links/images should be parsed.
 /// Set to `false` in nested contexts (inside link text, image alt, spans) to prevent recursive parsing.
+///
+/// **IMPLEMENTATION NOTE**: This now uses the two-phase parsing architecture which correctly
+/// handles emphasis with nested inline elements (code, math, links, etc.).
 pub fn parse_inline_text(
     builder: &mut GreenNodeBuilder,
     text: &str,
     config: &Config,
-    allow_reference_links: bool,
+    _allow_reference_links: bool,
 ) {
     log::trace!(
-        "Parsing inline text: {:?} ({} bytes), tex_math_single_backslash={}",
+        "Parsing inline text (recursive): {:?} ({} bytes)",
         &text[..text.len().min(40)],
-        text.len(),
-        config.extensions.tex_math_single_backslash
+        text.len()
     );
-    let mut pos = 0;
-    let bytes = text.as_bytes();
 
-    while pos < text.len() {
-        // Try to parse backslash math FIRST (when enabled)
-        // These take precedence over escapes per Pandoc spec
-        // Single backslash math: \(...\) and \[...\]
-        if bytes[pos] == b'\\'
-            && pos + 1 < text.len()
-            && config.extensions.tex_math_single_backslash
-        {
-            // Try display math first: \[...\]
-            if bytes[pos + 1] == b'['
-                && let Some((len, content)) = try_parse_single_backslash_display_math(&text[pos..])
-            {
-                log::debug!("Matched single backslash display math at pos {}", pos);
-                emit_single_backslash_display_math(builder, content);
-                pos += len;
-                continue;
-            }
-
-            // Try inline math: \(...\)
-            if bytes[pos + 1] == b'('
-                && let Some((len, content)) = try_parse_single_backslash_inline_math(&text[pos..])
-            {
-                log::debug!("Matched single backslash inline math at pos {}", pos);
-                emit_single_backslash_inline_math(builder, content);
-                pos += len;
-                continue;
-            }
-        }
-
-        // Double backslash math: \\(...\\) and \\[...\\]
-        if bytes[pos] == b'\\'
-            && pos + 2 < text.len()
-            && bytes[pos + 1] == b'\\'
-            && config.extensions.tex_math_double_backslash
-        {
-            // Try display math first: \\[...\\]
-            if bytes[pos + 2] == b'['
-                && let Some((len, content)) = try_parse_double_backslash_display_math(&text[pos..])
-            {
-                log::debug!("Matched double backslash display math at pos {}", pos);
-                emit_double_backslash_display_math(builder, content);
-                pos += len;
-                continue;
-            }
-
-            // Try inline math: \\(...\\)
-            if bytes[pos + 2] == b'('
-                && let Some((len, content)) = try_parse_double_backslash_inline_math(&text[pos..])
-            {
-                log::debug!("Matched double backslash inline math at pos {}", pos);
-                emit_double_backslash_inline_math(builder, content);
-                pos += len;
-                continue;
-            }
-        }
-
-        // Try to parse backslash escape (after math checks when enabled)
-        // This prevents escaped delimiters from being parsed
-        if bytes[pos] == b'\\'
-            && let Some((len, ch, escape_type)) = try_parse_escape(&text[pos..])
-        {
-            log::debug!("Matched escape at pos {}: \\{}", pos, ch);
-            emit_escape(builder, ch, escape_type);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse LaTeX command (after escapes, before code)
-        // This handles \cite{ref}, \textbf{text}, etc.
-        if bytes[pos] == b'\\'
-            && let Some(len) = try_parse_latex_command(&text[pos..])
-        {
-            log::debug!("Matched LaTeX command at pos {}", pos);
-            parse_latex_command(builder, &text[pos..], len);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse Quarto shortcodes (before code spans, since both can start with braces)
-        if bytes[pos] == b'{'
-            && config.extensions.quarto_shortcodes
-            && let Some((len, content, is_escaped)) = try_parse_shortcode(&text[pos..])
-        {
-            log::debug!(
-                "Matched shortcode at pos {}: escaped={}, content={:?}",
-                pos,
-                is_escaped,
-                &content[..content.len().min(20)]
-            );
-            emit_shortcode(builder, &content, is_escaped);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse code span or raw inline span
-        if bytes[pos] == b'`'
-            && let Some((len, content, backtick_count, attributes)) =
-                try_parse_code_span(&text[pos..])
-        {
-            log::debug!(
-                "Matched code span at pos {}: {} backticks, attributes={:?}",
-                pos,
-                backtick_count,
-                attributes
-            );
-
-            // Check if this is a raw inline span (has {=format} attribute)
-            if let Some(ref attrs) = attributes
-                && config.extensions.raw_attribute
-                && let Some(format) = is_raw_inline(attrs)
-            {
-                log::debug!("Matched raw inline span at pos {}: format={}", pos, format);
-                emit_raw_inline(builder, content, backtick_count, format);
-                pos += len;
-                continue;
-            }
-
-            // Regular code span
-            emit_code_span(builder, content, backtick_count, attributes);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse inline footnote (^[...])
-        if bytes[pos] == b'^'
-            && pos + 1 < text.len()
-            && bytes[pos + 1] == b'['
-            && let Some((len, content)) = try_parse_inline_footnote(&text[pos..])
-        {
-            log::debug!("Matched inline footnote at pos {}", pos);
-            emit_inline_footnote(builder, content, config);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse superscript (^text^)
-        // Must come after inline footnote check to avoid conflict with ^[
-        if bytes[pos] == b'^'
-            && let Some((len, content)) = try_parse_superscript(&text[pos..])
-        {
-            log::debug!("Matched superscript at pos {}", pos);
-            emit_superscript(builder, content, config);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse subscript (~text~)
-        // Must come before strikeout check to avoid conflict with ~~
-        if bytes[pos] == b'~'
-            && let Some((len, content)) = try_parse_subscript(&text[pos..])
-        {
-            log::debug!("Matched subscript at pos {}", pos);
-            emit_subscript(builder, content, config);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse strikeout (~~text~~)
-        if bytes[pos] == b'~'
-            && pos + 1 < text.len()
-            && bytes[pos + 1] == b'~'
-            && let Some((len, content)) = try_parse_strikeout(&text[pos..])
-        {
-            log::debug!("Matched strikeout at pos {}", pos);
-            emit_strikeout(builder, content, config);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse inline math (must check for $$ first for display math)
-        if bytes[pos] == b'$' {
-            // Try display math first ($$...$$)
-            if let Some((len, content)) = try_parse_display_math(&text[pos..]) {
-                let dollar_count = text[pos..].chars().take_while(|&c| c == '$').count();
-                log::debug!(
-                    "Matched display math at pos {}: {} dollars",
-                    pos,
-                    dollar_count
-                );
-
-                // Check for trailing attributes (Quarto cross-reference support)
-                let after_math = &text[pos + len..];
-                let attr_len = if config.extensions.quarto_crossrefs {
-                    use crate::parser::block_parser::attributes::try_parse_trailing_attributes;
-                    if let Some((_attr_block, _)) = try_parse_trailing_attributes(after_math) {
-                        log::debug!("Found attributes after inline display math");
-                        // Find the position of { in after_math
-                        let trimmed_after = after_math.trim_start();
-                        if let Some(open_brace_pos) = trimmed_after.find('{') {
-                            // Calculate total attribute length including leading whitespace
-                            let ws_before_brace = after_math.len() - trimmed_after.len();
-                            let attr_text_len = trimmed_after[open_brace_pos..]
-                                .find('}')
-                                .map(|close| close + 1)
-                                .unwrap_or(0);
-                            ws_before_brace + open_brace_pos + attr_text_len
-                        } else {
-                            0
-                        }
-                    } else {
-                        0
-                    }
-                } else {
-                    0
-                };
-
-                // Emit display math
-                emit_display_math(builder, content, dollar_count);
-
-                // Emit attributes if present
-                if attr_len > 0 {
-                    use crate::parser::block_parser::attributes::{
-                        emit_attributes, try_parse_trailing_attributes,
-                    };
-                    let attr_text = &text[pos + len..pos + len + attr_len];
-                    if let Some((attr_block, _)) = try_parse_trailing_attributes(attr_text) {
-                        // Emit whitespace before attributes
-                        let trimmed_after = attr_text.trim_start();
-                        let ws_len = attr_text.len() - trimmed_after.len();
-                        if ws_len > 0 {
-                            builder.token(SyntaxKind::WHITESPACE.into(), &attr_text[..ws_len]);
-                        }
-                        emit_attributes(builder, &attr_block);
-                    }
-                }
-
-                pos += len + attr_len;
-                continue;
-            }
-
-            // Try inline math ($...$)
-            if let Some((len, content)) = try_parse_inline_math(&text[pos..]) {
-                log::debug!("Matched inline math at pos {}", pos);
-                emit_inline_math(builder, content);
-                pos += len;
-                continue;
-            }
-        }
-
-        // Try to parse automatic link
-        if bytes[pos] == b'<'
-            && let Some((len, url)) = try_parse_autolink(&text[pos..])
-        {
-            log::debug!("Matched autolink at pos {}: {}", pos, url);
-            emit_autolink(builder, &text[pos..pos + len], url);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse native span (after autolink since both start with <)
-        if bytes[pos] == b'<'
-            && let Some((len, content, attributes)) = try_parse_native_span(&text[pos..])
-        {
-            log::debug!("Matched native span at pos {}", pos);
-            emit_native_span(builder, content, &attributes, config);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse inline image (must come before inline link since it starts with ![)
-        if pos + 1 < text.len()
-            && bytes[pos] == b'!'
-            && bytes[pos + 1] == b'['
-            && let Some((len, alt_text, dest, attributes)) = try_parse_inline_image(&text[pos..])
-        {
-            log::debug!("Matched inline image at pos {}: dest={}", pos, dest);
-            emit_inline_image(
-                builder,
-                &text[pos..pos + len],
-                alt_text,
-                dest,
-                attributes,
-                config,
-            );
-            pos += len;
-            continue;
-        }
-
-        // Try to parse reference image (after inline image check)
-        // Only if reference_links extension is enabled and we allow them in this context
-        if pos + 1 < text.len()
-            && bytes[pos] == b'!'
-            && bytes[pos + 1] == b'['
-            && config.extensions.reference_links
-            && allow_reference_links
-        {
-            let allow_shortcut = config.extensions.shortcut_reference_links;
-            if let Some((len, alt_text, label, is_shortcut)) =
-                try_parse_reference_image(&text[pos..], allow_shortcut)
-            {
-                log::debug!(
-                    "Matched reference image at pos {}: label={:?}, shortcut={}",
-                    pos,
-                    label,
-                    is_shortcut
-                );
-                emit_reference_image(builder, alt_text, &label, is_shortcut, config);
-                pos += len;
-                continue;
-            }
-        }
-
-        // Try to parse footnote reference [^id] (before inline/reference links)
-        // Only if footnotes extension is enabled
-        if bytes[pos] == b'['
-            && pos + 1 < text.len()
-            && bytes[pos + 1] == b'^'
-            && config.extensions.footnotes
-            && let Some((len, id)) = try_parse_footnote_reference(&text[pos..])
-        {
-            log::debug!("Matched footnote reference at pos {}: [^{}]", pos, id);
-            emit_footnote_reference(builder, &id);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse inline link
-        if bytes[pos] == b'['
-            && let Some((len, link_text, dest, attributes)) = try_parse_inline_link(&text[pos..])
-        {
-            log::debug!("Matched inline link at pos {}: dest={}", pos, dest);
-            emit_inline_link(
-                builder,
-                &text[pos..pos + len],
-                link_text,
-                dest,
-                attributes,
-                config,
-            );
-            pos += len;
-            continue;
-        }
-
-        // Try to parse reference link (after inline link check)
-        // Only if reference_links extension is enabled and we allow them in this context
-        if bytes[pos] == b'[' && config.extensions.reference_links && allow_reference_links {
-            let allow_shortcut = config.extensions.shortcut_reference_links;
-            if let Some((len, link_text, label, is_shortcut)) =
-                try_parse_reference_link(&text[pos..], allow_shortcut)
-            {
-                log::debug!(
-                    "Matched reference link at pos {}: label={:?}, shortcut={}",
-                    pos,
-                    label,
-                    is_shortcut
-                );
-                emit_reference_link(builder, link_text, &label, is_shortcut, config);
-                pos += len;
-                continue;
-            }
-        }
-
-        // Try to parse bracketed citation (after link since both start with [)
-        if bytes[pos] == b'['
-            && let Some((len, content)) = try_parse_bracketed_citation(&text[pos..])
-        {
-            log::debug!("Matched bracketed citation at pos {}", pos);
-            emit_bracketed_citation(builder, content);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse bracketed span (after link and citation since all start with [)
-        if bytes[pos] == b'['
-            && let Some((len, content, attributes)) = try_parse_bracketed_span(&text[pos..])
-        {
-            log::debug!(
-                "Matched bracketed span at pos {}: attrs={}",
-                pos,
-                attributes
-            );
-            emit_bracketed_span(builder, &content, &attributes, config);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse bare citation (author-in-text)
-        if (bytes[pos] == b'@'
-            || (bytes[pos] == b'-' && pos + 1 < text.len() && bytes[pos + 1] == b'@'))
-            && let Some((len, key, has_suppress)) = try_parse_bare_citation(&text[pos..])
-        {
-            log::debug!("Matched bare citation at pos {}: key={}", pos, key);
-            emit_bare_citation(builder, key, has_suppress);
-            pos += len;
-            continue;
-        }
-
-        // Try to parse emphasis
-        if (bytes[pos] == b'*' || bytes[pos] == b'_')
-            && let Some((len, inner_text, level, delim_char)) = try_parse_emphasis(&text[pos..])
-        {
-            log::debug!(
-                "Matched emphasis at pos {}: level={}, delim={}",
-                pos,
-                level,
-                delim_char
-            );
-            emit_emphasis(builder, inner_text, level, delim_char, config);
-            pos += len;
-            continue;
-        }
-
-        // No inline element matched - emit as plain text
-        let next_pos = find_next_inline_start(&text[pos..]);
-        let text_chunk = if next_pos > 0 {
-            &text[pos..pos + next_pos]
-        } else {
-            &text[pos..]
-        };
-
-        if !text_chunk.is_empty() {
-            builder.token(SyntaxKind::TEXT.into(), text_chunk);
-        }
-
-        if next_pos > 0 {
-            pos += next_pos;
-        } else {
-            break;
-        }
-    }
-}
-
-/// Find the next position where an inline element might start.
-/// Returns the number of bytes to skip, or 0 if at end.
-fn find_next_inline_start(text: &str) -> usize {
-    for (i, ch) in text.char_indices() {
-        match ch {
-            '\\' | '`' | '*' | '_' | '[' | '!' | '<' | '$' | '^' | '~' | '@' => return i.max(1),
-            '{' => {
-                // Only stop if this could be a shortcode ({{<)
-                if i + 2 < text.len()
-                    && text.as_bytes()[i + 1] == b'{'
-                    && text.as_bytes()[i + 2] == b'<'
-                {
-                    return i.max(1);
-                }
-            }
-            '-' => {
-                // Check if this might be a suppress-author citation -@
-                if i + 1 < text.len() && text.as_bytes()[i + 1] == b'@' {
-                    return i.max(1);
-                }
-            }
-            _ => {}
-        }
-    }
-    text.len()
+    // Use recursive parsing with Pandoc's algorithm for emphasis
+    core::parse_inline_text_recursive(builder, text, config);
 }
 
 /// The InlineParser takes a block-level CST and processes inline elements within text content.
@@ -699,22 +101,56 @@ impl InlineParser {
 
     /// Copy a node and its children to the builder, recursively parsing inline elements.
     fn copy_node_to_builder(&self, builder: &mut GreenNodeBuilder, node: &SyntaxNode) {
+        log::trace!("copy_node_to_builder: {:?}", node.kind());
         builder.start_node(node.kind().into());
 
         // For nodes that contain inline content (like paragraphs), concatenate TEXT/NEWLINE tokens
         // into a single string and parse it. This handles multi-line patterns like display math
         // while being much simpler than the TokenStream approach.
+        //
+        // IMPORTANT: We must NOT concatenate structural tokens like BLOCKQUOTE_MARKER.
+        // These need to be emitted directly to preserve the CST structure and prevent
+        // them from being treated as inline text content.
         if self.should_concatenate_for_parsing(node) {
             let mut concatenated = String::new();
-            for child in node.children_with_tokens() {
+            let mut children = node.children_with_tokens().peekable();
+
+            while let Some(child) = children.next() {
                 if let Some(token) = child.into_token() {
-                    concatenated.push_str(token.text());
+                    // Skip structural tokens - emit them directly without inline parsing
+                    if self.is_structural_token(token.kind()) {
+                        // First, parse any accumulated text before emitting the structural token
+                        if !concatenated.is_empty() {
+                            parse_inline_text_with_newlines(
+                                builder,
+                                &concatenated,
+                                &self.config,
+                                true,
+                            );
+                            concatenated.clear();
+                        }
+                        // Emit the structural token as-is
+                        builder.token(token.kind().into(), token.text());
+
+                        // Check if the next token is WHITESPACE that belongs to the structural marker
+                        // (e.g., the space after ">"). If so, emit it too.
+                        if let Some(rowan::NodeOrToken::Token(next)) = children.peek()
+                            && next.kind() == SyntaxKind::WHITESPACE
+                        {
+                            let ws_token = children.next().unwrap().into_token().unwrap();
+                            builder.token(SyntaxKind::WHITESPACE.into(), ws_token.text());
+                        }
+                    } else {
+                        // Concatenate TEXT and NEWLINE tokens for inline parsing
+                        concatenated.push_str(token.text());
+                    }
                 }
             }
 
-            // Parse the concatenated string - parse_inline_text_with_newlines will emit NEWLINE tokens
-            // when it encounters newlines, preserving losslessness
-            parse_inline_text_with_newlines(builder, &concatenated, &self.config, true);
+            // Parse any remaining concatenated text
+            if !concatenated.is_empty() {
+                parse_inline_text_with_newlines(builder, &concatenated, &self.config, true);
+            }
         } else {
             // For other nodes, recursively process children as before
             let mut children = node.children_with_tokens().peekable();
@@ -770,8 +206,15 @@ impl InlineParser {
 
                         // Normal token processing
                         if self.should_parse_inline(&t) {
-                            // Parse inline text, passing registry for reference resolution
-                            self.parse_text_with_refs(builder, t.text());
+                            // Special handling for REFERENCE_DEFINITION: parse label as LINK
+                            if let Some(parent) = t.parent()
+                                && parent.kind() == SyntaxKind::REFERENCE_DEFINITION
+                            {
+                                self.parse_reference_definition_label(builder, t.text());
+                            } else {
+                                // Parse inline text, passing registry for reference resolution
+                                self.parse_text_with_refs(builder, t.text());
+                            }
                         } else {
                             builder.token(t.kind().into(), t.text());
                         }
@@ -783,40 +226,68 @@ impl InlineParser {
         builder.finish_node();
     }
 
-    /// Check if a node should concatenate tokens for parsing (for multi-line inline patterns).
-    /// Currently, this is enabled for PARAGRAPH nodes that contain potential multi-line
-    /// patterns like display math ($$\n...\n$$).
+    /// Check if a node should concatenate tokens for parsing.
+    /// We always concatenate for paragraphs and plain text blocks to properly handle
+    /// multi-line inline constructs (emphasis, links, display math).
     fn should_concatenate_for_parsing(&self, node: &SyntaxNode) -> bool {
-        if node.kind() != SyntaxKind::PARAGRAPH {
-            return false;
-        }
+        matches!(node.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN)
+    }
 
-        // Check if paragraph contains potential multi-line display math
-        // We look for patterns like: $$\n or \n$$
-        // This is a conservative heuristic to avoid affecting single-line paragraphs
-        let text = node.to_string();
-
-        // Check for display math delimiters near newlines
-        if text.contains("$$\n") || text.contains("\n$$") {
-            return true;
-        }
-
-        // Check for backslash display math near newlines: \[\n or \n\]
-        if text.contains("\\[\n")
-            || text.contains("\n\\]")
-            || text.contains("\\\\[\n")
-            || text.contains("\n\\\\]")
-        {
-            return true;
-        }
-
-        false
+    /// Check if a token is a structural marker that should NOT be concatenated for inline parsing.
+    /// Structural tokens must be emitted directly to preserve CST structure.
+    fn is_structural_token(&self, kind: SyntaxKind) -> bool {
+        matches!(kind, SyntaxKind::BLOCKQUOTE_MARKER)
     }
 
     /// Parse inline text with reference link/image resolution support.
     fn parse_text_with_refs(&self, builder: &mut GreenNodeBuilder, text: &str) {
-        // Pass the reference registry for reference link/image resolution
         parse_inline_text(builder, text, &self.config, true);
+    }
+
+    /// Parse reference definition label as a LINK node.
+    /// Input: "[label]: url..." → Output: LINK(LINK_START, LINK_TEXT, "]") + TEXT(": url...")
+    fn parse_reference_definition_label(&self, builder: &mut GreenNodeBuilder, text: &str) {
+        // Parse the label part: [label]:
+        if !text.starts_with('[') {
+            // Fallback to normal parsing if doesn't start with [
+            self.parse_text_with_refs(builder, text);
+            return;
+        }
+
+        // Find the closing ]
+        let rest = &text[1..];
+        if let Some(close_pos) = rest.find(']') {
+            let label = &rest[..close_pos];
+            let after_bracket = &rest[close_pos + 1..];
+
+            // Must be followed by : for reference definition
+            if after_bracket.starts_with(':') {
+                // Emit LINK node with the label
+                builder.start_node(SyntaxKind::LINK.into());
+
+                // LINK_START
+                builder.start_node(SyntaxKind::LINK_START.into());
+                builder.token(SyntaxKind::LINK_START.into(), "[");
+                builder.finish_node();
+
+                // LINK_TEXT
+                builder.start_node(SyntaxKind::LINK_TEXT.into());
+                builder.token(SyntaxKind::TEXT.into(), label);
+                builder.finish_node();
+
+                // Closing bracket (as TEXT, following old behavior)
+                builder.token(SyntaxKind::TEXT.into(), "]");
+
+                builder.finish_node(); // LINK
+
+                // Rest of the line (": url...")
+                builder.token(SyntaxKind::TEXT.into(), after_bracket);
+                return;
+            }
+        }
+
+        // Fallback: not a valid reference definition format
+        self.parse_text_with_refs(builder, text);
     }
 
     /// Check if a token should be parsed for inline elements.
@@ -855,7 +326,7 @@ impl InlineParser {
 #[cfg(test)]
 mod inline_tests {
     use super::*;
-    use crate::config::Config;
+    use crate::config::{Config, Flavor};
     use crate::parser::block_parser::BlockParser;
 
     fn find_nodes_by_kind(node: &SyntaxNode, kind: SyntaxKind) -> Vec<String> {
@@ -869,7 +340,10 @@ mod inline_tests {
     }
 
     fn parse_inline(input: &str) -> SyntaxNode {
-        let config = Config::default();
+        let config = Config {
+            flavor: Flavor::Pandoc,
+            ..Config::default()
+        };
         let block_tree = BlockParser::new(input, &config).parse();
         InlineParser::new(block_tree, config).parse()
     }

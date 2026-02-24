@@ -258,7 +258,7 @@ impl Extensions {
             tex_math_double_backslash: false,
 
             // Footnotes
-            inline_footnotes: false,
+            inline_footnotes: true,
             footnotes: true,
 
             // Citations

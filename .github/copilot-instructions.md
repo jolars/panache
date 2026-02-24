@@ -2,16 +2,28 @@
 
 ## Repository Overview
 
-**panache** is a formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and Markdown files written in Rust. It understands Quarto/Pandoc-specific syntax that other formatters struggle with (fenced divs, tables, math formatting).
+**panache** is a formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and
+Markdown files written in Rust. It understands Quarto/Pandoc-specific syntax
+that other formatters struggle with (fenced divs, tables, math formatting).
 
-**Syntax Reference**: `assets/pandoc-spec.md` contains comprehensive Pandoc syntax specification with individual spec files in `assets/pandoc-spec/`. This is the definitive reference for parser implementation.
+**Syntax Reference**: `assets/pandoc-spec.md` contains comprehensive Pandoc
+syntax specification with individual spec files in `assets/pandoc-spec/`. This
+is the definitive reference for parser implementation.
 
-**Key Facts:**
+### Key Facts
 
 - **Language**: Rust 2024 edition, stable toolchain
 - **Architecture**: Binary crate + WASM workspace for web playground
 - **Status**: Early development - breaking changes expected
 - **Tests**: 817 total (747 unit + 70 integration), ~1 second runtime
+
+### Principles
+
+- Test-driven development: if you find a bug, write a test that reproduces it
+  before fixing. If you want to add a new feature, write a test first.
+- Pandoc parser is the gold standard - if in doubt, see how Pandoc handles it.
+- Parsing failures take priority over formatting issues - the parser must be
+  robust and lossless.
 
 ## Essential Commands
 
@@ -44,7 +56,7 @@ cargo run -- lint --fix document.qmd  # Apply auto-fixes
 cargo run -- lsp
 ```
 
-**Debugging with logging:**
+## Debugging with logging
 
 ```bash
 # Debug parsing decisions (requires debug build via cargo run)
@@ -56,19 +68,6 @@ RUST_LOG=panache::parser::inline_parser=debug cargo run -- format document.qmd
 
 # Release builds: INFO logs only (DEBUG/TRACE compiled out)
 RUST_LOG=info ./target/release/panache format document.qmd
-```
-
-**Golden test system:**
-
-```bash
-# Update expected formatted outputs (BE CAREFUL - verify changes!)
-UPDATE_EXPECTED=1 cargo test
-
-# Update CST snapshots
-UPDATE_CST=1 cargo test
-
-# Both together
-UPDATE_EXPECTED=1 UPDATE_CST=1 cargo test
 ```
 
 **Shell command debugging tips:**
@@ -157,6 +156,13 @@ Config threaded through parsers: `BlockParser::new(input, &Config)`, `InlinePars
 
 ## Testing Strategy
 
+- Unit tests: Embedded in source modules
+- Integration tests: `tests/` directory (CLI, LSP, format scenarios)
+  - **Linting tests**: `tests/linting/*.md` with focused assertions in `tests/linting.rs`
+  - **Formatting tests**: `tests/golden_cases.rs` with CST snapshots (use `UPDATE_EXPECTED=1` or `UPDATE_CST=1`)
+- Architecture tests: `inline_parser/architecture_tests.rs` verifies nesting
+- 60+ golden test scenarios covering all syntax elements
+
 ### Golden Tests (`tests/golden_cases.rs`)
 
 Each `tests/cases/*/` directory contains:
@@ -167,39 +173,38 @@ Each `tests/cases/*/` directory contains:
 
 You need to update the list of tests in `tests/golden_cases.rs` when adding new a new directory.
 
-**Test verification:**
+To update expected outputs or CST snapshots, set environment variables:
+
+```bash
+# Update expected formatted outputs (BE CAREFUL - verify changes!)
+UPDATE_EXPECTED=1 cargo test
+
+# Update CST snapshots
+UPDATE_CST=1 cargo test
+
+# Both together
+UPDATE_EXPECTED=1 UPDATE_CST=1 cargo test
+```
+
+But be *very careful* when updating snapshots - always verify changes are correct before committing!
+
+### Test verification
+
 - Formatting is idempotent
 - CST structure matches snapshot
 - Output matches expected
 
-**DO NOT** update snapshots without verifying changes are correct!
-
-### Test Organization
-
-- Unit tests: Embedded in source modules
-- Integration tests: `tests/` directory (CLI, LSP, format scenarios)
-  - **Linting tests**: `tests/linting/*.md` with focused assertions in `tests/linting.rs`
-  - **Formatting tests**: `tests/golden_cases.rs` with CST snapshots (use `UPDATE_EXPECTED=1` or `UPDATE_CST=1`)
-- Architecture tests: `inline_parser/architecture_tests.rs` verifies nesting
-- 60+ golden test scenarios covering all syntax elements
-
 ## LSP Implementation (`src/lsp/`)
 
-**Architecture:**
+### Architecture
+
 - Implements `tower_lsp_server::LanguageServer` trait
 - Uses `spawn_blocking` wrapper for non-Send rowan types
 - Document state in `Arc<RwLock<HashMap<String, Document>>>`
 - Incremental sync mode with UTF-16/UTF-8 position conversion
 
-**Capabilities:**
-- ✅ Formatting (full document and range)
-- ✅ Diagnostics (live linting)
-- ✅ Code actions (quick fixes)
-- ✅ Document symbols (hierarchical outline)
-- ✅ Folding ranges
-- ✅ Go to definition (reference links, footnotes)
+Uses typed AST wrappers for cleaner code:
 
-**Uses typed AST wrappers** for cleaner code:
 ```rust
 // With wrapper (preferred in LSP)
 if let Some(heading) = Heading::cast(node) {
@@ -256,7 +261,8 @@ Instead of listing every file, understand the patterns:
 
 ## Important Development Rules
 
-### DO:
+### DO
+
 - Run full test suite after changes: `cargo test`
 - Ensure clippy passes: `cargo clippy --all-targets --all-features -- -D warnings`
 - Auto-fix clippy warnings when possible: `cargo clippy --fix`
@@ -264,13 +270,14 @@ Instead of listing every file, understand the patterns:
 - Consider idempotency - formatting twice should equal formatting once
 - Verify CST snapshots before updating: `UPDATE_CST=1 cargo test`
 
-### DON'T:
+### DON'T
 
 - Break the hierarchical config system
 - Format code in the parser (parser preserves bytes, formatter applies rules)
 - Change core formatting without extensive golden test verification
 - Update golden test expectations without careful verification
 - Delete working files unless absolutely necessary
+- Run `cargo format`/`panache format` directly on files just to check formatting - **IT FORMATS IN PLACE**. Use `cargo  format < file.md` instead.
 
 ## Logging Infrastructure
 
@@ -292,6 +299,7 @@ Instead of listing every file, understand the patterns:
 ## External Resources
 
 - **Pandoc spec**: `assets/pandoc-spec.md` and `assets/pandoc-spec/`
+- **Pandoc source**: `assets/pandoc-src` (Haskell, reference for edge cases, incomplete)
 - **Documentation site**: `docs/` (Quarto-based, published to GitHub Pages)
 - **Playground**: `docs/playground/` (WASM-based web interface)
 - **WASM crate**: `crates/panache-wasm/` for browser integration

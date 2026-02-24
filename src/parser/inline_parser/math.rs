@@ -44,12 +44,6 @@ pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
                 continue;
             }
 
-            // Check if it's part of $$ (display math)
-            if rest[pos..].starts_with("$$") {
-                // This is display math start, not inline math end
-                return None;
-            }
-
             // Closing $ must have non-space character immediately to its left
             if pos == 0 || rest[..pos].ends_with(char::is_whitespace) {
                 // Continue searching - this $ doesn't close the math

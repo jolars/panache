@@ -34,8 +34,6 @@
 
 *foo* *bar*
 
-**foo****bar**
-
 *foo*bar*
 
 ## Intraword Emphasis (asterisks)

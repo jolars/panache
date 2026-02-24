@@ -16,4 +16,4 @@ Adjacent: *first* and *second* emphasis
 
 Intraword: un*frigging*believable and un**frigging**believable
 
-This is _ not emphasized _
+This is \_ not emphasized \_

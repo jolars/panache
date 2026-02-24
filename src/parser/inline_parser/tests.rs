@@ -853,3 +853,281 @@ mod raw_inline_tests {
         assert_eq!(code_spans.len(), 1);
     }
 }
+
+#[cfg(test)]
+mod complex_emphasis_tests {
+    use crate::config::Config;
+    use crate::parser::block_parser::BlockParser;
+    use crate::parser::inline_parser::InlineParser;
+    use crate::syntax::SyntaxKind;
+
+    fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
+        let config = Config::default();
+        let block_tree = BlockParser::new(input, &config).parse();
+        InlineParser::new(block_tree, config).parse()
+    }
+
+    fn count_node_type(node: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
+        node.descendants().filter(|n| n.kind() == kind).count()
+    }
+
+    fn find_text_nodes(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut texts = Vec::new();
+        for child in node.descendants_with_tokens() {
+            if let rowan::NodeOrToken::Token(token) = child
+                && token.kind() == SyntaxKind::TEXT
+            {
+                texts.push(token.text().to_string());
+            }
+        }
+        texts
+    }
+
+    #[test]
+    fn test_triple_emphasis_with_nested_strong() {
+        // Issue: ***foo **bar** baz***
+        // Should parse as: EMPH containing STRONG("foo"), text(" bar "), STRONG("baz")
+        // Currently: Fails to parse triple emphasis, treats *** as literal text
+        let input = "***foo **bar** baz***";
+        let tree = parse_inline(input);
+
+        println!("Tree:\n{:#?}", tree);
+
+        // Should have 1 EMPHASIS node
+        let emph_count = count_node_type(&tree, SyntaxKind::EMPHASIS);
+        assert_eq!(
+            emph_count, 1,
+            "Expected 1 EMPHASIS node, found {}",
+            emph_count
+        );
+
+        // Should have 2 STRONG nodes inside the EMPHASIS
+        let strong_count = count_node_type(&tree, SyntaxKind::STRONG);
+        assert_eq!(
+            strong_count, 2,
+            "Expected 2 STRONG nodes, found {}",
+            strong_count
+        );
+
+        // Should NOT have TEXT nodes containing ***
+        let text_nodes = find_text_nodes(&tree);
+        for text in &text_nodes {
+            assert!(
+                !text.contains("***"),
+                "Found TEXT node with ***: {:?}",
+                text
+            );
+        }
+    }
+
+    #[test]
+    fn test_adjacent_strong_delimiters() {
+        // Input: **foo****bar**
+        // Parser behavior: Two separate STRONG nodes (this is correct for CST)
+        // Formatter should merge them to **foobar**
+        //
+        // Note: Pandoc's AST shows Strong[Str "foo", Str "bar"] but that's after
+        // AST normalization. The parser naturally produces two STRONG nodes when
+        // `****` acts as closer + opener.
+        let input = "**foo****bar**";
+        let tree = parse_inline(input);
+
+        println!("Tree:\n{:#?}", tree);
+
+        // Parser produces 2 STRONG nodes - this is correct CST behavior
+        // The formatter is responsible for merging adjacent emphasis
+        let strong_count = count_node_type(&tree, SyntaxKind::STRONG);
+        assert_eq!(
+            strong_count, 2,
+            "Expected 2 STRONG nodes (formatter merges them), found {}",
+            strong_count
+        );
+    }
+
+    #[test]
+    fn test_triple_emphasis_simple() {
+        // Simple case: ***text***
+        // Should parse as: STRONG > EMPH > text
+        let input = "***simple***";
+        let tree = parse_inline(input);
+
+        println!("Tree:\n{:#?}", tree);
+
+        let emph_count = count_node_type(&tree, SyntaxKind::EMPHASIS);
+        let strong_count = count_node_type(&tree, SyntaxKind::STRONG);
+
+        // Should have 1 of each (nested)
+        assert_eq!(emph_count, 1, "Expected 1 EMPHASIS node");
+        assert_eq!(strong_count, 1, "Expected 1 STRONG node");
+    }
+
+    #[test]
+    fn test_overlapping_delimiters_with_escapes() {
+        // Issue: *foo **bar* baz**
+        // This is a complex case with overlapping boundaries
+        let input = "*foo **bar* baz**";
+        let tree = parse_inline(input);
+
+        println!("Tree:\n{:#?}", tree);
+
+        // Need to verify Pandoc's exact parsing here
+        // Likely: *foo **bar* (emphasis closes first) + remaining baz**
+    }
+
+    #[test]
+    fn test_emphasis_after_escaped_delimiter() {
+        // Test: \**not bold\**
+        // After \*, should still be able to parse *not bold*
+        // Currently works but formats with extra escaping
+        let input = r"\**not bold\**";
+        let tree = parse_inline(input);
+
+        println!("Tree:\n{:#?}", tree);
+
+        // Should have ESCAPED_CHAR nodes for \*
+        let escaped_count = tree
+            .descendants_with_tokens()
+            .filter(|n| {
+                if let rowan::NodeOrToken::Token(t) = n {
+                    t.kind() == SyntaxKind::ESCAPED_CHAR
+                } else {
+                    false
+                }
+            })
+            .count();
+
+        assert_eq!(escaped_count, 2, "Expected 2 ESCAPED_CHAR nodes");
+
+        // Note: Our current parse is actually reasonable, just formats differently than Pandoc
+    }
+
+    #[test]
+    fn test_triple_emphasis_with_embedded_double() {
+        // More specific test for the triple emphasis bug
+        // Input: ***a **b** c***
+        // The ** around "b" should be parsed as nested STRONG
+        // The *** should find the closing *** at the end
+        let input = "***a **b** c***";
+        let tree = parse_inline(input);
+
+        println!("Tree:\n{:#?}", tree);
+
+        // Debug: print all node kinds
+        for node in tree.descendants() {
+            println!("Node: {:?} = {}", node.kind(), node);
+        }
+
+        // Should have EMPHASIS wrapping everything
+        let emph_count = count_node_type(&tree, SyntaxKind::EMPHASIS);
+        assert!(emph_count >= 1, "Should have at least 1 EMPHASIS node");
+
+        // Should have STRONG for "b"
+        let strong_count = count_node_type(&tree, SyntaxKind::STRONG);
+        assert!(strong_count >= 1, "Should have at least 1 STRONG node");
+
+        // The opening *** should not be treated as TEXT
+        let text_nodes = find_text_nodes(&tree);
+        let has_triple_star_text = text_nodes.iter().any(|t| t.starts_with("***"));
+        assert!(
+            !has_triple_star_text,
+            "Opening *** should not be TEXT, found: {:?}",
+            text_nodes
+        );
+    }
+
+    #[test]
+    fn test_triple_emphasis_pandoc_structure() {
+        // Input: ***foo **bar** baz***
+        // Pandoc parses as: Emph[Strong["foo "], "bar", Strong[" baz"]]
+        // NOT as: Strong[Emph["foo ", Strong["bar"], " baz"]]
+        //
+        // The key is that `**` at position 7 acts as an ender for the `***` opener,
+        // triggering the `ender c 2 >> one c (B.strong <$> contents)` fallback.
+        let input = "***foo **bar** baz***";
+        let tree = parse_inline(input);
+
+        println!("Tree:\n{:#?}", tree);
+
+        // Find the top-level emphasis/strong structure
+        let paragraph = tree.children().find(|n| n.kind() == SyntaxKind::PARAGRAPH);
+        assert!(paragraph.is_some(), "Should have PARAGRAPH");
+
+        let para = paragraph.unwrap();
+        let first_child = para.children().next();
+        assert!(first_child.is_some(), "PARAGRAPH should have children");
+
+        // According to Pandoc, the outermost element should be EMPHASIS (not STRONG)
+        // because the `***` opener matches with `ender c 2` fallback which produces
+        // `one c (B.strong <$> contents)` = Emph[Strong[...], ...]
+        let first_kind = first_child.as_ref().unwrap().kind();
+        assert_eq!(
+            first_kind,
+            SyntaxKind::EMPHASIS,
+            "Outermost element should be EMPHASIS (Pandoc: Emph[Strong[...], ...]), got {:?}",
+            first_kind
+        );
+
+        // Count nested STRONG nodes inside the EMPHASIS
+        let emph_node = first_child.unwrap();
+        let strong_count: usize = emph_node
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::STRONG)
+            .count();
+
+        assert_eq!(
+            strong_count, 2,
+            "Should have 2 STRONG nodes inside EMPHASIS (for 'foo ' and ' baz')"
+        );
+    }
+
+    #[test]
+    fn test_nested_emphasis_and_strong() {
+        // Test: **foo *bar* baz**
+        // Should parse as STRONG containing EMPH
+        let input = "**foo *bar* baz**";
+        let tree = parse_inline(input);
+
+        let strong_count = count_node_type(&tree, SyntaxKind::STRONG);
+        let emph_count = count_node_type(&tree, SyntaxKind::EMPHASIS);
+
+        assert_eq!(strong_count, 1, "Should have 1 STRONG node");
+        assert_eq!(
+            emph_count, 1,
+            "Should have 1 EMPH node (nested inside STRONG)"
+        );
+    }
+
+    #[test]
+    fn test_nested_strong_and_emphasis() {
+        // Test: *foo **bar** baz*
+        // Should parse as EMPH containing STRONG
+        let input = "*foo **bar** baz*";
+        let tree = parse_inline(input);
+
+        let strong_count = count_node_type(&tree, SyntaxKind::STRONG);
+        let emph_count = count_node_type(&tree, SyntaxKind::EMPHASIS);
+
+        assert_eq!(emph_count, 1, "Should have 1 EMPH node");
+        assert_eq!(
+            strong_count, 1,
+            "Should have 1 STRONG node (nested inside EMPH)"
+        );
+    }
+
+    #[test]
+    fn test_deeply_nested_emphasis() {
+        // Test: **foo *bar **nested** baz* qux**
+        // Complex nesting: STRONG > EMPH > STRONG
+        let input = "**foo *bar **nested** baz* qux**";
+        let tree = parse_inline(input);
+
+        println!("Tree:\n{:#?}", tree);
+
+        // Should have 2 STRONG nodes and 1 EMPH node
+        let strong_count = count_node_type(&tree, SyntaxKind::STRONG);
+        let emph_count = count_node_type(&tree, SyntaxKind::EMPHASIS);
+
+        assert!(strong_count >= 2, "Should have at least 2 STRONG nodes");
+        assert!(emph_count >= 1, "Should have at least 1 EMPH node");
+    }
+}

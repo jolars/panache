@@ -1,5 +1,6 @@
 use crate::parser::block_parser::tests::helpers::{
-    assert_block_kinds, find_all, find_first, parse_blocks,
+    assert_block_kinds, assert_block_kinds_for_node, find_all, find_first, parse_blocks,
+    parse_blocks_quarto,
 };
 use crate::syntax::SyntaxKind;
 
@@ -55,9 +56,9 @@ fn parses_code_block_with_language() {
 #[test]
 fn parses_code_block_with_attributes() {
     let input = "```{python}\nprint(\"hello\")\n```\n";
-    let node = parse_blocks(input);
+    let node = parse_blocks_quarto(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
+    assert_block_kinds_for_node(&node, &[SyntaxKind::CODE_BLOCK], input);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "print(\"hello\")\n");
@@ -69,9 +70,9 @@ fn parses_code_block_with_attributes() {
 #[test]
 fn parses_code_block_with_complex_attributes() {
     let input = "```{python #mycode .numberLines startFrom=\"100\"}\nprint(\"hello\")\n```\n";
-    let node = parse_blocks(input);
+    let node = parse_blocks_quarto(input);
 
-    assert_block_kinds(input, &[SyntaxKind::CODE_BLOCK]);
+    assert_block_kinds_for_node(&node, &[SyntaxKind::CODE_BLOCK], input);
 
     let content = get_code_content(&node).unwrap();
     assert_eq!(content, "print(\"hello\")\n");
@@ -92,12 +93,61 @@ fn parses_multiline_code_block() {
 }
 
 #[test]
-fn requires_blank_line_before_code_block() {
-    let input = "text\n```\ncode\n```\n";
+fn code_block_can_interrupt_paragraph() {
+    // Fenced code blocks with language identifiers can interrupt paragraphs
+    // Bare fences (```) require a blank line to avoid ambiguity with inline code
+    let input = "text\n```python\ncode\n```\n";
     let node = parse_blocks(input);
 
-    // Should parse as paragraph, not code block
-    assert!(find_first(&node, SyntaxKind::CODE_BLOCK).is_none());
+    // Should parse as paragraph followed by code block
+    assert_block_kinds_for_node(
+        &node,
+        &[SyntaxKind::PARAGRAPH, SyntaxKind::CODE_BLOCK],
+        input,
+    );
+
+    let code_content = get_code_content(&node).unwrap();
+    assert_eq!(code_content, "code\n");
+}
+
+#[test]
+fn bare_fence_requires_blank_line() {
+    // Bare ``` without info string requires blank line to avoid confusion with inline code
+    let input = "text\n```\ncode\n```\n";
+    // Use full parse to get inline parsing too
+    let tree = crate::parse(input, None);
+
+    // Should parse as single paragraph
+    let paragraphs: Vec<_> = tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::PARAGRAPH)
+        .collect();
+    assert_eq!(paragraphs.len(), 1, "Should have one paragraph");
+
+    // The ``` should be parsed as inline code by the inline parser
+    let code_span = tree
+        .descendants()
+        .find(|n| n.kind() == SyntaxKind::CODE_SPAN);
+    assert!(code_span.is_some(), "Should contain inline code span");
+}
+
+#[test]
+fn code_block_with_language_can_interrupt_paragraph() {
+    // Test with language identifier
+    let input = "Some text:\n```r\na <- 1\n```\n";
+    let node = parse_blocks(input);
+
+    assert_block_kinds_for_node(
+        &node,
+        &[SyntaxKind::PARAGRAPH, SyntaxKind::CODE_BLOCK],
+        input,
+    );
+
+    let code_content = get_code_content(&node).unwrap();
+    assert_eq!(code_content, "a <- 1\n");
+
+    let info = get_code_info(&node).unwrap();
+    assert_eq!(info, "r");
 }
 
 #[test]

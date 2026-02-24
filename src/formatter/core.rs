@@ -1189,6 +1189,18 @@ impl Formatter {
 
             SyntaxKind::CODE_BLOCK => {
                 log::trace!("Formatting code block");
+
+                // Add blank line before code block if it follows a paragraph
+                // This matches Pandoc's formatting behavior
+                if let Some(prev_sibling) = node.prev_sibling()
+                    && prev_sibling.kind() == SyntaxKind::PARAGRAPH
+                {
+                    // Only add blank line if we don't already have one
+                    if !self.output.ends_with("\n\n") && !self.output.ends_with("\n \n") {
+                        self.output.push('\n');
+                    }
+                }
+
                 // Normalize code blocks to use backticks
                 self.format_code_block(node);
             }

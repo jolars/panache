@@ -29,3 +29,17 @@ qsort [] = []
 ```haskell {.numberLines}
 qsort [] = []
 ```
+
+A quarto fenced code block, with blankline:
+
+`{r} a <- 1`
+
+A quarto fenced code block, without blankline: `{r} a <- 1`
+
+A fenced code block should be separated with a blankline after we have formatted
+it:
+
+```r
+a <- 1
+b <- 2
+```

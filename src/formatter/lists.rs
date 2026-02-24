@@ -26,6 +26,44 @@ impl Formatter {
         None
     }
 
+    /// Check if a nested list is empty (contains only one item with no text content)
+    fn is_empty_nested_list(list_node: &SyntaxNode) -> bool {
+        let items: Vec<_> = list_node
+            .children()
+            .filter(|c| c.kind() == SyntaxKind::LIST_ITEM)
+            .collect();
+
+        // Must have exactly one item
+        if items.len() != 1 {
+            return false;
+        }
+
+        let item = &items[0];
+
+        // Check if item has any text content or nested structures
+        for child in item.children_with_tokens() {
+            match child {
+                NodeOrToken::Token(t) => {
+                    // Has text content beyond marker/whitespace/newline
+                    if matches!(t.kind(), SyntaxKind::TEXT | SyntaxKind::ESCAPED_CHAR) {
+                        return false;
+                    }
+                }
+                NodeOrToken::Node(n) => {
+                    // Has nested blocks (PLAIN/PARAGRAPH/LIST/etc)
+                    if !matches!(
+                        n.kind(),
+                        SyntaxKind::LIST_MARKER | SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE
+                    ) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
     /// Calculate the maximum marker width for all direct ListItem children of a List
     /// Returns 0 if markers shouldn't be aligned
     pub(super) fn calculate_max_marker_width(list_node: &SyntaxNode) -> usize {
@@ -292,6 +330,12 @@ impl Formatter {
             node_words
         };
 
+        // Check if this item contains only an empty nested list (special case formatting)
+        let has_only_empty_nested_list = node
+            .children()
+            .any(|c| c.kind() == SyntaxKind::LIST && Self::is_empty_nested_list(&c))
+            && words.is_empty();
+
         let algo = WrapAlgorithm::new();
         let line_widths = [available_width];
         let lines = algo.wrap(&words, &line_widths);
@@ -329,7 +373,19 @@ impl Formatter {
                     self.output.push_str(w.penalty);
                 }
             }
-            self.output.push('\n');
+            // Only output newline if this item doesn't have an inline empty nested list
+            if !has_only_empty_nested_list {
+                self.output.push('\n');
+            }
+        }
+
+        // Special case: if no lines were wrapped but we have empty nested list, still output marker
+        if lines.is_empty() && has_only_empty_nested_list {
+            self.output.push_str(&" ".repeat(total_indent));
+            self.output
+                .push_str(&" ".repeat(list_indent.marker_padding));
+            self.output.push_str(&marker);
+            self.output.push(' '); // Space before nested marker
         }
 
         // Format nested blocks inside this list item aligned to the content column.
@@ -352,11 +408,28 @@ impl Formatter {
                     // Otherwise skip - already handled
                 }
                 SyntaxKind::LIST => {
-                    // Nested list indent: base + marker + 1 space + checkbox
-                    self.format_node_sync(
-                        &child,
-                        total_indent + list_indent.marker_width + 1 + list_indent.checkbox_width,
-                    );
+                    // Check if this is an empty nested list (only has one item with no content)
+                    if Self::is_empty_nested_list(&child) {
+                        // Format inline: output nested marker and newline
+                        let nested_marker = Self::extract_list_marker(
+                            &child
+                                .children()
+                                .find(|c| c.kind() == SyntaxKind::LIST_ITEM)
+                                .unwrap(),
+                        )
+                        .unwrap_or_else(|| "-".to_string());
+                        self.output.push_str(&nested_marker);
+                        self.output.push('\n');
+                    } else {
+                        // Normal nested list: indent on next line
+                        self.format_node_sync(
+                            &child,
+                            total_indent
+                                + list_indent.marker_width
+                                + 1
+                                + list_indent.checkbox_width,
+                        );
+                    }
                 }
                 SyntaxKind::CODE_BLOCK => {
                     // Code blocks in list items need indentation

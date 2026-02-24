@@ -143,24 +143,24 @@ DOCUMENT@0..854
   BLANK_LINE@564..565
     BLANK_LINE@564..565 "\n"
   PARAGRAPH@565..638
-    TEXT@565..616 "To show a shortcode l ..."
-    SHORTCODE@616..635
-      SHORTCODE_MARKER_OPEN@616..619 "{{<"
+    TEXT@565..615 "To show a shortcode l ..."
+    SHORTCODE@615..636
+      SHORTCODE_MARKER_OPEN@615..619 "{{{<"
       SHORTCODE_CONTENT@619..632
         TEXT@619..632 " var version "
-      SHORTCODE_MARKER_CLOSE@632..635 ">}}"
-    TEXT@635..637 "}."
+      SHORTCODE_MARKER_CLOSE@632..636 ">}}}"
+    TEXT@636..637 "."
     NEWLINE@637..638 "\n"
   BLANK_LINE@638..639
     BLANK_LINE@638..639 "\n"
   PARAGRAPH@639..676
-    TEXT@639..657 "Another example: {"
-    SHORTCODE@657..673
-      SHORTCODE_MARKER_OPEN@657..660 "{{<"
+    TEXT@639..656 "Another example: "
+    SHORTCODE@656..674
+      SHORTCODE_MARKER_OPEN@656..660 "{{{<"
       SHORTCODE_CONTENT@660..670
         TEXT@660..670 "meta title"
-      SHORTCODE_MARKER_CLOSE@670..673 ">}}"
-    TEXT@673..675 "}."
+      SHORTCODE_MARKER_CLOSE@670..674 ">}}}"
+    TEXT@674..675 "."
     NEWLINE@675..676 "\n"
   BLANK_LINE@676..677
     BLANK_LINE@676..677 "\n"
