@@ -1406,6 +1406,164 @@ fn is_grid_content_row(line: &str) -> bool {
     trimmed.starts_with('|') && trimmed.ends_with('|')
 }
 
+/// Extract cell contents from a single grid table row line.
+/// Returns a vector of cell contents (trimmed) based on column boundaries.
+/// Grid table rows look like: "| Cell 1 | Cell 2 | Cell 3 |"
+fn extract_grid_cells_from_line(line: &str, columns: &[GridColumn]) -> Vec<String> {
+    let (line_content, _) = strip_newline(line);
+    let line_trimmed = line_content.trim();
+
+    // Remove leading and trailing pipes
+    let content = if line_trimmed.starts_with('|') && line_trimmed.ends_with('|') {
+        &line_trimmed[1..line_trimmed.len() - 1]
+    } else {
+        line_trimmed
+    };
+
+    // Split by | to get cells
+    let cell_segments: Vec<&str> = content.split('|').collect();
+
+    let mut cells = Vec::new();
+    for (i, _col) in columns.iter().enumerate() {
+        if i < cell_segments.len() {
+            cells.push(cell_segments[i].trim().to_string());
+        } else {
+            cells.push(String::new());
+        }
+    }
+
+    cells
+}
+
+/// Extract cell contents from multiple grid table row lines (for multi-line cells).
+/// Concatenates cell contents across lines with newlines, then trims.
+fn extract_grid_cells_multiline(lines: &[&str], columns: &[GridColumn]) -> Vec<String> {
+    if lines.is_empty() {
+        return vec![String::new(); columns.len()];
+    }
+
+    // Extract cells from each line
+    let mut cell_lines: Vec<Vec<String>> = Vec::new();
+    for line in lines {
+        cell_lines.push(extract_grid_cells_from_line(line, columns));
+    }
+
+    // Transpose and concatenate: combine all lines for each cell
+    let mut result = vec![String::new(); columns.len()];
+    for cell_idx in 0..columns.len() {
+        let mut cell_content_parts = Vec::new();
+        for line_cells in &cell_lines {
+            if cell_idx < line_cells.len() {
+                cell_content_parts.push(line_cells[cell_idx].as_str());
+            }
+        }
+        // Join with newline and trim the result
+        result[cell_idx] = cell_content_parts.join("\n").trim().to_string();
+    }
+
+    result
+}
+
+/// Emit a grid table row with inline-parsed cells.
+/// Handles multi-line rows by emitting first line with TABLE_CELL nodes,
+/// then continuation lines as raw TEXT for losslessness.
+fn emit_grid_table_row(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    columns: &[GridColumn],
+    row_kind: SyntaxKind,
+    config: &Config,
+) {
+    if lines.is_empty() {
+        return;
+    }
+
+    // Extract cell contents (concatenated across all lines if multi-line)
+    let cell_contents = extract_grid_cells_multiline(lines, columns);
+
+    builder.start_node(row_kind.into());
+
+    // Emit first line with TABLE_CELL nodes
+    // Grid table rows look like: "| Cell 1 | Cell 2 | Cell 3 |"
+    let first_line = lines[0];
+    let (line_without_newline, newline_str) = strip_newline(first_line);
+    let trimmed = line_without_newline.trim();
+
+    // Emit leading whitespace
+    let leading_ws_len = line_without_newline.len() - trimmed.len();
+    if leading_ws_len > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &line_without_newline[..leading_ws_len],
+        );
+    }
+
+    // Split by | to find cells (similar to pipe table parsing)
+    let mut parts: Vec<&str> = trimmed.split('|').collect();
+
+    // Remove empty first and last parts if line starts/ends with |
+    if !parts.is_empty() && parts[0].is_empty() {
+        parts.remove(0);
+    }
+    if !parts.is_empty() && parts[parts.len() - 1].is_empty() {
+        parts.pop();
+    }
+
+    // Emit leading pipe
+    if trimmed.starts_with('|') {
+        builder.token(SyntaxKind::TEXT.into(), "|");
+    }
+
+    // Emit each cell
+    for (idx, cell_content) in cell_contents.iter().enumerate() {
+        if idx < parts.len() {
+            let part = parts[idx];
+
+            // Emit leading whitespace in cell
+            let cell_trimmed = part.trim();
+            let ws_start_len = part.len() - part.trim_start().len();
+            if ws_start_len > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &part[..ws_start_len]);
+            }
+
+            // Emit TABLE_CELL with inline parsing
+            emit_table_cell(builder, cell_content, config);
+
+            // Emit trailing whitespace in cell
+            let ws_end_start = ws_start_len + cell_trimmed.len();
+            if ws_end_start < part.len() {
+                builder.token(SyntaxKind::WHITESPACE.into(), &part[ws_end_start..]);
+            }
+        }
+
+        // Emit pipe separator (unless this is the last cell and line doesn't end with |)
+        if idx < cell_contents.len() - 1 || trimmed.ends_with('|') {
+            builder.token(SyntaxKind::TEXT.into(), "|");
+        }
+    }
+
+    // Emit trailing whitespace before newline
+    let trailing_ws_start = leading_ws_len + trimmed.len();
+    if trailing_ws_start < line_without_newline.len() {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &line_without_newline[trailing_ws_start..],
+        );
+    }
+
+    // Emit newline
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+    }
+
+    // Emit continuation lines as TEXT for losslessness
+    for line in lines.iter().skip(1) {
+        emit_line_tokens(builder, line);
+    }
+
+    builder.finish_node();
+}
+
 /// Try to parse a grid table starting at the given position.
 /// Returns the number of lines consumed if successful.
 pub(crate) fn try_parse_grid_table(
@@ -1519,10 +1677,24 @@ pub(crate) fn try_parse_grid_table(
     // Track whether we've passed the header separator
     let mut past_header_sep = false;
     let mut in_footer_section = false;
+    let mut current_row_lines: Vec<&str> = Vec::new();
+    let mut current_row_kind = SyntaxKind::TABLE_HEADER;
 
-    // Emit table rows
+    // Emit table rows - accumulate multi-line cells
     for line in lines.iter().take(end_pos).skip(actual_start) {
         if let Some(sep_cols) = try_parse_grid_separator(line) {
+            // Separator line - emit any accumulated row first
+            if !current_row_lines.is_empty() {
+                emit_grid_table_row(
+                    builder,
+                    &current_row_lines,
+                    &sep_cols,
+                    current_row_kind,
+                    config,
+                );
+                current_row_lines.clear();
+            }
+
             let is_header_sep = sep_cols.iter().any(|c| c.is_header_separator);
 
             if is_header_sep {
@@ -1542,14 +1714,14 @@ pub(crate) fn try_parse_grid_table(
                     builder.finish_node();
                 }
             } else {
-                // Regular separator
+                // Regular separator (row boundary)
                 builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
                 emit_line_tokens(builder, line);
                 builder.finish_node();
             }
         } else if is_grid_content_row(line) {
-            // Content row
-            let row_kind = if !past_header_sep && found_header_sep {
+            // Content row - accumulate for multi-line cells
+            current_row_kind = if !past_header_sep && found_header_sep {
                 SyntaxKind::TABLE_HEADER
             } else if in_footer_section {
                 SyntaxKind::TABLE_FOOTER
@@ -1557,9 +1729,21 @@ pub(crate) fn try_parse_grid_table(
                 SyntaxKind::TABLE_ROW
             };
 
-            builder.start_node(row_kind.into());
-            emit_line_tokens(builder, line);
-            builder.finish_node();
+            current_row_lines.push(line);
+        }
+    }
+
+    // Emit any remaining accumulated row
+    if !current_row_lines.is_empty() {
+        // Use first separator's columns for cell boundaries
+        if let Some(sep_cols) = try_parse_grid_separator(lines[actual_start]) {
+            emit_grid_table_row(
+                builder,
+                &current_row_lines,
+                &sep_cols,
+                current_row_kind,
+                config,
+            );
         }
     }
 

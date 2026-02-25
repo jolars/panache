@@ -4,19 +4,64 @@ DOCUMENT@0..599
       TEXT@0..32 "+--------+----------+ ..."
       NEWLINE@32..33 "\n"
     TABLE_HEADER@33..66
-      TEXT@33..65 "| Header | Column 2 | ..."
+      TEXT@33..34 "|"
+      WHITESPACE@34..35 " "
+      TABLE_CELL@35..41
+        TEXT@35..41 "Header"
+      WHITESPACE@41..42 " "
+      TEXT@42..43 "|"
+      WHITESPACE@43..44 " "
+      TABLE_CELL@44..52
+        TEXT@44..52 "Column 2"
+      WHITESPACE@52..53 " "
+      TEXT@53..54 "|"
+      WHITESPACE@54..55 " "
+      TABLE_CELL@55..63
+        TEXT@55..63 "Column 3"
+      WHITESPACE@63..64 " "
+      TEXT@64..65 "|"
       NEWLINE@65..66 "\n"
     TABLE_SEPARATOR@66..99
       TEXT@66..98 "+========+==========+ ..."
       NEWLINE@98..99 "\n"
     TABLE_ROW@99..132
-      TEXT@99..131 "| A      | B        | ..."
+      TEXT@99..100 "|"
+      WHITESPACE@100..101 " "
+      TABLE_CELL@101..102
+        TEXT@101..102 "A"
+      WHITESPACE@102..108 "      "
+      TEXT@108..109 "|"
+      WHITESPACE@109..110 " "
+      TABLE_CELL@110..111
+        TEXT@110..111 "B"
+      WHITESPACE@111..119 "        "
+      TEXT@119..120 "|"
+      WHITESPACE@120..121 " "
+      TABLE_CELL@121..122
+        TEXT@121..122 "C"
+      WHITESPACE@122..130 "        "
+      TEXT@130..131 "|"
       NEWLINE@131..132 "\n"
     TABLE_SEPARATOR@132..165
       TEXT@132..164 "+--------+----------+ ..."
       NEWLINE@164..165 "\n"
     TABLE_ROW@165..198
-      TEXT@165..197 "| Data   | More     | ..."
+      TEXT@165..166 "|"
+      WHITESPACE@166..167 " "
+      TABLE_CELL@167..171
+        TEXT@167..171 "Data"
+      WHITESPACE@171..174 "   "
+      TEXT@174..175 "|"
+      WHITESPACE@175..176 " "
+      TABLE_CELL@176..180
+        TEXT@176..180 "More"
+      WHITESPACE@180..185 "     "
+      TEXT@185..186 "|"
+      WHITESPACE@186..187 " "
+      TABLE_CELL@187..193
+        TEXT@187..193 "Values"
+      WHITESPACE@193..196 "   "
+      TEXT@196..197 "|"
       NEWLINE@197..198 "\n"
     TABLE_SEPARATOR@198..231
       TEXT@198..230 "+--------+----------+ ..."
@@ -33,19 +78,64 @@ DOCUMENT@0..599
       TEXT@256..283 "+-------+--------+--- ..."
       NEWLINE@283..284 "\n"
     TABLE_HEADER@284..312
-      TEXT@284..311 "| Left  | Right  | Ce ..."
+      TEXT@284..285 "|"
+      WHITESPACE@285..286 " "
+      TABLE_CELL@286..290
+        TEXT@286..290 "Left"
+      WHITESPACE@290..292 "  "
+      TEXT@292..293 "|"
+      WHITESPACE@293..294 " "
+      TABLE_CELL@294..299
+        TEXT@294..299 "Right"
+      WHITESPACE@299..301 "  "
+      TEXT@301..302 "|"
+      WHITESPACE@302..303 " "
+      TABLE_CELL@303..309
+        TEXT@303..309 "Center"
+      WHITESPACE@309..310 " "
+      TEXT@310..311 "|"
       NEWLINE@311..312 "\n"
     TABLE_SEPARATOR@312..340
       TEXT@312..339 "+:======+=======:+:== ..."
       NEWLINE@339..340 "\n"
     TABLE_ROW@340..368
-      TEXT@340..367 "| A     |      B |    ..."
+      TEXT@340..341 "|"
+      WHITESPACE@341..342 " "
+      TABLE_CELL@342..343
+        TEXT@342..343 "A"
+      WHITESPACE@343..348 "     "
+      TEXT@348..349 "|"
+      WHITESPACE@349..355 "      "
+      TABLE_CELL@355..356
+        TEXT@355..356 "B"
+      WHITESPACE@356..357 " "
+      TEXT@357..358 "|"
+      WHITESPACE@358..361 "   "
+      TABLE_CELL@361..362
+        TEXT@361..362 "C"
+      WHITESPACE@362..366 "    "
+      TEXT@366..367 "|"
       NEWLINE@367..368 "\n"
     TABLE_SEPARATOR@368..396
       TEXT@368..395 "+-------+--------+--- ..."
       NEWLINE@395..396 "\n"
     TABLE_ROW@396..424
-      TEXT@396..423 "| Short | Longer |  M ..."
+      TEXT@396..397 "|"
+      WHITESPACE@397..398 " "
+      TABLE_CELL@398..403
+        TEXT@398..403 "Short"
+      WHITESPACE@403..404 " "
+      TEXT@404..405 "|"
+      WHITESPACE@405..406 " "
+      TABLE_CELL@406..412
+        TEXT@406..412 "Longer"
+      WHITESPACE@412..413 " "
+      TEXT@413..414 "|"
+      WHITESPACE@414..416 "  "
+      TABLE_CELL@416..419
+        TEXT@416..419 "Mid"
+      WHITESPACE@419..422 "   "
+      TEXT@422..423 "|"
       NEWLINE@423..424 "\n"
     TABLE_SEPARATOR@424..452
       TEXT@424..451 "+-------+--------+--- ..."
@@ -72,13 +162,39 @@ DOCUMENT@0..599
       TEXT@489..510 "+--------+----------+"
       NEWLINE@510..511 "\n"
     TABLE_HEADER@511..533
-      TEXT@511..532 "| *Bold* | `inline` |"
+      TEXT@511..512 "|"
+      WHITESPACE@512..513 " "
+      TABLE_CELL@513..519
+        EMPHASIS@513..519
+          EMPHASIS_MARKER@513..514 "*"
+          TEXT@514..518 "Bold"
+          EMPHASIS_MARKER@518..519 "*"
+      WHITESPACE@519..520 " "
+      TEXT@520..521 "|"
+      WHITESPACE@521..522 " "
+      TABLE_CELL@522..530
+        CODE_SPAN@522..530
+          CODE_SPAN_MARKER@522..523 "`"
+          TEXT@523..529 "inline"
+          CODE_SPAN_MARKER@529..530 "`"
+      WHITESPACE@530..531 " "
+      TEXT@531..532 "|"
       NEWLINE@532..533 "\n"
     TABLE_SEPARATOR@533..555
       TEXT@533..554 "+========+==========+"
       NEWLINE@554..555 "\n"
     TABLE_ROW@555..577
-      TEXT@555..576 "| Normal | text     |"
+      TEXT@555..556 "|"
+      WHITESPACE@556..557 " "
+      TABLE_CELL@557..563
+        TEXT@557..563 "Normal"
+      WHITESPACE@563..564 " "
+      TEXT@564..565 "|"
+      WHITESPACE@565..566 " "
+      TABLE_CELL@566..570
+        TEXT@566..570 "text"
+      WHITESPACE@570..575 "     "
+      TEXT@575..576 "|"
       NEWLINE@576..577 "\n"
     TABLE_SEPARATOR@577..599
       TEXT@577..598 "+--------+----------+"

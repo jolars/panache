@@ -1,11 +1,14 @@
 //! Post-processor to wrap list item content in Plain or PARAGRAPH blocks.
 //!
-//! This module transforms list items from having bare TEXT/NEWLINE tokens as direct
-//! children to wrapping them in Plain (tight lists) or PARAGRAPH (loose lists) blocks,
-//! matching Pandoc's AST structure.
+//! This module traverses the syntax tree after initial parsing to identify list items and wrap
+//! their content in Plain (for tight lists) or PARAGRAPH (for loose lists) nodes. It also applies
+//! inline parsing to the wrapped content to ensure that inline elements are correctly recognized
+//! within list items.
 //!
-//! **Phase 7 note**: With the removal of the InlineParser second pass, this postprocessor
-//! now also applies inline parsing to the wrapped content.
+//! TODO: Remove the inline parsing from this post-processor, maybe even remove this
+//! post-processing step entirely, by modifying the initial parser to emit the correct structure
+//! directly. This would simplify the architecture and avoid the need for a separate traversal and
+//! transformation step.
 
 use crate::config::Config;
 use crate::parser::inline_parser::core::parse_inline_text_recursive;

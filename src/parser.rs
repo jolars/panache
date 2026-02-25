@@ -9,13 +9,13 @@ pub mod list_postprocessor;
 
 // Re-export commonly used types
 pub use block_parser::BlockParser;
-pub use inline_parser::{InlineParser, parse_inline_text};
+pub use inline_parser::parse_inline_text;
 
 /// Parses a Quarto document string into a syntax tree.
 ///
-/// This function runs both the block parser and inline parser to produce
-/// a complete concrete syntax tree (CST). Line endings (LF or CRLF) are
-/// preserved exactly as they appear in the input.
+/// This function runs the block parser to produce a complete concrete syntax tree (CST).
+/// Inline parsing is now integrated into block parsing (single-pass architecture).
+/// Line endings (LF or CRLF) are preserved exactly as they appear in the input.
 ///
 /// # Examples
 ///
@@ -35,13 +35,12 @@ pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
     let config = config.unwrap_or_default();
     let block_tree = BlockParser::new(input, &config).parse();
 
-    // PHASE 7: Removed InlineParser second pass for most blocks
-    // Currently only needed for TABLE content which has complex structure
-    // TODO Phase 7.1: Add table cell inline parsing to avoid second pass entirely
-    let inline_tree = InlineParser::new(block_tree.clone(), config.clone()).parse();
+    // PHASE 7.1 COMPLETE: Single-pass parsing achieved!
+    // All block types now emit inline structure during block parsing.
+    // InlineParser second pass removed - no longer needed.
 
     // Post-process to wrap list item content in Plain/PARAGRAPH blocks
-    // Now also applies inline parsing during wrapping
-    let green = list_postprocessor::wrap_list_item_content(inline_tree, &config);
+    // Also applies inline parsing during wrapping
+    let green = list_postprocessor::wrap_list_item_content(block_tree, &config);
     SyntaxNode::new_root(green)
 }

@@ -97,13 +97,11 @@ fn check_duplicate_footnotes(tree: &SyntaxNode, input: &str) -> Vec<Diagnostic> 
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::parser::block_parser::BlockParser;
-    use crate::parser::inline_parser::InlineParser;
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
-        let tree = BlockParser::new(input, &config).parse();
-        let tree = InlineParser::new(tree, config.clone()).parse();
+        // Use main parse function which now includes inline parsing
+        let tree = crate::parser::parse(input, Some(config.clone()));
 
         let rule = DuplicateReferencesRule;
         rule.check(&tree, input, &config)
