@@ -187,6 +187,7 @@ golden_test_cases!(
     grid_table,
     latex_environment,
     lazy_continuation_deep,
+    line_blocks,
     line_ending_crlf,
     line_ending_lf,
     links,

@@ -1,0 +1,40 @@
+DOCUMENT@0..207
+  PARAGRAPH@0..18
+    TEXT@0..17 "Basic line block:"
+    NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  LINE_BLOCK@19..74
+    LINE_BLOCK_LINE@19..37
+      LINE_BLOCK_MARKER@19..21 "| "
+      TEXT@21..36 "The first line."
+      NEWLINE@36..37 "\n"
+    LINE_BLOCK_LINE@37..56
+      LINE_BLOCK_MARKER@37..39 "| "
+      TEXT@39..55 "The second line."
+      NEWLINE@55..56 "\n"
+    LINE_BLOCK_LINE@56..74
+      LINE_BLOCK_MARKER@56..58 "| "
+      TEXT@58..73 "The third line."
+      NEWLINE@73..74 "\n"
+  BLANK_LINE@74..75
+    BLANK_LINE@74..75 "\n"
+  PARAGRAPH@75..110
+    TEXT@75..109 "Line block with inlin ..."
+    NEWLINE@109..110 "\n"
+  BLANK_LINE@110..111
+    BLANK_LINE@110..111 "\n"
+  LINE_BLOCK@111..207
+    LINE_BLOCK_LINE@111..144
+      LINE_BLOCK_MARKER@111..113 "| "
+      TEXT@113..143 "This line has *emphas ..."
+      NEWLINE@143..144 "\n"
+    LINE_BLOCK_LINE@144..177
+      LINE_BLOCK_MARKER@144..146 "| "
+      TEXT@146..176 "This line has **stron ..."
+      NEWLINE@176..177 "\n"
+    LINE_BLOCK_LINE@177..207
+      LINE_BLOCK_MARKER@177..179 "| "
+      TEXT@179..206 "This line has `code`  ..."
+      NEWLINE@206..207 "\n"
+
