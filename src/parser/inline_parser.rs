@@ -256,10 +256,9 @@ impl InlineParser {
         matches!(
             node.kind(),
             SyntaxKind::HEADING_CONTENT // Add more node types as we migrate them:
-                                        // | SyntaxKind::TABLE_CELL
-                                        // | SyntaxKind::CAPTION
-                                        // | SyntaxKind::TERM
-                                        // | etc.
+                | SyntaxKind::TABLE_CAPTION // | SyntaxKind::TERM
+                                            // | SyntaxKind::LINE_BLOCK_LINE
+                                            // | etc.
         )
     }
 

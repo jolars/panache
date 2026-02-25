@@ -905,7 +905,7 @@ impl<'a> BlockParser<'a> {
             // Try to parse the table from this position
             if table_pos < self.lines.len() {
                 if let Some(lines_consumed) =
-                    try_parse_grid_table(&self.lines, table_pos, &mut self.builder)
+                    try_parse_grid_table(&self.lines, table_pos, &mut self.builder, self.config)
                 {
                     log::debug!(
                         "Parsed grid table (with caption) starting at line {} ({} lines total from caption)",
@@ -918,9 +918,12 @@ impl<'a> BlockParser<'a> {
                     return true;
                 }
 
-                if let Some(lines_consumed) =
-                    try_parse_multiline_table(&self.lines, table_pos, &mut self.builder)
-                {
+                if let Some(lines_consumed) = try_parse_multiline_table(
+                    &self.lines,
+                    table_pos,
+                    &mut self.builder,
+                    self.config,
+                ) {
                     log::debug!(
                         "Parsed multiline table (with caption) starting at line {} ({} lines total from caption)",
                         table_pos,
@@ -931,7 +934,7 @@ impl<'a> BlockParser<'a> {
                 }
 
                 if let Some(lines_consumed) =
-                    try_parse_pipe_table(&self.lines, table_pos, &mut self.builder)
+                    try_parse_pipe_table(&self.lines, table_pos, &mut self.builder, self.config)
                 {
                     log::debug!(
                         "Parsed pipe table (with caption) starting at line {} ({} lines total from caption)",
@@ -943,7 +946,7 @@ impl<'a> BlockParser<'a> {
                 }
 
                 if let Some(lines_consumed) =
-                    try_parse_simple_table(&self.lines, table_pos, &mut self.builder)
+                    try_parse_simple_table(&self.lines, table_pos, &mut self.builder, self.config)
                 {
                     log::debug!(
                         "Parsed simple table (with caption) starting at line {} ({} lines total from caption)",
@@ -959,7 +962,7 @@ impl<'a> BlockParser<'a> {
         if has_blank_before {
             // Try to parse grid table (check before pipe/simple since + is most specific)
             if let Some(lines_consumed) =
-                try_parse_grid_table(&self.lines, self.pos, &mut self.builder)
+                try_parse_grid_table(&self.lines, self.pos, &mut self.builder, self.config)
             {
                 log::debug!(
                     "Parsed grid table at line {} ({} lines)",
@@ -972,7 +975,7 @@ impl<'a> BlockParser<'a> {
 
             // Try to parse multiline table (check before pipe/simple since full-width dashes are specific)
             if let Some(lines_consumed) =
-                try_parse_multiline_table(&self.lines, self.pos, &mut self.builder)
+                try_parse_multiline_table(&self.lines, self.pos, &mut self.builder, self.config)
             {
                 log::debug!(
                     "Parsed multiline table at line {} ({} lines)",
@@ -985,7 +988,7 @@ impl<'a> BlockParser<'a> {
 
             // Try to parse pipe table (check before simple table since pipes are more specific)
             if let Some(lines_consumed) =
-                try_parse_pipe_table(&self.lines, self.pos, &mut self.builder)
+                try_parse_pipe_table(&self.lines, self.pos, &mut self.builder, self.config)
             {
                 log::debug!(
                     "Parsed pipe table at line {} ({} lines)",
@@ -998,7 +1001,7 @@ impl<'a> BlockParser<'a> {
 
             // Try to parse simple table
             if let Some(lines_consumed) =
-                try_parse_simple_table(&self.lines, self.pos, &mut self.builder)
+                try_parse_simple_table(&self.lines, self.pos, &mut self.builder, self.config)
             {
                 log::debug!(
                     "Parsed simple table at line {} ({} lines)",

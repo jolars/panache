@@ -181,7 +181,15 @@ mod tests {
         run_ab_test("headings");
     }
 
+    /// Test tables with captions and integrated inline parsing (Phase 3).
+    /// Verifies that table captions are parsed identically with both parsers.
+    #[test]
+    fn ab_test_table_captions() {
+        run_ab_test("table_with_caption");
+    }
+
     // Add more A/B tests as we migrate blocks:
-    // - Tables (when Phase 3 migrates table cells)
+    // - Definition lists (when Phase 3 migrates definition list terms)
+    // - Line blocks (when Phase 3 migrates line block lines)
     // - etc.
 }
