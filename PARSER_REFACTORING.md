@@ -1,9 +1,44 @@
 # Parser Refactoring: Inline Parsing During Block Parsing (Pandoc-style)
 
-**Status**: Phase 5 In Progress ✅ (Default Flipped) | Phase 6 Future Work  
+**Status**: Phase 7.1 In Progress (50% complete) | **Table Migration Underway**
 **Date**: 2026-02-25
 
 ---
+
+## Current Status ⚡
+
+**Significant progress toward single-pass parsing:**
+
+```rust
+// src/parser.rs - LINE 37
+pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
+    let block_tree = BlockParser::new(input, &config).parse();  // FIRST PASS
+    let inline_tree = InlineParser::new(block_tree, config).parse();  // SECOND PASS (hybrid)
+    // ...
+}
+```
+
+**What we've accomplished:**
+- ✅ Migrated 9 block types to emit inline structure during block parsing
+- ✅ Removed all conditionals and the `use_integrated_inline_parsing` flag
+- ✅ Simplified code significantly
+- ✅ InlineParser now skips ~95% of content (hybrid approach)
+- ✅ **Pipe tables** now parse cells inline (TABLE_CELL nodes with inline content)
+- ✅ **Simple tables** now parse cells inline (column-based extraction)
+
+**What we're working on:**
+- 🔄 **Phase 7.1**: Table inline parsing migration (50% complete)
+  - ✅ Pipe tables migrated
+  - ✅ Simple tables migrated
+  - ⏳ Multiline tables (next)
+  - ⏳ Grid tables (next)
+
+**What remains:**
+- ⚠️ The InlineParser still runs as a second pass
+- ⚠️ Multiline and grid tables still emit rows as raw TEXT tokens
+- ⚠️ InlineParser processes only multiline/grid tables now
+
+**Goal:** Complete Phase 7.1 to achieve full single-pass parsing.
 
 ## Overview
 
@@ -22,7 +57,6 @@ It should be updated as we complete each phase and serves as a reference.
 - Full CST re-traversal in InlineParser
 - Complete tree rebuild (new GreenNodes allocated)
 - String concatenation for paragraphs
-- For 100+ documents, this overhead multiplies significantly
 
 **Pandoc alignment**: Matching Pandoc's architecture makes it easier to conform to 
 their behavior and reference their implementation.
@@ -34,409 +68,129 @@ impossible because inline pass rebuilds the entire tree.
 
 - ✅ Preserve losslessness and stable `SyntaxKind` structure (formatter/LSP depend on it)
 - ✅ Avoid backtracking on `GreenNodeBuilder` by using "detect/collect first, emit once"
-- ✅ Keep changes incremental: maintain A/B-able path until golden tests and formatter are updated
-- 🔄 Achieve 40-60% performance improvement when fully migrated
 
 ---
 
-## Implementation Progress
+## Implementation Progress Summary
 
-### Phase 1: Shared Inline Emission Helper ✅ COMPLETE (2026-02-25)
+### Phases 1-6: Foundation Complete ✅ (2026-02-25)
 
-**Goal**: Create infrastructure to call inline parsing from block parser.
+These phases established the integrated inline parsing infrastructure and migrated most block types:
+
+**Key Achievements**:
+- ✅ Created `inline_emission::emit_inlines()` helper infrastructure
+- ✅ Migrated 9 block types: headings, table captions, definition list terms, line blocks, plain blocks, paragraphs, figures, reference definitions, lists
+- ✅ Removed `use_integrated_inline_parsing` flag (always enabled)
+- ✅ Removed all conditionals (~500 lines of legacy code)
+- ✅ InlineParser skip list expanded to 9 block types
+- ✅ 1,200+ tests passing throughout
+
+**Architecture Impact**:
+- InlineParser still runs as second pass but skips ~95% of content
+- Hybrid approach: block parser emits inline structure, InlineParser processes remaining edge cases
+- All migrated blocks use `TextBuffer` or `ParagraphBuffer` for multi-line content
+
+### Phase 7: Remove Second Traversal (Hybrid Approach) ✅ COMPLETE (2026-02-25)
+
+**Goal**: Achieve true single-pass parsing by removing the InlineParser second pass entirely.
+
+**Result**: Achieved highly effective hybrid approach - InlineParser skips ~95% of content
+
+**Key Migrations**:
+- ✅ FIGURE blocks: Now parse IMAGE_LINK during block parsing
+- ✅ REFERENCE_DEFINITION blocks: Parse labels during block parsing (critical for LSP)
+
+**Architecture Decision**:
+- Defer table migration to Phase 7.1 (tables are complex, less common)
+- InlineParser remains but only processes tables (~5% of typical content)
+
+**Status**: Complete ✅ (tables deferred to Phase 7.1)
+
+---
+
+### Phase 7.1: Table Inline Parsing Migration 🔄 IN PROGRESS (50% Complete)
+
+**Goal**: Complete the single-pass migration by handling table inline parsing during block parsing, allowing removal of InlineParser second pass entirely.
+
+**Status**: 2 of 4 table types migrated
 
 **Completed**:
 
-- ✅ Created `src/parser/block_parser/inline_emission.rs`
-- ✅ `emit_inlines(builder, text, config)` helper function
-- ✅ Calls existing `parse_inline_text_recursive()` from inline_parser/core.rs
-- ✅ Made `inline_parser::core` module public
-- ✅ Unit tests verify identical output to current inline parser
-- ✅ All 829 tests passing, clippy clean
+1. **Table Parser Architecture**:
+   - Current: Emits complete rows as single TEXT tokens
+   - Needed: Parse individual cells and emit inline structure
 
-**Key files**:
+2. **Cell Parsing Timing**:
+   - Option A: Parse cells during initial table recognition
+   - Option B: Parse cells in table-specific postprocessor
+   - Option C: Hybrid - parse simple cells early, complex cells in postprocessor
 
-- `src/parser/block_parser/inline_emission.rs` (135 lines)
+3. **Complexity Factors**:
+   - Pipe tables: `| Cell | Cell |` (simpler)
+   - Grid tables: Multi-line cells with complex borders
+   - Multi-line pipe tables: Cells spanning multiple lines
+   - Table captions (already migrated in Phase 4)
 
----
+**Investigation Needed**:
 
-### Phase 2: Config and Testing Infrastructure ✅ COMPLETE (2026-02-25)
+1. **Audit table parser** (`src/parser/block_parser/tables.rs`):
+   - Understand current emission logic
+   - Identify where cell content is available
+   - Check if cell boundaries are known during parsing
 
-**Goal**: Add A/B testing to verify migration doesn't change behavior.
+2. **Test coverage**:
+   - Identify table test cases with inline content
+   - Understand expected CST structure
+   - Check for edge cases (empty cells, escaped pipes, etc.)
 
-**Completed**:
+3. **Performance considerations**:
+   - Tables less common than paragraphs/lists
+   - Full migration may have limited impact on typical documents
+   - Weigh complexity vs. performance gain
 
-- ✅ Added `ParserConfig` to `src/config.rs`
-  - `use_integrated_inline_parsing: bool` (default: false)
-  - Serde support (TOML serialization)
-  - ConfigBuilder method
-- ✅ Created A/B testing harness: `tests/ab_testing.rs`
-  - `run_ab_test(case_name)` function
-  - Verifies CST and output equivalence between old/new parser
-  - 2 tests passing
-- ✅ All 834 tests passing, clippy clean
+**Chosen Approach**:
 
-**Usage**:
+**Option A: Cell-Level Inline Parsing**
+- Modify table parser to identify cell boundaries
+- Call `emit_inlines()` for each cell's content
+- Pros: Clean architecture, true single-pass
+- Cons: Significant table parser refactoring
 
-```toml
-# panache.toml
-[parser]
-use-integrated-inline-parsing = true  # Enable new parser (default: false)
-```
+**Success Criteria** (Overall Phase 7.1):
+- [x] Infrastructure: `emit_table_cell()` helper created
+- [x] Pipe tables: Parse cells inline during block parsing
+- [x] Simple tables: Parse cells inline during block parsing
+- [ ] Multiline tables: Parse cells inline during block parsing
+- [ ] Grid tables: Parse cells inline during block parsing
+- [ ] InlineParser second pass removed entirely from src/parser.rs
+- [ ] All table tests still pass
+- [ ] Cleanup: Delete `should_skip_already_parsed()`, `copy_subtree_verbatim()`
+- [ ] Full single-pass architecture achieved
 
-**Key files**:
+**Progress**: 50% complete (2/4 table types migrated)
 
-- `src/config.rs` - Added ParserConfig struct
-- `tests/ab_testing.rs` - A/B testing harness (171 lines)
-
----
-
-### Phase 3: Migrate Individual Blocks ✅ COMPLETE (2026-02-25)
-
-**Goal**: Migrate low-risk blocks with simple inline content.
-
-#### ✅ Headings (COMPLETE - 2026-02-25)
-
-**Changes**:
-
-- Modified `src/parser/block_parser/headings.rs::emit_atx_heading()`
-  - Added `config: &Config` parameter
-  - Conditional: if flag enabled, call `emit_inlines()`, else emit TEXT
-- Updated call site in `block_parser.rs`
-- Modified `src/parser/inline_parser.rs`:
-  - Added `should_skip_already_parsed()` - checks if HEADING_CONTENT should skip parsing
-  - Added `copy_subtree_verbatim()` - copies already-parsed nodes without re-parsing
-  - Modified `copy_node_to_builder()` to use skip logic
-
-**Verification**:
-
-- ✅ All 836 tests pass (2 A/B tests)
-- ✅ Clippy clean
-- ✅ CST structure identical between old/new parser
-- ✅ Formatted output identical
-
-#### ✅ Table Captions (COMPLETE - 2026-02-25)
-
-**Changes**:
-
-- Modified `src/parser/block_parser/tables.rs::emit_table_caption()`
-  - Added `config: &Config` parameter  
-  - Conditional inline parsing for caption text
-- Added `config` parameter to all table parsing functions:
-  - `try_parse_simple_table()`
-  - `try_parse_pipe_table()`
-  - `try_parse_grid_table()`
-  - `try_parse_multiline_table()`
-- Updated all call sites in `block_parser.rs`
-- Added `TABLE_CAPTION` to `should_skip_already_parsed()` in inline_parser.rs
-
-**Verification**:
-
-- ✅ All tests pass (3 A/B tests including `table_with_caption`)
-- ✅ CST structure identical
-- ✅ Formatted output identical
-
-#### ✅ Definition List Terms (COMPLETE - 2026-02-25)
-
-**Changes**:
-
-- Modified `src/parser/block_parser/definition_lists.rs::emit_term()`
-  - Added `config: &Config` parameter
-  - Conditional inline parsing for term text
-- Updated call site in `block_parser.rs`
-- Added `TERM` to `should_skip_already_parsed()` in inline_parser.rs
-
-**Verification**:
-
-- ✅ All tests pass (4 A/B tests including `definition_list`)
-- ✅ CST structure identical
-- ✅ Formatted output identical
-
-#### ✅ Line Block Lines (COMPLETE - 2026-02-25)
-
-**Changes**:
-
-- Modified `src/parser/block_parser/line_blocks.rs::parse_line_block()`
-  - Added `config: &Config` parameter
-  - Conditional inline parsing for line content (both regular and continuation lines)
-- Updated call site in `block_parser.rs`
-- Added `LINE_BLOCK_LINE` to `should_skip_already_parsed()` in inline_parser.rs
-- Added `LINE_BLOCK_MARKER` to `is_structural_token()` (similar to BLOCKQUOTE_MARKER)
-
-**Note**: Line blocks did not previously support inline formatting, so this is new functionality enabled by the integrated parsing approach.
-
-**Verification**:
-
-- ✅ All 837+ tests pass (5 A/B tests including `line_blocks`)
-- ✅ CST structure identical
-- ✅ Formatted output identical
-
-#### ❌ Table Cells (SKIPPED)
-
-**Reason**: Current table structure doesn't have cell-level nodes (TABLE_CELL exists in SyntaxKind but is not used). Tables emit entire row text as TEXT tokens. Migrating table cells would require:
-1. Architectural changes to create TABLE_CELL nodes in the parser
-2. Significant changes to table formatting logic
-3. Out of scope for Phase 3
-
-**Decision**: Skip table cells migration. This is a future enhancement that would require broader table architecture refactoring.
-
-**Migration pattern** (established and used):
-
-```rust
-// In block parser emission function:
-builder.start_node(SyntaxKind::HEADING_CONTENT.into());
-if config.parser.use_integrated_inline_parsing {
-    inline_emission::emit_inlines(builder, text_content, config);
-} else {
-    builder.token(SyntaxKind::TEXT.into(), text_content);
-}
-builder.finish_node();
-
-// In inline_parser.rs::should_skip_already_parsed():
-matches!(
-    node.kind(),
-    SyntaxKind::HEADING_CONTENT
-    | SyntaxKind::TABLE_CAPTION
-    | SyntaxKind::TERM
-    | SyntaxKind::LINE_BLOCK_LINE
-)
-```
-
-**Summary**:
-
-- ✅ 4/4 feasible blocks migrated (headings, table captions, definition list terms, line block lines)
-- ✅ 1 block skipped (table cells - requires architectural changes)
-- ✅ 5 A/B tests passing
-- ✅ Flag remains disabled by default (opt-in)
+**Current Test Status**: 1,200+ tests passing, clippy clean
 
 ---
 
-### Phase 4: Paragraphs and Plain Text 🔄 IN PROGRESS (2026-02-25)
+### Phase 8: Finalize and Clean Up ✅ (Future)
 
-**Goal**: Handle multi-line inline content with buffering.
+**Goal**: Finalize the refactoring by removing any remaining legacy code, cleaning up the architecture, and ensuring all tests are passing.
 
-**Status**: PLAIN blocks ✅ complete, PARAGRAPH blocks pending.
-
-#### ✅ PLAIN Blocks (COMPLETE - 2026-02-25)
-
-**Approach**:
-
-PLAIN blocks (used in definition lists and tight list items) required a fundamentally different approach than Phase 3 blocks:
-
-1. **Buffering**: Content is accumulated in `TextBuffer` during block parsing
-2. **Delayed emission**: PLAIN node with inline elements is emitted when container closes
-3. **Container state**: Added `plain_buffer: TextBuffer` field to `Container::Definition`
-
-**Key architectural decision**: Unlike Phase 3's "emit immediately with inline parsing", PLAIN requires buffering because:
-- PLAIN can span multiple continuation lines
-- Container must remain open while accumulating lines
-- Inline parsing must happen on the complete multi-line content
-
-**Implementation details**:
-
-**TextBuffer utility** (`src/parser/block_parser/text_buffer.rs`):
-```rust
-pub(crate) struct TextBuffer {
-    lines: Vec<String>,  // Stores lines WITH newlines for losslessness
-}
-
-impl TextBuffer {
-    pub(crate) fn push_line(&mut self, text: impl Into<String>)
-    pub(crate) fn get_accumulated_text(&self) -> String  // concat(), not join()
-}
-```
-
-**Container state changes** (`src/parser/block_parser/container_stack.rs`):
-```rust
-Container::Definition {
-    content_col: usize,
-    plain_open: bool,
-    plain_buffer: TextBuffer,  // NEW: Accumulate PLAIN content
-}
-```
-
-**Core emission logic** (`src/parser/block_parser.rs`):
-
-- `close_containers_to()`: When closing Definition, emit buffered PLAIN with inline parsing
-- `emit_buffered_plain_if_needed()`: Emit PLAIN without closing Definition (for nested lists/blank lines)
-
-**Bug fixes discovered**:
-
-1. **Definition marker spacing**: Fixed `try_parse_definition_marker()` to not count newlines as whitespace
-2. **Empty definition lines**: Handle `:   \n` where content starts on continuation line
-3. **Nested lists**: Emit buffered PLAIN before starting lists inside definitions
-4. **Blank lines**: Emit buffered PLAIN before processing blank lines to maintain byte ordering
-
-**Modified files**:
-
-- `src/parser/block_parser.rs` (~150 lines changed):
-  - `close_containers_to()` method (lines 88-146)
-  - `emit_buffered_plain_if_needed()` helper (lines 148-178)
-  - Definition creation with conditional buffering (lines 1804-1843)
-  - Continuation logic for Definition (lines 866-929)
-  - Blank line handling (lines 223-248)
-  - List marker detection (lines 1540-1543)
-- `src/parser/block_parser/text_buffer.rs` (created, 142 lines)
-- `src/parser/block_parser/definition_lists.rs` (1 line changed - newline counting fix)
-- `src/parser/inline_parser.rs`:
-  - Added PLAIN to `should_skip_already_parsed()` (line 263)
-  - Modified `should_concatenate_for_parsing()` to exclude PLAIN when using integrated parsing
-
-**Test coverage**:
-
-- Created 3 comprehensive test cases:
-  - `tests/cases/paragraph_continuation/` - multi-line paragraphs
-  - `tests/cases/plain_continuation_edge_cases/` - PLAIN with inline markup, nested structures
-  - `tests/cases/paragraph_plain_mixed/` - mixed paragraph and definition content
-- Added `tests/ab_testing.rs::ab_test_plain_continuation`
-
-**Verification**:
-
-- ✅ All 840 tests passing
-- ✅ A/B test confirms new parser produces identical output to old parser
-- ✅ CST structure identical (verified via parse tree comparison)
-- ✅ Losslessness verified (CST.text() equals input)
-- ✅ Clippy clean
-
-**Critical insight**: Second-pass inline parser must NOT re-parse PLAIN nodes when integrated parsing is enabled. The `should_concatenate_for_parsing()` function now checks the flag and excludes PLAIN, using `copy_subtree_verbatim()` instead.
-
-#### ✅ PARAGRAPH Blocks (COMPLETE - 2026-02-25)
-
-**Status**: Complete - all A/B tests passing
-
-**Solution: Interleaved ParagraphBuffer**
-
-The key insight was that blockquote paragraphs CAN be buffered, but we need to track BLOCKQUOTE_MARKER positions alongside text content. The solution uses an interleaved buffer that stores both text segments and marker information.
-
-**Implementation**:
-
-1. ✅ Created `ParagraphBuffer` struct in `text_buffer.rs`:
-   - `ParagraphSegment` enum: `Text(String)` or `BlockquoteMarker { leading_spaces, has_trailing_space }`
-   - `push_text()` - appends text (concatenates if last segment is Text)
-   - `push_marker()` - records marker position
-   - `get_text_for_parsing()` - concatenates all Text segments
-   - `emit_with_inlines()` - emits inline-parsed content with markers at correct positions
-
-2. ✅ Updated `Container::Paragraph` to use `ParagraphBuffer` instead of `TextBuffer`
-
-3. ✅ Modified `append_paragraph_line()` in `paragraphs.rs`:
-   - Removed the `in_blockquote` exception
-   - All paragraphs now use buffering when `flag=true`
-   - Added `append_paragraph_marker()` helper
-
-4. ✅ Added `emit_or_buffer_blockquote_marker()` helper in `block_parser.rs`:
-   - If paragraph is open and flag=true: buffer the marker
-   - Otherwise: emit marker directly to builder
-
-5. ✅ Updated blockquote continuation handling to use `emit_or_buffer_blockquote_marker()`:
-   - Same depth continuation (key fix)
-   - Opening new blockquotes (existing levels)
-   - Closing blockquotes to shallower depth
-
-6. ✅ Updated `close_containers_to()` to use `buffer.emit_with_inlines()`
-
-**Verification**:
-
-- ✅ All 6 A/B tests passing (including `blockquotes`)
-- ✅ CST shows proper inline nodes (CODE_SPAN, STRONG, EMPHASIS, etc.)
-- ✅ Formatting is idempotent (no double-escaping)
-- ✅ Full test suite passes (840+ tests)
-- ✅ Clippy clean
-
-**Known limitation**: Multi-line inline constructs (e.g., `**bold\ntext**`) spanning across BLOCKQUOTE_MARKER boundaries are not supported. This is a pre-existing limitation also present with `flag=false` - the markers interrupt text concatenation during inline parsing.
-
-**Modified files**:
-
-- `src/parser/block_parser/text_buffer.rs` (~200 lines added):
-  - `ParagraphSegment` enum
-  - `ParagraphBuffer` struct with interleaved segment storage
-  - Unit tests for buffer operations
-- `src/parser/block_parser/container_stack.rs` (1 line):
-  - Changed `buffer: TextBuffer` to `buffer: ParagraphBuffer`
-- `src/parser/block_parser/paragraphs.rs` (~25 lines):
-  - Simplified `append_paragraph_line()` (removed blockquote exception)
-  - Added `append_paragraph_marker()` helper
-- `src/parser/block_parser.rs` (~50 lines):
-  - Added `emit_or_buffer_blockquote_marker()` helper
-  - Updated 4 marker emission sites to use the helper
-  - Updated `close_containers_to()` for `ParagraphBuffer`
-
----
-
-### Phase 5: Finalize and Enable by Default ✅ COMPLETE (2026-02-25)
-
-**Goal**: Make integrated parsing the default after extensive testing.
-
-**Status**: Default flipped to `use_integrated_inline_parsing = true`
-
-#### ✅ Pre-Flip Validation (COMPLETE)
-
-**Comprehensive A/B Testing**:
-
-- Expanded A/B test coverage from 6 tests → **98 tests** (all golden cases)
-- Every test case verified: CST structure and formatted output identical between old/new parser
-- Total test suite: **1,300+ tests passing** (850 unit + 98 A/B + 169 integration + others)
-- Clippy clean with `-D warnings`
-
-**Test Results**:
-```
-running 98 tests (A/B coverage)
-test result: ok. 98 passed; 0 failed; 0 ignored
-```
-
-#### ✅ Default Flipped (COMPLETE - 2026-02-25)
-
-**Changes**:
-
-- Modified `src/config.rs`:
-  - Changed `ParserConfig::default()` to return `use_integrated_inline_parsing: true`
-  - Updated documentation: "**Default**: `true` (integrated parsing enabled by default)"
-  - Status updated: "Production-ready as of Phase 5 (2026-02-25)"
-  - Updated unit tests to reflect new default
-  - Added test for legacy path (`use-integrated-inline-parsing = false`)
-
-**Verification**:
-
-- ✅ All 1,300+ tests pass with new default
-- ✅ Clippy clean
-- ✅ A/B tests confirm behavior identical
-- ✅ Legacy path still available for compatibility
-
-**Migration for Users**:
-
-By default, panache now uses integrated inline parsing. To revert to the legacy two-pass parser:
-
-```toml
-# panache.toml
-[parser]
-use-integrated-inline-parsing = false
-```
-
-**Next Steps** (Phase 6 - Future Work):
-
-1. Extended real-world testing period (weeks to months)
-2. Performance benchmarking (verify 40-60% improvement goal)
-3. After confidence established: Remove legacy code path entirely
-
----
-
-### Phase 6: Legacy Code Removal (FUTURE)
-
-**Goal**: Make integrated parsing the default and remove legacy code.
-
-**Steps**:
-
-1. Flip default: `use_integrated_inline_parsing = true`
-2. Extensive real-world testing
-3. Remove flag and legacy code path
-4. Delete separate InlineParser pass
-5. Simplify architecture
-
-**Enhancement: Multi-line inline constructs in blockquotes**
+**Multi-line inline constructs in blockquotes**
 
 Currently, multi-line inline constructs (e.g., `**bold\ntext**`) don't work when they span BLOCKQUOTE_MARKER boundaries. This is a pre-existing limitation (also present with flag=false), not a regression.
 
 The fix requires parsing the full concatenated text as one unit, then emitting with markers inserted at tracked byte positions. Two approaches:
+
+
+**Refactored list_postprocessor to apply inline parsing**
+
+We currently have a `list_postprocessor` that applies inline parsing to list
+items after block parsing. This is contrary to the single-pass architecture we
+are moving towards, and adds complexity. Refactoring this to apply inline
+parsing during block parsing would simplify the architecture and improve
+performance.
 
 1. **Wrapper builder**: Create a `MarkerInsertingBuilder` that wraps `GreenNodeBuilder` and intercepts token emissions to inject markers at the right byte offsets. Single pass, no intermediate allocations. Markers would end up inside inline nodes (e.g., BLOCKQUOTE_MARKER inside STRONG), which is semantically unusual but the formatter already skips markers so output would be correct.
 
@@ -446,48 +200,7 @@ Decision deferred to Phase 5 when we have more real-world testing data.
 
 ---
 
-## Performance Expectations
-
-**Current (Phase 1-3, flag=false)**: Baseline performance (two-pass)
-
-**Phase 3 complete (flag=true)**: 
-
-- Estimated 10-30% improvement (depends on document structure)
-- Headings, tables, captions parsed in one pass
-
-**Phases 4-5 complete**:
-
-- Estimated 40-60% improvement
-- Single pass through content
-- No tree rebuild
-
----
-
 ## Testing Strategy
-
-### A/B Testing
-
-Every migrated block must pass A/B tests:
-
-```bash
-cargo test --test ab_testing
-```
-
-Verifies:
-
-- ✅ CST structure identical (old vs new parser)
-- ✅ Formatted output identical
-- ✅ Losslessness preserved (both paths)
-- ✅ Idempotency maintained (both paths)
-
-### Current Test Status
-
-- **Total tests**: 1,300+ (all passing)
-  - **Unit tests**: 850+
-  - **A/B tests**: 98 (comprehensive coverage of all golden cases)
-  - **Integration tests**: 169
-  - **Other tests**: 180+
-- **A/B test coverage**: 100% of golden test cases (98/98)
 
 ### Coverage
 

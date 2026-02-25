@@ -392,6 +392,19 @@ fn emit_table_caption(
     builder.finish_node(); // TABLE_CAPTION
 }
 
+/// Emit a table cell with inline content parsing.
+/// This is the core helper for Phase 7.1 table inline parsing migration.
+fn emit_table_cell(builder: &mut GreenNodeBuilder<'static>, cell_text: &str, config: &Config) {
+    builder.start_node(SyntaxKind::TABLE_CELL.into());
+
+    // Parse inline content within the cell
+    if !cell_text.is_empty() {
+        inline_emission::emit_inlines(builder, cell_text, config);
+    }
+
+    builder.finish_node(); // TABLE_CELL
+}
+
 /// Determine column alignments based on separator and optional header.
 fn determine_alignments(columns: &mut [Column], separator_line: &str, header_line: Option<&str>) {
     for col in columns.iter_mut() {
@@ -500,6 +513,7 @@ pub(crate) fn try_parse_simple_table(
             lines[separator_pos - 1],
             &columns,
             SyntaxKind::TABLE_HEADER,
+            config,
         );
     }
 
@@ -510,7 +524,7 @@ pub(crate) fn try_parse_simple_table(
 
     // Emit data rows
     for line in lines.iter().take(end_pos).skip(separator_pos + 1) {
-        emit_table_row(builder, line, &columns, SyntaxKind::TABLE_ROW);
+        emit_table_row(builder, line, &columns, SyntaxKind::TABLE_ROW, config);
     }
 
     // Emit caption after if present
@@ -585,19 +599,81 @@ fn find_table_end(lines: &[&str], start_pos: usize) -> usize {
     lines.len()
 }
 
-/// Emit a table row (header or data row).
+/// Emit a table row (header or data row) with inline-parsed cells for simple tables.
+/// Uses column boundaries from the separator line to extract cells.
 fn emit_table_row(
     builder: &mut GreenNodeBuilder<'static>,
     line: &str,
-    _columns: &[Column],
+    columns: &[Column],
     row_kind: SyntaxKind,
+    config: &Config,
 ) {
     builder.start_node(row_kind.into());
 
-    // Lines from split_inclusive already contain trailing newline (LF or CRLF)
-    // Split the text from the newline
-    let (text, newline_str) = strip_newline(line);
-    builder.token(SyntaxKind::TEXT.into(), text);
+    let (line_without_newline, newline_str) = strip_newline(line);
+
+    // Emit leading whitespace if present
+    let trimmed = line_without_newline.trim_start();
+    let leading_ws_len = line_without_newline.len() - trimmed.len();
+    if leading_ws_len > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &line_without_newline[..leading_ws_len],
+        );
+    }
+
+    // Track where we are in the line (for losslessness)
+    let mut current_pos = 0;
+
+    // Extract and emit cells based on column boundaries
+    for col in columns.iter() {
+        // Calculate actual positions in the trimmed line (accounting for leading whitespace)
+        let cell_start = if col.start >= leading_ws_len {
+            (col.start - leading_ws_len).min(trimmed.len())
+        } else {
+            0
+        };
+
+        let cell_end = if col.end >= leading_ws_len {
+            (col.end - leading_ws_len).min(trimmed.len())
+        } else {
+            0
+        };
+
+        // Extract cell text from column bounds
+        let cell_text = if cell_start < cell_end && cell_start < trimmed.len() {
+            &trimmed[cell_start..cell_end]
+        } else if cell_start < trimmed.len() {
+            &trimmed[cell_start..]
+        } else {
+            ""
+        };
+
+        let cell_content = cell_text.trim();
+        let cell_content_start = cell_text.len() - cell_text.trim_start().len();
+
+        // Emit any whitespace from current position to start of cell content
+        let content_abs_pos = (cell_start + cell_content_start).min(trimmed.len());
+        if current_pos < content_abs_pos {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &trimmed[current_pos..content_abs_pos],
+            );
+        }
+
+        // Emit cell with inline parsing
+        emit_table_cell(builder, cell_content, config);
+
+        // Update current position to end of cell content
+        current_pos = content_abs_pos + cell_content.len();
+    }
+
+    // Emit any remaining whitespace after last cell
+    if current_pos < trimmed.len() {
+        builder.token(SyntaxKind::WHITESPACE.into(), &trimmed[current_pos..]);
+    }
+
+    // Emit newline if present
     if !newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
@@ -669,26 +745,189 @@ fn try_parse_pipe_separator(line: &str) -> Option<Vec<Alignment>> {
 }
 
 /// Split a pipe table row into cells.
-fn split_pipe_row(line: &str) -> Vec<String> {
+/// Handles escaped pipes (\|) properly by not splitting on them.
+fn parse_pipe_table_row(line: &str) -> Vec<String> {
     let trimmed = line.trim();
 
-    // Handle escaped pipes: \|
-    // For now, simple split - in future handle escapes properly
-    let cells: Vec<&str> = trimmed.split('|').collect();
+    let mut cells = Vec::new();
+    let mut current_cell = String::new();
+    let mut chars = trimmed.chars().peekable();
+    let mut char_count = 0;
+
+    while let Some(ch) = chars.next() {
+        char_count += 1;
+        match ch {
+            '\\' => {
+                // Check if next char is a pipe - if so, it's an escaped pipe
+                if let Some(&'|') = chars.peek() {
+                    current_cell.push('\\');
+                    current_cell.push('|');
+                    chars.next(); // consume the pipe
+                } else {
+                    current_cell.push(ch);
+                }
+            }
+            '|' => {
+                // Check if this is the leading pipe (first character)
+                if char_count == 1 {
+                    continue; // Skip leading pipe
+                }
+
+                // End current cell, start new one
+                cells.push(current_cell.trim().to_string());
+                current_cell.clear();
+            }
+            _ => {
+                current_cell.push(ch);
+            }
+        }
+    }
+
+    // Add last cell if it's not empty (it would be empty if line ended with pipe)
+    let trimmed_cell = current_cell.trim().to_string();
+    if !trimmed_cell.is_empty() {
+        cells.push(trimmed_cell);
+    }
 
     cells
-        .iter()
-        .enumerate()
-        .filter_map(|(i, cell)| {
-            let cell = cell.trim();
-            // Skip first and last if they're empty (from leading/trailing pipes)
-            if (i == 0 || i == cells.len() - 1) && cell.is_empty() {
-                None
-            } else {
-                Some(cell.to_string())
+}
+
+/// Emit a pipe table row with inline-parsed cells.
+/// Preserves losslessness by emitting exact byte representation while parsing cell content inline.
+fn emit_pipe_table_row(
+    builder: &mut GreenNodeBuilder<'static>,
+    line: &str,
+    row_kind: SyntaxKind,
+    config: &Config,
+) {
+    builder.start_node(row_kind.into());
+
+    let (line_without_newline, newline_str) = strip_newline(line);
+    let trimmed = line_without_newline.trim();
+
+    // Parse cell boundaries
+    let mut cell_starts = Vec::new();
+    let mut cell_ends = Vec::new();
+    let mut in_escape = false;
+
+    // Find all pipe positions (excluding escaped ones)
+    let mut pipe_positions = Vec::new();
+    for (i, ch) in trimmed.char_indices() {
+        if in_escape {
+            in_escape = false;
+            continue;
+        }
+        if ch == '\\' {
+            in_escape = true;
+            continue;
+        }
+        if ch == '|' {
+            pipe_positions.push(i);
+        }
+    }
+
+    // Determine cell boundaries based on pipe positions
+    if pipe_positions.is_empty() {
+        // No pipes - treat entire line as one cell (shouldn't happen for valid pipe tables)
+        cell_starts.push(0);
+        cell_ends.push(trimmed.len());
+    } else {
+        // Check if line starts with pipe
+        let start_pipe = pipe_positions.first() == Some(&0);
+        // Check if line ends with pipe
+        let end_pipe = pipe_positions.last() == Some(&(trimmed.len() - 1));
+
+        if start_pipe {
+            // Skip first pipe
+            for i in 1..pipe_positions.len() {
+                cell_starts.push(pipe_positions[i - 1] + 1);
+                cell_ends.push(pipe_positions[i]);
             }
-        })
-        .collect()
+            // Add last cell if there's no trailing pipe
+            if !end_pipe {
+                cell_starts.push(*pipe_positions.last().unwrap() + 1);
+                cell_ends.push(trimmed.len());
+            }
+        } else {
+            // No leading pipe
+            cell_starts.push(0);
+            cell_ends.push(pipe_positions[0]);
+
+            for i in 1..pipe_positions.len() {
+                cell_starts.push(pipe_positions[i - 1] + 1);
+                cell_ends.push(pipe_positions[i]);
+            }
+
+            // Add last cell if there's no trailing pipe
+            if !end_pipe {
+                cell_starts.push(*pipe_positions.last().unwrap() + 1);
+                cell_ends.push(trimmed.len());
+            }
+        }
+    }
+
+    // Emit leading whitespace if present (before trim)
+    let leading_ws_len = line_without_newline.len() - line_without_newline.trim_start().len();
+    if leading_ws_len > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &line_without_newline[..leading_ws_len],
+        );
+    }
+
+    // Emit cells with pipes
+    for (idx, (start, end)) in cell_starts.iter().zip(cell_ends.iter()).enumerate() {
+        // Emit pipe before cell (except for first cell if no leading pipe)
+        if *start > 0 {
+            builder.token(SyntaxKind::TEXT.into(), "|");
+        } else if idx == 0 && trimmed.starts_with('|') {
+            // Leading pipe
+            builder.token(SyntaxKind::TEXT.into(), "|");
+        }
+
+        // Get cell content with its whitespace
+        let cell_with_ws = &trimmed[*start..*end];
+        let cell_content = cell_with_ws.trim();
+
+        // Emit leading whitespace within cell
+        let cell_leading_ws = &cell_with_ws[..cell_with_ws.len() - cell_with_ws.trim_start().len()];
+        if !cell_leading_ws.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), cell_leading_ws);
+        }
+
+        // Emit cell with inline parsing
+        emit_table_cell(builder, cell_content, config);
+
+        // Emit trailing whitespace within cell
+        let cell_trailing_ws_start = cell_leading_ws.len() + cell_content.len();
+        if cell_trailing_ws_start < cell_with_ws.len() {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &cell_with_ws[cell_trailing_ws_start..],
+            );
+        }
+    }
+
+    // Emit trailing pipe if present
+    if !pipe_positions.is_empty() && trimmed.ends_with('|') {
+        builder.token(SyntaxKind::TEXT.into(), "|");
+    }
+
+    // Emit trailing whitespace after trim (before newline)
+    let trailing_ws_start = leading_ws_len + trimmed.len();
+    if trailing_ws_start < line_without_newline.len() {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &line_without_newline[trailing_ws_start..],
+        );
+    }
+
+    // Emit newline
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+    }
+
+    builder.finish_node();
 }
 
 /// Try to parse a pipe table starting at the given position.
@@ -732,7 +971,7 @@ pub(crate) fn try_parse_pipe_table(
     let alignments = try_parse_pipe_separator(separator_line)?;
 
     // Parse header cells
-    let header_cells = split_pipe_row(header_line);
+    let header_cells = parse_pipe_table_row(header_line);
 
     // Number of columns should match (approximately - be lenient)
     if header_cells.len() != alignments.len() && !header_cells.is_empty() {
@@ -789,21 +1028,17 @@ pub(crate) fn try_parse_pipe_table(
         }
     }
 
-    // Emit header row
-    builder.start_node(SyntaxKind::TABLE_HEADER.into());
-    emit_line_tokens(builder, header_line);
-    builder.finish_node();
+    // Emit header row with inline-parsed cells
+    emit_pipe_table_row(builder, header_line, SyntaxKind::TABLE_HEADER, config);
 
     // Emit separator
     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
     emit_line_tokens(builder, separator_line);
     builder.finish_node();
 
-    // Emit data rows
+    // Emit data rows with inline-parsed cells
     for line in lines.iter().take(end_pos).skip(actual_start + 2) {
-        builder.start_node(SyntaxKind::TABLE_ROW.into());
-        emit_line_tokens(builder, line);
-        builder.finish_node();
+        emit_pipe_table_row(builder, line, SyntaxKind::TABLE_ROW, config);
     }
 
     // Emit caption after if present
@@ -992,15 +1227,15 @@ mod tests {
     }
 
     #[test]
-    fn test_split_pipe_row() {
-        let cells = split_pipe_row("| Right | Left | Center |");
+    fn test_parse_pipe_table_row() {
+        let cells = parse_pipe_table_row("| Right | Left | Center |");
         assert_eq!(cells.len(), 3);
         assert_eq!(cells[0], "Right");
         assert_eq!(cells[1], "Left");
         assert_eq!(cells[2], "Center");
 
         // Without leading/trailing pipes
-        let cells2 = split_pipe_row("Right | Left | Center");
+        let cells2 = parse_pipe_table_row("Right | Left | Center");
         assert_eq!(cells2.len(), 3);
     }
 
@@ -1818,6 +2053,7 @@ fn emit_multiline_row(builder: &mut GreenNodeBuilder<'static>, lines: &[&str], k
 #[cfg(test)]
 mod multiline_table_tests {
     use super::*;
+    use crate::syntax::SyntaxNode;
 
     #[test]
     fn test_multiline_separator_detection() {
@@ -1931,5 +2167,132 @@ mod multiline_table_tests {
 
         // Should not parse because first line isn't a full-width separator
         assert!(result.is_none());
+    }
+
+    // Phase 7.1: Unit tests for emit_table_cell() helper
+    #[test]
+    fn test_emit_table_cell_plain_text() {
+        let mut builder = GreenNodeBuilder::new();
+        emit_table_cell(&mut builder, "Cell", &Config::default());
+        let green = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.kind(), SyntaxKind::TABLE_CELL);
+        assert_eq!(node.text(), "Cell");
+
+        // Should have TEXT child
+        let children: Vec<_> = node.children_with_tokens().collect();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].kind(), SyntaxKind::TEXT);
+    }
+
+    #[test]
+    fn test_emit_table_cell_with_emphasis() {
+        let mut builder = GreenNodeBuilder::new();
+        emit_table_cell(&mut builder, "*italic*", &Config::default());
+        let green = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.kind(), SyntaxKind::TABLE_CELL);
+        assert_eq!(node.text(), "*italic*");
+
+        // Should have EMPHASIS child
+        let children: Vec<_> = node.children().collect();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].kind(), SyntaxKind::EMPHASIS);
+    }
+
+    #[test]
+    fn test_emit_table_cell_with_code() {
+        let mut builder = GreenNodeBuilder::new();
+        emit_table_cell(&mut builder, "`code`", &Config::default());
+        let green = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.kind(), SyntaxKind::TABLE_CELL);
+        assert_eq!(node.text(), "`code`");
+
+        // Should have CODE_SPAN child
+        let children: Vec<_> = node.children().collect();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].kind(), SyntaxKind::CODE_SPAN);
+    }
+
+    #[test]
+    fn test_emit_table_cell_with_link() {
+        let mut builder = GreenNodeBuilder::new();
+        emit_table_cell(&mut builder, "[text](url)", &Config::default());
+        let green = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.kind(), SyntaxKind::TABLE_CELL);
+        assert_eq!(node.text(), "[text](url)");
+
+        // Should have LINK child
+        let children: Vec<_> = node.children().collect();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].kind(), SyntaxKind::LINK);
+    }
+
+    #[test]
+    fn test_emit_table_cell_with_strong() {
+        let mut builder = GreenNodeBuilder::new();
+        emit_table_cell(&mut builder, "**bold**", &Config::default());
+        let green = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.kind(), SyntaxKind::TABLE_CELL);
+        assert_eq!(node.text(), "**bold**");
+
+        // Should have STRONG child
+        let children: Vec<_> = node.children().collect();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].kind(), SyntaxKind::STRONG);
+    }
+
+    #[test]
+    fn test_emit_table_cell_mixed_inline() {
+        let mut builder = GreenNodeBuilder::new();
+        emit_table_cell(&mut builder, "Text **bold** and `code`", &Config::default());
+        let green = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.kind(), SyntaxKind::TABLE_CELL);
+        assert_eq!(node.text(), "Text **bold** and `code`");
+
+        // Should have multiple children: TEXT, STRONG, TEXT, CODE_SPAN
+        let children: Vec<_> = node.children_with_tokens().collect();
+        assert!(children.len() >= 4);
+
+        // Check some expected types
+        assert_eq!(children[0].kind(), SyntaxKind::TEXT);
+        assert_eq!(children[1].kind(), SyntaxKind::STRONG);
+    }
+
+    #[test]
+    fn test_emit_table_cell_empty() {
+        let mut builder = GreenNodeBuilder::new();
+        emit_table_cell(&mut builder, "", &Config::default());
+        let green = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.kind(), SyntaxKind::TABLE_CELL);
+        assert_eq!(node.text(), "");
+
+        // Empty cell should have no children
+        let children: Vec<_> = node.children_with_tokens().collect();
+        assert_eq!(children.len(), 0);
+    }
+
+    #[test]
+    fn test_emit_table_cell_escaped_pipe() {
+        let mut builder = GreenNodeBuilder::new();
+        emit_table_cell(&mut builder, r"A \| B", &Config::default());
+        let green = builder.finish();
+        let node = SyntaxNode::new_root(green);
+
+        assert_eq!(node.kind(), SyntaxKind::TABLE_CELL);
+        // The escaped pipe should be preserved
+        assert_eq!(node.text(), r"A \| B");
     }
 }

@@ -3,21 +3,27 @@
 //! This module transforms list items from having bare TEXT/NEWLINE tokens as direct
 //! children to wrapping them in Plain (tight lists) or PARAGRAPH (loose lists) blocks,
 //! matching Pandoc's AST structure.
+//!
+//! **Phase 7 note**: With the removal of the InlineParser second pass, this postprocessor
+//! now also applies inline parsing to the wrapped content.
 
+use crate::config::Config;
+use crate::parser::inline_parser::core::parse_inline_text_recursive;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::{GreenNode, GreenNodeBuilder};
 
 /// Post-processes a syntax tree to wrap list item content in Plain/PARAGRAPH blocks.
 ///
 /// Traverses the tree looking for List nodes, determines if they're tight or loose,
-/// and wraps bare TEXT/NEWLINE tokens in list items appropriately.
-pub fn wrap_list_item_content(root: SyntaxNode) -> GreenNode {
+/// and wraps bare TEXT/NEWLINE tokens in list items appropriately. Also applies inline
+/// parsing to the wrapped content.
+pub fn wrap_list_item_content(root: SyntaxNode, config: &Config) -> GreenNode {
     let mut builder = GreenNodeBuilder::new();
-    process_node(&root, &mut builder);
+    process_node(&root, &mut builder, config);
     builder.finish()
 }
 
-fn process_node(node: &SyntaxNode, builder: &mut GreenNodeBuilder) {
+fn process_node(node: &SyntaxNode, builder: &mut GreenNodeBuilder, config: &Config) {
     match node.kind() {
         SyntaxKind::LIST => {
             // Start the List node
@@ -30,10 +36,10 @@ fn process_node(node: &SyntaxNode, builder: &mut GreenNodeBuilder) {
             for child in node.children_with_tokens() {
                 if let Some(child_node) = child.as_node() {
                     if child_node.kind() == SyntaxKind::LIST_ITEM {
-                        process_list_item(child_node, is_loose, builder);
+                        process_list_item(child_node, is_loose, builder, config);
                     } else {
                         // Other children (BlankLine, etc.) - recurse normally
-                        process_node_or_token(child_node, builder);
+                        process_node_or_token(child_node, builder, config);
                     }
                 } else {
                     // Token - add as-is
@@ -49,7 +55,7 @@ fn process_node(node: &SyntaxNode, builder: &mut GreenNodeBuilder) {
             builder.start_node(node.kind().into());
             for child in node.children_with_tokens() {
                 if let Some(child_node) = child.as_node() {
-                    process_node(child_node, builder);
+                    process_node(child_node, builder, config);
                 } else {
                     let token = child.as_token().unwrap();
                     builder.token(token.kind().into(), token.text());
@@ -60,11 +66,11 @@ fn process_node(node: &SyntaxNode, builder: &mut GreenNodeBuilder) {
     }
 }
 
-fn process_node_or_token(node: &SyntaxNode, builder: &mut GreenNodeBuilder) {
+fn process_node_or_token(node: &SyntaxNode, builder: &mut GreenNodeBuilder, config: &Config) {
     builder.start_node(node.kind().into());
     for child in node.children_with_tokens() {
         if let Some(child_node) = child.as_node() {
-            process_node(child_node, builder);
+            process_node(child_node, builder, config);
         } else {
             let token = child.as_token().unwrap();
             builder.token(token.kind().into(), token.text());
@@ -100,7 +106,13 @@ fn has_blank_line_between_items(list_node: &SyntaxNode) -> bool {
 }
 
 /// Processes a single list item, wrapping bare tokens in Plain/PARAGRAPH.
-fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeBuilder) {
+/// Now also applies inline parsing to the wrapped content.
+fn process_list_item(
+    item: &SyntaxNode,
+    is_loose: bool,
+    builder: &mut GreenNodeBuilder,
+    config: &Config,
+) {
     builder.start_node(SyntaxKind::LIST_ITEM.into());
 
     let wrapper_kind = if is_loose {
@@ -124,6 +136,7 @@ fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeB
 
     let mut in_content_wrapper = false;
     let mut after_marker = false;
+    let mut accumulated_text = String::new();
 
     for child in item.children_with_tokens() {
         match child {
@@ -132,9 +145,15 @@ fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeB
 
                 // ListMarker and first WHITESPACE after it are not wrapped
                 if kind == SyntaxKind::LIST_MARKER {
-                    // Close wrapper if open
+                    // Close wrapper if open (emit accumulated text with inline parsing)
                     if in_content_wrapper {
-                        builder.finish_node();
+                        emit_wrapper_with_inline_parsing(
+                            builder,
+                            wrapper_kind,
+                            &accumulated_text,
+                            config,
+                        );
+                        accumulated_text.clear();
                         in_content_wrapper = false;
                     }
                     builder.token(kind.into(), token.text());
@@ -143,37 +162,62 @@ fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeB
                     // First whitespace after marker is not wrapped
                     // Close wrapper if open
                     if in_content_wrapper {
-                        builder.finish_node();
+                        emit_wrapper_with_inline_parsing(
+                            builder,
+                            wrapper_kind,
+                            &accumulated_text,
+                            config,
+                        );
+                        accumulated_text.clear();
                         in_content_wrapper = false;
                     }
                     builder.token(kind.into(), token.text());
                     after_marker = false;
                 } else if kind == SyntaxKind::TEXT
                     || kind == SyntaxKind::NEWLINE
-                    || kind == SyntaxKind::WHITESPACE
                     || kind == SyntaxKind::ESCAPED_CHAR
                 {
                     // For empty items, don't wrap the trailing newline
                     if is_empty_item && kind == SyntaxKind::NEWLINE {
                         if in_content_wrapper {
-                            builder.finish_node();
+                            emit_wrapper_with_inline_parsing(
+                                builder,
+                                wrapper_kind,
+                                &accumulated_text,
+                                config,
+                            );
+                            accumulated_text.clear();
                             in_content_wrapper = false;
                         }
                         builder.token(kind.into(), token.text());
                     } else {
-                        // Start wrapper if not started
+                        // Accumulate text for inline parsing
                         if !in_content_wrapper {
-                            builder.start_node(wrapper_kind.into());
                             in_content_wrapper = true;
                         }
-                        builder.token(kind.into(), token.text());
+                        accumulated_text.push_str(token.text());
                     }
+                } else if kind == SyntaxKind::WHITESPACE {
+                    // WHITESPACE handling:
+                    // - After marker whitespace (after_marker=true) -> already handled above
+                    // - All other whitespace should be wrapped (it's either leading indent
+                    //   for nested lists, or inline whitespace)
+                    if !in_content_wrapper {
+                        in_content_wrapper = true;
+                    }
+                    accumulated_text.push_str(token.text());
                 } else {
                     // Other tokens (like HardLineBreak, etc.)
                     // These might need wrapping or not depending on context
                     // For now, don't wrap them
                     if in_content_wrapper {
-                        builder.finish_node();
+                        emit_wrapper_with_inline_parsing(
+                            builder,
+                            wrapper_kind,
+                            &accumulated_text,
+                            config,
+                        );
+                        accumulated_text.clear();
                         in_content_wrapper = false;
                     }
                     builder.token(kind.into(), token.text());
@@ -186,28 +230,54 @@ fn process_list_item(item: &SyntaxNode, is_loose: bool, builder: &mut GreenNodeB
                 if is_block_node(kind) {
                     // Close wrapper before block
                     if in_content_wrapper {
-                        builder.finish_node();
+                        emit_wrapper_with_inline_parsing(
+                            builder,
+                            wrapper_kind,
+                            &accumulated_text,
+                            config,
+                        );
+                        accumulated_text.clear();
                         in_content_wrapper = false;
                     }
                     // Emit the block node as-is (recurse for nested lists)
-                    process_node(&node, builder);
+                    process_node(&node, builder, config);
                 } else {
-                    // Inline nodes (Strong, Emphasis, Code, Link, etc.)
-                    // These should be wrapped INSIDE Plain/PARAGRAPH
+                    // Inline nodes (Strong, Emphasis, Code, Link, etc.) - should not happen
+                    // with current architecture, but handle just in case
                     if !in_content_wrapper {
-                        builder.start_node(wrapper_kind.into());
                         in_content_wrapper = true;
                     }
-                    // Emit the inline node inside the wrapper
-                    process_node_or_token(&node, builder);
+                    // Copy this node as text to be re-parsed
+                    // This shouldn't happen in practice since list items have raw TEXT tokens
+                    accumulated_text.push_str(&node.text().to_string());
                 }
             }
         }
     }
 
-    // Close wrapper if still open
-    if in_content_wrapper {
-        builder.finish_node();
+    // Close wrapper if still open (emit accumulated text with inline parsing)
+    if in_content_wrapper && !accumulated_text.is_empty() {
+        emit_wrapper_with_inline_parsing(builder, wrapper_kind, &accumulated_text, config);
+    }
+
+    builder.finish_node();
+}
+
+/// Emit a PLAIN or PARAGRAPH wrapper with inline-parsed content.
+fn emit_wrapper_with_inline_parsing(
+    builder: &mut GreenNodeBuilder,
+    wrapper_kind: SyntaxKind,
+    text: &str,
+    config: &Config,
+) {
+    builder.start_node(wrapper_kind.into());
+
+    // Special case: if the content is ONLY whitespace, emit it as WHITESPACE token
+    // (not as inline-parsed TEXT). This preserves the token type for leading indents.
+    if text.chars().all(|c| c.is_whitespace()) {
+        builder.token(SyntaxKind::WHITESPACE.into(), text);
+    } else {
+        parse_inline_text_recursive(builder, text, config);
     }
 
     builder.finish_node();

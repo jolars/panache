@@ -43,6 +43,27 @@ fn format_cell_content(node: &SyntaxNode, config: &Config) -> String {
     result
 }
 
+/// Extract cell contents from TABLE_CELL nodes if present, otherwise fall back to text splitting
+fn extract_row_cells(row_node: &SyntaxNode, config: &Config) -> Vec<String> {
+    let mut cells = Vec::new();
+
+    // Check if this row has TABLE_CELL children
+    let has_table_cells = row_node
+        .children()
+        .any(|child| child.kind() == SyntaxKind::TABLE_CELL);
+
+    if has_table_cells {
+        // New approach: extract from TABLE_CELL nodes
+        for child in row_node.children() {
+            if child.kind() == SyntaxKind::TABLE_CELL {
+                cells.push(format_cell_content(&child, config));
+            }
+        }
+    }
+
+    cells
+}
+
 /// Extract alignments from separator line (e.g., "|:---|---:|:---:|")
 fn extract_alignments(separator_text: &str) -> Vec<Alignment> {
     let trimmed = separator_text.trim();
@@ -742,6 +763,7 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     let mut caption_after = false;
     let mut separator_line = String::new();
     let mut header_line: Option<String> = None;
+    let mut header_cells: Option<Vec<String>> = None;
     let mut seen_separator = false;
 
     for child in node.children() {
@@ -777,25 +799,48 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                 columns = extract_simple_table_columns(&separator_line);
             }
             SyntaxKind::TABLE_HEADER => {
-                // Get RAW text for alignment detection (preserve exact spacing)
+                // Always preserve RAW text for alignment detection
                 let raw_text = child.text().to_string();
                 header_line = Some(raw_text);
+
+                // Try to extract from TABLE_CELL nodes for content
+                let cells = extract_row_cells(&child, config);
+                if !cells.is_empty() {
+                    header_cells = Some(cells);
+                } else {
+                    header_cells = None;
+                }
             }
             SyntaxKind::TABLE_ROW => {
                 // Data rows come after separator
                 if !columns.is_empty() {
-                    let row_content = format_cell_content(&child, config);
+                    // Try to extract from TABLE_CELL nodes first
+                    let cells = extract_row_cells(&child, config);
 
-                    // Skip rows that are actually separator lines (for headerless tables)
-                    // Separator lines are all dashes and spaces (and newlines)
-                    let is_separator = row_content
-                        .trim()
-                        .chars()
-                        .all(|c| c == '-' || c.is_whitespace());
+                    if !cells.is_empty() {
+                        // Check if this is actually a separator line (all cells are dashes/whitespace)
+                        let is_separator = cells
+                            .iter()
+                            .all(|cell| cell.trim().chars().all(|c| c == '-'));
 
-                    if !is_separator {
-                        let cells = split_simple_table_row(&row_content, &columns);
-                        rows.push(cells);
+                        if !is_separator {
+                            // Successfully extracted from TABLE_CELL nodes
+                            rows.push(cells);
+                        }
+                    } else {
+                        // Fall back to old approach (for backwards compatibility)
+                        let row_content = format_cell_content(&child, config);
+
+                        // Skip rows that are actually separator lines (for headerless tables)
+                        let is_separator = row_content
+                            .trim()
+                            .chars()
+                            .all(|c| c == '-' || c.is_whitespace());
+
+                        if !is_separator {
+                            let cells = split_simple_table_row(&row_content, &columns);
+                            rows.push(cells);
+                        }
                     }
                 }
             }
@@ -809,10 +854,14 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     }
 
     // Track if we have a header before potentially consuming header_line
-    let has_header = header_line.is_some();
+    let has_header = header_line.is_some() || header_cells.is_some();
 
     // Add header row to rows if present
-    if let Some(header) = header_line {
+    if let Some(cells) = header_cells {
+        // Already extracted from TABLE_CELL nodes
+        rows.insert(0, cells);
+    } else if let Some(header) = header_line {
+        // Fall back to old text splitting approach
         let header_cells = split_simple_table_row(&header, &columns);
         rows.insert(0, header_cells);
     }

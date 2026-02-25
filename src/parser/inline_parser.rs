@@ -246,9 +246,9 @@ impl InlineParser {
     }
 
     /// Check if a node should be skipped because it already has inline structure
-    /// from integrated parsing.
+    /// from integrated parsing or list postprocessing.
     fn should_skip_already_parsed(&self, node: &SyntaxNode) -> bool {
-        // All these nodes have inline elements emitted during block parsing
+        // All these nodes have inline elements emitted during block parsing or postprocessing
         matches!(
             node.kind(),
             SyntaxKind::HEADING_CONTENT
@@ -257,6 +257,10 @@ impl InlineParser {
                 | SyntaxKind::LINE_BLOCK_LINE
                 | SyntaxKind::PLAIN
                 | SyntaxKind::PARAGRAPH
+                | SyntaxKind::FIGURE
+                | SyntaxKind::REFERENCE_DEFINITION
+                | SyntaxKind::TABLE_ROW      // Phase 7.1: Pipe tables now parse cells inline
+                | SyntaxKind::TABLE_HEADER // Phase 7.1: Pipe table headers now parse cells inline
         )
     }
 

@@ -192,6 +192,54 @@ impl<'a> BlockParser<'a> {
         }
     }
 
+    /// Parse and emit reference definition content with inline structure for the label.
+    ///
+    /// Converts: `[label]: url "title"`
+    /// To: `LINK(LINK_START "[", LINK_TEXT "label", TEXT "]", TEXT ": url...")`
+    fn emit_reference_definition_content(&mut self, text: &str) {
+        // Parse the label part: [label]:
+        if !text.starts_with('[') {
+            // Fallback to plain text if doesn't start with [
+            self.builder.token(SyntaxKind::TEXT.into(), text);
+            return;
+        }
+
+        // Find the closing ]
+        let rest = &text[1..];
+        if let Some(close_pos) = rest.find(']') {
+            let label = &rest[..close_pos];
+            let after_bracket = &rest[close_pos + 1..];
+
+            // Must be followed by : for reference definition
+            if after_bracket.starts_with(':') {
+                // Emit LINK node with the label
+                self.builder.start_node(SyntaxKind::LINK.into());
+
+                // LINK_START
+                self.builder.start_node(SyntaxKind::LINK_START.into());
+                self.builder.token(SyntaxKind::LINK_START.into(), "[");
+                self.builder.finish_node();
+
+                // LINK_TEXT
+                self.builder.start_node(SyntaxKind::LINK_TEXT.into());
+                self.builder.token(SyntaxKind::TEXT.into(), label);
+                self.builder.finish_node();
+
+                // Closing bracket (as TEXT, following old behavior)
+                self.builder.token(SyntaxKind::TEXT.into(), "]");
+
+                self.builder.finish_node(); // LINK
+
+                // Rest of the line (": url...")
+                self.builder.token(SyntaxKind::TEXT.into(), after_bracket);
+                return;
+            }
+        }
+
+        // Fallback: not a valid reference definition format
+        self.builder.token(SyntaxKind::TEXT.into(), text);
+    }
+
     /// Emit or buffer a blockquote marker depending on parser state.
     ///
     /// If a paragraph is open and we're using integrated parsing, buffer the marker.
@@ -1171,7 +1219,7 @@ impl<'a> BlockParser<'a> {
                     full_line
                 };
 
-                parse_figure(&mut self.builder, line_to_parse);
+                parse_figure(&mut self.builder, line_to_parse, self.config);
                 self.pos += 1;
                 return true;
             }
@@ -1343,7 +1391,7 @@ impl<'a> BlockParser<'a> {
                 label
             );
 
-            // Emit as a node - preserve original text including newline
+            // Emit as a node - parse the label as inline LINK structure
             self.builder
                 .start_node(SyntaxKind::REFERENCE_DEFINITION.into());
 
@@ -1360,9 +1408,8 @@ impl<'a> BlockParser<'a> {
                     (full_line, "")
                 };
 
-            // Emit the reference definition content
-            self.builder
-                .token(SyntaxKind::TEXT.into(), content_without_newline);
+            // Parse the reference definition with inline structure for the label
+            self.emit_reference_definition_content(content_without_newline);
 
             // Emit newline separately if present
             if !line_ending.is_empty() {

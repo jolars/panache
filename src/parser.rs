@@ -34,9 +34,14 @@ pub use inline_parser::{InlineParser, parse_inline_text};
 pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
     let config = config.unwrap_or_default();
     let block_tree = BlockParser::new(input, &config).parse();
-    let inline_tree = InlineParser::new(block_tree, config).parse();
+
+    // PHASE 7: Removed InlineParser second pass for most blocks
+    // Currently only needed for TABLE content which has complex structure
+    // TODO Phase 7.1: Add table cell inline parsing to avoid second pass entirely
+    let inline_tree = InlineParser::new(block_tree.clone(), config.clone()).parse();
 
     // Post-process to wrap list item content in Plain/PARAGRAPH blocks
-    let green = list_postprocessor::wrap_list_item_content(inline_tree);
+    // Now also applies inline parsing during wrapping
+    let green = list_postprocessor::wrap_list_item_content(inline_tree, &config);
     SyntaxNode::new_root(green)
 }

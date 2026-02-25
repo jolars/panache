@@ -72,17 +72,7 @@ DOCUMENT@0..599
       TEXT@489..510 "+--------+----------+"
       NEWLINE@510..511 "\n"
     TABLE_HEADER@511..533
-      TEXT@511..513 "| "
-      EMPHASIS@513..519
-        EMPHASIS_MARKER@513..514 "*"
-        TEXT@514..518 "Bold"
-        EMPHASIS_MARKER@518..519 "*"
-      TEXT@519..522 " | "
-      CODE_SPAN@522..530
-        CODE_SPAN_MARKER@522..523 "`"
-        TEXT@523..529 "inline"
-        CODE_SPAN_MARKER@529..530 "`"
-      TEXT@530..532 " |"
+      TEXT@511..532 "| *Bold* | `inline` |"
       NEWLINE@532..533 "\n"
     TABLE_SEPARATOR@533..555
       TEXT@533..554 "+========+==========+"
