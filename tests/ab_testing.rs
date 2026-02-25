@@ -188,8 +188,14 @@ mod tests {
         run_ab_test("table_with_caption");
     }
 
+    /// Test definition lists with integrated inline parsing (Phase 3).
+    /// Verifies that definition list terms are parsed identically with both parsers.
+    #[test]
+    fn ab_test_definition_lists() {
+        run_ab_test("definition_list");
+    }
+
     // Add more A/B tests as we migrate blocks:
-    // - Definition lists (when Phase 3 migrates definition list terms)
     // - Line blocks (when Phase 3 migrates line block lines)
     // - etc.
 }

@@ -255,10 +255,8 @@ impl InlineParser {
         // Skip nodes that already have inline elements emitted during block parsing
         matches!(
             node.kind(),
-            SyntaxKind::HEADING_CONTENT // Add more node types as we migrate them:
-                | SyntaxKind::TABLE_CAPTION // | SyntaxKind::TERM
-                                            // | SyntaxKind::LINE_BLOCK_LINE
-                                            // | etc.
+            SyntaxKind::HEADING_CONTENT | SyntaxKind::TABLE_CAPTION | SyntaxKind::TERM // | SyntaxKind::LINE_BLOCK_LINE
+                                                                                       // | etc.
         )
     }
 

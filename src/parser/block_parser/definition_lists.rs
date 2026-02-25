@@ -1,6 +1,8 @@
+use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::inline_emission;
 use super::utils::strip_newline;
 
 /// Tries to parse a definition list marker (`:` or `~`)
@@ -39,11 +41,21 @@ pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, us
 }
 
 /// Emit a term line into the syntax tree
-pub(crate) fn emit_term(builder: &mut GreenNodeBuilder<'static>, line: &str) {
+pub(crate) fn emit_term(builder: &mut GreenNodeBuilder<'static>, line: &str, config: &Config) {
     builder.start_node(SyntaxKind::TERM.into());
     // Strip trailing newline from line (it will be emitted separately)
     let (text, newline_str) = strip_newline(line);
-    builder.token(SyntaxKind::TEXT.into(), text.trim_end());
+    let trimmed_text = text.trim_end();
+
+    if !trimmed_text.is_empty() {
+        // Use integrated inline parsing if enabled
+        if config.parser.use_integrated_inline_parsing {
+            inline_emission::emit_inlines(builder, trimmed_text, config);
+        } else {
+            builder.token(SyntaxKind::TEXT.into(), trimmed_text);
+        }
+    }
+
     if !newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }

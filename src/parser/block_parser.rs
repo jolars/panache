@@ -1761,7 +1761,7 @@ impl<'a> BlockParser<'a> {
             self.containers.push(Container::DefinitionItem {});
 
             // Emit term
-            emit_term(&mut self.builder, content);
+            emit_term(&mut self.builder, content, &self.config);
             self.pos += 1;
 
             // Emit blank lines between term and definition marker
