@@ -1,0 +1,3 @@
+[submodule "pandoc"]
+	path = pandoc
+	url = https://github.com/jgm/pandoc.git
