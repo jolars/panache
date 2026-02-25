@@ -1,6 +1,6 @@
 # Parser Refactoring: Inline Parsing During Block Parsing (Pandoc-style)
 
-**Status**: Phase 4 Complete ✅ (PLAIN blocks ✅, PARAGRAPH blocks ✅) | Phase 5 Future Work  
+**Status**: Phase 5 In Progress ✅ (Default Flipped) | Phase 6 Future Work  
 **Date**: 2026-02-25
 
 ---
@@ -363,7 +363,64 @@ The key insight was that blockquote paragraphs CAN be buffered, but we need to t
 
 ---
 
-### Phase 5: Finalize and Delete Legacy Pass (FUTURE)
+### Phase 5: Finalize and Enable by Default ✅ COMPLETE (2026-02-25)
+
+**Goal**: Make integrated parsing the default after extensive testing.
+
+**Status**: Default flipped to `use_integrated_inline_parsing = true`
+
+#### ✅ Pre-Flip Validation (COMPLETE)
+
+**Comprehensive A/B Testing**:
+
+- Expanded A/B test coverage from 6 tests → **98 tests** (all golden cases)
+- Every test case verified: CST structure and formatted output identical between old/new parser
+- Total test suite: **1,300+ tests passing** (850 unit + 98 A/B + 169 integration + others)
+- Clippy clean with `-D warnings`
+
+**Test Results**:
+```
+running 98 tests (A/B coverage)
+test result: ok. 98 passed; 0 failed; 0 ignored
+```
+
+#### ✅ Default Flipped (COMPLETE - 2026-02-25)
+
+**Changes**:
+
+- Modified `src/config.rs`:
+  - Changed `ParserConfig::default()` to return `use_integrated_inline_parsing: true`
+  - Updated documentation: "**Default**: `true` (integrated parsing enabled by default)"
+  - Status updated: "Production-ready as of Phase 5 (2026-02-25)"
+  - Updated unit tests to reflect new default
+  - Added test for legacy path (`use-integrated-inline-parsing = false`)
+
+**Verification**:
+
+- ✅ All 1,300+ tests pass with new default
+- ✅ Clippy clean
+- ✅ A/B tests confirm behavior identical
+- ✅ Legacy path still available for compatibility
+
+**Migration for Users**:
+
+By default, panache now uses integrated inline parsing. To revert to the legacy two-pass parser:
+
+```toml
+# panache.toml
+[parser]
+use-integrated-inline-parsing = false
+```
+
+**Next Steps** (Phase 6 - Future Work):
+
+1. Extended real-world testing period (weeks to months)
+2. Performance benchmarking (verify 40-60% improvement goal)
+3. After confidence established: Remove legacy code path entirely
+
+---
+
+### Phase 6: Legacy Code Removal (FUTURE)
 
 **Goal**: Make integrated parsing the default and remove legacy code.
 
@@ -425,8 +482,12 @@ Verifies:
 
 ### Current Test Status
 
-- **Total tests**: 840+ (all passing)
-- **A/B tests**: 6 (`blockquotes`, `headings`, `table_with_caption`, `definition_list`, `line_blocks`, `plain_continuation`)
+- **Total tests**: 1,300+ (all passing)
+  - **Unit tests**: 850+
+  - **A/B tests**: 98 (comprehensive coverage of all golden cases)
+  - **Integration tests**: 169
+  - **Other tests**: 180+
+- **A/B test coverage**: 100% of golden test cases (98/98)
 
 ### Coverage
 

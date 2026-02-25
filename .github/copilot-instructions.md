@@ -15,7 +15,8 @@ is the definitive reference for parser implementation.
 - **Language**: Rust 2024 edition, stable toolchain
 - **Architecture**: Binary crate + WASM workspace for web playground
 - **Status**: Early development - breaking changes expected
-- **Tests**: 817 total (747 unit + 70 integration), ~1 second runtime
+- **Tests**: 1,300+ total (850+ unit + 98 A/B + 169 integration + others), ~1 second runtime
+- **Parser**: Integrated inline parsing (single-pass, Pandoc-style) enabled by default
 
 ### Principles
 
@@ -171,12 +172,13 @@ Config threaded through parsers: `BlockParser::new(input, &Config)`,
 
 - Unit tests: Embedded in source modules
 - Integration tests: `tests/` directory (CLI, LSP, format scenarios)
+  - **A/B tests**: `tests/ab_testing.rs` - 98 tests verify old/new parser equivalence
   - **Linting tests**: `tests/linting/*.md` with focused assertions in
     `tests/linting.rs`
   - **Formatting tests**: `tests/golden_cases.rs` with CST snapshots (use
     `UPDATE_EXPECTED=1` or `UPDATE_CST=1`)
 - Architecture tests: `inline_parser/architecture_tests.rs` verifies nesting
-- 60+ golden test scenarios covering all syntax elements
+- 98 golden test scenarios covering all syntax elements (all have A/B test coverage)
 
 ### Golden Tests (`tests/golden_cases.rs`)
 
@@ -184,8 +186,11 @@ Each `tests/cases/*/` directory contains: - `input.md` (or `.qmd`, `.Rmd`)
 - `expected.md` - expected formatted output - `cst.txt` - CST snapshot for
 debugging - `panache.toml` - optional test-specific config
 
-You need to update the list of tests in `tests/golden_cases.rs` when adding new
-a new directory.
+You need to update the list of tests in `tests/golden_cases.rs` when adding a new directory.
+
+**A/B Testing**: All 98 golden test cases also have A/B tests in `tests/ab_testing.rs` 
+that verify the integrated inline parser (flag=true) produces identical output to the 
+legacy parser (flag=false). This ensures no regressions during parser migration.
 
 To update expected outputs or CST snapshots, set environment variables:
 
