@@ -10,7 +10,9 @@
 //! (it detects delimiters/patterns before emitting nodes).
 
 use crate::config::Config;
+use crate::parser::block_parser::text_buffer::TextBuffer;
 use crate::parser::inline_parser::core;
+use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 /// Emit inline elements from text content directly into the builder.
@@ -47,6 +49,54 @@ pub fn emit_inlines(builder: &mut GreenNodeBuilder, text: &str, config: &Config)
     // Call the existing recursive inline parser
     // This preserves all behavior from the second-pass approach
     core::parse_inline_text_recursive(builder, text, config);
+}
+
+/// Emit PLAIN block content with inline parsing applied.
+///
+/// This is a specialized version for PLAIN blocks that handles:
+/// 1. Multi-line content buffering (via TextBuffer)
+/// 2. Newline joining between lines
+/// 3. Integrated inline parsing when flag is enabled
+///
+/// # Arguments
+/// * `builder` - The GreenNodeBuilder to emit nodes into
+/// * `buffer` - The accumulated PLAIN text lines (without trailing newlines)
+/// * `config` - Configuration controlling parser behavior
+///
+/// # Behavior
+/// - If `use_integrated_inline_parsing` is enabled: emits inline-parsed content
+/// - Otherwise: emits legacy TEXT tokens with NEWLINE tokens between lines
+///
+/// # Note
+/// The buffer should contain lines without trailing newlines. This function
+/// will insert NEWLINE tokens between lines to preserve losslessness.
+#[allow(dead_code)] // Used in Subtask 4
+pub fn emit_plain_with_inlines(
+    builder: &mut GreenNodeBuilder,
+    buffer: &TextBuffer,
+    config: &Config,
+) {
+    if buffer.is_empty() {
+        return;
+    }
+
+    if config.parser.use_integrated_inline_parsing {
+        // New path: emit inline-parsed content
+        let text = buffer.get_accumulated_text();
+        core::parse_inline_text_recursive(builder, &text, config);
+    } else {
+        // Legacy path: emit TEXT tokens with NEWLINE between lines
+        // This preserves the exact behavior of the current parser
+        for (i, line) in buffer.lines().enumerate() {
+            if !line.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), line);
+            }
+            // Add NEWLINE between lines (not after the last line)
+            if i < buffer.len() - 1 {
+                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            }
+        }
+    }
 }
 
 #[cfg(test)]

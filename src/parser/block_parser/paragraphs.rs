@@ -7,6 +7,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::container_stack::{Container, ContainerStack};
+use super::text_buffer::TextBuffer;
 use super::utils;
 
 /// Start a paragraph if not already in one.
@@ -16,7 +17,9 @@ pub(super) fn start_paragraph_if_needed(
 ) {
     if !matches!(containers.last(), Some(Container::Paragraph { .. })) {
         builder.start_node(SyntaxKind::PARAGRAPH.into());
-        containers.push(Container::Paragraph {});
+        containers.push(Container::Paragraph {
+            buffer: TextBuffer::new(),
+        });
     }
 }
 

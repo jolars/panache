@@ -34,7 +34,7 @@ pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, us
 
     let spaces_after = after_marker
         .chars()
-        .take_while(|c| c.is_whitespace())
+        .take_while(|&c| c == ' ' || c == '\t')
         .count();
 
     Some((marker, indent, spaces_after))

@@ -1,6 +1,6 @@
 # Parser Refactoring: Inline Parsing During Block Parsing (Pandoc-style)
 
-**Status**: Phase 3 Complete ✅ (4/5 blocks migrated) | Phase 4-5 Future Work  
+**Status**: Phase 4 In Progress (PLAIN blocks ✅, PARAGRAPH blocks pending) | Phase 5 Future Work  
 **Date**: 2026-02-25
 
 ---
@@ -211,17 +211,107 @@ matches!(
 
 ---
 
-### Phase 4: Paragraphs and Plain Text (FUTURE)
+### Phase 4: Paragraphs and Plain Text 🔄 IN PROGRESS (2026-02-25)
 
 **Goal**: Handle multi-line inline content with buffering.
 
+**Status**: PLAIN blocks ✅ complete, PARAGRAPH blocks pending.
+
+#### ✅ PLAIN Blocks (COMPLETE - 2026-02-25)
+
 **Approach**:
 
-- Accumulate paragraph/plain bytes in container state during scanning
-- When block closes, call `emit_inlines()` on buffered content
-- Supports multi-line constructs (display math, etc.)
+PLAIN blocks (used in definition lists and tight list items) required a fundamentally different approach than Phase 3 blocks:
 
-**Status**: Deferred - higher complexity, needs careful state management.
+1. **Buffering**: Content is accumulated in `TextBuffer` during block parsing
+2. **Delayed emission**: PLAIN node with inline elements is emitted when container closes
+3. **Container state**: Added `plain_buffer: TextBuffer` field to `Container::Definition`
+
+**Key architectural decision**: Unlike Phase 3's "emit immediately with inline parsing", PLAIN requires buffering because:
+- PLAIN can span multiple continuation lines
+- Container must remain open while accumulating lines
+- Inline parsing must happen on the complete multi-line content
+
+**Implementation details**:
+
+**TextBuffer utility** (`src/parser/block_parser/text_buffer.rs`):
+```rust
+pub(crate) struct TextBuffer {
+    lines: Vec<String>,  // Stores lines WITH newlines for losslessness
+}
+
+impl TextBuffer {
+    pub(crate) fn push_line(&mut self, text: impl Into<String>)
+    pub(crate) fn get_accumulated_text(&self) -> String  // concat(), not join()
+}
+```
+
+**Container state changes** (`src/parser/block_parser/container_stack.rs`):
+```rust
+Container::Definition {
+    content_col: usize,
+    plain_open: bool,
+    plain_buffer: TextBuffer,  // NEW: Accumulate PLAIN content
+}
+```
+
+**Core emission logic** (`src/parser/block_parser.rs`):
+
+- `close_containers_to()`: When closing Definition, emit buffered PLAIN with inline parsing
+- `emit_buffered_plain_if_needed()`: Emit PLAIN without closing Definition (for nested lists/blank lines)
+
+**Bug fixes discovered**:
+
+1. **Definition marker spacing**: Fixed `try_parse_definition_marker()` to not count newlines as whitespace
+2. **Empty definition lines**: Handle `:   \n` where content starts on continuation line
+3. **Nested lists**: Emit buffered PLAIN before starting lists inside definitions
+4. **Blank lines**: Emit buffered PLAIN before processing blank lines to maintain byte ordering
+
+**Modified files**:
+
+- `src/parser/block_parser.rs` (~150 lines changed):
+  - `close_containers_to()` method (lines 88-146)
+  - `emit_buffered_plain_if_needed()` helper (lines 148-178)
+  - Definition creation with conditional buffering (lines 1804-1843)
+  - Continuation logic for Definition (lines 866-929)
+  - Blank line handling (lines 223-248)
+  - List marker detection (lines 1540-1543)
+- `src/parser/block_parser/text_buffer.rs` (created, 142 lines)
+- `src/parser/block_parser/definition_lists.rs` (1 line changed - newline counting fix)
+- `src/parser/inline_parser.rs`:
+  - Added PLAIN to `should_skip_already_parsed()` (line 263)
+  - Modified `should_concatenate_for_parsing()` to exclude PLAIN when using integrated parsing
+
+**Test coverage**:
+
+- Created 3 comprehensive test cases:
+  - `tests/cases/paragraph_continuation/` - multi-line paragraphs
+  - `tests/cases/plain_continuation_edge_cases/` - PLAIN with inline markup, nested structures
+  - `tests/cases/paragraph_plain_mixed/` - mixed paragraph and definition content
+- Added `tests/ab_testing.rs::ab_test_plain_continuation`
+
+**Verification**:
+
+- ✅ All 840 tests passing
+- ✅ A/B test confirms new parser produces identical output to old parser
+- ✅ CST structure identical (verified via parse tree comparison)
+- ✅ Losslessness verified (CST.text() equals input)
+- ✅ Clippy clean
+
+**Critical insight**: Second-pass inline parser must NOT re-parse PLAIN nodes when integrated parsing is enabled. The `should_concatenate_for_parsing()` function now checks the flag and excludes PLAIN, using `copy_subtree_verbatim()` instead.
+
+#### ⏳ PARAGRAPH Blocks (PENDING)
+
+**Status**: Not started
+
+**Planned approach**: Apply identical buffering pattern to PARAGRAPH:
+
+1. Add `buffer: TextBuffer` to `Container::Paragraph`
+2. Modify `append_paragraph_line()` to buffer instead of emit
+3. Create `close_paragraph()` helper to emit buffered content with inline parsing
+4. Update all paragraph close sites to use the helper
+
+**Expected complexity**: Similar to PLAIN but simpler (no nested list edge cases)
 
 ---
 
@@ -275,8 +365,8 @@ Verifies:
 
 ### Current Test Status
 
-- **Total tests**: 837+ (all passing)
-- **A/B tests**: 5 (`blockquotes`, `headings`, `table_with_caption`, `definition_list`, `line_blocks`)
+- **Total tests**: 840+ (all passing)
+- **A/B tests**: 6 (`blockquotes`, `headings`, `table_with_caption`, `definition_list`, `line_blocks`, `plain_continuation`)
 
 ### Coverage
 

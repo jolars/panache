@@ -23,6 +23,7 @@ mod metadata;
 mod paragraphs;
 mod reference_links; // Reference definition and footnote parsing
 mod tables;
+mod text_buffer; // Text buffering for paragraph/plain accumulation
 mod utils;
 
 use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
@@ -44,6 +45,7 @@ use tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
 };
+use text_buffer::TextBuffer;
 use utils::{split_lines_inclusive, strip_newline};
 
 fn init_logger() {
@@ -82,6 +84,89 @@ impl<'a> BlockParser<'a> {
         SyntaxNode::new_root(self.builder.finish())
     }
 
+    /// Emit buffered PLAIN content if Definition container has open PLAIN.
+    /// Close containers down to `keep`, emitting buffered content first if needed.
+    ///
+    /// This method handles both the old immediate-emit approach and the new buffering approach:
+    /// - If `use_integrated_inline_parsing=false`: Delegates to `close_to` (old behavior)
+    /// - If `use_integrated_inline_parsing=true`: Emits buffered PLAIN content before closing
+    fn close_containers_to(&mut self, keep: usize) {
+        if !self.config.parser.use_integrated_inline_parsing {
+            // Old path: Use original close_to logic
+            self.containers.close_to(keep, &mut self.builder);
+            return;
+        }
+
+        // New path: Emit buffered PLAIN content before closing
+        while self.containers.depth() > keep {
+            // Before closing Definition, emit any buffered PLAIN content
+            if let Some(Container::Definition {
+                plain_open: true,
+                plain_buffer,
+                ..
+            }) = self.containers.stack.last()
+                && !plain_buffer.is_empty()
+            {
+                // Emit PLAIN node with buffered inline-parsed content
+                self.builder.start_node(SyntaxKind::PLAIN.into());
+                let text = plain_buffer.get_accumulated_text();
+                inline_emission::emit_inlines(&mut self.builder, &text, self.config);
+                self.builder.finish_node();
+            }
+
+            // Mark PLAIN as closed and clear buffer
+            if let Some(Container::Definition {
+                plain_open,
+                plain_buffer,
+                ..
+            }) = self.containers.stack.last_mut()
+                && *plain_open
+            {
+                plain_buffer.clear();
+                *plain_open = false;
+            }
+
+            // Pop container and finish node
+            self.containers.stack.pop();
+            self.builder.finish_node();
+        }
+    }
+
+    /// Emit buffered PLAIN content if there's an open PLAIN in a Definition.
+    /// This is used when we need to close PLAIN but keep the Definition container open.
+    fn emit_buffered_plain_if_needed(&mut self) {
+        if !self.config.parser.use_integrated_inline_parsing {
+            return;
+        }
+
+        // Check if we have an open PLAIN with buffered content
+        if let Some(Container::Definition {
+            plain_open: true,
+            plain_buffer,
+            ..
+        }) = self.containers.stack.last()
+            && !plain_buffer.is_empty()
+        {
+            // Emit PLAIN node with buffered inline-parsed content
+            self.builder.start_node(SyntaxKind::PLAIN.into());
+            let text = plain_buffer.get_accumulated_text();
+            inline_emission::emit_inlines(&mut self.builder, &text, self.config);
+            self.builder.finish_node();
+        }
+
+        // Mark PLAIN as closed and clear buffer
+        if let Some(Container::Definition {
+            plain_open,
+            plain_buffer,
+            ..
+        }) = self.containers.stack.last_mut()
+            && *plain_open
+        {
+            plain_buffer.clear();
+            *plain_open = false;
+        }
+    }
+
     fn parse_document_stack(&mut self) {
         self.builder.start_node(SyntaxKind::DOCUMENT.into());
 
@@ -106,7 +191,7 @@ impl<'a> BlockParser<'a> {
             self.pos += 1;
         }
 
-        self.containers.close_to(0, &mut self.builder);
+        self.close_containers_to(0);
         self.builder.finish_node(); // DOCUMENT
     }
 
@@ -134,22 +219,27 @@ impl<'a> BlockParser<'a> {
         if is_blank {
             // Close paragraph if open
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Close Plain node in Definition if open
             // Blank lines should close Plain, allowing subsequent content to be siblings
-            if let Some(Container::Definition {
-                plain_open: true, ..
-            }) = self.containers.last()
-            {
-                self.builder.finish_node(); // Close Plain node
-                // Mark Plain as closed
-                if let Some(Container::Definition { plain_open, .. }) =
-                    self.containers.stack.last_mut()
+            if self.config.parser.use_integrated_inline_parsing {
+                // New parser: Emit buffered PLAIN content before continuing
+                self.emit_buffered_plain_if_needed();
+            } else {
+                // Old parser: Finish the open PLAIN node
+                if let Some(Container::Definition {
+                    plain_open: true, ..
+                }) = self.containers.last()
                 {
-                    *plain_open = false;
+                    self.builder.finish_node(); // Close Plain node
+                    // Mark Plain as closed
+                    if let Some(Container::Definition { plain_open, .. }) =
+                        self.containers.stack.last_mut()
+                    {
+                        *plain_open = false;
+                    }
                 }
             }
 
@@ -213,10 +303,11 @@ impl<'a> BlockParser<'a> {
                             levels_to_keep
                         );
 
-                        // If closing a Definition with open Plain, close Plain first
-                        if let Some(Container::Definition {
-                            plain_open: true, ..
-                        }) = self.containers.last()
+                        // If closing a Definition with open Plain, close Plain first (old parser only)
+                        if !self.config.parser.use_integrated_inline_parsing
+                            && let Some(Container::Definition {
+                                plain_open: true, ..
+                            }) = self.containers.last()
                         {
                             self.builder.finish_node(); // Close Plain node
                             // Update container to mark Plain as closed before removing it
@@ -227,8 +318,7 @@ impl<'a> BlockParser<'a> {
                             }
                         }
 
-                        self.containers
-                            .close_to(self.containers.depth() - 1, &mut self.builder);
+                        self.close_containers_to(self.containers.depth() - 1);
                     }
                     _ => break,
                 }
@@ -316,8 +406,7 @@ impl<'a> BlockParser<'a> {
 
             // Close paragraph before opening blockquote
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Parse marker information for all levels
@@ -414,8 +503,7 @@ impl<'a> BlockParser<'a> {
 
             // Not lazy continuation - close paragraph if open
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Close blockquotes down to the new depth
@@ -480,8 +568,7 @@ impl<'a> BlockParser<'a> {
                         effective_indent,
                         content_col
                     );
-                    self.containers
-                        .close_to(self.containers.depth() - 1, &mut self.builder);
+                    self.close_containers_to(self.containers.depth() - 1);
                 } else {
                     log::debug!(
                         "Keeping ListItem: effective_indent={} >= content_col={}",
@@ -772,13 +859,10 @@ impl<'a> BlockParser<'a> {
             (content, None)
         };
 
-        // Check if we have an open Plain node in a Definition container
-        // If so, append this line to the Plain node instead of creating a new block
+        // Check if we're in a Definition container (with or without an open PLAIN)
+        // Continuation lines should be added to PLAIN, not treated as new blocks
         // BUT: Don't treat lines with block element markers as continuations
-        if let Some(Container::Definition {
-            plain_open: true, ..
-        }) = self.containers.last()
-        {
+        if matches!(self.containers.last(), Some(Container::Definition { .. })) {
             // Check if this line starts with any block element marker
             // Use stripped_content so we check AFTER removing footnote/definition indent
             let is_block_element = try_parse_definition_marker(stripped_content).is_some()
@@ -794,33 +878,53 @@ impl<'a> BlockParser<'a> {
                     && try_parse_latex_env_begin(stripped_content).is_some());
 
             if is_block_element {
-                // Close the Plain node before processing the block element
-                self.builder.finish_node(); // Close Plain
-                // Update container to mark Plain as closed
-                if let Some(Container::Definition { plain_open, .. }) =
-                    self.containers.stack.last_mut()
-                {
-                    *plain_open = false;
-                }
+                // Close any open Plain block before processing the block element
+                // Buffered PLAIN content will be emitted by emit_buffered_plain_if_needed()
                 // Fall through to parse the block element
             } else {
-                // This is a continuation line for an open Plain block
-                // For lossless parsing, we need to preserve the entire line including indent
-
-                // Get the original line to preserve exact whitespace
+                // This is a continuation line - add to PLAIN (start one if needed)
                 let full_line = self.lines[self.pos];
-
-                // Split off trailing newline
                 let (text_without_newline, newline_str) = utils::strip_newline(full_line);
 
-                // Emit the entire line (including indent) as TEXT + NEWLINE to open Plain node
-                if !text_without_newline.is_empty() {
-                    self.builder
-                        .token(SyntaxKind::TEXT.into(), text_without_newline);
-                }
+                if self.config.parser.use_integrated_inline_parsing {
+                    // New path: Buffer the line for later inline parsing
+                    if let Some(Container::Definition {
+                        plain_open,
+                        plain_buffer,
+                        ..
+                    }) = self.containers.stack.last_mut()
+                    {
+                        // Include the newline in the buffered text for losslessness
+                        let line_with_newline = if !newline_str.is_empty() {
+                            format!("{}{}", text_without_newline, newline_str)
+                        } else {
+                            text_without_newline.to_string()
+                        };
+                        plain_buffer.push_line(line_with_newline);
+                        *plain_open = true; // Mark that we now have an open PLAIN
+                    }
+                } else {
+                    // Old path: Emit TEXT+NEWLINE tokens
+                    // If PLAIN isn't open, start it first
+                    if let Some(Container::Definition { plain_open, .. }) =
+                        self.containers.stack.last()
+                        && !plain_open
+                    {
+                        self.builder.start_node(SyntaxKind::PLAIN.into());
+                        if let Some(Container::Definition { plain_open, .. }) =
+                            self.containers.stack.last_mut()
+                        {
+                            *plain_open = true;
+                        }
+                    }
 
-                if !newline_str.is_empty() {
-                    self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                    if !text_without_newline.is_empty() {
+                        self.builder
+                            .token(SyntaxKind::TEXT.into(), text_without_newline);
+                    }
+                    if !newline_str.is_empty() {
+                        self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                    }
                 }
 
                 self.pos += 1;
@@ -868,8 +972,7 @@ impl<'a> BlockParser<'a> {
             log::debug!("Parsed HTML block at line {}: {:?}", self.pos, block_type);
             // Close paragraph before opening HTML block
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
@@ -1037,8 +1140,7 @@ impl<'a> BlockParser<'a> {
                 log::debug!("Parsed figure at line {}", self.pos);
                 // Close paragraph before creating figure
                 if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                    self.containers
-                        .close_to(self.containers.depth() - 1, &mut self.builder);
+                    self.close_containers_to(self.containers.depth() - 1);
                 }
 
                 // Get the full original line to preserve losslessness
@@ -1139,8 +1241,7 @@ impl<'a> BlockParser<'a> {
                 if can_interrupt_paragraph
                     && matches!(self.containers.last(), Some(Container::Paragraph { .. }))
                 {
-                    self.containers
-                        .close_to(self.containers.depth() - 1, &mut self.builder);
+                    self.close_containers_to(self.containers.depth() - 1);
                 }
 
                 let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
@@ -1172,8 +1273,7 @@ impl<'a> BlockParser<'a> {
 
             // Close paragraph if one is open
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Close previous footnote if one is open
@@ -1181,8 +1281,7 @@ impl<'a> BlockParser<'a> {
                 self.containers.last(),
                 Some(Container::FootnoteDefinition { .. })
             ) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Start the footnote definition container
@@ -1281,8 +1380,7 @@ impl<'a> BlockParser<'a> {
             );
             // Close paragraph before opening fenced div
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Start FencedDiv node
@@ -1386,8 +1484,7 @@ impl<'a> BlockParser<'a> {
         if self.in_fenced_div() && is_div_closing_fence(content) {
             // Close paragraph before closing fenced div
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Emit closing fence - parse to avoid newline duplication
@@ -1424,8 +1521,7 @@ impl<'a> BlockParser<'a> {
             self.builder.finish_node(); // DivFenceClose
 
             // Pop the FencedDiv container (this will finish the FencedDiv node)
-            self.containers
-                .close_to(self.containers.depth() - 1, &mut self.builder);
+            self.close_containers_to(self.containers.depth() - 1);
 
             self.pos += 1;
             return true;
@@ -1442,8 +1538,7 @@ impl<'a> BlockParser<'a> {
             );
             // Close paragraph before opening LaTeX environment
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
@@ -1485,8 +1580,20 @@ impl<'a> BlockParser<'a> {
                 }
 
                 // Blank line before - can interrupt paragraph
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
+            }
+
+            // Close any open PLAIN node in a Definition before starting a list
+            // This ensures buffered PLAIN content is emitted before the list
+            if matches!(
+                self.containers.last(),
+                Some(Container::Definition {
+                    plain_open: true,
+                    ..
+                })
+            ) {
+                // Emit buffered PLAIN content but keep Definition open
+                self.emit_buffered_plain_if_needed();
             }
 
             // Check if this continues an existing list level
@@ -1651,8 +1758,7 @@ impl<'a> BlockParser<'a> {
         if let Some((marker_char, indent, spaces_after)) = try_parse_definition_marker(content) {
             // Close paragraph before starting definition
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Start definition list if not in one
@@ -1663,8 +1769,7 @@ impl<'a> BlockParser<'a> {
 
             // Close previous definition if one is open (but keep DefinitionItem open)
             if matches!(self.containers.last(), Some(Container::Definition { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Start new definition item if not in one
@@ -1698,21 +1803,35 @@ impl<'a> BlockParser<'a> {
             let after_marker_and_spaces = &content[indent + 1 + spaces_after..];
             let has_content = !after_marker_and_spaces.trim().is_empty();
 
+            // Create buffer for accumulating PLAIN content
+            let mut plain_buffer = TextBuffer::new();
+
             if has_content {
-                // Wrap inline content in a Plain node (keep open for continuation lines)
-                self.builder.start_node(SyntaxKind::PLAIN.into());
-                self.builder
-                    .token(SyntaxKind::TEXT.into(), after_marker_and_spaces.trim_end());
+                if self.config.parser.use_integrated_inline_parsing {
+                    // New path: Buffer content WITH newline, emit later with inline parsing
+                    let current_line = self.lines[self.pos];
+                    let (_, newline_str) = strip_newline(current_line);
+                    let line_with_newline = if !newline_str.is_empty() {
+                        format!("{}{}", after_marker_and_spaces.trim_end(), newline_str)
+                    } else {
+                        after_marker_and_spaces.trim_end().to_string()
+                    };
+                    plain_buffer.push_line(line_with_newline);
+                    // PLAIN node will be emitted when Definition closes
+                } else {
+                    // Old path: Start PLAIN node immediately, keep it open for continuations
+                    self.builder.start_node(SyntaxKind::PLAIN.into());
+                    self.builder
+                        .token(SyntaxKind::TEXT.into(), after_marker_and_spaces.trim_end());
 
-                // Extract and emit the actual newline from the original line
-                let current_line = self.lines[self.pos];
-                let (_, newline_str) = strip_newline(current_line);
-                if !newline_str.is_empty() {
-                    self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                    // Extract and emit the actual newline from the original line
+                    let current_line = self.lines[self.pos];
+                    let (_, newline_str) = strip_newline(current_line);
+                    if !newline_str.is_empty() {
+                        self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                    }
+                    // DON'T close Plain node yet - continuation lines will be added
                 }
-
-                // DON'T close Plain node yet - continuation lines will be added to it
-                // self.builder.finish_node(); // Plain
             } else {
                 // No content on this line, just emit newline directly
                 let current_line = self.lines[self.pos];
@@ -1725,6 +1844,7 @@ impl<'a> BlockParser<'a> {
             self.containers.push(Container::Definition {
                 content_col,
                 plain_open: has_content,
+                plain_buffer,
             });
             self.pos += 1;
             return true;
@@ -1737,8 +1857,7 @@ impl<'a> BlockParser<'a> {
         {
             // Close any open structures
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Start definition list if not in one
@@ -1752,8 +1871,7 @@ impl<'a> BlockParser<'a> {
                 self.containers.last(),
                 Some(Container::Definition { .. }) | Some(Container::DefinitionItem { .. })
             ) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
             // Start new definition item
@@ -1761,7 +1879,7 @@ impl<'a> BlockParser<'a> {
             self.containers.push(Container::DefinitionItem {});
 
             // Emit term
-            emit_term(&mut self.builder, content, &self.config);
+            emit_term(&mut self.builder, content, self.config);
             self.pos += 1;
 
             // Emit blank lines between term and definition marker
@@ -1791,11 +1909,10 @@ impl<'a> BlockParser<'a> {
             log::debug!("Parsed line block at line {}", self.pos);
             // Close paragraph before opening line block
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.containers
-                    .close_to(self.containers.depth() - 1, &mut self.builder);
+                self.close_containers_to(self.containers.depth() - 1);
             }
 
-            let new_pos = parse_line_block(&self.lines, self.pos, &mut self.builder, &self.config);
+            let new_pos = parse_line_block(&self.lines, self.pos, &mut self.builder, self.config);
             self.pos = new_pos;
             return true;
         }

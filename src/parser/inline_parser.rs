@@ -249,17 +249,18 @@ impl InlineParser {
     /// from integrated parsing (when use_integrated_inline_parsing=true).
     fn should_skip_already_parsed(&self, node: &SyntaxNode) -> bool {
         if !self.config.parser.use_integrated_inline_parsing {
-            return false;
+            false
+        } else {
+            // Skip nodes that already have inline elements emitted during block parsing
+            matches!(
+                node.kind(),
+                SyntaxKind::HEADING_CONTENT
+                    | SyntaxKind::TABLE_CAPTION
+                    | SyntaxKind::TERM
+                    | SyntaxKind::LINE_BLOCK_LINE
+                    | SyntaxKind::PLAIN
+            )
         }
-
-        // Skip nodes that already have inline elements emitted during block parsing
-        matches!(
-            node.kind(),
-            SyntaxKind::HEADING_CONTENT
-                | SyntaxKind::TABLE_CAPTION
-                | SyntaxKind::TERM
-                | SyntaxKind::LINE_BLOCK_LINE
-        )
     }
 
     /// Copy a node and all its descendants verbatim, without any parsing or modification.
@@ -283,8 +284,18 @@ impl InlineParser {
     /// Check if a node should concatenate tokens for parsing.
     /// We always concatenate for paragraphs and plain text blocks to properly handle
     /// multi-line inline constructs (emphasis, links, display math).
+    ///
+    /// EXCEPT: When using integrated inline parsing, PLAIN blocks already have inline
+    /// structure emitted during block parsing, so they should skip this step.
     fn should_concatenate_for_parsing(&self, node: &SyntaxNode) -> bool {
-        matches!(node.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN)
+        match node.kind() {
+            SyntaxKind::PARAGRAPH => true,
+            SyntaxKind::PLAIN => {
+                // Skip concatenation if PLAIN already has inline structure from integrated parsing
+                !self.config.parser.use_integrated_inline_parsing
+            }
+            _ => false,
+        }
     }
 
     /// Check if a token is a structural marker that should NOT be concatenated for inline parsing.
