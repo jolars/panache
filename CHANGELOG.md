@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.6.1](https://github.com/jolars/panache/compare/v2.6.0...v2.6.1) (2026-02-25)
+
+### Bug Fixes
+
+* **parser:** handle complex emphasis cases ([f7fe514](https://github.com/jolars/panache/commit/f7fe51439e81da6ae3a838c7ab7c8a91eb3dfc9c))
+
 ## [2.6.0](https://github.com/jolars/panache/compare/v2.5.1...v2.6.0) (2026-02-20)
 
 ### Features
