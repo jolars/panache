@@ -174,8 +174,14 @@ mod tests {
         run_ab_test("blockquotes");
     }
 
+    /// Test headings with integrated inline parsing (Phase 3).
+    /// Verifies that heading content is parsed identically with both parsers.
+    #[test]
+    fn ab_test_headings() {
+        run_ab_test("headings");
+    }
+
     // Add more A/B tests as we migrate blocks:
-    // - Headings (when Phase 3 migrates headings)
     // - Tables (when Phase 3 migrates table cells)
     // - etc.
 }

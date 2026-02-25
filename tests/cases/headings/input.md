@@ -18,8 +18,8 @@
 
 #### Heading with super^script^ and sub~script~
 
-# Heading with attributes {#custom-id}
+# Heading with attributes{#custom-id}
 
-## Heading with classes {.important .highlight}
+## Heading with classes{.important .highlight}
 
-### Heading with key-value {width=100}
+### Heading with key-value{width="100"}

@@ -1024,7 +1024,7 @@ impl<'a> BlockParser<'a> {
                     self.pos,
                     heading_level
                 );
-                emit_atx_heading(&mut self.builder, content, heading_level);
+                emit_atx_heading(&mut self.builder, content, heading_level, self.config);
                 self.pos += 1;
                 return true;
             }

@@ -153,76 +153,131 @@ impl InlineParser {
             }
         } else {
             // For other nodes, recursively process children as before
-            let mut children = node.children_with_tokens().peekable();
-            while let Some(child) = children.next() {
-                match child {
-                    rowan::NodeOrToken::Node(n) => {
-                        self.copy_node_to_builder(builder, &n);
-                    }
-                    rowan::NodeOrToken::Token(t) => {
-                        // Check for hard line breaks: two or more spaces at end of line, or backslash at end of line
-                        // Only in non-verbatim contexts
-                        if t.kind() == SyntaxKind::TEXT
-                            && self.should_parse_inline(&t)
-                            && let Some(rowan::NodeOrToken::Token(next)) = children.peek()
-                            && next.kind() == SyntaxKind::NEWLINE
-                        {
-                            let text = t.text();
-
-                            // Check for backslash-newline hard line break (requires escaped_line_breaks extension)
-                            if self.config.extensions.escaped_line_breaks && text.ends_with('\\') {
-                                // Emit the text before the backslash
-                                let text_before = &text[..text.len() - 1];
-                                if !text_before.is_empty() {
-                                    self.parse_text_with_refs(builder, text_before);
-                                }
-                                // Emit hard line break - preserve the backslash for losslessness
-                                builder.token(SyntaxKind::HARD_LINE_BREAK.into(), "\\\n");
-                                // Skip the NEWLINE token
-                                children.next();
-                                continue;
-                            }
-
-                            // Check for two-or-more-spaces hard line break (always enabled in Pandoc)
-                            let trailing_spaces =
-                                text.chars().rev().take_while(|&c| c == ' ').count();
-                            if trailing_spaces >= 2 {
-                                // Emit the text before the trailing spaces
-                                let text_before = &text[..text.len() - trailing_spaces];
-                                if !text_before.is_empty() {
-                                    self.parse_text_with_refs(builder, text_before);
-                                }
-                                // Emit hard line break - preserve the trailing spaces for losslessness
-                                let spaces = " ".repeat(trailing_spaces);
-                                builder.token(
-                                    SyntaxKind::HARD_LINE_BREAK.into(),
-                                    &format!("{}\n", spaces),
-                                );
-                                // Skip the NEWLINE token
-                                children.next();
-                                continue;
-                            }
+            // BUT: Skip nodes that already have inline structure from integrated parsing
+            if self.should_skip_already_parsed(node) {
+                // Node already has inline structure - just copy it verbatim without recursion
+                for child in node.children_with_tokens() {
+                    match child {
+                        rowan::NodeOrToken::Node(n) => {
+                            // Copy entire subtree without parsing
+                            self.copy_subtree_verbatim(builder, &n);
                         }
-
-                        // Normal token processing
-                        if self.should_parse_inline(&t) {
-                            // Special handling for REFERENCE_DEFINITION: parse label as LINK
-                            if let Some(parent) = t.parent()
-                                && parent.kind() == SyntaxKind::REFERENCE_DEFINITION
-                            {
-                                self.parse_reference_definition_label(builder, t.text());
-                            } else {
-                                // Parse inline text, passing registry for reference resolution
-                                self.parse_text_with_refs(builder, t.text());
-                            }
-                        } else {
+                        rowan::NodeOrToken::Token(t) => {
                             builder.token(t.kind().into(), t.text());
+                        }
+                    }
+                }
+            } else {
+                // Process children normally
+                let mut children = node.children_with_tokens().peekable();
+                while let Some(child) = children.next() {
+                    match child {
+                        rowan::NodeOrToken::Node(n) => {
+                            self.copy_node_to_builder(builder, &n);
+                        }
+                        rowan::NodeOrToken::Token(t) => {
+                            // Check for hard line breaks: two or more spaces at end of line, or backslash at end of line
+                            // Only in non-verbatim contexts
+                            if t.kind() == SyntaxKind::TEXT
+                                && self.should_parse_inline(&t)
+                                && let Some(rowan::NodeOrToken::Token(next)) = children.peek()
+                                && next.kind() == SyntaxKind::NEWLINE
+                            {
+                                let text = t.text();
+
+                                // Check for backslash-newline hard line break (requires escaped_line_breaks extension)
+                                if self.config.extensions.escaped_line_breaks
+                                    && text.ends_with('\\')
+                                {
+                                    // Emit the text before the backslash
+                                    let text_before = &text[..text.len() - 1];
+                                    if !text_before.is_empty() {
+                                        self.parse_text_with_refs(builder, text_before);
+                                    }
+                                    // Emit hard line break - preserve the backslash for losslessness
+                                    builder.token(SyntaxKind::HARD_LINE_BREAK.into(), "\\\n");
+                                    // Skip the NEWLINE token
+                                    children.next();
+                                    continue;
+                                }
+
+                                // Check for two-or-more-spaces hard line break (always enabled in Pandoc)
+                                let trailing_spaces =
+                                    text.chars().rev().take_while(|&c| c == ' ').count();
+                                if trailing_spaces >= 2 {
+                                    // Emit the text before the trailing spaces
+                                    let text_before = &text[..text.len() - trailing_spaces];
+                                    if !text_before.is_empty() {
+                                        self.parse_text_with_refs(builder, text_before);
+                                    }
+                                    // Emit hard line break - preserve the trailing spaces for losslessness
+                                    let spaces = " ".repeat(trailing_spaces);
+                                    builder.token(
+                                        SyntaxKind::HARD_LINE_BREAK.into(),
+                                        &format!("{}\n", spaces),
+                                    );
+                                    // Skip the NEWLINE token
+                                    children.next();
+                                    continue;
+                                }
+                            }
+
+                            // Normal token processing
+                            if self.should_parse_inline(&t) {
+                                // Special handling for REFERENCE_DEFINITION: parse label as LINK
+                                if let Some(parent) = t.parent()
+                                    && parent.kind() == SyntaxKind::REFERENCE_DEFINITION
+                                {
+                                    self.parse_reference_definition_label(builder, t.text());
+                                } else {
+                                    // Parse inline text, passing registry for reference resolution
+                                    self.parse_text_with_refs(builder, t.text());
+                                }
+                            } else {
+                                builder.token(t.kind().into(), t.text());
+                            }
                         }
                     }
                 }
             }
         }
 
+        builder.finish_node();
+    }
+
+    /// Check if a node should be skipped because it already has inline structure
+    /// from integrated parsing (when use_integrated_inline_parsing=true).
+    fn should_skip_already_parsed(&self, node: &SyntaxNode) -> bool {
+        if !self.config.parser.use_integrated_inline_parsing {
+            return false;
+        }
+
+        // Skip nodes that already have inline elements emitted during block parsing
+        matches!(
+            node.kind(),
+            SyntaxKind::HEADING_CONTENT // Add more node types as we migrate them:
+                                        // | SyntaxKind::TABLE_CELL
+                                        // | SyntaxKind::CAPTION
+                                        // | SyntaxKind::TERM
+                                        // | etc.
+        )
+    }
+
+    /// Copy a node and all its descendants verbatim, without any parsing or modification.
+    /// Used for nodes that already have inline structure from integrated parsing.
+    #[allow(clippy::only_used_in_recursion)]
+    fn copy_subtree_verbatim(&self, builder: &mut GreenNodeBuilder, node: &SyntaxNode) {
+        builder.start_node(node.kind().into());
+        for child in node.children_with_tokens() {
+            match child {
+                rowan::NodeOrToken::Node(n) => {
+                    self.copy_subtree_verbatim(builder, &n);
+                }
+                rowan::NodeOrToken::Token(t) => {
+                    builder.token(t.kind().into(), t.text());
+                }
+            }
+        }
         builder.finish_node();
     }
 

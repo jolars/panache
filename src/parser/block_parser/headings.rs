@@ -1,9 +1,11 @@
 //! ATX heading parsing utilities.
 
+use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::attributes::{emit_attributes, try_parse_trailing_attributes};
+use super::inline_emission;
 
 /// Try to parse an ATX heading from content, returns heading level (1-6) if found.
 pub(crate) fn try_parse_atx_heading(content: &str) -> Option<usize> {
@@ -36,6 +38,7 @@ pub(crate) fn emit_atx_heading(
     builder: &mut GreenNodeBuilder<'static>,
     content: &str,
     level: usize,
+    config: &Config,
 ) {
     builder.start_node(SyntaxKind::HEADING.into());
 
@@ -96,7 +99,12 @@ pub(crate) fn emit_atx_heading(
     // Heading content node
     builder.start_node(SyntaxKind::HEADING_CONTENT.into());
     if !text_content.is_empty() {
-        builder.token(SyntaxKind::TEXT.into(), text_content);
+        // Use integrated inline parsing if enabled, otherwise emit TEXT token
+        if config.parser.use_integrated_inline_parsing {
+            inline_emission::emit_inlines(builder, text_content, config);
+        } else {
+            builder.token(SyntaxKind::TEXT.into(), text_content);
+        }
     }
     builder.finish_node();
 
