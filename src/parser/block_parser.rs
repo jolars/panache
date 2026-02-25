@@ -14,6 +14,7 @@ mod headings;
 mod horizontal_rules;
 mod html_blocks;
 mod indented_code;
+mod inline_emission; // Inline element emission during block parsing
 mod latex_envs;
 mod line_blocks;
 mod lists;

@@ -11,7 +11,7 @@ mod architecture_tests;
 mod bracketed_spans;
 mod citations;
 mod code_spans;
-mod core;
+pub mod core; // Public for use in block_parser inline_emission
 mod escapes;
 mod inline_footnotes;
 mod latex;

@@ -753,6 +753,26 @@ impl StyleConfig {
     // No flavor-specific defaults needed - just use field defaults
 }
 
+/// Parser configuration.
+///
+/// These settings control internal parser behavior, primarily for migration
+/// and performance optimization purposes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct ParserConfig {
+    /// Use integrated inline parsing during block parsing (single-pass).
+    ///
+    /// When `true`, inline elements are parsed directly during block parsing,
+    /// matching Pandoc's architecture. When `false` (default), uses the legacy
+    /// two-pass approach (block parser → inline parser).
+    ///
+    /// **Status**: Experimental. Currently only supports low-risk blocks
+    /// (headings, table cells, etc.). Full migration in progress.
+    ///
+    /// **Default**: `false` for backward compatibility.
+    pub use_integrated_inline_parsing: bool,
+}
+
 /// Internal deserialization struct that allows for optional fields
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -781,6 +801,10 @@ struct RawConfig {
     blank_lines: BlankLines,
     #[serde(default)]
     code_blocks: Option<CodeBlockConfig>,
+
+    // Parser configuration
+    #[serde(default)]
+    parser: Option<ParserConfig>,
 
     // NEW: Language → Formatter(s) mapping
     // This will be a raw Value that we'll parse manually to handle both formats
@@ -1001,6 +1025,7 @@ impl RawConfig {
             code_blocks: style.code_blocks.unwrap_or_default(),
             formatters: resolve_formatters(self.formatters),
             linters: self.linters,
+            parser: self.parser.unwrap_or_default(),
         }
     }
 }
@@ -1187,6 +1212,8 @@ pub struct Config {
     /// Language → Formatter(s) mapping (supports multiple formatters per language)
     pub formatters: HashMap<String, Vec<FormatterConfig>>,
     pub linters: HashMap<String, String>,
+    /// Parser configuration (experimental)
+    pub parser: ParserConfig,
 }
 
 impl<'de> Deserialize<'de> for Config {
@@ -1213,6 +1240,7 @@ impl Default for Config {
             code_blocks: CodeBlockConfig::default(),
             formatters: HashMap::new(), // Opt-in: empty by default
             linters: HashMap::new(),    // Opt-in: empty by default
+            parser: ParserConfig::default(),
         }
     }
 }
@@ -1240,6 +1268,11 @@ impl ConfigBuilder {
 
     pub fn blank_lines(mut self, mode: BlankLines) -> Self {
         self.config.blank_lines = mode;
+        self
+    }
+
+    pub fn use_integrated_inline_parsing(mut self, enabled: bool) -> Self {
+        self.config.parser.use_integrated_inline_parsing = enabled;
         self
     }
 
@@ -2362,5 +2395,44 @@ mod code_blocks_config_test {
         // No base args (no preset, no explicit args), modifiers create args from scratch
         // Result: ["--flag", "--other"]
         assert_eq!(r_fmts[0].args, vec!["--flag", "--other"]);
+    }
+}
+
+#[cfg(test)]
+mod parser_config_test {
+    use super::*;
+
+    #[test]
+    fn test_parser_config_default() {
+        let cfg = Config::default();
+        assert!(!cfg.parser.use_integrated_inline_parsing);
+    }
+
+    #[test]
+    fn test_parser_config_deserialization() {
+        let toml_str = r#"
+            [parser]
+            use-integrated-inline-parsing = true
+        "#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+        assert!(cfg.parser.use_integrated_inline_parsing);
+    }
+
+    #[test]
+    fn test_parser_config_builder() {
+        let cfg = ConfigBuilder::default()
+            .use_integrated_inline_parsing(true)
+            .build();
+        assert!(cfg.parser.use_integrated_inline_parsing);
+    }
+
+    #[test]
+    fn test_parser_config_omitted_uses_default() {
+        // When parser section is omitted, should use defaults
+        let toml_str = r#"
+            flavor = "pandoc"
+        "#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+        assert!(!cfg.parser.use_integrated_inline_parsing);
     }
 }
