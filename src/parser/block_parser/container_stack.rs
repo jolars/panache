@@ -1,5 +1,5 @@
 use crate::parser::block_parser::lists::ListMarker;
-use crate::parser::block_parser::text_buffer::TextBuffer;
+use crate::parser::block_parser::text_buffer::{ParagraphBuffer, TextBuffer};
 use rowan::GreenNodeBuilder;
 
 #[derive(Debug, Clone)]
@@ -30,8 +30,7 @@ pub(crate) enum Container {
         plain_buffer: TextBuffer, // Buffer for accumulating PLAIN content
     },
     Paragraph {
-        #[allow(dead_code)] // Will be used in Subtask 5
-        buffer: TextBuffer, // Buffer for accumulating paragraph content
+        buffer: ParagraphBuffer, // Interleaved buffer for paragraph content with markers
     },
     FootnoteDefinition {
         content_col: usize,

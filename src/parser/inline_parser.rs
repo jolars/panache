@@ -259,6 +259,7 @@ impl InlineParser {
                     | SyntaxKind::TERM
                     | SyntaxKind::LINE_BLOCK_LINE
                     | SyntaxKind::PLAIN
+                    | SyntaxKind::PARAGRAPH
             )
         }
     }
@@ -285,11 +286,14 @@ impl InlineParser {
     /// We always concatenate for paragraphs and plain text blocks to properly handle
     /// multi-line inline constructs (emphasis, links, display math).
     ///
-    /// EXCEPT: When using integrated inline parsing, PLAIN blocks already have inline
+    /// EXCEPT: When using integrated inline parsing, PLAIN and PARAGRAPH blocks already have inline
     /// structure emitted during block parsing, so they should skip this step.
     fn should_concatenate_for_parsing(&self, node: &SyntaxNode) -> bool {
         match node.kind() {
-            SyntaxKind::PARAGRAPH => true,
+            SyntaxKind::PARAGRAPH => {
+                // Skip concatenation if PARAGRAPH already has inline structure from integrated parsing
+                !self.config.parser.use_integrated_inline_parsing
+            }
             SyntaxKind::PLAIN => {
                 // Skip concatenation if PLAIN already has inline structure from integrated parsing
                 !self.config.parser.use_integrated_inline_parsing

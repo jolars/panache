@@ -1,6 +1,6 @@
 # Parser Refactoring: Inline Parsing During Block Parsing (Pandoc-style)
 
-**Status**: Phase 4 In Progress (PLAIN blocks ✅, PARAGRAPH blocks pending) | Phase 5 Future Work  
+**Status**: Phase 4 Complete ✅ (PLAIN blocks ✅, PARAGRAPH blocks ✅) | Phase 5 Future Work  
 **Date**: 2026-02-25
 
 ---
@@ -300,18 +300,66 @@ Container::Definition {
 
 **Critical insight**: Second-pass inline parser must NOT re-parse PLAIN nodes when integrated parsing is enabled. The `should_concatenate_for_parsing()` function now checks the flag and excludes PLAIN, using `copy_subtree_verbatim()` instead.
 
-#### ⏳ PARAGRAPH Blocks (PENDING)
+#### ✅ PARAGRAPH Blocks (COMPLETE - 2026-02-25)
 
-**Status**: Not started
+**Status**: Complete - all A/B tests passing
 
-**Planned approach**: Apply identical buffering pattern to PARAGRAPH:
+**Solution: Interleaved ParagraphBuffer**
 
-1. Add `buffer: TextBuffer` to `Container::Paragraph`
-2. Modify `append_paragraph_line()` to buffer instead of emit
-3. Create `close_paragraph()` helper to emit buffered content with inline parsing
-4. Update all paragraph close sites to use the helper
+The key insight was that blockquote paragraphs CAN be buffered, but we need to track BLOCKQUOTE_MARKER positions alongside text content. The solution uses an interleaved buffer that stores both text segments and marker information.
 
-**Expected complexity**: Similar to PLAIN but simpler (no nested list edge cases)
+**Implementation**:
+
+1. ✅ Created `ParagraphBuffer` struct in `text_buffer.rs`:
+   - `ParagraphSegment` enum: `Text(String)` or `BlockquoteMarker { leading_spaces, has_trailing_space }`
+   - `push_text()` - appends text (concatenates if last segment is Text)
+   - `push_marker()` - records marker position
+   - `get_text_for_parsing()` - concatenates all Text segments
+   - `emit_with_inlines()` - emits inline-parsed content with markers at correct positions
+
+2. ✅ Updated `Container::Paragraph` to use `ParagraphBuffer` instead of `TextBuffer`
+
+3. ✅ Modified `append_paragraph_line()` in `paragraphs.rs`:
+   - Removed the `in_blockquote` exception
+   - All paragraphs now use buffering when `flag=true`
+   - Added `append_paragraph_marker()` helper
+
+4. ✅ Added `emit_or_buffer_blockquote_marker()` helper in `block_parser.rs`:
+   - If paragraph is open and flag=true: buffer the marker
+   - Otherwise: emit marker directly to builder
+
+5. ✅ Updated blockquote continuation handling to use `emit_or_buffer_blockquote_marker()`:
+   - Same depth continuation (key fix)
+   - Opening new blockquotes (existing levels)
+   - Closing blockquotes to shallower depth
+
+6. ✅ Updated `close_containers_to()` to use `buffer.emit_with_inlines()`
+
+**Verification**:
+
+- ✅ All 6 A/B tests passing (including `blockquotes`)
+- ✅ CST shows proper inline nodes (CODE_SPAN, STRONG, EMPHASIS, etc.)
+- ✅ Formatting is idempotent (no double-escaping)
+- ✅ Full test suite passes (840+ tests)
+- ✅ Clippy clean
+
+**Known limitation**: Multi-line inline constructs (e.g., `**bold\ntext**`) spanning across BLOCKQUOTE_MARKER boundaries are not supported. This is a pre-existing limitation also present with `flag=false` - the markers interrupt text concatenation during inline parsing.
+
+**Modified files**:
+
+- `src/parser/block_parser/text_buffer.rs` (~200 lines added):
+  - `ParagraphSegment` enum
+  - `ParagraphBuffer` struct with interleaved segment storage
+  - Unit tests for buffer operations
+- `src/parser/block_parser/container_stack.rs` (1 line):
+  - Changed `buffer: TextBuffer` to `buffer: ParagraphBuffer`
+- `src/parser/block_parser/paragraphs.rs` (~25 lines):
+  - Simplified `append_paragraph_line()` (removed blockquote exception)
+  - Added `append_paragraph_marker()` helper
+- `src/parser/block_parser.rs` (~50 lines):
+  - Added `emit_or_buffer_blockquote_marker()` helper
+  - Updated 4 marker emission sites to use the helper
+  - Updated `close_containers_to()` for `ParagraphBuffer`
 
 ---
 
@@ -326,6 +374,18 @@ Container::Definition {
 3. Remove flag and legacy code path
 4. Delete separate InlineParser pass
 5. Simplify architecture
+
+**Enhancement: Multi-line inline constructs in blockquotes**
+
+Currently, multi-line inline constructs (e.g., `**bold\ntext**`) don't work when they span BLOCKQUOTE_MARKER boundaries. This is a pre-existing limitation (also present with flag=false), not a regression.
+
+The fix requires parsing the full concatenated text as one unit, then emitting with markers inserted at tracked byte positions. Two approaches:
+
+1. **Wrapper builder**: Create a `MarkerInsertingBuilder` that wraps `GreenNodeBuilder` and intercepts token emissions to inject markers at the right byte offsets. Single pass, no intermediate allocations. Markers would end up inside inline nodes (e.g., BLOCKQUOTE_MARKER inside STRONG), which is semantically unusual but the formatter already skips markers so output would be correct.
+
+2. **Intermediate tree**: Parse to a temporary `GreenNode`, then traverse and emit to the real builder with markers inserted. Cleaner tree structure control, but extra allocation.
+
+Decision deferred to Phase 5 when we have more real-world testing data.
 
 ---
 

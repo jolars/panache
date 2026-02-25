@@ -89,7 +89,7 @@ impl<'a> BlockParser<'a> {
     ///
     /// This method handles both the old immediate-emit approach and the new buffering approach:
     /// - If `use_integrated_inline_parsing=false`: Delegates to `close_to` (old behavior)
-    /// - If `use_integrated_inline_parsing=true`: Emits buffered PLAIN content before closing
+    /// - If `use_integrated_inline_parsing=true`: Emits buffered PARAGRAPH/PLAIN content before closing
     fn close_containers_to(&mut self, keep: usize) {
         if !self.config.parser.use_integrated_inline_parsing {
             // Old path: Use original close_to logic
@@ -97,38 +97,77 @@ impl<'a> BlockParser<'a> {
             return;
         }
 
-        // New path: Emit buffered PLAIN content before closing
+        // New path: Emit buffered PARAGRAPH/PLAIN content before closing
         while self.containers.depth() > keep {
-            // Before closing Definition, emit any buffered PLAIN content
-            if let Some(Container::Definition {
-                plain_open: true,
-                plain_buffer,
-                ..
-            }) = self.containers.stack.last()
-                && !plain_buffer.is_empty()
-            {
-                // Emit PLAIN node with buffered inline-parsed content
-                self.builder.start_node(SyntaxKind::PLAIN.into());
-                let text = plain_buffer.get_accumulated_text();
-                inline_emission::emit_inlines(&mut self.builder, &text, self.config);
-                self.builder.finish_node();
-            }
+            match self.containers.stack.last() {
+                // Handle Paragraph with buffering - use emit_with_inlines for interleaved markers
+                Some(Container::Paragraph { buffer }) if !buffer.is_empty() => {
+                    // Clone buffer to avoid borrow issues
+                    let buffer_clone = buffer.clone();
+                    // Pop container first
+                    self.containers.stack.pop();
+                    // Emit buffered content with inline parsing (handles markers)
+                    buffer_clone.emit_with_inlines(&mut self.builder, self.config);
+                    self.builder.finish_node();
+                }
+                // Handle Paragraph without buffering (flag=false)
+                Some(Container::Paragraph { .. }) => {
+                    // Just close normally - content was emitted immediately
+                    self.containers.stack.pop();
+                    self.builder.finish_node();
+                }
+                // Handle Definition with buffered PLAIN
+                Some(Container::Definition {
+                    plain_open: true,
+                    plain_buffer,
+                    ..
+                }) if !plain_buffer.is_empty() => {
+                    // Emit PLAIN node with buffered inline-parsed content
+                    self.builder.start_node(SyntaxKind::PLAIN.into());
+                    let text = plain_buffer.get_accumulated_text();
+                    inline_emission::emit_inlines(&mut self.builder, &text, self.config);
+                    self.builder.finish_node();
 
-            // Mark PLAIN as closed and clear buffer
-            if let Some(Container::Definition {
-                plain_open,
-                plain_buffer,
-                ..
-            }) = self.containers.stack.last_mut()
-                && *plain_open
-            {
-                plain_buffer.clear();
-                *plain_open = false;
-            }
+                    // Mark PLAIN as closed and clear buffer
+                    if let Some(Container::Definition {
+                        plain_open,
+                        plain_buffer,
+                        ..
+                    }) = self.containers.stack.last_mut()
+                    {
+                        plain_buffer.clear();
+                        *plain_open = false;
+                    }
 
-            // Pop container and finish node
-            self.containers.stack.pop();
-            self.builder.finish_node();
+                    // Pop container and finish node
+                    self.containers.stack.pop();
+                    self.builder.finish_node();
+                }
+                // Handle Definition with PLAIN open but empty buffer
+                Some(Container::Definition {
+                    plain_open: true, ..
+                }) => {
+                    // Mark PLAIN as closed
+                    if let Some(Container::Definition {
+                        plain_open,
+                        plain_buffer,
+                        ..
+                    }) = self.containers.stack.last_mut()
+                    {
+                        plain_buffer.clear();
+                        *plain_open = false;
+                    }
+
+                    // Pop container and finish node
+                    self.containers.stack.pop();
+                    self.builder.finish_node();
+                }
+                // All other containers
+                _ => {
+                    self.containers.stack.pop();
+                    self.builder.finish_node();
+                }
+            }
         }
     }
 
@@ -164,6 +203,34 @@ impl<'a> BlockParser<'a> {
         {
             plain_buffer.clear();
             *plain_open = false;
+        }
+    }
+
+    /// Emit or buffer a blockquote marker depending on parser state.
+    ///
+    /// If a paragraph is open and we're using integrated parsing, buffer the marker.
+    /// Otherwise emit it directly to the builder.
+    fn emit_or_buffer_blockquote_marker(
+        &mut self,
+        leading_spaces: usize,
+        has_trailing_space: bool,
+    ) {
+        if self.config.parser.use_integrated_inline_parsing
+            && matches!(self.containers.last(), Some(Container::Paragraph { .. }))
+        {
+            // Buffer the marker in the paragraph
+            paragraphs::append_paragraph_marker(
+                &mut self.containers,
+                leading_spaces,
+                has_trailing_space,
+            );
+        } else {
+            // Emit directly
+            blockquotes::emit_one_blockquote_marker(
+                &mut self.builder,
+                leading_spaces,
+                has_trailing_space,
+            );
         }
     }
 
@@ -353,7 +420,12 @@ impl<'a> BlockParser<'a> {
             if current_bq_depth == 0 && !blockquotes::can_start_blockquote(self.pos, &self.lines) {
                 // Can't start blockquote without blank line - treat as paragraph
                 paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
-                paragraphs::append_paragraph_line(&mut self.builder, line);
+                paragraphs::append_paragraph_line(
+                    &mut self.containers,
+                    &mut self.builder,
+                    line,
+                    self.config,
+                );
                 self.pos += 1;
                 return true;
             }
@@ -382,8 +454,7 @@ impl<'a> BlockParser<'a> {
                 let marker_info = parse_blockquote_marker_info(line);
                 for i in 0..current_bq_depth {
                     if let Some(info) = marker_info.get(i) {
-                        blockquotes::emit_one_blockquote_marker(
-                            &mut self.builder,
+                        self.emit_or_buffer_blockquote_marker(
                             info.leading_spaces,
                             info.has_trailing_space,
                         );
@@ -392,13 +463,23 @@ impl<'a> BlockParser<'a> {
 
                 if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                     // Lazy continuation with the extra > as content
-                    paragraphs::append_paragraph_line(&mut self.builder, content_at_current_depth);
+                    paragraphs::append_paragraph_line(
+                        &mut self.containers,
+                        &mut self.builder,
+                        content_at_current_depth,
+                        self.config,
+                    );
                     self.pos += 1;
                     return true;
                 } else {
                     // Start new paragraph with the extra > as content
                     paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
-                    paragraphs::append_paragraph_line(&mut self.builder, content_at_current_depth);
+                    paragraphs::append_paragraph_line(
+                        &mut self.containers,
+                        &mut self.builder,
+                        content_at_current_depth,
+                        self.config,
+                    );
                     self.pos += 1;
                     return true;
                 }
@@ -415,8 +496,7 @@ impl<'a> BlockParser<'a> {
             // First, emit markers for existing blockquote levels (before opening new ones)
             for level in 0..current_bq_depth {
                 if let Some(info) = marker_info.get(level) {
-                    blockquotes::emit_one_blockquote_marker(
-                        &mut self.builder,
+                    self.emit_or_buffer_blockquote_marker(
                         info.leading_spaces,
                         info.has_trailing_space,
                     );
@@ -448,7 +528,12 @@ impl<'a> BlockParser<'a> {
             if bq_depth == 0 {
                 // Check for lazy paragraph continuation
                 if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                    paragraphs::append_paragraph_line(&mut self.builder, line);
+                    paragraphs::append_paragraph_line(
+                        &mut self.containers,
+                        &mut self.builder,
+                        line,
+                        self.config,
+                    );
                     self.pos += 1;
                     return true;
                 }
@@ -519,8 +604,7 @@ impl<'a> BlockParser<'a> {
                 let marker_info = parse_blockquote_marker_info(line);
                 for i in 0..bq_depth {
                     if let Some(info) = marker_info.get(i) {
-                        blockquotes::emit_one_blockquote_marker(
-                            &mut self.builder,
+                        self.emit_or_buffer_blockquote_marker(
                             info.leading_spaces,
                             info.has_trailing_space,
                         );
@@ -581,8 +665,7 @@ impl<'a> BlockParser<'a> {
             let marker_info = parse_blockquote_marker_info(line);
             for i in 0..bq_depth {
                 if let Some(info) = marker_info.get(i) {
-                    blockquotes::emit_one_blockquote_marker(
-                        &mut self.builder,
+                    self.emit_or_buffer_blockquote_marker(
                         info.leading_spaces,
                         info.has_trailing_space,
                     );
@@ -597,7 +680,12 @@ impl<'a> BlockParser<'a> {
         if current_bq_depth > 0 {
             // Check for lazy paragraph continuation
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                paragraphs::append_paragraph_line(&mut self.builder, line);
+                paragraphs::append_paragraph_line(
+                    &mut self.containers,
+                    &mut self.builder,
+                    line,
+                    self.config,
+                );
                 self.pos += 1;
                 return true;
             }
@@ -1304,7 +1392,12 @@ impl<'a> BlockParser<'a> {
             let first_line_content = &content[content_start..];
             if !first_line_content.trim().is_empty() {
                 paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
-                paragraphs::append_paragraph_line(&mut self.builder, first_line_content);
+                paragraphs::append_paragraph_line(
+                    &mut self.containers,
+                    &mut self.builder,
+                    first_line_content,
+                    self.config,
+                );
             }
 
             self.pos += 1;
@@ -1561,7 +1654,12 @@ impl<'a> BlockParser<'a> {
             if indent_cols >= 4 && !lists::in_list(&self.containers) {
                 // Code block at top-level, treat as paragraph
                 paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
-                paragraphs::append_paragraph_line(&mut self.builder, content);
+                paragraphs::append_paragraph_line(
+                    &mut self.containers,
+                    &mut self.builder,
+                    content,
+                    self.config,
+                );
                 self.pos += 1;
                 return true;
             }
@@ -1572,8 +1670,10 @@ impl<'a> BlockParser<'a> {
                 if !has_blank_before {
                     // List cannot interrupt paragraph without blank line - treat as paragraph content
                     paragraphs::append_paragraph_line(
+                        &mut self.containers,
                         &mut self.builder,
                         line_to_append.unwrap_or(content),
+                        self.config,
                     );
                     self.pos += 1;
                     return true;
@@ -1940,7 +2040,12 @@ impl<'a> BlockParser<'a> {
         // For lossless parsing: use line_to_append if provided (e.g., for blockquotes
         // where markers have been stripped), otherwise use the original line
         let line = line_to_append.unwrap_or(self.lines[self.pos]);
-        paragraphs::append_paragraph_line(&mut self.builder, line);
+        paragraphs::append_paragraph_line(
+            &mut self.containers,
+            &mut self.builder,
+            line,
+            self.config,
+        );
         self.pos += 1;
         true
     }
