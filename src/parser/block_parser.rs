@@ -1795,7 +1795,7 @@ impl<'a> BlockParser<'a> {
                     .close_to(self.containers.depth() - 1, &mut self.builder);
             }
 
-            let new_pos = parse_line_block(&self.lines, self.pos, &mut self.builder);
+            let new_pos = parse_line_block(&self.lines, self.pos, &mut self.builder, &self.config);
             self.pos = new_pos;
             return true;
         }

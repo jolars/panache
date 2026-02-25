@@ -255,8 +255,10 @@ impl InlineParser {
         // Skip nodes that already have inline elements emitted during block parsing
         matches!(
             node.kind(),
-            SyntaxKind::HEADING_CONTENT | SyntaxKind::TABLE_CAPTION | SyntaxKind::TERM // | SyntaxKind::LINE_BLOCK_LINE
-                                                                                       // | etc.
+            SyntaxKind::HEADING_CONTENT
+                | SyntaxKind::TABLE_CAPTION
+                | SyntaxKind::TERM
+                | SyntaxKind::LINE_BLOCK_LINE
         )
     }
 
@@ -288,7 +290,10 @@ impl InlineParser {
     /// Check if a token is a structural marker that should NOT be concatenated for inline parsing.
     /// Structural tokens must be emitted directly to preserve CST structure.
     fn is_structural_token(&self, kind: SyntaxKind) -> bool {
-        matches!(kind, SyntaxKind::BLOCKQUOTE_MARKER)
+        matches!(
+            kind,
+            SyntaxKind::BLOCKQUOTE_MARKER | SyntaxKind::LINE_BLOCK_MARKER
+        )
     }
 
     /// Parse inline text with reference link/image resolution support.

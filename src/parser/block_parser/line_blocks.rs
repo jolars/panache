@@ -1,6 +1,8 @@
+use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use super::inline_emission;
 use super::utils::strip_newline;
 
 /// Try to parse the start of a line block.
@@ -20,6 +22,7 @@ pub fn parse_line_block(
     lines: &[&str],
     start_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
+    config: &Config,
 ) -> usize {
     log::debug!("Parsing line block at line {}", start_pos + 1);
 
@@ -45,7 +48,12 @@ pub fn parse_line_block(
             let (content_without_newline, newline_str) = strip_newline(content);
 
             if !content_without_newline.is_empty() {
-                builder.token(SyntaxKind::TEXT.into(), content_without_newline);
+                // Use integrated inline parsing if enabled
+                if config.parser.use_integrated_inline_parsing {
+                    inline_emission::emit_inlines(builder, content_without_newline, config);
+                } else {
+                    builder.token(SyntaxKind::TEXT.into(), content_without_newline);
+                }
             }
 
             if !newline_str.is_empty() {
@@ -68,7 +76,12 @@ pub fn parse_line_block(
                     let (line_without_newline, newline_str) = strip_newline(next_line);
 
                     if !line_without_newline.is_empty() {
-                        builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+                        // Use integrated inline parsing if enabled
+                        if config.parser.use_integrated_inline_parsing {
+                            inline_emission::emit_inlines(builder, line_without_newline, config);
+                        } else {
+                            builder.token(SyntaxKind::TEXT.into(), line_without_newline);
+                        }
                     }
 
                     if !newline_str.is_empty() {
@@ -145,7 +158,7 @@ mod tests {
         let input = vec!["| Line one", "| Line two", "| Line three"];
 
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_line_block(&input, 0, &mut builder);
+        let new_pos = parse_line_block(&input, 0, &mut builder, &Config::default());
 
         assert_eq!(new_pos, 3);
     }
@@ -159,7 +172,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_line_block(&input, 0, &mut builder);
+        let new_pos = parse_line_block(&input, 0, &mut builder, &Config::default());
 
         assert_eq!(new_pos, 3);
     }
@@ -169,7 +182,7 @@ mod tests {
         let input = vec!["| First line", "|    Indented line", "| Back to normal"];
 
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_line_block(&input, 0, &mut builder);
+        let new_pos = parse_line_block(&input, 0, &mut builder, &Config::default());
 
         assert_eq!(new_pos, 3);
     }
@@ -179,7 +192,7 @@ mod tests {
         let input = vec!["| Line one", "| Line two", "Regular paragraph"];
 
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_line_block(&input, 0, &mut builder);
+        let new_pos = parse_line_block(&input, 0, &mut builder, &Config::default());
 
         assert_eq!(new_pos, 2); // Should stop before "Regular paragraph"
     }

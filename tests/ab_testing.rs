@@ -195,7 +195,10 @@ mod tests {
         run_ab_test("definition_list");
     }
 
-    // Add more A/B tests as we migrate blocks:
-    // - Line blocks (when Phase 3 migrates line block lines)
-    // - etc.
+    /// Test line blocks with integrated inline parsing (Phase 3).
+    /// Verifies that line block lines are parsed identically with both parsers.
+    #[test]
+    fn ab_test_line_blocks() {
+        run_ab_test("line_blocks");
+    }
 }
