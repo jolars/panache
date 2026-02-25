@@ -9,7 +9,6 @@ use rowan::GreenNodeBuilder;
 
 use super::container_stack::{Container, ContainerStack};
 use super::text_buffer::ParagraphBuffer;
-use super::utils;
 
 /// Start a paragraph if not already in one.
 pub(super) fn start_paragraph_if_needed(
@@ -27,31 +26,14 @@ pub(super) fn start_paragraph_if_needed(
 /// Append a line to the current paragraph (preserving losslessness).
 pub(super) fn append_paragraph_line(
     containers: &mut ContainerStack,
-    builder: &mut GreenNodeBuilder<'static>,
+    _builder: &mut GreenNodeBuilder<'static>,
     line: &str,
-    config: &Config,
+    _config: &Config,
 ) {
-    if config.parser.use_integrated_inline_parsing {
-        // New path: Buffer the line (with newline for losslessness)
-        // Works for ALL paragraphs including those in blockquotes
-        if let Some(Container::Paragraph { buffer }) = containers.stack.last_mut() {
-            buffer.push_text(line);
-        }
-    } else {
-        // Old path: Emit immediately (preserving losslessness)
-        // For lossless parsing, preserve the line exactly as-is
-        // Don't strip to content column in the parser - that's the formatter's job
-
-        // Split off trailing newline (LF or CRLF) if present
-        let (text_without_newline, newline_str) = utils::strip_newline(line);
-
-        if !text_without_newline.is_empty() {
-            builder.token(SyntaxKind::TEXT.into(), text_without_newline);
-        }
-
-        if !newline_str.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-        }
+    // Buffer the line (with newline for losslessness)
+    // Works for ALL paragraphs including those in blockquotes
+    if let Some(Container::Paragraph { buffer }) = containers.stack.last_mut() {
+        buffer.push_text(line);
     }
 }
 

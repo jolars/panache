@@ -246,22 +246,18 @@ impl InlineParser {
     }
 
     /// Check if a node should be skipped because it already has inline structure
-    /// from integrated parsing (when use_integrated_inline_parsing=true).
+    /// from integrated parsing.
     fn should_skip_already_parsed(&self, node: &SyntaxNode) -> bool {
-        if !self.config.parser.use_integrated_inline_parsing {
-            false
-        } else {
-            // Skip nodes that already have inline elements emitted during block parsing
-            matches!(
-                node.kind(),
-                SyntaxKind::HEADING_CONTENT
-                    | SyntaxKind::TABLE_CAPTION
-                    | SyntaxKind::TERM
-                    | SyntaxKind::LINE_BLOCK_LINE
-                    | SyntaxKind::PLAIN
-                    | SyntaxKind::PARAGRAPH
-            )
-        }
+        // All these nodes have inline elements emitted during block parsing
+        matches!(
+            node.kind(),
+            SyntaxKind::HEADING_CONTENT
+                | SyntaxKind::TABLE_CAPTION
+                | SyntaxKind::TERM
+                | SyntaxKind::LINE_BLOCK_LINE
+                | SyntaxKind::PLAIN
+                | SyntaxKind::PARAGRAPH
+        )
     }
 
     /// Copy a node and all its descendants verbatim, without any parsing or modification.
@@ -283,23 +279,11 @@ impl InlineParser {
     }
 
     /// Check if a node should concatenate tokens for parsing.
-    /// We always concatenate for paragraphs and plain text blocks to properly handle
-    /// multi-line inline constructs (emphasis, links, display math).
-    ///
-    /// EXCEPT: When using integrated inline parsing, PLAIN and PARAGRAPH blocks already have inline
-    /// structure emitted during block parsing, so they should skip this step.
-    fn should_concatenate_for_parsing(&self, node: &SyntaxNode) -> bool {
-        match node.kind() {
-            SyntaxKind::PARAGRAPH => {
-                // Skip concatenation if PARAGRAPH already has inline structure from integrated parsing
-                !self.config.parser.use_integrated_inline_parsing
-            }
-            SyntaxKind::PLAIN => {
-                // Skip concatenation if PLAIN already has inline structure from integrated parsing
-                !self.config.parser.use_integrated_inline_parsing
-            }
-            _ => false,
-        }
+    /// PLAIN and PARAGRAPH blocks already have inline structure from integrated parsing,
+    /// so they should never concatenate.
+    fn should_concatenate_for_parsing(&self, _node: &SyntaxNode) -> bool {
+        // PLAIN and PARAGRAPH already have inline structure - never concatenate
+        false
     }
 
     /// Check if a token is a structural marker that should NOT be concatenated for inline parsing.

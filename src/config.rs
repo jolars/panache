@@ -755,30 +755,12 @@ impl StyleConfig {
 
 /// Parser configuration.
 ///
-/// These settings control internal parser behavior, primarily for migration
-/// and performance optimization purposes.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// Reserved for future parser settings. Currently empty as the integrated
+/// inline parsing is the only mode (as of Phase 6, 2026-02-25).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct ParserConfig {
-    /// Use integrated inline parsing during block parsing (single-pass).
-    ///
-    /// When `true` (default), inline elements are parsed directly during block parsing,
-    /// matching Pandoc's architecture. When `false`, uses the legacy two-pass approach
-    /// (block parser → inline parser).
-    ///
-    /// **Status**: Production-ready as of Phase 5 (2026-02-25). All 98 golden test
-    /// cases verified with A/B testing. Legacy path maintained for compatibility.
-    ///
-    /// **Default**: `true` (integrated parsing enabled by default).
-    pub use_integrated_inline_parsing: bool,
-}
-
-impl Default for ParserConfig {
-    fn default() -> Self {
-        Self {
-            use_integrated_inline_parsing: true,
-        }
-    }
+    // Reserved for future parser configuration options
 }
 
 /// Internal deserialization struct that allows for optional fields
@@ -1276,11 +1258,6 @@ impl ConfigBuilder {
 
     pub fn blank_lines(mut self, mode: BlankLines) -> Self {
         self.config.blank_lines = mode;
-        self
-    }
-
-    pub fn use_integrated_inline_parsing(mut self, enabled: bool) -> Self {
-        self.config.parser.use_integrated_inline_parsing = enabled;
         self
     }
 
@@ -2413,45 +2390,17 @@ mod parser_config_test {
     #[test]
     fn test_parser_config_default() {
         let cfg = Config::default();
-        assert!(cfg.parser.use_integrated_inline_parsing);
+        // ParserConfig is now empty but should still be present
+        assert_eq!(cfg.parser, ParserConfig::default());
     }
 
     #[test]
-    fn test_parser_config_deserialization() {
+    fn test_parser_config_empty() {
+        // Verify empty parser config deserializes correctly
         let toml_str = r#"
             [parser]
-            use-integrated-inline-parsing = true
         "#;
         let cfg: Config = toml::from_str(toml_str).unwrap();
-        assert!(cfg.parser.use_integrated_inline_parsing);
-    }
-
-    #[test]
-    fn test_parser_config_builder() {
-        let cfg = ConfigBuilder::default()
-            .use_integrated_inline_parsing(true)
-            .build();
-        assert!(cfg.parser.use_integrated_inline_parsing);
-    }
-
-    #[test]
-    fn test_parser_config_omitted_uses_default() {
-        // When parser section is omitted, should use defaults (flag=true)
-        let toml_str = r#"
-            flavor = "pandoc"
-        "#;
-        let cfg: Config = toml::from_str(toml_str).unwrap();
-        assert!(cfg.parser.use_integrated_inline_parsing);
-    }
-
-    #[test]
-    fn test_parser_config_legacy_path() {
-        // Users can explicitly disable integrated parsing for legacy path
-        let toml_str = r#"
-            [parser]
-            use-integrated-inline-parsing = false
-        "#;
-        let cfg: Config = toml::from_str(toml_str).unwrap();
-        assert!(!cfg.parser.use_integrated_inline_parsing);
+        assert_eq!(cfg.parser, ParserConfig::default());
     }
 }

@@ -356,12 +356,7 @@ fn emit_table_caption(
                     let (caption_text, newline_str) = strip_newline(&line[rest_start..]);
 
                     if !caption_text.is_empty() {
-                        // Use integrated inline parsing if enabled
-                        if config.parser.use_integrated_inline_parsing {
-                            inline_emission::emit_inlines(builder, caption_text, config);
-                        } else {
-                            builder.token(SyntaxKind::TEXT.into(), caption_text);
-                        }
+                        inline_emission::emit_inlines(builder, caption_text, config);
                     }
 
                     if !newline_str.is_empty() {
@@ -373,12 +368,7 @@ fn emit_table_caption(
                 let (text, newline_str) = strip_newline(&line[leading_ws_len..]);
 
                 if !text.is_empty() {
-                    // Use integrated inline parsing if enabled
-                    if config.parser.use_integrated_inline_parsing {
-                        inline_emission::emit_inlines(builder, text, config);
-                    } else {
-                        builder.token(SyntaxKind::TEXT.into(), text);
-                    }
+                    inline_emission::emit_inlines(builder, text, config);
                 }
 
                 if !newline_str.is_empty() {
@@ -390,12 +380,7 @@ fn emit_table_caption(
             let (text, newline_str) = strip_newline(line);
 
             if !text.is_empty() {
-                // Use integrated inline parsing if enabled
-                if config.parser.use_integrated_inline_parsing {
-                    inline_emission::emit_inlines(builder, text, config);
-                } else {
-                    builder.token(SyntaxKind::TEXT.into(), text);
-                }
+                inline_emission::emit_inlines(builder, text, config);
             }
 
             if !newline_str.is_empty() {

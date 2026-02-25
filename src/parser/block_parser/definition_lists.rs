@@ -48,12 +48,7 @@ pub(crate) fn emit_term(builder: &mut GreenNodeBuilder<'static>, line: &str, con
     let trimmed_text = text.trim_end();
 
     if !trimmed_text.is_empty() {
-        // Use integrated inline parsing if enabled
-        if config.parser.use_integrated_inline_parsing {
-            inline_emission::emit_inlines(builder, trimmed_text, config);
-        } else {
-            builder.token(SyntaxKind::TEXT.into(), trimmed_text);
-        }
+        inline_emission::emit_inlines(builder, trimmed_text, config);
     }
 
     if !newline_str.is_empty() {

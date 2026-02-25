@@ -48,12 +48,7 @@ pub fn parse_line_block(
             let (content_without_newline, newline_str) = strip_newline(content);
 
             if !content_without_newline.is_empty() {
-                // Use integrated inline parsing if enabled
-                if config.parser.use_integrated_inline_parsing {
-                    inline_emission::emit_inlines(builder, content_without_newline, config);
-                } else {
-                    builder.token(SyntaxKind::TEXT.into(), content_without_newline);
-                }
+                inline_emission::emit_inlines(builder, content_without_newline, config);
             }
 
             if !newline_str.is_empty() {
@@ -76,12 +71,7 @@ pub fn parse_line_block(
                     let (line_without_newline, newline_str) = strip_newline(next_line);
 
                     if !line_without_newline.is_empty() {
-                        // Use integrated inline parsing if enabled
-                        if config.parser.use_integrated_inline_parsing {
-                            inline_emission::emit_inlines(builder, line_without_newline, config);
-                        } else {
-                            builder.token(SyntaxKind::TEXT.into(), line_without_newline);
-                        }
+                        inline_emission::emit_inlines(builder, line_without_newline, config);
                     }
 
                     if !newline_str.is_empty() {

@@ -99,12 +99,7 @@ pub(crate) fn emit_atx_heading(
     // Heading content node
     builder.start_node(SyntaxKind::HEADING_CONTENT.into());
     if !text_content.is_empty() {
-        // Use integrated inline parsing if enabled, otherwise emit TEXT token
-        if config.parser.use_integrated_inline_parsing {
-            inline_emission::emit_inlines(builder, text_content, config);
-        } else {
-            builder.token(SyntaxKind::TEXT.into(), text_content);
-        }
+        inline_emission::emit_inlines(builder, text_content, config);
     }
     builder.finish_node();
 
