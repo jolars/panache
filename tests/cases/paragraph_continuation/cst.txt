@@ -1,0 +1,233 @@
+DOCUMENT@0..1133
+  HEADING@0..30
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..29
+      TEXT@2..29 "Paragraph Continuatio ..."
+    NEWLINE@29..30 "\n"
+  BLANK_LINE@30..31
+    BLANK_LINE@30..31 "\n"
+  PARAGRAPH@31..144
+    TEXT@31..76 "This is a multi-line  ..."
+    NEWLINE@76..77 "\n"
+    TEXT@77..121 "on the second line an ..."
+    NEWLINE@121..122 "\n"
+    TEXT@122..143 "with various content."
+    NEWLINE@143..144 "\n"
+  BLANK_LINE@144..145
+    BLANK_LINE@144..145 "\n"
+  PARAGRAPH@145..189
+    TEXT@145..188 "This paragraph is fol ..."
+    NEWLINE@188..189 "\n"
+  BLANK_LINE@189..190
+    BLANK_LINE@189..190 "\n"
+  BLOCKQUOTE@190..236
+    BLOCKQUOTE_MARKER@190..191 ">"
+    WHITESPACE@191..192 " "
+    PARAGRAPH@192..236
+      TEXT@192..215 "Blockquote content here"
+      NEWLINE@215..216 "\n"
+      BLOCKQUOTE_MARKER@216..217 ">"
+      WHITESPACE@217..218 " "
+      TEXT@218..235 "with continuation"
+      NEWLINE@235..236 "\n"
+  BLANK_LINE@236..237
+    BLANK_LINE@236..237 "\n"
+  PARAGRAPH@237..279
+    TEXT@237..278 "Back to a paragraph a ..."
+    NEWLINE@278..279 "\n"
+  BLANK_LINE@279..280
+    BLANK_LINE@279..280 "\n"
+  HORIZONTAL_RULE@280..284
+    HORIZONTAL_RULE@280..283 "---"
+    NEWLINE@283..284 "\n"
+  BLANK_LINE@284..285
+    BLANK_LINE@284..285 "\n"
+  HEADING@285..310
+    ATX_HEADING_MARKER@285..287
+      ATX_HEADING_MARKER@285..287 "##"
+    WHITESPACE@287..288 " "
+    HEADING_CONTENT@288..309
+      TEXT@288..309 "Paragraph Before List"
+    NEWLINE@309..310 "\n"
+  BLANK_LINE@310..311
+    BLANK_LINE@310..311 "\n"
+  PARAGRAPH@311..363
+    TEXT@311..338 "Regular paragraph tex ..."
+    NEWLINE@338..339 "\n"
+    TEXT@339..362 "continues on next line."
+    NEWLINE@362..363 "\n"
+  BLANK_LINE@363..364
+    BLANK_LINE@363..364 "\n"
+  LIST@364..396
+    LIST_ITEM@364..380
+      LIST_MARKER@364..365 "-"
+      WHITESPACE@365..366 " "
+      PLAIN@366..380
+        TEXT@366..379 "List item one"
+        NEWLINE@379..380 "\n"
+    LIST_ITEM@380..396
+      LIST_MARKER@380..381 "-"
+      WHITESPACE@381..382 " "
+      PLAIN@382..396
+        TEXT@382..395 "List item two"
+        NEWLINE@395..396 "\n"
+  BLANK_LINE@396..397
+    BLANK_LINE@396..397 "\n"
+  HEADING@397..428
+    ATX_HEADING_MARKER@397..399
+      ATX_HEADING_MARKER@397..399 "##"
+    WHITESPACE@399..400 " "
+    HEADING_CONTENT@400..427
+      TEXT@400..427 "Paragraph Before Code ..."
+    NEWLINE@427..428 "\n"
+  BLANK_LINE@428..429
+    BLANK_LINE@428..429 "\n"
+  PARAGRAPH@429..492
+    TEXT@429..463 "Some paragraph text t ..."
+    NEWLINE@463..464 "\n"
+    TEXT@464..491 "across multiple lines ..."
+    NEWLINE@491..492 "\n"
+  BLANK_LINE@492..493
+    BLANK_LINE@492..493 "\n"
+  CODE_BLOCK@493..531
+    CODE_FENCE_OPEN@493..503
+      CODE_FENCE_MARKER@493..496 "```"
+      CODE_INFO@496..502
+        CODE_LANGUAGE@496..502 "python"
+      NEWLINE@502..503 "\n"
+    CODE_CONTENT@503..527
+      TEXT@503..517 "def example():"
+      NEWLINE@517..518 "\n"
+      TEXT@518..526 "    pass"
+      NEWLINE@526..527 "\n"
+    CODE_FENCE_CLOSE@527..531
+      CODE_FENCE_MARKER@527..530 "```"
+      NEWLINE@530..531 "\n"
+  BLANK_LINE@531..532
+    BLANK_LINE@531..532 "\n"
+  HEADING@532..560
+    ATX_HEADING_MARKER@532..534
+      ATX_HEADING_MARKER@532..534 "##"
+    WHITESPACE@534..535 " "
+    HEADING_CONTENT@535..559
+      TEXT@535..559 "Paragraph Before Heading"
+    NEWLINE@559..560 "\n"
+  BLANK_LINE@560..561
+    BLANK_LINE@560..561 "\n"
+  PARAGRAPH@561..612
+    TEXT@561..586 "Multi-line paragraph  ..."
+    NEWLINE@586..587 "\n"
+    TEXT@587..611 "with continuation lines."
+    NEWLINE@611..612 "\n"
+  BLANK_LINE@612..613
+    BLANK_LINE@612..613 "\n"
+  HEADING@613..633
+    ATX_HEADING_MARKER@613..616
+      ATX_HEADING_MARKER@613..616 "###"
+    WHITESPACE@616..617 " "
+    HEADING_CONTENT@617..632
+      TEXT@617..632 "Another Heading"
+    NEWLINE@632..633 "\n"
+  BLANK_LINE@633..634
+    BLANK_LINE@633..634 "\n"
+  HEADING@634..652
+    ATX_HEADING_MARKER@634..636
+      ATX_HEADING_MARKER@634..636 "##"
+    WHITESPACE@636..637 " "
+    HEADING_CONTENT@637..651
+      TEXT@637..651 "Nested Context"
+    NEWLINE@651..652 "\n"
+  BLANK_LINE@652..653
+    BLANK_LINE@652..653 "\n"
+  BLOCKQUOTE@653..803
+    BLOCKQUOTE_MARKER@653..654 ">"
+    WHITESPACE@654..655 " "
+    PARAGRAPH@655..750
+      TEXT@655..694 "This is a paragraph i ..."
+      NEWLINE@694..695 "\n"
+      BLOCKQUOTE_MARKER@695..696 ">"
+      WHITESPACE@696..697 " "
+      TEXT@697..728 "that continues on the ..."
+      NEWLINE@728..729 "\n"
+      BLOCKQUOTE_MARKER@729..730 ">"
+      WHITESPACE@730..731 " "
+      TEXT@731..749 "with more content."
+      NEWLINE@749..750 "\n"
+    BLOCKQUOTE_MARKER@750..751 ">"
+    BLANK_LINE@751..752
+      BLANK_LINE@751..752 "\n"
+    BLOCKQUOTE_MARKER@752..753 ">"
+    WHITESPACE@753..754 " "
+    PARAGRAPH@754..803
+      TEXT@754..784 "Second paragraph in b ..."
+      NEWLINE@784..785 "\n"
+      BLOCKQUOTE_MARKER@785..786 ">"
+      WHITESPACE@786..787 " "
+      TEXT@787..802 "also continues."
+      NEWLINE@802..803 "\n"
+  BLANK_LINE@803..804
+    BLANK_LINE@803..804 "\n"
+  LIST@804..909
+    LIST_ITEM@804..886
+      LIST_MARKER@804..805 "-"
+      WHITESPACE@805..806 " "
+      PARAGRAPH@806..831
+        TEXT@806..830 "List item with paragraph"
+        NEWLINE@830..831 "\n"
+      BLANK_LINE@831..834
+        BLANK_LINE@831..834 "  \n"
+      PARAGRAPH@834..886
+        TEXT@834..867 "  Indented paragraph  ..."
+        NEWLINE@867..868 "\n"
+        TEXT@868..885 "  continues here."
+        NEWLINE@885..886 "\n"
+    BLANK_LINE@886..889
+      BLANK_LINE@886..889 "  \n"
+    LIST_ITEM@889..909
+      LIST_MARKER@889..890 "-"
+      WHITESPACE@890..891 " "
+      PARAGRAPH@891..909
+        TEXT@891..908 "Another list item"
+        NEWLINE@908..909 "\n"
+  BLANK_LINE@909..910
+    BLANK_LINE@909..910 "\n"
+  HEADING@910..930
+    ATX_HEADING_MARKER@910..912
+      ATX_HEADING_MARKER@910..912 "##"
+    WHITESPACE@912..913 " "
+    HEADING_CONTENT@913..929
+      TEXT@913..929 "Hard Line Breaks"
+    NEWLINE@929..930 "\n"
+  BLANK_LINE@930..931
+    BLANK_LINE@930..931 "\n"
+  PARAGRAPH@931..990
+    TEXT@931..956 "Paragraph with hard b ..."
+    HARD_LINE_BREAK@956..958 "\\\n"
+    TEXT@958..989 "continues here after  ..."
+    NEWLINE@989..990 "\n"
+  BLANK_LINE@990..991
+    BLANK_LINE@990..991 "\n"
+  PARAGRAPH@991..1057
+    TEXT@991..1021 "Paragraph with traili ..."
+    HARD_LINE_BREAK@1021..1024 "  \n"
+    TEXT@1024..1056 "continues here after  ..."
+    NEWLINE@1056..1057 "\n"
+  BLANK_LINE@1057..1058
+    BLANK_LINE@1057..1058 "\n"
+  HEADING@1058..1077
+    ATX_HEADING_MARKER@1058..1060
+      ATX_HEADING_MARKER@1058..1060 "##"
+    WHITESPACE@1060..1061 " "
+    HEADING_CONTENT@1061..1076
+      TEXT@1061..1076 "End of Document"
+    NEWLINE@1076..1077 "\n"
+  BLANK_LINE@1077..1078
+    BLANK_LINE@1077..1078 "\n"
+  PARAGRAPH@1078..1133
+    TEXT@1078..1103 "Final paragraph conti ..."
+    NEWLINE@1103..1104 "\n"
+    TEXT@1104..1132 "to the very end of th ..."
+    NEWLINE@1132..1133 "\n"
+

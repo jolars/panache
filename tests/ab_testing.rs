@@ -201,4 +201,11 @@ mod tests {
     fn ab_test_line_blocks() {
         run_ab_test("line_blocks");
     }
+
+    /// Test PLAIN blocks with integrated inline parsing (Phase 4).
+    /// Verifies that PLAIN content with continuation is parsed identically.
+    #[test]
+    fn ab_test_plain_continuation() {
+        run_ab_test("plain_continuation_edge_cases");
+    }
 }
