@@ -176,6 +176,7 @@ golden_test_cases!(
     fenced_divs,
     footnote_def_paragraph,
     footnote_definition_list,
+    headings,
     headerless_table,
     horizontal_rules,
     html_block,
