@@ -1240,17 +1240,49 @@ fn extract_multiline_cells(text: &str, column_positions: &[(usize, usize)]) -> V
         // Keep line as-is without normalization - column positions should work on original text
         for (col_idx, &(col_start, col_end)) in column_positions.iter().enumerate() {
             let cell_line = if col_end <= line.len() {
-                line[col_start..col_end].trim()
+                &line[col_start..col_end]
             } else if col_start < line.len() {
-                line[col_start..].trim()
+                &line[col_start..]
             } else {
                 ""
             };
-            cells[col_idx].push(cell_line.to_string());
+            // Trim the cell line to normalize spacing - this ensures idempotency
+            // We trim both leading and trailing whitespace because alignment will be
+            // recalculated based on column positions
+            cells[col_idx].push(cell_line.trim().to_string());
         }
     }
 
     cells
+}
+
+/// Extract cells from TABLE_CELL nodes and continuation TEXT (Phase 7.1)
+fn extract_cells_from_table_cell_nodes(
+    row: &SyntaxNode,
+    config: &Config,
+    column_positions: &[(usize, usize)],
+) -> Vec<Vec<String>> {
+    // Format TABLE_CELL inline content, then extract multi-line text
+    let mut formatted_text = String::new();
+
+    for child in row.children_with_tokens() {
+        match child {
+            rowan::NodeOrToken::Token(token) => {
+                formatted_text.push_str(token.text());
+            }
+            rowan::NodeOrToken::Node(node) => {
+                if node.kind() == SyntaxKind::TABLE_CELL {
+                    // Format the inline content within the cell
+                    formatted_text.push_str(&format_cell_content(&node, config));
+                } else {
+                    // Other nodes (shouldn't happen in well-formed CST)
+                    formatted_text.push_str(&node.text().to_string());
+                }
+            }
+        }
+    }
+
+    extract_multiline_cells(&formatted_text, column_positions)
 }
 
 /// Extract structured data from multiline table AST node
@@ -1300,16 +1332,21 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
             }
             SyntaxKind::TABLE_HEADER => {
                 has_header = true;
-                // Collect all header text (may span multiple lines)
+                // Always use raw text for alignment detection - it preserves original spacing
                 header_text = child.text().to_string();
             }
             SyntaxKind::TABLE_ROW => {
-                // Format cell content and split into cells
-                let row_content = format_cell_content(&child, config);
-
-                // Extract multiline cells
-                let cells = extract_multiline_cells(&row_content, &column_positions);
-                rows.push(cells);
+                // Check if row has TABLE_CELL nodes (Phase 7.1)
+                if child.children().any(|c| c.kind() == SyntaxKind::TABLE_CELL) {
+                    let cells =
+                        extract_cells_from_table_cell_nodes(&child, config, &column_positions);
+                    rows.push(cells);
+                } else {
+                    // Old style: format cell content and split into cells
+                    let row_content = format_cell_content(&child, config);
+                    let cells = extract_multiline_cells(&row_content, &column_positions);
+                    rows.push(cells);
+                }
             }
             _ => {}
         }
@@ -1317,7 +1354,22 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
 
     // Add header as first row if present
     if has_header && !column_positions.is_empty() {
-        let header_cells = extract_multiline_cells(&header_text, &column_positions);
+        let header_node = node
+            .children()
+            .find(|c| c.kind() == SyntaxKind::TABLE_HEADER);
+
+        let header_cells = if let Some(hdr) = header_node {
+            if hdr.children().any(|c| c.kind() == SyntaxKind::TABLE_CELL) {
+                // New style: extract from TABLE_CELL nodes + continuation text
+                extract_cells_from_table_cell_nodes(&hdr, config, &column_positions)
+            } else {
+                // Old style: extract from text
+                extract_multiline_cells(&header_text, &column_positions)
+            }
+        } else {
+            extract_multiline_cells(&header_text, &column_positions)
+        };
+
         rows.insert(0, header_cells);
 
         // Determine alignments from header
@@ -1327,13 +1379,12 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
         }
     } else if !rows.is_empty() && !column_positions.is_empty() {
         // No header - determine alignment from first body row (per Pandoc spec)
-        let first_row_text = format_cell_content(
-            &node
-                .children()
-                .find(|c| c.kind() == SyntaxKind::TABLE_ROW)
-                .unwrap(),
-            config,
-        );
+        let first_row_node = node
+            .children()
+            .find(|c| c.kind() == SyntaxKind::TABLE_ROW)
+            .unwrap();
+        // Use raw text to preserve original spacing for alignment detection
+        let first_row_text = first_row_node.text().to_string();
         for &(col_start, col_end) in &column_positions {
             let alignment = determine_multiline_alignment(&first_row_text, col_start, col_end);
             alignments.push(alignment);

@@ -223,3 +223,27 @@ fn test_grid_table_center_alignment() {
     let result = format(input, None, None);
     assert_eq!(result, expected);
 }
+
+#[test]
+fn test_multiline_table_idempotency() {
+    let input = r#"-------------------------------------------------------------
+ Centered   Default           Right Left
+  Header    Aligned         Aligned Aligned
+----------- ------- --------------- -------------------------
+   First    row                12.0 Example of a row that
+                                    spans multiple lines.
+
+  Second    row                 5.0 Here's another one. Note
+                                    the blank line between
+                                    rows.
+-------------------------------------------------------------
+"#;
+
+    let first_format = format(input, None, None);
+    let second_format = format(&first_format, None, None);
+
+    assert_eq!(
+        first_format, second_format,
+        "Multiline table formatting must be idempotent"
+    );
+}

@@ -1916,6 +1916,10 @@ pub(crate) fn try_parse_multiline_table(
 
     let end_pos = pos;
 
+    // Extract column boundaries from the separator line
+    let columns =
+        try_parse_table_separator(lines[column_sep_pos]).expect("Column separator must be valid");
+
     // Check for caption before table
     let caption_before = find_caption_before_table(lines, start_pos);
 
@@ -1955,7 +1959,13 @@ pub(crate) fn try_parse_multiline_table(
         if i == column_sep_pos {
             // Emit any accumulated header lines
             if !current_row_lines.is_empty() {
-                emit_multiline_row(builder, &current_row_lines, SyntaxKind::TABLE_HEADER);
+                emit_multiline_table_row(
+                    builder,
+                    &current_row_lines,
+                    &columns,
+                    SyntaxKind::TABLE_HEADER,
+                    config,
+                );
                 current_row_lines.clear();
             }
 
@@ -1975,7 +1985,7 @@ pub(crate) fn try_parse_multiline_table(
                 } else {
                     SyntaxKind::TABLE_ROW
                 };
-                emit_multiline_row(builder, &current_row_lines, kind);
+                emit_multiline_table_row(builder, &current_row_lines, &columns, kind, config);
                 current_row_lines.clear();
             }
 
@@ -1994,7 +2004,7 @@ pub(crate) fn try_parse_multiline_table(
                 } else {
                     SyntaxKind::TABLE_ROW
                 };
-                emit_multiline_row(builder, &current_row_lines, kind);
+                emit_multiline_table_row(builder, &current_row_lines, &columns, kind, config);
                 current_row_lines.clear();
             }
 
@@ -2015,7 +2025,7 @@ pub(crate) fn try_parse_multiline_table(
         } else {
             SyntaxKind::TABLE_ROW
         };
-        emit_multiline_row(builder, &current_row_lines, kind);
+        emit_multiline_table_row(builder, &current_row_lines, &columns, kind, config);
     }
 
     // Emit caption after if present
@@ -2041,12 +2051,84 @@ pub(crate) fn try_parse_multiline_table(
     Some(table_end - table_start)
 }
 
-/// Emit a multiline table row (may span multiple lines).
-fn emit_multiline_row(builder: &mut GreenNodeBuilder<'static>, lines: &[&str], kind: SyntaxKind) {
+/// Extract cell contents from first line only (for CST emission).
+/// Multi-line content will be in continuation TEXT tokens.
+fn extract_first_line_cell_contents(line: &str, columns: &[Column]) -> Vec<String> {
+    let (line_content, _) = strip_newline(line);
+    let mut cells = Vec::new();
+
+    for column in columns.iter() {
+        // Extract FULL text for this column (including whitespace)
+        let cell_text = if column.end <= line_content.len() {
+            &line_content[column.start..column.end]
+        } else if column.start < line_content.len() {
+            &line_content[column.start..]
+        } else {
+            ""
+        };
+
+        cells.push(cell_text.to_string());
+    }
+
+    cells
+}
+
+/// Emit a multiline table row with inline parsing (Phase 7.1).
+fn emit_multiline_table_row(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    columns: &[Column],
+    kind: SyntaxKind,
+    config: &Config,
+) {
+    if lines.is_empty() {
+        return;
+    }
+
+    // Extract cell contents from first line only (for CST losslessness)
+    let first_line = lines[0];
+    let cell_contents = extract_first_line_cell_contents(first_line, columns);
+
     builder.start_node(kind.into());
-    for line in lines {
+
+    // Emit first line with TABLE_CELL nodes
+    let (trimmed, newline_str) = strip_newline(first_line);
+    let mut current_pos = 0;
+
+    for (col_idx, column) in columns.iter().enumerate() {
+        let cell_text = &cell_contents[col_idx];
+        let cell_start = column.start.min(trimmed.len());
+        let cell_end = column.end.min(trimmed.len());
+
+        // Emit whitespace before cell
+        if current_pos < cell_start {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &trimmed[current_pos..cell_start],
+            );
+        }
+
+        // Emit cell with inline parsing (first line content only)
+        emit_table_cell(builder, cell_text, config);
+
+        current_pos = cell_end;
+    }
+
+    // Emit trailing whitespace
+    if current_pos < trimmed.len() {
+        builder.token(SyntaxKind::WHITESPACE.into(), &trimmed[current_pos..]);
+    }
+
+    // Emit newline
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+    }
+
+    // Emit continuation lines as TEXT to preserve exact line structure
+    for line in lines.iter().skip(1) {
         emit_line_tokens(builder, line);
     }
+
     builder.finish_node();
 }
 
