@@ -16,13 +16,14 @@ use std::any::Any;
 use super::blocks::code_blocks::{
     CodeBlockType, FenceInfo, InfoString, parse_fenced_code_block, try_parse_fence_open,
 };
-use super::blocks::figures::{parse_figure, try_parse_figure};
+use super::blocks::figures::parse_figure;
 use super::blocks::headings::{
     emit_atx_heading, emit_setext_heading, try_parse_atx_heading, try_parse_setext_heading,
 };
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::metadata::try_parse_yaml_block;
 use super::blocks::reference_links::try_parse_reference_definition;
+use super::inlines::links::try_parse_inline_image;
 use super::utils::container_stack::byte_index_at_column;
 use super::utils::helpers::strip_newline;
 
@@ -342,20 +343,39 @@ impl BlockParser for FigureParser {
     fn can_parse(
         &self,
         ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
         _lines: &[&str],
         _line_pos: usize,
-    ) -> BlockDetectionResult {
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         // Must have blank line before
         if !ctx.has_blank_before {
-            return BlockDetectionResult::No;
+            return None;
         }
 
-        // Check if this looks like a figure
-        if try_parse_figure(ctx.content) {
-            BlockDetectionResult::Yes
-        } else {
-            BlockDetectionResult::No
+        let trimmed = ctx.content.trim();
+        // Must start with ![
+        if !trimmed.starts_with("![") {
+            return None;
         }
+
+        // Run the expensive inline-image validation once here.
+        let (len, _alt, _dest, _attrs) = try_parse_inline_image(trimmed)?;
+        let after_image = &trimmed[len..];
+        if !after_image.trim().is_empty() {
+            return None;
+        }
+
+        Some((BlockDetectionResult::Yes, Some(Box::new(len))))
     }
 
     fn parse(
@@ -365,9 +385,24 @@ impl BlockParser for FigureParser {
         lines: &[&str],
         line_pos: usize,
     ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        // If detection succeeded, we already validated that this is a standalone image.
+        // Payload currently only caches the parsed length (future-proofing).
+        let _len = payload.and_then(|p| p.downcast_ref::<usize>().copied());
+
         let line = lines[line_pos];
         parse_figure(builder, line, ctx.config);
-        1 // Consumed 1 line
+        1
     }
 
     fn name(&self) -> &'static str {

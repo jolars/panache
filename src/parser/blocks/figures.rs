@@ -7,33 +7,8 @@ use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-use crate::parser::inlines::links::try_parse_inline_image;
 use crate::parser::utils::helpers;
 use crate::parser::utils::inline_emission::emit_inlines;
-
-/// Try to parse a line as a standalone figure (image).
-///
-/// Uses the existing inline image parser to validate the syntax properly.
-/// Returns true if the line contains only a valid image (possibly with attributes).
-pub(in crate::parser) fn try_parse_figure(line: &str) -> bool {
-    let trimmed = line.trim();
-
-    // Must start with ![
-    if !trimmed.starts_with("![") {
-        return false;
-    }
-
-    // Use the inline parser's image validation to check if this is a valid image
-    // This handles all the bracket/paren matching, escapes, etc.
-    if let Some((len, _alt, _dest, _attrs)) = try_parse_inline_image(trimmed) {
-        // Check that the image spans the entire line (except trailing whitespace)
-        // After the image, only whitespace should remain
-        let after_image = &trimmed[len..];
-        after_image.trim().is_empty()
-    } else {
-        false
-    }
-}
 
 /// Parse a figure block (standalone image).
 ///
@@ -58,31 +33,4 @@ pub(in crate::parser) fn parse_figure(
     }
 
     builder.finish_node(); // Close Figure
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_try_parse_figure_starts_with_image() {
-        assert!(try_parse_figure("![alt text](image.png)"));
-        assert!(try_parse_figure("  ![alt text](image.png)  "));
-        assert!(try_parse_figure("![alt text](image.png)\n"));
-        assert!(try_parse_figure("![](image.png)"));
-        assert!(try_parse_figure("![alt text](image.png \"Title\")"));
-    }
-
-    #[test]
-    fn test_try_parse_figure_not_a_figure() {
-        // Has text before the image
-        assert!(!try_parse_figure("Text before ![alt](img.png)"));
-
-        // Not an image (regular link)
-        assert!(!try_parse_figure("[text](url)"));
-
-        // Empty or other content
-        assert!(!try_parse_figure(""));
-        assert!(!try_parse_figure("# Heading"));
-    }
 }
