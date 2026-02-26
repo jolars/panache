@@ -7,8 +7,6 @@ use super::block_dispatcher::{
 };
 use super::blocks::blockquotes;
 use super::blocks::definition_lists;
-use super::blocks::html_blocks;
-use super::blocks::latex_envs;
 use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
@@ -20,12 +18,11 @@ use super::utils::inline_emission;
 use super::utils::marker_utils;
 use super::utils::text_buffer;
 
+use super::utils::continuation::ContinuationPolicy;
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
-use html_blocks::try_parse_html_block_start;
-use latex_envs::try_parse_latex_env_begin;
 use line_blocks::{parse_line_block, try_parse_line_block_start};
-use lists::{is_content_nested_bullet_marker, markers_match, try_parse_list_marker};
+use lists::{is_content_nested_bullet_marker, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use reference_links::try_parse_footnote_marker;
 use tables::{
@@ -394,7 +391,11 @@ impl<'a> Parser<'a> {
 
             // Determine what containers to keep open based on next line
             let levels_to_keep = if peek < self.lines.len() {
-                self.compute_levels_to_keep(line, self.lines[peek])
+                ContinuationPolicy::new(self.config, &self.block_registry).compute_levels_to_keep(
+                    self.current_blockquote_depth(),
+                    &self.containers,
+                    self.lines[peek],
+                )
             } else {
                 0
             };
@@ -805,196 +806,6 @@ impl<'a> Parser<'a> {
         self.parse_inner_content(line, None)
     }
 
-    fn has_nested_block_structure(&self, content: &str) -> bool {
-        let block_ctx = BlockContext {
-            content,
-            has_blank_before: true,
-            // For blank-line container-keep decisions we do NOT want indented code blocks
-            // to count as “nested structure” (that would keep definitions open incorrectly).
-            has_blank_before_strict: false,
-            at_document_start: false,
-            in_fenced_div: self.in_fenced_div(),
-            blockquote_depth: self.current_blockquote_depth(),
-            config: self.config,
-            content_indent: 0,
-            list_indent_info: None,
-            next_line: None,
-        };
-
-        // Note: we only use the registry for its “is this a block start?” decision;
-        // it should not rely on `lines` here (setext is gated by `has_blank_before`).
-        // Provide `lines` so blocks that require lookahead (e.g. indented code over blank lines)
-        // can reason about continuation correctly.
-        self.block_registry
-            .detect_prepared(&block_ctx, &self.lines, self.pos)
-            .is_some()
-    }
-
-    /// Compute how many container levels to keep open based on next line content.
-    fn compute_levels_to_keep(&self, blank_line: &str, next_line: &str) -> usize {
-        let (_, blank_inner) = count_blockquote_markers(blank_line);
-        let (_blank_indent_cols, _) = leading_indent(blank_inner);
-
-        let (next_bq_depth, next_inner) = count_blockquote_markers(next_line);
-        let (raw_indent_cols, _) = leading_indent(next_inner);
-        let next_marker = try_parse_list_marker(next_inner, self.config);
-
-        // Calculate current blockquote depth for proper indent calculation
-        let current_bq_depth = self.current_blockquote_depth();
-
-        log::debug!(
-            "compute_levels_to_keep: next_line indent={}, has_marker={}, stack_depth={}, current_bq={}, next_bq={}",
-            raw_indent_cols,
-            next_marker.is_some(),
-            self.containers.depth(),
-            current_bq_depth,
-            next_bq_depth
-        );
-
-        let mut keep_level = 0;
-        let mut content_indent_so_far = 0usize;
-
-        // First, account for blockquotes
-        for (i, c) in self.containers.stack.iter().enumerate() {
-            match c {
-                Container::BlockQuote { .. } => {
-                    // Count blockquotes up to this point
-                    let bq_count = self.containers.stack[..=i]
-                        .iter()
-                        .filter(|x| matches!(x, Container::BlockQuote { .. }))
-                        .count();
-                    if bq_count <= next_bq_depth {
-                        keep_level = i + 1;
-                    }
-                }
-                Container::FootnoteDefinition { content_col, .. } => {
-                    // Track footnote indent for nested containers
-                    content_indent_so_far += *content_col;
-                    // Footnote continuation: line must be indented at least 4 spaces
-                    // (or at the content column if content started after marker)
-                    let min_indent = (*content_col).max(4);
-                    if raw_indent_cols >= min_indent {
-                        keep_level = i + 1;
-                    }
-                }
-                Container::Definition { content_col, .. } => {
-                    // Definition continuation: line must be indented at least 4 spaces.
-                    // After a blank line, only keep if there's nested block content (lists, code, etc).
-                    // Plain text after blank line should close the definition.
-                    let min_indent = (*content_col).max(4);
-                    if raw_indent_cols >= min_indent {
-                        // Check what kind of content this is
-                        let after_content_indent = if raw_indent_cols >= content_indent_so_far {
-                            let idx = byte_index_at_column(next_line, content_indent_so_far);
-                            &next_line[idx..]
-                        } else {
-                            next_line
-                        };
-
-                        // Keep Definition if there's a definition marker or nested block structure
-                        let has_definition_marker =
-                            try_parse_definition_marker(after_content_indent).is_some();
-                        let has_list_marker =
-                            try_parse_list_marker(after_content_indent, self.config).is_some();
-                        let has_block_structure = has_list_marker
-                            || count_blockquote_markers(after_content_indent).0 > 0
-                            || self.has_nested_block_structure(after_content_indent);
-
-                        if !has_definition_marker && has_block_structure {
-                            // Keep Definition for nested block content
-                            keep_level = i + 1;
-                        }
-                        // Otherwise let Definition close (either new definition or plain text)
-                    }
-                }
-                Container::List {
-                    marker,
-                    base_indent_cols,
-                    ..
-                } => {
-                    // Adjust indent for footnote context
-                    let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
-                    let continues_list = if let Some((ref nm, _, _)) = next_marker {
-                        markers_match(marker, nm) && effective_indent <= base_indent_cols + 3
-                    } else {
-                        // For non-list-marker lines, must be indented past list content
-                        let item_content_col = self
-                            .containers
-                            .stack
-                            .get(i + 1)
-                            .and_then(|c| match c {
-                                Container::ListItem { content_col, .. } => Some(*content_col),
-                                _ => None,
-                            })
-                            // If no list item, require at least 1 space indent to continue list
-                            .unwrap_or(1);
-                        effective_indent >= item_content_col
-                    };
-                    if continues_list {
-                        keep_level = i + 1;
-                    }
-                }
-                Container::ListItem { content_col, .. } => {
-                    // Keep list item if next line is indented to content column
-                    // BUT NOT if it's a new list item marker at an outer level
-
-                    // Special case: if next line has MORE blockquote markers than current depth,
-                    // those extra markers count as "content" that should be indented for list continuation.
-                    // Example: "> - item" followed by ">   > nested" - the 2 spaces between the markers
-                    // indicate list continuation, and the second > is content.
-                    let effective_indent = if next_bq_depth > current_bq_depth {
-                        // The line has extra blockquote markers. After stripping current depth's markers,
-                        // check the indent before any remaining markers.
-                        let after_current_bq =
-                            blockquotes::strip_n_blockquote_markers(next_line, current_bq_depth);
-                        let (spaces_before_next_marker, _) = leading_indent(after_current_bq);
-                        spaces_before_next_marker.saturating_sub(content_indent_so_far)
-                    } else {
-                        raw_indent_cols.saturating_sub(content_indent_so_far)
-                    };
-
-                    log::debug!(
-                        "ListItem continuation check: content_col={}, effective_indent={}, next_bq_depth={}, current_bq_depth={}",
-                        content_col,
-                        effective_indent,
-                        next_bq_depth,
-                        current_bq_depth
-                    );
-
-                    let is_new_item_at_outer_level = if let Some((ref _nm, _, _)) = next_marker {
-                        // Check if this marker would start a sibling item (at parent list level)
-                        // by checking if it's at or before the current item's start
-                        effective_indent < *content_col
-                    } else {
-                        false
-                    };
-
-                    if !is_new_item_at_outer_level && effective_indent >= *content_col {
-                        keep_level = i + 1;
-                        log::debug!(
-                            "Keeping ListItem: keep_level now {} (i={}, effective_indent={} >= content_col={})",
-                            keep_level,
-                            i,
-                            effective_indent,
-                            content_col
-                        );
-                    } else {
-                        log::debug!(
-                            "NOT keeping ListItem: is_new_item={}, effective_indent={} < content_col={}",
-                            is_new_item_at_outer_level,
-                            effective_indent,
-                            content_col
-                        );
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        log::debug!("compute_levels_to_keep returning: {}", keep_level);
-        keep_level
-    }
-
     /// Get the total indentation to strip from content containers (footnotes + definitions).
     fn content_container_indent_to_strip(&self) -> usize {
         self.containers
@@ -1047,76 +858,51 @@ impl<'a> Parser<'a> {
         // Continuation lines should be added to PLAIN, not treated as new blocks
         // BUT: Don't treat lines with block element markers as continuations
         if matches!(self.containers.last(), Some(Container::Definition { .. })) {
-            // A blank line that isn't indented to the definition content column ends the definition.
-            // (Otherwise indented code blocks after a blank line get swallowed as PLAIN continuation.)
-            let (indent_cols, _) = leading_indent(content);
-            if content.trim().is_empty() && indent_cols < content_indent {
-                // Fall through to normal blank-line handling.
-            } else {
-                // Check if this line starts with any block element marker
-                // Use stripped_content so we check AFTER removing footnote/definition indent
-                let is_block_element = try_parse_definition_marker(stripped_content).is_some()
-                    || try_parse_list_marker(stripped_content, self.config).is_some()
-                    || count_blockquote_markers(stripped_content).0 > 0
-                    || (self.config.extensions.raw_html
-                        && try_parse_html_block_start(stripped_content).is_some())
-                    || (self.config.extensions.raw_tex
-                        && try_parse_latex_env_begin(stripped_content).is_some())
-                    || {
-                        let next_line = if self.pos + 1 < self.lines.len() {
-                            Some(self.lines[self.pos + 1])
-                        } else {
-                            None
-                        };
+            let policy = ContinuationPolicy::new(self.config, &self.block_registry);
 
-                        let block_ctx = BlockContext {
-                            content: stripped_content,
-                            has_blank_before: true,
-                            has_blank_before_strict: true,
-                            at_document_start: self.pos == 0
-                                && self.current_blockquote_depth() == 0,
-                            in_fenced_div: self.in_fenced_div(),
-                            blockquote_depth: self.current_blockquote_depth(),
-                            config: self.config,
-                            content_indent,
-                            list_indent_info: None,
-                            next_line,
-                        };
+            if policy.definition_plain_can_continue(
+                stripped_content,
+                content,
+                content_indent,
+                &BlockContext {
+                    content: stripped_content,
+                    has_blank_before: true,
+                    has_blank_before_strict: true,
+                    at_document_start: self.pos == 0 && self.current_blockquote_depth() == 0,
+                    in_fenced_div: self.in_fenced_div(),
+                    blockquote_depth: self.current_blockquote_depth(),
+                    config: self.config,
+                    content_indent,
+                    list_indent_info: None,
+                    next_line: if self.pos + 1 < self.lines.len() {
+                        Some(self.lines[self.pos + 1])
+                    } else {
+                        None
+                    },
+                },
+                &self.lines,
+                self.pos,
+            ) {
+                let full_line = self.lines[self.pos];
+                let (text_without_newline, newline_str) = strip_newline(full_line);
 
-                        self.block_registry
-                            .detect_prepared(&block_ctx, &self.lines, self.pos)
-                            .is_some()
+                if let Some(Container::Definition {
+                    plain_open,
+                    plain_buffer,
+                    ..
+                }) = self.containers.stack.last_mut()
+                {
+                    let line_with_newline = if !newline_str.is_empty() {
+                        format!("{}{}", text_without_newline, newline_str)
+                    } else {
+                        text_without_newline.to_string()
                     };
-
-                if is_block_element {
-                    // Close any open Plain block before processing the block element
-                    // Buffered PLAIN content will be emitted by emit_buffered_plain_if_needed()
-                    // Fall through to parse the block element
-                } else {
-                    // This is a continuation line - add to PLAIN (start one if needed)
-                    let full_line = self.lines[self.pos];
-                    let (text_without_newline, newline_str) = strip_newline(full_line);
-
-                    // Buffer the line for later inline parsing
-                    if let Some(Container::Definition {
-                        plain_open,
-                        plain_buffer,
-                        ..
-                    }) = self.containers.stack.last_mut()
-                    {
-                        // Include the newline in the buffered text for losslessness
-                        let line_with_newline = if !newline_str.is_empty() {
-                            format!("{}{}", text_without_newline, newline_str)
-                        } else {
-                            text_without_newline.to_string()
-                        };
-                        plain_buffer.push_line(line_with_newline);
-                        *plain_open = true; // Mark that we now have an open PLAIN
-                    }
-
-                    self.pos += 1;
-                    return true;
+                    plain_buffer.push_line(line_with_newline);
+                    *plain_open = true;
                 }
+
+                self.pos += 1;
+                return true;
             }
         }
 

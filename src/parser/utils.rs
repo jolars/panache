@@ -9,6 +9,8 @@ pub mod attributes; // Public for use in inline parser and formatter
 pub mod chunk_options; // Public for hashpipe formatter
 #[path = "utils/container_stack.rs"]
 pub mod container_stack;
+#[path = "utils/continuation.rs"]
+pub mod continuation;
 #[path = "utils/helpers.rs"]
 pub mod helpers;
 #[path = "utils/inline_emission.rs"]

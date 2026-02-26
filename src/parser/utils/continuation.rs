@@ -1,0 +1,223 @@
+//! Continuation/blank-line handling policy.
+//!
+//! This module centralizes the parser's "should this line continue an existing container?"
+//! logic (especially across blank lines). Keeping this logic in one place reduces the
+//! risk of scattered ad-hoc heuristics diverging as blocks move into the dispatcher.
+
+use crate::config::Config;
+
+use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
+use crate::parser::blocks::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
+use crate::parser::blocks::{definition_lists, html_blocks, latex_envs, lists};
+use crate::parser::utils::container_stack::{ContainerStack, byte_index_at_column, leading_indent};
+
+pub(crate) struct ContinuationPolicy<'a, 'cfg> {
+    config: &'cfg Config,
+    block_registry: &'a BlockParserRegistry,
+}
+
+impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
+    pub(crate) fn new(config: &'cfg Config, block_registry: &'a BlockParserRegistry) -> Self {
+        Self {
+            config,
+            block_registry,
+        }
+    }
+
+    /// Registry-based "does this look like the start of some nested block structure" probe.
+    ///
+    /// Important: this is intended for *blank-line keep-open decisions*, so it uses
+    /// `has_blank_before_strict = false` to avoid treating indented code blocks as nested.
+    pub(crate) fn has_nested_block_structure(&self, content: &str) -> bool {
+        let block_ctx = BlockContext {
+            content,
+            has_blank_before: true,
+            // For blank-line container-keep decisions we do NOT want indented code blocks
+            // to count as “nested structure” (that would keep definitions open incorrectly).
+            has_blank_before_strict: false,
+            at_document_start: false,
+            in_fenced_div: false,
+            blockquote_depth: 0,
+            config: self.config,
+            content_indent: 0,
+            list_indent_info: None,
+            next_line: None,
+        };
+
+        // We intentionally pass empty `lines` here so lookahead-sensitive blocks (e.g. setext)
+        // won't count as nested structure for blank-line keep-open decisions.
+        self.block_registry
+            .detect_prepared(&block_ctx, &[], 0)
+            .is_some()
+    }
+
+    pub(crate) fn compute_levels_to_keep(
+        &self,
+        current_bq_depth: usize,
+        containers: &ContainerStack,
+        next_line: &str,
+    ) -> usize {
+        let (next_bq_depth, next_inner) = count_blockquote_markers(next_line);
+        let (raw_indent_cols, _) = leading_indent(next_inner);
+        let next_marker = lists::try_parse_list_marker(next_inner, self.config);
+
+        // `current_bq_depth` is used for proper indent calculation when the next line
+        // increases blockquote nesting.
+
+        let mut keep_level = 0;
+        let mut content_indent_so_far = 0usize;
+
+        // First, account for blockquotes
+        for (i, c) in containers.stack.iter().enumerate() {
+            match c {
+                crate::parser::utils::container_stack::Container::BlockQuote { .. } => {
+                    let bq_count = containers.stack[..=i]
+                        .iter()
+                        .filter(|x| {
+                            matches!(
+                                x,
+                                crate::parser::utils::container_stack::Container::BlockQuote { .. }
+                            )
+                        })
+                        .count();
+                    if bq_count <= next_bq_depth {
+                        keep_level = i + 1;
+                    }
+                }
+                crate::parser::utils::container_stack::Container::FootnoteDefinition {
+                    content_col,
+                    ..
+                } => {
+                    content_indent_so_far += *content_col;
+                    let min_indent = (*content_col).max(4);
+                    if raw_indent_cols >= min_indent {
+                        keep_level = i + 1;
+                    }
+                }
+                crate::parser::utils::container_stack::Container::Definition {
+                    content_col,
+                    ..
+                } => {
+                    let min_indent = (*content_col).max(4);
+                    if raw_indent_cols >= min_indent {
+                        let after_content_indent = if raw_indent_cols >= content_indent_so_far {
+                            let idx = byte_index_at_column(next_line, content_indent_so_far);
+                            &next_line[idx..]
+                        } else {
+                            next_line
+                        };
+
+                        let has_definition_marker =
+                            definition_lists::try_parse_definition_marker(after_content_indent)
+                                .is_some();
+                        let has_list_marker =
+                            lists::try_parse_list_marker(after_content_indent, self.config)
+                                .is_some();
+                        let has_block_structure = has_list_marker
+                            || count_blockquote_markers(after_content_indent).0 > 0
+                            || self.has_nested_block_structure(after_content_indent);
+
+                        if !has_definition_marker && has_block_structure {
+                            keep_level = i + 1;
+                        }
+                    }
+                }
+                crate::parser::utils::container_stack::Container::List {
+                    marker,
+                    base_indent_cols,
+                    ..
+                } => {
+                    let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
+                    let continues_list = if let Some((ref nm, _, _)) = next_marker {
+                        lists::markers_match(marker, nm) && effective_indent <= base_indent_cols + 3
+                    } else {
+                        let item_content_col = containers
+                            .stack
+                            .get(i + 1)
+                            .and_then(|c| match c {
+                                crate::parser::utils::container_stack::Container::ListItem {
+                                    content_col,
+                                    ..
+                                } => Some(*content_col),
+                                _ => None,
+                            })
+                            .unwrap_or(1);
+                        effective_indent >= item_content_col
+                    };
+                    if continues_list {
+                        keep_level = i + 1;
+                    }
+                }
+                crate::parser::utils::container_stack::Container::ListItem {
+                    content_col, ..
+                } => {
+                    let effective_indent = if next_bq_depth > current_bq_depth {
+                        let after_current_bq =
+                            strip_n_blockquote_markers(next_line, current_bq_depth);
+                        let (spaces_before_next_marker, _) = leading_indent(after_current_bq);
+                        spaces_before_next_marker.saturating_sub(content_indent_so_far)
+                    } else {
+                        raw_indent_cols.saturating_sub(content_indent_so_far)
+                    };
+
+                    let is_new_item_at_outer_level = if next_marker.is_some() {
+                        effective_indent < *content_col
+                    } else {
+                        false
+                    };
+
+                    if !is_new_item_at_outer_level && effective_indent >= *content_col {
+                        keep_level = i + 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        keep_level
+    }
+
+    /// Checks whether a line inside a definition should be treated as a plain continuation
+    /// (and buffered into the definition PLAIN), rather than parsed as a new block.
+    pub(crate) fn definition_plain_can_continue(
+        &self,
+        stripped_content: &str,
+        raw_content: &str,
+        content_indent: usize,
+        block_ctx: &BlockContext,
+        lines: &[&str],
+        pos: usize,
+    ) -> bool {
+        // A blank line that isn't indented to the definition content column ends the definition.
+        let (indent_cols, _) = leading_indent(raw_content);
+        if raw_content.trim().is_empty() && indent_cols < content_indent {
+            return false;
+        }
+
+        // If it's a block element marker, don't continue as plain.
+        if definition_lists::try_parse_definition_marker(stripped_content).is_some() {
+            return false;
+        }
+        if lists::try_parse_list_marker(stripped_content, self.config).is_some() {
+            return false;
+        }
+        if count_blockquote_markers(stripped_content).0 > 0 {
+            return false;
+        }
+        if self.config.extensions.raw_html
+            && html_blocks::try_parse_html_block_start(stripped_content).is_some()
+        {
+            return false;
+        }
+        if self.config.extensions.raw_tex
+            && latex_envs::try_parse_latex_env_begin(stripped_content).is_some()
+        {
+            return false;
+        }
+
+        !self
+            .block_registry
+            .detect_prepared(block_ctx, lines, pos)
+            .is_some()
+    }
+}
