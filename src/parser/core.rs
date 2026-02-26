@@ -899,23 +899,7 @@ impl<'a> Parser<'a> {
                             try_parse_list_marker(after_content_indent, self.config).is_some();
                         let has_block_structure = has_list_marker
                             || count_blockquote_markers(after_content_indent).0 > 0
-                            || {
-                                let block_ctx = BlockContext {
-                                    content: after_content_indent,
-                                    has_blank_before: true,
-                                    at_document_start: false,
-                                    blockquote_depth: self.current_blockquote_depth(),
-                                    config: self.config,
-                                    content_indent: 0,
-                                    list_indent_info: None,
-                                    // Avoid setext heading detection here; we only care about
-                                    // marker-like nested block structure after blank lines.
-                                    next_line: None,
-                                };
-                                self.block_registry
-                                    .detect_prepared(&block_ctx, &[], 0)
-                                    .is_some()
-                            };
+                            || self.has_nested_block_structure(after_content_indent);
 
                         if !has_definition_marker && has_block_structure {
                             // Keep Definition for nested block content
