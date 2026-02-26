@@ -26,8 +26,7 @@ DOCUMENT@0..2266
         NEWLINE@247..248 "\n"
       LIST@248..834
         LIST_ITEM@248..626
-          PLAIN@248..250
-            WHITESPACE@248..250 "  "
+          WHITESPACE@248..250 "  "
           LIST_MARKER@250..251 "-"
           WHITESPACE@251..252 " "
           PLAIN@252..410
@@ -35,8 +34,7 @@ DOCUMENT@0..2266
             NEWLINE@409..410 "\n"
           LIST@410..626
             LIST_ITEM@410..626
-              PLAIN@410..414
-                WHITESPACE@410..414 "    "
+              WHITESPACE@410..414 "    "
               LIST_MARKER@414..415 "-"
               WHITESPACE@415..416 " "
               PLAIN@416..546
@@ -44,16 +42,14 @@ DOCUMENT@0..2266
                 NEWLINE@545..546 "\n"
               LIST@546..626
                 LIST_ITEM@546..626
-                  PLAIN@546..552
-                    WHITESPACE@546..552 "      "
+                  WHITESPACE@546..552 "      "
                   LIST_MARKER@552..553 "-"
                   WHITESPACE@553..554 " "
                   PLAIN@554..626
                     TEXT@554..625 "Fourth level with mor ..."
                     NEWLINE@625..626 "\n"
         LIST_ITEM@626..834
-          PLAIN@626..628
-            WHITESPACE@626..628 "  "
+          WHITESPACE@626..628 "  "
           LIST_MARKER@628..629 "-"
           WHITESPACE@629..630 " "
           PLAIN@630..834
@@ -67,16 +63,14 @@ DOCUMENT@0..2266
         NEWLINE@858..859 "\n"
       LIST@859..1229
         LIST_ITEM@859..953
-          PLAIN@859..861
-            WHITESPACE@859..861 "  "
+          WHITESPACE@859..861 "  "
           LIST_MARKER@861..863 "1."
           WHITESPACE@863..864 " "
           PLAIN@864..953
             TEXT@864..952 "Nested ordered list w ..."
             NEWLINE@952..953 "\n"
         LIST_ITEM@953..1176
-          PLAIN@953..955
-            WHITESPACE@953..955 "  "
+          WHITESPACE@953..955 "  "
           LIST_MARKER@955..957 "2."
           WHITESPACE@957..958 " "
           PLAIN@958..992
@@ -84,24 +78,21 @@ DOCUMENT@0..2266
             NEWLINE@991..992 "\n"
           LIST@992..1176
             LIST_ITEM@992..1070
-              PLAIN@992..997
-                WHITESPACE@992..997 "     "
+              WHITESPACE@992..997 "     "
               LIST_MARKER@997..998 "-"
               WHITESPACE@998..999 " "
               PLAIN@999..1070
                 TEXT@999..1069 "Bullet inside ordered ..."
                 NEWLINE@1069..1070 "\n"
             LIST_ITEM@1070..1176
-              PLAIN@1070..1075
-                WHITESPACE@1070..1075 "     "
+              WHITESPACE@1070..1075 "     "
               LIST_MARKER@1075..1076 "-"
               WHITESPACE@1076..1077 " "
               PLAIN@1077..1176
                 TEXT@1077..1175 "Another bullet with e ..."
                 NEWLINE@1175..1176 "\n"
         LIST_ITEM@1176..1229
-          PLAIN@1176..1178
-            WHITESPACE@1176..1178 "  "
+          WHITESPACE@1176..1178 "  "
           LIST_MARKER@1178..1180 "3."
           WHITESPACE@1180..1181 " "
           PLAIN@1181..1229
@@ -128,8 +119,7 @@ DOCUMENT@0..2266
         NEWLINE@1411..1412 "\n"
       LIST@1412..1753
         LIST_ITEM@1412..1609
-          PLAIN@1412..1414
-            WHITESPACE@1412..1414 "  "
+          WHITESPACE@1412..1414 "  "
           LIST_MARKER@1414..1415 "-"
           WHITESPACE@1415..1416 " "
           TASK_CHECKBOX@1416..1419 "[ ]"
@@ -138,8 +128,7 @@ DOCUMENT@0..2266
             NEWLINE@1493..1494 "\n"
           LIST@1494..1609
             LIST_ITEM@1494..1609
-              PLAIN@1494..1498
-                WHITESPACE@1494..1498 "    "
+              WHITESPACE@1494..1498 "    "
               LIST_MARKER@1498..1499 "-"
               WHITESPACE@1499..1500 " "
               TASK_CHECKBOX@1500..1503 "[x]"
@@ -147,8 +136,7 @@ DOCUMENT@0..2266
                 TEXT@1503..1608 " Deeply nested comple ..."
                 NEWLINE@1608..1609 "\n"
         LIST_ITEM@1609..1753
-          PLAIN@1609..1611
-            WHITESPACE@1609..1611 "  "
+          WHITESPACE@1609..1611 "  "
           LIST_MARKER@1611..1612 "-"
           WHITESPACE@1612..1613 " "
           TASK_CHECKBOX@1613..1616 "[x]"
@@ -175,16 +163,14 @@ DOCUMENT@0..2266
     BLANK_LINE@1825..1826 "\n"
   LIST@1826..2266
     LIST_ITEM@1826..1934
-      PLAIN@1826..1828
-        WHITESPACE@1826..1828 "  "
+      WHITESPACE@1826..1828 "  "
       LIST_MARKER@1828..1830 "i."
       WHITESPACE@1830..1831 " "
       PLAIN@1831..1934
         TEXT@1831..1933 "First Roman numeral i ..."
         NEWLINE@1933..1934 "\n"
     LIST_ITEM@1934..1951
-      PLAIN@1934..1935
-        WHITESPACE@1934..1935 " "
+      WHITESPACE@1934..1935 " "
       LIST_MARKER@1935..1938 "ii."
       WHITESPACE@1938..1939 " "
       PLAIN@1939..1951
@@ -197,16 +183,14 @@ DOCUMENT@0..2266
         TEXT@1956..2083 "Third item with anoth ..."
         NEWLINE@2083..2084 "\n"
     LIST_ITEM@2084..2136
-      PLAIN@2084..2085
-        WHITESPACE@2084..2085 " "
+      WHITESPACE@2084..2085 " "
       LIST_MARKER@2085..2088 "iv."
       WHITESPACE@2088..2089 " "
       PLAIN@2089..2136
         TEXT@2089..2135 "Fourth item with a mo ..."
         NEWLINE@2135..2136 "\n"
     LIST_ITEM@2136..2266
-      PLAIN@2136..2138
-        WHITESPACE@2136..2138 "  "
+      WHITESPACE@2136..2138 "  "
       LIST_MARKER@2138..2140 "v."
       WHITESPACE@2140..2141 " "
       PLAIN@2141..2266

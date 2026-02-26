@@ -1,6 +1,6 @@
+use super::list_item_buffer::ListItemBuffer;
 use super::text_buffer::{ParagraphBuffer, TextBuffer};
 use crate::parser::blocks::lists::ListMarker;
-use rowan::GreenNodeBuilder;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Container {
@@ -13,9 +13,11 @@ pub(crate) enum Container {
     List {
         marker: ListMarker,
         base_indent_cols: usize,
+        has_blank_between_items: bool, // Track if list is loose (blank lines between items)
     },
     ListItem {
         content_col: usize,
+        buffer: ListItemBuffer, // Buffer for list item content
     },
     DefinitionList {
         // Definition lists don't need special tracking
@@ -56,26 +58,6 @@ impl ContainerStack {
 
     pub(crate) fn push(&mut self, c: Container) {
         self.stack.push(c);
-    }
-
-    /// Close containers from the top down until `keep` remain.
-    pub(crate) fn close_to(&mut self, keep: usize, builder: &mut GreenNodeBuilder<'static>) {
-        while self.stack.len() > keep {
-            // If closing a Definition with open Plain, close Plain node first
-            if let Some(Container::Definition {
-                plain_open: true, ..
-            }) = self.stack.last()
-            {
-                builder.finish_node(); // Close Plain node
-                // Mark Plain as closed
-                if let Some(Container::Definition { plain_open, .. }) = self.stack.last_mut() {
-                    *plain_open = false;
-                }
-            }
-
-            self.stack.pop();
-            builder.finish_node();
-        }
     }
 }
 

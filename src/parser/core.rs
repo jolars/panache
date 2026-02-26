@@ -19,7 +19,7 @@ use super::blocks::paragraphs;
 use super::blocks::reference_links;
 use super::blocks::tables;
 use super::utils::container_stack;
-use super::utils::helpers::{emit_line_tokens, split_lines_inclusive, strip_newline};
+use super::utils::helpers::{split_lines_inclusive, strip_newline};
 use super::utils::inline_emission;
 use super::utils::marker_utils;
 use super::utils::text_buffer;
@@ -87,6 +87,57 @@ impl<'a> Parser<'a> {
         // Emit buffered PARAGRAPH/PLAIN content before closing
         while self.containers.depth() > keep {
             match self.containers.stack.last() {
+                // Handle ListItem with buffering
+                Some(Container::ListItem { buffer, .. }) if !buffer.is_empty() => {
+                    // Clone buffer to avoid borrow issues
+                    let buffer_clone = buffer.clone();
+
+                    log::debug!(
+                        "Closing ListItem with buffer (is_empty={}, segment_count={})",
+                        buffer_clone.is_empty(),
+                        buffer_clone.segment_count()
+                    );
+
+                    // Determine if this should be Plain or PARAGRAPH:
+                    // 1. Check if parent LIST has blank lines between items (list-level loose)
+                    // 2. OR check if this item has blank lines within its content (item-level loose)
+                    let parent_list_is_loose = self
+                        .containers
+                        .stack
+                        .iter()
+                        .rev()
+                        .find_map(|c| match c {
+                            Container::List {
+                                has_blank_between_items,
+                                ..
+                            } => Some(*has_blank_between_items),
+                            _ => None,
+                        })
+                        .unwrap_or(false);
+
+                    let use_paragraph =
+                        parent_list_is_loose || buffer_clone.has_blank_lines_between_content();
+
+                    log::debug!(
+                        "Emitting ListItem buffer: use_paragraph={} (parent_list_is_loose={}, item_has_blanks={})",
+                        use_paragraph,
+                        parent_list_is_loose,
+                        buffer_clone.has_blank_lines_between_content()
+                    );
+
+                    // Pop container first
+                    self.containers.stack.pop();
+                    // Emit buffered content as Plain or PARAGRAPH
+                    buffer_clone.emit_as_block(&mut self.builder, use_paragraph, self.config);
+                    self.builder.finish_node(); // Close LIST_ITEM
+                }
+                // Handle ListItem without content
+                Some(Container::ListItem { .. }) => {
+                    log::debug!("Closing empty ListItem (no buffer content)");
+                    // Just close normally (empty list item)
+                    self.containers.stack.pop();
+                    self.builder.finish_node();
+                }
                 // Handle Paragraph with buffering
                 Some(Container::Paragraph { buffer }) if !buffer.is_empty() => {
                     // Clone buffer to avoid borrow issues
@@ -186,6 +237,41 @@ impl<'a> Parser<'a> {
         {
             plain_buffer.clear();
             *plain_open = false;
+        }
+    }
+
+    /// Close blockquotes down to a target depth.
+    ///
+    /// Must use `Parser::close_containers_to` (not `ContainerStack::close_to`) so list/paragraph
+    /// buffers are emitted for losslessness.
+    fn close_blockquotes_to_depth(&mut self, target_depth: usize) {
+        let mut current = blockquotes::current_blockquote_depth(&self.containers);
+        while current > target_depth {
+            while !matches!(self.containers.last(), Some(Container::BlockQuote { .. })) {
+                if self.containers.depth() == 0 {
+                    break;
+                }
+                self.close_containers_to(self.containers.depth() - 1);
+            }
+            if matches!(self.containers.last(), Some(Container::BlockQuote { .. })) {
+                self.close_containers_to(self.containers.depth() - 1);
+                current -= 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// Emit buffered list item content if we're in a ListItem and it has content.
+    /// This is used before starting block-level elements inside list items.
+    fn emit_list_item_buffer_if_needed(&mut self) {
+        if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut()
+            && !buffer.is_empty()
+        {
+            let buffer_clone = buffer.clone();
+            buffer.clear();
+            let use_paragraph = buffer_clone.has_blank_lines_between_content();
+            buffer_clone.emit_as_block(&mut self.builder, use_paragraph, self.config);
         }
     }
 
@@ -336,12 +422,8 @@ impl<'a> Parser<'a> {
                     self.containers.push(Container::BlockQuote {});
                 }
             } else if bq_depth < current_bq_depth {
-                // Close blockquotes down to bq_depth
-                blockquotes::close_blockquotes_to_depth(
-                    &mut self.containers,
-                    &mut self.builder,
-                    bq_depth,
-                );
+                // Close blockquotes down to bq_depth (must use Parser close to emit buffers)
+                self.close_blockquotes_to_depth(bq_depth);
             }
 
             // Peek ahead to determine what containers to keep open
@@ -367,11 +449,21 @@ impl<'a> Parser<'a> {
                 }
             );
 
+            // Check if blank line should be buffered in a ListItem BEFORE closing containers
+
             // Close containers down to the level we want to keep
             while self.containers.depth() > levels_to_keep {
                 match self.containers.last() {
-                    Some(Container::ListItem { .. })
-                    | Some(Container::List { .. })
+                    Some(Container::ListItem { .. }) => {
+                        // levels_to_keep wants to close the ListItem - blank line is between items
+                        log::debug!(
+                            "Closing ListItem at blank line (levels_to_keep={} < depth={})",
+                            levels_to_keep,
+                            self.containers.depth()
+                        );
+                        self.close_containers_to(self.containers.depth() - 1);
+                    }
+                    Some(Container::List { .. })
                     | Some(Container::FootnoteDefinition { .. })
                     | Some(Container::Paragraph { .. })
                     | Some(Container::Definition { .. })
@@ -388,6 +480,13 @@ impl<'a> Parser<'a> {
                     }
                     _ => break,
                 }
+            }
+
+            // If we kept a list item open, its first-line text may still be buffered.
+            // Flush it *before* emitting the blank line node (and its blockquote markers)
+            // so byte order matches the source.
+            if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                self.emit_list_item_buffer_if_needed();
             }
 
             // Emit blockquote markers for this blank line if inside blockquotes
@@ -408,6 +507,7 @@ impl<'a> Parser<'a> {
             self.builder
                 .token(SyntaxKind::BLANK_LINE.into(), inner_content);
             self.builder.finish_node();
+
             self.pos += 1;
             return true;
         }
@@ -548,11 +648,16 @@ impl<'a> Parser<'a> {
                         lists::find_matching_list_level(&self.containers, &marker, indent_cols)
                     {
                         // Continue the list inside the blockquote
-                        lists::continue_list_at_level(
-                            &mut self.containers,
-                            &mut self.builder,
-                            level,
-                        );
+                        // Close containers to the target level, emitting buffers properly
+                        self.close_containers_to(level + 1);
+
+                        // Close any open paragraph or list item at this level
+                        if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                            self.close_containers_to(self.containers.depth() - 1);
+                        }
+                        if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                            self.close_containers_to(self.containers.depth() - 1);
+                        }
 
                         // Check if content is a nested bullet marker
                         if let Some(nested_marker) =
@@ -590,12 +695,8 @@ impl<'a> Parser<'a> {
                 self.close_containers_to(self.containers.depth() - 1);
             }
 
-            // Close blockquotes down to the new depth
-            blockquotes::close_blockquotes_to_depth(
-                &mut self.containers,
-                &mut self.builder,
-                bq_depth,
-            );
+            // Close blockquotes down to the new depth (must use Parser close to emit buffers)
+            self.close_blockquotes_to_depth(bq_depth);
 
             // Parse the inner content at the new depth
             if bq_depth > 0 {
@@ -622,13 +723,13 @@ impl<'a> Parser<'a> {
             // ListItem should continue if the line is properly indented for continuation
             if matches!(
                 self.containers.last(),
-                Some(Container::ListItem { content_col: _ })
+                Some(Container::ListItem { content_col: _, .. })
             ) {
                 let (indent_cols, _) = leading_indent(inner_content);
                 let content_indent = self.content_container_indent_to_strip();
                 let effective_indent = indent_cols.saturating_sub(content_indent);
                 let content_col = match self.containers.last() {
-                    Some(Container::ListItem { content_col }) => *content_col,
+                    Some(Container::ListItem { content_col, .. }) => *content_col,
                     _ => 0,
                 };
 
@@ -698,7 +799,16 @@ impl<'a> Parser<'a> {
                 if let Some(level) =
                     lists::find_matching_list_level(&self.containers, &marker, indent_cols)
                 {
-                    lists::continue_list_at_level(&mut self.containers, &mut self.builder, level);
+                    // Close containers to the target level, emitting buffers properly
+                    self.close_containers_to(level + 1);
+
+                    // Close any open paragraph or list item at this level
+                    if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                        self.close_containers_to(self.containers.depth() - 1);
+                    }
+                    if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                        self.close_containers_to(self.containers.depth() - 1);
+                    }
 
                     // Check if content is a nested bullet marker
                     if let Some(nested_marker) =
@@ -814,6 +924,7 @@ impl<'a> Parser<'a> {
                 Container::List {
                     marker,
                     base_indent_cols,
+                    ..
                 } => {
                     // Adjust indent for footnote context
                     let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
@@ -826,7 +937,7 @@ impl<'a> Parser<'a> {
                             .stack
                             .get(i + 1)
                             .and_then(|c| match c {
-                                Container::ListItem { content_col } => Some(*content_col),
+                                Container::ListItem { content_col, .. } => Some(*content_col),
                                 _ => None,
                             })
                             // If no list item, require at least 1 space indent to continue list
@@ -837,7 +948,7 @@ impl<'a> Parser<'a> {
                         keep_level = i + 1;
                     }
                 }
-                Container::ListItem { content_col } => {
+                Container::ListItem { content_col, .. } => {
                     // Keep list item if next line is indented to content column
                     // BUT NOT if it's a new list item marker at an outer level
 
@@ -1033,6 +1144,10 @@ impl<'a> Parser<'a> {
             && let Some(block_type) = try_parse_html_block_start(content)
         {
             log::debug!("Parsed HTML block at line {}: {:?}", self.pos, block_type);
+
+            // Emit buffer before HTML block
+            self.emit_list_item_buffer_if_needed();
+
             // Close paragraph before opening HTML block
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.close_containers_to(self.containers.depth() - 1);
@@ -1054,6 +1169,10 @@ impl<'a> Parser<'a> {
         // If so, try to parse the table (which will include the caption)
         if is_caption_followed_by_table(&self.lines, self.pos) {
             log::debug!("Found caption followed by table at line {}", self.pos);
+
+            // Emit buffer before starting table
+            self.emit_list_item_buffer_if_needed();
+
             let caption_start = self.pos;
 
             // The caption is at self.pos. We need to find where the actual table starts.
@@ -1135,6 +1254,8 @@ impl<'a> Parser<'a> {
                     self.pos,
                     lines_consumed
                 );
+                // Emit buffer before table (should be done by table parser, but ensure)
+                self.emit_list_item_buffer_if_needed();
                 self.pos += lines_consumed;
                 return true;
             }
@@ -1148,6 +1269,7 @@ impl<'a> Parser<'a> {
                     self.pos,
                     lines_consumed
                 );
+                self.emit_list_item_buffer_if_needed();
                 self.pos += lines_consumed;
                 return true;
             }
@@ -1181,6 +1303,10 @@ impl<'a> Parser<'a> {
             // Try to parse horizontal rule (but only if not YAML)
             if try_parse_horizontal_rule(content).is_some() {
                 log::debug!("Parsed horizontal rule at line {}", self.pos);
+
+                // If we're in a ListItem with buffered content, emit it first
+                self.emit_list_item_buffer_if_needed();
+
                 emit_horizontal_rule(&mut self.builder, content);
                 self.pos += 1;
                 return true;
@@ -1300,6 +1426,10 @@ impl<'a> Parser<'a> {
             if skip_executable_in_pandoc {
                 // Don't parse as code block - let it fall through to paragraph/inline code
             } else {
+                // If we're in a ListItem with buffered content, emit it BEFORE the code block
+                // This ensures text appears before blocks in source order
+                self.emit_list_item_buffer_if_needed();
+
                 // Close paragraph before opening code block
                 if can_interrupt_paragraph
                     && matches!(self.containers.last(), Some(Container::Paragraph { .. }))
@@ -1425,6 +1555,9 @@ impl<'a> Parser<'a> {
             && is_indented_code_line(content)
             && try_parse_list_marker(content, self.config).is_none()
         {
+            // Emit buffer before indented code block
+            self.emit_list_item_buffer_if_needed();
+
             let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
             log::debug!("Parsed indented code block at line {}", self.pos);
             let new_pos = parse_indented_code_block(
@@ -1445,6 +1578,10 @@ impl<'a> Parser<'a> {
                 self.pos,
                 div_fence.fence_count
             );
+
+            // Emit buffer before fenced div
+            self.emit_list_item_buffer_if_needed();
+
             // Close paragraph before opening fenced div
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.close_containers_to(self.containers.depth() - 1);
@@ -1603,6 +1740,10 @@ impl<'a> Parser<'a> {
                 self.pos,
                 env_info.env_name
             );
+
+            // Emit buffer before LaTeX environment
+            self.emit_list_item_buffer_if_needed();
+
             // Close paragraph before opening LaTeX environment
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.close_containers_to(self.containers.depth() - 1);
@@ -1697,11 +1838,17 @@ impl<'a> Parser<'a> {
 
                     if num_parent_lists > 0 {
                         // This matches a nested list - continue it
-                        lists::continue_list_at_level(
-                            &mut self.containers,
-                            &mut self.builder,
-                            level,
-                        );
+                        // Close containers to the target level, emitting buffers properly
+                        self.close_containers_to(level + 1);
+
+                        // Close any open paragraph or list item at this level
+                        if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                            self.close_containers_to(self.containers.depth() - 1);
+                        }
+                        if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                            self.close_containers_to(self.containers.depth() - 1);
+                        }
+
                         if let Some(indent_str) = indent_to_emit {
                             self.builder
                                 .token(SyntaxKind::WHITESPACE.into(), indent_str);
@@ -1737,7 +1884,10 @@ impl<'a> Parser<'a> {
                     }
                 }
 
-                // No exact match - start new nested list
+                // No exact match - start new nested list.
+                // Flush buffered item text first so it stays before the nested LIST in source order.
+                self.emit_list_item_buffer_if_needed();
+
                 lists::start_nested_list(
                     &mut self.containers,
                     &mut self.builder,
@@ -1755,7 +1905,17 @@ impl<'a> Parser<'a> {
 
             // indent < content_col: Continue parent list if matched
             if let Some(level) = matched_level {
-                lists::continue_list_at_level(&mut self.containers, &mut self.builder, level);
+                // Close containers to the target level, emitting buffers properly
+                self.close_containers_to(level + 1);
+
+                // Close any open paragraph or list item at this level
+                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                    self.close_containers_to(self.containers.depth() - 1);
+                }
+                if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                    self.close_containers_to(self.containers.depth() - 1);
+                }
+
                 if let Some(indent_str) = indent_to_emit {
                     self.builder
                         .token(SyntaxKind::WHITESPACE.into(), indent_str);
@@ -1790,14 +1950,28 @@ impl<'a> Parser<'a> {
                 return true;
             }
 
-            // No match and not nested - start new top-level list
-            lists::start_new_list(
-                &mut self.containers,
-                &mut self.builder,
-                &marker,
-                indent_cols,
-                indent_to_emit,
-            );
+            // No match and not nested - start new top-level list.
+            // Close existing containers via Parser so buffers are emitted.
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.close_containers_to(self.containers.depth() - 1);
+            }
+            while matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                self.close_containers_to(self.containers.depth() - 1);
+            }
+            while matches!(self.containers.last(), Some(Container::List { .. })) {
+                self.close_containers_to(self.containers.depth() - 1);
+            }
+
+            self.builder.start_node(SyntaxKind::LIST.into());
+            if let Some(indent_str) = indent_to_emit {
+                self.builder
+                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
+            }
+            self.containers.push(Container::List {
+                marker: marker.clone(),
+                base_indent_cols: indent_cols,
+                has_blank_between_items: false,
+            });
 
             // Check if content is a nested bullet marker (e.g., "- *")
             if let Some(nested_marker) =
@@ -1970,15 +2144,20 @@ impl<'a> Parser<'a> {
         }
 
         // Paragraph or list item continuation
-        // Check if we're inside a ListItem - if so, emit bare tokens instead of wrapping in PARAGRAPH
+        // Check if we're inside a ListItem - if so, buffer the content instead of emitting
         if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
             log::debug!(
-                "Inside ListItem - emitting bare tokens for: {:?}",
+                "Inside ListItem - buffering content: {:?}",
                 line_to_append.unwrap_or(self.lines[self.pos]).trim_end()
             );
-            // Inside list item - emit as bare tokens for postprocessor to wrap later
+            // Inside list item - buffer content for later parsing
             let line = line_to_append.unwrap_or(self.lines[self.pos]);
-            emit_line_tokens(&mut self.builder, line);
+
+            // Add line to buffer in the ListItem container
+            if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+                buffer.push_text(line);
+            }
+
             self.pos += 1;
             return true;
         }

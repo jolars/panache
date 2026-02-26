@@ -2,7 +2,9 @@ use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use crate::parser::utils::container_stack::{Container, ContainerStack};
 use crate::parser::utils::helpers::strip_newline;
+use crate::parser::utils::list_item_buffer::ListItemBuffer;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ListMarker {
@@ -556,8 +558,9 @@ pub(crate) fn markers_match(a: &ListMarker, b: &ListMarker) -> bool {
     }
 }
 
-/// Emit a list item node to the builder.
-/// Returns the content column for the list item.
+/// Emit a list item node to the builder (marker and whitespace only).
+/// Returns (content_col, text_to_buffer) where text_to_buffer is the content that should be
+/// added to the list item buffer for later inline parsing.
 pub(crate) fn emit_list_item(
     builder: &mut GreenNodeBuilder<'static>,
     content: &str,
@@ -565,7 +568,7 @@ pub(crate) fn emit_list_item(
     spaces_after: usize,
     indent_cols: usize,
     indent_bytes: usize,
-) -> usize {
+) -> (usize, String) {
     builder.start_node(SyntaxKind::LIST_ITEM.into());
 
     // Emit leading indentation for lossless parsing
@@ -590,52 +593,27 @@ pub(crate) fn emit_list_item(
     let content_col = indent_cols + marker_len + spaces_after;
     let content_start = indent_bytes + marker_len + spaces_after;
 
-    if content_start < content.len() {
-        let remaining = &content[content_start..];
-
-        // Strip trailing newline from remaining text (it will be emitted separately)
-        let (text_part, newline_str) = strip_newline(remaining);
-
-        if !text_part.is_empty() {
-            // Check if this is a task list item (starts with [ ] or [x] or [X])
-            let trimmed = text_part.trim_start();
-            if trimmed.starts_with('[')
-                && trimmed.len() >= 3
-                && matches!(trimmed.chars().nth(1), Some(' ') | Some('x') | Some('X'))
-                && trimmed.chars().nth(2) == Some(']')
-            {
-                // Emit leading whitespace before checkbox if any
-                let leading_ws_len = text_part.len() - trimmed.len();
-                if leading_ws_len > 0 {
-                    builder.token(SyntaxKind::WHITESPACE.into(), &text_part[..leading_ws_len]);
-                }
-
-                // Emit the checkbox as a token
-                builder.token(SyntaxKind::TASK_CHECKBOX.into(), &trimmed[..3]);
-
-                // Emit the rest as TEXT
-                if trimmed.len() > 3 {
-                    builder.token(SyntaxKind::TEXT.into(), &trimmed[3..]);
-                }
-            } else {
-                // Not a task list, emit as normal TEXT
-                builder.token(SyntaxKind::TEXT.into(), text_part);
-            }
-        }
-
-        // Emit newline token separately if present
-        if !newline_str.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+    // Extract text content to be buffered (instead of emitting it directly).
+    // If the item starts with a task checkbox, emit it as a dedicated token so it
+    // doesn't get parsed as a link.
+    let text_to_buffer = if content_start < content.len() {
+        let rest = &content[content_start..];
+        if (rest.starts_with("[ ]") || rest.starts_with("[x]") || rest.starts_with("[X]"))
+            && rest
+                .as_bytes()
+                .get(3)
+                .is_some_and(|b| (*b as char).is_whitespace())
+        {
+            builder.token(SyntaxKind::TASK_CHECKBOX.into(), &rest[..3]);
+            rest[3..].to_string()
+        } else {
+            rest.to_string()
         }
     } else {
-        // Empty content line - just emit newline if present
-        let (_, line_newline_str) = strip_newline(content);
-        if !line_newline_str.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), line_newline_str);
-        }
-    }
+        String::new()
+    };
 
-    content_col
+    (content_col, text_to_buffer)
 }
 
 #[cfg(test)]
@@ -859,8 +837,6 @@ fn parses_nested_bullet_list_from_single_marker() {
 
 // Helper functions for list management in Parser
 
-use crate::parser::utils::container_stack::{Container, ContainerStack};
-
 /// Check if we're in any list.
 pub(in crate::parser) fn in_list(containers: &ContainerStack) -> bool {
     containers
@@ -897,6 +873,7 @@ pub(in crate::parser) fn find_matching_list_level(
         if let Container::List {
             marker: list_marker,
             base_indent_cols,
+            ..
         } = c
             && markers_match(marker, list_marker)
         {
@@ -933,49 +910,6 @@ pub(in crate::parser) fn find_matching_list_level(
     best_match.map(|(i, _)| i)
 }
 
-/// Continue list at a specific level (close containers down to level+1).
-pub(in crate::parser) fn continue_list_at_level(
-    containers: &mut ContainerStack,
-    builder: &mut GreenNodeBuilder<'static>,
-    level: usize,
-) {
-    containers.close_to(level + 1, builder);
-    if matches!(containers.last(), Some(Container::Paragraph { .. })) {
-        containers.close_to(containers.depth() - 1, builder);
-    }
-    if matches!(containers.last(), Some(Container::ListItem { .. })) {
-        containers.close_to(containers.depth() - 1, builder);
-    }
-}
-
-/// Start a new list, closing any existing lists/list items.
-pub(in crate::parser) fn start_new_list(
-    containers: &mut ContainerStack,
-    builder: &mut GreenNodeBuilder<'static>,
-    marker: &ListMarker,
-    indent_cols: usize,
-    indent_to_emit: Option<&str>,
-) {
-    if matches!(containers.last(), Some(Container::Paragraph { .. })) {
-        containers.close_to(containers.depth() - 1, builder);
-    }
-    while matches!(containers.last(), Some(Container::ListItem { .. })) {
-        containers.close_to(containers.depth() - 1, builder);
-    }
-    while matches!(containers.last(), Some(Container::List { .. })) {
-        containers.close_to(containers.depth() - 1, builder);
-    }
-    builder.start_node(SyntaxKind::LIST.into());
-    // Emit footnote/definition indent for losslessness
-    if let Some(indent_str) = indent_to_emit {
-        builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
-    }
-    containers.push(Container::List {
-        marker: marker.clone(),
-        base_indent_cols: indent_cols,
-    });
-}
-
 /// Start a nested list within an existing list item.
 #[allow(clippy::too_many_arguments)]
 pub(in crate::parser) fn start_nested_list(
@@ -999,10 +933,11 @@ pub(in crate::parser) fn start_nested_list(
     containers.push(Container::List {
         marker: marker.clone(),
         base_indent_cols: indent_cols,
+        has_blank_between_items: false,
     });
 
     // Add the nested list item
-    let content_col = emit_list_item(
+    let (content_col, text_to_buffer) = emit_list_item(
         builder,
         content,
         marker_len,
@@ -1010,7 +945,14 @@ pub(in crate::parser) fn start_nested_list(
         indent_cols,
         indent_bytes,
     );
-    containers.push(Container::ListItem { content_col });
+    let mut buffer = ListItemBuffer::new();
+    if !text_to_buffer.is_empty() {
+        buffer.push_text(text_to_buffer);
+    }
+    containers.push(Container::ListItem {
+        content_col,
+        buffer,
+    });
 }
 
 /// Checks if the content after a list marker is exactly another bullet marker.
@@ -1102,7 +1044,10 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
 
     // Push container for the outer list item
     let content_col = indent_cols + marker_len + spaces_after;
-    containers.push(Container::ListItem { content_col });
+    containers.push(Container::ListItem {
+        content_col,
+        buffer: ListItemBuffer::new(),
+    });
 }
 
 /// Add a list item to the current list.
@@ -1115,7 +1060,7 @@ pub(in crate::parser) fn add_list_item(
     indent_cols: usize,
     indent_bytes: usize,
 ) {
-    let content_col = emit_list_item(
+    let (content_col, text_to_buffer) = emit_list_item(
         builder,
         content,
         marker_len,
@@ -1123,5 +1068,19 @@ pub(in crate::parser) fn add_list_item(
         indent_cols,
         indent_bytes,
     );
-    containers.push(Container::ListItem { content_col });
+
+    log::debug!(
+        "add_list_item: content={:?}, text_to_buffer={:?}",
+        content,
+        text_to_buffer
+    );
+
+    let mut buffer = ListItemBuffer::new();
+    if !text_to_buffer.is_empty() {
+        buffer.push_text(text_to_buffer);
+    }
+    containers.push(Container::ListItem {
+        content_col,
+        buffer,
+    });
 }

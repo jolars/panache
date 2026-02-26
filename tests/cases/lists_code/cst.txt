@@ -3,7 +3,7 @@ DOCUMENT@0..184
     LIST_ITEM@0..45
       LIST_MARKER@0..1 "*"
       WHITESPACE@1..4 "   "
-      PARAGRAPH@4..12
+      PLAIN@4..12
         TEXT@4..11 "Bullet."
         NEWLINE@11..12 "\n"
       BLANK_LINE@12..13
@@ -28,7 +28,7 @@ DOCUMENT@0..184
     LIST_ITEM@46..63
       LIST_MARKER@46..47 "*"
       WHITESPACE@47..50 "   "
-      PARAGRAPH@50..63
+      PLAIN@50..63
         TEXT@50..62 "Next bullet."
         NEWLINE@62..63 "\n"
     BLANK_LINE@63..64
@@ -36,18 +36,17 @@ DOCUMENT@0..184
     LIST_ITEM@64..184
       LIST_MARKER@64..65 "*"
       WHITESPACE@65..68 "   "
-      PARAGRAPH@68..89
+      PLAIN@68..89
         TEXT@68..88 "Here's another list:"
         NEWLINE@88..89 "\n"
       BLANK_LINE@89..90
         BLANK_LINE@89..90 "\n"
       LIST@90..184
         LIST_ITEM@90..155
-          PARAGRAPH@90..94
-            WHITESPACE@90..94 "    "
+          WHITESPACE@90..94 "    "
           LIST_MARKER@94..95 "*"
           WHITESPACE@95..98 "   "
-          PARAGRAPH@98..110
+          PLAIN@98..110
             TEXT@98..109 "Sub-bullet."
             NEWLINE@109..110 "\n"
           BLANK_LINE@110..111
@@ -70,11 +69,10 @@ DOCUMENT@0..184
         BLANK_LINE@155..156
           BLANK_LINE@155..156 "\n"
         LIST_ITEM@156..184
-          PARAGRAPH@156..160
-            WHITESPACE@156..160 "    "
+          WHITESPACE@156..160 "    "
           LIST_MARKER@160..161 "*"
           WHITESPACE@161..164 "   "
-          PARAGRAPH@164..184
+          PLAIN@164..184
             TEXT@164..183 "Another sub-bullet."
             NEWLINE@183..184 "\n"
 

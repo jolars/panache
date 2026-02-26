@@ -173,12 +173,12 @@ DOCUMENT@0..1133
     LIST_ITEM@804..886
       LIST_MARKER@804..805 "-"
       WHITESPACE@805..806 " "
-      PARAGRAPH@806..831
+      PLAIN@806..831
         TEXT@806..830 "List item with paragraph"
         NEWLINE@830..831 "\n"
       BLANK_LINE@831..834
         BLANK_LINE@831..834 "  \n"
-      PARAGRAPH@834..886
+      PLAIN@834..886
         TEXT@834..867 "  Indented paragraph  ..."
         NEWLINE@867..868 "\n"
         TEXT@868..885 "  continues here."
@@ -188,7 +188,7 @@ DOCUMENT@0..1133
     LIST_ITEM@889..909
       LIST_MARKER@889..890 "-"
       WHITESPACE@890..891 " "
-      PARAGRAPH@891..909
+      PLAIN@891..909
         TEXT@891..908 "Another list item"
         NEWLINE@908..909 "\n"
   BLANK_LINE@909..910

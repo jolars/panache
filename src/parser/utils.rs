@@ -13,6 +13,8 @@ pub mod container_stack;
 pub mod helpers;
 #[path = "utils/inline_emission.rs"]
 pub mod inline_emission;
+#[path = "utils/list_item_buffer.rs"]
+pub mod list_item_buffer;
 #[path = "utils/marker_utils.rs"]
 pub mod marker_utils;
 #[path = "utils/text_buffer.rs"]

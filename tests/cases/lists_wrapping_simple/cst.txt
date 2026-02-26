@@ -130,16 +130,14 @@ DOCUMENT@0..1668
         NEWLINE@1282..1283 "\n"
       LIST@1283..1425
         LIST_ITEM@1283..1322
-          PLAIN@1283..1285
-            WHITESPACE@1283..1285 "  "
+          WHITESPACE@1283..1285 "  "
           LIST_MARKER@1285..1287 "1."
           WHITESPACE@1287..1288 " "
           PLAIN@1288..1322
             TEXT@1288..1321 "Nested ordered item t ..."
             NEWLINE@1321..1322 "\n"
         LIST_ITEM@1322..1425
-          PLAIN@1322..1324
-            WHITESPACE@1322..1324 "  "
+          WHITESPACE@1322..1324 "  "
           LIST_MARKER@1324..1326 "2."
           WHITESPACE@1326..1327 " "
           PLAIN@1327..1425
@@ -153,16 +151,14 @@ DOCUMENT@0..1668
         NEWLINE@1556..1557 "\n"
       LIST@1557..1668
         LIST_ITEM@1557..1579
-          PLAIN@1557..1559
-            WHITESPACE@1557..1559 "  "
+          WHITESPACE@1557..1559 "  "
           LIST_MARKER@1559..1560 "-"
           WHITESPACE@1560..1561 " "
           PLAIN@1561..1579
             TEXT@1561..1578 "Nested bullet one"
             NEWLINE@1578..1579 "\n"
         LIST_ITEM@1579..1668
-          PLAIN@1579..1581
-            WHITESPACE@1579..1581 "  "
+          WHITESPACE@1579..1581 "  "
           LIST_MARKER@1581..1582 "-"
           WHITESPACE@1582..1583 " "
           PLAIN@1583..1668

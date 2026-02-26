@@ -62,14 +62,14 @@ DOCUMENT@0..734
       LIST_MARKER@190..191 "*"
       WHITESPACE@191..192 " "
       TASK_CHECKBOX@192..195 "[ ]"
-      PARAGRAPH@195..215
+      PLAIN@195..215
         TEXT@195..214 " Task with asterisk"
         NEWLINE@214..215 "\n"
     LIST_ITEM@215..236
       LIST_MARKER@215..216 "*"
       WHITESPACE@216..217 " "
       TASK_CHECKBOX@217..220 "[x]"
-      PARAGRAPH@220..236
+      PLAIN@220..236
         TEXT@220..235 " Completed task"
         NEWLINE@235..236 "\n"
     BLANK_LINE@236..237
@@ -78,14 +78,14 @@ DOCUMENT@0..734
       LIST_MARKER@237..238 "+"
       WHITESPACE@238..239 " "
       TASK_CHECKBOX@239..242 "[ ]"
-      PARAGRAPH@242..258
+      PLAIN@242..258
         TEXT@242..257 " Task with plus"
         NEWLINE@257..258 "\n"
     LIST_ITEM@258..279
       LIST_MARKER@258..259 "+"
       WHITESPACE@259..260 " "
       TASK_CHECKBOX@260..263 "[x]"
-      PARAGRAPH@263..279
+      PLAIN@263..279
         TEXT@263..278 " Completed task"
         NEWLINE@278..279 "\n"
   BLANK_LINE@279..280
@@ -161,8 +161,7 @@ DOCUMENT@0..734
         NEWLINE@457..458 "\n"
       LIST@458..516
         LIST_ITEM@458..488
-          PLAIN@458..460
-            WHITESPACE@458..460 "  "
+          WHITESPACE@458..460 "  "
           LIST_MARKER@460..461 "-"
           WHITESPACE@461..462 " "
           TASK_CHECKBOX@462..465 "[ ]"
@@ -170,8 +169,7 @@ DOCUMENT@0..734
             TEXT@465..487 " Nested unchecked task"
             NEWLINE@487..488 "\n"
         LIST_ITEM@488..516
-          PLAIN@488..490
-            WHITESPACE@488..490 "  "
+          WHITESPACE@488..490 "  "
           LIST_MARKER@490..491 "-"
           WHITESPACE@491..492 " "
           TASK_CHECKBOX@492..495 "[x]"

@@ -34,13 +34,13 @@ DOCUMENT@0..759
     LIST_ITEM@165..176
       LIST_MARKER@165..166 "-"
       WHITESPACE@166..167 " "
-      PARAGRAPH@167..176
+      PLAIN@167..176
         TEXT@167..175 "Item one"
         NEWLINE@175..176 "\n"
     LIST_ITEM@176..187
       LIST_MARKER@176..177 "-"
       WHITESPACE@177..178 " "
-      PARAGRAPH@178..187
+      PLAIN@178..187
         TEXT@178..186 "Item two"
         NEWLINE@186..187 "\n"
     BLANK_LINE@187..188
@@ -48,7 +48,7 @@ DOCUMENT@0..759
     LIST_ITEM@188..323
       LIST_MARKER@188..189 "-"
       WHITESPACE@189..192 "   "
-      PARAGRAPH@192..323
+      PLAIN@192..323
         TEXT@192..263 "A function has a name ..."
         NEWLINE@263..264 "\n"
         TEXT@264..322 "and when called it ev ..."
@@ -56,7 +56,7 @@ DOCUMENT@0..759
     LIST_ITEM@323..454
       LIST_MARKER@323..324 "-"
       WHITESPACE@324..327 "   "
-      PARAGRAPH@327..454
+      PLAIN@327..454
         TEXT@327..400 "The function returns  ..."
         NEWLINE@400..401 "\n"
         TEXT@401..453 "when the body contain ..."
@@ -64,7 +64,7 @@ DOCUMENT@0..759
     LIST_ITEM@454..615
       LIST_MARKER@454..455 "-"
       WHITESPACE@455..458 "   "
-      PARAGRAPH@458..615
+      PLAIN@458..615
         TEXT@458..524 "Formal arguments can  ..."
         NEWLINE@524..525 "\n"
         TEXT@525..602 "implemented, and argu ..."
@@ -74,7 +74,7 @@ DOCUMENT@0..759
     LIST_ITEM@615..693
       LIST_MARKER@615..616 "-"
       WHITESPACE@616..619 "   "
-      PARAGRAPH@619..693
+      PLAIN@619..693
         TEXT@619..692 "Functions should do a ..."
         NEWLINE@692..693 "\n"
   BLANK_LINE@693..694

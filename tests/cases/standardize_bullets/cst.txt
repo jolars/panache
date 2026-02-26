@@ -31,13 +31,13 @@ DOCUMENT@0..1226
     LIST_ITEM@136..154
       LIST_MARKER@136..137 "*"
       WHITESPACE@137..138 " "
-      PARAGRAPH@138..154
+      PLAIN@138..154
         TEXT@138..153 "Asterisk item 1"
         NEWLINE@153..154 "\n"
     LIST_ITEM@154..172
       LIST_MARKER@154..155 "*"
       WHITESPACE@155..156 " "
-      PARAGRAPH@156..172
+      PLAIN@156..172
         TEXT@156..171 "Asterisk item 2"
         NEWLINE@171..172 "\n"
     BLANK_LINE@172..173
@@ -45,13 +45,13 @@ DOCUMENT@0..1226
     LIST_ITEM@173..187
       LIST_MARKER@173..174 "+"
       WHITESPACE@174..175 " "
-      PARAGRAPH@175..187
+      PLAIN@175..187
         TEXT@175..186 "Plus item 1"
         NEWLINE@186..187 "\n"
     LIST_ITEM@187..201
       LIST_MARKER@187..188 "+"
       WHITESPACE@188..189 " "
-      PARAGRAPH@189..201
+      PLAIN@189..201
         TEXT@189..200 "Plus item 2"
         NEWLINE@200..201 "\n"
     BLANK_LINE@201..202
@@ -59,13 +59,13 @@ DOCUMENT@0..1226
     LIST_ITEM@202..218
       LIST_MARKER@202..203 "-"
       WHITESPACE@203..204 " "
-      PARAGRAPH@204..218
+      PLAIN@204..218
         TEXT@204..217 "Hyphen item 1"
         NEWLINE@217..218 "\n"
     LIST_ITEM@218..234
       LIST_MARKER@218..219 "-"
       WHITESPACE@219..220 " "
-      PARAGRAPH@220..234
+      PLAIN@220..234
         TEXT@220..233 "Hyphen item 2"
         NEWLINE@233..234 "\n"
   BLANK_LINE@234..235
@@ -93,8 +93,7 @@ DOCUMENT@0..1226
         NEWLINE@313..314 "\n"
       LIST@314..409
         LIST_ITEM@314..409
-          PLAIN@314..316
-            WHITESPACE@314..316 "  "
+          WHITESPACE@314..316 "  "
           LIST_MARKER@316..317 "+"
           WHITESPACE@317..318 " "
           PLAIN@318..341
@@ -102,8 +101,7 @@ DOCUMENT@0..1226
             NEWLINE@340..341 "\n"
           LIST@341..409
             LIST_ITEM@341..409
-              PLAIN@341..345
-                WHITESPACE@341..345 "    "
+              WHITESPACE@341..345 "    "
               LIST_MARKER@345..346 "-"
               WHITESPACE@346..347 " "
               PLAIN@347..371
@@ -111,8 +109,7 @@ DOCUMENT@0..1226
                 NEWLINE@370..371 "\n"
               LIST@371..409
                 LIST_ITEM@371..409
-                  PLAIN@371..377
-                    WHITESPACE@371..377 "      "
+                  WHITESPACE@371..377 "      "
                   LIST_MARKER@377..378 "*"
                   WHITESPACE@378..379 " "
                   PLAIN@379..409
@@ -197,7 +194,7 @@ DOCUMENT@0..1226
     LIST_ITEM@698..729
       LIST_MARKER@698..699 "*"
       WHITESPACE@699..700 " "
-      PARAGRAPH@700..729
+      PLAIN@700..729
         TEXT@700..715 "List item with "
         CODE_SPAN@715..728
           CODE_SPAN_MARKER@715..716 "`"
@@ -207,14 +204,14 @@ DOCUMENT@0..1226
     LIST_ITEM@729..911
       LIST_MARKER@729..730 "*"
       WHITESPACE@730..731 " "
-      PARAGRAPH@731..821
+      PLAIN@731..821
         TEXT@731..805 "List item with more t ..."
         NEWLINE@805..806 "\n"
         TEXT@806..820 "  processes it"
         NEWLINE@820..821 "\n"
       BLANK_LINE@821..824
         BLANK_LINE@821..824 "  \n"
-      PARAGRAPH@824..862
+      PLAIN@824..862
         TEXT@824..861 "  Continuation paragr ..."
         NEWLINE@861..862 "\n"
       BLANK_LINE@862..865
@@ -242,7 +239,7 @@ DOCUMENT@0..1226
     LIST_ITEM@912..954
       LIST_MARKER@912..913 "+"
       WHITESPACE@913..914 " "
-      PARAGRAPH@914..954
+      PLAIN@914..954
         TEXT@914..953 "Another list item wit ..."
         NEWLINE@953..954 "\n"
   BLANK_LINE@954..955

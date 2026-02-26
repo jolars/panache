@@ -63,27 +63,3 @@ pub(in crate::parser) fn emit_one_blockquote_marker(
         builder.token(SyntaxKind::WHITESPACE.into(), " ");
     }
 }
-
-/// Close blockquotes down to a target depth.
-pub(in crate::parser) fn close_blockquotes_to_depth(
-    containers: &mut ContainerStack,
-    builder: &mut GreenNodeBuilder<'static>,
-    target_depth: usize,
-) {
-    let mut current = current_blockquote_depth(containers);
-    while current > target_depth {
-        // Close everything until we hit a blockquote, then close it
-        while !matches!(containers.last(), Some(Container::BlockQuote { .. })) {
-            if containers.depth() == 0 {
-                break;
-            }
-            containers.close_to(containers.depth() - 1, builder);
-        }
-        if matches!(containers.last(), Some(Container::BlockQuote { .. })) {
-            containers.close_to(containers.depth() - 1, builder);
-            current -= 1;
-        } else {
-            break;
-        }
-    }
-}

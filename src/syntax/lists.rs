@@ -32,14 +32,10 @@ impl AstNode for List {
 
 impl List {
     /// Returns true if this is a loose list (has blank lines between items).
-    ///
-    /// Loose lists have list items with PARAGRAPH children, while compact lists
-    /// have list items with PLAIN children.
     pub fn is_loose(&self) -> bool {
-        self.items().any(|item| {
-            item.children()
-                .any(|child| child.kind() == SyntaxKind::PARAGRAPH)
-        })
+        self.0
+            .children()
+            .any(|n| n.kind() == SyntaxKind::BLANK_LINE)
     }
 
     /// Returns true if this is a compact/tight list (no blank lines between items).

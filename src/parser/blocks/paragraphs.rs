@@ -59,7 +59,7 @@ pub(in crate::parser) fn current_content_col(containers: &ContainerStack) -> usi
         .iter()
         .rev()
         .find_map(|c| match c {
-            Container::ListItem { content_col } => Some(*content_col),
+            Container::ListItem { content_col, .. } => Some(*content_col),
             Container::FootnoteDefinition { content_col, .. } => Some(*content_col),
             _ => None,
         })

@@ -155,17 +155,10 @@ impl Formatter {
         let max_marker_width = Self::calculate_max_marker_width(node);
         self.max_marker_widths.push(max_marker_width);
 
-        // Detect if this is a loose list by checking for PARAGRAPH wrapper nodes
-        // (Parser marks loose lists with PARAGRAPH, tight lists with Plain)
-        let is_loose = node
-            .children()
-            .find(|child| child.kind() == SyntaxKind::LIST_ITEM)
-            .and_then(|item| {
-                item.children()
-                    .find(|c| matches!(c.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN))
-            })
-            .map(|wrapper| wrapper.kind() == SyntaxKind::PARAGRAPH)
-            .unwrap_or(false);
+        // Decide loose/tight at the *list* level.
+        // Parser may emit PLAIN for most list item text; we treat lists as loose
+        // if there are explicit blank lines between items in the CST.
+        let is_loose = node.children().any(|c| c.kind() == SyntaxKind::BLANK_LINE);
 
         log::debug!("Formatting list: is_loose={}", is_loose);
 
