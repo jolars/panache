@@ -1275,6 +1275,13 @@ impl<'a> Parser<'a> {
                 None
             };
 
+            // Get next line for lookahead (used by setext headings)
+            let next_line = if self.pos + 1 < self.lines.len() {
+                Some(self.lines[self.pos + 1])
+            } else {
+                None
+            };
+
             let block_ctx = BlockContext {
                 content,
                 has_blank_before,
@@ -1284,6 +1291,7 @@ impl<'a> Parser<'a> {
                 containers: &self.containers,
                 content_indent,
                 list_indent_info,
+                next_line,
             };
 
             if let Some((parser_idx, detection)) =
@@ -1316,6 +1324,12 @@ impl<'a> Parser<'a> {
                             None
                         };
 
+                        let next_line = if self.pos + 1 < self.lines.len() {
+                            Some(self.lines[self.pos + 1])
+                        } else {
+                            None
+                        };
+
                         let block_ctx = BlockContext {
                             content,
                             has_blank_before,
@@ -1325,6 +1339,7 @@ impl<'a> Parser<'a> {
                             containers: &self.containers,
                             content_indent,
                             list_indent_info,
+                            next_line,
                         };
 
                         let lines_consumed = self.block_registry.parse(
@@ -1354,6 +1369,12 @@ impl<'a> Parser<'a> {
                             None
                         };
 
+                        let next_line = if self.pos + 1 < self.lines.len() {
+                            Some(self.lines[self.pos + 1])
+                        } else {
+                            None
+                        };
+
                         let block_ctx = BlockContext {
                             content,
                             has_blank_before,
@@ -1363,6 +1384,7 @@ impl<'a> Parser<'a> {
                             containers: &self.containers,
                             content_indent,
                             list_indent_info,
+                            next_line,
                         };
 
                         let lines_consumed = self.block_registry.parse(
@@ -1398,6 +1420,12 @@ impl<'a> Parser<'a> {
             None
         };
 
+        let next_line = if self.pos + 1 < self.lines.len() {
+            Some(self.lines[self.pos + 1])
+        } else {
+            None
+        };
+
         let block_ctx = BlockContext {
             content,
             has_blank_before,
@@ -1407,6 +1435,7 @@ impl<'a> Parser<'a> {
             containers: &self.containers,
             content_indent,
             list_indent_info,
+            next_line,
         };
 
         if let Some((parser_idx, detection)) =
@@ -1436,6 +1465,12 @@ impl<'a> Parser<'a> {
                     None
                 };
 
+                let next_line = if self.pos + 1 < self.lines.len() {
+                    Some(self.lines[self.pos + 1])
+                } else {
+                    None
+                };
+
                 let block_ctx = BlockContext {
                     content,
                     has_blank_before,
@@ -1445,6 +1480,7 @@ impl<'a> Parser<'a> {
                     containers: &self.containers,
                     content_indent,
                     list_indent_info,
+                    next_line,
                 };
 
                 let lines_consumed = self.block_registry.parse(
@@ -1511,6 +1547,13 @@ impl<'a> Parser<'a> {
         // Check for reference definition: [label]: url "title"
         // These can appear anywhere in the document (no blank line needed)
         // Try dispatcher first
+
+        let next_line = if self.pos + 1 < self.lines.len() {
+            Some(self.lines[self.pos + 1])
+        } else {
+            None
+        };
+
         let block_ctx = BlockContext {
             content,
             has_blank_before,
@@ -1520,6 +1563,7 @@ impl<'a> Parser<'a> {
             containers: &self.containers,
             content_indent,
             list_indent_info: None, // Not needed for reference definitions
+            next_line,
         };
 
         if let Some((parser_idx, _detection)) =

@@ -13,7 +13,8 @@ pub(super) fn format_heading(node: &SyntaxNode) -> String {
             }
             SyntaxKind::SETEXT_HEADING_UNDERLINE => {
                 let t = child.text().to_string();
-                if t.chars().all(|c| c == '=') {
+                let first_char = t.trim().chars().next().unwrap_or('=');
+                if first_char == '=' {
                     level = 1;
                 } else {
                     level = 2;

@@ -33,6 +33,178 @@ pub(crate) fn try_parse_atx_heading(content: &str) -> Option<usize> {
     Some(hash_count)
 }
 
+/// Try to parse a setext heading from lines, returns (level, underline_char) if found.
+///
+/// Setext headings consist of:
+/// 1. A non-empty text line (heading content)
+/// 2. An underline of `=` (level 1) or `-` (level 2) characters
+///
+/// Rules:
+/// - Underline must be at least 3 characters long
+/// - Underline can have leading/trailing spaces (up to 3 leading spaces)
+/// - All underline characters must be the same (`=` or `-`)
+/// - Text line cannot be indented 4+ spaces (would be code block)
+/// - Text line cannot be empty/blank
+pub(crate) fn try_parse_setext_heading(lines: &[&str], pos: usize) -> Option<(usize, char)> {
+    // Need current line (text) and next line (underline)
+    if pos >= lines.len() {
+        return None;
+    }
+
+    let text_line = lines[pos];
+    let next_pos = pos + 1;
+    if next_pos >= lines.len() {
+        return None;
+    }
+
+    let underline = lines[next_pos];
+
+    // Text line cannot be empty or blank
+    if text_line.trim().is_empty() {
+        return None;
+    }
+
+    // Text line cannot be indented 4+ spaces (would be code block)
+    let leading_spaces = text_line.len() - text_line.trim_start().len();
+    if leading_spaces >= 4 {
+        return None;
+    }
+
+    // Check if underline is valid
+    let underline_trimmed = underline.trim();
+
+    // Must be at least 3 characters
+    if underline_trimmed.len() < 3 {
+        return None;
+    }
+
+    // Determine underline character and check consistency
+    let first_char = underline_trimmed.chars().next()?;
+    if first_char != '=' && first_char != '-' {
+        return None;
+    }
+
+    // All characters must be the same
+    if !underline_trimmed.chars().all(|c| c == first_char) {
+        return None;
+    }
+
+    // Leading spaces in underline (max 3 for consistency with other block rules)
+    let underline_leading_spaces = underline.len() - underline.trim_start().len();
+    if underline_leading_spaces >= 4 {
+        return None;
+    }
+
+    // Determine level: '=' is level 1, '-' is level 2
+    let level = if first_char == '=' { 1 } else { 2 };
+
+    Some((level, first_char))
+}
+
+/// Emit a setext heading node to the builder.
+///
+/// Setext headings consist of a text line followed by an underline.
+/// This function emits the complete HEADING node with both lines.
+pub(crate) fn emit_setext_heading(
+    builder: &mut GreenNodeBuilder<'static>,
+    text_line: &str,
+    underline_line: &str,
+    _level: usize,
+    config: &Config,
+) {
+    builder.start_node(SyntaxKind::HEADING.into());
+
+    // Strip trailing newline from text line for processing
+    let (text_without_newline, text_newline_str) =
+        if let Some(stripped) = text_line.strip_suffix("\r\n") {
+            (stripped, "\r\n")
+        } else if let Some(stripped) = text_line.strip_suffix('\n') {
+            (stripped, "\n")
+        } else {
+            (text_line, "")
+        };
+
+    // Handle leading spaces in text line
+    let text_trimmed = text_without_newline.trim_start();
+    let leading_spaces = text_without_newline.len() - text_trimmed.len();
+
+    if leading_spaces > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &text_without_newline[..leading_spaces],
+        );
+    }
+
+    // Try to parse trailing attributes from heading text
+    let (text_content, attributes, space_before_attrs) =
+        if let Some((attrs, text_before)) = try_parse_trailing_attributes(text_trimmed) {
+            // Find where { starts in text_trimmed to get the space between text and attributes
+            let start_brace_pos = text_trimmed.rfind('{').unwrap();
+            let space = &text_trimmed[text_before.len()..start_brace_pos];
+            (text_before, Some(attrs), space)
+        } else {
+            (text_trimmed, None, "")
+        };
+
+    // Emit heading content with inline parsing
+    builder.start_node(SyntaxKind::HEADING_CONTENT.into());
+    if !text_content.is_empty() {
+        inline_emission::emit_inlines(builder, text_content, config);
+    }
+    builder.finish_node();
+
+    // Emit space before attributes if present
+    if !space_before_attrs.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), space_before_attrs);
+    }
+
+    // Emit attributes if present
+    if let Some(attrs) = attributes {
+        emit_attributes(builder, &attrs);
+    }
+
+    // Emit newline after text line
+    if !text_newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), text_newline_str);
+    }
+
+    // Strip trailing newline from underline for processing
+    let (underline_without_newline, underline_newline_str) =
+        if let Some(stripped) = underline_line.strip_suffix("\r\n") {
+            (stripped, "\r\n")
+        } else if let Some(stripped) = underline_line.strip_suffix('\n') {
+            (stripped, "\n")
+        } else {
+            (underline_line, "")
+        };
+
+    // Emit underline leading spaces if present
+    let underline_trimmed = underline_without_newline.trim_start();
+    let underline_leading_spaces = underline_without_newline.len() - underline_trimmed.len();
+
+    if underline_leading_spaces > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &underline_without_newline[..underline_leading_spaces],
+        );
+    }
+
+    // Emit the setext underline as a node containing a token
+    builder.start_node(SyntaxKind::SETEXT_HEADING_UNDERLINE.into());
+    builder.token(
+        SyntaxKind::SETEXT_HEADING_UNDERLINE.into(),
+        underline_trimmed,
+    );
+    builder.finish_node();
+
+    // Emit trailing newline after underline
+    if !underline_newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), underline_newline_str);
+    }
+
+    builder.finish_node(); // HEADING
+}
+
 /// Emit an ATX heading node to the builder.
 pub(crate) fn emit_atx_heading(
     builder: &mut GreenNodeBuilder<'static>,
@@ -153,5 +325,71 @@ mod tests {
     #[test]
     fn test_level_7_invalid() {
         assert_eq!(try_parse_atx_heading("####### Too many"), None);
+    }
+
+    // Setext heading tests
+    #[test]
+    fn test_setext_level_1() {
+        let lines = vec!["Heading", "======="];
+        assert_eq!(try_parse_setext_heading(&lines, 0), Some((1, '=')));
+    }
+
+    #[test]
+    fn test_setext_level_2() {
+        let lines = vec!["Heading", "-------"];
+        assert_eq!(try_parse_setext_heading(&lines, 0), Some((2, '-')));
+    }
+
+    #[test]
+    fn test_setext_minimum_three_chars() {
+        let lines = vec!["Heading", "=="];
+        assert_eq!(try_parse_setext_heading(&lines, 0), None);
+
+        let lines = vec!["Heading", "==="];
+        assert_eq!(try_parse_setext_heading(&lines, 0), Some((1, '=')));
+    }
+
+    #[test]
+    fn test_setext_mixed_chars_invalid() {
+        let lines = vec!["Heading", "==-=="];
+        assert_eq!(try_parse_setext_heading(&lines, 0), None);
+    }
+
+    #[test]
+    fn test_setext_with_leading_spaces() {
+        let lines = vec!["Heading", "   ======="];
+        assert_eq!(try_parse_setext_heading(&lines, 0), Some((1, '=')));
+    }
+
+    #[test]
+    fn test_setext_with_trailing_spaces() {
+        let lines = vec!["Heading", "=======   "];
+        assert_eq!(try_parse_setext_heading(&lines, 0), Some((1, '=')));
+    }
+
+    #[test]
+    fn test_setext_empty_text_line() {
+        let lines = vec!["", "======="];
+        assert_eq!(try_parse_setext_heading(&lines, 0), None);
+    }
+
+    #[test]
+    fn test_setext_no_next_line() {
+        let lines = vec!["Heading"];
+        assert_eq!(try_parse_setext_heading(&lines, 0), None);
+    }
+
+    #[test]
+    fn test_setext_four_spaces_indent() {
+        // 4+ spaces means code block, not setext
+        let lines = vec!["    Heading", "    ======="];
+        assert_eq!(try_parse_setext_heading(&lines, 0), None);
+    }
+
+    #[test]
+    fn test_setext_long_underline() {
+        let underline = "=".repeat(100);
+        let lines = vec!["Heading", underline.as_str()];
+        assert_eq!(try_parse_setext_heading(&lines, 0), Some((1, '=')));
     }
 }

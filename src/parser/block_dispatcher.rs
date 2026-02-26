@@ -16,7 +16,9 @@ use super::blocks::code_blocks::{
     CodeBlockType, InfoString, parse_fenced_code_block, try_parse_fence_open,
 };
 use super::blocks::figures::{parse_figure, try_parse_figure};
-use super::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
+use super::blocks::headings::{
+    emit_atx_heading, emit_setext_heading, try_parse_atx_heading, try_parse_setext_heading,
+};
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::metadata::try_parse_yaml_block;
 use super::blocks::reference_links::try_parse_reference_definition;
@@ -62,6 +64,9 @@ pub(crate) struct BlockContext<'a> {
 
     /// List indentation info if inside a list
     pub list_indent_info: Option<ListIndentInfo>,
+
+    /// Next line content for lookahead (used by setext headings)
+    pub next_line: Option<&'a str>,
 }
 
 /// Result of detecting whether a block can be parsed.
@@ -539,6 +544,70 @@ impl BlockParser for FencedCodeBlockParser {
 }
 
 // ============================================================================
+// Setext Heading Parser (position #3)
+// ============================================================================
+
+pub(crate) struct SetextHeadingParser;
+
+impl BlockParser for SetextHeadingParser {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
+        // Setext headings require blank line before (unless at document start)
+        if !ctx.has_blank_before && !ctx.at_document_start {
+            return BlockDetectionResult::No;
+        }
+
+        // Need next line for lookahead
+        let next_line = match ctx.next_line {
+            Some(line) => line,
+            None => return BlockDetectionResult::No,
+        };
+
+        // Create lines array for detection function
+        let lines = vec![ctx.content, next_line];
+
+        // Try to detect setext heading
+        if try_parse_setext_heading(&lines, 0).is_some() {
+            // Setext headings need blank line before (normal case)
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::No
+        }
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        pos: usize,
+    ) -> usize {
+        // Get text line and underline line
+        let text_line = lines[pos];
+        let underline_line = lines[pos + 1];
+
+        // Determine level from underline character (no need to call try_parse again)
+        // can_parse() already validated this is a valid setext heading
+        let underline_char = underline_line.trim().chars().next().unwrap_or('=');
+        let level = if underline_char == '=' { 1 } else { 2 };
+
+        // Emit the setext heading
+        emit_setext_heading(builder, text_line, underline_line, level, ctx.config);
+
+        // Return lines consumed: text line + underline line
+        2
+    }
+
+    fn name(&self) -> &'static str {
+        "setext_heading"
+    }
+}
+
+// ============================================================================
 // Block Parser Registry
 // ============================================================================
 
@@ -587,7 +656,10 @@ impl BlockParserRegistry {
             Box::new(FencedCodeBlockParser),
             // (3) YAML metadata - before headers and hrules!
             Box::new(YamlMetadataParser),
-            // (7) ATX headings
+            // (7) Setext headings (part of Pandoc's "header" parser)
+            // Must come before ATX to properly handle `---` disambiguation
+            Box::new(SetextHeadingParser),
+            // (7) ATX headings (part of Pandoc's "header" parser)
             Box::new(AtxHeadingParser),
             // (15) Horizontal rules - AFTER headings per Pandoc
             Box::new(HorizontalRuleParser),

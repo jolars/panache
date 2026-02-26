@@ -177,6 +177,7 @@ golden_test_cases!(
     footnote_def_paragraph,
     footnote_definition_list,
     headings,
+    setext_headings,
     headerless_table,
     horizontal_rules,
     html_block,
