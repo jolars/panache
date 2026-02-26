@@ -42,37 +42,49 @@ pub(crate) struct BlockContext<'a> {
     pub containers: &'a ContainerStack,
 }
 
-/// Result of attempting to parse a block element.
-pub(crate) enum BlockParseResult {
-    /// Block was successfully parsed and emitted. Contains number of lines consumed.
-    Parsed { lines_consumed: usize },
+/// Result of detecting whether a block can be parsed.
+pub(crate) enum BlockDetectionResult {
+    /// Can parse this block, requires blank line before
+    Yes,
 
-    /// This parser cannot handle this content (try next parser)
-    NotApplicable,
+    /// Can parse this block and can interrupt paragraphs (no blank line needed)
+    #[allow(dead_code)] // Will be used when we migrate fenced code blocks
+    YesCanInterrupt,
 
-    /// Block was recognized but should not be parsed (e.g., needs different context)
-    #[allow(dead_code)] // Will be used for complex blocks like lists
-    Skip,
+    /// Cannot parse this content
+    No,
 }
 
 /// Trait for block-level parsers.
 ///
-/// Each block type implements this trait to provide:
-/// 1. Detection: Can this block type parse this content?
-/// 2. Emission: Parse and emit the block to the builder
+/// Each block type implements this trait with a two-phase approach:
+/// 1. Detection: Can this block type parse this content? (lightweight, no emission)
+/// 2. Parsing: Actually parse and emit the block to the builder (called after preparation)
+///
+/// This separation allows the caller to:
+/// - Prepare for block elements (close paragraphs, flush buffers) BEFORE emission
+/// - Handle blocks that can interrupt paragraphs vs those that need blank lines
+/// - Maintain correct CST node ordering
 ///
 /// Note: This is purely organizational - the trait doesn't introduce
 /// backtracking or multiple passes. Each parser operates during the
 /// single forward pass through the document.
 pub(crate) trait BlockParser {
-    /// Try to parse and emit this block type.
+    /// Detect if this parser can handle the content (lightweight check, no emission).
     ///
-    /// If this parser recognizes and can handle the content:
-    /// - Emit the block structure to the builder
-    /// - Return BlockParseResult::Parsed with number of lines consumed
+    /// Returns:
+    /// - `Yes`: Can parse, requires blank line before
+    /// - `YesCanInterrupt`: Can parse and can interrupt paragraphs
+    /// - `No`: Cannot parse this content
     ///
-    /// If this parser cannot handle the content:
-    /// - Return BlockParseResult::NotApplicable (dispatcher tries next parser)
+    /// This method should be fast and do minimal work (peek at first few characters).
+    /// It should NOT emit anything to the builder.
+    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult;
+
+    /// Parse and emit this block type to the builder.
+    ///
+    /// Called only after `can_parse` returns `Yes` or `YesCanInterrupt`, and after
+    /// the caller has prepared (closed paragraphs, flushed buffers).
     ///
     /// # Arguments
     /// - `ctx`: Context about the current parsing state
@@ -80,18 +92,21 @@ pub(crate) trait BlockParser {
     /// - `lines`: Full document lines (for multi-line blocks)
     /// - `line_pos`: Current line position in the document
     ///
+    /// # Returns
+    /// Number of lines consumed by this block
+    ///
     /// # Single-pass guarantee
     /// This method is called during the single forward pass. It should:
     /// - Read ahead in `lines` if needed (tables, code blocks, etc.)
     /// - Emit inline elements immediately via inline_emission
     /// - Not modify any state outside of builder emission
-    fn try_parse(
+    fn parse(
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
-    ) -> BlockParseResult;
+    ) -> usize;
 
     /// Name of this block parser (for debugging/logging)
     fn name(&self) -> &'static str;
@@ -105,28 +120,38 @@ pub(crate) trait BlockParser {
 pub(crate) struct HorizontalRuleParser;
 
 impl BlockParser for HorizontalRuleParser {
-    fn try_parse(
+    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult {
+        // Must have blank line before
+        if !ctx.has_blank_before {
+            return BlockDetectionResult::No;
+        }
+
+        // Check if this looks like a horizontal rule
+        if try_parse_horizontal_rule(ctx.content).is_some() {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::No
+        }
+    }
+
+    fn parse(
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
-    ) -> BlockParseResult {
-        // Must have blank line before (handled by caller checking ctx.has_blank_before)
-        if !ctx.has_blank_before {
-            return BlockParseResult::NotApplicable;
-        }
+    ) -> usize {
+        // Use ctx.content (blockquote markers already stripped)
+        // But preserve newline from original line
+        let (_, newline_str) = strip_newline(lines[line_pos]);
+        let content_with_newline = if !newline_str.is_empty() {
+            format!("{}{}", ctx.content.trim_end(), newline_str)
+        } else {
+            ctx.content.to_string()
+        };
 
-        // Try to parse horizontal rule
-        if try_parse_horizontal_rule(ctx.content).is_none() {
-            return BlockParseResult::NotApplicable;
-        }
-
-        // Emit the horizontal rule
-        let line = lines[line_pos];
-        emit_horizontal_rule(builder, line);
-
-        BlockParseResult::Parsed { lines_consumed: 1 }
+        emit_horizontal_rule(builder, &content_with_newline);
+        1 // Consumed 1 line
     }
 
     fn name(&self) -> &'static str {
@@ -138,28 +163,31 @@ impl BlockParser for HorizontalRuleParser {
 pub(crate) struct AtxHeadingParser;
 
 impl BlockParser for AtxHeadingParser {
-    fn try_parse(
+    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult {
+        // Must have blank line before
+        if !ctx.has_blank_before {
+            return BlockDetectionResult::No;
+        }
+
+        // Check if this looks like an ATX heading
+        if try_parse_atx_heading(ctx.content).is_some() {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::No
+        }
+    }
+
+    fn parse(
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
-    ) -> BlockParseResult {
-        // Must have blank line before (checked by caller)
-        if !ctx.has_blank_before {
-            return BlockParseResult::NotApplicable;
-        }
-
-        // Try to parse ATX heading
-        let Some(heading_level) = try_parse_atx_heading(ctx.content) else {
-            return BlockParseResult::NotApplicable;
-        };
-
-        // Emit the heading
+    ) -> usize {
         let line = lines[line_pos];
+        let heading_level = try_parse_atx_heading(ctx.content).unwrap();
         emit_atx_heading(builder, line, heading_level, ctx.config);
-
-        BlockParseResult::Parsed { lines_consumed: 1 }
+        1 // Consumed 1 line
     }
 
     fn name(&self) -> &'static str {
@@ -171,28 +199,30 @@ impl BlockParser for AtxHeadingParser {
 pub(crate) struct FigureParser;
 
 impl BlockParser for FigureParser {
-    fn try_parse(
+    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult {
+        // Must have blank line before
+        if !ctx.has_blank_before {
+            return BlockDetectionResult::No;
+        }
+
+        // Check if this looks like a figure
+        if try_parse_figure(ctx.content) {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::No
+        }
+    }
+
+    fn parse(
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
-    ) -> BlockParseResult {
-        // Must have blank line before (checked by caller)
-        if !ctx.has_blank_before {
-            return BlockParseResult::NotApplicable;
-        }
-
-        // Try to parse figure
-        if !try_parse_figure(ctx.content) {
-            return BlockParseResult::NotApplicable;
-        }
-
-        // Emit the figure
+    ) -> usize {
         let line = lines[line_pos];
         parse_figure(builder, line, ctx.config);
-
-        BlockParseResult::Parsed { lines_consumed: 1 }
+        1 // Consumed 1 line
     }
 
     fn name(&self) -> &'static str {
@@ -204,21 +234,23 @@ impl BlockParser for FigureParser {
 pub(crate) struct ReferenceDefinitionParser;
 
 impl BlockParser for ReferenceDefinitionParser {
-    fn try_parse(
+    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult {
+        // Reference definitions don't need blank line before
+        // Check if this looks like a reference definition
+        if try_parse_reference_definition(ctx.content).is_some() {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::No
+        }
+    }
+
+    fn parse(
         &self,
-        ctx: &BlockContext,
+        _ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
-    ) -> BlockParseResult {
-        // Reference definitions don't need blank line before
-
-        // Try to parse reference definition
-        let Some((_len, _label, _url, _title)) = try_parse_reference_definition(ctx.content) else {
-            return BlockParseResult::NotApplicable;
-        };
-
-        // Emit as REFERENCE_DEFINITION node with inline LINK structure
+    ) -> usize {
         use crate::syntax::SyntaxKind;
 
         builder.start_node(SyntaxKind::REFERENCE_DEFINITION.into());
@@ -236,7 +268,7 @@ impl BlockParser for ReferenceDefinitionParser {
 
         builder.finish_node();
 
-        BlockParseResult::Parsed { lines_consumed: 1 }
+        1 // Consumed 1 line
     }
 
     fn name(&self) -> &'static str {
@@ -316,31 +348,44 @@ impl BlockParserRegistry {
 
     /// Try to parse a block using the registered parsers.
     ///
-    /// Returns the first successful parse result, or None if no parser matched.
-    pub fn try_parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> Option<BlockParseResult> {
-        for parser in &self.parsers {
-            let result = parser.try_parse(ctx, builder, lines, line_pos);
+    /// This method implements the two-phase parsing:
+    /// 1. Detection: Check if any parser can handle this content
+    /// 2. Caller prepares (closes paragraphs, flushes buffers)
+    /// 3. Parser emits the block
+    ///
+    /// Returns (parser_index, detection_result) if a parser can handle this,
+    /// or None if no parser matched.
+    pub fn detect(&self, ctx: &BlockContext) -> Option<(usize, BlockDetectionResult)> {
+        for (i, parser) in self.parsers.iter().enumerate() {
+            let result = parser.can_parse(ctx);
             match result {
-                BlockParseResult::Parsed { .. } => {
-                    log::debug!("Block parsed by: {}", parser.name());
-                    return Some(result);
+                BlockDetectionResult::Yes | BlockDetectionResult::YesCanInterrupt => {
+                    log::debug!("Block detected by: {}", parser.name());
+                    return Some((i, result));
                 }
-                BlockParseResult::Skip => {
-                    log::trace!("Block skipped by: {}", parser.name());
-                    return Some(result);
-                }
-                BlockParseResult::NotApplicable => {
+                BlockDetectionResult::No => {
                     // Try next parser
                     continue;
                 }
             }
         }
         None
+    }
+
+    /// Parse a block using the specified parser (by index from detect()).
+    ///
+    /// Should only be called after detect() returns Some and after
+    /// caller has prepared for the block element.
+    pub fn parse(
+        &self,
+        parser_index: usize,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        let parser = &self.parsers[parser_index];
+        log::debug!("Block parsed by: {}", parser.name());
+        parser.parse(ctx, builder, lines, line_pos)
     }
 }

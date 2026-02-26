@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
-use super::block_dispatcher::{BlockContext, BlockParseResult, BlockParserRegistry};
+use super::block_dispatcher::{BlockContext, BlockDetectionResult, BlockParserRegistry};
 use super::blocks::blockquotes;
 use super::blocks::code_blocks;
 use super::blocks::definition_lists;
@@ -1278,22 +1278,37 @@ impl<'a> Parser<'a> {
                 containers: &self.containers,
             };
 
-            if let Some(result) =
-                self.block_registry
-                    .try_parse(&block_ctx, &mut self.builder, &self.lines, self.pos)
-            {
-                match result {
-                    BlockParseResult::Parsed { lines_consumed } => {
+            if let Some((parser_idx, detection)) = self.block_registry.detect(&block_ctx) {
+                // Drop context to release borrow before prepare
+
+                // Only parse if detection says blank line is acceptable
+                match detection {
+                    BlockDetectionResult::Yes | BlockDetectionResult::YesCanInterrupt => {
                         // Prepare for block element (flush buffers, close paragraphs)
                         self.prepare_for_block_element();
+
+                        // Recreate context for parsing
+                        let block_ctx = BlockContext {
+                            content,
+                            has_blank_before,
+                            blockquote_depth: self.current_blockquote_depth(),
+                            config: self.config,
+                            containers: &self.containers,
+                        };
+
+                        let lines_consumed = self.block_registry.parse(
+                            parser_idx,
+                            &block_ctx,
+                            &mut self.builder,
+                            &self.lines,
+                            self.pos,
+                        );
                         self.pos += lines_consumed;
                         return true;
                     }
-                    BlockParseResult::Skip => {
-                        return false;
-                    }
-                    BlockParseResult::NotApplicable => {
-                        // Fall through to manual checks
+                    BlockDetectionResult::No => {
+                        // Should not happen since detect() returned Some
+                        unreachable!()
                     }
                 }
             }
@@ -1467,22 +1482,17 @@ impl<'a> Parser<'a> {
             containers: &self.containers,
         };
 
-        if let Some(result) =
-            self.block_registry
-                .try_parse(&block_ctx, &mut self.builder, &self.lines, self.pos)
-        {
-            match result {
-                BlockParseResult::Parsed { lines_consumed } => {
-                    self.pos += lines_consumed;
-                    return true;
-                }
-                BlockParseResult::Skip => {
-                    return false;
-                }
-                BlockParseResult::NotApplicable => {
-                    // Fall through
-                }
-            }
+        if let Some((parser_idx, _detection)) = self.block_registry.detect(&block_ctx) {
+            // Reference definitions don't need preparation
+            let lines_consumed = self.block_registry.parse(
+                parser_idx,
+                &block_ctx,
+                &mut self.builder,
+                &self.lines,
+                self.pos,
+            );
+            self.pos += lines_consumed;
+            return true;
         }
 
         // Check for indented code block
