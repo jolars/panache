@@ -218,37 +218,15 @@ panache lint --config cfg.toml      # Custom config
 - ✅ Grid tables
 - ✅ Multiline tables
 
-## Parser - Comprehensive Pandoc Feature Coverage
+## Parser
 
-### Known Differences from Pandoc
+### Performance
 
-#### Reference Link Parsing
+- 🚧 Avoid temporary green tree when injecting `BLOCKQUOTE_MARKER` tokens into
+  inline-parsed paragraphs (current approach parses inlines into a temp tree,
+  then replays while inserting markers)
 
-**Status**: 🤔 **Deferred architectural decision**
-
-**Issue**: Our CST structure differs from Pandoc's AST for undefined reference links.
-
-**Current behavior**:
-- `[undefined]` (no definition exists) → Parsed as LINK node in CST
-- Pandoc behavior: `[undefined]` → Parsed as literal text `Str "[undefined]"`
-- **Formatting output is correct** (both produce `[undefined]`)
-
-**Impact**: 
-- ✅ No impact on formatting (our primary use case)
-- ✅ No impact on LSP features (uses CST traversal)
-- ✅ No impact on linting (uses CST traversal)
-- ⚠️ CST structure differs from Pandoc's AST (only matters for library users inspecting CST)
-
-**Possible solutions** (if needed):
-1. CST traversal during inline parsing to check if definition exists (O(n) cost per reference)
-2. Minimal registry with `HashSet<String>` of definition labels (O(1) lookup)
-3. Two-pass parsing (parse blocks first, then inline with definition knowledge)
-
-**Decision**: Accept current behavior until a real-world use case requires matching Pandoc's AST structure exactly.
-
----
-
-## Parser - Comprehensive Pandoc Feature Coverage
+## Parser - Coverage
 
 This section tracks implementation status of Pandoc Markdown features based on
 the spec files in `assets/pandoc-spec/`.
@@ -286,6 +264,7 @@ implemented.
   behavior)
 - ✅ Block quotes containing lists
 - ✅ Block quotes containing code blocks
+
 
 ### Lists 🚧
 
@@ -538,3 +517,33 @@ for initial implementation.
 - ✅ Golden test coverage
 - ❌ LSP diagnostics for malformed shortcodes (future)
 - ❌ Completion for built-in shortcode names (future)
+
+### Known Differences from Pandoc
+
+#### Reference Link Parsing
+
+**Status**: 🤔 **Deferred architectural decision**
+
+**Issue**: Our CST structure differs from Pandoc's AST for undefined reference links.
+
+**Current behavior**:
+
+- `[undefined]` (no definition exists) → Parsed as LINK node in CST
+- Pandoc behavior: `[undefined]` → Parsed as literal text `Str "[undefined]"`
+- **Formatting output is correct** (both produce `[undefined]`)
+
+**Impact**: 
+
+- ✅ No impact on formatting (our primary use case)
+- ✅ No impact on LSP features (uses CST traversal)
+- ✅ No impact on linting (uses CST traversal)
+- ⚠️ CST structure differs from Pandoc's AST (only matters for library users inspecting CST)
+
+**Possible solutions** (if needed):
+
+1. CST traversal during inline parsing to check if definition exists (O(n) cost per reference)
+2. Minimal registry with `HashSet<String>` of definition labels (O(1) lookup)
+3. Two-pass parsing (parse blocks first, then inline with definition knowledge)
+
+**Decision**: Accept current behavior until a real-world use case requires matching Pandoc's AST structure exactly.
+
