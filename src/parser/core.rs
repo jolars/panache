@@ -8,7 +8,6 @@ use super::block_dispatcher::{
 use super::blocks::blockquotes;
 use super::blocks::definition_lists;
 use super::blocks::html_blocks;
-use super::blocks::indented_code;
 use super::blocks::latex_envs;
 use super::blocks::line_blocks;
 use super::blocks::lists;
@@ -24,7 +23,6 @@ use super::utils::text_buffer;
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
 use html_blocks::try_parse_html_block_start;
-use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::try_parse_latex_env_begin;
 use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{is_content_nested_bullet_marker, markers_match, try_parse_list_marker};
@@ -396,7 +394,7 @@ impl<'a> Parser<'a> {
 
             // Determine what containers to keep open based on next line
             let levels_to_keep = if peek < self.lines.len() {
-                self.compute_levels_to_keep(self.lines[peek])
+                self.compute_levels_to_keep(line, self.lines[peek])
             } else {
                 0
             };
@@ -811,6 +809,9 @@ impl<'a> Parser<'a> {
         let block_ctx = BlockContext {
             content,
             has_blank_before: true,
+            // For blank-line container-keep decisions we do NOT want indented code blocks
+            // to count as “nested structure” (that would keep definitions open incorrectly).
+            has_blank_before_strict: false,
             at_document_start: false,
             in_fenced_div: self.in_fenced_div(),
             blockquote_depth: self.current_blockquote_depth(),
@@ -822,13 +823,18 @@ impl<'a> Parser<'a> {
 
         // Note: we only use the registry for its “is this a block start?” decision;
         // it should not rely on `lines` here (setext is gated by `has_blank_before`).
+        // Provide `lines` so blocks that require lookahead (e.g. indented code over blank lines)
+        // can reason about continuation correctly.
         self.block_registry
-            .detect_prepared(&block_ctx, &[], 0)
+            .detect_prepared(&block_ctx, &self.lines, self.pos)
             .is_some()
     }
 
     /// Compute how many container levels to keep open based on next line content.
-    fn compute_levels_to_keep(&self, next_line: &str) -> usize {
+    fn compute_levels_to_keep(&self, blank_line: &str, next_line: &str) -> usize {
+        let (_, blank_inner) = count_blockquote_markers(blank_line);
+        let (_blank_indent_cols, _) = leading_indent(blank_inner);
+
         let (next_bq_depth, next_inner) = count_blockquote_markers(next_line);
         let (raw_indent_cols, _) = leading_indent(next_inner);
         let next_marker = try_parse_list_marker(next_inner, self.config);
@@ -872,9 +878,9 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Container::Definition { content_col, .. } => {
-                    // Definition continuation: line must be indented at least 4 spaces
-                    // After a blank line, only keep if there's nested block content (lists, code, etc)
-                    // Plain text after blank line should close the definition
+                    // Definition continuation: line must be indented at least 4 spaces.
+                    // After a blank line, only keep if there's nested block content (lists, code, etc).
+                    // Plain text after blank line should close the definition.
                     let min_indent = (*content_col).max(4);
                     if raw_indent_cols >= min_indent {
                         // Check what kind of content this is
@@ -1041,67 +1047,76 @@ impl<'a> Parser<'a> {
         // Continuation lines should be added to PLAIN, not treated as new blocks
         // BUT: Don't treat lines with block element markers as continuations
         if matches!(self.containers.last(), Some(Container::Definition { .. })) {
-            // Check if this line starts with any block element marker
-            // Use stripped_content so we check AFTER removing footnote/definition indent
-            let is_block_element = try_parse_definition_marker(stripped_content).is_some()
-                || try_parse_list_marker(stripped_content, self.config).is_some()
-                || count_blockquote_markers(stripped_content).0 > 0
-                || (self.config.extensions.raw_html
-                    && try_parse_html_block_start(stripped_content).is_some())
-                || (self.config.extensions.raw_tex
-                    && try_parse_latex_env_begin(stripped_content).is_some())
-                || {
-                    let next_line = if self.pos + 1 < self.lines.len() {
-                        Some(self.lines[self.pos + 1])
-                    } else {
-                        None
-                    };
-
-                    let block_ctx = BlockContext {
-                        content: stripped_content,
-                        has_blank_before: true,
-                        at_document_start: self.pos == 0 && self.current_blockquote_depth() == 0,
-                        in_fenced_div: self.in_fenced_div(),
-                        blockquote_depth: self.current_blockquote_depth(),
-                        config: self.config,
-                        content_indent,
-                        list_indent_info: None,
-                        next_line,
-                    };
-
-                    self.block_registry
-                        .detect_prepared(&block_ctx, &self.lines, self.pos)
-                        .is_some()
-                };
-
-            if is_block_element {
-                // Close any open Plain block before processing the block element
-                // Buffered PLAIN content will be emitted by emit_buffered_plain_if_needed()
-                // Fall through to parse the block element
+            // A blank line that isn't indented to the definition content column ends the definition.
+            // (Otherwise indented code blocks after a blank line get swallowed as PLAIN continuation.)
+            let (indent_cols, _) = leading_indent(content);
+            if content.trim().is_empty() && indent_cols < content_indent {
+                // Fall through to normal blank-line handling.
             } else {
-                // This is a continuation line - add to PLAIN (start one if needed)
-                let full_line = self.lines[self.pos];
-                let (text_without_newline, newline_str) = strip_newline(full_line);
+                // Check if this line starts with any block element marker
+                // Use stripped_content so we check AFTER removing footnote/definition indent
+                let is_block_element = try_parse_definition_marker(stripped_content).is_some()
+                    || try_parse_list_marker(stripped_content, self.config).is_some()
+                    || count_blockquote_markers(stripped_content).0 > 0
+                    || (self.config.extensions.raw_html
+                        && try_parse_html_block_start(stripped_content).is_some())
+                    || (self.config.extensions.raw_tex
+                        && try_parse_latex_env_begin(stripped_content).is_some())
+                    || {
+                        let next_line = if self.pos + 1 < self.lines.len() {
+                            Some(self.lines[self.pos + 1])
+                        } else {
+                            None
+                        };
 
-                // Buffer the line for later inline parsing
-                if let Some(Container::Definition {
-                    plain_open,
-                    plain_buffer,
-                    ..
-                }) = self.containers.stack.last_mut()
-                {
-                    // Include the newline in the buffered text for losslessness
-                    let line_with_newline = if !newline_str.is_empty() {
-                        format!("{}{}", text_without_newline, newline_str)
-                    } else {
-                        text_without_newline.to_string()
+                        let block_ctx = BlockContext {
+                            content: stripped_content,
+                            has_blank_before: true,
+                            has_blank_before_strict: true,
+                            at_document_start: self.pos == 0
+                                && self.current_blockquote_depth() == 0,
+                            in_fenced_div: self.in_fenced_div(),
+                            blockquote_depth: self.current_blockquote_depth(),
+                            config: self.config,
+                            content_indent,
+                            list_indent_info: None,
+                            next_line,
+                        };
+
+                        self.block_registry
+                            .detect_prepared(&block_ctx, &self.lines, self.pos)
+                            .is_some()
                     };
-                    plain_buffer.push_line(line_with_newline);
-                    *plain_open = true; // Mark that we now have an open PLAIN
-                }
 
-                self.pos += 1;
-                return true;
+                if is_block_element {
+                    // Close any open Plain block before processing the block element
+                    // Buffered PLAIN content will be emitted by emit_buffered_plain_if_needed()
+                    // Fall through to parse the block element
+                } else {
+                    // This is a continuation line - add to PLAIN (start one if needed)
+                    let full_line = self.lines[self.pos];
+                    let (text_without_newline, newline_str) = strip_newline(full_line);
+
+                    // Buffer the line for later inline parsing
+                    if let Some(Container::Definition {
+                        plain_open,
+                        plain_buffer,
+                        ..
+                    }) = self.containers.stack.last_mut()
+                    {
+                        // Include the newline in the buffered text for losslessness
+                        let line_with_newline = if !newline_str.is_empty() {
+                            format!("{}{}", text_without_newline, newline_str)
+                        } else {
+                            text_without_newline.to_string()
+                        };
+                        plain_buffer.push_line(line_with_newline);
+                        *plain_open = true; // Mark that we now have an open PLAIN
+                    }
+
+                    self.pos += 1;
+                    return true;
+                }
             }
         }
 
@@ -1136,8 +1151,9 @@ impl<'a> Parser<'a> {
 
         let dispatcher_ctx = BlockContext {
             content,
-            has_blank_before: false,  // filled in later
-            at_document_start: false, // filled in later
+            has_blank_before: false,        // filled in later
+            has_blank_before_strict: false, // filled in later
+            at_document_start: false,       // filled in later
             in_fenced_div: self.in_fenced_div(),
             blockquote_depth: current_bq_depth,
             config: self.config,
@@ -1166,7 +1182,17 @@ impl<'a> Parser<'a> {
         // Being at document start (pos == 0) is OK only if we're not inside a blockquote
         let at_document_start = self.pos == 0 && current_bq_depth == 0;
 
+        let prev_line_blank = if self.pos > 0 {
+            let prev_line = self.lines[self.pos - 1];
+            let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
+            prev_line.trim().is_empty() || (prev_bq_depth > 0 && prev_inner.trim().is_empty())
+        } else {
+            false
+        };
+        let has_blank_before_strict = at_document_start || prev_line_blank;
+
         dispatcher_ctx.has_blank_before = has_blank_before;
+        dispatcher_ctx.has_blank_before_strict = has_blank_before_strict;
         dispatcher_ctx.at_document_start = at_document_start;
 
         let dispatcher_match =
@@ -1184,14 +1210,6 @@ impl<'a> Parser<'a> {
         } else {
             dispatcher_match
         };
-        let prev_line_blank = if self.pos > 0 {
-            let prev_line = self.lines[self.pos - 1];
-            let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
-            prev_line.trim().is_empty() || (prev_bq_depth > 0 && prev_inner.trim().is_empty())
-        } else {
-            false
-        };
-        let has_blank_before_strict = at_document_start || prev_line_blank;
 
         // Check if this line looks like a table caption followed by a table
         // If so, try to parse the table (which will include the caption)
@@ -1453,29 +1471,6 @@ impl<'a> Parser<'a> {
             }
 
             self.pos += 1;
-            return true;
-        }
-
-        // Check for indented code block
-        // Inside a footnote, content needs 4 spaces for code (8 total in raw line)
-        // BUT: Don't treat as code if it's a list marker (list takes precedence)
-        if has_blank_before_strict
-            && is_indented_code_line(content)
-            && try_parse_list_marker(content, self.config).is_none()
-        {
-            // Prepare for indented code block
-            self.prepare_for_block_element();
-
-            let bq_depth = self.current_blockquote_depth();
-            log::debug!("Parsed indented code block at line {}", self.pos);
-            let new_pos = parse_indented_code_block(
-                &mut self.builder,
-                &self.lines,
-                self.pos,
-                bq_depth,
-                content_indent,
-            );
-            self.pos = new_pos;
             return true;
         }
 

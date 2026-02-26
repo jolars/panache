@@ -24,8 +24,10 @@ use super::blocks::headings::{
 };
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::html_blocks::{HtmlBlockType, parse_html_block, try_parse_html_block_start};
+use super::blocks::indented_code::{is_indented_code_line, parse_indented_code_block};
 use super::blocks::latex_envs::{LatexEnvInfo, parse_latex_environment, try_parse_latex_env_begin};
 use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
+use super::blocks::lists::try_parse_list_marker;
 use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 use super::blocks::reference_links::try_parse_reference_definition;
 use super::inlines::links::try_parse_inline_image;
@@ -50,8 +52,11 @@ pub(crate) struct BlockContext<'a> {
     /// Current line content (after blockquote markers stripped if any)
     pub content: &'a str,
 
-    /// Whether there was a blank line before this line
+    /// Whether there was a blank line before this line (relaxed, container-aware)
     pub has_blank_before: bool,
+
+    /// Whether there was a strict blank line before this line (no container exceptions)
+    pub has_blank_before_strict: bool,
 
     /// Whether we're currently inside a fenced div (container-owned state)
     pub in_fenced_div: bool,
@@ -1211,6 +1216,80 @@ impl BlockParser for FencedDivCloseParser {
 }
 
 // ============================================================================
+// Indented Code Block Parser (position #11)
+// ============================================================================
+
+pub(crate) struct IndentedCodeBlockParser;
+
+impl BlockParser for IndentedCodeBlockParser {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, _lines, _line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        // Indented code blocks require a strict blank line before (or doc start).
+        if !ctx.has_blank_before_strict {
+            return None;
+        }
+
+        // Don't treat as code if it's a list marker (list takes precedence).
+        if try_parse_list_marker(ctx.content, ctx.config).is_some() {
+            return None;
+        }
+
+        if !is_indented_code_line(ctx.content) {
+            return None;
+        }
+
+        Some((BlockDetectionResult::Yes, None))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        let new_pos = parse_indented_code_block(
+            builder,
+            lines,
+            line_pos,
+            ctx.blockquote_depth,
+            ctx.content_indent,
+        );
+        new_pos - line_pos
+    }
+
+    fn name(&self) -> &'static str {
+        "indented_code_block"
+    }
+}
+
+// ============================================================================
 // Setext Heading Parser (position #3)
 // ============================================================================
 
@@ -1339,6 +1418,8 @@ impl BlockParserRegistry {
             Box::new(LatexEnvironmentParser),
             // (13) Line blocks
             Box::new(LineBlockParser),
+            // (11) Indented code blocks (AFTER fenced!)
+            Box::new(IndentedCodeBlockParser),
             // (15) Horizontal rules - AFTER headings per Pandoc
             Box::new(HorizontalRuleParser),
             // Figures (standalone images) - Pandoc doesn't have these
@@ -1348,7 +1429,6 @@ impl BlockParserRegistry {
             // TODO: Migrate remaining blocks in Pandoc order:
             // - (4-6) Lists and divs (bulletList, divHtml)
             // - (10) Tables (grid, multiline, pipe, simple)
-            // - (11) Indented code blocks (AFTER fenced!)
             // - (16) Ordered lists
             // - (17) Definition lists
             // - (18) Footnote definitions (noteBlock)
