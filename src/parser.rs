@@ -18,7 +18,6 @@ pub use core::Parser;
 /// Parses a Quarto document string into a syntax tree.
 ///
 /// Single-pass architecture: blocks emit inline structure during parsing.
-/// Line endings (LF or CRLF) are preserved exactly as they appear in the input.
 ///
 /// # Examples
 ///
@@ -40,5 +39,6 @@ pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
 
     // Post-process to wrap list item content in Plain/PARAGRAPH blocks
     let green = list_postprocessor::wrap_list_item_content(block_tree, &config);
+
     SyntaxNode::new_root(green)
 }
