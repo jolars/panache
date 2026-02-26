@@ -10,6 +10,7 @@ pub mod blocks;
 pub mod inlines;
 pub mod utils;
 
+mod block_dispatcher;
 mod core;
 
 // Re-export main parser

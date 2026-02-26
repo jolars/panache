@@ -2,11 +2,11 @@ use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
+use super::block_dispatcher::{BlockContext, BlockParseResult, BlockParserRegistry};
 use super::blocks::blockquotes;
 use super::blocks::code_blocks;
 use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
-use super::blocks::figures;
 use super::blocks::headings;
 use super::blocks::horizontal_rules;
 use super::blocks::html_blocks;
@@ -28,9 +28,8 @@ use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
-use figures::{parse_figure, try_parse_figure};
-use headings::{emit_atx_heading, try_parse_atx_heading};
-use horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
+use headings::try_parse_atx_heading;
+use horizontal_rules::try_parse_horizontal_rule;
 use html_blocks::{parse_html_block, try_parse_html_block_start};
 use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
@@ -38,7 +37,7 @@ use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{is_content_nested_bullet_marker, markers_match, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
-use reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
+use reference_links::try_parse_footnote_marker;
 use tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
@@ -55,6 +54,7 @@ pub struct Parser<'a> {
     builder: GreenNodeBuilder<'static>,
     containers: ContainerStack,
     config: &'a Config,
+    block_registry: BlockParserRegistry,
 }
 
 impl<'a> Parser<'a> {
@@ -67,6 +67,7 @@ impl<'a> Parser<'a> {
             builder: GreenNodeBuilder::new(),
             containers: ContainerStack::new(),
             config,
+            block_registry: BlockParserRegistry::new(),
         }
     }
 
@@ -245,7 +246,7 @@ impl<'a> Parser<'a> {
     /// Must use `Parser::close_containers_to` (not `ContainerStack::close_to`) so list/paragraph
     /// buffers are emitted for losslessness.
     fn close_blockquotes_to_depth(&mut self, target_depth: usize) {
-        let mut current = blockquotes::current_blockquote_depth(&self.containers);
+        let mut current = self.current_blockquote_depth();
         while current > target_depth {
             while !matches!(self.containers.last(), Some(Container::BlockQuote { .. })) {
                 if self.containers.depth() == 0 {
@@ -275,52 +276,28 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parse and emit reference definition content with inline structure for the label.
-    ///
-    /// Converts: `[label]: url "title"`
-    /// To: `LINK(LINK_START "[", LINK_TEXT "label", TEXT "]", TEXT ": url...")`
-    fn emit_reference_definition_content(&mut self, text: &str) {
-        // Parse the label part: [label]:
-        if !text.starts_with('[') {
-            // Fallback to plain text if doesn't start with [
-            self.builder.token(SyntaxKind::TEXT.into(), text);
-            return;
+    /// Check if a paragraph is currently open.
+    fn is_paragraph_open(&self) -> bool {
+        matches!(self.containers.last(), Some(Container::Paragraph { .. }))
+    }
+
+    /// Close paragraph if one is currently open.
+    fn close_paragraph_if_open(&mut self) {
+        if self.is_paragraph_open() {
+            self.close_containers_to(self.containers.depth() - 1);
         }
+    }
 
-        // Find the closing ]
-        let rest = &text[1..];
-        if let Some(close_pos) = rest.find(']') {
-            let label = &rest[..close_pos];
-            let after_bracket = &rest[close_pos + 1..];
+    /// Prepare for a block-level element by flushing buffers and closing paragraphs.
+    /// This is a common pattern before starting tables, code blocks, divs, etc.
+    fn prepare_for_block_element(&mut self) {
+        self.emit_list_item_buffer_if_needed();
+        self.close_paragraph_if_open();
+    }
 
-            // Must be followed by : for reference definition
-            if after_bracket.starts_with(':') {
-                // Emit LINK node with the label
-                self.builder.start_node(SyntaxKind::LINK.into());
-
-                // LINK_START
-                self.builder.start_node(SyntaxKind::LINK_START.into());
-                self.builder.token(SyntaxKind::LINK_START.into(), "[");
-                self.builder.finish_node();
-
-                // LINK_TEXT
-                self.builder.start_node(SyntaxKind::LINK_TEXT.into());
-                self.builder.token(SyntaxKind::TEXT.into(), label);
-                self.builder.finish_node();
-
-                // Closing bracket (as TEXT, following old behavior)
-                self.builder.token(SyntaxKind::TEXT.into(), "]");
-
-                self.builder.finish_node(); // LINK
-
-                // Rest of the line (": url...")
-                self.builder.token(SyntaxKind::TEXT.into(), after_bracket);
-                return;
-            }
-        }
-
-        // Fallback: not a valid reference definition format
-        self.builder.token(SyntaxKind::TEXT.into(), text);
+    /// Get current blockquote depth from container stack.
+    fn current_blockquote_depth(&self) -> usize {
+        blockquotes::current_blockquote_depth(&self.containers)
     }
 
     /// Emit or buffer a blockquote marker depending on parser state.
@@ -382,7 +359,7 @@ impl<'a> Parser<'a> {
     fn parse_line(&mut self, line: &str) -> bool {
         // Count blockquote markers on this line
         let (bq_depth, inner_content) = count_blockquote_markers(line);
-        let current_bq_depth = blockquotes::current_blockquote_depth(&self.containers);
+        let current_bq_depth = self.current_blockquote_depth();
 
         log::debug!(
             "parse_line [{}]: bq_depth={}, current_bq={}, depth={}, line={:?}",
@@ -401,9 +378,7 @@ impl<'a> Parser<'a> {
 
         if is_blank {
             // Close paragraph if open
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
+            self.close_paragraph_if_open();
 
             // Close Plain node in Definition if open
             // Blank lines should close Plain, allowing subsequent content to be siblings
@@ -852,7 +827,7 @@ impl<'a> Parser<'a> {
         let next_marker = try_parse_list_marker(next_inner, self.config);
 
         // Calculate current blockquote depth for proper indent calculation
-        let current_bq_depth = blockquotes::current_blockquote_depth(&self.containers);
+        let current_bq_depth = self.current_blockquote_depth();
 
         log::debug!(
             "compute_levels_to_keep: next_line indent={}, has_marker={}, stack_depth={}, current_bq={}, next_bq={}",
@@ -1117,8 +1092,7 @@ impl<'a> Parser<'a> {
 
         // For indented code blocks, we need a stricter condition - only actual blank lines count
         // Being at document start (pos == 0) is OK only if we're not inside a blockquote
-        let at_document_start =
-            self.pos == 0 && blockquotes::current_blockquote_depth(&self.containers) == 0;
+        let at_document_start = self.pos == 0 && self.current_blockquote_depth() == 0;
         let prev_line_blank = if self.pos > 0 {
             let prev_line = self.lines[self.pos - 1];
             let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
@@ -1129,7 +1103,7 @@ impl<'a> Parser<'a> {
         let has_blank_before_strict = at_document_start || prev_line_blank;
 
         // At top level only (not inside blockquotes), check for YAML metadata
-        if blockquotes::current_blockquote_depth(&self.containers) == 0 && content.trim() == "---" {
+        if self.current_blockquote_depth() == 0 && content.trim() == "---" {
             let at_document_start = self.pos == 0;
             if let Some(new_pos) =
                 try_parse_yaml_block(&self.lines, self.pos, &mut self.builder, at_document_start)
@@ -1145,15 +1119,10 @@ impl<'a> Parser<'a> {
         {
             log::debug!("Parsed HTML block at line {}: {:?}", self.pos, block_type);
 
-            // Emit buffer before HTML block
-            self.emit_list_item_buffer_if_needed();
+            // Prepare for HTML block
+            self.prepare_for_block_element();
 
-            // Close paragraph before opening HTML block
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-
-            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
+            let bq_depth = self.current_blockquote_depth();
             let new_pos = parse_html_block(
                 &mut self.builder,
                 &self.lines,
@@ -1170,8 +1139,8 @@ impl<'a> Parser<'a> {
         if is_caption_followed_by_table(&self.lines, self.pos) {
             log::debug!("Found caption followed by table at line {}", self.pos);
 
-            // Emit buffer before starting table
-            self.emit_list_item_buffer_if_needed();
+            // Prepare for table
+            self.prepare_for_block_element();
 
             let caption_start = self.pos;
 
@@ -1254,8 +1223,8 @@ impl<'a> Parser<'a> {
                     self.pos,
                     lines_consumed
                 );
-                // Emit buffer before table (should be done by table parser, but ensure)
-                self.emit_list_item_buffer_if_needed();
+                // Prepare for grid table
+                self.prepare_for_block_element();
                 self.pos += lines_consumed;
                 return true;
             }
@@ -1269,7 +1238,7 @@ impl<'a> Parser<'a> {
                     self.pos,
                     lines_consumed
                 );
-                self.emit_list_item_buffer_if_needed();
+                self.prepare_for_block_element();
                 self.pos += lines_consumed;
                 return true;
             }
@@ -1300,55 +1269,37 @@ impl<'a> Parser<'a> {
                 return true;
             }
 
-            // Try to parse horizontal rule (but only if not YAML)
-            if try_parse_horizontal_rule(content).is_some() {
-                log::debug!("Parsed horizontal rule at line {}", self.pos);
+            // Try dispatcher for blocks that need blank line before
+            let block_ctx = BlockContext {
+                content,
+                has_blank_before,
+                blockquote_depth: self.current_blockquote_depth(),
+                config: self.config,
+                containers: &self.containers,
+            };
 
-                // If we're in a ListItem with buffered content, emit it first
-                self.emit_list_item_buffer_if_needed();
-
-                emit_horizontal_rule(&mut self.builder, content);
-                self.pos += 1;
-                return true;
-            }
-
-            // Try to parse ATX heading from stripped content
-            if let Some(heading_level) = try_parse_atx_heading(content) {
-                log::debug!(
-                    "Parsed ATX heading at line {}: level {}",
-                    self.pos,
-                    heading_level
-                );
-                emit_atx_heading(&mut self.builder, content, heading_level, self.config);
-                self.pos += 1;
-                return true;
-            }
-
-            // Check for standalone figure (image on its own line)
-            if try_parse_figure(content) {
-                log::debug!("Parsed figure at line {}", self.pos);
-                // Close paragraph before creating figure
-                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                    self.close_containers_to(self.containers.depth() - 1);
+            if let Some(result) =
+                self.block_registry
+                    .try_parse(&block_ctx, &mut self.builder, &self.lines, self.pos)
+            {
+                match result {
+                    BlockParseResult::Parsed { lines_consumed } => {
+                        // Prepare for block element (flush buffers, close paragraphs)
+                        self.prepare_for_block_element();
+                        self.pos += lines_consumed;
+                        return true;
+                    }
+                    BlockParseResult::Skip => {
+                        return false;
+                    }
+                    BlockParseResult::NotApplicable => {
+                        // Fall through to manual checks
+                    }
                 }
-
-                // Get the full original line to preserve losslessness
-                let full_line = self.lines[self.pos];
-                // Build from original line with possible indent to preserve
-                let line_to_parse = if let Some(indent) = indent_to_emit {
-                    self.builder.token(SyntaxKind::WHITESPACE.into(), indent);
-                    &full_line[indent.len()..]
-                } else {
-                    full_line
-                };
-
-                parse_figure(&mut self.builder, line_to_parse, self.config);
-                self.pos += 1;
-                return true;
             }
         }
 
-        // Check for fenced code block
+        // Fenced code blocks
         // When inside a list, strip list indentation before checking
         let list_indent_stripped = if lists::in_list(&self.containers) {
             let content_col = paragraphs::current_content_col(&self.containers);
@@ -1431,13 +1382,11 @@ impl<'a> Parser<'a> {
                 self.emit_list_item_buffer_if_needed();
 
                 // Close paragraph before opening code block
-                if can_interrupt_paragraph
-                    && matches!(self.containers.last(), Some(Container::Paragraph { .. }))
-                {
+                if can_interrupt_paragraph && self.is_paragraph_open() {
                     self.close_containers_to(self.containers.depth() - 1);
                 }
 
-                let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
+                let bq_depth = self.current_blockquote_depth();
                 log::debug!(
                     "Parsed fenced code block at line {}: {} fence",
                     self.pos,
@@ -1465,9 +1414,7 @@ impl<'a> Parser<'a> {
             log::debug!("Parsed footnote definition at line {}: [^{}]", self.pos, id);
 
             // Close paragraph if one is open
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
+            self.close_paragraph_if_open();
 
             // Close previous footnote if one is open
             while matches!(
@@ -1510,55 +1457,45 @@ impl<'a> Parser<'a> {
         }
 
         // Check for reference definition: [label]: url "title"
-        // These can appear anywhere in the document
-        if let Some((_len, label, _url, _title)) = try_parse_reference_definition(content) {
-            log::debug!(
-                "Parsed reference definition at line {}: [{}]",
-                self.pos,
-                label
-            );
+        // These can appear anywhere in the document (no blank line needed)
+        // Try dispatcher first
+        let block_ctx = BlockContext {
+            content,
+            has_blank_before,
+            blockquote_depth: self.current_blockquote_depth(),
+            config: self.config,
+            containers: &self.containers,
+        };
 
-            // Emit as a node - parse the label as inline LINK structure
-            self.builder
-                .start_node(SyntaxKind::REFERENCE_DEFINITION.into());
-
-            // Get the full original line to preserve losslessness
-            let full_line = self.lines[self.pos];
-
-            // Strip line ending (handle both CRLF and LF)
-            let (content_without_newline, line_ending) =
-                if let Some(content) = full_line.strip_suffix("\r\n") {
-                    (content, "\r\n")
-                } else if let Some(content) = full_line.strip_suffix('\n') {
-                    (content, "\n")
-                } else {
-                    (full_line, "")
-                };
-
-            // Parse the reference definition with inline structure for the label
-            self.emit_reference_definition_content(content_without_newline);
-
-            // Emit newline separately if present
-            if !line_ending.is_empty() {
-                self.builder.token(SyntaxKind::NEWLINE.into(), line_ending);
+        if let Some(result) =
+            self.block_registry
+                .try_parse(&block_ctx, &mut self.builder, &self.lines, self.pos)
+        {
+            match result {
+                BlockParseResult::Parsed { lines_consumed } => {
+                    self.pos += lines_consumed;
+                    return true;
+                }
+                BlockParseResult::Skip => {
+                    return false;
+                }
+                BlockParseResult::NotApplicable => {
+                    // Fall through
+                }
             }
-
-            self.builder.finish_node();
-            self.pos += 1;
-            return true;
         }
 
-        // Check for indented code block (must have actual blank line before)
+        // Check for indented code block
         // Inside a footnote, content needs 4 spaces for code (8 total in raw line)
         // BUT: Don't treat as code if it's a list marker (list takes precedence)
         if has_blank_before_strict
             && is_indented_code_line(content)
             && try_parse_list_marker(content, self.config).is_none()
         {
-            // Emit buffer before indented code block
-            self.emit_list_item_buffer_if_needed();
+            // Prepare for indented code block
+            self.prepare_for_block_element();
 
-            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
+            let bq_depth = self.current_blockquote_depth();
             log::debug!("Parsed indented code block at line {}", self.pos);
             let new_pos = parse_indented_code_block(
                 &mut self.builder,
@@ -1579,13 +1516,8 @@ impl<'a> Parser<'a> {
                 div_fence.fence_count
             );
 
-            // Emit buffer before fenced div
-            self.emit_list_item_buffer_if_needed();
-
-            // Close paragraph before opening fenced div
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
+            // Prepare for fenced div
+            self.prepare_for_block_element();
 
             // Start FencedDiv node
             self.builder.start_node(SyntaxKind::FENCED_DIV.into());
@@ -1687,9 +1619,7 @@ impl<'a> Parser<'a> {
         // Check for fenced div closing
         if self.in_fenced_div() && is_div_closing_fence(content) {
             // Close paragraph before closing fenced div
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
+            self.close_paragraph_if_open();
 
             // Emit closing fence - parse to avoid newline duplication
             self.builder.start_node(SyntaxKind::DIV_FENCE_CLOSE.into());
@@ -1706,14 +1636,7 @@ impl<'a> Parser<'a> {
             }
 
             // Emit fence content without newline (handle both CRLF and LF)
-            let (content_without_newline, line_ending) =
-                if let Some(content) = trimmed.strip_suffix("\r\n") {
-                    (content, "\r\n")
-                } else if let Some(content) = trimmed.strip_suffix('\n') {
-                    (content, "\n")
-                } else {
-                    (trimmed, "")
-                };
+            let (content_without_newline, line_ending) = strip_newline(trimmed);
 
             self.builder
                 .token(SyntaxKind::TEXT.into(), content_without_newline);
@@ -1741,15 +1664,10 @@ impl<'a> Parser<'a> {
                 env_info.env_name
             );
 
-            // Emit buffer before LaTeX environment
-            self.emit_list_item_buffer_if_needed();
+            // Prepare for LaTeX environment
+            self.prepare_for_block_element();
 
-            // Close paragraph before opening LaTeX environment
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-
-            let bq_depth = blockquotes::current_blockquote_depth(&self.containers);
+            let bq_depth = self.current_blockquote_depth();
             let new_pos = parse_latex_environment(
                 &mut self.builder,
                 &self.lines,
@@ -1781,7 +1699,7 @@ impl<'a> Parser<'a> {
 
             // Lists can only interrupt paragraphs if there was a blank line before
             // (Per Pandoc spec - lists need blank lines to start interrupting paragraphs)
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+            if self.is_paragraph_open() {
                 if !has_blank_before {
                     // List cannot interrupt paragraph without blank line - treat as paragraph content
                     paragraphs::append_paragraph_line(
@@ -2134,9 +2052,7 @@ impl<'a> Parser<'a> {
         if self.config.extensions.line_blocks && try_parse_line_block_start(content).is_some() {
             log::debug!("Parsed line block at line {}", self.pos);
             // Close paragraph before opening line block
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
+            self.close_paragraph_if_open();
 
             let new_pos = parse_line_block(&self.lines, self.pos, &mut self.builder, self.config);
             self.pos = new_pos;
