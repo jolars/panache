@@ -15,7 +15,8 @@ is the definitive reference for parser implementation.
 - **Language**: Rust 2024 edition, stable toolchain
 - **Architecture**: Binary crate + WASM workspace for web playground
 - **Status**: Early development - breaking changes expected
-- **Tests**: 1,200+ total (846+ unit + 169 integration + others), ~1 second runtime
+- **Tests**: 1,200+ total (846+ unit + 169 integration + others), \~1 second
+  runtime
 - **Parser**: Integrated inline parsing (single-pass, Pandoc-style) - only mode
 
 ### Principles
@@ -65,7 +66,8 @@ RUST_LOG=debug cargo run -- format document.qmd
 RUST_LOG=trace cargo run -- parse document.qmd
 
 # Module-specific
-RUST_LOG=panache::parser::inline_parser=debug cargo run -- format document.qmd
+RUST_LOG=panache::parser::blocks=debug cargo run -- format document.qmd
+RUST_LOG=panache::parser::inlines=debug cargo run -- format document.qmd
 
 # Release builds: INFO logs only (DEBUG/TRACE compiled out)
 RUST_LOG=info ./target/release/panache format document.qmd
@@ -97,33 +99,32 @@ RUST_LOG=info ./target/release/panache format document.qmd
   markers
 - Located in `src/syntax/{headings,links,tables,references}.rs`
 
-### Two-Stage Parsing
+### Single-Pass Parsing Architecture
 
-1. **Block Parser** (`src/parser/block_parser/`):
+**Parser** (`src/parser/`):
 
-   - First pass: Parse flat block structures (headings, code blocks, paragraphs)
-   - Second pass: Resolve containers (blockquotes, lists) from flat structure
-   - Each block type isolated in own module
+1. **Parser** (`src/parser/core.rs`):
+   - Main parsing implementation in `Parser` struct
+   - Parses block structures (headings, code blocks, paragraphs, tables, lists,
+     etc.)
+   - Emits inline structure during block parsing (single-pass, Pandoc-style)
+   - Each block type isolated in `blocks/` directory
    - Config-aware (respects flavor and extension flags)
 
-2. **Inline Parser** (`src/parser/inline_parser/`):
-
-   - Runs after block parser on text content
+2. **Inline Parsing** (integrated, not a separate pass):
+   - Inline elements parsed during block parsing via `inlines/core.rs`
    - Delimiter-based with proper precedence (CommonMark spec)
    - Recursive for nested elements (e.g., emphasis in links)
-   - Standalone `parse_inline_text()` enables recursion
+   - Available in `inlines/` directory for specific constructs
+
+3. **Post-Processing**:
+   - `list_postprocessor.rs`: Wraps list item content in Plain/PARAGRAPH blocks
 
 **Key invariant**: Parser preserves ALL input bytes in CST, including structural
 markers. Formatter applies formatting rules, not the parser.
 
-### Long-term refactor plan: inline parsing during block parsing (Pandoc-style)
-
-We have decided to incrementally move from the current “block parse → inline
-pass” pipeline to a Pandoc-like approach where blocks emit inline structure
-directly.
-
-See `PARSER_REFACTORING.md` for detailed incremental plan and status of the
-refactor.
+**Architecture Note**: See `PARSER_REFACTORING.md` for the complete single-pass
+migration history (Phases 1-8 complete).
 
 ### Formatter Architecture
 
@@ -165,8 +166,7 @@ Hierarchical lookup: 1. Explicit `--config` path (errors if invalid)
 (affects enabled extensions) - `line_width`: Default 80 - `wrap`: Reflow
 (default) or Preserve - `extensions`: 60+ bool flags for Pandoc extensions
 
-Config threaded through parsers: `BlockParser::new(input, &Config)`,
-`InlineParser::new(tree, Config)`
+Config threaded through parsers: `Parser::new(input, &Config)`
 
 ## Testing Strategy
 
@@ -176,7 +176,7 @@ Config threaded through parsers: `BlockParser::new(input, &Config)`,
     `tests/linting.rs`
   - **Formatting tests**: `tests/golden_cases.rs` with CST snapshots (use
     `UPDATE_EXPECTED=1` or `UPDATE_CST=1`)
-- Architecture tests: `inline_parser/architecture_tests.rs` verifies nesting
+- Architecture tests: `blocks/tests/` verifies block parsing behavior
 - 98 golden test scenarios covering all syntax elements
 
 ### Golden Tests (`tests/golden_cases.rs`)
@@ -185,7 +185,8 @@ Each `tests/cases/*/` directory contains: - `input.md` (or `.qmd`, `.Rmd`)
 - `expected.md` - expected formatted output - `cst.txt` - CST snapshot for
 debugging - `panache.toml` - optional test-specific config
 
-You need to update the list of tests in `tests/golden_cases.rs` when adding a new directory.
+You need to update the list of tests in `tests/golden_cases.rs` when adding a
+new directory.
 
 To update expected outputs or CST snapshots, set environment variables:
 
@@ -237,19 +238,24 @@ if let Some(heading) = Heading::cast(node) {
 **Current rules:** - `heading-hierarchy`: Warns on skipped levels (h1 → h3),
 provides auto-fix
 
-**Usage:** ```bash panache lint document.qmd panache lint --check document.qmd
-# CI mode (exit 1 if violations) panache lint --fix document.qmd # Apply
-auto-fixes ```
+**Usage:**
+`bash panache lint document.qmd panache lint --check document.qmd # CI mode (exit 1 if violations) panache lint --fix document.qmd # Apply auto-fixes`
 
 ## File Organization Principles
 
 Instead of listing every file, understand the patterns:
 
-**Parser modules** (`src/parser/block_parser/`, `src/parser/inline_parser/`):
+**Parser modules** (`src/parser/`):
 
-- One module per syntax element type
-- Example: `headings.rs`, `links.rs`, `tables.rs`, `emphasis.rs`
-- Each module exports `try_parse_*()` and `emit_*()` functions
+- `core.rs`: Main `Parser` struct and orchestration logic
+- `blocks/`: Block-level constructs (headings, tables, lists, paragraphs, etc.)
+  - One module per syntax element type
+  - Each module exports `try_parse_*()` and `emit_*()` functions
+- `inlines/`: Inline-level constructs (emphasis, links, code spans, math, etc.)
+  - `core.rs`: Main inline parsing entry point
+  - Recursive parsing for nested inline elements
+- `utils/`: Shared utilities (attributes, text buffers, inline emission helpers)
+- `list_postprocessor.rs`: Post-processing for list item content wrapping
 
 **Formatter modules** (`src/formatter/`):
 
@@ -301,8 +307,8 @@ Instead of listing every file, understand the patterns:
 
 **Key modules with logging:**
 
-- `panache::parser::block_parser`
-- `panache::parser::inline_parser`
+- `panache::parser::blocks`
+- `panache::parser::inlines`
 - `panache::formatter`
 - `panache::config`
 

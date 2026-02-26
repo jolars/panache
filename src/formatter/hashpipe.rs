@@ -3,7 +3,7 @@
 //! Converts inline chunk options to Quarto's new hashpipe format with proper
 //! line wrapping and language-specific comment prefixes.
 
-use crate::parser::block_parser::chunk_options::ChunkOptionValue;
+use crate::parser::utils::chunk_options::ChunkOptionValue;
 use crate::syntax::{AstNode, ChunkLabel, ChunkOption, SyntaxKind, SyntaxNode};
 
 /// A chunk option with a classified value (simple or expression).
@@ -216,7 +216,7 @@ fn classify_option_for_hashpipe(
     value: &str,
     is_quoted: bool,
 ) -> Option<ChunkOptionValue> {
-    use crate::parser::block_parser::chunk_options::{is_boolean_literal, is_numeric_literal};
+    use crate::parser::utils::chunk_options::{is_boolean_literal, is_numeric_literal};
 
     // Find allowed value types for this option
     let allowed_types = HASHPIPE_SAFE_OPTIONS
@@ -360,7 +360,7 @@ pub fn format_as_hashpipe(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::block_parser::chunk_options::ChunkOptionValue;
+    use crate::parser::utils::chunk_options::ChunkOptionValue;
 
     #[test]
     fn test_get_comment_prefix_r() {

@@ -1,7 +1,7 @@
 use crate::config::{AttributeStyle, Config, FenceStyle, Flavor};
 #[cfg(feature = "lsp")]
 use crate::external_formatters::format_code_async;
-use crate::parser::block_parser::code_blocks::{CodeBlockType, InfoString};
+use crate::parser::blocks::code_blocks::{CodeBlockType, InfoString};
 use crate::syntax::{AstNode, SyntaxKind, SyntaxNode};
 use crate::utils;
 use rowan::NodeOrToken;

@@ -1,20 +1,23 @@
-//! Parser module containing block and inline parsers.
+//! Parser module for Pandoc/Quarto documents.
+//!
+//! Single-pass parsing architecture: blocks emit inline structure during parsing.
 
 use crate::config::Config;
 use crate::syntax::SyntaxNode;
 
-pub mod block_parser;
-pub mod inline_parser;
+pub mod blocks;
+pub mod inlines;
 pub mod list_postprocessor;
+pub mod utils;
 
-// Re-export commonly used types
-pub use block_parser::BlockParser;
-pub use inline_parser::parse_inline_text;
+mod core;
+
+// Re-export main parser
+pub use core::Parser;
 
 /// Parses a Quarto document string into a syntax tree.
 ///
-/// This function runs the block parser to produce a complete concrete syntax tree (CST).
-/// Inline parsing is now integrated into block parsing (single-pass architecture).
+/// Single-pass architecture: blocks emit inline structure during parsing.
 /// Line endings (LF or CRLF) are preserved exactly as they appear in the input.
 ///
 /// # Examples
@@ -33,14 +36,9 @@ pub use inline_parser::parse_inline_text;
 /// * `config` - Optional configuration. If None, uses default config.
 pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
     let config = config.unwrap_or_default();
-    let block_tree = BlockParser::new(input, &config).parse();
-
-    // PHASE 7.1 COMPLETE: Single-pass parsing achieved!
-    // All block types now emit inline structure during block parsing.
-    // InlineParser second pass removed - no longer needed.
+    let block_tree = Parser::new(input, &config).parse();
 
     // Post-process to wrap list item content in Plain/PARAGRAPH blocks
-    // Also applies inline parsing during wrapping
     let green = list_postprocessor::wrap_list_item_content(block_tree, &config);
     SyntaxNode::new_root(green)
 }

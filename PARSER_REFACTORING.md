@@ -12,7 +12,7 @@
 ```rust
 // src/parser.rs - LINE 34
 pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
-    let block_tree = BlockParser::new(input, &config).parse();  // SINGLE PASS!
+    let block_tree = Parser::new(input, &config).parse();  // SINGLE PASS!
     
     // Post-process to wrap list item content in Plain/PARAGRAPH blocks
     let green = list_postprocessor::wrap_list_item_content(block_tree, &config);
@@ -36,7 +36,7 @@ pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
   - ✅ Formatting idempotency verified
 
 **Architecture:**
-- ⚡ Main parse path: BlockParser only (single pass)
+- ⚡ Main parse path: Parser only (single pass)
 - ⚡ InlineParser still exists for tests and linter tools
 - ⚡ ~0% overhead from second traversal (eliminated)
 
@@ -148,19 +148,55 @@ These phases established the integrated inline parsing infrastructure and migrat
 - ~0% overhead eliminated (InlineParser second pass removed)
 - Typical documents parsed ~50% faster (no tree rebuild)
 
-**Current Test Status**: 1,231 tests passing, clippy clean
+**Current Test Status**: 1,180 tests passing, clippy clean
 
-**Architecture Achievement**: True single-pass parsing! BlockParser emits complete CST with inline structure. InlineParser remains for tests and linter tools but is not used in main parsing path.
+**Architecture Achievement**: True single-pass parsing! BlockParser emits complete CST with inline structure.
 
 ---
 
-### Phase 8: Finalize and Clean Up 🎯 (Next Steps)
+### Phase 8: Code Reorganization ✅ COMPLETE (2026-02-25)
 
-**Goal**: Complete any remaining optimizations and documentation now that single-pass parsing is achieved.
+**Goal**: Clean up module structure and remove remnants of two-pass architecture.
 
-**Potential Future Work**:
+**Completed**:
 
-1. **Multi-line inline constructs in blockquotes** (Low Priority)
+1. **Module Reorganization** ✅
+   - Flattened parser structure from `block_parser/` and `inline_parser/` to `blocks/`, `inlines/`, `utils/`
+   - Used modern Rust conventions (module.rs at parent level, not module/mod.rs)
+   - Created clear separation: `parser/blocks.rs`, `parser/inlines.rs`, `parser/utils.rs`
+   - Moved shared utilities (attributes, chunk_options, text_buffer, etc.) to `utils/`
+   - Renamed `block_parser.rs` → `parser/block_parser.rs` (main parser implementation)
+   - Renamed `utils/utils.rs` → `utils/helpers.rs` to avoid module_inception warning
+
+2. **Import Updates** ✅
+   - Updated all ~60+ import statements across the codebase
+   - Fixed function visibility with `pub(in crate::parser)` for internal functions
+   - Updated external imports in formatter and LSP modules
+   - All compilation errors resolved, clippy clean
+
+3. **Cleanup** ✅
+   - Removed old `block_parser/` and `inline_parser/` directories
+   - Removed thin wrapper files (`block_parser.rs`, `inline_parser.rs` at top level)
+   - Removed comments about "InlineParser second pass"
+   - Removed comments about "use_integrated_inline_parsing" flag
+   - Cleaned up module documentation to reflect single-pass architecture
+
+**Result**: Clean, maintainable module structure that accurately reflects the single-pass parsing architecture. No remnants of the old two-pass approach remain.
+
+---
+
+### Phase 9: Future Improvements 🎯 (Next Steps)
+
+**Goal**: Additional optimizations and enhancements beyond the core refactoring.
+
+**Future Work**:
+
+1. **List postprocessor**
+
+   Lists parsing is not truly single-pass yet because we do the parsing of inline
+   elements in a post-processor, which is not ideal.
+
+2. **Multi-line inline constructs in blockquotes**
    
    Currently, multi-line inline constructs (e.g., `**bold\ntext**`) don't work when they span BLOCKQUOTE_MARKER boundaries. This is a pre-existing limitation (also present before refactoring), not a regression.
    
@@ -169,23 +205,8 @@ These phases established the integrated inline parsing infrastructure and migrat
    a. **Wrapper builder**: Create a `MarkerInsertingBuilder` that wraps `GreenNodeBuilder` and intercepts token emissions to inject markers at the right byte offsets. Single pass, no intermediate allocations. Markers would end up inside inline nodes (e.g., BLOCKQUOTE_MARKER inside STRONG), which is semantically unusual but the formatter already skips markers so output would be correct.
    
    b. **Intermediate tree**: Parse to a temporary `GreenNode`, then traverse and emit to the real builder with markers inserted. Cleaner tree structure control, but extra allocation.
-   
-   Decision: Deferred until we have real-world use cases requiring this functionality.
 
-2. **Performance Benchmarking**
-   
-   Now that single-pass parsing is complete, benchmark against the old two-pass architecture to quantify performance improvements:
-   - Parse time reduction
-   - Memory allocation patterns
-   - Impact on typical document sizes
-   
-3. **Documentation Updates**
-   
-   - Update architecture diagrams
-   - Document the integrated inline parsing approach
-   - Add developer guide for adding new block types
-
-4. **Incremental Parsing** (Long-term Goal)
+3. **Incremental Parsing** (Long-term Goal)
    
    Single-pass architecture is a prerequisite for incremental parsing. Future work could explore:
    - Tracking byte offsets for node boundaries
