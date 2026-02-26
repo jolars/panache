@@ -1744,7 +1744,6 @@ mod tests {
 
     /// Test parsing nested emphasis/strong
     #[test]
-    #[ignore] // TODO: This test needs a wrapper node, fix later
     fn test_parse_nested_emphasis_strong() {
         use crate::config::Config;
 
