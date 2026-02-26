@@ -3,6 +3,7 @@
 use crate::parser::utils::helpers::strip_leading_spaces;
 
 /// Information about a detected div fence opening.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DivFenceInfo {
     pub attributes: String,
     pub fence_count: usize,

@@ -21,7 +21,10 @@ use super::blocks::headings::{
     emit_atx_heading, emit_setext_heading, try_parse_atx_heading, try_parse_setext_heading,
 };
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
-use super::blocks::metadata::try_parse_yaml_block;
+use super::blocks::html_blocks::{HtmlBlockType, parse_html_block, try_parse_html_block_start};
+use super::blocks::latex_envs::{LatexEnvInfo, parse_latex_environment, try_parse_latex_env_begin};
+use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
+use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 use super::blocks::reference_links::try_parse_reference_definition;
 use super::inlines::links::try_parse_inline_image;
 use super::utils::container_stack::byte_index_at_column;
@@ -274,6 +277,68 @@ impl BlockParser for AtxHeadingParser {
     }
 }
 
+/// Pandoc title block parser (% Title ...)
+pub(crate) struct PandocTitleBlockParser;
+
+impl BlockParser for PandocTitleBlockParser {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        // Must be at document start.
+        if !ctx.at_document_start || line_pos != 0 {
+            return None;
+        }
+
+        // Must start with % (allow leading spaces).
+        if !ctx.content.trim_start().starts_with('%') {
+            return None;
+        }
+
+        Some((BlockDetectionResult::Yes, None))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        let new_pos =
+            try_parse_pandoc_title_block(lines, line_pos, builder).unwrap_or(line_pos + 1);
+        new_pos - line_pos
+    }
+
+    fn name(&self) -> &'static str {
+        "pandoc_title_block"
+    }
+}
+
 /// YAML metadata block parser (--- ... ---/...)
 pub(crate) struct YamlMetadataParser;
 
@@ -284,34 +349,44 @@ impl BlockParser for YamlMetadataParser {
         lines: &[&str],
         line_pos: usize,
     ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         // Must be at top level (not inside blockquotes)
         if ctx.blockquote_depth > 0 {
-            return BlockDetectionResult::No;
+            return None;
         }
 
         // Must start with ---
         if ctx.content.trim() != "---" {
-            return BlockDetectionResult::No;
+            return None;
         }
 
         // YAML needs blank line before OR be at document start
         if !ctx.has_blank_before && !ctx.at_document_start {
-            return BlockDetectionResult::No;
+            return None;
         }
 
         // Look ahead: next line must NOT be blank (to distinguish from horizontal rule)
-        if line_pos + 1 < lines.len() {
-            let next_line = lines[line_pos + 1];
-            if next_line.trim().is_empty() {
-                // This is a horizontal rule, not YAML
-                return BlockDetectionResult::No;
-            }
-        } else {
-            // No content after ---, can't be YAML
-            return BlockDetectionResult::No;
+        let next_line = lines.get(line_pos + 1)?;
+        if next_line.trim().is_empty() {
+            // This is a horizontal rule, not YAML
+            return None;
         }
 
-        BlockDetectionResult::Yes
+        // Cache the `at_document_start` flag for emission (avoids any ambiguity if ctx changes).
+        Some((
+            BlockDetectionResult::Yes,
+            Some(Box::new(ctx.at_document_start)),
+        ))
     }
 
     fn parse(
@@ -321,13 +396,25 @@ impl BlockParser for YamlMetadataParser {
         lines: &[&str],
         line_pos: usize,
     ) -> usize {
-        // Pass at_document_start to try_parse_yaml_block
-        if let Some(new_pos) = try_parse_yaml_block(lines, line_pos, builder, ctx.at_document_start)
-        {
-            new_pos - line_pos // Return lines consumed
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        let at_document_start = payload
+            .and_then(|p| p.downcast_ref::<bool>().copied())
+            .unwrap_or(ctx.at_document_start);
+
+        if let Some(new_pos) = try_parse_yaml_block(lines, line_pos, builder, at_document_start) {
+            new_pos - line_pos
         } else {
-            // Should not happen since can_parse returned Yes
-            1 // Consume at least the opening line
+            1
         }
     }
 
@@ -431,6 +518,7 @@ impl BlockParser for ReferenceDefinitionParser {
         _lines: &[&str],
         _line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        // Parse once and cache for emission.
         let parsed = try_parse_reference_definition(ctx.content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(parsed))))
     }
@@ -460,10 +548,13 @@ impl BlockParser for ReferenceDefinitionParser {
         let full_line = lines[line_pos];
         let (content_without_newline, line_ending) = strip_newline(full_line);
 
-        // Currently we only cache that this *is* a refdef.
-        // When we migrate refdefs fully, we can reuse `parsed` to emit URL/title structure too.
-        let _parsed =
-            payload.and_then(|p| p.downcast_ref::<(usize, String, String, Option<String>)>());
+        // Detection already cached the parsed tuple; emission should not need to re-parse.
+        // If payload is missing (legacy callsites), we fall back to the old raw emission.
+        debug_assert!(
+            payload
+                .and_then(|p| p.downcast_ref::<(usize, String, String, Option<String>)>())
+                .is_some()
+        );
 
         emit_reference_definition_content(builder, content_without_newline);
 
@@ -637,6 +728,223 @@ impl BlockParser for FencedCodeBlockParser {
 }
 
 // ============================================================================
+// HTML Block Parser (position #9)
+// ============================================================================
+
+pub(crate) struct HtmlBlockParser;
+
+impl BlockParser for HtmlBlockParser {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.raw_html {
+            return None;
+        }
+
+        let block_type = try_parse_html_block_start(ctx.content)?;
+
+        // Match previous behavior (and Pandoc-ish semantics): HTML blocks can interrupt
+        // paragraphs; blank lines are not required.
+        let detection = if ctx.has_blank_before || ctx.at_document_start {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::YesCanInterrupt
+        };
+
+        Some((detection, Some(Box::new(block_type))))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        let block_type = if let Some(bt) = payload.and_then(|p| p.downcast_ref::<HtmlBlockType>()) {
+            bt.clone()
+        } else {
+            try_parse_html_block_start(ctx.content).expect("HTML block type should exist")
+        };
+
+        let new_pos = parse_html_block(builder, lines, line_pos, block_type, ctx.blockquote_depth);
+        new_pos - line_pos
+    }
+
+    fn name(&self) -> &'static str {
+        "html_block"
+    }
+}
+
+// ============================================================================
+// LaTeX Environment Parser (position #12)
+// ============================================================================
+
+pub(crate) struct LatexEnvironmentParser;
+
+impl BlockParser for LatexEnvironmentParser {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.raw_tex {
+            return None;
+        }
+
+        let env_info = try_parse_latex_env_begin(ctx.content)?;
+
+        // Like HTML blocks, raw TeX blocks should be able to interrupt paragraphs.
+        let detection = if ctx.has_blank_before || ctx.at_document_start {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::YesCanInterrupt
+        };
+
+        Some((detection, Some(Box::new(env_info))))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        let env_info = if let Some(info) = payload.and_then(|p| p.downcast_ref::<LatexEnvInfo>()) {
+            info.clone()
+        } else {
+            try_parse_latex_env_begin(ctx.content).expect("LaTeX env info should exist")
+        };
+
+        let new_pos =
+            parse_latex_environment(builder, lines, line_pos, env_info, ctx.blockquote_depth);
+        new_pos - line_pos
+    }
+
+    fn name(&self) -> &'static str {
+        "latex_environment"
+    }
+}
+
+// ============================================================================
+// Line Block Parser (position #13)
+// ============================================================================
+
+pub(crate) struct LineBlockParser;
+
+impl BlockParser for LineBlockParser {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.line_blocks {
+            return None;
+        }
+
+        if try_parse_line_block_start(ctx.content).is_none() {
+            return None;
+        }
+
+        // Line blocks can interrupt paragraphs.
+        let detection = if ctx.has_blank_before || ctx.at_document_start {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::YesCanInterrupt
+        };
+
+        Some((detection, None))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        let new_pos = parse_line_block(lines, line_pos, builder, ctx.config);
+        new_pos - line_pos
+    }
+
+    fn name(&self) -> &'static str {
+        "line_block"
+    }
+}
+
+// ============================================================================
 // Setext Heading Parser (position #3)
 // ============================================================================
 
@@ -745,6 +1053,8 @@ impl BlockParserRegistry {
     pub fn new() -> Self {
         let parsers: Vec<Box<dyn BlockParser>> = vec![
             // Match Pandoc's ordering to ensure correct precedence:
+            // (0) Pandoc title block (must be at document start).
+            Box::new(PandocTitleBlockParser),
             // (2) Fenced code blocks - can interrupt paragraphs!
             Box::new(FencedCodeBlockParser),
             // (3) YAML metadata - before headers and hrules!
@@ -754,6 +1064,12 @@ impl BlockParserRegistry {
             Box::new(SetextHeadingParser),
             // (7) ATX headings (part of Pandoc's "header" parser)
             Box::new(AtxHeadingParser),
+            // (9) HTML blocks
+            Box::new(HtmlBlockParser),
+            // (12) LaTeX environment blocks
+            Box::new(LatexEnvironmentParser),
+            // (13) Line blocks
+            Box::new(LineBlockParser),
             // (15) Horizontal rules - AFTER headings per Pandoc
             Box::new(HorizontalRuleParser),
             // Figures (standalone images) - Pandoc doesn't have these
@@ -762,10 +1078,8 @@ impl BlockParserRegistry {
             Box::new(ReferenceDefinitionParser),
             // TODO: Migrate remaining blocks in Pandoc order:
             // - (4-6) Lists and divs (bulletList, divHtml, divFenced)
-            // - (9) HTML blocks
             // - (10) Tables (grid, multiline, pipe, simple)
             // - (11) Indented code blocks (AFTER fenced!)
-            // - (12) LaTeX blocks (rawTeXBlock)
             // - (13) Line blocks
             // - (16) Ordered lists
             // - (17) Definition lists

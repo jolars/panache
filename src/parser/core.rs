@@ -11,7 +11,6 @@ use super::blocks::indented_code;
 use super::blocks::latex_envs;
 use super::blocks::line_blocks;
 use super::blocks::lists;
-use super::blocks::metadata;
 use super::blocks::paragraphs;
 use super::blocks::reference_links;
 use super::blocks::tables;
@@ -24,13 +23,12 @@ use super::utils::text_buffer;
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
-use html_blocks::{parse_html_block, try_parse_html_block_start};
+use html_blocks::try_parse_html_block_start;
 use indented_code::{is_indented_code_line, parse_indented_code_block};
-use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
+use latex_envs::try_parse_latex_env_begin;
 use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{is_content_nested_bullet_marker, markers_match, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
-use metadata::try_parse_pandoc_title_block;
 use reference_links::try_parse_footnote_marker;
 use tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
@@ -326,13 +324,7 @@ impl<'a> Parser<'a> {
 
         log::debug!("Starting document parse");
 
-        // Check for Pandoc title block at document start
-        if self.pos == 0
-            && !self.lines.is_empty()
-            && let Some(new_pos) = try_parse_pandoc_title_block(&self.lines, 0, &mut self.builder)
-        {
-            self.pos = new_pos;
-        }
+        // Pandoc title block is handled via the block dispatcher.
 
         while self.pos < self.lines.len() {
             let line = self.lines[self.pos];
@@ -1131,7 +1123,9 @@ impl<'a> Parser<'a> {
         };
 
         let next_line = if self.pos + 1 < self.lines.len() {
-            Some(self.lines[self.pos + 1])
+            // For lookahead-based blocks (e.g. setext headings), the dispatcher expects
+            // `ctx.next_line` to be in the same “inner content” form as `ctx.content`.
+            Some(count_blockquote_markers(self.lines[self.pos + 1]).1)
         } else {
             None
         };
@@ -1195,27 +1189,6 @@ impl<'a> Parser<'a> {
             false
         };
         let has_blank_before_strict = at_document_start || prev_line_blank;
-
-        // Check for HTML block (if raw_html extension is enabled)
-        if self.config.extensions.raw_html
-            && let Some(block_type) = try_parse_html_block_start(content)
-        {
-            log::debug!("Parsed HTML block at line {}: {:?}", self.pos, block_type);
-
-            // Prepare for HTML block
-            self.prepare_for_block_element();
-
-            let bq_depth = self.current_blockquote_depth();
-            let new_pos = parse_html_block(
-                &mut self.builder,
-                &self.lines,
-                self.pos,
-                block_type,
-                bq_depth,
-            );
-            self.pos = new_pos;
-            return true;
-        }
 
         // Check if this line looks like a table caption followed by a table
         // If so, try to parse the table (which will include the caption)
@@ -1624,31 +1597,6 @@ impl<'a> Parser<'a> {
             self.close_containers_to(self.containers.depth() - 1);
 
             self.pos += 1;
-            return true;
-        }
-
-        // Check for LaTeX environment (if raw_tex extension is enabled)
-        if self.config.extensions.raw_tex
-            && let Some(env_info) = try_parse_latex_env_begin(content)
-        {
-            log::debug!(
-                "Parsed LaTeX environment at line {}: \\begin{{{}}}",
-                self.pos,
-                env_info.env_name
-            );
-
-            // Prepare for LaTeX environment
-            self.prepare_for_block_element();
-
-            let bq_depth = self.current_blockquote_depth();
-            let new_pos = parse_latex_environment(
-                &mut self.builder,
-                &self.lines,
-                self.pos,
-                env_info,
-                bq_depth,
-            );
-            self.pos = new_pos;
             return true;
         }
 
