@@ -4,11 +4,8 @@ use rowan::GreenNodeBuilder;
 
 use super::block_dispatcher::{BlockContext, BlockDetectionResult, BlockParserRegistry};
 use super::blocks::blockquotes;
-use super::blocks::code_blocks;
 use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
-use super::blocks::headings;
-use super::blocks::horizontal_rules;
 use super::blocks::html_blocks;
 use super::blocks::indented_code;
 use super::blocks::latex_envs;
@@ -24,12 +21,9 @@ use super::utils::inline_emission;
 use super::utils::marker_utils;
 use super::utils::text_buffer;
 
-use code_blocks::try_parse_fence_open;
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
-use headings::try_parse_atx_heading;
-use horizontal_rules::try_parse_horizontal_rule;
 use html_blocks::{parse_html_block, try_parse_html_block_start};
 use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
@@ -373,6 +367,7 @@ impl<'a> Parser<'a> {
         // Handle blank lines specially (including blank lines inside blockquotes)
         // A line like ">" with nothing after is a blank line inside a blockquote
         // Note: lines may end with \n from split_inclusive
+        // TODO: Does this handle CLRF correctly?
         let is_blank = line.trim_end_matches('\n').trim().is_empty()
             || (bq_depth > 0 && inner_content.trim_end_matches('\n').trim().is_empty());
 
@@ -820,6 +815,25 @@ impl<'a> Parser<'a> {
         self.parse_inner_content(line, None)
     }
 
+    fn has_nested_block_structure(&self, content: &str) -> bool {
+        let block_ctx = BlockContext {
+            content,
+            has_blank_before: true,
+            at_document_start: false,
+            blockquote_depth: self.current_blockquote_depth(),
+            config: self.config,
+            content_indent: 0,
+            list_indent_info: None,
+            next_line: None,
+        };
+
+        // Note: we only use the registry for its “is this a block start?” decision;
+        // it should not rely on `lines` here (setext is gated by `has_blank_before`).
+        self.block_registry
+            .detect_prepared(&block_ctx, &[], 0)
+            .is_some()
+    }
+
     /// Compute how many container levels to keep open based on next line content.
     fn compute_levels_to_keep(&self, next_line: &str) -> usize {
         let (next_bq_depth, next_inner) = count_blockquote_markers(next_line);
@@ -885,9 +899,23 @@ impl<'a> Parser<'a> {
                             try_parse_list_marker(after_content_indent, self.config).is_some();
                         let has_block_structure = has_list_marker
                             || count_blockquote_markers(after_content_indent).0 > 0
-                            || try_parse_fence_open(after_content_indent).is_some()
-                            || try_parse_div_fence_open(after_content_indent).is_some()
-                            || try_parse_horizontal_rule(after_content_indent).is_some();
+                            || {
+                                let block_ctx = BlockContext {
+                                    content: after_content_indent,
+                                    has_blank_before: true,
+                                    at_document_start: false,
+                                    blockquote_depth: self.current_blockquote_depth(),
+                                    config: self.config,
+                                    content_indent: 0,
+                                    list_indent_info: None,
+                                    // Avoid setext heading detection here; we only care about
+                                    // marker-like nested block structure after blank lines.
+                                    next_line: None,
+                                };
+                                self.block_registry
+                                    .detect_prepared(&block_ctx, &[], 0)
+                                    .is_some()
+                            };
 
                         if !has_definition_marker && has_block_structure {
                             // Keep Definition for nested block content
@@ -1041,14 +1069,32 @@ impl<'a> Parser<'a> {
             let is_block_element = try_parse_definition_marker(stripped_content).is_some()
                 || try_parse_list_marker(stripped_content, self.config).is_some()
                 || count_blockquote_markers(stripped_content).0 > 0
-                || try_parse_fence_open(stripped_content).is_some()
-                || try_parse_div_fence_open(stripped_content).is_some()
-                || try_parse_horizontal_rule(stripped_content).is_some()
-                || try_parse_atx_heading(stripped_content).is_some()
                 || (self.config.extensions.raw_html
                     && try_parse_html_block_start(stripped_content).is_some())
                 || (self.config.extensions.raw_tex
-                    && try_parse_latex_env_begin(stripped_content).is_some());
+                    && try_parse_latex_env_begin(stripped_content).is_some())
+                || {
+                    let next_line = if self.pos + 1 < self.lines.len() {
+                        Some(self.lines[self.pos + 1])
+                    } else {
+                        None
+                    };
+
+                    let block_ctx = BlockContext {
+                        content: stripped_content,
+                        has_blank_before: true,
+                        at_document_start: self.pos == 0 && self.current_blockquote_depth() == 0,
+                        blockquote_depth: self.current_blockquote_depth(),
+                        config: self.config,
+                        content_indent,
+                        list_indent_info: None,
+                        next_line,
+                    };
+
+                    self.block_registry
+                        .detect_prepared(&block_ctx, &self.lines, self.pos)
+                        .is_some()
+                };
 
             if is_block_element {
                 // Close any open Plain block before processing the block element
@@ -1084,6 +1130,51 @@ impl<'a> Parser<'a> {
         // Store the stripped content for later use
         let content = stripped_content;
 
+        // Precompute dispatcher match once per line (reused by multiple branches below).
+        // This covers: blocks requiring blank lines, blocks that can interrupt paragraphs,
+        // and blocks that can appear without blank lines (e.g. reference definitions).
+        use super::blocks::lists;
+        use super::blocks::paragraphs;
+        let list_indent_info = if lists::in_list(&self.containers) {
+            let content_col = paragraphs::current_content_col(&self.containers);
+            if content_col > 0 {
+                Some(super::block_dispatcher::ListIndentInfo { content_col })
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let next_line = if self.pos + 1 < self.lines.len() {
+            Some(self.lines[self.pos + 1])
+        } else {
+            None
+        };
+
+        let current_bq_depth = self.current_blockquote_depth();
+
+        let dispatcher_ctx = BlockContext {
+            content,
+            has_blank_before: false,  // filled in later
+            at_document_start: false, // filled in later
+            blockquote_depth: current_bq_depth,
+            config: self.config,
+            content_indent,
+            list_indent_info,
+            next_line,
+        };
+
+        // We'll update these two fields shortly (after they are computed), but we can still
+        // use this ctx shape to avoid rebuilding repeated context objects.
+        let mut dispatcher_ctx = dispatcher_ctx;
+
+        // Initial detection (before blank/doc-start are computed). Note: this can
+        // match reference definitions, but footnotes are handled explicitly later.
+        let dispatcher_match =
+            self.block_registry
+                .detect_prepared(&dispatcher_ctx, &self.lines, self.pos);
+
         // Check for heading (needs blank line before, or at start of container)
         let has_blank_before = self.pos == 0
             || self.lines[self.pos - 1].trim().is_empty()
@@ -1092,7 +1183,26 @@ impl<'a> Parser<'a> {
 
         // For indented code blocks, we need a stricter condition - only actual blank lines count
         // Being at document start (pos == 0) is OK only if we're not inside a blockquote
-        let at_document_start = self.pos == 0 && self.current_blockquote_depth() == 0;
+        let at_document_start = self.pos == 0 && current_bq_depth == 0;
+
+        dispatcher_ctx.has_blank_before = has_blank_before;
+        dispatcher_ctx.at_document_start = at_document_start;
+
+        let dispatcher_match =
+            if dispatcher_ctx.has_blank_before || dispatcher_ctx.at_document_start {
+                // Recompute now that blank/doc-start conditions are known.
+                self.block_registry
+                    .detect_prepared(&dispatcher_ctx, &self.lines, self.pos)
+            } else {
+                dispatcher_match
+            };
+
+        // Avoid treating footnote definitions as dispatcher blocks (footnotes must win).
+        let dispatcher_match = if try_parse_footnote_marker(content).is_some() {
+            None
+        } else {
+            dispatcher_match
+        };
         let prev_line_blank = if self.pos > 0 {
             let prev_line = self.lines[self.pos - 1];
             let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
@@ -1258,234 +1368,52 @@ impl<'a> Parser<'a> {
                 return true;
             }
 
-            // Try dispatcher for blocks that need blank line before
-            // OR that can interrupt paragraphs (e.g., fenced code blocks)
+            if let Some(block_match) = dispatcher_match.as_ref() {
+                let detection = block_match.detection;
 
-            // Calculate list indent info for blocks that need it (e.g., fenced code)
-            use super::blocks::lists;
-            use super::blocks::paragraphs;
-            let list_indent_info = if lists::in_list(&self.containers) {
-                let content_col = paragraphs::current_content_col(&self.containers);
-                if content_col > 0 {
-                    Some(super::block_dispatcher::ListIndentInfo { content_col })
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            // Get next line for lookahead (used by setext headings)
-            let next_line = if self.pos + 1 < self.lines.len() {
-                Some(self.lines[self.pos + 1])
-            } else {
-                None
-            };
-
-            let block_ctx = BlockContext {
-                content,
-                has_blank_before,
-                at_document_start,
-                blockquote_depth: self.current_blockquote_depth(),
-                config: self.config,
-                containers: &self.containers,
-                content_indent,
-                list_indent_info,
-                next_line,
-            };
-
-            if let Some((parser_idx, detection)) =
-                self.block_registry
-                    .detect(&block_ctx, &self.lines, self.pos)
-            {
-                // Drop context to release borrow before prepare
-
-                // Handle based on detection result
                 match detection {
                     BlockDetectionResult::YesCanInterrupt => {
-                        // Block can interrupt paragraphs
-                        // Emit list item buffer if needed
                         self.emit_list_item_buffer_if_needed();
-
-                        // Close paragraph if one is open
                         if self.is_paragraph_open() {
                             self.close_containers_to(self.containers.depth() - 1);
                         }
-
-                        // Recreate context for parsing
-                        let list_indent_info = if lists::in_list(&self.containers) {
-                            let content_col = paragraphs::current_content_col(&self.containers);
-                            if content_col > 0 {
-                                Some(super::block_dispatcher::ListIndentInfo { content_col })
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        };
-
-                        let next_line = if self.pos + 1 < self.lines.len() {
-                            Some(self.lines[self.pos + 1])
-                        } else {
-                            None
-                        };
-
-                        let block_ctx = BlockContext {
-                            content,
-                            has_blank_before,
-                            at_document_start,
-                            blockquote_depth: self.current_blockquote_depth(),
-                            config: self.config,
-                            containers: &self.containers,
-                            content_indent,
-                            list_indent_info,
-                            next_line,
-                        };
-
-                        let lines_consumed = self.block_registry.parse(
-                            parser_idx,
-                            &block_ctx,
-                            &mut self.builder,
-                            &self.lines,
-                            self.pos,
-                        );
-                        self.pos += lines_consumed;
-                        return true;
                     }
                     BlockDetectionResult::Yes => {
-                        // Block needs blank line before (normal case)
-                        // Prepare for block element (flush buffers, close paragraphs)
                         self.prepare_for_block_element();
-
-                        // Recreate context for parsing
-                        let list_indent_info = if lists::in_list(&self.containers) {
-                            let content_col = paragraphs::current_content_col(&self.containers);
-                            if content_col > 0 {
-                                Some(super::block_dispatcher::ListIndentInfo { content_col })
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        };
-
-                        let next_line = if self.pos + 1 < self.lines.len() {
-                            Some(self.lines[self.pos + 1])
-                        } else {
-                            None
-                        };
-
-                        let block_ctx = BlockContext {
-                            content,
-                            has_blank_before,
-                            at_document_start,
-                            blockquote_depth: self.current_blockquote_depth(),
-                            config: self.config,
-                            containers: &self.containers,
-                            content_indent,
-                            list_indent_info,
-                            next_line,
-                        };
-
-                        let lines_consumed = self.block_registry.parse(
-                            parser_idx,
-                            &block_ctx,
-                            &mut self.builder,
-                            &self.lines,
-                            self.pos,
-                        );
-                        self.pos += lines_consumed;
-                        return true;
                     }
-                    BlockDetectionResult::No => {
-                        // Should not happen since detect() returned Some
-                        unreachable!()
-                    }
-                }
-            }
-        }
-
-        // Try dispatcher for blocks that can interrupt paragraphs (even without blank line before)
-        // This is called OUTSIDE the has_blank_before check
-        use super::blocks::lists;
-        use super::blocks::paragraphs;
-        let list_indent_info = if lists::in_list(&self.containers) {
-            let content_col = paragraphs::current_content_col(&self.containers);
-            if content_col > 0 {
-                Some(super::block_dispatcher::ListIndentInfo { content_col })
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let next_line = if self.pos + 1 < self.lines.len() {
-            Some(self.lines[self.pos + 1])
-        } else {
-            None
-        };
-
-        let block_ctx = BlockContext {
-            content,
-            has_blank_before,
-            at_document_start,
-            blockquote_depth: self.current_blockquote_depth(),
-            config: self.config,
-            containers: &self.containers,
-            content_indent,
-            list_indent_info,
-            next_line,
-        };
-
-        if let Some((parser_idx, detection)) =
-            self.block_registry
-                .detect(&block_ctx, &self.lines, self.pos)
-        {
-            // Check if this is a block that can interrupt paragraphs
-            if matches!(detection, BlockDetectionResult::YesCanInterrupt) {
-                // Block can interrupt paragraphs
-                // Emit list item buffer if needed
-                self.emit_list_item_buffer_if_needed();
-
-                // Close paragraph if one is open
-                if self.is_paragraph_open() {
-                    self.close_containers_to(self.containers.depth() - 1);
+                    BlockDetectionResult::No => unreachable!(),
                 }
 
-                // Recreate context for parsing
-                let list_indent_info = if lists::in_list(&self.containers) {
-                    let content_col = paragraphs::current_content_col(&self.containers);
-                    if content_col > 0 {
-                        Some(super::block_dispatcher::ListIndentInfo { content_col })
-                    } else {
-                        None
+                let lines_consumed = self.block_registry.parse_prepared(
+                    block_match,
+                    &dispatcher_ctx,
+                    &mut self.builder,
+                    &self.lines,
+                    self.pos,
+                );
+                self.pos += lines_consumed;
+                return true;
+            }
+        } else if let Some(block_match) = dispatcher_match.as_ref() {
+            // Without blank-before, only allow interrupting blocks OR blocks that are
+            // explicitly allowed without blank lines (e.g. reference definitions).
+            match block_match.detection {
+                BlockDetectionResult::YesCanInterrupt => {
+                    self.emit_list_item_buffer_if_needed();
+                    if self.is_paragraph_open() {
+                        self.close_containers_to(self.containers.depth() - 1);
                     }
-                } else {
-                    None
-                };
+                }
+                BlockDetectionResult::Yes => {
+                    // E.g. reference definitions: no preparation (matches previous behavior).
+                }
+                BlockDetectionResult::No => unreachable!(),
+            }
 
-                let next_line = if self.pos + 1 < self.lines.len() {
-                    Some(self.lines[self.pos + 1])
-                } else {
-                    None
-                };
-
-                let block_ctx = BlockContext {
-                    content,
-                    has_blank_before,
-                    at_document_start,
-                    blockquote_depth: self.current_blockquote_depth(),
-                    config: self.config,
-                    containers: &self.containers,
-                    content_indent,
-                    list_indent_info,
-                    next_line,
-                };
-
-                let lines_consumed = self.block_registry.parse(
-                    parser_idx,
-                    &block_ctx,
+            if !matches!(block_match.detection, BlockDetectionResult::No) {
+                let lines_consumed = self.block_registry.parse_prepared(
+                    block_match,
+                    &dispatcher_ctx,
                     &mut self.builder,
                     &self.lines,
                     self.pos,
@@ -1499,6 +1427,8 @@ impl<'a> Parser<'a> {
         // Similar to list items - marker followed by content that can span multiple lines
         // Must check BEFORE reference definitions since both start with [
         if let Some((id, content_start)) = try_parse_footnote_marker(content) {
+            // Footnotes have precedence over dispatcher-based reference definitions.
+            // (Dispatcher match is evaluated above for performance; we handle footnotes here.)
             log::debug!("Parsed footnote definition at line {}: [^{}]", self.pos, id);
 
             // Close paragraph if one is open
@@ -1541,44 +1471,6 @@ impl<'a> Parser<'a> {
             }
 
             self.pos += 1;
-            return true;
-        }
-
-        // Check for reference definition: [label]: url "title"
-        // These can appear anywhere in the document (no blank line needed)
-        // Try dispatcher first
-
-        let next_line = if self.pos + 1 < self.lines.len() {
-            Some(self.lines[self.pos + 1])
-        } else {
-            None
-        };
-
-        let block_ctx = BlockContext {
-            content,
-            has_blank_before,
-            at_document_start,
-            blockquote_depth: self.current_blockquote_depth(),
-            config: self.config,
-            containers: &self.containers,
-            content_indent,
-            list_indent_info: None, // Not needed for reference definitions
-            next_line,
-        };
-
-        if let Some((parser_idx, _detection)) =
-            self.block_registry
-                .detect(&block_ctx, &self.lines, self.pos)
-        {
-            // Reference definitions don't need preparation
-            let lines_consumed = self.block_registry.parse(
-                parser_idx,
-                &block_ctx,
-                &mut self.builder,
-                &self.lines,
-                self.pos,
-            );
-            self.pos += lines_consumed;
             return true;
         }
 

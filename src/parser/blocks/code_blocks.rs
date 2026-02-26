@@ -433,6 +433,7 @@ impl InfoString {
 }
 
 /// Information about a detected code fence opening.
+#[derive(Debug, Clone)]
 pub(crate) struct FenceInfo {
     pub fence_char: char,
     pub fence_count: usize,

@@ -11,9 +11,10 @@
 
 use crate::config::Config;
 use rowan::GreenNodeBuilder;
+use std::any::Any;
 
 use super::blocks::code_blocks::{
-    CodeBlockType, InfoString, parse_fenced_code_block, try_parse_fence_open,
+    CodeBlockType, FenceInfo, InfoString, parse_fenced_code_block, try_parse_fence_open,
 };
 use super::blocks::figures::{parse_figure, try_parse_figure};
 use super::blocks::headings::{
@@ -22,7 +23,7 @@ use super::blocks::headings::{
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::metadata::try_parse_yaml_block;
 use super::blocks::reference_links::try_parse_reference_definition;
-use super::utils::container_stack::{ContainerStack, byte_index_at_column};
+use super::utils::container_stack::byte_index_at_column;
 use super::utils::helpers::strip_newline;
 
 /// Information about list indentation context.
@@ -55,10 +56,8 @@ pub(crate) struct BlockContext<'a> {
     /// Parser configuration
     pub config: &'a Config,
 
-    /// Container stack for checking context (lists, blockquotes, etc.)
-    #[allow(dead_code)] // Will be used as we migrate more blocks
-    pub containers: &'a ContainerStack,
-
+    // NOTE: we intentionally do not store `&ContainerStack` here to avoid
+    // long-lived borrows of `self` in the main parser loop.
     /// Base indentation from container context (footnotes, definitions)
     pub content_indent: usize,
 
@@ -70,16 +69,27 @@ pub(crate) struct BlockContext<'a> {
 }
 
 /// Result of detecting whether a block can be parsed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BlockDetectionResult {
     /// Can parse this block, requires blank line before
     Yes,
 
     /// Can parse this block and can interrupt paragraphs (no blank line needed)
-    #[allow(dead_code)] // Will be used when we migrate fenced code blocks
+    #[allow(dead_code)]
     YesCanInterrupt,
 
     /// Cannot parse this content
     No,
+}
+
+/// A prepared (cached) detection result.
+///
+/// This allows expensive detection logic (e.g., fence parsing) to be performed once,
+/// while emission happens only after the caller prepares (flushes buffers/closes paragraphs).
+pub(crate) struct PreparedBlockMatch {
+    pub parser_index: usize,
+    pub detection: BlockDetectionResult,
+    pub payload: Option<Box<dyn Any>>,
 }
 
 /// Trait for block-level parsers.
@@ -97,20 +107,7 @@ pub(crate) enum BlockDetectionResult {
 /// backtracking or multiple passes. Each parser operates during the
 /// single forward pass through the document.
 pub(crate) trait BlockParser {
-    /// Detect if this parser can handle the content (lightweight check, no emission).
-    ///
-    /// Returns:
-    /// - `Yes`: Can parse, requires blank line before
-    /// - `YesCanInterrupt`: Can parse and can interrupt paragraphs
-    /// - `No`: Cannot parse this content
-    ///
-    /// This method should be fast and do minimal work (peek at first few characters).
-    /// It should NOT emit anything to the builder.
-    ///
-    /// # Parameters
-    /// - `ctx`: Context with content and parser state
-    /// - `lines`: All lines in the document (for look-ahead if needed)
-    /// - `line_pos`: Current line position
+    /// Detect if this parser can handle the content (no emission).
     fn can_parse(
         &self,
         ctx: &BlockContext,
@@ -118,25 +115,25 @@ pub(crate) trait BlockParser {
         line_pos: usize,
     ) -> BlockDetectionResult;
 
+    /// Prepared detection hook.
+    ///
+    /// Default implementation just calls `can_parse()` and returns no payload.
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        let detection = self.can_parse(ctx, lines, line_pos);
+        match detection {
+            BlockDetectionResult::Yes | BlockDetectionResult::YesCanInterrupt => {
+                Some((detection, None))
+            }
+            BlockDetectionResult::No => None,
+        }
+    }
+
     /// Parse and emit this block type to the builder.
-    ///
-    /// Called only after `can_parse` returns `Yes` or `YesCanInterrupt`, and after
-    /// the caller has prepared (closed paragraphs, flushed buffers).
-    ///
-    /// # Arguments
-    /// - `ctx`: Context about the current parsing state
-    /// - `builder`: Builder to emit syntax nodes to
-    /// - `lines`: Full document lines (for multi-line blocks)
-    /// - `line_pos`: Current line position in the document
-    ///
-    /// # Returns
-    /// Number of lines consumed by this block
-    ///
-    /// # Single-pass guarantee
-    /// This method is called during the single forward pass. It should:
-    /// - Read ahead in `lines` if needed (tables, code blocks, etc.)
-    /// - Emit inline elements immediately via inline_emission
-    /// - Not modify any state outside of builder emission
     fn parse(
         &self,
         ctx: &BlockContext,
@@ -144,6 +141,20 @@ pub(crate) trait BlockParser {
         lines: &[&str],
         line_pos: usize,
     ) -> usize;
+
+    /// Prepared parse hook.
+    ///
+    /// Default implementation ignores payload and calls `parse()`.
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        self.parse(ctx, builder, lines, line_pos)
+    }
 
     /// Name of this block parser (for debugging/logging)
     fn name(&self) -> &'static str;
@@ -208,20 +219,26 @@ impl BlockParser for AtxHeadingParser {
     fn can_parse(
         &self,
         ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
         _lines: &[&str],
         _line_pos: usize,
-    ) -> BlockDetectionResult {
-        // Must have blank line before
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         if !ctx.has_blank_before {
-            return BlockDetectionResult::No;
+            return None;
         }
 
-        // Check if this looks like an ATX heading
-        if try_parse_atx_heading(ctx.content).is_some() {
-            BlockDetectionResult::Yes
-        } else {
-            BlockDetectionResult::No
-        }
+        let level = try_parse_atx_heading(ctx.content)?;
+        Some((BlockDetectionResult::Yes, Some(Box::new(level))))
     }
 
     fn parse(
@@ -231,10 +248,24 @@ impl BlockParser for AtxHeadingParser {
         lines: &[&str],
         line_pos: usize,
     ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
         let line = lines[line_pos];
-        let heading_level = try_parse_atx_heading(ctx.content).unwrap();
+        let heading_level = payload
+            .and_then(|p| p.downcast_ref::<usize>().copied())
+            .or_else(|| try_parse_atx_heading(ctx.content))
+            .unwrap_or(1);
         emit_atx_heading(builder, line, heading_level, ctx.config);
-        1 // Consumed 1 line
+        1
     }
 
     fn name(&self) -> &'static str {
@@ -351,24 +382,41 @@ impl BlockParser for ReferenceDefinitionParser {
     fn can_parse(
         &self,
         ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
         _lines: &[&str],
         _line_pos: usize,
-    ) -> BlockDetectionResult {
-        // Reference definitions don't need blank line before
-        // Check if this looks like a reference definition
-        if try_parse_reference_definition(ctx.content).is_some() {
-            BlockDetectionResult::Yes
-        } else {
-            BlockDetectionResult::No
-        }
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        let parsed = try_parse_reference_definition(ctx.content)?;
+        Some((BlockDetectionResult::Yes, Some(Box::new(parsed))))
     }
 
     fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
         &self,
         _ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
+        payload: Option<&dyn Any>,
     ) -> usize {
         use crate::syntax::SyntaxKind;
 
@@ -377,17 +425,20 @@ impl BlockParser for ReferenceDefinitionParser {
         let full_line = lines[line_pos];
         let (content_without_newline, line_ending) = strip_newline(full_line);
 
-        // Parse the reference definition with inline structure for the label
+        // Currently we only cache that this *is* a refdef.
+        // When we migrate refdefs fully, we can reuse `parsed` to emit URL/title structure too.
+        let _parsed =
+            payload.and_then(|p| p.downcast_ref::<(usize, String, String, Option<String>)>());
+
         emit_reference_definition_content(builder, content_without_newline);
 
-        // Emit newline separately if present
         if !line_ending.is_empty() {
             builder.token(SyntaxKind::NEWLINE.into(), line_ending);
         }
 
         builder.finish_node();
 
-        1 // Consumed 1 line
+        1
     }
 
     fn name(&self) -> &'static str {
@@ -442,9 +493,19 @@ impl BlockParser for FencedCodeBlockParser {
         _lines: &[&str],
         _line_pos: usize,
     ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, _lines, _line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         // Calculate content to check - may need to strip list indentation
         let content_to_check = if let Some(list_info) = ctx.list_indent_info {
-            // Strip list indentation before checking for fence
             if list_info.content_col > 0 && !ctx.content.is_empty() {
                 let idx = byte_index_at_column(ctx.content, list_info.content_col);
                 &ctx.content[idx..]
@@ -455,16 +516,11 @@ impl BlockParser for FencedCodeBlockParser {
             ctx.content
         };
 
-        // Try to detect fence opening
-        let fence = match try_parse_fence_open(content_to_check) {
-            Some(f) => f,
-            None => return BlockDetectionResult::No,
-        };
+        let fence = try_parse_fence_open(content_to_check)?;
 
-        // Parse info string to determine block type
+        // Parse info string to determine block type (expensive, but now cached via fence)
         let info = InfoString::parse(&fence.info_string);
 
-        // Check if this is an executable chunk in Pandoc-like flavor
         let is_executable = matches!(info.block_type, CodeBlockType::Executable { .. });
         let is_pandoc_like = matches!(
             ctx.config.flavor,
@@ -472,28 +528,23 @@ impl BlockParser for FencedCodeBlockParser {
                 | crate::config::Flavor::CommonMark
                 | crate::config::Flavor::Gfm
         );
-
-        // In Pandoc-like flavors, executable chunks should NEVER be code blocks
-        // They should be parsed as inline code (``` delimiters with executable syntax)
         if is_executable && is_pandoc_like {
-            return BlockDetectionResult::No;
+            return None;
         }
 
-        // Fenced code blocks can interrupt paragraphs UNLESS:
-        // It has no info string (might be inline code delimiter)
+        // Fenced code blocks can interrupt paragraphs only if they have an info string.
         let has_info = !fence.info_string.trim().is_empty();
-        let can_interrupt = has_info;
-
-        // Return based on whether we can parse this block
-        if can_interrupt {
-            // Can interrupt paragraphs - return YesCanInterrupt
+        let detection = if has_info {
             BlockDetectionResult::YesCanInterrupt
         } else if ctx.has_blank_before {
-            // Has blank line before, can parse normally
             BlockDetectionResult::Yes
         } else {
-            // Cannot parse (would need blank line but don't have one)
             BlockDetectionResult::No
+        };
+
+        match detection {
+            BlockDetectionResult::No => None,
+            _ => Some((detection, Some(Box::new(fence)))),
         }
     }
 
@@ -504,27 +555,35 @@ impl BlockParser for FencedCodeBlockParser {
         lines: &[&str],
         line_pos: usize,
     ) -> usize {
-        // Calculate content to check (with list indent stripped)
-        let list_indent_stripped = if let Some(list_info) = ctx.list_indent_info {
-            list_info.content_col
-        } else {
-            0
-        };
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
 
-        let content_to_check = if list_indent_stripped > 0 && !ctx.content.is_empty() {
-            let idx = byte_index_at_column(ctx.content, list_indent_stripped);
-            &ctx.content[idx..]
-        } else {
-            ctx.content
-        };
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        let list_indent_stripped = ctx.list_indent_info.map(|i| i.content_col).unwrap_or(0);
 
-        // Get fence info (we know it exists from can_parse)
-        let fence = try_parse_fence_open(content_to_check).expect("Fence should exist");
+        let fence = if let Some(fence) = payload.and_then(|p| p.downcast_ref::<FenceInfo>()) {
+            fence.clone()
+        } else {
+            // Backward-compat: if called via legacy `parse()`, recompute.
+            let content_to_check = if list_indent_stripped > 0 && !ctx.content.is_empty() {
+                let idx = byte_index_at_column(ctx.content, list_indent_stripped);
+                &ctx.content[idx..]
+            } else {
+                ctx.content
+            };
+            try_parse_fence_open(content_to_check).expect("Fence should exist")
+        };
 
         // Calculate total indent: base content indent + list indent
         let total_indent = ctx.content_indent + list_indent_stripped;
 
-        // Parse the fenced code block
         let new_pos = parse_fenced_code_block(
             builder,
             lines,
@@ -534,7 +593,6 @@ impl BlockParser for FencedCodeBlockParser {
             total_indent,
         );
 
-        // Return lines consumed
         new_pos - line_pos
     }
 
@@ -567,8 +625,8 @@ impl BlockParser for SetextHeadingParser {
             None => return BlockDetectionResult::No,
         };
 
-        // Create lines array for detection function
-        let lines = vec![ctx.content, next_line];
+        // Create lines array for detection function (avoid allocation)
+        let lines = [ctx.content, next_line];
 
         // Try to detect setext heading
         if try_parse_setext_heading(&lines, 0).is_some() {
@@ -691,6 +749,7 @@ impl BlockParserRegistry {
     ///
     /// Returns (parser_index, detection_result) if a parser can handle this,
     /// or None if no parser matched.
+    #[allow(dead_code)]
     pub fn detect(
         &self,
         ctx: &BlockContext,
@@ -704,10 +763,27 @@ impl BlockParserRegistry {
                     log::debug!("Block detected by: {}", parser.name());
                     return Some((i, result));
                 }
-                BlockDetectionResult::No => {
-                    // Try next parser
-                    continue;
-                }
+                BlockDetectionResult::No => continue,
+            }
+        }
+        None
+    }
+
+    /// Like `detect()`, but allows parsers to return cached payload for emission.
+    pub fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> Option<PreparedBlockMatch> {
+        for (i, parser) in self.parsers.iter().enumerate() {
+            if let Some((detection, payload)) = parser.detect_prepared(ctx, lines, line_pos) {
+                log::debug!("Block detected by: {}", parser.name());
+                return Some(PreparedBlockMatch {
+                    parser_index: i,
+                    detection,
+                    payload,
+                });
             }
         }
         None
@@ -717,6 +793,7 @@ impl BlockParserRegistry {
     ///
     /// Should only be called after detect() returns Some and after
     /// caller has prepared for the block element.
+    #[allow(dead_code)]
     pub fn parse(
         &self,
         parser_index: usize,
@@ -728,5 +805,24 @@ impl BlockParserRegistry {
         let parser = &self.parsers[parser_index];
         log::debug!("Block parsed by: {}", parser.name());
         parser.parse(ctx, builder, lines, line_pos)
+    }
+
+    pub fn parse_prepared(
+        &self,
+        block_match: &PreparedBlockMatch,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        let parser = &self.parsers[block_match.parser_index];
+        log::debug!("Block parsed by: {}", parser.name());
+        parser.parse_prepared(
+            ctx,
+            builder,
+            lines,
+            line_pos,
+            block_match.payload.as_deref(),
+        )
     }
 }
