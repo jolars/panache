@@ -111,6 +111,19 @@ fn blockquote_with_blank_lines() {
 }
 
 #[test]
+fn multiline_strong_across_blockquote_markers() {
+    let input = "> **bold\n> text**\n";
+    let tree = parse_blocks(input);
+
+    // Should parse as a single STRONG spanning the newline, even though the second
+    // line starts with a blockquote marker.
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::STRONG), 1);
+
+    // Must remain lossless.
+    assert_eq!(tree.text().to_string(), input);
+}
+
+#[test]
 fn blockquote_with_heading() {
     let input = "> # This is a heading in a blockquote\n>\n> And this is a paragraph.";
     let tree = parse_blocks(input);

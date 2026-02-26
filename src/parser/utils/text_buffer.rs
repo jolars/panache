@@ -5,8 +5,8 @@
 
 use super::inline_emission;
 use crate::config::Config;
-use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
+use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
+use rowan::{GreenNodeBuilder, NodeOrToken};
 
 /// Buffer for accumulating text lines before emission.
 ///
@@ -274,6 +274,9 @@ impl ParagraphBuffer {
     }
 
     /// Emit inline content with markers at specified byte positions.
+    ///
+    /// Important: we must parse the full text *once* so multiline inlines (like STRONG)
+    /// can span across blockquote marker boundaries.
     fn emit_with_markers(
         &self,
         builder: &mut GreenNodeBuilder<'static>,
@@ -281,32 +284,107 @@ impl ParagraphBuffer {
         marker_positions: &[(usize, usize, bool)],
         config: &Config,
     ) {
-        let mut last_pos = 0;
+        // Parse inlines once into a temporary tree.
+        let mut temp_builder = GreenNodeBuilder::new();
+        temp_builder.start_node(SyntaxKind::HEADING_CONTENT.into());
+        inline_emission::emit_inlines(&mut temp_builder, text, config);
+        temp_builder.finish_node();
+        let inline_root = SyntaxNode::new_root(temp_builder.finish());
 
-        for &(byte_offset, leading_spaces, has_trailing_space) in marker_positions {
-            // Emit text segment before this marker (if any)
-            if byte_offset > last_pos {
-                let segment = &text[last_pos..byte_offset];
-                inline_emission::emit_inlines(builder, segment, config);
-            }
-
-            // Emit the marker
-            if leading_spaces > 0 {
-                builder.token(SyntaxKind::WHITESPACE.into(), &" ".repeat(leading_spaces));
-            }
-            builder.token(SyntaxKind::BLOCKQUOTE_MARKER.into(), ">");
-            if has_trailing_space {
-                builder.token(SyntaxKind::WHITESPACE.into(), " ");
-            }
-
-            last_pos = byte_offset;
+        struct MarkerEmitter<'a> {
+            marker_positions: &'a [(usize, usize, bool)],
+            idx: usize,
+            offset: usize,
         }
 
-        // Emit remaining text after last marker
-        if last_pos < text.len() {
-            let segment = &text[last_pos..];
-            inline_emission::emit_inlines(builder, segment, config);
+        impl<'a> MarkerEmitter<'a> {
+            fn emit_markers_at_current(&mut self, builder: &mut GreenNodeBuilder<'static>) {
+                while let Some(&(byte_offset, leading_spaces, has_trailing_space)) =
+                    self.marker_positions.get(self.idx)
+                    && byte_offset == self.offset
+                {
+                    if leading_spaces > 0 {
+                        builder.token(SyntaxKind::WHITESPACE.into(), &" ".repeat(leading_spaces));
+                    }
+                    builder.token(SyntaxKind::BLOCKQUOTE_MARKER.into(), ">");
+                    if has_trailing_space {
+                        builder.token(SyntaxKind::WHITESPACE.into(), " ");
+                    }
+                    self.idx += 1;
+                }
+            }
+
+            fn emit_token_with_markers(
+                &mut self,
+                builder: &mut GreenNodeBuilder<'static>,
+                token: &SyntaxToken,
+            ) {
+                let kind = token.kind();
+                let token_text = token.text();
+
+                let mut start = 0;
+                while start < token_text.len() {
+                    // Markers at the current offset must be emitted before emitting any bytes.
+                    self.emit_markers_at_current(builder);
+
+                    let remaining = token_text.len() - start;
+
+                    let next_marker_offset = self
+                        .marker_positions
+                        .get(self.idx)
+                        .map(|(byte_offset, _, _)| *byte_offset);
+
+                    if let Some(next) = next_marker_offset
+                        && next > self.offset
+                        && next < self.offset + remaining
+                    {
+                        let split_len = next - self.offset;
+                        let end = start + split_len;
+                        if end > start {
+                            builder.token(kind.into(), &token_text[start..end]);
+                            self.offset += split_len;
+                            start = end;
+                            continue;
+                        }
+                    }
+
+                    builder.token(kind.into(), &token_text[start..]);
+                    self.offset += remaining;
+                    break;
+                }
+            }
+
+            fn emit_element(
+                &mut self,
+                builder: &mut GreenNodeBuilder<'static>,
+                el: NodeOrToken<SyntaxNode, SyntaxToken>,
+            ) {
+                match el {
+                    NodeOrToken::Node(n) => {
+                        builder.start_node(n.kind().into());
+                        for child in n.children_with_tokens() {
+                            self.emit_element(builder, child);
+                        }
+                        builder.finish_node();
+                    }
+                    NodeOrToken::Token(t) => self.emit_token_with_markers(builder, &t),
+                }
+            }
         }
+
+        let mut emitter = MarkerEmitter {
+            marker_positions,
+            idx: 0,
+            offset: 0,
+        };
+
+        // Emit the inline parse result, injecting markers at the recorded offsets.
+        for el in inline_root.children_with_tokens() {
+            emitter.emit_element(builder, el);
+        }
+
+        // Emit any markers at the end.
+        emitter.emit_markers_at_current(builder);
     }
 
     /// Clear the buffer for reuse.
