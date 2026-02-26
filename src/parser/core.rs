@@ -2,10 +2,11 @@ use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
-use super::block_dispatcher::{BlockContext, BlockDetectionResult, BlockParserRegistry};
+use super::block_dispatcher::{
+    BlockContext, BlockDetectionResult, BlockEffect, BlockParserRegistry,
+};
 use super::blocks::blockquotes;
 use super::blocks::definition_lists;
-use super::blocks::fenced_divs;
 use super::blocks::html_blocks;
 use super::blocks::indented_code;
 use super::blocks::latex_envs;
@@ -22,7 +23,6 @@ use super::utils::text_buffer;
 
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
-use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
 use html_blocks::try_parse_html_block_start;
 use indented_code::{is_indented_code_line, parse_indented_code_block};
 use latex_envs::try_parse_latex_env_begin;
@@ -812,6 +812,7 @@ impl<'a> Parser<'a> {
             content,
             has_blank_before: true,
             at_document_start: false,
+            in_fenced_div: self.in_fenced_div(),
             blockquote_depth: self.current_blockquote_depth(),
             config: self.config,
             content_indent: 0,
@@ -1060,6 +1061,7 @@ impl<'a> Parser<'a> {
                         content: stripped_content,
                         has_blank_before: true,
                         at_document_start: self.pos == 0 && self.current_blockquote_depth() == 0,
+                        in_fenced_div: self.in_fenced_div(),
                         blockquote_depth: self.current_blockquote_depth(),
                         config: self.config,
                         content_indent,
@@ -1136,6 +1138,7 @@ impl<'a> Parser<'a> {
             content,
             has_blank_before: false,  // filled in later
             at_document_start: false, // filled in later
+            in_fenced_div: self.in_fenced_div(),
             blockquote_depth: current_bq_depth,
             config: self.config,
             content_indent,
@@ -1348,6 +1351,17 @@ impl<'a> Parser<'a> {
                     &self.lines,
                     self.pos,
                 );
+
+                match block_match.effect {
+                    BlockEffect::None => {}
+                    BlockEffect::OpenFencedDiv => {
+                        self.containers.push(Container::FencedDiv {});
+                    }
+                    BlockEffect::CloseFencedDiv => {
+                        self.close_containers_to(self.containers.depth().saturating_sub(1));
+                    }
+                }
+
                 self.pos += lines_consumed;
                 return true;
             }
@@ -1375,6 +1389,17 @@ impl<'a> Parser<'a> {
                     &self.lines,
                     self.pos,
                 );
+
+                match block_match.effect {
+                    BlockEffect::None => {}
+                    BlockEffect::OpenFencedDiv => {
+                        self.containers.push(Container::FencedDiv {});
+                    }
+                    BlockEffect::CloseFencedDiv => {
+                        self.close_containers_to(self.containers.depth().saturating_sub(1));
+                    }
+                }
+
                 self.pos += lines_consumed;
                 return true;
             }
@@ -1451,152 +1476,6 @@ impl<'a> Parser<'a> {
                 content_indent,
             );
             self.pos = new_pos;
-            return true;
-        }
-
-        // Check for fenced div opening
-        if has_blank_before && let Some(div_fence) = try_parse_div_fence_open(content) {
-            log::debug!(
-                "Parsed fenced div at line {}: {} colons",
-                self.pos,
-                div_fence.fence_count
-            );
-
-            // Prepare for fenced div
-            self.prepare_for_block_element();
-
-            // Start FencedDiv node
-            self.builder.start_node(SyntaxKind::FENCED_DIV.into());
-
-            // Emit opening fence with attributes as child node to avoid duplication
-            self.builder.start_node(SyntaxKind::DIV_FENCE_OPEN.into());
-
-            // Get original full line
-            let full_line = self.lines[self.pos];
-            let trimmed = full_line.trim_start();
-
-            // Emit leading whitespace if present
-            let leading_ws_len = full_line.len() - trimmed.len();
-            if leading_ws_len > 0 {
-                self.builder
-                    .token(SyntaxKind::WHITESPACE.into(), &full_line[..leading_ws_len]);
-            }
-
-            // Emit fence colons
-            let fence_str: String = ":".repeat(div_fence.fence_count);
-            self.builder.token(SyntaxKind::TEXT.into(), &fence_str);
-
-            // Parse everything after colons
-            let after_colons = &trimmed[div_fence.fence_count..];
-            let (content_before_newline, newline_str) = strip_newline(after_colons);
-
-            // Emit optional space before attributes
-            let has_leading_space = content_before_newline.starts_with(' ');
-            if has_leading_space {
-                self.builder.token(SyntaxKind::WHITESPACE.into(), " ");
-            }
-
-            // Get content after the leading space (if any)
-            let content_after_space = if has_leading_space {
-                &content_before_newline[1..]
-            } else {
-                content_before_newline
-            };
-
-            // Emit attributes as DivInfo child node (avoids duplication)
-            self.builder.start_node(SyntaxKind::DIV_INFO.into());
-            self.builder
-                .token(SyntaxKind::TEXT.into(), &div_fence.attributes);
-            self.builder.finish_node(); // DivInfo
-
-            // Check for trailing colons after attributes (symmetric fences)
-            let (trailing_space, trailing_colons) = if div_fence.attributes.starts_with('{') {
-                // For bracketed attributes like {.class}, find what's after the closing brace
-                if let Some(close_idx) = content_after_space.find('}') {
-                    let after_attrs = &content_after_space[close_idx + 1..];
-                    let trailing = after_attrs.trim_start();
-                    let space_count = after_attrs.len() - trailing.len();
-                    if !trailing.is_empty() && trailing.chars().all(|c| c == ':') {
-                        (space_count > 0, trailing)
-                    } else {
-                        (false, "")
-                    }
-                } else {
-                    (false, "")
-                }
-            } else {
-                // For simple class names like "Warning", check after first word
-                // content_after_space starts with the attribute (e.g., "Warning ::::::")
-                let after_attrs = &content_after_space[div_fence.attributes.len()..];
-                if let Some(after_space) = after_attrs.strip_prefix(' ') {
-                    if !after_space.is_empty() && after_space.chars().all(|c| c == ':') {
-                        (true, after_space)
-                    } else {
-                        (false, "")
-                    }
-                } else {
-                    (false, "")
-                }
-            };
-
-            // Emit space before trailing colons if present
-            if trailing_space {
-                self.builder.token(SyntaxKind::WHITESPACE.into(), " ");
-            }
-
-            // Emit trailing colons if present
-            if !trailing_colons.is_empty() {
-                self.builder.token(SyntaxKind::TEXT.into(), trailing_colons);
-            }
-
-            // Emit newline
-            if !newline_str.is_empty() {
-                self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-            }
-            self.builder.finish_node(); // DivFenceOpen
-
-            // Push FencedDiv container
-            self.containers.push(Container::FencedDiv {});
-
-            self.pos += 1;
-            return true;
-        }
-
-        // Check for fenced div closing
-        if self.in_fenced_div() && is_div_closing_fence(content) {
-            // Close paragraph before closing fenced div
-            self.close_paragraph_if_open();
-
-            // Emit closing fence - parse to avoid newline duplication
-            self.builder.start_node(SyntaxKind::DIV_FENCE_CLOSE.into());
-
-            // Get original full line
-            let full_line = self.lines[self.pos];
-            let trimmed = full_line.trim_start();
-
-            // Emit leading whitespace if present
-            let leading_ws_len = full_line.len() - trimmed.len();
-            if leading_ws_len > 0 {
-                self.builder
-                    .token(SyntaxKind::WHITESPACE.into(), &full_line[..leading_ws_len]);
-            }
-
-            // Emit fence content without newline (handle both CRLF and LF)
-            let (content_without_newline, line_ending) = strip_newline(trimmed);
-
-            self.builder
-                .token(SyntaxKind::TEXT.into(), content_without_newline);
-
-            // Emit newline separately if present
-            if !line_ending.is_empty() {
-                self.builder.token(SyntaxKind::NEWLINE.into(), line_ending);
-            }
-            self.builder.finish_node(); // DivFenceClose
-
-            // Pop the FencedDiv container (this will finish the FencedDiv node)
-            self.close_containers_to(self.containers.depth() - 1);
-
-            self.pos += 1;
             return true;
         }
 

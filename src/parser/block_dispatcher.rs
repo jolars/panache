@@ -13,9 +13,11 @@ use crate::config::Config;
 use rowan::GreenNodeBuilder;
 use std::any::Any;
 
+use super::blocks::blockquotes::strip_n_blockquote_markers;
 use super::blocks::code_blocks::{
     CodeBlockType, FenceInfo, InfoString, parse_fenced_code_block, try_parse_fence_open,
 };
+use super::blocks::fenced_divs::{DivFenceInfo, is_div_closing_fence, try_parse_div_fence_open};
 use super::blocks::figures::parse_figure;
 use super::blocks::headings::{
     emit_atx_heading, emit_setext_heading, try_parse_atx_heading, try_parse_setext_heading,
@@ -50,6 +52,9 @@ pub(crate) struct BlockContext<'a> {
 
     /// Whether there was a blank line before this line
     pub has_blank_before: bool,
+
+    /// Whether we're currently inside a fenced div (container-owned state)
+    pub in_fenced_div: bool,
 
     /// Whether we're at document start (pos == 0)
     pub at_document_start: bool,
@@ -93,7 +98,15 @@ pub(crate) enum BlockDetectionResult {
 pub(crate) struct PreparedBlockMatch {
     pub parser_index: usize,
     pub detection: BlockDetectionResult,
+    pub effect: BlockEffect,
     pub payload: Option<Box<dyn Any>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BlockEffect {
+    None,
+    OpenFencedDiv,
+    CloseFencedDiv,
 }
 
 /// Trait for block-level parsers.
@@ -118,6 +131,10 @@ pub(crate) trait BlockParser {
         lines: &[&str],
         line_pos: usize,
     ) -> BlockDetectionResult;
+
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::None
+    }
 
     /// Prepared detection hook.
     ///
@@ -501,6 +518,10 @@ impl BlockParser for FigureParser {
 pub(crate) struct ReferenceDefinitionParser;
 
 impl BlockParser for ReferenceDefinitionParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::None
+    }
+
     fn can_parse(
         &self,
         ctx: &BlockContext,
@@ -945,6 +966,251 @@ impl BlockParser for LineBlockParser {
 }
 
 // ============================================================================
+// Fenced Div Parsers (position #6)
+// ============================================================================
+
+pub(crate) struct FencedDivOpenParser;
+
+impl BlockParser for FencedDivOpenParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenFencedDiv
+    }
+
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, _lines, _line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.fenced_divs {
+            return None;
+        }
+
+        if !ctx.has_blank_before && !ctx.at_document_start {
+            return None;
+        }
+
+        let div_fence = try_parse_div_fence_open(ctx.content)?;
+        Some((BlockDetectionResult::Yes, Some(Box::new(div_fence))))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let div_fence = payload
+            .and_then(|p| p.downcast_ref::<DivFenceInfo>())
+            .cloned()
+            .or_else(|| try_parse_div_fence_open(ctx.content));
+
+        let Some(div_fence) = div_fence else {
+            return 1;
+        };
+
+        // Start FENCED_DIV node (container push happens in core based on `effect`).
+        builder.start_node(SyntaxKind::FENCED_DIV.into());
+
+        // Emit opening fence with attributes as child node to avoid duplication.
+        builder.start_node(SyntaxKind::DIV_FENCE_OPEN.into());
+
+        // Use full original line to preserve indentation and newline.
+        let full_line = lines[line_pos];
+        let line_no_bq = strip_n_blockquote_markers(full_line, ctx.blockquote_depth);
+        let trimmed = line_no_bq.trim_start();
+
+        // Leading whitespace
+        let leading_ws_len = line_no_bq.len() - trimmed.len();
+        if leading_ws_len > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &line_no_bq[..leading_ws_len]);
+        }
+
+        // Fence colons
+        let fence_str: String = ":".repeat(div_fence.fence_count);
+        builder.token(SyntaxKind::TEXT.into(), &fence_str);
+
+        // Everything after colons
+        let after_colons = &trimmed[div_fence.fence_count..];
+        let (content_before_newline, newline_str) = strip_newline(after_colons);
+
+        // Optional space before attributes
+        let has_leading_space = content_before_newline.starts_with(' ');
+        if has_leading_space {
+            builder.token(SyntaxKind::WHITESPACE.into(), " ");
+        }
+
+        let content_after_space = if has_leading_space {
+            &content_before_newline[1..]
+        } else {
+            content_before_newline
+        };
+
+        // Attributes
+        builder.start_node(SyntaxKind::DIV_INFO.into());
+        builder.token(SyntaxKind::TEXT.into(), &div_fence.attributes);
+        builder.finish_node();
+
+        // Trailing colons (symmetric fences)
+        let (trailing_space, trailing_colons) = if div_fence.attributes.starts_with('{') {
+            if let Some(close_idx) = content_after_space.find('}') {
+                let after_attrs = &content_after_space[close_idx + 1..];
+                let trailing = after_attrs.trim_start();
+                let space_count = after_attrs.len() - trailing.len();
+                if !trailing.is_empty() && trailing.chars().all(|c| c == ':') {
+                    (space_count > 0, trailing)
+                } else {
+                    (false, "")
+                }
+            } else {
+                (false, "")
+            }
+        } else {
+            let after_attrs = &content_after_space[div_fence.attributes.len()..];
+            if let Some(after_space) = after_attrs.strip_prefix(' ') {
+                if !after_space.is_empty() && after_space.chars().all(|c| c == ':') {
+                    (true, after_space)
+                } else {
+                    (false, "")
+                }
+            } else {
+                (false, "")
+            }
+        };
+
+        if trailing_space {
+            builder.token(SyntaxKind::WHITESPACE.into(), " ");
+        }
+        if !trailing_colons.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), trailing_colons);
+        }
+
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        }
+
+        builder.finish_node(); // DIV_FENCE_OPEN
+
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "fenced_div_open"
+    }
+}
+
+pub(crate) struct FencedDivCloseParser;
+
+impl BlockParser for FencedDivCloseParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::CloseFencedDiv
+    }
+
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, _lines, _line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.fenced_divs {
+            return None;
+        }
+
+        if !ctx.in_fenced_div {
+            return None;
+        }
+
+        if !is_div_closing_fence(ctx.content) {
+            return None;
+        }
+
+        Some((BlockDetectionResult::YesCanInterrupt, None))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        builder.start_node(SyntaxKind::DIV_FENCE_CLOSE.into());
+
+        let full_line = lines[line_pos];
+        let line_no_bq = strip_n_blockquote_markers(full_line, ctx.blockquote_depth);
+        let trimmed = line_no_bq.trim_start();
+
+        let leading_ws_len = line_no_bq.len() - trimmed.len();
+        if leading_ws_len > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &line_no_bq[..leading_ws_len]);
+        }
+
+        let (content_without_newline, line_ending) = strip_newline(trimmed);
+        builder.token(SyntaxKind::TEXT.into(), content_without_newline);
+
+        if !line_ending.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), line_ending);
+        }
+
+        builder.finish_node();
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "fenced_div_close"
+    }
+}
+
+// ============================================================================
 // Setext Heading Parser (position #3)
 // ============================================================================
 
@@ -1059,6 +1325,9 @@ impl BlockParserRegistry {
             Box::new(FencedCodeBlockParser),
             // (3) YAML metadata - before headers and hrules!
             Box::new(YamlMetadataParser),
+            // (6) Fenced divs ::: (open/close)
+            Box::new(FencedDivCloseParser),
+            Box::new(FencedDivOpenParser),
             // (7) Setext headings (part of Pandoc's "header" parser)
             // Must come before ATX to properly handle `---` disambiguation
             Box::new(SetextHeadingParser),
@@ -1077,10 +1346,9 @@ impl BlockParserRegistry {
             // (19) Reference definitions
             Box::new(ReferenceDefinitionParser),
             // TODO: Migrate remaining blocks in Pandoc order:
-            // - (4-6) Lists and divs (bulletList, divHtml, divFenced)
+            // - (4-6) Lists and divs (bulletList, divHtml)
             // - (10) Tables (grid, multiline, pipe, simple)
             // - (11) Indented code blocks (AFTER fenced!)
-            // - (13) Line blocks
             // - (16) Ordered lists
             // - (17) Definition lists
             // - (18) Footnote definitions (noteBlock)
@@ -1131,6 +1399,7 @@ impl BlockParserRegistry {
                 return Some(PreparedBlockMatch {
                     parser_index: i,
                     detection,
+                    effect: parser.effect(),
                     payload,
                 });
             }
