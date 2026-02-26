@@ -168,7 +168,7 @@ golden_test_cases!(
     emphasis_complex,
     emphasis_nested_inlines,
     equation_attributes,
-    //equation_attributes_disabled, // TODO: re-enable once trailing text bug is fixed
+    equation_attributes_disabled,
     equation_attributes_single_line,
     escapes,
     fenced_code,
