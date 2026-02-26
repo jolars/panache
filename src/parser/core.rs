@@ -11,7 +11,6 @@ use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
 use super::blocks::reference_links;
-use super::blocks::tables;
 use super::utils::container_stack;
 use super::utils::helpers::{split_lines_inclusive, strip_newline};
 use super::utils::inline_emission;
@@ -25,10 +24,6 @@ use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{is_content_nested_bullet_marker, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use reference_links::try_parse_footnote_marker;
-use tables::{
-    is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
-    try_parse_pipe_table, try_parse_simple_table,
-};
 use text_buffer::TextBuffer;
 
 fn init_logger() {
@@ -997,141 +992,7 @@ impl<'a> Parser<'a> {
             dispatcher_match
         };
 
-        // Check if this line looks like a table caption followed by a table
-        // If so, try to parse the table (which will include the caption)
-        if is_caption_followed_by_table(&self.lines, self.pos) {
-            log::debug!("Found caption followed by table at line {}", self.pos);
-
-            // Prepare for table
-            self.prepare_for_block_element();
-
-            let caption_start = self.pos;
-
-            // The caption is at self.pos. We need to find where the actual table starts.
-            // Skip non-blank lines (caption continuation) and one blank line
-            let mut table_pos = self.pos + 1;
-            while table_pos < self.lines.len() && !self.lines[table_pos].trim().is_empty() {
-                table_pos += 1;
-            }
-            // Skip one blank line if present
-            if table_pos < self.lines.len() && self.lines[table_pos].trim().is_empty() {
-                table_pos += 1;
-            }
-
-            // Now table_pos should be at the table start (separator, header, or grid fence)
-            // Try to parse the table from this position
-            if table_pos < self.lines.len() {
-                if let Some(lines_consumed) =
-                    try_parse_grid_table(&self.lines, table_pos, &mut self.builder, self.config)
-                {
-                    log::debug!(
-                        "Parsed grid table (with caption) starting at line {} ({} lines total from caption)",
-                        table_pos,
-                        lines_consumed
-                    );
-                    // lines_consumed is from table_pos, but includes the caption found by find_caption_before_table
-                    // So we advance from caption_start by lines_consumed
-                    self.pos = caption_start + lines_consumed;
-                    return true;
-                }
-
-                if let Some(lines_consumed) = try_parse_multiline_table(
-                    &self.lines,
-                    table_pos,
-                    &mut self.builder,
-                    self.config,
-                ) {
-                    log::debug!(
-                        "Parsed multiline table (with caption) starting at line {} ({} lines total from caption)",
-                        table_pos,
-                        lines_consumed
-                    );
-                    self.pos = caption_start + lines_consumed;
-                    return true;
-                }
-
-                if let Some(lines_consumed) =
-                    try_parse_pipe_table(&self.lines, table_pos, &mut self.builder, self.config)
-                {
-                    log::debug!(
-                        "Parsed pipe table (with caption) starting at line {} ({} lines total from caption)",
-                        table_pos,
-                        lines_consumed
-                    );
-                    self.pos = caption_start + lines_consumed;
-                    return true;
-                }
-
-                if let Some(lines_consumed) =
-                    try_parse_simple_table(&self.lines, table_pos, &mut self.builder, self.config)
-                {
-                    log::debug!(
-                        "Parsed simple table (with caption) starting at line {} ({} lines total from caption)",
-                        table_pos,
-                        lines_consumed
-                    );
-                    self.pos = caption_start + lines_consumed;
-                    return true;
-                }
-            }
-        }
-
         if has_blank_before {
-            // Try to parse grid table (check before pipe/simple since + is most specific)
-            if let Some(lines_consumed) =
-                try_parse_grid_table(&self.lines, self.pos, &mut self.builder, self.config)
-            {
-                log::debug!(
-                    "Parsed grid table at line {} ({} lines)",
-                    self.pos,
-                    lines_consumed
-                );
-                // Prepare for grid table
-                self.prepare_for_block_element();
-                self.pos += lines_consumed;
-                return true;
-            }
-
-            // Try to parse multiline table (check before pipe/simple since full-width dashes are specific)
-            if let Some(lines_consumed) =
-                try_parse_multiline_table(&self.lines, self.pos, &mut self.builder, self.config)
-            {
-                log::debug!(
-                    "Parsed multiline table at line {} ({} lines)",
-                    self.pos,
-                    lines_consumed
-                );
-                self.prepare_for_block_element();
-                self.pos += lines_consumed;
-                return true;
-            }
-
-            // Try to parse pipe table (check before simple table since pipes are more specific)
-            if let Some(lines_consumed) =
-                try_parse_pipe_table(&self.lines, self.pos, &mut self.builder, self.config)
-            {
-                log::debug!(
-                    "Parsed pipe table at line {} ({} lines)",
-                    self.pos,
-                    lines_consumed
-                );
-                self.pos += lines_consumed;
-                return true;
-            }
-
-            // Try to parse simple table
-            if let Some(lines_consumed) =
-                try_parse_simple_table(&self.lines, self.pos, &mut self.builder, self.config)
-            {
-                log::debug!(
-                    "Parsed simple table at line {} ({} lines)",
-                    self.pos,
-                    lines_consumed
-                );
-                self.pos += lines_consumed;
-                return true;
-            }
-
             if let Some(block_match) = dispatcher_match.as_ref() {
                 let detection = block_match.detection;
 
@@ -1620,13 +1481,6 @@ impl<'a> Parser<'a> {
             }
 
             return true;
-        }
-
-        // Check if this is a table caption followed by a table
-        // If so, don't parse as paragraph - let table parser handle it
-        if is_caption_followed_by_table(&self.lines, self.pos) {
-            // Don't parse as paragraph - this will be consumed by table parser
-            return false;
         }
 
         // Check for line block (if line_blocks extension is enabled)

@@ -30,6 +30,10 @@ use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
 use super::blocks::lists::try_parse_list_marker;
 use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 use super::blocks::reference_links::try_parse_reference_definition;
+use super::blocks::tables::{
+    is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
+    try_parse_pipe_table, try_parse_simple_table,
+};
 use super::inlines::links::try_parse_inline_image;
 use super::utils::container_stack::byte_index_at_column;
 use super::utils::helpers::strip_newline;
@@ -595,6 +599,272 @@ impl BlockParser for ReferenceDefinitionParser {
 
     fn name(&self) -> &'static str {
         "reference_definition"
+    }
+}
+
+// ============================================================================
+// Table Parser (position #10)
+// ============================================================================
+
+pub(crate) struct TableParser;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TableKind {
+    Grid,
+    Multiline,
+    Pipe,
+    Simple,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TablePrepared {
+    kind: TableKind,
+}
+
+impl BlockParser for TableParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::None
+    }
+
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !(ctx.config.extensions.simple_tables
+            || ctx.config.extensions.multiline_tables
+            || ctx.config.extensions.grid_tables
+            || ctx.config.extensions.pipe_tables)
+        {
+            return None;
+        }
+
+        if !ctx.has_blank_before && !ctx.at_document_start {
+            return None;
+        }
+
+        // Correctness first: only claim a match if a real parse would succeed.
+        // (Otherwise we can steal list items/paragraphs and drop content.)
+        let mut tmp = GreenNodeBuilder::new();
+
+        // Handle caption-before-table lines by matching the *table kind* starting
+        // after the caption, but parsing from the caption line so the caption is
+        // included and consumed.
+        if ctx.config.extensions.table_captions && is_caption_followed_by_table(lines, line_pos) {
+            // Skip caption continuation lines and one optional blank line.
+            let mut table_pos = line_pos + 1;
+            while table_pos < lines.len() && !lines[table_pos].trim().is_empty() {
+                table_pos += 1;
+            }
+            if table_pos < lines.len() && lines[table_pos].trim().is_empty() {
+                table_pos += 1;
+            }
+
+            if ctx.config.extensions.grid_tables
+                && try_parse_grid_table(lines, table_pos, &mut tmp, ctx.config).is_some()
+            {
+                return Some((
+                    BlockDetectionResult::Yes,
+                    Some(Box::new(TablePrepared {
+                        kind: TableKind::Grid,
+                    })),
+                ));
+            }
+
+            if ctx.config.extensions.multiline_tables
+                && try_parse_multiline_table(lines, table_pos, &mut tmp, ctx.config).is_some()
+            {
+                return Some((
+                    BlockDetectionResult::Yes,
+                    Some(Box::new(TablePrepared {
+                        kind: TableKind::Multiline,
+                    })),
+                ));
+            }
+
+            if ctx.config.extensions.pipe_tables
+                && try_parse_pipe_table(lines, table_pos, &mut tmp, ctx.config).is_some()
+            {
+                return Some((
+                    BlockDetectionResult::Yes,
+                    Some(Box::new(TablePrepared {
+                        kind: TableKind::Pipe,
+                    })),
+                ));
+            }
+
+            if ctx.config.extensions.simple_tables
+                && try_parse_simple_table(lines, table_pos, &mut tmp, ctx.config).is_some()
+            {
+                return Some((
+                    BlockDetectionResult::Yes,
+                    Some(Box::new(TablePrepared {
+                        kind: TableKind::Simple,
+                    })),
+                ));
+            }
+
+            return None;
+        }
+
+        if ctx.config.extensions.grid_tables
+            && try_parse_grid_table(lines, line_pos, &mut tmp, ctx.config).is_some()
+        {
+            return Some((
+                BlockDetectionResult::Yes,
+                Some(Box::new(TablePrepared {
+                    kind: TableKind::Grid,
+                })),
+            ));
+        }
+
+        if ctx.config.extensions.multiline_tables
+            && try_parse_multiline_table(lines, line_pos, &mut tmp, ctx.config).is_some()
+        {
+            return Some((
+                BlockDetectionResult::Yes,
+                Some(Box::new(TablePrepared {
+                    kind: TableKind::Multiline,
+                })),
+            ));
+        }
+
+        if ctx.config.extensions.pipe_tables
+            && try_parse_pipe_table(lines, line_pos, &mut tmp, ctx.config).is_some()
+        {
+            return Some((
+                BlockDetectionResult::Yes,
+                Some(Box::new(TablePrepared {
+                    kind: TableKind::Pipe,
+                })),
+            ));
+        }
+
+        if ctx.config.extensions.simple_tables
+            && try_parse_simple_table(lines, line_pos, &mut tmp, ctx.config).is_some()
+        {
+            return Some((
+                BlockDetectionResult::Yes,
+                Some(Box::new(TablePrepared {
+                    kind: TableKind::Simple,
+                })),
+            ));
+        }
+
+        // (Optional) Caption-only lookahead without table parse shouldn't match.
+        // The real parsers already handle captions when invoked on the caption line.
+
+        None
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        let prepared = payload.and_then(|p| p.downcast_ref::<TablePrepared>().copied());
+
+        let table_pos = if ctx.config.extensions.table_captions
+            && is_caption_followed_by_table(lines, line_pos)
+        {
+            // Skip caption continuation lines and one optional blank line.
+            let mut pos = line_pos + 1;
+            while pos < lines.len() && !lines[pos].trim().is_empty() {
+                pos += 1;
+            }
+            if pos < lines.len() && lines[pos].trim().is_empty() {
+                pos += 1;
+            }
+            pos
+        } else {
+            line_pos
+        };
+
+        let try_kind =
+            |kind: TableKind, builder: &mut GreenNodeBuilder<'static>| -> Option<usize> {
+                match kind {
+                    TableKind::Grid => {
+                        if ctx.config.extensions.grid_tables {
+                            try_parse_grid_table(lines, table_pos, builder, ctx.config)
+                        } else {
+                            None
+                        }
+                    }
+                    TableKind::Multiline => {
+                        if ctx.config.extensions.multiline_tables {
+                            try_parse_multiline_table(lines, table_pos, builder, ctx.config)
+                        } else {
+                            None
+                        }
+                    }
+                    TableKind::Pipe => {
+                        if ctx.config.extensions.pipe_tables {
+                            try_parse_pipe_table(lines, table_pos, builder, ctx.config)
+                        } else {
+                            None
+                        }
+                    }
+                    TableKind::Simple => {
+                        if ctx.config.extensions.simple_tables {
+                            try_parse_simple_table(lines, table_pos, builder, ctx.config)
+                        } else {
+                            None
+                        }
+                    }
+                }
+            };
+
+        if let Some(prepared) = prepared {
+            if let Some(n) = try_kind(prepared.kind, builder) {
+                return n;
+            }
+        }
+
+        // Fallback (should be rare) - match core order.
+        if let Some(n) = try_kind(TableKind::Grid, builder) {
+            return n;
+        }
+        if let Some(n) = try_kind(TableKind::Multiline, builder) {
+            return n;
+        }
+        if let Some(n) = try_kind(TableKind::Pipe, builder) {
+            return n;
+        }
+        if let Some(n) = try_kind(TableKind::Simple, builder) {
+            return n;
+        }
+
+        debug_assert!(false, "TableParser::parse called without a matching table");
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "table"
     }
 }
 
@@ -1416,6 +1686,8 @@ impl BlockParserRegistry {
             Box::new(HtmlBlockParser),
             // (12) LaTeX environment blocks
             Box::new(LatexEnvironmentParser),
+            // (10) Tables
+            Box::new(TableParser),
             // (13) Line blocks
             Box::new(LineBlockParser),
             // (11) Indented code blocks (AFTER fenced!)
@@ -1428,7 +1700,7 @@ impl BlockParserRegistry {
             Box::new(ReferenceDefinitionParser),
             // TODO: Migrate remaining blocks in Pandoc order:
             // - (4-6) Lists and divs (bulletList, divHtml)
-            // - (10) Tables (grid, multiline, pipe, simple)
+            // - (10) Tables (grid, multiline, pipe, simple) (migrated)
             // - (16) Ordered lists
             // - (17) Definition lists
             // - (18) Footnote definitions (noteBlock)

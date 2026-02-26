@@ -125,14 +125,14 @@ fn try_parse_caption_prefix(line: &str) -> Option<(usize, &str)> {
         return None;
     }
 
-    // Check for "Table:" or "table:" or just ":"
+    // Check for "Table:" or "table:" or just ":".
     if let Some(rest) = trimmed.strip_prefix("Table:") {
         Some((leading_spaces + 6, rest))
     } else if let Some(rest) = trimmed.strip_prefix("table:") {
         Some((leading_spaces + 6, rest))
     } else if let Some(rest) = trimmed.strip_prefix(':') {
-        // Just ":" - but need to be careful not to match definition list markers
-        // A caption with just ":" should have content or be followed by content
+        // Just ":" - but need to be careful not to match definition list markers.
+        // A caption with just ":" should have content or be followed by content.
         if !rest.trim().is_empty() || rest.starts_with(' ') {
             Some((leading_spaces + 1, rest))
         } else {
