@@ -15,6 +15,7 @@ use rowan::GreenNodeBuilder;
 use super::blocks::figures::{parse_figure, try_parse_figure};
 use super::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
+use super::blocks::metadata::try_parse_yaml_block;
 use super::blocks::reference_links::try_parse_reference_definition;
 use super::utils::container_stack::ContainerStack;
 use super::utils::helpers::strip_newline;
@@ -30,8 +31,10 @@ pub(crate) struct BlockContext<'a> {
     /// Whether there was a blank line before this line
     pub has_blank_before: bool,
 
+    /// Whether we're at document start (pos == 0)
+    pub at_document_start: bool,
+
     /// Current blockquote depth
-    #[allow(dead_code)] // Will be used as we migrate more blocks
     pub blockquote_depth: usize,
 
     /// Parser configuration
@@ -79,7 +82,17 @@ pub(crate) trait BlockParser {
     ///
     /// This method should be fast and do minimal work (peek at first few characters).
     /// It should NOT emit anything to the builder.
-    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult;
+    ///
+    /// # Parameters
+    /// - `ctx`: Context with content and parser state
+    /// - `lines`: All lines in the document (for look-ahead if needed)
+    /// - `line_pos`: Current line position
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult;
 
     /// Parse and emit this block type to the builder.
     ///
@@ -120,7 +133,12 @@ pub(crate) trait BlockParser {
 pub(crate) struct HorizontalRuleParser;
 
 impl BlockParser for HorizontalRuleParser {
-    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
         // Must have blank line before
         if !ctx.has_blank_before {
             return BlockDetectionResult::No;
@@ -163,7 +181,12 @@ impl BlockParser for HorizontalRuleParser {
 pub(crate) struct AtxHeadingParser;
 
 impl BlockParser for AtxHeadingParser {
-    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
         // Must have blank line before
         if !ctx.has_blank_before {
             return BlockDetectionResult::No;
@@ -195,11 +218,78 @@ impl BlockParser for AtxHeadingParser {
     }
 }
 
+/// YAML metadata block parser (--- ... ---/...)
+pub(crate) struct YamlMetadataParser;
+
+impl BlockParser for YamlMetadataParser {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        // Must be at top level (not inside blockquotes)
+        if ctx.blockquote_depth > 0 {
+            return BlockDetectionResult::No;
+        }
+
+        // Must start with ---
+        if ctx.content.trim() != "---" {
+            return BlockDetectionResult::No;
+        }
+
+        // YAML needs blank line before OR be at document start
+        if !ctx.has_blank_before && !ctx.at_document_start {
+            return BlockDetectionResult::No;
+        }
+
+        // Look ahead: next line must NOT be blank (to distinguish from horizontal rule)
+        if line_pos + 1 < lines.len() {
+            let next_line = lines[line_pos + 1];
+            if next_line.trim().is_empty() {
+                // This is a horizontal rule, not YAML
+                return BlockDetectionResult::No;
+            }
+        } else {
+            // No content after ---, can't be YAML
+            return BlockDetectionResult::No;
+        }
+
+        BlockDetectionResult::Yes
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        // Pass at_document_start to try_parse_yaml_block
+        if let Some(new_pos) = try_parse_yaml_block(lines, line_pos, builder, ctx.at_document_start)
+        {
+            new_pos - line_pos // Return lines consumed
+        } else {
+            // Should not happen since can_parse returned Yes
+            1 // Consume at least the opening line
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "yaml_metadata"
+    }
+}
+
 /// Figure parser (standalone image on its own line)
 pub(crate) struct FigureParser;
 
 impl BlockParser for FigureParser {
-    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
         // Must have blank line before
         if !ctx.has_blank_before {
             return BlockDetectionResult::No;
@@ -234,7 +324,12 @@ impl BlockParser for FigureParser {
 pub(crate) struct ReferenceDefinitionParser;
 
 impl BlockParser for ReferenceDefinitionParser {
-    fn can_parse(&self, ctx: &BlockContext) -> BlockDetectionResult {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
         // Reference definitions don't need blank line before
         // Check if this looks like a reference definition
         if try_parse_reference_definition(ctx.content).is_some() {
@@ -331,16 +426,54 @@ impl BlockParserRegistry {
     ///
     /// Order matters! Parsers are tried in the order listed here.
     /// This follows Pandoc's design where ordering is explicit and documented.
+    ///
+    /// **Pandoc reference order** (from pandoc/src/Text/Pandoc/Readers/Markdown.hs:487-515):
+    /// 1. blanklines (handled separately in our parser)
+    /// 2. codeBlockFenced
+    /// 3. yamlMetaBlock' ← YAML metadata comes early!
+    /// 4. bulletList
+    /// 5. divHtml
+    /// 6. divFenced
+    /// 7. header ← ATX headings
+    /// 8. lhsCodeBlock
+    /// 9. htmlBlock
+    /// 10. table
+    /// 11. codeBlockIndented
+    /// 12. rawTeXBlock (LaTeX)
+    /// 13. lineBlock
+    /// 14. blockQuote
+    /// 15. hrule ← Horizontal rules come AFTER headers!
+    /// 16. orderedList
+    /// 17. definitionList
+    /// 18. noteBlock (footnotes)
+    /// 19. referenceKey ← Reference definitions
+    /// 20. abbrevKey
+    /// 21. para
+    /// 22. plain
     pub fn new() -> Self {
         let parsers: Vec<Box<dyn BlockParser>> = vec![
-            // Try horizontal rules first (simple, unambiguous)
-            Box::new(HorizontalRuleParser),
-            // Then headings (also unambiguous)
+            // Match Pandoc's ordering to ensure correct precedence:
+            // (3) YAML metadata - before headers and hrules!
+            Box::new(YamlMetadataParser),
+            // (7) ATX headings
             Box::new(AtxHeadingParser),
-            // Figures (standalone images)
+            // (15) Horizontal rules - AFTER headings per Pandoc
+            Box::new(HorizontalRuleParser),
+            // Figures (standalone images) - Pandoc doesn't have these
             Box::new(FigureParser),
-            // Reference definitions last (lower priority, can be confused with other syntax)
+            // (19) Reference definitions
             Box::new(ReferenceDefinitionParser),
+            // TODO: Migrate remaining blocks in Pandoc order:
+            // - (2) Fenced code blocks (codeBlockFenced)
+            // - (4-6) Lists and divs (bulletList, divHtml, divFenced)
+            // - (9) HTML blocks
+            // - (10) Tables (grid, multiline, pipe, simple)
+            // - (11) Indented code blocks (AFTER fenced!)
+            // - (12) LaTeX blocks (rawTeXBlock)
+            // - (13) Line blocks
+            // - (16) Ordered lists
+            // - (17) Definition lists
+            // - (18) Footnote definitions (noteBlock)
         ];
 
         Self { parsers }
@@ -355,9 +488,14 @@ impl BlockParserRegistry {
     ///
     /// Returns (parser_index, detection_result) if a parser can handle this,
     /// or None if no parser matched.
-    pub fn detect(&self, ctx: &BlockContext) -> Option<(usize, BlockDetectionResult)> {
+    pub fn detect(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> Option<(usize, BlockDetectionResult)> {
         for (i, parser) in self.parsers.iter().enumerate() {
-            let result = parser.can_parse(ctx);
+            let result = parser.can_parse(ctx, lines, line_pos);
             match result {
                 BlockDetectionResult::Yes | BlockDetectionResult::YesCanInterrupt => {
                     log::debug!("Block detected by: {}", parser.name());

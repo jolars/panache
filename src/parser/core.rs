@@ -36,7 +36,7 @@ use latex_envs::{parse_latex_environment, try_parse_latex_env_begin};
 use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{is_content_nested_bullet_marker, markers_match, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
-use metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
+use metadata::try_parse_pandoc_title_block;
 use reference_links::try_parse_footnote_marker;
 use tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
@@ -1102,17 +1102,6 @@ impl<'a> Parser<'a> {
         };
         let has_blank_before_strict = at_document_start || prev_line_blank;
 
-        // At top level only (not inside blockquotes), check for YAML metadata
-        if self.current_blockquote_depth() == 0 && content.trim() == "---" {
-            let at_document_start = self.pos == 0;
-            if let Some(new_pos) =
-                try_parse_yaml_block(&self.lines, self.pos, &mut self.builder, at_document_start)
-            {
-                self.pos = new_pos;
-                return true;
-            }
-        }
-
         // Check for HTML block (if raw_html extension is enabled)
         if self.config.extensions.raw_html
             && let Some(block_type) = try_parse_html_block_start(content)
@@ -1273,12 +1262,16 @@ impl<'a> Parser<'a> {
             let block_ctx = BlockContext {
                 content,
                 has_blank_before,
+                at_document_start,
                 blockquote_depth: self.current_blockquote_depth(),
                 config: self.config,
                 containers: &self.containers,
             };
 
-            if let Some((parser_idx, detection)) = self.block_registry.detect(&block_ctx) {
+            if let Some((parser_idx, detection)) =
+                self.block_registry
+                    .detect(&block_ctx, &self.lines, self.pos)
+            {
                 // Drop context to release borrow before prepare
 
                 // Only parse if detection says blank line is acceptable
@@ -1291,6 +1284,7 @@ impl<'a> Parser<'a> {
                         let block_ctx = BlockContext {
                             content,
                             has_blank_before,
+                            at_document_start,
                             blockquote_depth: self.current_blockquote_depth(),
                             config: self.config,
                             containers: &self.containers,
@@ -1477,12 +1471,16 @@ impl<'a> Parser<'a> {
         let block_ctx = BlockContext {
             content,
             has_blank_before,
+            at_document_start,
             blockquote_depth: self.current_blockquote_depth(),
             config: self.config,
             containers: &self.containers,
         };
 
-        if let Some((parser_idx, _detection)) = self.block_registry.detect(&block_ctx) {
+        if let Some((parser_idx, _detection)) =
+            self.block_registry
+                .detect(&block_ctx, &self.lines, self.pos)
+        {
             // Reference definitions don't need preparation
             let lines_consumed = self.block_registry.parse(
                 parser_idx,
