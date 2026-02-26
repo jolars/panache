@@ -24,7 +24,7 @@ use super::utils::inline_emission;
 use super::utils::marker_utils;
 use super::utils::text_buffer;
 
-use code_blocks::{parse_fenced_code_block, try_parse_fence_open};
+use code_blocks::try_parse_fence_open;
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
 use fenced_divs::{is_div_closing_fence, try_parse_div_fence_open};
@@ -1259,6 +1259,22 @@ impl<'a> Parser<'a> {
             }
 
             // Try dispatcher for blocks that need blank line before
+            // OR that can interrupt paragraphs (e.g., fenced code blocks)
+
+            // Calculate list indent info for blocks that need it (e.g., fenced code)
+            use super::blocks::lists;
+            use super::blocks::paragraphs;
+            let list_indent_info = if lists::in_list(&self.containers) {
+                let content_col = paragraphs::current_content_col(&self.containers);
+                if content_col > 0 {
+                    Some(super::block_dispatcher::ListIndentInfo { content_col })
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             let block_ctx = BlockContext {
                 content,
                 has_blank_before,
@@ -1266,6 +1282,8 @@ impl<'a> Parser<'a> {
                 blockquote_depth: self.current_blockquote_depth(),
                 config: self.config,
                 containers: &self.containers,
+                content_indent,
+                list_indent_info,
             };
 
             if let Some((parser_idx, detection)) =
@@ -1274,13 +1292,30 @@ impl<'a> Parser<'a> {
             {
                 // Drop context to release borrow before prepare
 
-                // Only parse if detection says blank line is acceptable
+                // Handle based on detection result
                 match detection {
-                    BlockDetectionResult::Yes | BlockDetectionResult::YesCanInterrupt => {
-                        // Prepare for block element (flush buffers, close paragraphs)
-                        self.prepare_for_block_element();
+                    BlockDetectionResult::YesCanInterrupt => {
+                        // Block can interrupt paragraphs
+                        // Emit list item buffer if needed
+                        self.emit_list_item_buffer_if_needed();
+
+                        // Close paragraph if one is open
+                        if self.is_paragraph_open() {
+                            self.close_containers_to(self.containers.depth() - 1);
+                        }
 
                         // Recreate context for parsing
+                        let list_indent_info = if lists::in_list(&self.containers) {
+                            let content_col = paragraphs::current_content_col(&self.containers);
+                            if content_col > 0 {
+                                Some(super::block_dispatcher::ListIndentInfo { content_col })
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
                         let block_ctx = BlockContext {
                             content,
                             has_blank_before,
@@ -1288,6 +1323,46 @@ impl<'a> Parser<'a> {
                             blockquote_depth: self.current_blockquote_depth(),
                             config: self.config,
                             containers: &self.containers,
+                            content_indent,
+                            list_indent_info,
+                        };
+
+                        let lines_consumed = self.block_registry.parse(
+                            parser_idx,
+                            &block_ctx,
+                            &mut self.builder,
+                            &self.lines,
+                            self.pos,
+                        );
+                        self.pos += lines_consumed;
+                        return true;
+                    }
+                    BlockDetectionResult::Yes => {
+                        // Block needs blank line before (normal case)
+                        // Prepare for block element (flush buffers, close paragraphs)
+                        self.prepare_for_block_element();
+
+                        // Recreate context for parsing
+                        let list_indent_info = if lists::in_list(&self.containers) {
+                            let content_col = paragraphs::current_content_col(&self.containers);
+                            if content_col > 0 {
+                                Some(super::block_dispatcher::ListIndentInfo { content_col })
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
+                        let block_ctx = BlockContext {
+                            content,
+                            has_blank_before,
+                            at_document_start,
+                            blockquote_depth: self.current_blockquote_depth(),
+                            config: self.config,
+                            containers: &self.containers,
+                            content_indent,
+                            list_indent_info,
                         };
 
                         let lines_consumed = self.block_registry.parse(
@@ -1308,110 +1383,78 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // Fenced code blocks
-        // When inside a list, strip list indentation before checking
-        let list_indent_stripped = if lists::in_list(&self.containers) {
+        // Try dispatcher for blocks that can interrupt paragraphs (even without blank line before)
+        // This is called OUTSIDE the has_blank_before check
+        use super::blocks::lists;
+        use super::blocks::paragraphs;
+        let list_indent_info = if lists::in_list(&self.containers) {
             let content_col = paragraphs::current_content_col(&self.containers);
             if content_col > 0 {
-                // We're inside a list item - strip up to content column
-                let (indent_cols, _) = leading_indent(content);
-                indent_cols.min(content_col)
+                Some(super::block_dispatcher::ListIndentInfo { content_col })
             } else {
-                // Inside list but not in item (shouldn't happen normally)
-                // Strip up to 4 spaces (typical list indentation)
-                if content.starts_with("    ") {
-                    4
-                } else if content.starts_with("   ") {
-                    3
-                } else if content.starts_with("  ") {
-                    2
-                } else {
-                    0
-                }
+                None
             }
         } else {
-            0
-        };
-        let content_for_fence_check = if list_indent_stripped > 0 {
-            let idx = byte_index_at_column(content, list_indent_stripped);
-            &content[idx..]
-        } else {
-            content
+            None
         };
 
-        // Fenced code blocks can interrupt paragraphs without a blank line
-        // This is standard Pandoc/CommonMark behavior
-        // EXCEPT:
-        // 1. Executable chunks (```{r}, ```{python}) in Pandoc/CommonMark/GFM should be inline code
-        // 2. Bare fences (```) without info string might be inline code delimiters, so require blank line
-        let can_interrupt_paragraph =
-            if let Some(fence) = try_parse_fence_open(content_for_fence_check) {
-                let info = code_blocks::InfoString::parse(&fence.info_string);
-                let is_executable = matches!(
-                    info.block_type,
-                    code_blocks::CodeBlockType::Executable { .. }
-                );
-                let is_pandoc_like = matches!(
-                    self.config.flavor,
-                    crate::config::Flavor::Pandoc
-                        | crate::config::Flavor::CommonMark
-                        | crate::config::Flavor::Gfm
-                );
+        let block_ctx = BlockContext {
+            content,
+            has_blank_before,
+            at_document_start,
+            blockquote_depth: self.current_blockquote_depth(),
+            config: self.config,
+            containers: &self.containers,
+            content_indent,
+            list_indent_info,
+        };
 
-                // Don't allow interrupt if:
-                // - It's an executable chunk in Pandoc-like flavors, OR
-                // - It has no info string (might be inline code delimiter)
-                let has_info = !fence.info_string.trim().is_empty();
-                !(is_executable && is_pandoc_like) && has_info
-            } else {
-                false
-            };
-
-        if (has_blank_before || can_interrupt_paragraph)
-            && let Some(fence) = try_parse_fence_open(content_for_fence_check)
+        if let Some((parser_idx, detection)) =
+            self.block_registry
+                .detect(&block_ctx, &self.lines, self.pos)
         {
-            // In Pandoc/CommonMark/GFM, don't treat ```{r} as code blocks
-            // They should be parsed as inline code instead
-            let info = code_blocks::InfoString::parse(&fence.info_string);
-            let skip_executable_in_pandoc = matches!(
-                self.config.flavor,
-                crate::config::Flavor::Pandoc
-                    | crate::config::Flavor::CommonMark
-                    | crate::config::Flavor::Gfm
-            ) && matches!(
-                info.block_type,
-                code_blocks::CodeBlockType::Executable { .. }
-            );
-
-            if skip_executable_in_pandoc {
-                // Don't parse as code block - let it fall through to paragraph/inline code
-            } else {
-                // If we're in a ListItem with buffered content, emit it BEFORE the code block
-                // This ensures text appears before blocks in source order
+            // Check if this is a block that can interrupt paragraphs
+            if matches!(detection, BlockDetectionResult::YesCanInterrupt) {
+                // Block can interrupt paragraphs
+                // Emit list item buffer if needed
                 self.emit_list_item_buffer_if_needed();
 
-                // Close paragraph before opening code block
-                if can_interrupt_paragraph && self.is_paragraph_open() {
+                // Close paragraph if one is open
+                if self.is_paragraph_open() {
                     self.close_containers_to(self.containers.depth() - 1);
                 }
 
-                let bq_depth = self.current_blockquote_depth();
-                log::debug!(
-                    "Parsed fenced code block at line {}: {} fence",
-                    self.pos,
-                    fence.fence_char
-                );
-                // Pass total indent (footnote + list) to the parser
-                let total_indent = content_indent + list_indent_stripped;
-                let new_pos = parse_fenced_code_block(
+                // Recreate context for parsing
+                let list_indent_info = if lists::in_list(&self.containers) {
+                    let content_col = paragraphs::current_content_col(&self.containers);
+                    if content_col > 0 {
+                        Some(super::block_dispatcher::ListIndentInfo { content_col })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                let block_ctx = BlockContext {
+                    content,
+                    has_blank_before,
+                    at_document_start,
+                    blockquote_depth: self.current_blockquote_depth(),
+                    config: self.config,
+                    containers: &self.containers,
+                    content_indent,
+                    list_indent_info,
+                };
+
+                let lines_consumed = self.block_registry.parse(
+                    parser_idx,
+                    &block_ctx,
                     &mut self.builder,
                     &self.lines,
                     self.pos,
-                    fence,
-                    bq_depth,
-                    total_indent,
                 );
-                self.pos = new_pos;
+                self.pos += lines_consumed;
                 return true;
             }
         }
@@ -1475,6 +1518,8 @@ impl<'a> Parser<'a> {
             blockquote_depth: self.current_blockquote_depth(),
             config: self.config,
             containers: &self.containers,
+            content_indent,
+            list_indent_info: None, // Not needed for reference definitions
         };
 
         if let Some((parser_idx, _detection)) =

@@ -12,13 +12,26 @@
 use crate::config::Config;
 use rowan::GreenNodeBuilder;
 
+use super::blocks::code_blocks::{
+    CodeBlockType, InfoString, parse_fenced_code_block, try_parse_fence_open,
+};
 use super::blocks::figures::{parse_figure, try_parse_figure};
 use super::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::metadata::try_parse_yaml_block;
 use super::blocks::reference_links::try_parse_reference_definition;
-use super::utils::container_stack::ContainerStack;
+use super::utils::container_stack::{ContainerStack, byte_index_at_column};
 use super::utils::helpers::strip_newline;
+
+/// Information about list indentation context.
+///
+/// Used by block parsers that need to handle indentation stripping
+/// when parsing inside list items (e.g., fenced code blocks).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ListIndentInfo {
+    /// Number of columns to strip for list content
+    pub content_col: usize,
+}
 
 /// Context passed to block parsers for decision-making.
 ///
@@ -43,6 +56,12 @@ pub(crate) struct BlockContext<'a> {
     /// Container stack for checking context (lists, blockquotes, etc.)
     #[allow(dead_code)] // Will be used as we migrate more blocks
     pub containers: &'a ContainerStack,
+
+    /// Base indentation from container context (footnotes, definitions)
+    pub content_indent: usize,
+
+    /// List indentation info if inside a list
+    pub list_indent_info: Option<ListIndentInfo>,
 }
 
 /// Result of detecting whether a block can be parsed.
@@ -408,6 +427,117 @@ fn emit_reference_definition_content(builder: &mut GreenNodeBuilder<'static>, te
     builder.token(SyntaxKind::TEXT.into(), text);
 }
 
+/// Fenced code block parser (``` or ~~~)
+pub(crate) struct FencedCodeBlockParser;
+
+impl BlockParser for FencedCodeBlockParser {
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
+        // Calculate content to check - may need to strip list indentation
+        let content_to_check = if let Some(list_info) = ctx.list_indent_info {
+            // Strip list indentation before checking for fence
+            if list_info.content_col > 0 && !ctx.content.is_empty() {
+                let idx = byte_index_at_column(ctx.content, list_info.content_col);
+                &ctx.content[idx..]
+            } else {
+                ctx.content
+            }
+        } else {
+            ctx.content
+        };
+
+        // Try to detect fence opening
+        let fence = match try_parse_fence_open(content_to_check) {
+            Some(f) => f,
+            None => return BlockDetectionResult::No,
+        };
+
+        // Parse info string to determine block type
+        let info = InfoString::parse(&fence.info_string);
+
+        // Check if this is an executable chunk in Pandoc-like flavor
+        let is_executable = matches!(info.block_type, CodeBlockType::Executable { .. });
+        let is_pandoc_like = matches!(
+            ctx.config.flavor,
+            crate::config::Flavor::Pandoc
+                | crate::config::Flavor::CommonMark
+                | crate::config::Flavor::Gfm
+        );
+
+        // In Pandoc-like flavors, executable chunks should NEVER be code blocks
+        // They should be parsed as inline code (``` delimiters with executable syntax)
+        if is_executable && is_pandoc_like {
+            return BlockDetectionResult::No;
+        }
+
+        // Fenced code blocks can interrupt paragraphs UNLESS:
+        // It has no info string (might be inline code delimiter)
+        let has_info = !fence.info_string.trim().is_empty();
+        let can_interrupt = has_info;
+
+        // Return based on whether we can parse this block
+        if can_interrupt {
+            // Can interrupt paragraphs - return YesCanInterrupt
+            BlockDetectionResult::YesCanInterrupt
+        } else if ctx.has_blank_before {
+            // Has blank line before, can parse normally
+            BlockDetectionResult::Yes
+        } else {
+            // Cannot parse (would need blank line but don't have one)
+            BlockDetectionResult::No
+        }
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        // Calculate content to check (with list indent stripped)
+        let list_indent_stripped = if let Some(list_info) = ctx.list_indent_info {
+            list_info.content_col
+        } else {
+            0
+        };
+
+        let content_to_check = if list_indent_stripped > 0 && !ctx.content.is_empty() {
+            let idx = byte_index_at_column(ctx.content, list_indent_stripped);
+            &ctx.content[idx..]
+        } else {
+            ctx.content
+        };
+
+        // Get fence info (we know it exists from can_parse)
+        let fence = try_parse_fence_open(content_to_check).expect("Fence should exist");
+
+        // Calculate total indent: base content indent + list indent
+        let total_indent = ctx.content_indent + list_indent_stripped;
+
+        // Parse the fenced code block
+        let new_pos = parse_fenced_code_block(
+            builder,
+            lines,
+            line_pos,
+            fence,
+            ctx.blockquote_depth,
+            total_indent,
+        );
+
+        // Return lines consumed
+        new_pos - line_pos
+    }
+
+    fn name(&self) -> &'static str {
+        "fenced_code_block"
+    }
+}
+
 // ============================================================================
 // Block Parser Registry
 // ============================================================================
@@ -453,6 +583,8 @@ impl BlockParserRegistry {
     pub fn new() -> Self {
         let parsers: Vec<Box<dyn BlockParser>> = vec![
             // Match Pandoc's ordering to ensure correct precedence:
+            // (2) Fenced code blocks - can interrupt paragraphs!
+            Box::new(FencedCodeBlockParser),
             // (3) YAML metadata - before headers and hrules!
             Box::new(YamlMetadataParser),
             // (7) ATX headings
@@ -464,7 +596,6 @@ impl BlockParserRegistry {
             // (19) Reference definitions
             Box::new(ReferenceDefinitionParser),
             // TODO: Migrate remaining blocks in Pandoc order:
-            // - (2) Fenced code blocks (codeBlockFenced)
             // - (4-6) Lists and divs (bulletList, divHtml, divFenced)
             // - (9) HTML blocks
             // - (10) Tables (grid, multiline, pipe, simple)
