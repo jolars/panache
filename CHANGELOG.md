@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.2](https://github.com/jolars/panache/compare/v2.6.1...v2.6.2) (2026-02-27)
+
+### Bug Fixes
+
+* **parser:** handle multilines in blockquotes ([02d7c20](https://github.com/jolars/panache/commit/02d7c204515f276420da5aa229cb581b0616d199))
+* reimplement support for setext headings ([12c9182](https://github.com/jolars/panache/commit/12c91829ac0eb4f66e47c57071c208b45e504670))
+
 ## [2.6.1](https://github.com/jolars/panache/compare/v2.6.0...v2.6.1) (2026-02-25)
 
 ### Bug Fixes
