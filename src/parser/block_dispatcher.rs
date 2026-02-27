@@ -1708,16 +1708,16 @@ impl BlockParserRegistry {
             Box::new(AtxHeadingParser),
             // (9) HTML blocks
             Box::new(HtmlBlockParser),
-            // (12) LaTeX environment blocks
-            Box::new(LatexEnvironmentParser),
             // (10) Tables
             Box::new(TableParser),
+            // (11) Indented code blocks (AFTER fenced!)
+            Box::new(IndentedCodeBlockParser),
+            // (12) LaTeX environment blocks
+            Box::new(LatexEnvironmentParser),
             // (13) Line blocks
             Box::new(LineBlockParser),
             // (14) Block quotes (detection-only for now)
             Box::new(BlockQuoteParser),
-            // (11) Indented code blocks (AFTER fenced!)
-            Box::new(IndentedCodeBlockParser),
             // (15) Horizontal rules - AFTER headings per Pandoc
             Box::new(HorizontalRuleParser),
             // Figures (standalone images) - Pandoc doesn't have these
@@ -1728,10 +1728,6 @@ impl BlockParserRegistry {
             Box::new(FootnoteDefinitionParser),
             // (19) Reference definitions
             Box::new(ReferenceDefinitionParser),
-            // TODO: Migrate remaining blocks in Pandoc order:
-            // - (4-6) Lists and divs (bulletList, divHtml)
-            // - (16) Ordered lists
-            // - (17) Definition lists
         ];
 
         Self { parsers }
