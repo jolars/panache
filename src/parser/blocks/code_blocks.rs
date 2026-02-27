@@ -3,7 +3,7 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-use super::blockquotes::count_blockquote_markers;
+use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use crate::parser::utils::helpers::{strip_leading_spaces, strip_newline};
 
 /// Represents the type of code block based on its info string syntax.
@@ -777,7 +777,13 @@ pub(crate) fn parse_fenced_code_block(
 
     // Opening fence
     let first_line = lines[start_pos];
-    let (_, first_inner) = count_blockquote_markers(first_line);
+    // Only strip blockquote markers for the *surrounding* blockquote depth.
+    // Anything beyond that (e.g. a literal `>` inside the code block) must be preserved.
+    let first_inner = if bq_depth > 0 {
+        strip_n_blockquote_markers(first_line, bq_depth)
+    } else {
+        first_line
+    };
 
     // For lossless parsing: emit the base indent before stripping it
     let first_stripped = if base_indent > 0 && first_inner.len() >= base_indent {
@@ -825,13 +831,20 @@ pub(crate) fn parse_fenced_code_block(
     while current_pos < lines.len() {
         let line = lines[current_pos];
 
-        // Strip blockquote markers to get inner content
-        let (line_bq_depth, inner) = count_blockquote_markers(line);
+        // Count blockquote markers to detect leaving the surrounding blockquote.
+        let (line_bq_depth, _) = count_blockquote_markers(line);
 
         // If blockquote depth decreases, code block ends (we've left the blockquote)
         if line_bq_depth < bq_depth {
             break;
         }
+
+        // Strip exactly the surrounding blockquote depth; preserve any additional `>` literally.
+        let inner = if bq_depth > 0 {
+            strip_n_blockquote_markers(line, bq_depth)
+        } else {
+            line
+        };
 
         // Strip base indent (footnote context) from content lines for fence detection
         let inner_stripped = if base_indent > 0 && inner.len() >= base_indent {
@@ -888,7 +901,11 @@ pub(crate) fn parse_fenced_code_block(
     // Closing fence (if found)
     if found_closing {
         let closing_line = lines[current_pos - 1];
-        let (_, closing_inner) = count_blockquote_markers(closing_line);
+        let closing_inner = if bq_depth > 0 {
+            strip_n_blockquote_markers(closing_line, bq_depth)
+        } else {
+            closing_line
+        };
 
         // Emit base indent for lossless parsing
         if base_indent > 0 && closing_inner.len() >= base_indent {
@@ -971,6 +988,13 @@ mod tests {
         assert!(is_closing_fence("````", &fence));
         assert!(!is_closing_fence("``", &fence));
         assert!(!is_closing_fence("~~~", &fence));
+    }
+
+    #[test]
+    fn test_fenced_code_preserves_leading_gt() {
+        let input = "```\n> foo\n```\n";
+        let tree = crate::parse(input, None);
+        assert_eq!(tree.text().to_string(), input);
     }
 
     #[test]
