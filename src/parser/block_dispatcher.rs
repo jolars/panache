@@ -106,7 +106,6 @@ pub(crate) enum BlockDetectionResult {
     Yes,
 
     /// Can parse this block and can interrupt paragraphs (no blank line needed)
-    #[allow(dead_code)]
     YesCanInterrupt,
 
     /// Cannot parse this content
@@ -387,6 +386,7 @@ impl BlockParser for FigureParser {
         }
 
         let trimmed = ctx.content.trim();
+
         // Must start with ![
         if !trimmed.starts_with("![") {
             return None;
@@ -433,10 +433,10 @@ pub(crate) struct FootnoteDefinitionPrepared {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub(crate) struct BlockQuotePrepared {
     pub depth: usize,
     pub marker_info: Vec<crate::parser::utils::marker_utils::BlockQuoteMarkerInfo>,
+    #[allow(dead_code)]
     pub inner_content: String,
     pub can_start: bool,
     pub can_nest: bool,

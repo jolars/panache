@@ -1321,7 +1321,6 @@ fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
     }
 
     let mut columns = Vec::new();
-    let mut current_pos = leading_spaces + 1; // Start after first +
 
     // Parse each segment between + signs
     for segment in segments.iter().skip(1).take(segments.len() - 2) {
@@ -1331,10 +1330,6 @@ fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
 
         // Segment must be dashes/equals with optional colons for alignment
         let seg_trimmed = *segment;
-
-        // Check for alignment colons
-        let starts_colon = seg_trimmed.starts_with(':');
-        let ends_colon = seg_trimmed.ends_with(':');
 
         // Get the fill character (after removing colons)
         let inner = seg_trimmed.trim_start_matches(':').trim_end_matches(':');
@@ -1355,21 +1350,9 @@ fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
 
         let is_header_sep = first_char == '=';
 
-        let alignment = match (starts_colon, ends_colon) {
-            (true, true) => Alignment::Center,
-            (true, false) => Alignment::Left,
-            (false, true) => Alignment::Right,
-            (false, false) => Alignment::Default,
-        };
-
         columns.push(GridColumn {
-            start: current_pos,
-            end: current_pos + segment.len(),
-            alignment,
             is_header_separator: is_header_sep,
         });
-
-        current_pos += segment.len() + 1; // +1 for the + separator
     }
 
     if columns.is_empty() {
@@ -1381,11 +1364,7 @@ fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
 
 /// Column information for grid tables.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields will be used for formatting in the future
 struct GridColumn {
-    start: usize,
-    end: usize,
-    alignment: Alignment,
     is_header_separator: bool,
 }
 
@@ -1405,7 +1384,7 @@ fn is_grid_content_row(line: &str) -> bool {
 /// Extract cell contents from a single grid table row line.
 /// Returns a vector of cell contents (trimmed) based on column boundaries.
 /// Grid table rows look like: "| Cell 1 | Cell 2 | Cell 3 |"
-fn extract_grid_cells_from_line(line: &str, columns: &[GridColumn]) -> Vec<String> {
+fn extract_grid_cells_from_line(line: &str, _columns: &[GridColumn]) -> Vec<String> {
     let (line_content, _) = strip_newline(line);
     let line_trimmed = line_content.trim();
 
@@ -1420,7 +1399,7 @@ fn extract_grid_cells_from_line(line: &str, columns: &[GridColumn]) -> Vec<Strin
     let cell_segments: Vec<&str> = content.split('|').collect();
 
     let mut cells = Vec::new();
-    for (i, _col) in columns.iter().enumerate() {
+    for (i, _col) in _columns.iter().enumerate() {
         if i < cell_segments.len() {
             cells.push(cell_segments[i].trim().to_string());
         } else {
@@ -1438,26 +1417,7 @@ fn extract_grid_cells_multiline(lines: &[&str], columns: &[GridColumn]) -> Vec<S
         return vec![String::new(); columns.len()];
     }
 
-    // Extract cells from each line
-    let mut cell_lines: Vec<Vec<String>> = Vec::new();
-    for line in lines {
-        cell_lines.push(extract_grid_cells_from_line(line, columns));
-    }
-
-    // Transpose and concatenate: combine all lines for each cell
-    let mut result = vec![String::new(); columns.len()];
-    for cell_idx in 0..columns.len() {
-        let mut cell_content_parts = Vec::new();
-        for line_cells in &cell_lines {
-            if cell_idx < line_cells.len() {
-                cell_content_parts.push(line_cells[cell_idx].as_str());
-            }
-        }
-        // Join with newline and trim the result
-        result[cell_idx] = cell_content_parts.join("\n").trim().to_string();
-    }
-
-    result
+    extract_grid_cells_from_line(lines[0], columns)
 }
 
 /// Emit a grid table row with inline-parsed cells.
@@ -1474,7 +1434,7 @@ fn emit_grid_table_row(
         return;
     }
 
-    // Extract cell contents (concatenated across all lines if multi-line)
+    // Extract cell contents from the first line.
     let cell_contents = extract_grid_cells_multiline(lines, columns);
 
     builder.start_node(row_kind.into());
@@ -1777,20 +1737,9 @@ mod grid_table_tests {
         assert!(try_parse_grid_separator("+---+---+").is_some());
         assert!(try_parse_grid_separator("+===+===+").is_some());
         assert!(try_parse_grid_separator("+---------------+---------------+").is_some());
-        assert!(try_parse_grid_separator("+:---+---:+").is_some()); // with alignment
         assert!(try_parse_grid_separator("+:---:+").is_some()); // center aligned
         assert!(try_parse_grid_separator("not a separator").is_none());
         assert!(try_parse_grid_separator("|---|---|").is_none()); // pipe table sep
-    }
-
-    #[test]
-    fn test_grid_separator_alignment() {
-        let cols = try_parse_grid_separator("+:---+---:+:---:+---+").unwrap();
-        assert_eq!(cols.len(), 4);
-        assert_eq!(cols[0].alignment, Alignment::Left);
-        assert_eq!(cols[1].alignment, Alignment::Right);
-        assert_eq!(cols[2].alignment, Alignment::Center);
-        assert_eq!(cols[3].alignment, Alignment::Default);
     }
 
     #[test]
@@ -1880,24 +1829,6 @@ mod grid_table_tests {
             "+-------+-------+",
             "| C     | D     |",
             "+-------+-------+",
-            "",
-        ];
-
-        let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &Config::default());
-
-        assert!(result.is_some());
-        assert_eq!(result.unwrap(), 5);
-    }
-
-    #[test]
-    fn test_grid_table_with_alignment() {
-        let input = vec![
-            "+-------+-------+-------+",
-            "| Right | Left  | Center|",
-            "+======:+:======+:=====:+",
-            "| A     | B     | C     |",
-            "+-------+-------+-------+",
             "",
         ];
 

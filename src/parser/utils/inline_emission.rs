@@ -8,7 +8,6 @@
 //! before calling builder methods. The inline parser already follows this pattern
 //! (it detects delimiters/patterns before emitting nodes).
 
-use super::text_buffer::TextBuffer;
 use crate::config::Config;
 use crate::parser::inlines::core;
 use rowan::GreenNodeBuilder;
@@ -39,35 +38,6 @@ pub fn emit_inlines(builder: &mut GreenNodeBuilder, text: &str, config: &Config)
 
     // Call the recursive inline parser
     core::parse_inline_text_recursive(builder, text, config);
-}
-
-/// Emit PLAIN block content with inline parsing applied.
-///
-/// This is a specialized version for PLAIN blocks that handles:
-/// 1. Multi-line content buffering (via TextBuffer)
-/// 2. Newline preservation between lines
-/// 3. Integrated inline parsing
-///
-/// # Arguments
-/// * `builder` - The GreenNodeBuilder to emit nodes into
-/// * `buffer` - The accumulated PLAIN text lines
-/// * `config` - Configuration controlling parser behavior
-///
-/// # Note
-/// The buffer contains lines WITH newlines for losslessness.
-#[allow(dead_code)] // Used by block_parser when emitting buffered PLAIN
-pub(crate) fn emit_plain_with_inlines(
-    builder: &mut GreenNodeBuilder,
-    buffer: &TextBuffer,
-    config: &Config,
-) {
-    if buffer.is_empty() {
-        return;
-    }
-
-    // Emit inline-parsed content
-    let text = buffer.get_accumulated_text();
-    core::parse_inline_text_recursive(builder, &text, config);
 }
 
 #[cfg(test)]
