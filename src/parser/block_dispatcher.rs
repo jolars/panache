@@ -150,58 +150,25 @@ pub(crate) enum BlockEffect {
 /// backtracking or multiple passes. Each parser operates during the
 /// single forward pass through the document.
 pub(crate) trait BlockParser {
-    /// Detect if this parser can handle the content (no emission).
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult;
-
     fn effect(&self) -> BlockEffect {
         BlockEffect::None
     }
 
-    /// Prepared detection hook.
-    ///
-    /// Default implementation just calls `can_parse()` and returns no payload.
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
         lines: &[&str],
         line_pos: usize,
-    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        let detection = self.can_parse(ctx, lines, line_pos);
-        match detection {
-            BlockDetectionResult::Yes | BlockDetectionResult::YesCanInterrupt => {
-                Some((detection, None))
-            }
-            BlockDetectionResult::No => None,
-        }
-    }
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)>;
 
-    /// Parse and emit this block type to the builder.
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize;
-
-    /// Prepared parse hook.
-    ///
-    /// Default implementation ignores payload and calls `parse()`.
     fn parse_prepared(
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
-        _payload: Option<&dyn Any>,
-    ) -> usize {
-        self.parse(ctx, builder, lines, line_pos)
-    }
+        payload: Option<&dyn Any>,
+    ) -> usize;
 
     /// Name of this block parser (for debugging/logging)
     fn name(&self) -> &'static str;
@@ -215,17 +182,6 @@ pub(crate) trait BlockParser {
 pub(crate) struct HorizontalRuleParser;
 
 impl BlockParser for HorizontalRuleParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -243,16 +199,6 @@ impl BlockParser for HorizontalRuleParser {
         } else {
             None
         }
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -285,17 +231,6 @@ impl BlockParser for HorizontalRuleParser {
 pub(crate) struct AtxHeadingParser;
 
 impl BlockParser for AtxHeadingParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -308,16 +243,6 @@ impl BlockParser for AtxHeadingParser {
 
         let level = try_parse_atx_heading(ctx.content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(level))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -346,17 +271,6 @@ impl BlockParser for AtxHeadingParser {
 pub(crate) struct PandocTitleBlockParser;
 
 impl BlockParser for PandocTitleBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -374,16 +288,6 @@ impl BlockParser for PandocTitleBlockParser {
         }
 
         Some((BlockDetectionResult::Yes, None))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -408,17 +312,6 @@ impl BlockParser for PandocTitleBlockParser {
 pub(crate) struct YamlMetadataParser;
 
 impl BlockParser for YamlMetadataParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -454,16 +347,6 @@ impl BlockParser for YamlMetadataParser {
         ))
     }
 
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
-    }
-
     fn parse_prepared(
         &self,
         ctx: &BlockContext,
@@ -492,17 +375,6 @@ impl BlockParser for YamlMetadataParser {
 pub(crate) struct FigureParser;
 
 impl BlockParser for FigureParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -528,16 +400,6 @@ impl BlockParser for FigureParser {
         }
 
         Some((BlockDetectionResult::Yes, Some(Box::new(len))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -617,17 +479,6 @@ impl BlockParser for ListParser {
         BlockEffect::OpenList
     }
 
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -670,16 +521,6 @@ impl BlockParser for ListParser {
         ))
     }
 
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
-    }
-
     fn parse_prepared(
         &self,
         _ctx: &BlockContext,
@@ -704,17 +545,6 @@ impl BlockParser for ListParser {
 impl BlockParser for BlockQuoteParser {
     fn effect(&self) -> BlockEffect {
         BlockEffect::OpenBlockQuote
-    }
-
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
     }
 
     fn detect_prepared(
@@ -764,16 +594,6 @@ impl BlockParser for BlockQuoteParser {
         ))
     }
 
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
-    }
-
     fn parse_prepared(
         &self,
         _ctx: &BlockContext,
@@ -811,17 +631,6 @@ impl BlockParser for DefinitionListParser {
         BlockEffect::OpenDefinitionList
     }
 
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -854,16 +663,6 @@ impl BlockParser for DefinitionListParser {
         None
     }
 
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
-    }
-
     fn parse_prepared(
         &self,
         _ctx: &BlockContext,
@@ -893,17 +692,6 @@ impl BlockParser for FootnoteDefinitionParser {
         BlockEffect::OpenFootnoteDefinition
     }
 
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, _lines, _line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -919,16 +707,6 @@ impl BlockParser for FootnoteDefinitionParser {
             BlockDetectionResult::YesCanInterrupt,
             Some(Box::new(FootnoteDefinitionPrepared { content_start })),
         ))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -971,17 +749,6 @@ impl BlockParser for ReferenceDefinitionParser {
         BlockEffect::None
     }
 
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -991,16 +758,6 @@ impl BlockParser for ReferenceDefinitionParser {
         // Parse once and cache for emission.
         let parsed = try_parse_reference_definition(ctx.content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(parsed))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1064,17 +821,6 @@ struct TablePrepared {
 impl BlockParser for TableParser {
     fn effect(&self) -> BlockEffect {
         BlockEffect::None
-    }
-
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
     }
 
     fn detect_prepared(
@@ -1209,16 +955,6 @@ impl BlockParser for TableParser {
         None
     }
 
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
-    }
-
     fn parse_prepared(
         &self,
         ctx: &BlockContext,
@@ -1349,17 +1085,6 @@ fn emit_reference_definition_content(builder: &mut GreenNodeBuilder<'static>, te
 pub(crate) struct FencedCodeBlockParser;
 
 impl BlockParser for FencedCodeBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, _lines, _line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1410,16 +1135,6 @@ impl BlockParser for FencedCodeBlockParser {
         }
     }
 
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
-    }
-
     fn parse_prepared(
         &self,
         ctx: &BlockContext,
@@ -1433,7 +1148,6 @@ impl BlockParser for FencedCodeBlockParser {
         let fence = if let Some(fence) = payload.and_then(|p| p.downcast_ref::<FenceInfo>()) {
             fence.clone()
         } else {
-            // Backward-compat: if called via legacy `parse()`, recompute.
             let content_to_check = if list_indent_stripped > 0 && !ctx.content.is_empty() {
                 let idx = byte_index_at_column(ctx.content, list_indent_stripped);
                 &ctx.content[idx..]
@@ -1470,17 +1184,6 @@ impl BlockParser for FencedCodeBlockParser {
 pub(crate) struct HtmlBlockParser;
 
 impl BlockParser for HtmlBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1502,16 +1205,6 @@ impl BlockParser for HtmlBlockParser {
         };
 
         Some((detection, Some(Box::new(block_type))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1544,17 +1237,6 @@ impl BlockParser for HtmlBlockParser {
 pub(crate) struct LatexEnvironmentParser;
 
 impl BlockParser for LatexEnvironmentParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1575,16 +1257,6 @@ impl BlockParser for LatexEnvironmentParser {
         };
 
         Some((detection, Some(Box::new(env_info))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1618,17 +1290,6 @@ impl BlockParser for LatexEnvironmentParser {
 pub(crate) struct LineBlockParser;
 
 impl BlockParser for LineBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1649,16 +1310,6 @@ impl BlockParser for LineBlockParser {
         };
 
         Some((detection, None))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1689,17 +1340,6 @@ impl BlockParser for FencedDivOpenParser {
         BlockEffect::OpenFencedDiv
     }
 
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, _lines, _line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1716,16 +1356,6 @@ impl BlockParser for FencedDivOpenParser {
 
         let div_fence = try_parse_div_fence_open(ctx.content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(div_fence))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1844,17 +1474,6 @@ impl BlockParser for FencedDivCloseParser {
         BlockEffect::CloseFencedDiv
     }
 
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, _lines, _line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1874,16 +1493,6 @@ impl BlockParser for FencedDivCloseParser {
         }
 
         Some((BlockDetectionResult::YesCanInterrupt, None))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1930,17 +1539,6 @@ impl BlockParser for FencedDivCloseParser {
 pub(crate) struct IndentedCodeBlockParser;
 
 impl BlockParser for IndentedCodeBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, _lines, _line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1962,16 +1560,6 @@ impl BlockParser for IndentedCodeBlockParser {
         }
 
         Some((BlockDetectionResult::Yes, None))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -2004,48 +1592,44 @@ impl BlockParser for IndentedCodeBlockParser {
 pub(crate) struct SetextHeadingParser;
 
 impl BlockParser for SetextHeadingParser {
-    fn can_parse(
+    fn detect_prepared(
         &self,
         ctx: &BlockContext,
         _lines: &[&str],
         _line_pos: usize,
-    ) -> BlockDetectionResult {
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         // Setext headings require blank line before (unless at document start)
         if !ctx.has_blank_before && !ctx.at_document_start {
-            return BlockDetectionResult::No;
+            return None;
         }
 
         // Need next line for lookahead
-        let next_line = match ctx.next_line {
-            Some(line) => line,
-            None => return BlockDetectionResult::No,
-        };
+        let next_line = ctx.next_line?;
 
         // Create lines array for detection function (avoid allocation)
         let lines = [ctx.content, next_line];
 
         // Try to detect setext heading
         if try_parse_setext_heading(&lines, 0).is_some() {
-            // Setext headings need blank line before (normal case)
-            BlockDetectionResult::Yes
+            Some((BlockDetectionResult::Yes, None))
         } else {
-            BlockDetectionResult::No
+            None
         }
     }
 
-    fn parse(
+    fn parse_prepared(
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         pos: usize,
+        _payload: Option<&dyn Any>,
     ) -> usize {
         // Get text line and underline line
         let text_line = lines[pos];
         let underline_line = lines[pos + 1];
 
         // Determine level from underline character (no need to call try_parse again)
-        // can_parse() already validated this is a valid setext heading
         let underline_char = underline_line.trim().chars().next().unwrap_or('=');
         let level = if underline_char == '=' { 1 } else { 2 };
 
@@ -2153,35 +1737,6 @@ impl BlockParserRegistry {
         Self { parsers }
     }
 
-    /// Try to parse a block using the registered parsers.
-    ///
-    /// This method implements the two-phase parsing:
-    /// 1. Detection: Check if any parser can handle this content
-    /// 2. Caller prepares (closes paragraphs, flushes buffers)
-    /// 3. Parser emits the block
-    ///
-    /// Returns (parser_index, detection_result) if a parser can handle this,
-    /// or None if no parser matched.
-    #[allow(dead_code)]
-    pub fn detect(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> Option<(usize, BlockDetectionResult)> {
-        for (i, parser) in self.parsers.iter().enumerate() {
-            let result = parser.can_parse(ctx, lines, line_pos);
-            match result {
-                BlockDetectionResult::Yes | BlockDetectionResult::YesCanInterrupt => {
-                    log::debug!("Block detected by: {}", parser.name());
-                    return Some((i, result));
-                }
-                BlockDetectionResult::No => continue,
-            }
-        }
-        None
-    }
-
     /// Like `detect()`, but allows parsers to return cached payload for emission.
     pub fn detect_prepared(
         &self,
@@ -2201,24 +1756,6 @@ impl BlockParserRegistry {
             }
         }
         None
-    }
-
-    /// Parse a block using the specified parser (by index from detect()).
-    ///
-    /// Should only be called after detect() returns Some and after
-    /// caller has prepared for the block element.
-    #[allow(dead_code)]
-    pub fn parse(
-        &self,
-        parser_index: usize,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        let parser = &self.parsers[parser_index];
-        log::debug!("Block parsed by: {}", parser.name());
-        parser.parse(ctx, builder, lines, line_pos)
     }
 
     pub fn parse_prepared(
