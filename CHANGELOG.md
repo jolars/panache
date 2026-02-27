@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.6.3](https://github.com/jolars/panache/compare/v2.6.2...v2.6.3) (2026-02-27)
+
+### Performance Improvements
+
+* refactor parser into block dispatcher approach ([#36](https://github.com/jolars/panache/issues/36)) ([4804f80](https://github.com/jolars/panache/commit/4804f806d64eea4ebaf852aeead6703422e238fc))
+
 ## [2.6.2](https://github.com/jolars/panache/compare/v2.6.1...v2.6.2) (2026-02-27)
 
 ### Bug Fixes
