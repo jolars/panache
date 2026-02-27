@@ -218,19 +218,30 @@ impl BlockParser for HorizontalRuleParser {
     fn can_parse(
         &self,
         ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
         _lines: &[&str],
         _line_pos: usize,
-    ) -> BlockDetectionResult {
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         // Must have blank line before
         if !ctx.has_blank_before {
-            return BlockDetectionResult::No;
+            return None;
         }
 
         // Check if this looks like a horizontal rule
         if try_parse_horizontal_rule(ctx.content).is_some() {
-            BlockDetectionResult::Yes
+            Some((BlockDetectionResult::Yes, None))
         } else {
-            BlockDetectionResult::No
+            None
         }
     }
 
@@ -240,6 +251,17 @@ impl BlockParser for HorizontalRuleParser {
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        _payload: Option<&dyn Any>,
     ) -> usize {
         // Use ctx.content (blockquote markers already stripped)
         // But preserve newline from original line
