@@ -1416,6 +1416,9 @@ impl<'a> Parser<'a> {
                     BlockEffect::OpenDefinitionList => {
                         self.handle_definition_list_effect(block_match, content, indent_to_emit);
                     }
+                    BlockEffect::OpenBlockQuote => {
+                        // Detection only for now; keep core blockquote handling intact.
+                    }
                 }
 
                 self.pos += lines_consumed;
@@ -1478,6 +1481,9 @@ impl<'a> Parser<'a> {
                     }
                     BlockEffect::OpenDefinitionList => {
                         self.handle_definition_list_effect(block_match, content, indent_to_emit);
+                    }
+                    BlockEffect::OpenBlockQuote => {
+                        // Detection only for now; keep core blockquote handling intact.
                     }
                 }
 

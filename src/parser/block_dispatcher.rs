@@ -13,7 +13,9 @@ use crate::config::Config;
 use rowan::GreenNodeBuilder;
 use std::any::Any;
 
-use super::blocks::blockquotes::strip_n_blockquote_markers;
+use super::blocks::blockquotes::{
+    can_start_blockquote, count_blockquote_markers, strip_n_blockquote_markers,
+};
 use super::blocks::code_blocks::{
     CodeBlockType, FenceInfo, InfoString, parse_fenced_code_block, try_parse_fence_open,
 };
@@ -40,6 +42,7 @@ use super::blocks::tables::{
 use super::inlines::links::try_parse_inline_image;
 use super::utils::container_stack::byte_index_at_column;
 use super::utils::helpers::strip_newline;
+use super::utils::marker_utils::parse_blockquote_marker_info;
 
 /// Information about list indentation context.
 ///
@@ -128,6 +131,7 @@ pub(crate) enum BlockEffect {
     OpenFootnoteDefinition,
     OpenList,
     OpenDefinitionList,
+    OpenBlockQuote,
 }
 
 /// Trait for block-level parsers.
@@ -544,6 +548,16 @@ pub(crate) struct FootnoteDefinitionPrepared {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub(crate) struct BlockQuotePrepared {
+    pub depth: usize,
+    pub marker_info: Vec<crate::parser::utils::marker_utils::BlockQuoteMarkerInfo>,
+    pub inner_content: String,
+    pub can_start: bool,
+    pub can_nest: bool,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct ListPrepared {
     pub marker: ListMarker,
     pub marker_len: usize,
@@ -571,6 +585,9 @@ pub(crate) struct ListParser;
 
 /// Definition list parser (term lines and definition markers)
 pub(crate) struct DefinitionListParser;
+
+/// Blockquote parser (detection only; core handles emission)
+pub(crate) struct BlockQuoteParser;
 
 impl BlockParser for ListParser {
     fn effect(&self) -> BlockEffect {
@@ -658,6 +675,94 @@ impl BlockParser for ListParser {
 
     fn name(&self) -> &'static str {
         "list"
+    }
+}
+
+impl BlockParser for BlockQuoteParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenBlockQuote
+    }
+
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if ctx.blockquote_depth > 0 {
+            return None;
+        }
+
+        let line = lines.get(line_pos)?;
+        let (depth, inner_content) = count_blockquote_markers(line);
+        if depth == 0 {
+            return None;
+        }
+
+        let marker_info = parse_blockquote_marker_info(line);
+        let at_document_start = ctx.at_document_start;
+        let can_start = can_start_blockquote(line_pos, lines);
+
+        let can_nest = depth <= 1 || at_document_start || {
+            let prev_line = lines.get(line_pos.wrapping_sub(1)).unwrap_or(&"");
+            let (prev_depth, prev_inner) = count_blockquote_markers(prev_line);
+            prev_depth > 0 && prev_inner.trim().is_empty()
+        };
+
+        let has_blank_before = ctx.has_blank_before;
+        let detection = if has_blank_before || at_document_start {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::YesCanInterrupt
+        };
+
+        Some((
+            detection,
+            Some(Box::new(BlockQuotePrepared {
+                depth,
+                marker_info,
+                inner_content: inner_content.to_string(),
+                can_start,
+                can_nest,
+            })),
+        ))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        _builder: &mut GreenNodeBuilder<'static>,
+        _lines: &[&str],
+        _line_pos: usize,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        // Core handles blockquote emission; consuming 0 lines here ensures we don't double-emit.
+        0
+    }
+
+    fn name(&self) -> &'static str {
+        "blockquote"
     }
 }
 
@@ -1942,7 +2047,7 @@ impl BlockParserRegistry {
     /// 4. bulletList
     /// 5. divHtml
     /// 6. divFenced
-    /// 7. header ← ATX headings
+    /// 7. header ← ATX and Setext headers
     /// 8. lhsCodeBlock
     /// 9. htmlBlock
     /// 10. table
@@ -1985,6 +2090,8 @@ impl BlockParserRegistry {
             Box::new(TableParser),
             // (13) Line blocks
             Box::new(LineBlockParser),
+            // (14) Block quotes (detection-only for now)
+            Box::new(BlockQuoteParser),
             // (11) Indented code blocks (AFTER fenced!)
             Box::new(IndentedCodeBlockParser),
             // (15) Horizontal rules - AFTER headings per Pandoc

@@ -328,3 +328,206 @@ fn blockquote_with_code_block() {
     // Code block should be inside the blockquote
     assert_eq!(count_nodes_of_type(blockquote, SyntaxKind::CODE_BLOCK), 1);
 }
+
+#[test]
+fn dispatcher_blockquote_detection() {
+    use crate::config::Config;
+    use crate::parser::block_dispatcher::BlockContext;
+    use crate::parser::block_dispatcher::BlockParserRegistry;
+
+    let line = "> Quote";
+    let registry = BlockParserRegistry::new();
+    let ctx = BlockContext {
+        content: line,
+        has_blank_before: true,
+        has_blank_before_strict: true,
+        at_document_start: true,
+        in_fenced_div: false,
+        blockquote_depth: 0,
+        config: &Config::default(),
+        content_indent: 0,
+        indent_to_emit: None,
+        list_indent_info: None,
+        in_list: false,
+        next_line: None,
+    };
+
+    let result = registry.detect_prepared(&ctx, &[line], 0);
+    assert!(result.is_some(), "Dispatcher should detect blockquote");
+    let result = result.unwrap();
+    assert_eq!(
+        result.effect,
+        crate::parser::block_dispatcher::BlockEffect::OpenBlockQuote
+    );
+}
+
+#[test]
+fn dispatcher_blockquote_requires_blank_before() {
+    use crate::config::Config;
+    use crate::parser::block_dispatcher::BlockContext;
+    use crate::parser::block_dispatcher::BlockParserRegistry;
+
+    let line = "> Quote";
+    let registry = BlockParserRegistry::new();
+    let ctx = BlockContext {
+        content: line,
+        has_blank_before: false,
+        has_blank_before_strict: false,
+        at_document_start: false,
+        in_fenced_div: false,
+        blockquote_depth: 0,
+        config: &Config::default(),
+        content_indent: 0,
+        indent_to_emit: None,
+        list_indent_info: None,
+        in_list: false,
+        next_line: None,
+    };
+
+    let result = registry.detect_prepared(&ctx, &[line], 0);
+    assert!(
+        result.is_some(),
+        "Dispatcher should still detect blockquote"
+    );
+    let result = result.unwrap();
+    assert_eq!(
+        result.effect,
+        crate::parser::block_dispatcher::BlockEffect::OpenBlockQuote
+    );
+    assert_eq!(
+        result.detection,
+        crate::parser::block_dispatcher::BlockDetectionResult::YesCanInterrupt
+    );
+}
+
+#[test]
+fn dispatcher_blockquote_payload_basic() {
+    use crate::config::Config;
+    use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
+
+    let line = "> Quote";
+    let registry = BlockParserRegistry::new();
+    let ctx = BlockContext {
+        content: line,
+        has_blank_before: true,
+        has_blank_before_strict: true,
+        at_document_start: true,
+        in_fenced_div: false,
+        blockquote_depth: 0,
+        config: &Config::default(),
+        content_indent: 0,
+        indent_to_emit: None,
+        list_indent_info: None,
+        in_list: false,
+        next_line: None,
+    };
+
+    let result = registry.detect_prepared(&ctx, &[line], 0).unwrap();
+    let payload = result
+        .payload
+        .as_ref()
+        .and_then(|payload| payload.downcast_ref::<BlockQuotePrepared>())
+        .expect("Expected blockquote payload");
+
+    assert_eq!(payload.depth, 1);
+    assert_eq!(payload.inner_content, "Quote");
+    assert!(payload.can_start);
+    assert!(payload.can_nest);
+}
+
+#[test]
+fn dispatcher_blockquote_payload_nested_requires_blank() {
+    use crate::config::Config;
+    use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
+
+    let lines = ["> Outer", ">> Inner"];
+    let registry = BlockParserRegistry::new();
+    let ctx = BlockContext {
+        content: lines[1],
+        has_blank_before: false,
+        has_blank_before_strict: false,
+        at_document_start: false,
+        in_fenced_div: false,
+        blockquote_depth: 0,
+        config: &Config::default(),
+        content_indent: 0,
+        indent_to_emit: None,
+        list_indent_info: None,
+        in_list: false,
+        next_line: None,
+    };
+
+    let result = registry.detect_prepared(&ctx, &lines, 1).unwrap();
+    let payload = result
+        .payload
+        .as_ref()
+        .and_then(|payload| payload.downcast_ref::<BlockQuotePrepared>())
+        .expect("Expected blockquote payload");
+
+    assert_eq!(payload.depth, 2);
+    assert_eq!(payload.inner_content, "Inner");
+    assert!(!payload.can_nest);
+}
+
+#[test]
+fn dispatcher_blockquote_ignored_inside_blockquote() {
+    use crate::config::Config;
+    use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
+
+    let line = "Lazy continuation";
+    let registry = BlockParserRegistry::new();
+    let ctx = BlockContext {
+        content: line,
+        has_blank_before: false,
+        has_blank_before_strict: false,
+        at_document_start: false,
+        in_fenced_div: false,
+        blockquote_depth: 1,
+        config: &Config::default(),
+        content_indent: 0,
+        indent_to_emit: None,
+        list_indent_info: None,
+        in_list: false,
+        next_line: None,
+    };
+
+    let result = registry.detect_prepared(&ctx, &[line], 0);
+    assert!(
+        result.is_none(),
+        "Dispatcher should ignore nested blockquote lines"
+    );
+}
+
+#[test]
+fn dispatcher_blockquote_payload_nested_with_blank() {
+    use crate::config::Config;
+    use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
+
+    let lines = ["> Outer", ">", ">> Inner"];
+    let registry = BlockParserRegistry::new();
+    let ctx = BlockContext {
+        content: lines[2],
+        has_blank_before: false,
+        has_blank_before_strict: false,
+        at_document_start: false,
+        in_fenced_div: false,
+        blockquote_depth: 0,
+        config: &Config::default(),
+        content_indent: 0,
+        indent_to_emit: None,
+        list_indent_info: None,
+        in_list: false,
+        next_line: None,
+    };
+
+    let result = registry.detect_prepared(&ctx, &lines, 2).unwrap();
+    let payload = result
+        .payload
+        .as_ref()
+        .and_then(|payload| payload.downcast_ref::<BlockQuotePrepared>())
+        .expect("Expected blockquote payload");
+
+    assert_eq!(payload.depth, 2);
+    assert_eq!(payload.inner_content, "Inner");
+    assert!(payload.can_nest);
+}
