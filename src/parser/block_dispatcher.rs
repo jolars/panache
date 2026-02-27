@@ -14,7 +14,8 @@ use rowan::GreenNodeBuilder;
 use std::any::Any;
 
 use super::blocks::blockquotes::{
-    can_start_blockquote, count_blockquote_markers, strip_n_blockquote_markers,
+    can_start_blockquote, count_blockquote_markers, emit_one_blockquote_marker,
+    strip_n_blockquote_markers,
 };
 use super::blocks::code_blocks::{
     CodeBlockType, FenceInfo, InfoString, parse_fenced_code_block, try_parse_fence_open,
@@ -714,11 +715,13 @@ impl BlockParser for BlockQuoteParser {
         let at_document_start = ctx.at_document_start;
         let can_start = can_start_blockquote(line_pos, lines);
 
-        let can_nest = depth <= 1 || at_document_start || {
-            let prev_line = lines.get(line_pos.wrapping_sub(1)).unwrap_or(&"");
-            let (prev_depth, prev_inner) = count_blockquote_markers(prev_line);
-            prev_depth > 0 && prev_inner.trim().is_empty()
-        };
+        let prev_line = lines.get(line_pos.wrapping_sub(1)).unwrap_or(&"");
+        let prev_line_blank = prev_line.trim().is_empty();
+        let (prev_depth, prev_inner) = count_blockquote_markers(prev_line);
+        let prev_line_is_quoted_blank = prev_depth > 0 && prev_inner.trim().is_empty();
+
+        let can_nest =
+            depth <= 1 || at_document_start || prev_line_blank || prev_line_is_quoted_blank;
 
         let has_blank_before = ctx.has_blank_before;
         let detection = if has_blank_before || at_document_start {
@@ -752,12 +755,27 @@ impl BlockParser for BlockQuoteParser {
     fn parse_prepared(
         &self,
         _ctx: &BlockContext,
-        _builder: &mut GreenNodeBuilder<'static>,
+        builder: &mut GreenNodeBuilder<'static>,
         _lines: &[&str],
         _line_pos: usize,
-        _payload: Option<&dyn Any>,
+        payload: Option<&dyn Any>,
     ) -> usize {
-        // Core handles blockquote emission; consuming 0 lines here ensures we don't double-emit.
+        use crate::syntax::SyntaxKind;
+
+        let prepared = payload.and_then(|p| p.downcast_ref::<BlockQuotePrepared>());
+        let Some(prepared) = prepared else {
+            return 0;
+        };
+
+        let marker_info = &prepared.marker_info;
+
+        for level in 0..prepared.depth {
+            builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+            if let Some(info) = marker_info.get(level) {
+                emit_one_blockquote_marker(builder, info.leading_spaces, info.has_trailing_space);
+            }
+        }
+
         0
     }
 

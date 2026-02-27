@@ -531,3 +531,68 @@ fn dispatcher_blockquote_payload_nested_with_blank() {
     assert_eq!(payload.inner_content, "Inner");
     assert!(payload.can_nest);
 }
+
+#[test]
+fn dispatcher_blockquote_payload_nested_after_blank_line() {
+    use crate::config::Config;
+    use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
+
+    let lines = ["> Outer", "", ">> Inner"];
+    let registry = BlockParserRegistry::new();
+    let ctx = BlockContext {
+        content: lines[2],
+        has_blank_before: true,
+        has_blank_before_strict: true,
+        at_document_start: false,
+        in_fenced_div: false,
+        blockquote_depth: 0,
+        config: &Config::default(),
+        content_indent: 0,
+        indent_to_emit: None,
+        list_indent_info: None,
+        in_list: false,
+        next_line: None,
+    };
+
+    let result = registry.detect_prepared(&ctx, &lines, 2).unwrap();
+    let payload = result
+        .payload
+        .as_ref()
+        .and_then(|payload| payload.downcast_ref::<BlockQuotePrepared>())
+        .expect("Expected blockquote payload");
+
+    assert_eq!(payload.depth, 2);
+    assert_eq!(payload.inner_content, "Inner");
+    assert!(payload.can_nest);
+}
+
+#[test]
+fn blockquote_depth_change_regression() {
+    let input = "# Test: Changing blockquote depth mid-list
+
+> - First item at depth 1
+> - Second item at depth 1
+
+> > - Nested item at depth 2
+> > - Another at depth 2
+
+> - Back to depth 1
+
+How should the list structure be interpreted?
+";
+    let tree = parse_blocks(input);
+
+    let blockquotes = find_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE);
+    assert!(blockquotes.len() >= 3, "Expected nested blockquotes");
+
+    let outer = &blockquotes[0];
+    assert!(
+        !find_nodes_of_type(outer, SyntaxKind::BLOCKQUOTE).is_empty(),
+        "Expected nested blockquote inside outer"
+    );
+
+    assert!(
+        count_nodes_of_type(&tree, SyntaxKind::LIST) >= 2,
+        "Expected lists inside blockquotes"
+    );
+}

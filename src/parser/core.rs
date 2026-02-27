@@ -3,7 +3,8 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
 use super::block_dispatcher::{
-    BlockContext, BlockDetectionResult, BlockEffect, BlockParserRegistry,
+    BlockContext, BlockDetectionResult, BlockEffect, BlockParserRegistry, BlockQuotePrepared,
+    PreparedBlockMatch,
 };
 use super::blocks::blockquotes;
 use super::blocks::definition_lists;
@@ -643,6 +644,32 @@ impl<'a> Parser<'a> {
     }
 
     /// Get current blockquote depth from container stack.
+    fn blockquote_marker_info(
+        &self,
+        payload: Option<&BlockQuotePrepared>,
+        line: &str,
+    ) -> Vec<marker_utils::BlockQuoteMarkerInfo> {
+        payload
+            .map(|payload| payload.marker_info.clone())
+            .unwrap_or_else(|| parse_blockquote_marker_info(line))
+    }
+
+    fn emit_blockquote_markers(
+        &mut self,
+        marker_info: &[marker_utils::BlockQuoteMarkerInfo],
+        depth: usize,
+    ) {
+        for i in 0..depth {
+            if let Some(info) = marker_info.get(i) {
+                blockquotes::emit_one_blockquote_marker(
+                    &mut self.builder,
+                    info.leading_spaces,
+                    info.has_trailing_space,
+                );
+            }
+        }
+    }
+
     fn current_blockquote_depth(&self) -> usize {
         blockquotes::current_blockquote_depth(&self.containers)
     }
@@ -701,6 +728,52 @@ impl<'a> Parser<'a> {
         // Count blockquote markers on this line
         let (bq_depth, inner_content) = count_blockquote_markers(line);
         let current_bq_depth = self.current_blockquote_depth();
+
+        let has_blank_before = self.pos == 0 || self.lines[self.pos - 1].trim().is_empty();
+        let mut blockquote_match: Option<PreparedBlockMatch> = None;
+        let dispatcher_ctx = if current_bq_depth == 0 {
+            Some(BlockContext {
+                content: line,
+                has_blank_before,
+                has_blank_before_strict: has_blank_before,
+                at_document_start: self.pos == 0,
+                in_fenced_div: self.in_fenced_div(),
+                blockquote_depth: current_bq_depth,
+                config: self.config,
+                content_indent: 0,
+                indent_to_emit: None,
+                list_indent_info: None,
+                in_list: lists::in_list(&self.containers),
+                next_line: if self.pos + 1 < self.lines.len() {
+                    Some(self.lines[self.pos + 1])
+                } else {
+                    None
+                },
+            })
+        } else {
+            None
+        };
+
+        let blockquote_payload = if let Some(dispatcher_ctx) = dispatcher_ctx.as_ref() {
+            self.block_registry
+                .detect_prepared(dispatcher_ctx, &self.lines, self.pos)
+                .and_then(|prepared| {
+                    if matches!(prepared.effect, BlockEffect::OpenBlockQuote) {
+                        blockquote_match = Some(prepared);
+                        blockquote_match.as_ref().and_then(|prepared| {
+                            prepared
+                                .payload
+                                .as_ref()
+                                .and_then(|payload| payload.downcast_ref::<BlockQuotePrepared>())
+                                .cloned()
+                        })
+                    } else {
+                        None
+                    }
+                })
+        } else {
+            None
+        };
 
         log::debug!(
             "parse_line [{}]: bq_depth={}, current_bq={}, depth={}, line={:?}",
@@ -812,16 +885,8 @@ impl<'a> Parser<'a> {
 
             // Emit blockquote markers for this blank line if inside blockquotes
             if bq_depth > 0 {
-                let marker_info = parse_blockquote_marker_info(line);
-                for i in 0..bq_depth {
-                    if let Some(info) = marker_info.get(i) {
-                        blockquotes::emit_one_blockquote_marker(
-                            &mut self.builder,
-                            info.leading_spaces,
-                            info.has_trailing_space,
-                        );
-                    }
-                }
+                let marker_info = self.blockquote_marker_info(blockquote_payload.as_ref(), line);
+                self.emit_blockquote_markers(&marker_info, bq_depth);
             }
 
             self.builder.start_node(SyntaxKind::BLANK_LINE.into());
@@ -837,7 +902,12 @@ impl<'a> Parser<'a> {
         if bq_depth > current_bq_depth {
             // Need to open new blockquote(s)
             // But first check blank_before_blockquote requirement
-            if current_bq_depth == 0 && !blockquotes::can_start_blockquote(self.pos, &self.lines) {
+            if current_bq_depth == 0
+                && !blockquote_payload
+                    .as_ref()
+                    .map(|payload| payload.can_start)
+                    .unwrap_or_else(|| blockquotes::can_start_blockquote(self.pos, &self.lines))
+            {
                 // Can't start blockquote without blank line - treat as paragraph
                 paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
                 paragraphs::append_paragraph_line(
@@ -861,7 +931,10 @@ impl<'a> Parser<'a> {
                         prev_bq_depth >= current_bq_depth && prev_inner.trim().is_empty()
                     })
             } else {
-                true
+                blockquote_payload
+                    .as_ref()
+                    .map(|payload| payload.can_nest)
+                    .unwrap_or(true)
             };
 
             if !can_nest {
@@ -871,7 +944,7 @@ impl<'a> Parser<'a> {
                     blockquotes::strip_n_blockquote_markers(line, current_bq_depth);
 
                 // Emit blockquote markers for current depth (for losslessness)
-                let marker_info = parse_blockquote_marker_info(line);
+                let marker_info = self.blockquote_marker_info(blockquote_payload.as_ref(), line);
                 for i in 0..current_bq_depth {
                     if let Some(info) = marker_info.get(i) {
                         self.emit_or_buffer_blockquote_marker(
@@ -911,32 +984,47 @@ impl<'a> Parser<'a> {
             }
 
             // Parse marker information for all levels
-            let marker_info = parse_blockquote_marker_info(line);
+            let marker_info = self.blockquote_marker_info(blockquote_payload.as_ref(), line);
 
-            // First, emit markers for existing blockquote levels (before opening new ones)
-            for level in 0..current_bq_depth {
-                if let Some(info) = marker_info.get(level) {
-                    self.emit_or_buffer_blockquote_marker(
-                        info.leading_spaces,
-                        info.has_trailing_space,
-                    );
+            if let (Some(dispatcher_ctx), Some(prepared)) =
+                (dispatcher_ctx.as_ref(), blockquote_match.as_ref())
+            {
+                let _ = self.block_registry.parse_prepared(
+                    prepared,
+                    dispatcher_ctx,
+                    &mut self.builder,
+                    &self.lines,
+                    self.pos,
+                );
+                for _ in 0..bq_depth {
+                    self.containers.push(Container::BlockQuote {});
                 }
-            }
-
-            // Then open new blockquotes and emit their markers
-            for level in current_bq_depth..bq_depth {
-                self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
-
-                // Emit the marker for this new level
-                if let Some(info) = marker_info.get(level) {
-                    blockquotes::emit_one_blockquote_marker(
-                        &mut self.builder,
-                        info.leading_spaces,
-                        info.has_trailing_space,
-                    );
+            } else {
+                // First, emit markers for existing blockquote levels (before opening new ones)
+                for level in 0..current_bq_depth {
+                    if let Some(info) = marker_info.get(level) {
+                        self.emit_or_buffer_blockquote_marker(
+                            info.leading_spaces,
+                            info.has_trailing_space,
+                        );
+                    }
                 }
 
-                self.containers.push(Container::BlockQuote {});
+                // Then open new blockquotes and emit their markers
+                for level in current_bq_depth..bq_depth {
+                    self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+
+                    // Emit the marker for this new level
+                    if let Some(info) = marker_info.get(level) {
+                        blockquotes::emit_one_blockquote_marker(
+                            &mut self.builder,
+                            info.leading_spaces,
+                            info.has_trailing_space,
+                        );
+                    }
+
+                    self.containers.push(Container::BlockQuote {});
+                }
             }
 
             // Now parse the inner content
