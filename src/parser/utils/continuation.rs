@@ -215,9 +215,8 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
             return false;
         }
 
-        !self
-            .block_registry
+        self.block_registry
             .detect_prepared(block_ctx, lines, pos)
-            .is_some()
+            .is_none()
     }
 }

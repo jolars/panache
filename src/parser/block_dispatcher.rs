@@ -839,10 +839,10 @@ impl BlockParser for TableParser {
                 }
             };
 
-        if let Some(prepared) = prepared {
-            if let Some(n) = try_kind(prepared.kind, builder) {
-                return n;
-            }
+        if let Some(prepared) = prepared
+            && let Some(n) = try_kind(prepared.kind, builder)
+        {
+            return n;
         }
 
         // Fallback (should be rare) - match core order.
@@ -1199,9 +1199,7 @@ impl BlockParser for LineBlockParser {
             return None;
         }
 
-        if try_parse_line_block_start(ctx.content).is_none() {
-            return None;
-        }
+        try_parse_line_block_start(ctx.content)?;
 
         // Line blocks can interrupt paragraphs.
         let detection = if ctx.has_blank_before || ctx.at_document_start {
