@@ -88,6 +88,27 @@ This document tracks implementation status for panache's features.
 - ❌ **Configuration via LSP** - `workspace/didChangeConfiguration` to reload
   config
 
+## Pandoc Test Adoption
+
+- 🚧 **Pandoc Reader Tests (Markdown.hs)**
+  - [ ] Autolinks/bare URIs
+  - [ ] Links/references edge cases
+  - [ ] Headers/implicit refs
+  - [ ] Emphasis/strong
+  - [ ] Lists/definition lists
+  - [ ] Footnotes/citations
+- 🚧 **Pandoc Reader Tests (markdown-reader-more.txt)**
+  - [ ] URLs with spaces/punctuation
+  - [ ] Multilingual URLs
+  - [ ] Entities in links/titles
+  - [ ] Parentheses/backslashes in URLs
+  - [ ] Reference link fallbacks
+- 🚧 **Pandoc Writer Tests (writer.markdown)**
+  - [ ] Autolinks and email autolinks
+  - [ ] Links and titles
+  - [ ] Headers/paragraphs
+  - [ ] Lists and definition lists
+
 ---
 
 ## Configuration System
