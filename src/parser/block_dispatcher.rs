@@ -13,9 +13,15 @@ use crate::config::Config;
 use rowan::GreenNodeBuilder;
 use std::any::Any;
 
-use super::blocks::blockquotes::strip_n_blockquote_markers;
+use super::blocks::blockquotes::{
+    can_start_blockquote, count_blockquote_markers, emit_one_blockquote_marker,
+    strip_n_blockquote_markers,
+};
 use super::blocks::code_blocks::{
     CodeBlockType, FenceInfo, InfoString, parse_fenced_code_block, try_parse_fence_open,
+};
+use super::blocks::definition_lists::{
+    next_line_is_definition_marker, try_parse_definition_marker,
 };
 use super::blocks::fenced_divs::{DivFenceInfo, is_div_closing_fence, try_parse_div_fence_open};
 use super::blocks::figures::parse_figure;
@@ -27,9 +33,9 @@ use super::blocks::html_blocks::{HtmlBlockType, parse_html_block, try_parse_html
 use super::blocks::indented_code::{is_indented_code_line, parse_indented_code_block};
 use super::blocks::latex_envs::{LatexEnvInfo, parse_latex_environment, try_parse_latex_env_begin};
 use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
-use super::blocks::lists::try_parse_list_marker;
+use super::blocks::lists::{ListMarker, is_content_nested_bullet_marker, try_parse_list_marker};
 use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
-use super::blocks::reference_links::try_parse_reference_definition;
+use super::blocks::reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
 use super::blocks::tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
@@ -37,6 +43,7 @@ use super::blocks::tables::{
 use super::inlines::links::try_parse_inline_image;
 use super::utils::container_stack::byte_index_at_column;
 use super::utils::helpers::strip_newline;
+use super::utils::marker_utils::parse_blockquote_marker_info;
 
 /// Information about list indentation context.
 ///
@@ -79,8 +86,14 @@ pub(crate) struct BlockContext<'a> {
     /// Base indentation from container context (footnotes, definitions)
     pub content_indent: usize,
 
+    /// Indentation stripped from the current line that should be emitted for losslessness
+    pub indent_to_emit: Option<&'a str>,
+
     /// List indentation info if inside a list
     pub list_indent_info: Option<ListIndentInfo>,
+
+    /// Whether we're currently inside any list
+    pub in_list: bool,
 
     /// Next line content for lookahead (used by setext headings)
     pub next_line: Option<&'a str>,
@@ -93,7 +106,6 @@ pub(crate) enum BlockDetectionResult {
     Yes,
 
     /// Can parse this block and can interrupt paragraphs (no blank line needed)
-    #[allow(dead_code)]
     YesCanInterrupt,
 
     /// Cannot parse this content
@@ -116,6 +128,10 @@ pub(crate) enum BlockEffect {
     None,
     OpenFencedDiv,
     CloseFencedDiv,
+    OpenFootnoteDefinition,
+    OpenList,
+    OpenDefinitionList,
+    OpenBlockQuote,
 }
 
 /// Trait for block-level parsers.
@@ -133,58 +149,25 @@ pub(crate) enum BlockEffect {
 /// backtracking or multiple passes. Each parser operates during the
 /// single forward pass through the document.
 pub(crate) trait BlockParser {
-    /// Detect if this parser can handle the content (no emission).
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult;
-
     fn effect(&self) -> BlockEffect {
         BlockEffect::None
     }
 
-    /// Prepared detection hook.
-    ///
-    /// Default implementation just calls `can_parse()` and returns no payload.
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
         lines: &[&str],
         line_pos: usize,
-    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        let detection = self.can_parse(ctx, lines, line_pos);
-        match detection {
-            BlockDetectionResult::Yes | BlockDetectionResult::YesCanInterrupt => {
-                Some((detection, None))
-            }
-            BlockDetectionResult::No => None,
-        }
-    }
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)>;
 
-    /// Parse and emit this block type to the builder.
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize;
-
-    /// Prepared parse hook.
-    ///
-    /// Default implementation ignores payload and calls `parse()`.
     fn parse_prepared(
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
-        _payload: Option<&dyn Any>,
-    ) -> usize {
-        self.parse(ctx, builder, lines, line_pos)
-    }
+        payload: Option<&dyn Any>,
+    ) -> usize;
 
     /// Name of this block parser (for debugging/logging)
     fn name(&self) -> &'static str;
@@ -198,31 +181,32 @@ pub(crate) trait BlockParser {
 pub(crate) struct HorizontalRuleParser;
 
 impl BlockParser for HorizontalRuleParser {
-    fn can_parse(
+    fn detect_prepared(
         &self,
         ctx: &BlockContext,
         _lines: &[&str],
         _line_pos: usize,
-    ) -> BlockDetectionResult {
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         // Must have blank line before
         if !ctx.has_blank_before {
-            return BlockDetectionResult::No;
+            return None;
         }
 
         // Check if this looks like a horizontal rule
         if try_parse_horizontal_rule(ctx.content).is_some() {
-            BlockDetectionResult::Yes
+            Some((BlockDetectionResult::Yes, None))
         } else {
-            BlockDetectionResult::No
+            None
         }
     }
 
-    fn parse(
+    fn parse_prepared(
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         line_pos: usize,
+        _payload: Option<&dyn Any>,
     ) -> usize {
         // Use ctx.content (blockquote markers already stripped)
         // But preserve newline from original line
@@ -246,17 +230,6 @@ impl BlockParser for HorizontalRuleParser {
 pub(crate) struct AtxHeadingParser;
 
 impl BlockParser for AtxHeadingParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -269,16 +242,6 @@ impl BlockParser for AtxHeadingParser {
 
         let level = try_parse_atx_heading(ctx.content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(level))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -307,17 +270,6 @@ impl BlockParser for AtxHeadingParser {
 pub(crate) struct PandocTitleBlockParser;
 
 impl BlockParser for PandocTitleBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -335,16 +287,6 @@ impl BlockParser for PandocTitleBlockParser {
         }
 
         Some((BlockDetectionResult::Yes, None))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -369,17 +311,6 @@ impl BlockParser for PandocTitleBlockParser {
 pub(crate) struct YamlMetadataParser;
 
 impl BlockParser for YamlMetadataParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -415,16 +346,6 @@ impl BlockParser for YamlMetadataParser {
         ))
     }
 
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
-    }
-
     fn parse_prepared(
         &self,
         ctx: &BlockContext,
@@ -453,17 +374,6 @@ impl BlockParser for YamlMetadataParser {
 pub(crate) struct FigureParser;
 
 impl BlockParser for FigureParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -476,6 +386,7 @@ impl BlockParser for FigureParser {
         }
 
         let trimmed = ctx.content.trim();
+
         // Must start with ![
         if !trimmed.starts_with("![") {
             return None;
@@ -489,16 +400,6 @@ impl BlockParser for FigureParser {
         }
 
         Some((BlockDetectionResult::Yes, Some(Box::new(len))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -526,20 +427,326 @@ impl BlockParser for FigureParser {
 /// Reference definition parser ([label]: url "title")
 pub(crate) struct ReferenceDefinitionParser;
 
-impl BlockParser for ReferenceDefinitionParser {
+#[derive(Debug, Clone)]
+pub(crate) struct FootnoteDefinitionPrepared {
+    pub content_start: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct BlockQuotePrepared {
+    pub depth: usize,
+    pub marker_info: Vec<crate::parser::utils::marker_utils::BlockQuoteMarkerInfo>,
+    #[allow(dead_code)]
+    pub inner_content: String,
+    pub can_start: bool,
+    pub can_nest: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ListPrepared {
+    pub marker: ListMarker,
+    pub marker_len: usize,
+    pub spaces_after: usize,
+    pub indent_cols: usize,
+    pub indent_bytes: usize,
+    pub nested_marker: Option<char>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum DefinitionPrepared {
+    Term {
+        blank_count: usize,
+    },
+    Definition {
+        marker_char: char,
+        indent: usize,
+        spaces_after: usize,
+        has_content: bool,
+    },
+}
+
+/// List marker parser
+pub(crate) struct ListParser;
+
+/// Definition list parser (term lines and definition markers)
+pub(crate) struct DefinitionListParser;
+
+/// Blockquote parser (detection only; core handles emission)
+pub(crate) struct BlockQuoteParser;
+
+impl BlockParser for ListParser {
     fn effect(&self) -> BlockEffect {
-        BlockEffect::None
+        BlockEffect::OpenList
     }
 
-    fn can_parse(
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        let (marker, marker_len, spaces_after) = try_parse_list_marker(ctx.content, ctx.config)?;
+        if spaces_after == 0 {
+            return None;
+        }
+        if (ctx.has_blank_before || ctx.at_document_start)
+            && try_parse_horizontal_rule(ctx.content).is_some()
+        {
+            return None;
+        }
+        let (indent_cols, indent_bytes) =
+            super::utils::container_stack::leading_indent(ctx.content);
+
+        if indent_cols >= 4 && !ctx.in_list {
+            return None;
+        }
+
+        let nested_marker = is_content_nested_bullet_marker(ctx.content, marker_len, spaces_after);
+        let detection = if ctx.has_blank_before || ctx.at_document_start {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::YesCanInterrupt
+        };
+
+        Some((
+            detection,
+            Some(Box::new(ListPrepared {
+                marker,
+                marker_len,
+                spaces_after,
+                indent_cols,
+                indent_bytes,
+                nested_marker,
+            })),
+        ))
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        _builder: &mut GreenNodeBuilder<'static>,
+        _lines: &[&str],
+        _line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        let prepared = payload.and_then(|p| p.downcast_ref::<ListPrepared>());
+        if prepared.is_none() {
+            return 1;
+        }
+
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "list"
+    }
+}
+
+impl BlockParser for BlockQuoteParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenBlockQuote
+    }
+
+    fn detect_prepared(
         &self,
         ctx: &BlockContext,
         lines: &[&str],
         line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if ctx.blockquote_depth > 0 {
+            return None;
+        }
+
+        let line = lines.get(line_pos)?;
+        let (depth, inner_content) = count_blockquote_markers(line);
+        if depth == 0 {
+            return None;
+        }
+
+        let marker_info = parse_blockquote_marker_info(line);
+        let at_document_start = ctx.at_document_start;
+        let can_start = can_start_blockquote(line_pos, lines);
+
+        let prev_line = lines.get(line_pos.wrapping_sub(1)).unwrap_or(&"");
+        let prev_line_blank = prev_line.trim().is_empty();
+        let (prev_depth, prev_inner) = count_blockquote_markers(prev_line);
+        let prev_line_is_quoted_blank = prev_depth > 0 && prev_inner.trim().is_empty();
+
+        let can_nest =
+            depth <= 1 || at_document_start || prev_line_blank || prev_line_is_quoted_blank;
+
+        let has_blank_before = ctx.has_blank_before;
+        let detection = if has_blank_before || at_document_start {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::YesCanInterrupt
+        };
+
+        Some((
+            detection,
+            Some(Box::new(BlockQuotePrepared {
+                depth,
+                marker_info,
+                inner_content: inner_content.to_string(),
+                can_start,
+                can_nest,
+            })),
+        ))
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        _lines: &[&str],
+        _line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let prepared = payload.and_then(|p| p.downcast_ref::<BlockQuotePrepared>());
+        let Some(prepared) = prepared else {
+            return 0;
+        };
+
+        let marker_info = &prepared.marker_info;
+
+        for level in 0..prepared.depth {
+            builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+            if let Some(info) = marker_info.get(level) {
+                emit_one_blockquote_marker(builder, info.leading_spaces, info.has_trailing_space);
+            }
+        }
+
+        0
+    }
+
+    fn name(&self) -> &'static str {
+        "blockquote"
+    }
+}
+
+impl BlockParser for DefinitionListParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenDefinitionList
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if let Some((marker_char, indent, spaces_after)) = try_parse_definition_marker(ctx.content)
+        {
+            let has_content = !ctx.content[indent + 1 + spaces_after..].trim().is_empty();
+            return Some((
+                BlockDetectionResult::YesCanInterrupt,
+                Some(Box::new(DefinitionPrepared::Definition {
+                    marker_char,
+                    indent,
+                    spaces_after,
+                    has_content,
+                })),
+            ));
+        }
+
+        if let Some(blank_count) = next_line_is_definition_marker(lines, line_pos)
+            && !ctx.content.trim().is_empty()
+        {
+            return Some((
+                BlockDetectionResult::YesCanInterrupt,
+                Some(Box::new(DefinitionPrepared::Term { blank_count })),
+            ));
+        }
+
+        None
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        _builder: &mut GreenNodeBuilder<'static>,
+        _lines: &[&str],
+        _line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        let prepared = payload.and_then(|p| p.downcast_ref::<DefinitionPrepared>());
+        if prepared.is_none() {
+            return 1;
+        }
+
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "definition_list"
+    }
+}
+
+/// Footnote definition parser ([^id]: content)
+pub(crate) struct FootnoteDefinitionParser;
+
+impl BlockParser for FootnoteDefinitionParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenFootnoteDefinition
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.footnotes {
+            return None;
+        }
+
+        let (_id, content_start) = try_parse_footnote_marker(ctx.content)?;
+        Some((
+            BlockDetectionResult::YesCanInterrupt,
+            Some(Box::new(FootnoteDefinitionPrepared { content_start })),
+        ))
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        _lines: &[&str],
+        _line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let prepared = payload.and_then(|p| p.downcast_ref::<FootnoteDefinitionPrepared>());
+        let content_start = prepared
+            .map(|p| p.content_start)
+            .or_else(|| try_parse_footnote_marker(ctx.content).map(|(_, pos)| pos));
+
+        let Some(content_start) = content_start else {
+            return 1;
+        };
+
+        if let Some(indent_str) = ctx.indent_to_emit {
+            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
+
+        builder.start_node(SyntaxKind::FOOTNOTE_DEFINITION.into());
+        let marker_text = &ctx.content[..content_start];
+        builder.token(SyntaxKind::FOOTNOTE_REFERENCE.into(), marker_text);
+
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "footnote_definition"
+    }
+}
+
+impl BlockParser for ReferenceDefinitionParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::None
     }
 
     fn detect_prepared(
@@ -551,16 +758,6 @@ impl BlockParser for ReferenceDefinitionParser {
         // Parse once and cache for emission.
         let parsed = try_parse_reference_definition(ctx.content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(parsed))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -624,17 +821,6 @@ struct TablePrepared {
 impl BlockParser for TableParser {
     fn effect(&self) -> BlockEffect {
         BlockEffect::None
-    }
-
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
     }
 
     fn detect_prepared(
@@ -769,16 +955,6 @@ impl BlockParser for TableParser {
         None
     }
 
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
-    }
-
     fn parse_prepared(
         &self,
         ctx: &BlockContext,
@@ -909,17 +1085,6 @@ fn emit_reference_definition_content(builder: &mut GreenNodeBuilder<'static>, te
 pub(crate) struct FencedCodeBlockParser;
 
 impl BlockParser for FencedCodeBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, _lines, _line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -970,16 +1135,6 @@ impl BlockParser for FencedCodeBlockParser {
         }
     }
 
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
-    }
-
     fn parse_prepared(
         &self,
         ctx: &BlockContext,
@@ -993,7 +1148,6 @@ impl BlockParser for FencedCodeBlockParser {
         let fence = if let Some(fence) = payload.and_then(|p| p.downcast_ref::<FenceInfo>()) {
             fence.clone()
         } else {
-            // Backward-compat: if called via legacy `parse()`, recompute.
             let content_to_check = if list_indent_stripped > 0 && !ctx.content.is_empty() {
                 let idx = byte_index_at_column(ctx.content, list_indent_stripped);
                 &ctx.content[idx..]
@@ -1030,17 +1184,6 @@ impl BlockParser for FencedCodeBlockParser {
 pub(crate) struct HtmlBlockParser;
 
 impl BlockParser for HtmlBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1062,16 +1205,6 @@ impl BlockParser for HtmlBlockParser {
         };
 
         Some((detection, Some(Box::new(block_type))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1104,17 +1237,6 @@ impl BlockParser for HtmlBlockParser {
 pub(crate) struct LatexEnvironmentParser;
 
 impl BlockParser for LatexEnvironmentParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1135,16 +1257,6 @@ impl BlockParser for LatexEnvironmentParser {
         };
 
         Some((detection, Some(Box::new(env_info))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1178,17 +1290,6 @@ impl BlockParser for LatexEnvironmentParser {
 pub(crate) struct LineBlockParser;
 
 impl BlockParser for LineBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, lines, line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1209,16 +1310,6 @@ impl BlockParser for LineBlockParser {
         };
 
         Some((detection, None))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1249,17 +1340,6 @@ impl BlockParser for FencedDivOpenParser {
         BlockEffect::OpenFencedDiv
     }
 
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, _lines, _line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1276,16 +1356,6 @@ impl BlockParser for FencedDivOpenParser {
 
         let div_fence = try_parse_div_fence_open(ctx.content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(div_fence))))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1404,17 +1474,6 @@ impl BlockParser for FencedDivCloseParser {
         BlockEffect::CloseFencedDiv
     }
 
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, _lines, _line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1434,16 +1493,6 @@ impl BlockParser for FencedDivCloseParser {
         }
 
         Some((BlockDetectionResult::YesCanInterrupt, None))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1490,17 +1539,6 @@ impl BlockParser for FencedDivCloseParser {
 pub(crate) struct IndentedCodeBlockParser;
 
 impl BlockParser for IndentedCodeBlockParser {
-    fn can_parse(
-        &self,
-        ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
-    ) -> BlockDetectionResult {
-        self.detect_prepared(ctx, _lines, _line_pos)
-            .map(|(d, _)| d)
-            .unwrap_or(BlockDetectionResult::No)
-    }
-
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
@@ -1522,16 +1560,6 @@ impl BlockParser for IndentedCodeBlockParser {
         }
 
         Some((BlockDetectionResult::Yes, None))
-    }
-
-    fn parse(
-        &self,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        self.parse_prepared(ctx, builder, lines, line_pos, None)
     }
 
     fn parse_prepared(
@@ -1564,48 +1592,44 @@ impl BlockParser for IndentedCodeBlockParser {
 pub(crate) struct SetextHeadingParser;
 
 impl BlockParser for SetextHeadingParser {
-    fn can_parse(
+    fn detect_prepared(
         &self,
         ctx: &BlockContext,
         _lines: &[&str],
         _line_pos: usize,
-    ) -> BlockDetectionResult {
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         // Setext headings require blank line before (unless at document start)
         if !ctx.has_blank_before && !ctx.at_document_start {
-            return BlockDetectionResult::No;
+            return None;
         }
 
         // Need next line for lookahead
-        let next_line = match ctx.next_line {
-            Some(line) => line,
-            None => return BlockDetectionResult::No,
-        };
+        let next_line = ctx.next_line?;
 
         // Create lines array for detection function (avoid allocation)
         let lines = [ctx.content, next_line];
 
         // Try to detect setext heading
         if try_parse_setext_heading(&lines, 0).is_some() {
-            // Setext headings need blank line before (normal case)
-            BlockDetectionResult::Yes
+            Some((BlockDetectionResult::Yes, None))
         } else {
-            BlockDetectionResult::No
+            None
         }
     }
 
-    fn parse(
+    fn parse_prepared(
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &[&str],
         pos: usize,
+        _payload: Option<&dyn Any>,
     ) -> usize {
         // Get text line and underline line
         let text_line = lines[pos];
         let underline_line = lines[pos + 1];
 
         // Determine level from underline character (no need to call try_parse again)
-        // can_parse() already validated this is a valid setext heading
         let underline_char = underline_line.trim().chars().next().unwrap_or('=');
         let level = if underline_char == '=' { 1 } else { 2 };
 
@@ -1647,7 +1671,7 @@ impl BlockParserRegistry {
     /// 4. bulletList
     /// 5. divHtml
     /// 6. divFenced
-    /// 7. header ← ATX headings
+    /// 7. header ← ATX and Setext headers
     /// 8. lhsCodeBlock
     /// 9. htmlBlock
     /// 10. table
@@ -1672,6 +1696,8 @@ impl BlockParserRegistry {
             Box::new(FencedCodeBlockParser),
             // (3) YAML metadata - before headers and hrules!
             Box::new(YamlMetadataParser),
+            // (4) Lists
+            Box::new(ListParser),
             // (6) Fenced divs ::: (open/close)
             Box::new(FencedDivCloseParser),
             Box::new(FencedDivOpenParser),
@@ -1682,57 +1708,29 @@ impl BlockParserRegistry {
             Box::new(AtxHeadingParser),
             // (9) HTML blocks
             Box::new(HtmlBlockParser),
-            // (12) LaTeX environment blocks
-            Box::new(LatexEnvironmentParser),
             // (10) Tables
             Box::new(TableParser),
-            // (13) Line blocks
-            Box::new(LineBlockParser),
             // (11) Indented code blocks (AFTER fenced!)
             Box::new(IndentedCodeBlockParser),
+            // (12) LaTeX environment blocks
+            Box::new(LatexEnvironmentParser),
+            // (13) Line blocks
+            Box::new(LineBlockParser),
+            // (14) Block quotes (detection-only for now)
+            Box::new(BlockQuoteParser),
             // (15) Horizontal rules - AFTER headings per Pandoc
             Box::new(HorizontalRuleParser),
             // Figures (standalone images) - Pandoc doesn't have these
             Box::new(FigureParser),
+            // (17) Definition lists
+            Box::new(DefinitionListParser),
+            // (18) Footnote definitions (noteBlock)
+            Box::new(FootnoteDefinitionParser),
             // (19) Reference definitions
             Box::new(ReferenceDefinitionParser),
-            // TODO: Migrate remaining blocks in Pandoc order:
-            // - (4-6) Lists and divs (bulletList, divHtml)
-            // - (16) Ordered lists
-            // - (17) Definition lists
-            // - (18) Footnote definitions (noteBlock) (requires container semantics)
         ];
 
         Self { parsers }
-    }
-
-    /// Try to parse a block using the registered parsers.
-    ///
-    /// This method implements the two-phase parsing:
-    /// 1. Detection: Check if any parser can handle this content
-    /// 2. Caller prepares (closes paragraphs, flushes buffers)
-    /// 3. Parser emits the block
-    ///
-    /// Returns (parser_index, detection_result) if a parser can handle this,
-    /// or None if no parser matched.
-    #[allow(dead_code)]
-    pub fn detect(
-        &self,
-        ctx: &BlockContext,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> Option<(usize, BlockDetectionResult)> {
-        for (i, parser) in self.parsers.iter().enumerate() {
-            let result = parser.can_parse(ctx, lines, line_pos);
-            match result {
-                BlockDetectionResult::Yes | BlockDetectionResult::YesCanInterrupt => {
-                    log::debug!("Block detected by: {}", parser.name());
-                    return Some((i, result));
-                }
-                BlockDetectionResult::No => continue,
-            }
-        }
-        None
     }
 
     /// Like `detect()`, but allows parsers to return cached payload for emission.
@@ -1754,24 +1752,6 @@ impl BlockParserRegistry {
             }
         }
         None
-    }
-
-    /// Parse a block using the specified parser (by index from detect()).
-    ///
-    /// Should only be called after detect() returns Some and after
-    /// caller has prepared for the block element.
-    #[allow(dead_code)]
-    pub fn parse(
-        &self,
-        parser_index: usize,
-        ctx: &BlockContext,
-        builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
-    ) -> usize {
-        let parser = &self.parsers[parser_index];
-        log::debug!("Block parsed by: {}", parser.name());
-        parser.parse(ctx, builder, lines, line_pos)
     }
 
     pub fn parse_prepared(

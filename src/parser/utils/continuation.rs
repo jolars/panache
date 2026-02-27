@@ -40,7 +40,9 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
             blockquote_depth: 0,
             config: self.config,
             content_indent: 0,
+            indent_to_emit: None,
             list_indent_info: None,
+            in_list: false,
             next_line: None,
         };
 
@@ -195,8 +197,22 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         }
 
         // If it's a block element marker, don't continue as plain.
-        if definition_lists::try_parse_definition_marker(stripped_content).is_some() {
-            return false;
+        if definition_lists::try_parse_definition_marker(stripped_content).is_some()
+            && leading_indent(raw_content).0 <= 3
+            && !stripped_content.starts_with(':')
+            && stripped_content.contains(':')
+        {
+            let is_next_definition = self
+                .block_registry
+                .detect_prepared(block_ctx, lines, pos)
+                .map(|match_result| {
+                    match_result.effect
+                        == crate::parser::block_dispatcher::BlockEffect::OpenDefinitionList
+                })
+                .unwrap_or(false);
+            if is_next_definition {
+                return false;
+            }
         }
         if lists::try_parse_list_marker(stripped_content, self.config).is_some() {
             return false;
@@ -215,8 +231,28 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
             return false;
         }
 
-        self.block_registry
-            .detect_prepared(block_ctx, lines, pos)
-            .is_none()
+        if let Some(match_result) = self.block_registry.detect_prepared(block_ctx, lines, pos) {
+            if match_result.effect
+                == crate::parser::block_dispatcher::BlockEffect::OpenDefinitionList
+                && match_result
+                    .payload
+                    .as_ref()
+                    .and_then(|payload| {
+                        payload
+                            .downcast_ref::<crate::parser::block_dispatcher::DefinitionPrepared>()
+                    })
+                    .is_some_and(|prepared| {
+                        matches!(
+                            prepared,
+                            crate::parser::block_dispatcher::DefinitionPrepared::Term { .. }
+                        )
+                    })
+            {
+                return true;
+            }
+            return false;
+        }
+
+        true
     }
 }

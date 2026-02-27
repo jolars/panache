@@ -15,7 +15,6 @@ pub fn parse_blocks_quarto(input: &str) -> SyntaxNode {
     Parser::new(input, &config).parse()
 }
 
-#[allow(dead_code)]
 pub fn parse_blocks_rmarkdown(input: &str) -> SyntaxNode {
     let config = Config {
         flavor: Flavor::RMarkdown,

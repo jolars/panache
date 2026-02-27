@@ -28,7 +28,6 @@ pub(crate) enum Container {
     Definition {
         content_col: usize,
         plain_open: bool,
-        #[allow(dead_code)] // Will be used in Subtask 4
         plain_buffer: TextBuffer, // Buffer for accumulating PLAIN content
     },
     Paragraph {

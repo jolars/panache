@@ -15,8 +15,7 @@ is the definitive reference for parser implementation.
 - **Language**: Rust 2024 edition, stable toolchain
 - **Architecture**: Binary crate + WASM workspace for web playground
 - **Status**: Early development - breaking changes expected
-- **Tests**: 1,200+ total (846+ unit + 169 integration + others), \~1 second
-  runtime
+- **Tests**: 1,200+ total (846+ unit + 169 integration + others),
 - **Parser**: Integrated inline parsing (single-pass, Pandoc-style) - only mode
 
 ### Principles
@@ -49,6 +48,9 @@ cat document.qmd | cargo run -- format
 
 # Parse (show CST for debugging)
 printf "# Test" | cargo run -- parse
+
+# Targeted golden case
+cargo test --test golden_cases <case_name>
 
 # Lint
 cargo run -- lint document.qmd
@@ -106,7 +108,7 @@ RUST_LOG=info ./target/release/panache format document.qmd
 1. **Parser** (`src/parser/core.rs`):
    - Main parsing implementation in `Parser` struct
    - Parses block structures (headings, code blocks, paragraphs, tables, lists,
-     etc.)
+     etc.) in a single forward pass
    - Emits inline structure during block parsing (single-pass, Pandoc-style)
    - Each block type isolated in `blocks/` directory
    - Config-aware (respects flavor and extension flags)
@@ -117,14 +119,16 @@ RUST_LOG=info ./target/release/panache format document.qmd
    - Recursive for nested elements (e.g., emphasis in links)
    - Available in `inlines/` directory for specific constructs
 
-3. **Post-Processing**:
-   - `list_postprocessor.rs`: Wraps list item content in Plain/PARAGRAPH blocks
+3. **Block Dispatcher** (`src/parser/block_dispatcher.rs`):
+   - Centralized block detection via `detect_prepared()` and emission via
+     `parse_prepared()` (legacy `can_parse/parse` removed)
+   - Carries prepared payloads (e.g., blockquote markers, list metadata) to avoid
+     re-parsing during emission
+   - Parser core still owns continuation rules, blank-line handling, and list
+     item buffering
 
 **Key invariant**: Parser preserves ALL input bytes in CST, including structural
 markers. Formatter applies formatting rules, not the parser.
-
-**Architecture Note**: See `PARSER_REFACTORING.md` for the complete single-pass
-migration history (Phases 1-8 complete).
 
 ### Formatter Architecture
 

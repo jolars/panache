@@ -183,6 +183,15 @@ impl FootnoteDefinition {
             }
         }
 
+        // Check for list nodes in the CST (handles nested lists reliably).
+        if self
+            .0
+            .descendants()
+            .any(|node| node.kind() == SyntaxKind::LIST)
+        {
+            return false;
+        }
+
         true
     }
 }

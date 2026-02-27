@@ -13,13 +13,11 @@ use rowan::{GreenNodeBuilder, NodeOrToken};
 /// Designed for minimal allocation overhead - reuses the same buffer
 /// across multiple paragraph/plain blocks by clearing between uses.
 #[derive(Debug, Default, Clone)]
-#[allow(dead_code)] // Will be used in Subtask 3
 pub(crate) struct TextBuffer {
     /// Accumulated lines (stored WITH trailing newlines if they had them in source).
     lines: Vec<String>,
 }
 
-#[allow(dead_code)] // Will be used in Subtask 3
 impl TextBuffer {
     /// Create a new empty text buffer.
     pub(crate) fn new() -> Self {
@@ -50,16 +48,6 @@ impl TextBuffer {
     pub(crate) fn is_empty(&self) -> bool {
         self.lines.is_empty()
     }
-
-    /// Get number of lines in buffer.
-    pub(crate) fn len(&self) -> usize {
-        self.lines.len()
-    }
-
-    /// Get an iterator over the buffered lines.
-    pub(crate) fn lines(&self) -> impl Iterator<Item = &str> {
-        self.lines.iter().map(|s| s.as_str())
-    }
 }
 
 #[cfg(test)]
@@ -70,7 +58,7 @@ mod tests {
     fn test_new_buffer_is_empty() {
         let buffer = TextBuffer::new();
         assert!(buffer.is_empty());
-        assert_eq!(buffer.len(), 0);
+        assert!(buffer.is_empty());
         assert_eq!(buffer.get_accumulated_text(), "");
     }
 
@@ -79,7 +67,6 @@ mod tests {
         let mut buffer = TextBuffer::new();
         buffer.push_line("Hello, world!");
         assert!(!buffer.is_empty());
-        assert_eq!(buffer.len(), 1);
         assert_eq!(buffer.get_accumulated_text(), "Hello, world!");
     }
 
@@ -89,7 +76,6 @@ mod tests {
         buffer.push_line("Line 1\n");
         buffer.push_line("Line 2\n");
         buffer.push_line("Line 3");
-        assert_eq!(buffer.len(), 3);
         assert_eq!(buffer.get_accumulated_text(), "Line 1\nLine 2\nLine 3");
     }
 
@@ -98,11 +84,8 @@ mod tests {
         let mut buffer = TextBuffer::new();
         buffer.push_line("Line 1");
         buffer.push_line("Line 2");
-        assert_eq!(buffer.len(), 2);
-
         buffer.clear();
         assert!(buffer.is_empty());
-        assert_eq!(buffer.len(), 0);
         assert_eq!(buffer.get_accumulated_text(), "");
     }
 
@@ -134,7 +117,7 @@ mod tests {
         buffer.push_line("\n");
         buffer.push_line("Non-empty\n");
         buffer.push_line("");
-        assert_eq!(buffer.len(), 3);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.get_accumulated_text(), "\nNon-empty\n");
     }
 
@@ -387,12 +370,6 @@ impl ParagraphBuffer {
         emitter.emit_markers_at_current(builder);
     }
 
-    /// Clear the buffer for reuse.
-    #[allow(dead_code)] // May be used for buffer reuse optimization
-    pub(crate) fn clear(&mut self) {
-        self.segments.clear();
-    }
-
     /// Check if buffer is empty.
     pub(crate) fn is_empty(&self) -> bool {
         self.segments.is_empty()
@@ -465,16 +442,6 @@ mod paragraph_buffer_tests {
         assert_eq!(positions.len(), 2);
         assert_eq!(positions[0], (2, 0, true)); // first marker at byte 2
         assert_eq!(positions[1], (4, 1, false)); // second marker at byte 4
-    }
-
-    #[test]
-    fn test_clear() {
-        let mut buffer = ParagraphBuffer::new();
-        buffer.push_text("Some text");
-        buffer.push_marker(0, true);
-        buffer.clear();
-        assert!(buffer.is_empty());
-        assert_eq!(buffer.get_text_for_parsing(), "");
     }
 
     #[test]
