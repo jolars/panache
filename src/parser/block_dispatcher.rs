@@ -1700,10 +1700,9 @@ impl BlockParserRegistry {
             Box::new(ReferenceDefinitionParser),
             // TODO: Migrate remaining blocks in Pandoc order:
             // - (4-6) Lists and divs (bulletList, divHtml)
-            // - (10) Tables (grid, multiline, pipe, simple) (migrated)
             // - (16) Ordered lists
             // - (17) Definition lists
-            // - (18) Footnote definitions (noteBlock)
+            // - (18) Footnote definitions (noteBlock) (requires container semantics)
         ];
 
         Self { parsers }

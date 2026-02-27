@@ -23,7 +23,6 @@ use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_m
 use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{is_content_nested_bullet_marker, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
-use reference_links::try_parse_footnote_marker;
 use text_buffer::TextBuffer;
 
 fn init_logger() {
@@ -985,13 +984,6 @@ impl<'a> Parser<'a> {
                 dispatcher_match
             };
 
-        // Avoid treating footnote definitions as dispatcher blocks (footnotes must win).
-        let dispatcher_match = if try_parse_footnote_marker(content).is_some() {
-            None
-        } else {
-            dispatcher_match
-        };
-
         if has_blank_before {
             if let Some(block_match) = dispatcher_match.as_ref() {
                 let detection = block_match.detection;
@@ -1070,18 +1062,17 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // Check for footnote definition: [^id]: content
-        // Similar to list items - marker followed by content that can span multiple lines
-        // Must check BEFORE reference definitions since both start with [
-        if let Some((id, content_start)) = try_parse_footnote_marker(content) {
-            // Footnotes have precedence over dispatcher-based reference definitions.
-            // (Dispatcher match is evaluated above for performance; we handle footnotes here.)
-            log::debug!("Parsed footnote definition at line {}: [^{}]", self.pos, id);
+        // Footnote definition: [^id]: content
+        // Must be handled here (container semantics) so the footnote body can span
+        // multiple indented lines and nested blocks.
+        if self.config.extensions.footnotes
+            && let Some((_id, content_start)) = reference_links::try_parse_footnote_marker(content)
+        {
+            log::debug!("Parsed footnote definition at line {}", self.pos);
 
-            // Close paragraph if one is open
-            self.close_paragraph_if_open();
+            self.prepare_for_block_element();
 
-            // Close previous footnote if one is open
+            // Close previous footnote (if any)
             while matches!(
                 self.containers.last(),
                 Some(Container::FootnoteDefinition { .. })
@@ -1089,23 +1080,25 @@ impl<'a> Parser<'a> {
                 self.close_containers_to(self.containers.depth() - 1);
             }
 
-            // Start the footnote definition container
+            if let Some(indent_str) = indent_to_emit {
+                self.builder
+                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
+            }
+
             self.builder
                 .start_node(SyntaxKind::FOOTNOTE_DEFINITION.into());
 
-            // Emit the marker
+            // Emit the marker (including colon + any following spaces)
             let marker_text = &content[..content_start];
             self.builder
                 .token(SyntaxKind::FOOTNOTE_REFERENCE.into(), marker_text);
 
-            // Calculate content column (minimum 4 spaces for continuation)
-            // The first line can start right after the marker, but subsequent lines
-            // need at least 4 spaces of indentation
+            // Continuation lines must be indented at least 4 spaces.
             let content_col = 4;
             self.containers
                 .push(Container::FootnoteDefinition { content_col });
 
-            // Parse the first line content (if any)
+            // Parse the first line content (if any) as paragraph content inside the footnote.
             let first_line_content = &content[content_start..];
             if !first_line_content.trim().is_empty() {
                 paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
