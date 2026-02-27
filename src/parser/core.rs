@@ -18,9 +18,9 @@ use super::utils::text_buffer;
 
 use super::utils::continuation::ContinuationPolicy;
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
-use definition_lists::{emit_definition_marker, emit_term, try_parse_definition_marker};
+use definition_lists::{emit_definition_marker, emit_term};
 use line_blocks::{parse_line_block, try_parse_line_block_start};
-use lists::{is_content_nested_bullet_marker, try_parse_list_marker};
+use lists::{is_content_nested_bullet_marker, start_nested_list, try_parse_list_marker};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use text_buffer::TextBuffer;
 
@@ -308,6 +308,336 @@ impl<'a> Parser<'a> {
                     first_line_content,
                     self.config,
                 );
+            }
+        }
+    }
+
+    fn handle_list_open_effect(
+        &mut self,
+        block_match: &super::block_dispatcher::PreparedBlockMatch,
+        content: &str,
+        indent_to_emit: Option<&str>,
+    ) {
+        use super::block_dispatcher::ListPrepared;
+
+        let prepared = block_match
+            .payload
+            .as_ref()
+            .and_then(|p| p.downcast_ref::<ListPrepared>());
+        let Some(prepared) = prepared else {
+            return;
+        };
+
+        if prepared.indent_cols >= 4 && !lists::in_list(&self.containers) {
+            paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+            paragraphs::append_paragraph_line(
+                &mut self.containers,
+                &mut self.builder,
+                content,
+                self.config,
+            );
+            return;
+        }
+
+        if self.is_paragraph_open() {
+            if !block_match.detection.eq(&BlockDetectionResult::Yes) {
+                paragraphs::append_paragraph_line(
+                    &mut self.containers,
+                    &mut self.builder,
+                    content,
+                    self.config,
+                );
+                return;
+            }
+            self.close_containers_to(self.containers.depth() - 1);
+        }
+
+        if matches!(
+            self.containers.last(),
+            Some(Container::Definition {
+                plain_open: true,
+                ..
+            })
+        ) {
+            self.emit_buffered_plain_if_needed();
+        }
+
+        let matched_level = lists::find_matching_list_level(
+            &self.containers,
+            &prepared.marker,
+            prepared.indent_cols,
+        );
+        let current_content_col = paragraphs::current_content_col(&self.containers);
+
+        if current_content_col > 0 && prepared.indent_cols >= current_content_col {
+            if let Some(level) = matched_level
+                && let Some(Container::List {
+                    base_indent_cols, ..
+                }) = self.containers.stack.get(level)
+                && prepared.indent_cols == *base_indent_cols
+            {
+                let num_parent_lists = self.containers.stack[..level]
+                    .iter()
+                    .filter(|c| matches!(c, Container::List { .. }))
+                    .count();
+
+                if num_parent_lists > 0 {
+                    self.close_containers_to(level + 1);
+
+                    if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                        self.close_containers_to(self.containers.depth() - 1);
+                    }
+                    if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                        self.close_containers_to(self.containers.depth() - 1);
+                    }
+
+                    if let Some(indent_str) = indent_to_emit {
+                        self.builder
+                            .token(SyntaxKind::WHITESPACE.into(), indent_str);
+                    }
+
+                    if let Some(nested_marker) = prepared.nested_marker {
+                        lists::add_list_item_with_nested_empty_list(
+                            &mut self.containers,
+                            &mut self.builder,
+                            content,
+                            prepared.marker_len,
+                            prepared.spaces_after,
+                            prepared.indent_cols,
+                            prepared.indent_bytes,
+                            nested_marker,
+                        );
+                    } else {
+                        lists::add_list_item(
+                            &mut self.containers,
+                            &mut self.builder,
+                            content,
+                            prepared.marker_len,
+                            prepared.spaces_after,
+                            prepared.indent_cols,
+                            prepared.indent_bytes,
+                        );
+                    }
+                    return;
+                }
+            }
+
+            self.emit_list_item_buffer_if_needed();
+
+            start_nested_list(
+                &mut self.containers,
+                &mut self.builder,
+                content,
+                &prepared.marker,
+                prepared.marker_len,
+                prepared.spaces_after,
+                prepared.indent_cols,
+                prepared.indent_bytes,
+                indent_to_emit,
+            );
+            return;
+        }
+
+        if let Some(level) = matched_level {
+            self.close_containers_to(level + 1);
+
+            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                self.close_containers_to(self.containers.depth() - 1);
+            }
+            if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                self.close_containers_to(self.containers.depth() - 1);
+            }
+
+            if let Some(indent_str) = indent_to_emit {
+                self.builder
+                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
+            }
+
+            if let Some(nested_marker) = prepared.nested_marker {
+                lists::add_list_item_with_nested_empty_list(
+                    &mut self.containers,
+                    &mut self.builder,
+                    content,
+                    prepared.marker_len,
+                    prepared.spaces_after,
+                    prepared.indent_cols,
+                    prepared.indent_bytes,
+                    nested_marker,
+                );
+            } else {
+                lists::add_list_item(
+                    &mut self.containers,
+                    &mut self.builder,
+                    content,
+                    prepared.marker_len,
+                    prepared.spaces_after,
+                    prepared.indent_cols,
+                    prepared.indent_bytes,
+                );
+            }
+            return;
+        }
+
+        if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+            self.close_containers_to(self.containers.depth() - 1);
+        }
+        while matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+            self.close_containers_to(self.containers.depth() - 1);
+        }
+        while matches!(self.containers.last(), Some(Container::List { .. })) {
+            self.close_containers_to(self.containers.depth() - 1);
+        }
+
+        self.builder.start_node(SyntaxKind::LIST.into());
+        if let Some(indent_str) = indent_to_emit {
+            self.builder
+                .token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
+        self.containers.push(Container::List {
+            marker: prepared.marker.clone(),
+            base_indent_cols: prepared.indent_cols,
+            has_blank_between_items: false,
+        });
+
+        if let Some(nested_marker) = prepared.nested_marker {
+            lists::add_list_item_with_nested_empty_list(
+                &mut self.containers,
+                &mut self.builder,
+                content,
+                prepared.marker_len,
+                prepared.spaces_after,
+                prepared.indent_cols,
+                prepared.indent_bytes,
+                nested_marker,
+            );
+        } else {
+            lists::add_list_item(
+                &mut self.containers,
+                &mut self.builder,
+                content,
+                prepared.marker_len,
+                prepared.spaces_after,
+                prepared.indent_cols,
+                prepared.indent_bytes,
+            );
+        }
+    }
+
+    fn handle_definition_list_effect(
+        &mut self,
+        block_match: &super::block_dispatcher::PreparedBlockMatch,
+        content: &str,
+        indent_to_emit: Option<&str>,
+    ) {
+        use super::block_dispatcher::DefinitionPrepared;
+
+        let prepared = block_match
+            .payload
+            .as_ref()
+            .and_then(|p| p.downcast_ref::<DefinitionPrepared>());
+        let Some(prepared) = prepared else {
+            return;
+        };
+
+        match prepared {
+            DefinitionPrepared::Definition {
+                marker_char,
+                indent,
+                spaces_after,
+                has_content,
+            } => {
+                self.emit_buffered_plain_if_needed();
+
+                if matches!(self.containers.last(), Some(Container::Definition { .. })) {
+                    self.close_containers_to(self.containers.depth() - 1);
+                }
+
+                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                    self.close_containers_to(self.containers.depth() - 1);
+                }
+
+                if !definition_lists::in_definition_list(&self.containers) {
+                    self.builder.start_node(SyntaxKind::DEFINITION_LIST.into());
+                    self.containers.push(Container::DefinitionList {});
+                }
+
+                if !matches!(
+                    self.containers.last(),
+                    Some(Container::DefinitionItem { .. })
+                ) {
+                    self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
+                    self.containers.push(Container::DefinitionItem {});
+                }
+
+                self.builder.start_node(SyntaxKind::DEFINITION.into());
+
+                if let Some(indent_str) = indent_to_emit {
+                    self.builder
+                        .token(SyntaxKind::WHITESPACE.into(), indent_str);
+                }
+
+                emit_definition_marker(&mut self.builder, *marker_char, *indent);
+                if *spaces_after > 0 {
+                    self.builder
+                        .token(SyntaxKind::WHITESPACE.into(), &" ".repeat(*spaces_after));
+                }
+
+                let content_col = *indent + 1 + *spaces_after;
+                let after_marker_and_spaces = &content[content_col..];
+                let mut plain_buffer = TextBuffer::new();
+
+                if *has_content {
+                    let current_line = self.lines[self.pos];
+                    let (_, newline_str) = strip_newline(current_line);
+                    let line_with_newline = if !newline_str.is_empty() {
+                        format!("{}{}", after_marker_and_spaces.trim_end(), newline_str)
+                    } else {
+                        after_marker_and_spaces.trim_end().to_string()
+                    };
+                    plain_buffer.push_line(line_with_newline);
+                }
+
+                self.containers.push(Container::Definition {
+                    content_col,
+                    plain_open: *has_content,
+                    plain_buffer,
+                });
+            }
+            DefinitionPrepared::Term { blank_count } => {
+                self.emit_buffered_plain_if_needed();
+
+                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
+                    self.close_containers_to(self.containers.depth() - 1);
+                }
+
+                if !definition_lists::in_definition_list(&self.containers) {
+                    self.builder.start_node(SyntaxKind::DEFINITION_LIST.into());
+                    self.containers.push(Container::DefinitionList {});
+                }
+
+                while matches!(
+                    self.containers.last(),
+                    Some(Container::Definition { .. }) | Some(Container::DefinitionItem { .. })
+                ) {
+                    self.close_containers_to(self.containers.depth() - 1);
+                }
+
+                self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
+                self.containers.push(Container::DefinitionItem {});
+
+                emit_term(&mut self.builder, content, self.config);
+
+                for i in 0..*blank_count {
+                    let blank_pos = self.pos + 1 + i;
+                    if blank_pos < self.lines.len() {
+                        let blank_line = self.lines[blank_pos];
+                        self.builder.start_node(SyntaxKind::BLANK_LINE.into());
+                        self.builder
+                            .token(SyntaxKind::BLANK_LINE.into(), blank_line);
+                        self.builder.finish_node();
+                    }
+                }
+                self.pos += *blank_count;
             }
         }
     }
@@ -888,52 +1218,74 @@ impl<'a> Parser<'a> {
         // Continuation lines should be added to PLAIN, not treated as new blocks
         // BUT: Don't treat lines with block element markers as continuations
         if matches!(self.containers.last(), Some(Container::Definition { .. })) {
-            let policy = ContinuationPolicy::new(self.config, &self.block_registry);
+            let is_definition_marker =
+                definition_lists::try_parse_definition_marker(stripped_content).is_some()
+                    && !stripped_content.starts_with(':')
+                    && stripped_content.contains(':')
+                    && !stripped_content.trim().contains(' ')
+                    && !stripped_content.contains(':');
+            if content_indent == 0 && is_definition_marker {
+                // Definition markers at top-level should start a new definition.
+            } else {
+                let policy = ContinuationPolicy::new(self.config, &self.block_registry);
 
-            if policy.definition_plain_can_continue(
-                stripped_content,
-                content,
-                content_indent,
-                &BlockContext {
-                    content: stripped_content,
-                    has_blank_before: true,
-                    has_blank_before_strict: true,
-                    at_document_start: self.pos == 0 && self.current_blockquote_depth() == 0,
-                    in_fenced_div: self.in_fenced_div(),
-                    blockquote_depth: self.current_blockquote_depth(),
-                    config: self.config,
+                if policy.definition_plain_can_continue(
+                    stripped_content,
+                    content,
                     content_indent,
-                    indent_to_emit: None,
-                    list_indent_info: None,
-                    next_line: if self.pos + 1 < self.lines.len() {
-                        Some(self.lines[self.pos + 1])
-                    } else {
-                        None
+                    &BlockContext {
+                        content: stripped_content,
+                        has_blank_before: true,
+                        has_blank_before_strict: true,
+                        at_document_start: self.pos == 0 && self.current_blockquote_depth() == 0,
+                        in_fenced_div: self.in_fenced_div(),
+                        blockquote_depth: self.current_blockquote_depth(),
+                        config: self.config,
+                        content_indent,
+                        indent_to_emit: None,
+                        list_indent_info: None,
+                        in_list: lists::in_list(&self.containers),
+                        next_line: if self.pos + 1 < self.lines.len() {
+                            Some(self.lines[self.pos + 1])
+                        } else {
+                            None
+                        },
                     },
-                },
-                &self.lines,
-                self.pos,
-            ) {
-                let full_line = self.lines[self.pos];
-                let (text_without_newline, newline_str) = strip_newline(full_line);
-
-                if let Some(Container::Definition {
-                    plain_open,
-                    plain_buffer,
-                    ..
-                }) = self.containers.stack.last_mut()
-                {
-                    let line_with_newline = if !newline_str.is_empty() {
-                        format!("{}{}", text_without_newline, newline_str)
+                    &self.lines,
+                    self.pos,
+                ) {
+                    let content_line = stripped_content;
+                    let (text_without_newline, newline_str) = strip_newline(content_line);
+                    let (indent_cols, _) = leading_indent(self.lines[self.pos]);
+                    let indent_prefix = if content_indent > 0
+                        && indent_cols >= content_indent
+                        && !text_without_newline.trim().is_empty()
+                        && indent_to_emit.is_some()
+                    {
+                        indent_to_emit.unwrap_or("")
                     } else {
-                        text_without_newline.to_string()
+                        ""
                     };
-                    plain_buffer.push_line(line_with_newline);
-                    *plain_open = true;
-                }
+                    let content_line = format!("{}{}", indent_prefix, text_without_newline);
 
-                self.pos += 1;
-                return true;
+                    if let Some(Container::Definition {
+                        plain_open,
+                        plain_buffer,
+                        ..
+                    }) = self.containers.stack.last_mut()
+                    {
+                        let line_with_newline = if !newline_str.is_empty() {
+                            format!("{}{}", content_line, newline_str)
+                        } else {
+                            content_line
+                        };
+                        plain_buffer.push_line(line_with_newline);
+                        *plain_open = true;
+                    }
+
+                    self.pos += 1;
+                    return true;
+                }
             }
         }
 
@@ -977,6 +1329,7 @@ impl<'a> Parser<'a> {
             content_indent,
             indent_to_emit,
             list_indent_info,
+            in_list: lists::in_list(&self.containers),
             next_line,
         };
 
@@ -993,8 +1346,7 @@ impl<'a> Parser<'a> {
         // Check for heading (needs blank line before, or at start of container)
         let has_blank_before = self.pos == 0
             || self.lines[self.pos - 1].trim().is_empty()
-            || matches!(self.containers.last(), Some(Container::BlockQuote { .. }))
-            || matches!(self.containers.last(), Some(Container::List { .. }));
+            || matches!(self.containers.last(), Some(Container::BlockQuote { .. }));
 
         // For indented code blocks, we need a stricter condition - only actual blank lines count
         // Being at document start (pos == 0) is OK only if we're not inside a blockquote
@@ -1058,6 +1410,12 @@ impl<'a> Parser<'a> {
                     BlockEffect::OpenFootnoteDefinition => {
                         self.handle_footnote_open_effect(block_match, content);
                     }
+                    BlockEffect::OpenList => {
+                        self.handle_list_open_effect(block_match, content, indent_to_emit);
+                    }
+                    BlockEffect::OpenDefinitionList => {
+                        self.handle_definition_list_effect(block_match, content, indent_to_emit);
+                    }
                 }
 
                 self.pos += lines_consumed;
@@ -1068,6 +1426,22 @@ impl<'a> Parser<'a> {
             // explicitly allowed without blank lines (e.g. reference definitions).
             match block_match.detection {
                 BlockDetectionResult::YesCanInterrupt => {
+                    if matches!(block_match.effect, BlockEffect::OpenList)
+                        && self.is_paragraph_open()
+                        && !lists::in_list(&self.containers)
+                        && self.content_container_indent_to_strip() == 0
+                    {
+                        // Do not let lists interrupt a paragraph without a blank line.
+                        paragraphs::append_paragraph_line(
+                            &mut self.containers,
+                            &mut self.builder,
+                            line_to_append.unwrap_or(self.lines[self.pos]),
+                            self.config,
+                        );
+                        self.pos += 1;
+                        return true;
+                    }
+
                     self.emit_list_item_buffer_if_needed();
                     if self.is_paragraph_open() {
                         self.close_containers_to(self.containers.depth() - 1);
@@ -1099,373 +1473,17 @@ impl<'a> Parser<'a> {
                     BlockEffect::OpenFootnoteDefinition => {
                         self.handle_footnote_open_effect(block_match, content);
                     }
+                    BlockEffect::OpenList => {
+                        self.handle_list_open_effect(block_match, content, indent_to_emit);
+                    }
+                    BlockEffect::OpenDefinitionList => {
+                        self.handle_definition_list_effect(block_match, content, indent_to_emit);
+                    }
                 }
 
                 self.pos += lines_consumed;
                 return true;
             }
-        }
-
-        // List marker?
-        if let Some((marker, marker_len, spaces_after)) =
-            try_parse_list_marker(content, self.config)
-        {
-            let (indent_cols, indent_bytes) = leading_indent(content);
-            if indent_cols >= 4 && !lists::in_list(&self.containers) {
-                // Code block at top-level, treat as paragraph
-                paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
-                paragraphs::append_paragraph_line(
-                    &mut self.containers,
-                    &mut self.builder,
-                    content,
-                    self.config,
-                );
-                self.pos += 1;
-                return true;
-            }
-
-            // Lists can only interrupt paragraphs if there was a blank line before
-            // (Per Pandoc spec - lists need blank lines to start interrupting paragraphs)
-            if self.is_paragraph_open() {
-                if !has_blank_before {
-                    // List cannot interrupt paragraph without blank line - treat as paragraph content
-                    paragraphs::append_paragraph_line(
-                        &mut self.containers,
-                        &mut self.builder,
-                        line_to_append.unwrap_or(content),
-                        self.config,
-                    );
-                    self.pos += 1;
-                    return true;
-                }
-
-                // Blank line before - can interrupt paragraph
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-
-            // Close any open PLAIN node in a Definition before starting a list
-            // This ensures buffered PLAIN content is emitted before the list
-            if matches!(
-                self.containers.last(),
-                Some(Container::Definition {
-                    plain_open: true,
-                    ..
-                })
-            ) {
-                // Emit buffered PLAIN content but keep Definition open
-                self.emit_buffered_plain_if_needed();
-            }
-
-            // Check if this continues an existing list level
-            let matched_level =
-                lists::find_matching_list_level(&self.containers, &marker, indent_cols);
-            let current_content_col = paragraphs::current_content_col(&self.containers);
-
-            // Decision tree:
-            // 1. If indent < content_col: Must be continuing a parent list (close nested and continue)
-            // 2. If indent >= content_col:
-            //    a. If exactly matches a nested list's base_indent: Continue that nested list
-            //    b. Otherwise: Start new nested list
-
-            if current_content_col > 0 && indent_cols >= current_content_col {
-                // Potentially nested - but check if it EXACTLY matches an existing nested list first
-                if let Some(level) = matched_level
-                    && let Some(Container::List {
-                        base_indent_cols, ..
-                    }) = self.containers.stack.get(level)
-                    && indent_cols == *base_indent_cols
-                {
-                    // Exact match - this is a sibling item in the matched list
-                    let num_parent_lists = self.containers.stack[..level]
-                        .iter()
-                        .filter(|c| matches!(c, Container::List { .. }))
-                        .count();
-
-                    if num_parent_lists > 0 {
-                        // This matches a nested list - continue it
-                        // Close containers to the target level, emitting buffers properly
-                        self.close_containers_to(level + 1);
-
-                        // Close any open paragraph or list item at this level
-                        if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                            self.close_containers_to(self.containers.depth() - 1);
-                        }
-                        if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
-                            self.close_containers_to(self.containers.depth() - 1);
-                        }
-
-                        if let Some(indent_str) = indent_to_emit {
-                            self.builder
-                                .token(SyntaxKind::WHITESPACE.into(), indent_str);
-                        }
-
-                        // Check if content is a nested bullet marker
-                        if let Some(nested_marker) =
-                            is_content_nested_bullet_marker(content, marker_len, spaces_after)
-                        {
-                            lists::add_list_item_with_nested_empty_list(
-                                &mut self.containers,
-                                &mut self.builder,
-                                content,
-                                marker_len,
-                                spaces_after,
-                                indent_cols,
-                                indent_bytes,
-                                nested_marker,
-                            );
-                        } else {
-                            lists::add_list_item(
-                                &mut self.containers,
-                                &mut self.builder,
-                                content,
-                                marker_len,
-                                spaces_after,
-                                indent_cols,
-                                indent_bytes,
-                            );
-                        }
-                        self.pos += 1;
-                        return true;
-                    }
-                }
-
-                // No exact match - start new nested list.
-                // Flush buffered item text first so it stays before the nested LIST in source order.
-                self.emit_list_item_buffer_if_needed();
-
-                lists::start_nested_list(
-                    &mut self.containers,
-                    &mut self.builder,
-                    content,
-                    &marker,
-                    marker_len,
-                    spaces_after,
-                    indent_cols,
-                    indent_bytes,
-                    indent_to_emit,
-                );
-                self.pos += 1;
-                return true;
-            }
-
-            // indent < content_col: Continue parent list if matched
-            if let Some(level) = matched_level {
-                // Close containers to the target level, emitting buffers properly
-                self.close_containers_to(level + 1);
-
-                // Close any open paragraph or list item at this level
-                if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                    self.close_containers_to(self.containers.depth() - 1);
-                }
-                if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
-                    self.close_containers_to(self.containers.depth() - 1);
-                }
-
-                if let Some(indent_str) = indent_to_emit {
-                    self.builder
-                        .token(SyntaxKind::WHITESPACE.into(), indent_str);
-                }
-
-                // Check if content is a nested bullet marker
-                if let Some(nested_marker) =
-                    is_content_nested_bullet_marker(content, marker_len, spaces_after)
-                {
-                    lists::add_list_item_with_nested_empty_list(
-                        &mut self.containers,
-                        &mut self.builder,
-                        content,
-                        marker_len,
-                        spaces_after,
-                        indent_cols,
-                        indent_bytes,
-                        nested_marker,
-                    );
-                } else {
-                    lists::add_list_item(
-                        &mut self.containers,
-                        &mut self.builder,
-                        content,
-                        marker_len,
-                        spaces_after,
-                        indent_cols,
-                        indent_bytes,
-                    );
-                }
-                self.pos += 1;
-                return true;
-            }
-
-            // No match and not nested - start new top-level list.
-            // Close existing containers via Parser so buffers are emitted.
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-            while matches!(self.containers.last(), Some(Container::ListItem { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-            while matches!(self.containers.last(), Some(Container::List { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-
-            self.builder.start_node(SyntaxKind::LIST.into());
-            if let Some(indent_str) = indent_to_emit {
-                self.builder
-                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
-            }
-            self.containers.push(Container::List {
-                marker: marker.clone(),
-                base_indent_cols: indent_cols,
-                has_blank_between_items: false,
-            });
-
-            // Check if content is a nested bullet marker (e.g., "- *")
-            if let Some(nested_marker) =
-                is_content_nested_bullet_marker(content, marker_len, spaces_after)
-            {
-                lists::add_list_item_with_nested_empty_list(
-                    &mut self.containers,
-                    &mut self.builder,
-                    content,
-                    marker_len,
-                    spaces_after,
-                    indent_cols,
-                    indent_bytes,
-                    nested_marker,
-                );
-            } else {
-                lists::add_list_item(
-                    &mut self.containers,
-                    &mut self.builder,
-                    content,
-                    marker_len,
-                    spaces_after,
-                    indent_cols,
-                    indent_bytes,
-                );
-            }
-            self.pos += 1;
-            return true;
-        }
-
-        // Definition list marker?
-        if let Some((marker_char, indent, spaces_after)) = try_parse_definition_marker(content) {
-            // Close paragraph before starting definition
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-
-            // Start definition list if not in one
-            if !definition_lists::in_definition_list(&self.containers) {
-                self.builder.start_node(SyntaxKind::DEFINITION_LIST.into());
-                self.containers.push(Container::DefinitionList {});
-            }
-
-            // Close previous definition if one is open (but keep DefinitionItem open)
-            if matches!(self.containers.last(), Some(Container::Definition { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-
-            // Start new definition item if not in one
-            if !matches!(
-                self.containers.last(),
-                Some(Container::DefinitionItem { .. })
-            ) {
-                self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
-                self.containers.push(Container::DefinitionItem {});
-            }
-
-            // Start Definition node
-            self.builder.start_node(SyntaxKind::DEFINITION.into());
-
-            // Emit container indent (e.g., footnote indent) before the marker
-            if let Some(indent_str) = indent_to_emit {
-                self.builder
-                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
-            }
-
-            emit_definition_marker(&mut self.builder, marker_char, indent);
-            if spaces_after > 0 {
-                self.builder
-                    .token(SyntaxKind::WHITESPACE.into(), &" ".repeat(spaces_after));
-            }
-
-            // Calculate content column (marker + spaces)
-            let content_col = indent + 1 + spaces_after;
-
-            // Emit remaining content on this line if any
-            let after_marker_and_spaces = &content[indent + 1 + spaces_after..];
-            let has_content = !after_marker_and_spaces.trim().is_empty();
-
-            // Create buffer for accumulating PLAIN content
-            let mut plain_buffer = TextBuffer::new();
-
-            if has_content {
-                // Buffer content WITH newline, emit later with inline parsing
-                let current_line = self.lines[self.pos];
-                let (_, newline_str) = strip_newline(current_line);
-                let line_with_newline = if !newline_str.is_empty() {
-                    format!("{}{}", after_marker_and_spaces.trim_end(), newline_str)
-                } else {
-                    after_marker_and_spaces.trim_end().to_string()
-                };
-                plain_buffer.push_line(line_with_newline);
-                // PLAIN node will be emitted when Definition closes
-            }
-
-            self.containers.push(Container::Definition {
-                content_col,
-                plain_open: has_content,
-                plain_buffer,
-            });
-            self.pos += 1;
-            return true;
-        }
-
-        // Term line (if next line has definition marker)?
-        if let Some(blank_count) =
-            definition_lists::next_line_is_definition_marker(&self.lines, self.pos)
-            && !content.trim().is_empty()
-        {
-            // Close any open structures
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-
-            // Start definition list if not in one
-            if !definition_lists::in_definition_list(&self.containers) {
-                self.builder.start_node(SyntaxKind::DEFINITION_LIST.into());
-                self.containers.push(Container::DefinitionList {});
-            }
-
-            // Close previous definition item if exists
-            while matches!(
-                self.containers.last(),
-                Some(Container::Definition { .. }) | Some(Container::DefinitionItem { .. })
-            ) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-
-            // Start new definition item
-            self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
-            self.containers.push(Container::DefinitionItem {});
-
-            // Emit term
-            emit_term(&mut self.builder, content, self.config);
-            self.pos += 1;
-
-            // Emit blank lines between term and definition marker
-            for _ in 0..blank_count {
-                if self.pos < self.lines.len() {
-                    let blank_line = self.lines[self.pos];
-                    self.builder.start_node(SyntaxKind::BLANK_LINE.into());
-                    self.builder
-                        .token(SyntaxKind::BLANK_LINE.into(), blank_line);
-                    self.builder.finish_node();
-                    self.pos += 1;
-                }
-            }
-
-            return true;
         }
 
         // Check for line block (if line_blocks extension is enabled)

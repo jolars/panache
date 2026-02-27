@@ -39,6 +39,11 @@ pub(crate) fn try_parse_table_separator(line: &str) -> Option<Vec<Column>> {
         return None;
     }
 
+    // Simple tables only use dashed separators.
+    if trimmed.contains('*') || trimmed.contains('_') {
+        return None;
+    }
+
     // Must contain at least one dash
     if !trimmed.contains('-') {
         return None;
@@ -49,19 +54,10 @@ pub(crate) fn try_parse_table_separator(line: &str) -> Option<Vec<Column>> {
         return None;
     }
 
-    // Must not be a horizontal rule (needs spaces between dash groups)
-    // Horizontal rules are continuous dashes (possibly with leading spaces)
-    if trimmed.chars().filter(|&c| c == '-').count() >= 3
-        && !trimmed.contains("  ") // no double spaces = likely horizontal rule
-        && trimmed.chars().all(|c| c == '-' || c == ' ')
-    {
-        // Could be horizontal rule, check if there are clear column separations
-        let dash_groups: Vec<_> = trimmed.split(' ').filter(|s| !s.is_empty()).collect();
-
-        // If only one group of dashes, it's a horizontal rule
-        if dash_groups.len() == 1 {
-            return None;
-        }
+    // Must not be a horizontal rule.
+    let dash_groups: Vec<_> = trimmed.split(' ').filter(|s| !s.is_empty()).collect();
+    if dash_groups.len() <= 1 {
+        return None;
     }
 
     // Extract column positions from dash groups
@@ -1994,7 +1990,7 @@ fn try_parse_multiline_separator(line: &str) -> Option<Vec<Column>> {
 /// Check if a line is a column separator line for multiline tables.
 /// Column separators have dashes with spaces between them to define columns.
 fn is_column_separator(line: &str) -> bool {
-    try_parse_table_separator(line).is_some()
+    try_parse_table_separator(line).is_some() && !line.contains('*') && !line.contains('_')
 }
 
 /// Try to parse a multiline table starting at the given position.

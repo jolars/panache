@@ -17,6 +17,9 @@ use super::blocks::blockquotes::strip_n_blockquote_markers;
 use super::blocks::code_blocks::{
     CodeBlockType, FenceInfo, InfoString, parse_fenced_code_block, try_parse_fence_open,
 };
+use super::blocks::definition_lists::{
+    next_line_is_definition_marker, try_parse_definition_marker,
+};
 use super::blocks::fenced_divs::{DivFenceInfo, is_div_closing_fence, try_parse_div_fence_open};
 use super::blocks::figures::parse_figure;
 use super::blocks::headings::{
@@ -27,7 +30,7 @@ use super::blocks::html_blocks::{HtmlBlockType, parse_html_block, try_parse_html
 use super::blocks::indented_code::{is_indented_code_line, parse_indented_code_block};
 use super::blocks::latex_envs::{LatexEnvInfo, parse_latex_environment, try_parse_latex_env_begin};
 use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
-use super::blocks::lists::try_parse_list_marker;
+use super::blocks::lists::{ListMarker, is_content_nested_bullet_marker, try_parse_list_marker};
 use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 use super::blocks::reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
 use super::blocks::tables::{
@@ -85,6 +88,9 @@ pub(crate) struct BlockContext<'a> {
     /// List indentation info if inside a list
     pub list_indent_info: Option<ListIndentInfo>,
 
+    /// Whether we're currently inside any list
+    pub in_list: bool,
+
     /// Next line content for lookahead (used by setext headings)
     pub next_line: Option<&'a str>,
 }
@@ -120,6 +126,8 @@ pub(crate) enum BlockEffect {
     OpenFencedDiv,
     CloseFencedDiv,
     OpenFootnoteDefinition,
+    OpenList,
+    OpenDefinitionList,
 }
 
 /// Trait for block-level parsers.
@@ -533,6 +541,203 @@ pub(crate) struct ReferenceDefinitionParser;
 #[derive(Debug, Clone)]
 pub(crate) struct FootnoteDefinitionPrepared {
     pub content_start: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ListPrepared {
+    pub marker: ListMarker,
+    pub marker_len: usize,
+    pub spaces_after: usize,
+    pub indent_cols: usize,
+    pub indent_bytes: usize,
+    pub nested_marker: Option<char>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum DefinitionPrepared {
+    Term {
+        blank_count: usize,
+    },
+    Definition {
+        marker_char: char,
+        indent: usize,
+        spaces_after: usize,
+        has_content: bool,
+    },
+}
+
+/// List marker parser
+pub(crate) struct ListParser;
+
+/// Definition list parser (term lines and definition markers)
+pub(crate) struct DefinitionListParser;
+
+impl BlockParser for ListParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenList
+    }
+
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        let (marker, marker_len, spaces_after) = try_parse_list_marker(ctx.content, ctx.config)?;
+        if spaces_after == 0 {
+            return None;
+        }
+        if (ctx.has_blank_before || ctx.at_document_start)
+            && try_parse_horizontal_rule(ctx.content).is_some()
+        {
+            return None;
+        }
+        let (indent_cols, indent_bytes) =
+            super::utils::container_stack::leading_indent(ctx.content);
+
+        if indent_cols >= 4 && !ctx.in_list {
+            return None;
+        }
+
+        let nested_marker = is_content_nested_bullet_marker(ctx.content, marker_len, spaces_after);
+        let detection = if ctx.has_blank_before || ctx.at_document_start {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::YesCanInterrupt
+        };
+
+        Some((
+            detection,
+            Some(Box::new(ListPrepared {
+                marker,
+                marker_len,
+                spaces_after,
+                indent_cols,
+                indent_bytes,
+                nested_marker,
+            })),
+        ))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        _builder: &mut GreenNodeBuilder<'static>,
+        _lines: &[&str],
+        _line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        let prepared = payload.and_then(|p| p.downcast_ref::<ListPrepared>());
+        if prepared.is_none() {
+            return 1;
+        }
+
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "list"
+    }
+}
+
+impl BlockParser for DefinitionListParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenDefinitionList
+    }
+
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, lines, line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if let Some((marker_char, indent, spaces_after)) = try_parse_definition_marker(ctx.content)
+        {
+            let has_content = !ctx.content[indent + 1 + spaces_after..].trim().is_empty();
+            return Some((
+                BlockDetectionResult::YesCanInterrupt,
+                Some(Box::new(DefinitionPrepared::Definition {
+                    marker_char,
+                    indent,
+                    spaces_after,
+                    has_content,
+                })),
+            ));
+        }
+
+        if let Some(blank_count) = next_line_is_definition_marker(lines, line_pos)
+            && !ctx.content.trim().is_empty()
+        {
+            return Some((
+                BlockDetectionResult::YesCanInterrupt,
+                Some(Box::new(DefinitionPrepared::Term { blank_count })),
+            ));
+        }
+
+        None
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        _builder: &mut GreenNodeBuilder<'static>,
+        _lines: &[&str],
+        _line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        let prepared = payload.and_then(|p| p.downcast_ref::<DefinitionPrepared>());
+        if prepared.is_none() {
+            return 1;
+        }
+
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "definition_list"
+    }
 }
 
 /// Footnote definition parser ([^id]: content)
@@ -1762,6 +1967,8 @@ impl BlockParserRegistry {
             Box::new(FencedCodeBlockParser),
             // (3) YAML metadata - before headers and hrules!
             Box::new(YamlMetadataParser),
+            // (4) Lists
+            Box::new(ListParser),
             // (6) Fenced divs ::: (open/close)
             Box::new(FencedDivCloseParser),
             Box::new(FencedDivOpenParser),
@@ -1784,6 +1991,8 @@ impl BlockParserRegistry {
             Box::new(HorizontalRuleParser),
             // Figures (standalone images) - Pandoc doesn't have these
             Box::new(FigureParser),
+            // (17) Definition lists
+            Box::new(DefinitionListParser),
             // (18) Footnote definitions (noteBlock)
             Box::new(FootnoteDefinitionParser),
             // (19) Reference definitions
