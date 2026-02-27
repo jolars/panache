@@ -10,7 +10,6 @@ use super::blocks::definition_lists;
 use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
-use super::blocks::reference_links;
 use super::utils::container_stack;
 use super::utils::helpers::{split_lines_inclusive, strip_newline};
 use super::utils::inline_emission;
@@ -274,6 +273,43 @@ impl<'a> Parser<'a> {
     fn prepare_for_block_element(&mut self) {
         self.emit_list_item_buffer_if_needed();
         self.close_paragraph_if_open();
+    }
+
+    fn handle_footnote_open_effect(
+        &mut self,
+        block_match: &super::block_dispatcher::PreparedBlockMatch,
+        content: &str,
+    ) {
+        let content_start = block_match
+            .payload
+            .as_ref()
+            .and_then(|p| p.downcast_ref::<super::block_dispatcher::FootnoteDefinitionPrepared>())
+            .map(|p| p.content_start)
+            .unwrap_or(0);
+
+        while matches!(
+            self.containers.last(),
+            Some(Container::FootnoteDefinition { .. })
+        ) {
+            self.close_containers_to(self.containers.depth() - 1);
+        }
+
+        let content_col = 4;
+        self.containers
+            .push(Container::FootnoteDefinition { content_col });
+
+        if content_start > 0 {
+            let first_line_content = &content[content_start..];
+            if !first_line_content.trim().is_empty() {
+                paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+                paragraphs::append_paragraph_line(
+                    &mut self.containers,
+                    &mut self.builder,
+                    first_line_content,
+                    self.config,
+                );
+            }
+        }
     }
 
     /// Get current blockquote depth from container stack.
@@ -867,6 +903,7 @@ impl<'a> Parser<'a> {
                     blockquote_depth: self.current_blockquote_depth(),
                     config: self.config,
                     content_indent,
+                    indent_to_emit: None,
                     list_indent_info: None,
                     next_line: if self.pos + 1 < self.lines.len() {
                         Some(self.lines[self.pos + 1])
@@ -938,6 +975,7 @@ impl<'a> Parser<'a> {
             blockquote_depth: current_bq_depth,
             config: self.config,
             content_indent,
+            indent_to_emit,
             list_indent_info,
             next_line,
         };
@@ -1017,6 +1055,9 @@ impl<'a> Parser<'a> {
                     BlockEffect::CloseFencedDiv => {
                         self.close_containers_to(self.containers.depth().saturating_sub(1));
                     }
+                    BlockEffect::OpenFootnoteDefinition => {
+                        self.handle_footnote_open_effect(block_match, content);
+                    }
                 }
 
                 self.pos += lines_consumed;
@@ -1055,63 +1096,14 @@ impl<'a> Parser<'a> {
                     BlockEffect::CloseFencedDiv => {
                         self.close_containers_to(self.containers.depth().saturating_sub(1));
                     }
+                    BlockEffect::OpenFootnoteDefinition => {
+                        self.handle_footnote_open_effect(block_match, content);
+                    }
                 }
 
                 self.pos += lines_consumed;
                 return true;
             }
-        }
-
-        // Footnote definition: [^id]: content
-        // Must be handled here (container semantics) so the footnote body can span
-        // multiple indented lines and nested blocks.
-        if self.config.extensions.footnotes
-            && let Some((_id, content_start)) = reference_links::try_parse_footnote_marker(content)
-        {
-            log::debug!("Parsed footnote definition at line {}", self.pos);
-
-            self.prepare_for_block_element();
-
-            // Close previous footnote (if any)
-            while matches!(
-                self.containers.last(),
-                Some(Container::FootnoteDefinition { .. })
-            ) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-
-            if let Some(indent_str) = indent_to_emit {
-                self.builder
-                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
-            }
-
-            self.builder
-                .start_node(SyntaxKind::FOOTNOTE_DEFINITION.into());
-
-            // Emit the marker (including colon + any following spaces)
-            let marker_text = &content[..content_start];
-            self.builder
-                .token(SyntaxKind::FOOTNOTE_REFERENCE.into(), marker_text);
-
-            // Continuation lines must be indented at least 4 spaces.
-            let content_col = 4;
-            self.containers
-                .push(Container::FootnoteDefinition { content_col });
-
-            // Parse the first line content (if any) as paragraph content inside the footnote.
-            let first_line_content = &content[content_start..];
-            if !first_line_content.trim().is_empty() {
-                paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
-                paragraphs::append_paragraph_line(
-                    &mut self.containers,
-                    &mut self.builder,
-                    first_line_content,
-                    self.config,
-                );
-            }
-
-            self.pos += 1;
-            return true;
         }
 
         // List marker?

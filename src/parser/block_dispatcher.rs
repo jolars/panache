@@ -29,7 +29,7 @@ use super::blocks::latex_envs::{LatexEnvInfo, parse_latex_environment, try_parse
 use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
 use super::blocks::lists::try_parse_list_marker;
 use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
-use super::blocks::reference_links::try_parse_reference_definition;
+use super::blocks::reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
 use super::blocks::tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
@@ -79,6 +79,9 @@ pub(crate) struct BlockContext<'a> {
     /// Base indentation from container context (footnotes, definitions)
     pub content_indent: usize,
 
+    /// Indentation stripped from the current line that should be emitted for losslessness
+    pub indent_to_emit: Option<&'a str>,
+
     /// List indentation info if inside a list
     pub list_indent_info: Option<ListIndentInfo>,
 
@@ -116,6 +119,7 @@ pub(crate) enum BlockEffect {
     None,
     OpenFencedDiv,
     CloseFencedDiv,
+    OpenFootnoteDefinition,
 }
 
 /// Trait for block-level parsers.
@@ -525,6 +529,92 @@ impl BlockParser for FigureParser {
 
 /// Reference definition parser ([label]: url "title")
 pub(crate) struct ReferenceDefinitionParser;
+
+#[derive(Debug, Clone)]
+pub(crate) struct FootnoteDefinitionPrepared {
+    pub content_start: usize,
+}
+
+/// Footnote definition parser ([^id]: content)
+pub(crate) struct FootnoteDefinitionParser;
+
+impl BlockParser for FootnoteDefinitionParser {
+    fn effect(&self) -> BlockEffect {
+        BlockEffect::OpenFootnoteDefinition
+    }
+
+    fn can_parse(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> BlockDetectionResult {
+        self.detect_prepared(ctx, _lines, _line_pos)
+            .map(|(d, _)| d)
+            .unwrap_or(BlockDetectionResult::No)
+    }
+
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.footnotes {
+            return None;
+        }
+
+        let (_id, content_start) = try_parse_footnote_marker(ctx.content)?;
+        Some((
+            BlockDetectionResult::YesCanInterrupt,
+            Some(Box::new(FootnoteDefinitionPrepared { content_start })),
+        ))
+    }
+
+    fn parse(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+    ) -> usize {
+        self.parse_prepared(ctx, builder, lines, line_pos, None)
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        _lines: &[&str],
+        _line_pos: usize,
+        payload: Option<&dyn Any>,
+    ) -> usize {
+        use crate::syntax::SyntaxKind;
+
+        let prepared = payload.and_then(|p| p.downcast_ref::<FootnoteDefinitionPrepared>());
+        let content_start = prepared
+            .map(|p| p.content_start)
+            .or_else(|| try_parse_footnote_marker(ctx.content).map(|(_, pos)| pos));
+
+        let Some(content_start) = content_start else {
+            return 1;
+        };
+
+        if let Some(indent_str) = ctx.indent_to_emit {
+            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
+
+        builder.start_node(SyntaxKind::FOOTNOTE_DEFINITION.into());
+        let marker_text = &ctx.content[..content_start];
+        builder.token(SyntaxKind::FOOTNOTE_REFERENCE.into(), marker_text);
+
+        1
+    }
+
+    fn name(&self) -> &'static str {
+        "footnote_definition"
+    }
+}
 
 impl BlockParser for ReferenceDefinitionParser {
     fn effect(&self) -> BlockEffect {
@@ -1694,13 +1784,14 @@ impl BlockParserRegistry {
             Box::new(HorizontalRuleParser),
             // Figures (standalone images) - Pandoc doesn't have these
             Box::new(FigureParser),
+            // (18) Footnote definitions (noteBlock)
+            Box::new(FootnoteDefinitionParser),
             // (19) Reference definitions
             Box::new(ReferenceDefinitionParser),
             // TODO: Migrate remaining blocks in Pandoc order:
             // - (4-6) Lists and divs (bulletList, divHtml)
             // - (16) Ordered lists
             // - (17) Definition lists
-            // - (18) Footnote definitions (noteBlock) (requires container semantics)
         ];
 
         Self { parsers }

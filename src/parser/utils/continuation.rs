@@ -40,6 +40,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
             blockquote_depth: 0,
             config: self.config,
             content_indent: 0,
+            indent_to_emit: None,
             list_indent_info: None,
             next_line: None,
         };
