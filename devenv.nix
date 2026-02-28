@@ -42,6 +42,20 @@
       rustfmt = {
         enable = true;
       };
+
+      panache-format = {
+        enable = true;
+
+        name = "panache format";
+
+        entry = "panache format";
+
+        language = "system";
+
+        files = "\.(qmd|md|Rmd)$";
+
+        excludes = [ "^(pandoc|assets|tests)" ];
+      };
     };
   };
 }
