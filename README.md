@@ -83,7 +83,8 @@ panache lint .
 
 ### Pre-commit Hooks
 
-panache integrates with [pre-commit](https://pre-commit.com/) to automatically format and lint your files before committing.
+panache integrates with [pre-commit](https://pre-commit.com/) to automatically
+format and lint your files before committing.
 
 **Installation:**
 
@@ -100,10 +101,10 @@ Then add panache to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/jolars/panache
-    rev: v2.6.3  # Use the latest version
+    rev: v2.6.3 # Use the latest version
     hooks:
-      - id: panache-format  # Format files
-      - id: panache-lint    # Lint and auto-fix issues
+      - id: panache-format # Format files
+      - id: panache-lint # Lint and auto-fix issues
 ```
 
 Install the hooks:
@@ -112,7 +113,8 @@ Install the hooks:
 pre-commit install
 ```
 
-Now panache will automatically run on your staged `.qmd`, `.md`, and `.Rmd` files before each commit.
+Now panache will automatically run on your staged `.qmd`, `.md`, and `.Rmd`
+files before each commit.
 
 **Hook Options:**
 
@@ -120,7 +122,8 @@ Now panache will automatically run on your staged `.qmd`, `.md`, and `.Rmd` file
 - `panache-lint` - Lints files and applies auto-fixes
 - `panache` - Combined format + lint (convenience hook)
 
-See [examples/pre-commit-config.yaml](examples/pre-commit-config.yaml) for more configuration options.
+See [examples/pre-commit-config.yaml](examples/pre-commit-config.yaml) for more
+configuration options.
 
 ### Language Server (LSP)
 
@@ -410,4 +413,3 @@ syntax.
 - Format math
 - Hook into external formatters for code blocks (e.g. `air` for R, `ruff` for
   Python)
-
