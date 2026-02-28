@@ -83,7 +83,8 @@ This document tracks implementation status for panache's features.
   auto-formatting triggers (not sure about this, low priority)
 - ❌ **Document links** - `textDocument/documentLink` for clickable links
 - ❌ **Semantic tokens** - Syntax highlighting via LSP
-- ❌ **Rename** - Rename reference links/footnotes/citations across document and bibliography
+- ❌ **Rename** - Rename reference links/footnotes/citations across document
+  and bibliography
 - ❌ **Workspace symbols** - Search for headings across all workspace documents
 - ❌ **Configuration via LSP** - `workspace/didChangeConfiguration` to reload
   config
@@ -108,9 +109,11 @@ This document tracks implementation status for panache's features.
   - [x] Links and titles (partial; `tests/cases/writer_autolinks`)
   - [x] Headers (partial; `tests/cases/writer_headers`)
   - [x] Paragraphs (partial; `tests/cases/writer_paragraphs`)
-  - [x] Lists and definition lists (partial; `tests/cases/writer_definition_lists_multiblock`)
+  - [x] Lists and definition lists (partial;
+        `tests/cases/writer_definition_lists_multiblock`)
   - [x] HTML blocks (partial; `tests/cases/writer_html_blocks`)
-  - [x] Indented code blocks + escape preservation (partial; `tests/cases/writer_indented_code_escapes`)
+  - [x] Indented code blocks + escape preservation (partial;
+        `tests/cases/writer_indented_code_escapes`)
   - [x] Blockquote negative case (partial; `tests/cases/writer_blockquote_not`)
 
 ---
@@ -233,6 +236,7 @@ panache lint --config cfg.toml      # Custom config
 - Should linter rules be pluggable (external crates)?
 - How to balance parser error recovery vs. strict linting?
 - Performance: incremental linting for LSP mode?
+- LSP: incremental parsing cache (tree reuse on didChange)
 
 ## Formatter
 
@@ -256,9 +260,9 @@ panache lint --config cfg.toml      # Custom config
 This section tracks implementation status of Pandoc Markdown features based on
 the spec files in `assets/pandoc-spec/`.
 
-**Focus**: Prioritize **default Pandoc extensions**. Non-default extensions are
-lower priority and may be deferred until after core formatting features are
-implemented.
+**Focus**: Prioritize **default Pandoc extensions**. Non-default extensions
+are lower priority and may be deferred until after core formatting features
+are implemented.
 
 ### Block-Level Elements
 
@@ -289,7 +293,6 @@ implemented.
   behavior)
 - ✅ Block quotes containing lists
 - ✅ Block quotes containing code blocks
-
 
 ### Lists 🚧
 
@@ -358,11 +361,11 @@ implemented.
 
 ### Code & Verbatim ✅
 
-- ✅ Inline code (`` `code` ``)
-- ✅ Multi-backtick code spans (``` `` ` `` ```)
+- ✅ Inline code (`code`)
+- ✅ Multi-backtick code spans (\`\`\`\`\`)
 - ✅ Code spans containing backticks
 - ✅ Proper whitespace preservation in code spans
-- ✅ Fenced code blocks (``` and ~~~)
+- ✅ Fenced code blocks (\`\`\` and \~\~\~)
 - ✅ Indented code blocks
 
 ### Links ✅
@@ -509,7 +512,7 @@ for initial implementation.
 ### Non-Default: RMarkdown-Specific
 
 - ❌ RMarkdown code chunks with output
-- ❌ Bookdown-style references (`\@ref(fig-id)`, etc.`)
+- ❌ Bookdown-style references (`\@ref(fig-id)`, etc.\`)
 
 ### Non-Default: Other
 
@@ -549,7 +552,8 @@ for initial implementation.
 
 **Status**: 🤔 **Deferred architectural decision**
 
-**Issue**: Our CST structure differs from Pandoc's AST for undefined reference links.
+**Issue**: Our CST structure differs from Pandoc's AST for undefined reference
+links.
 
 **Current behavior**:
 
@@ -557,18 +561,20 @@ for initial implementation.
 - Pandoc behavior: `[undefined]` → Parsed as literal text `Str "[undefined]"`
 - **Formatting output is correct** (both produce `[undefined]`)
 
-**Impact**: 
+**Impact**:
 
 - ✅ No impact on formatting (our primary use case)
 - ✅ No impact on LSP features (uses CST traversal)
 - ✅ No impact on linting (uses CST traversal)
-- ⚠️ CST structure differs from Pandoc's AST (only matters for library users inspecting CST)
+- ⚠️ CST structure differs from Pandoc's AST (only matters for library users
+  inspecting CST)
 
 **Possible solutions** (if needed):
 
-1. CST traversal during inline parsing to check if definition exists (O(n) cost per reference)
+1. CST traversal during inline parsing to check if definition exists (O(n) cost
+   per reference)
 2. Minimal registry with `HashSet<String>` of definition labels (O(1) lookup)
 3. Two-pass parsing (parse blocks first, then inline with definition knowledge)
 
-**Decision**: Accept current behavior until a real-world use case requires matching Pandoc's AST structure exactly.
-
+**Decision**: Accept current behavior until a real-world use case requires
+matching Pandoc's AST structure exactly.

@@ -185,6 +185,14 @@ impl TestLspServer {
         let docs = doc_map.lock().await;
         docs.get(uri).map(|state| state.text.clone())
     }
+
+    /// Get the current syntax tree for a document (test-only).
+    pub async fn get_document_tree(&self, uri: &str) -> Option<panache::SyntaxNode> {
+        let doc_map = self.lsp.document_map();
+        let docs = doc_map.lock().await;
+        docs.get(uri)
+            .map(|state| panache::SyntaxNode::new_root(state.tree.clone()))
+    }
 }
 
 /// Wrapper that delegates all LanguageServer methods to the inner Arc<PanacheLsp>.

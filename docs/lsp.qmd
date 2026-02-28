@@ -29,6 +29,7 @@ provides document formatting capabilities for editors and IDEs.
 - Document tracking (`textDocument/didOpen/didChange/didClose`)
 - Configuration discovery from workspace root
 - Format on save support
+- Incremental parsing for LSP document updates (parser cache per document)
 
 ## Starting the Server
 

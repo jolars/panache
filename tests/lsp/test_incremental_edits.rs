@@ -10,7 +10,6 @@ async fn test_incremental_edit_simple() {
     server
         .open_document("file:///test.qmd", "# Title\n\nOld text.", "quarto")
         .await;
-
     // Make an incremental edit (replace "Old" with "New")
     server
         .edit_document(
@@ -22,6 +21,14 @@ async fn test_incremental_edit_simple() {
     // Verify the edit was applied
     let content = server.get_document_content("file:///test.qmd").await;
     assert_eq!(content, Some("# Title\n\nNew text.".to_string()));
+
+    let tree_after = server
+        .get_document_tree("file:///test.qmd")
+        .await
+        .expect("tree after edit");
+    let expected = panache::parse("# Title\n\nNew text.", None);
+    assert_eq!(tree_after.text_range(), expected.text_range());
+    assert_eq!(tree_after.to_string(), expected.to_string());
 }
 
 #[tokio::test]

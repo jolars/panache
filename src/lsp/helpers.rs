@@ -22,6 +22,17 @@ pub(crate) async fn get_document_content(
         .map(|state| state.text.clone())
 }
 
+/// Helper to get document content and tree from the document map
+pub(crate) async fn get_document_content_and_tree(
+    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
+    uri: &Uri,
+) -> Option<(String, SyntaxNode)> {
+    let doc_map = document_map.lock().await;
+    doc_map
+        .get(&uri.to_string())
+        .map(|state| (state.text.clone(), SyntaxNode::new_root(state.tree.clone())))
+}
+
 /// Helper to load config with URI-based flavor detection
 pub(crate) async fn get_config(
     client: &tower_lsp_server::Client,

@@ -93,7 +93,7 @@ fn find_expandable_container(node: &SyntaxNode) -> Option<SyntaxNode> {
 ///
 /// # Returns
 /// Expanded byte range `(start, end)` that covers complete blocks
-fn expand_byte_range_to_blocks(tree: &SyntaxNode, start: usize, end: usize) -> (usize, usize) {
+pub fn expand_byte_range_to_blocks(tree: &SyntaxNode, start: usize, end: usize) -> (usize, usize) {
     // Handle empty or invalid ranges
     if start >= end {
         // Treat as cursor position - find enclosing block

@@ -4,6 +4,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_lsp_server::{Client, LspService, Server};
 
+use rowan::GreenNode;
+
 mod config;
 mod conversions;
 mod documents;
@@ -18,6 +20,8 @@ pub struct DocumentState {
     pub text: String,
     /// Parsed metadata from YAML frontmatter (if present).
     pub metadata: Option<crate::metadata::DocumentMetadata>,
+    /// Cached syntax tree for incremental parsing.
+    pub tree: GreenNode,
 }
 
 pub struct PanacheLsp {

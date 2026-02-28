@@ -11,30 +11,24 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
-use crate::parser::parse;
 use crate::syntax::{AstNode, FootnoteDefinition};
 
 use super::super::{conversions, helpers};
 
 /// Handle textDocument/hover request
 pub(crate) async fn hover(
-    client: &tower_lsp_server::Client,
+    _client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: HoverParams,
 ) -> Result<Option<Hover>> {
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
-    // Get document content and config
-    let Some((content, config)) =
-        helpers::get_document_and_config(client, &document_map, &workspace_root, uri).await
+    let Some((content, root)) = helpers::get_document_content_and_tree(&document_map, uri).await
     else {
         return Ok(None);
     };
-
-    // Parse the document
-    let root = parse(&content, Some(config));
 
     // Convert LSP position to byte offset
     let Some(offset) = conversions::position_to_offset(&content, position) else {

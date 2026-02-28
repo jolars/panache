@@ -8,34 +8,32 @@ use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
-use crate::lsp::helpers::get_document_and_config;
+use crate::lsp::helpers::get_document_content_and_tree;
 use crate::syntax::{
     AstNode, GridTable, Heading, ImageLink, MultilineTable, PipeTable, SimpleTable, SyntaxKind,
     SyntaxNode,
 };
 
 pub async fn document_symbol(
-    client: &Client,
+    _client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: DocumentSymbolParams,
 ) -> Result<Option<DocumentSymbolResponse>> {
     let uri = params.text_document.uri;
     log::debug!("document_symbol request for: {}", *uri);
 
-    // Use helper to get document and config
-    let (content, config) =
-        match get_document_and_config(client, &document_map, &workspace_root, &uri).await {
-            Some(result) => result,
-            None => {
-                log::warn!("Document not found in document_map: {}", *uri);
-                return Ok(None);
-            }
-        };
+    // Use helper to get document content and tree
+    let (content, syntax_tree) = match get_document_content_and_tree(&document_map, &uri).await {
+        Some(result) => result,
+        None => {
+            log::warn!("Document not found in document_map: {}", *uri);
+            return Ok(None);
+        }
+    };
     log::debug!("Document content length: {} bytes", content.len());
 
-    // Parse and build symbols synchronously (SyntaxNode is not Send)
-    let syntax_tree = crate::parser::parse(&content, Some(config));
+    // Build symbols synchronously (SyntaxNode is not Send)
     let symbols = build_document_symbols(&syntax_tree, &content);
 
     log::debug!("Found {} top-level symbols", symbols.len());

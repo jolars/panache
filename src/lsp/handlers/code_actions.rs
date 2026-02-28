@@ -76,61 +76,59 @@ pub(crate) async fn code_action(
         }
     }
 
+    let tree = crate::parse(&text, Some(config.clone()));
+
     // Add list conversion code actions (refactoring)
     // Parse tree synchronously (SyntaxNode is not Send, can't use spawn_blocking)
-    if let Some(offset) = position_to_offset(&text, params.range.start) {
-        let tree = crate::parse(&text, Some(config.clone()));
-        if let Some(list_node) = list_conversion::find_list_at_position(&tree, offset)
-            && let Some(list) = List::cast(list_node.clone())
-        {
-            if list.is_loose() {
-                // Offer to convert to compact
-                let edits = list_conversion::convert_to_compact(&list_node, &text);
-                if !edits.is_empty() {
-                    let mut changes = HashMap::new();
-                    changes.insert(uri.clone(), edits);
+    if let Some(offset) = position_to_offset(&text, params.range.start)
+        && let Some(list_node) = list_conversion::find_list_at_position(&tree, offset)
+        && let Some(list) = List::cast(list_node.clone())
+    {
+        if list.is_loose() {
+            // Offer to convert to compact
+            let edits = list_conversion::convert_to_compact(&list_node, &text);
+            if !edits.is_empty() {
+                let mut changes = HashMap::new();
+                changes.insert(uri.clone(), edits);
 
-                    let action = CodeAction {
-                        title: "Convert to compact list".to_string(),
-                        kind: Some(CodeActionKind::REFACTOR),
-                        diagnostics: None,
-                        edit: Some(WorkspaceEdit {
-                            changes: Some(changes),
-                            ..Default::default()
-                        }),
+                let action = CodeAction {
+                    title: "Convert to compact list".to_string(),
+                    kind: Some(CodeActionKind::REFACTOR),
+                    diagnostics: None,
+                    edit: Some(WorkspaceEdit {
+                        changes: Some(changes),
                         ..Default::default()
-                    };
+                    }),
+                    ..Default::default()
+                };
 
-                    actions.push(CodeActionOrCommand::CodeAction(action));
-                }
-            } else {
-                // Offer to convert to loose
-                let edits = list_conversion::convert_to_loose(&list_node, &text);
-                if !edits.is_empty() {
-                    let mut changes = HashMap::new();
-                    changes.insert(uri.clone(), edits);
+                actions.push(CodeActionOrCommand::CodeAction(action));
+            }
+        } else {
+            // Offer to convert to loose
+            let edits = list_conversion::convert_to_loose(&list_node, &text);
+            if !edits.is_empty() {
+                let mut changes = HashMap::new();
+                changes.insert(uri.clone(), edits);
 
-                    let action = CodeAction {
-                        title: "Convert to loose list".to_string(),
-                        kind: Some(CodeActionKind::REFACTOR),
-                        diagnostics: None,
-                        edit: Some(WorkspaceEdit {
-                            changes: Some(changes),
-                            ..Default::default()
-                        }),
+                let action = CodeAction {
+                    title: "Convert to loose list".to_string(),
+                    kind: Some(CodeActionKind::REFACTOR),
+                    diagnostics: None,
+                    edit: Some(WorkspaceEdit {
+                        changes: Some(changes),
                         ..Default::default()
-                    };
+                    }),
+                    ..Default::default()
+                };
 
-                    actions.push(CodeActionOrCommand::CodeAction(action));
-                }
+                actions.push(CodeActionOrCommand::CodeAction(action));
             }
         }
     }
 
     // Add footnote conversion code actions (refactoring)
     if let Some(offset) = position_to_offset(&text, params.range.start) {
-        let tree = crate::parse(&text, Some(config.clone()));
-
         // Check for reference footnote at cursor
         if let Some(ref_node) =
             footnote_conversion::find_footnote_reference_at_position(&tree, offset)
