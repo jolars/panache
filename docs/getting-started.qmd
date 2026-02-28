@@ -130,14 +130,6 @@ panache format --config custom.toml document.qmd
 
 See the [Configuration](configuration.qmd) guide for all options.
 
-## Next Steps
-
-- **Configure panache**: See [Configuration](configuration.qmd) for detailed
-  options
-- **Set up editor integration**: See [LSP](lsp.qmd) for Language Server setup
-- **Learn formatting rules**: See [Formatting](formatting.qmd) for examples
-- **Explore CLI options**: See [CLI Reference](cli.qmd) for all commands
-
 ## Getting Help
 
 - **GitHub Issues**:
