@@ -1,0 +1,94 @@
+---
+title: "Integrations"
+---
+
+## Pre-Commit
+
+[pre-commit](https://pre-commit.com/) is a framework for managing and
+maintaining multi-language pre-commit hooks. It runs checks on your code before
+each commit to ensure quality and consistency.
+
+Create a `.pre-commit-config.yaml` file in your repository root:
+
+```yaml
+repos:
+  - repo: https://github.com/jolars/panache
+    rev: v{{< meta version >}} # Use specific version
+    hooks:
+      - id: panache-format
+      - id: panache-lint
+```
+
+Then install the hooks:
+
+```bash
+pre-commit install
+```
+
+panache provides two hook IDs:
+
+`panache-format`
+:   Automatically formats files according to panache's formatting rules.
+
+`panache-lint`
+:   Lints files and automatically applies fixes where possible.
+
+You can pass additional arguments to panache:
+
+```yaml
+repos:
+  - repo: https://github.com/jolars/panache
+    rev: v{{< meta version >}}
+    hooks:
+      - id: panache-format
+        args: [--config, custom-config.toml]
+```
+
+### File Patterns
+
+By default, hooks run on `.qmd`, `.md`, `.markdown`, and `.Rmd` files. Override
+with `files`:
+
+```yaml
+repos:
+  - repo: https://github.com/jolars/panache
+    rev: v{{< meta version >}}
+    hooks:
+      - id: panache-format
+         files: '\.(qmd|Rmd)$' # Only .qmd and .Rmd
+```
+
+## GitHub Actions
+
+Integrate panache into your CI pipeline using GitHub Actions. Here's an example
+
+```yaml
+# .github/workflows/panache.yml
+name: panache
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  format-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-panache-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install panache
+        run: cargo install panache --locked
+      - name: Check formatting
+        run: panache format --check .
+      - name: Run linter
+        run: panache lint --check .
+```

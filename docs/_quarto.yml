@@ -37,6 +37,7 @@ website:
         text: LSP
       - href: cli.qmd
         text: CLI
+      - href: integrations.qmd
       - href: playground
         text: Playground
 

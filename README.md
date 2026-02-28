@@ -81,6 +81,47 @@ panache lint document.qmd
 panache lint .
 ```
 
+### Pre-commit Hooks
+
+panache integrates with [pre-commit](https://pre-commit.com/) to automatically format and lint your files before committing.
+
+**Installation:**
+
+First, install pre-commit if you haven't already:
+
+```bash
+pip install pre-commit
+# or
+brew install pre-commit
+```
+
+Then add panache to your `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/jolars/panache
+    rev: v2.6.3  # Use the latest version
+    hooks:
+      - id: panache-format  # Format files
+      - id: panache-lint    # Lint and auto-fix issues
+```
+
+Install the hooks:
+
+```bash
+pre-commit install
+```
+
+Now panache will automatically run on your staged `.qmd`, `.md`, and `.Rmd` files before each commit.
+
+**Hook Options:**
+
+- `panache-format` - Formats files in place
+- `panache-lint` - Lints files and applies auto-fixes
+- `panache` - Combined format + lint (convenience hook)
+
+See [examples/pre-commit-config.yaml](examples/pre-commit-config.yaml) for more configuration options.
+
 ### Language Server (LSP)
 
 panache includes a built-in Language Server Protocol implementation for editor
