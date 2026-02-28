@@ -1392,11 +1392,11 @@ impl<'a> Parser<'a> {
                     for level in current_bq_depth..bq_depth {
                         self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
 
-                        if level == current_bq_depth {
-                            if let Some(indent_str) = indent_to_emit {
-                                self.builder
-                                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
-                            }
+                        if level == current_bq_depth
+                            && let Some(indent_str) = indent_to_emit
+                        {
+                            self.builder
+                                .token(SyntaxKind::WHITESPACE.into(), indent_str);
                         }
 
                         if let Some(info) = marker_info.get(level) {
