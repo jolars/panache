@@ -227,6 +227,10 @@ golden_test_cases!(
     standardize_bullets,
     table_with_caption,
     trailing_blanklines,
+    writer_autolinks,
+    writer_blockquote_not,
+    writer_definition_lists_multiblock,
+    writer_html_blocks,
     writer_indented_code_escapes,
     yaml_metadata,
 );

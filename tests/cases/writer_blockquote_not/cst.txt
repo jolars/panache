@@ -1,0 +1,33 @@
+DOCUMENT@0..197
+  HTML_BLOCK@0..53
+    HTML_BLOCK_TAG@0..53
+      TEXT@0..52 "<!-- Source: pandoc/t ..."
+      NEWLINE@52..53 "\n"
+  BLANK_LINE@53..54
+    BLANK_LINE@53..54 "\n"
+  HEADING@54..81
+    ATX_HEADING_MARKER@54..55
+      ATX_HEADING_MARKER@54..55 "#"
+    WHITESPACE@55..56 " "
+    HEADING_CONTENT@56..80
+      TEXT@56..80 "Blockquote negative case"
+    NEWLINE@80..81 "\n"
+  BLANK_LINE@81..82
+    BLANK_LINE@81..82 "\n"
+  BLOCKQUOTE@82..127
+    BLOCKQUOTE_MARKER@82..83 ">"
+    WHITESPACE@83..84 " "
+    PARAGRAPH@84..127
+      TEXT@84..126 "This is a block quote ..."
+      NEWLINE@126..127 "\n"
+  BLANK_LINE@127..128
+    BLANK_LINE@127..128 "\n"
+  PARAGRAPH@128..169
+    TEXT@128..168 "This should not be a  ..."
+    NEWLINE@168..169 "\n"
+  BLANK_LINE@169..170
+    BLANK_LINE@169..170 "\n"
+  PARAGRAPH@170..197
+    TEXT@170..196 "And a following parag ..."
+    NEWLINE@196..197 "\n"
+

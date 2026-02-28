@@ -56,27 +56,24 @@ DOCUMENT@0..1146
     NEWLINE@227..228 "\n"
   BLANK_LINE@228..229
     BLANK_LINE@228..229 "\n"
-  DEFINITION_LIST@229..272
-    DEFINITION_ITEM@229..272
+  DEFINITION_LIST@229..327
+    DEFINITION_ITEM@229..327
       TERM@229..245
         TEXT@229..244 "Term with blank"
         NEWLINE@244..245 "\n"
-      DEFINITION@245..272
+      DEFINITION@245..327
         DEFINITION_MARKER@245..246 ":"
         WHITESPACE@246..249 "   "
         PLAIN@249..272
           TEXT@249..271 "Definition starts here"
           NEWLINE@271..272 "\n"
-  BLANK_LINE@272..273
-    BLANK_LINE@272..273 "\n"
-  CODE_BLOCK@273..327
-    CODE_CONTENT@273..327
-      WHITESPACE@273..277 "    "
-      TEXT@277..303 "Continues after blank ..."
-      NEWLINE@303..304 "\n"
-      WHITESPACE@304..308 "    "
-      TEXT@308..326 "with more content."
-      NEWLINE@326..327 "\n"
+        BLANK_LINE@272..273
+          BLANK_LINE@272..273 "\n"
+        PLAIN@273..327
+          TEXT@273..303 "    Continues after b ..."
+          NEWLINE@303..304 "\n"
+          TEXT@304..326 "    with more content."
+          NEWLINE@326..327 "\n"
   BLANK_LINE@327..328
     BLANK_LINE@327..328 "\n"
   HEADING@328..366

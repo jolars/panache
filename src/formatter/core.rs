@@ -453,7 +453,14 @@ impl Formatter {
                         }
                         _ => {
                             // Other blocks (lists, etc.) - format with indentation
+                            // format_node_sync(child, child_indent) already accounts for indent,
+                            // so we can append its output directly.
+                            let saved_output = self.output.clone();
+                            self.output.clear();
                             self.format_node_sync(child, child_indent);
+                            let formatted = self.output.clone();
+                            self.output = saved_output;
+                            self.output.push_str(&formatted);
                         }
                     }
 
@@ -524,8 +531,9 @@ impl Formatter {
                 }
 
                 // Prefixes for quoted content and blank quoted lines
-                let content_prefix = "> ".repeat(depth); // includes trailing space
-                let blank_prefix = content_prefix.trim_end(); // no trailing space
+                let base_indent = " ".repeat(indent);
+                let content_prefix = format!("{}{}", base_indent, "> ".repeat(depth)); // includes trailing space
+                let blank_prefix = content_prefix.trim_end().to_string(); // no trailing space
 
                 // Format children (paragraphs, blank lines) with proper > prefix per depth
                 // NOTE: BlockQuoteMarker tokens are in the tree for losslessness, but we ignore
@@ -588,7 +596,7 @@ impl Formatter {
                             }
                         },
                         SyntaxKind::BLANK_LINE => {
-                            self.output.push_str(blank_prefix);
+                            self.output.push_str(&blank_prefix);
                             self.output.push('\n');
                         }
                         SyntaxKind::HORIZONTAL_RULE => {
@@ -616,7 +624,7 @@ impl Formatter {
 
                             for line in list_output.lines() {
                                 if line.is_empty() {
-                                    self.output.push_str(blank_prefix);
+                                    self.output.push_str(&blank_prefix);
                                 } else {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(line);
@@ -635,7 +643,7 @@ impl Formatter {
 
                             for line in code_output.lines() {
                                 if line.is_empty() {
-                                    self.output.push_str(blank_prefix);
+                                    self.output.push_str(&blank_prefix);
                                 } else {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(line);

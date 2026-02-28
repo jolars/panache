@@ -104,10 +104,13 @@ This document tracks implementation status for panache's features.
   - [ ] Parentheses/backslashes in URLs
   - [ ] Reference link fallbacks
 - 🚧 **Pandoc Writer Tests (writer.markdown)**
-  - [ ] Autolinks and email autolinks
-  - [ ] Links and titles
+  - [x] Autolinks and email autolinks (`tests/cases/writer_autolinks`)
+  - [x] Links and titles (partial; `tests/cases/writer_autolinks`)
   - [ ] Headers/paragraphs
-  - [ ] Lists and definition lists
+  - [x] Lists and definition lists (partial; `tests/cases/writer_definition_lists_multiblock`)
+  - [x] HTML blocks (partial; `tests/cases/writer_html_blocks`)
+  - [x] Indented code blocks + escape preservation (partial; `tests/cases/writer_indented_code_escapes`)
+  - [x] Blockquote negative case (partial; `tests/cases/writer_blockquote_not`)
 
 ---
 

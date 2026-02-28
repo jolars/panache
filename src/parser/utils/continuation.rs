@@ -9,7 +9,7 @@ use crate::config::Config;
 use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
 use crate::parser::blocks::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use crate::parser::blocks::{definition_lists, html_blocks, latex_envs, lists};
-use crate::parser::utils::container_stack::{ContainerStack, byte_index_at_column, leading_indent};
+use crate::parser::utils::container_stack::{ContainerStack, leading_indent};
 
 pub(crate) struct ContinuationPolicy<'a, 'cfg> {
     config: &'cfg Config,
@@ -28,6 +28,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
     ///
     /// Important: this is intended for *blank-line keep-open decisions*, so it uses
     /// `has_blank_before_strict = false` to avoid treating indented code blocks as nested.
+    #[allow(dead_code)]
     pub(crate) fn has_nested_block_structure(&self, content: &str) -> bool {
         let block_ctx = BlockContext {
             content,
@@ -100,29 +101,16 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                     content_col,
                     ..
                 } => {
+                    // A blank line does not necessarily end a definition, but the continuation
+                    // indent must be measured relative to any outer content containers (e.g.
+                    // footnotes). Otherwise a line indented only for the footnote would wrongly
+                    // continue the definition.
                     let min_indent = (*content_col).max(4);
-                    if raw_indent_cols >= min_indent {
-                        let after_content_indent = if raw_indent_cols >= content_indent_so_far {
-                            let idx = byte_index_at_column(next_line, content_indent_so_far);
-                            &next_line[idx..]
-                        } else {
-                            next_line
-                        };
-
-                        let has_definition_marker =
-                            definition_lists::try_parse_definition_marker(after_content_indent)
-                                .is_some();
-                        let has_list_marker =
-                            lists::try_parse_list_marker(after_content_indent, self.config)
-                                .is_some();
-                        let has_block_structure = has_list_marker
-                            || count_blockquote_markers(after_content_indent).0 > 0
-                            || self.has_nested_block_structure(after_content_indent);
-
-                        if !has_definition_marker && has_block_structure {
-                            keep_level = i + 1;
-                        }
+                    let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
+                    if effective_indent >= min_indent {
+                        keep_level = i + 1;
                     }
+                    content_indent_so_far += *content_col;
                 }
                 crate::parser::utils::container_stack::Container::List {
                     marker,

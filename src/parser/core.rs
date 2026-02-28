@@ -8,6 +8,7 @@ use super::block_dispatcher::{
 };
 use super::blocks::blockquotes;
 use super::blocks::definition_lists;
+use super::blocks::fenced_divs;
 use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
@@ -17,6 +18,7 @@ use super::utils::inline_emission;
 use super::utils::marker_utils;
 use super::utils::text_buffer;
 
+use super::blocks::blockquotes::strip_n_blockquote_markers;
 use super::utils::continuation::ContinuationPolicy;
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term};
@@ -1344,12 +1346,7 @@ impl<'a> Parser<'a> {
                 ) {
                     let content_line = stripped_content;
                     let (text_without_newline, newline_str) = strip_newline(content_line);
-                    let (indent_cols, _) = leading_indent(self.lines[self.pos]);
-                    let indent_prefix = if content_indent > 0
-                        && indent_cols >= content_indent
-                        && !text_without_newline.trim().is_empty()
-                        && indent_to_emit.is_some()
-                    {
+                    let indent_prefix = if !text_without_newline.trim().is_empty() {
                         indent_to_emit.unwrap_or("")
                     } else {
                         ""
@@ -1374,6 +1371,53 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     return true;
                 }
+            }
+        }
+
+        // Handle blockquotes that appear after stripping content-container indentation
+        // (e.g. `    > quote` inside a definition list item).
+        if content_indent > 0 {
+            let (bq_depth, inner_content) = count_blockquote_markers(stripped_content);
+            let current_bq_depth = self.current_blockquote_depth();
+
+            if bq_depth > 0 {
+                // Blockquotes can nest inside content containers; preserve the stripped indentation
+                // as WHITESPACE before the first marker for losslessness.
+                self.close_paragraph_if_open();
+
+                if bq_depth > current_bq_depth {
+                    let marker_info = parse_blockquote_marker_info(stripped_content);
+
+                    // Open new blockquotes and emit their markers.
+                    for level in current_bq_depth..bq_depth {
+                        self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+
+                        if level == current_bq_depth {
+                            if let Some(indent_str) = indent_to_emit {
+                                self.builder
+                                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
+                            }
+                        }
+
+                        if let Some(info) = marker_info.get(level) {
+                            blockquotes::emit_one_blockquote_marker(
+                                &mut self.builder,
+                                info.leading_spaces,
+                                info.has_trailing_space,
+                            );
+                        }
+
+                        self.containers.push(Container::BlockQuote {});
+                    }
+                } else if bq_depth < current_bq_depth {
+                    self.close_blockquotes_to_depth(bq_depth);
+                } else {
+                    // Same depth: emit markers for losslessness.
+                    let marker_info = parse_blockquote_marker_info(stripped_content);
+                    self.emit_blockquote_markers(&marker_info, bq_depth);
+                }
+
+                return self.parse_inner_content(inner_content, Some(inner_content));
             }
         }
 
@@ -1432,9 +1476,24 @@ impl<'a> Parser<'a> {
                 .detect_prepared(&dispatcher_ctx, &self.lines, self.pos);
 
         // Check for heading (needs blank line before, or at start of container)
-        let has_blank_before = self.pos == 0
-            || self.lines[self.pos - 1].trim().is_empty()
-            || matches!(self.containers.last(), Some(Container::BlockQuote { .. }));
+        // Note: for fenced div nesting, the line immediately after a div opening fence
+        // should be treated like the start of a container (Pandoc allows nested fences
+        // without an intervening blank line).
+        let has_blank_before = if self.pos == 0 {
+            true
+        } else {
+            let prev_line = self.lines[self.pos - 1];
+            let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
+            let (prev_inner_no_nl, _) = strip_newline(prev_inner);
+            let prev_is_fenced_div_open = fenced_divs::try_parse_div_fence_open(
+                strip_n_blockquote_markers(prev_inner_no_nl, prev_bq_depth).trim_start(),
+            )
+            .is_some();
+
+            prev_line.trim().is_empty()
+                || prev_is_fenced_div_open
+                || matches!(self.containers.last(), Some(Container::BlockQuote { .. }))
+        };
 
         // For indented code blocks, we need a stricter condition - only actual blank lines count
         // Being at document start (pos == 0) is OK only if we're not inside a blockquote
