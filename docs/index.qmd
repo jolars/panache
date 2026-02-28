@@ -1,13 +1,11 @@
 ---
-title: panache
+title: Panache
 ---
 
-## Overview
-
-**panache** is a CLI formatter and Language Server for Quarto (`.qmd`),
-Pandoc, and Markdown files written in Rust. It's designed to understand
-Quarto/Pandoc-specific syntax that other formatters like Prettier and mdformat
-struggle with.
+Panache is a formatter, LSP server, and linter for Pandoc Markdown, Quarto, and
+R Markdown documents. It is designed to be fast, configurable, and fully support
+the rich syntax of Pandoc Markdown, including features like fenced divs, grid
+tables, definition lists, inline footnotes, and more.
 
 ## Key Features
 
