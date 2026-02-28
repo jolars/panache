@@ -230,6 +230,7 @@ golden_test_cases!(
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,
+    writer_headers,
     writer_html_blocks,
     writer_indented_code_escapes,
     yaml_metadata,
