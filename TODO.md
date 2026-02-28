@@ -107,7 +107,7 @@ This document tracks implementation status for panache's features.
   - [x] Autolinks and email autolinks (`tests/cases/writer_autolinks`)
   - [x] Links and titles (partial; `tests/cases/writer_autolinks`)
   - [x] Headers (partial; `tests/cases/writer_headers`)
-  - [ ] Paragraphs
+  - [x] Paragraphs (partial; `tests/cases/writer_paragraphs`)
   - [x] Lists and definition lists (partial; `tests/cases/writer_definition_lists_multiblock`)
   - [x] HTML blocks (partial; `tests/cases/writer_html_blocks`)
   - [x] Indented code blocks + escape preservation (partial; `tests/cases/writer_indented_code_escapes`)

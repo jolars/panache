@@ -232,6 +232,7 @@ golden_test_cases!(
     writer_definition_lists_multiblock,
     writer_headers,
     writer_html_blocks,
+    writer_paragraphs,
     writer_indented_code_escapes,
     yaml_metadata,
 );
