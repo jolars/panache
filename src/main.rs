@@ -291,7 +291,14 @@ fn main() -> io::Result<()> {
 
                 let input = read_all(None)?;
                 let tree = parse(&input, Some(cfg.clone()));
-                let diagnostics = panache::linter::lint_with_external_sync(&tree, &input, &cfg);
+                let metadata =
+                    panache::metadata::extract_metadata(&tree, Path::new("stdin.md")).ok();
+                let diagnostics = panache::linter::lint_with_external_sync_and_metadata(
+                    &tree,
+                    &input,
+                    &cfg,
+                    metadata.as_ref(),
+                );
 
                 if diagnostics.is_empty() {
                     if !check {
@@ -339,7 +346,13 @@ fn main() -> io::Result<()> {
 
                 let input = fs::read_to_string(file_path)?;
                 let tree = parse(&input, Some(cfg.clone()));
-                let diagnostics = panache::linter::lint_with_external_sync(&tree, &input, &cfg);
+                let metadata = panache::metadata::extract_metadata(&tree, file_path).ok();
+                let diagnostics = panache::linter::lint_with_external_sync_and_metadata(
+                    &tree,
+                    &input,
+                    &cfg,
+                    metadata.as_ref(),
+                );
 
                 if !diagnostics.is_empty() {
                     any_issues = true;

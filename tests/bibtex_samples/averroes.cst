@@ -1,0 +1,916 @@
+BIBTEX_FILE@0..4123
+  ENTRY@0..41
+    AT_MARK@0..1 "@"
+    ENTRY_TYPE@1..7
+      TEXT@1..7 "string"
+    LBRACE@7..8 "{"
+    ENTRY_KEY@8..40
+      TEXT@8..40 "anch-ie = {Angew.~Che ..."
+    RBRACE@40..41 "}"
+  TEXT@41..42 "}"
+  NEWLINE@42..43 "\n"
+  ENTRY@43..89
+    AT_MARK@43..44 "@"
+    ENTRY_TYPE@44..50
+      TEXT@44..50 "string"
+    LBRACE@50..51 "{"
+    ENTRY_KEY@51..88
+      TEXT@51..88 "cup     = {Cambridge  ..."
+    RBRACE@88..89 "}"
+  TEXT@89..90 "}"
+  NEWLINE@90..91 "\n"
+  ENTRY@91..139
+    AT_MARK@91..92 "@"
+    ENTRY_TYPE@92..98
+      TEXT@92..98 "string"
+    LBRACE@98..99 "{"
+    ENTRY_KEY@99..138
+      TEXT@99..138 "dtv     = {Deutscher  ..."
+    RBRACE@138..139 "}"
+  TEXT@139..140 "}"
+  NEWLINE@140..141 "\n"
+  ENTRY@141..185
+    AT_MARK@141..142 "@"
+    ENTRY_TYPE@142..148
+      TEXT@142..148 "string"
+    LBRACE@148..149 "{"
+    ENTRY_KEY@149..184
+      TEXT@149..184 "hup     = {Harvard Un ..."
+    RBRACE@184..185 "}"
+  TEXT@185..186 "}"
+  NEWLINE@186..187 "\n"
+  ENTRY@187..226
+    AT_MARK@187..188 "@"
+    ENTRY_TYPE@188..194
+      TEXT@188..194 "string"
+    LBRACE@194..195 "{"
+    ENTRY_KEY@195..225
+      TEXT@195..225 "jams    = {J.~Amer. M ..."
+    RBRACE@225..226 "}"
+  TEXT@226..227 "}"
+  NEWLINE@227..228 "\n"
+  ENTRY@228..262
+    AT_MARK@228..229 "@"
+    ENTRY_TYPE@229..235
+      TEXT@229..235 "string"
+    LBRACE@235..236 "{"
+    ENTRY_KEY@236..261
+      TEXT@236..261 "jchph   = {J.~Chem. P ..."
+    RBRACE@261..262 "}"
+  TEXT@262..263 "}"
+  NEWLINE@263..264 "\n"
+  ENTRY@264..303
+    AT_MARK@264..265 "@"
+    ENTRY_TYPE@265..271
+      TEXT@265..271 "string"
+    LBRACE@271..272 "{"
+    ENTRY_KEY@272..302
+      TEXT@272..302 "jomch   = {J.~Organom ..."
+    RBRACE@302..303 "}"
+  TEXT@303..304 "}"
+  NEWLINE@304..305 "\n"
+  ENTRY@305..351
+    AT_MARK@305..306 "@"
+    ENTRY_TYPE@306..312
+      TEXT@306..312 "string"
+    LBRACE@312..313 "{"
+    ENTRY_KEY@313..350
+      TEXT@313..350 "pup     = {Princeton  ..."
+    RBRACE@350..351 "}"
+  TEXT@351..352 "}"
+  NEWLINE@352..353 "\n"
+  NEWLINE@353..354 "\n"
+  ENTRY@354..1324
+    AT_MARK@354..355 "@"
+    ENTRY_TYPE@355..359
+      TEXT@355..359 "book"
+    LBRACE@359..360 "{"
+    ENTRY_KEY@360..374
+      TEXT@360..374 "averroes/bland"
+    COMMA@374..375 ","
+    NEWLINE@375..376 "\n"
+    WHITESPACE@376..378 "  "
+    FIELD@378..404
+      FIELD_NAME@378..384
+        TEXT@378..384 "author"
+      WHITESPACE@384..391 "       "
+      EQUALS@391..392 "="
+      WHITESPACE@392..393 " "
+      FIELD_VALUE@393..403
+        LBRACE@393..394 "{"
+        STRING@394..402
+          TEXT@394..402 "Averroes"
+        RBRACE@402..403 "}"
+      COMMA@403..404 ","
+    NEWLINE@404..405 "\n"
+    WHITESPACE@405..407 "  "
+    FIELD@407..568
+      FIELD_NAME@407..412
+        TEXT@407..412 "title"
+      WHITESPACE@412..420 "        "
+      EQUALS@420..421 "="
+      WHITESPACE@421..422 " "
+      FIELD_VALUE@422..567
+        LBRACE@422..423 "{"
+        STRING@423..566
+          TEXT@423..566 "The Epistle on the Po ..."
+        RBRACE@566..567 "}"
+      COMMA@567..568 ","
+    NEWLINE@568..569 "\n"
+    WHITESPACE@569..571 "  "
+    FIELD@571..591
+      FIELD_NAME@571..575
+        TEXT@571..575 "date"
+      WHITESPACE@575..584 "         "
+      EQUALS@584..585 "="
+      WHITESPACE@585..586 " "
+      FIELD_VALUE@586..590
+        STRING@586..590
+          TEXT@586..590 "1982"
+      COMMA@590..591 ","
+    NEWLINE@591..592 "\n"
+    WHITESPACE@592..594 "  "
+    FIELD@594..628
+      FIELD_NAME@594..600
+        TEXT@594..600 "editor"
+      WHITESPACE@600..607 "       "
+      EQUALS@607..608 "="
+      WHITESPACE@608..609 " "
+      FIELD_VALUE@609..627
+        LBRACE@609..610 "{"
+        STRING@610..626
+          TEXT@610..626 "Bland, Kalman P."
+        RBRACE@626..627 "}"
+      COMMA@627..628 ","
+    NEWLINE@628..629 "\n"
+    WHITESPACE@629..631 "  "
+    FIELD@631..665
+      FIELD_NAME@631..641
+        TEXT@631..641 "translator"
+      WHITESPACE@641..644 "   "
+      EQUALS@644..645 "="
+      WHITESPACE@645..646 " "
+      FIELD_VALUE@646..664
+        LBRACE@646..647 "{"
+        STRING@647..663
+          TEXT@647..663 "Bland, Kalman P."
+        RBRACE@663..664 "}"
+      COMMA@664..665 ","
+    NEWLINE@665..666 "\n"
+    WHITESPACE@666..668 "  "
+    FIELD@668..747
+      FIELD_NAME@668..674
+        TEXT@668..674 "series"
+      WHITESPACE@674..681 "       "
+      EQUALS@681..682 "="
+      WHITESPACE@682..683 " "
+      FIELD_VALUE@683..746
+        LBRACE@683..684 "{"
+        STRING@684..745
+          TEXT@684..745 "Moreshet: Studies in  ..."
+        RBRACE@745..746 "}"
+      COMMA@746..747 ","
+    NEWLINE@747..748 "\n"
+    WHITESPACE@748..750 "  "
+    FIELD@750..767
+      FIELD_NAME@750..756
+        TEXT@750..756 "number"
+      WHITESPACE@756..763 "       "
+      EQUALS@763..764 "="
+      WHITESPACE@764..765 " "
+      FIELD_VALUE@765..766
+        STRING@765..766
+          TEXT@765..766 "7"
+      COMMA@766..767 ","
+    NEWLINE@767..768 "\n"
+    WHITESPACE@768..770 "  "
+    FIELD@770..826
+      FIELD_NAME@770..779
+        TEXT@770..779 "publisher"
+      WHITESPACE@779..783 "    "
+      EQUALS@783..784 "="
+      WHITESPACE@784..785 " "
+      FIELD_VALUE@785..825
+        LBRACE@785..786 "{"
+        STRING@786..824
+          TEXT@786..824 "Jewish Theological Se ..."
+        RBRACE@824..825 "}"
+      COMMA@825..826 ","
+    NEWLINE@826..827 "\n"
+    WHITESPACE@827..829 "  "
+    FIELD@829..855
+      FIELD_NAME@829..837
+        TEXT@829..837 "location"
+      WHITESPACE@837..842 "     "
+      EQUALS@842..843 "="
+      WHITESPACE@843..844 " "
+      FIELD_VALUE@844..854
+        LBRACE@844..845 "{"
+        STRING@845..853
+          TEXT@845..853 "New York"
+        RBRACE@853..854 "}"
+      COMMA@854..855 ","
+    NEWLINE@855..856 "\n"
+    WHITESPACE@856..858 "  "
+    FIELD@858..883
+      FIELD_NAME@858..866
+        TEXT@858..866 "keywords"
+      WHITESPACE@866..871 "     "
+      EQUALS@871..872 "="
+      WHITESPACE@872..873 " "
+      FIELD_VALUE@873..882
+        LBRACE@873..874 "{"
+        STRING@874..881
+          TEXT@874..881 "primary"
+        RBRACE@881..882 "}"
+      COMMA@882..883 ","
+    NEWLINE@883..884 "\n"
+    WHITESPACE@884..886 "  "
+    FIELD@886..911
+      FIELD_NAME@886..892
+        TEXT@886..892 "langid"
+      WHITESPACE@892..899 "       "
+      EQUALS@899..900 "="
+      WHITESPACE@900..901 " "
+      FIELD_VALUE@901..910
+        LBRACE@901..902 "{"
+        STRING@902..909
+          TEXT@902..909 "english"
+        RBRACE@909..910 "}"
+      COMMA@910..911 ","
+    NEWLINE@911..912 "\n"
+    WHITESPACE@912..914 "  "
+    FIELD@914..948
+      FIELD_NAME@914..924
+        TEXT@914..924 "langidopts"
+      WHITESPACE@924..927 "   "
+      EQUALS@927..928 "="
+      WHITESPACE@928..929 " "
+      FIELD_VALUE@929..947
+        LBRACE@929..930 "{"
+        STRING@930..946
+          TEXT@930..946 "variant=american"
+        RBRACE@946..947 "}"
+      COMMA@947..948 ","
+    NEWLINE@948..949 "\n"
+    WHITESPACE@949..951 "  "
+    FIELD@951..1015
+      FIELD_NAME@951..961
+        TEXT@951..961 "indextitle"
+      WHITESPACE@961..964 "   "
+      EQUALS@964..965 "="
+      WHITESPACE@965..966 " "
+      FIELD_VALUE@966..1014
+        LBRACE@966..967 "{"
+        STRING@967..1013
+          TEXT@967..1013 "Epistle on the Possib ..."
+        RBRACE@1013..1014 "}"
+      COMMA@1014..1015 ","
+    NEWLINE@1015..1016 "\n"
+    WHITESPACE@1016..1018 "  "
+    FIELD@1018..1062
+      FIELD_NAME@1018..1028
+        TEXT@1018..1028 "shorttitle"
+      WHITESPACE@1028..1031 "   "
+      EQUALS@1031..1032 "="
+      WHITESPACE@1032..1033 " "
+      FIELD_VALUE@1033..1061
+        LBRACE@1033..1034 "{"
+        STRING@1034..1060
+          TEXT@1034..1060 "Possibility of Conjun ..."
+        RBRACE@1060..1061 "}"
+      COMMA@1061..1062 ","
+    NEWLINE@1062..1063 "\n"
+    WHITESPACE@1063..1065 "  "
+    FIELD@1065..1322
+      FIELD_NAME@1065..1075
+        TEXT@1065..1075 "annotation"
+      WHITESPACE@1075..1078 "   "
+      EQUALS@1078..1079 "="
+      WHITESPACE@1079..1080 " "
+      FIELD_VALUE@1080..1321
+        LBRACE@1080..1081 "{"
+        STRING@1081..1320
+          TEXT@1081..1320 "A \\texttt{book} entry ..."
+        RBRACE@1320..1321 "}"
+      COMMA@1321..1322 ","
+    NEWLINE@1322..1323 "\n"
+    RBRACE@1323..1324 "}"
+  NEWLINE@1324..1325 "\n"
+  NEWLINE@1325..1326 "\n"
+  ENTRY@1326..2402
+    AT_MARK@1326..1327 "@"
+    ENTRY_TYPE@1327..1331
+      TEXT@1327..1331 "book"
+    LBRACE@1331..1332 "{"
+    ENTRY_KEY@1332..1347
+      TEXT@1332..1347 "averroes/hannes"
+    COMMA@1347..1348 ","
+    NEWLINE@1348..1349 "\n"
+    WHITESPACE@1349..1351 "  "
+    FIELD@1351..1377
+      FIELD_NAME@1351..1357
+        TEXT@1351..1357 "author"
+      WHITESPACE@1357..1364 "       "
+      EQUALS@1364..1365 "="
+      WHITESPACE@1365..1366 " "
+      FIELD_VALUE@1366..1376
+        LBRACE@1366..1367 "{"
+        STRING@1367..1375
+          TEXT@1367..1375 "Averroes"
+        RBRACE@1375..1376 "}"
+      COMMA@1376..1377 ","
+    NEWLINE@1377..1378 "\n"
+    WHITESPACE@1378..1380 "  "
+    FIELD@1380..1573
+      FIELD_NAME@1380..1385
+        TEXT@1380..1385 "title"
+      WHITESPACE@1385..1393 "        "
+      EQUALS@1393..1394 "="
+      WHITESPACE@1394..1395 " "
+      FIELD_VALUE@1395..1572
+        LBRACE@1395..1396 "{"
+        STRING@1396..1571
+          TEXT@1396..1571 "Des Averro{\\\"e}s Abha ..."
+        RBRACE@1571..1572 "}"
+      COMMA@1572..1573 ","
+    NEWLINE@1573..1574 "\n"
+    WHITESPACE@1574..1576 "  "
+    FIELD@1576..1596
+      FIELD_NAME@1576..1580
+        TEXT@1576..1580 "date"
+      WHITESPACE@1580..1589 "         "
+      EQUALS@1589..1590 "="
+      WHITESPACE@1590..1591 " "
+      FIELD_VALUE@1591..1595
+        STRING@1591..1595
+          TEXT@1591..1595 "1892"
+      COMMA@1595..1596 ","
+    NEWLINE@1596..1597 "\n"
+    WHITESPACE@1597..1599 "  "
+    FIELD@1599..1631
+      FIELD_NAME@1599..1605
+        TEXT@1599..1605 "editor"
+      WHITESPACE@1605..1612 "       "
+      EQUALS@1612..1613 "="
+      WHITESPACE@1613..1614 " "
+      FIELD_VALUE@1614..1630
+        LBRACE@1614..1615 "{"
+        STRING@1615..1629
+          TEXT@1615..1629 "Hannes, Ludwig"
+        RBRACE@1629..1630 "}"
+      COMMA@1630..1631 ","
+    NEWLINE@1631..1632 "\n"
+    WHITESPACE@1632..1634 "  "
+    FIELD@1634..1666
+      FIELD_NAME@1634..1644
+        TEXT@1634..1644 "translator"
+      WHITESPACE@1644..1647 "   "
+      EQUALS@1647..1648 "="
+      WHITESPACE@1648..1649 " "
+      FIELD_VALUE@1649..1665
+        LBRACE@1649..1650 "{"
+        STRING@1650..1664
+          TEXT@1650..1664 "Hannes, Ludwig"
+        RBRACE@1664..1665 "}"
+      COMMA@1665..1666 ","
+    NEWLINE@1666..1667 "\n"
+    WHITESPACE@1667..1669 "  "
+    FIELD@1669..1701
+      FIELD_NAME@1669..1678
+        TEXT@1669..1678 "annotator"
+      WHITESPACE@1678..1682 "    "
+      EQUALS@1682..1683 "="
+      WHITESPACE@1683..1684 " "
+      FIELD_VALUE@1684..1700
+        LBRACE@1684..1685 "{"
+        STRING@1685..1699
+          TEXT@1685..1699 "Hannes, Ludwig"
+        RBRACE@1699..1700 "}"
+      COMMA@1700..1701 ","
+    NEWLINE@1701..1702 "\n"
+    WHITESPACE@1702..1704 "  "
+    FIELD@1704..1737
+      FIELD_NAME@1704..1713
+        TEXT@1704..1713 "publisher"
+      WHITESPACE@1713..1717 "    "
+      EQUALS@1717..1718 "="
+      WHITESPACE@1718..1719 " "
+      FIELD_VALUE@1719..1736
+        LBRACE@1719..1720 "{"
+        STRING@1720..1735
+          TEXT@1720..1735 "C.~A. Kaemmerer"
+        RBRACE@1735..1736 "}"
+      COMMA@1736..1737 ","
+    NEWLINE@1737..1738 "\n"
+    WHITESPACE@1738..1740 "  "
+    FIELD@1740..1776
+      FIELD_NAME@1740..1748
+        TEXT@1740..1748 "location"
+      WHITESPACE@1748..1753 "     "
+      EQUALS@1753..1754 "="
+      WHITESPACE@1754..1755 " "
+      FIELD_VALUE@1755..1775
+        LBRACE@1755..1756 "{"
+        STRING@1756..1774
+          TEXT@1756..1774 "Halle an der Saale"
+        RBRACE@1774..1775 "}"
+      COMMA@1775..1776 ","
+    NEWLINE@1776..1777 "\n"
+    WHITESPACE@1777..1779 "  "
+    FIELD@1779..1804
+      FIELD_NAME@1779..1787
+        TEXT@1779..1787 "keywords"
+      WHITESPACE@1787..1792 "     "
+      EQUALS@1792..1793 "="
+      WHITESPACE@1793..1794 " "
+      FIELD_VALUE@1794..1803
+        LBRACE@1794..1795 "{"
+        STRING@1795..1802
+          TEXT@1795..1802 "primary"
+        RBRACE@1802..1803 "}"
+      COMMA@1803..1804 ","
+    NEWLINE@1804..1805 "\n"
+    WHITESPACE@1805..1807 "  "
+    FIELD@1807..1831
+      FIELD_NAME@1807..1813
+        TEXT@1807..1813 "langid"
+      WHITESPACE@1813..1820 "       "
+      EQUALS@1820..1821 "="
+      WHITESPACE@1821..1822 " "
+      FIELD_VALUE@1822..1830
+        LBRACE@1822..1823 "{"
+        STRING@1823..1829
+          TEXT@1823..1829 "german"
+        RBRACE@1829..1830 "}"
+      COMMA@1830..1831 ","
+    NEWLINE@1831..1832 "\n"
+    WHITESPACE@1832..1834 "  "
+    FIELD@1834..1888
+      FIELD_NAME@1834..1843
+        TEXT@1834..1843 "sorttitle"
+      WHITESPACE@1843..1847 "    "
+      EQUALS@1847..1848 "="
+      WHITESPACE@1848..1849 " "
+      FIELD_VALUE@1849..1887
+        LBRACE@1849..1850 "{"
+        STRING@1850..1886
+          TEXT@1850..1886 "Uber die Moglichkeit  ..."
+        RBRACE@1886..1887 "}"
+      COMMA@1887..1888 ","
+    NEWLINE@1888..1889 "\n"
+    WHITESPACE@1889..1891 "  "
+    FIELD@1891..1946
+      FIELD_NAME@1891..1905
+        TEXT@1891..1905 "indexsorttitle"
+      EQUALS@1905..1906 "="
+      WHITESPACE@1906..1907 " "
+      FIELD_VALUE@1907..1945
+        LBRACE@1907..1908 "{"
+        STRING@1908..1944
+          TEXT@1908..1944 "Uber die Moglichkeit  ..."
+        RBRACE@1944..1945 "}"
+      COMMA@1945..1946 ","
+    NEWLINE@1946..1947 "\n"
+    WHITESPACE@1947..1949 "  "
+    FIELD@1949..2011
+      FIELD_NAME@1949..1959
+        TEXT@1949..1959 "indextitle"
+      WHITESPACE@1959..1962 "   "
+      EQUALS@1962..1963 "="
+      WHITESPACE@1963..1964 " "
+      FIELD_VALUE@1964..2010
+        LBRACE@1964..1965 "{"
+        STRING@1965..2009
+          TEXT@1965..2009 "{\\\"U}ber die M{\\\"o}gl ..."
+        RBRACE@2009..2010 "}"
+      COMMA@2010..2011 ","
+    NEWLINE@2011..2012 "\n"
+    WHITESPACE@2012..2014 "  "
+    FIELD@2014..2076
+      FIELD_NAME@2014..2024
+        TEXT@2014..2024 "shorttitle"
+      WHITESPACE@2024..2027 "   "
+      EQUALS@2027..2028 "="
+      WHITESPACE@2028..2029 " "
+      FIELD_VALUE@2029..2075
+        LBRACE@2029..2030 "{"
+        STRING@2030..2074
+          TEXT@2030..2074 "{\\\"U}ber die M{\\\"o}gl ..."
+        RBRACE@2074..2075 "}"
+      COMMA@2075..2076 ","
+    NEWLINE@2076..2077 "\n"
+    WHITESPACE@2077..2079 "  "
+    FIELD@2079..2400
+      FIELD_NAME@2079..2089
+        TEXT@2079..2089 "annotation"
+      WHITESPACE@2089..2092 "   "
+      EQUALS@2092..2093 "="
+      WHITESPACE@2093..2094 " "
+      FIELD_VALUE@2094..2399
+        LBRACE@2094..2095 "{"
+        STRING@2095..2398
+          TEXT@2095..2398 "An annotated edition. ..."
+        RBRACE@2398..2399 "}"
+      COMMA@2399..2400 ","
+    NEWLINE@2400..2401 "\n"
+    RBRACE@2401..2402 "}"
+  NEWLINE@2402..2403 "\n"
+  NEWLINE@2403..2404 "\n"
+  ENTRY@2404..3286
+    AT_MARK@2404..2405 "@"
+    ENTRY_TYPE@2405..2409
+      TEXT@2405..2409 "book"
+    LBRACE@2409..2410 "{"
+    ENTRY_KEY@2410..2424
+      TEXT@2410..2424 "averroes/hercz"
+    COMMA@2424..2425 ","
+    NEWLINE@2425..2426 "\n"
+    WHITESPACE@2426..2428 "  "
+    FIELD@2428..2454
+      FIELD_NAME@2428..2434
+        TEXT@2428..2434 "author"
+      WHITESPACE@2434..2441 "       "
+      EQUALS@2441..2442 "="
+      WHITESPACE@2442..2443 " "
+      FIELD_VALUE@2443..2453
+        LBRACE@2443..2444 "{"
+        STRING@2444..2452
+          TEXT@2444..2452 "Averroes"
+        RBRACE@2452..2453 "}"
+      COMMA@2453..2454 ","
+    NEWLINE@2454..2455 "\n"
+    WHITESPACE@2455..2457 "  "
+    FIELD@2457..2577
+      FIELD_NAME@2457..2462
+        TEXT@2457..2462 "title"
+      WHITESPACE@2462..2470 "        "
+      EQUALS@2470..2471 "="
+      WHITESPACE@2471..2472 " "
+      FIELD_VALUE@2472..2576
+        LBRACE@2472..2473 "{"
+        STRING@2473..2575
+          TEXT@2473..2575 "Drei Abhandlungen {\\\" ..."
+        RBRACE@2575..2576 "}"
+      COMMA@2576..2577 ","
+    NEWLINE@2577..2578 "\n"
+    WHITESPACE@2578..2580 "  "
+    FIELD@2580..2600
+      FIELD_NAME@2580..2584
+        TEXT@2580..2584 "date"
+      WHITESPACE@2584..2593 "         "
+      EQUALS@2593..2594 "="
+      WHITESPACE@2594..2595 " "
+      FIELD_VALUE@2595..2599
+        STRING@2595..2599
+          TEXT@2595..2599 "1869"
+      COMMA@2599..2600 ","
+    NEWLINE@2600..2601 "\n"
+    WHITESPACE@2601..2603 "  "
+    FIELD@2603..2630
+      FIELD_NAME@2603..2609
+        TEXT@2603..2609 "editor"
+      WHITESPACE@2609..2616 "       "
+      EQUALS@2616..2617 "="
+      WHITESPACE@2617..2618 " "
+      FIELD_VALUE@2618..2629
+        LBRACE@2618..2619 "{"
+        STRING@2619..2628
+          TEXT@2619..2628 "Hercz, J."
+        RBRACE@2628..2629 "}"
+      COMMA@2629..2630 ","
+    NEWLINE@2630..2631 "\n"
+    WHITESPACE@2631..2633 "  "
+    FIELD@2633..2660
+      FIELD_NAME@2633..2643
+        TEXT@2633..2643 "translator"
+      WHITESPACE@2643..2646 "   "
+      EQUALS@2646..2647 "="
+      WHITESPACE@2647..2648 " "
+      FIELD_VALUE@2648..2659
+        LBRACE@2648..2649 "{"
+        STRING@2649..2658
+          TEXT@2649..2658 "Hercz, J."
+        RBRACE@2658..2659 "}"
+      COMMA@2659..2660 ","
+    NEWLINE@2660..2661 "\n"
+    WHITESPACE@2661..2663 "  "
+    FIELD@2663..2691
+      FIELD_NAME@2663..2672
+        TEXT@2663..2672 "publisher"
+      WHITESPACE@2672..2676 "    "
+      EQUALS@2676..2677 "="
+      WHITESPACE@2677..2678 " "
+      FIELD_VALUE@2678..2690
+        LBRACE@2678..2679 "{"
+        STRING@2679..2689
+          TEXT@2679..2689 "S.~Hermann"
+        RBRACE@2689..2690 "}"
+      COMMA@2690..2691 ","
+    NEWLINE@2691..2692 "\n"
+    WHITESPACE@2692..2694 "  "
+    FIELD@2694..2718
+      FIELD_NAME@2694..2702
+        TEXT@2694..2702 "location"
+      WHITESPACE@2702..2707 "     "
+      EQUALS@2707..2708 "="
+      WHITESPACE@2708..2709 " "
+      FIELD_VALUE@2709..2717
+        LBRACE@2709..2710 "{"
+        STRING@2710..2716
+          TEXT@2710..2716 "Berlin"
+        RBRACE@2716..2717 "}"
+      COMMA@2717..2718 ","
+    NEWLINE@2718..2719 "\n"
+    WHITESPACE@2719..2721 "  "
+    FIELD@2721..2746
+      FIELD_NAME@2721..2729
+        TEXT@2721..2729 "keywords"
+      WHITESPACE@2729..2734 "     "
+      EQUALS@2734..2735 "="
+      WHITESPACE@2735..2736 " "
+      FIELD_VALUE@2736..2745
+        LBRACE@2736..2737 "{"
+        STRING@2737..2744
+          TEXT@2737..2744 "primary"
+        RBRACE@2744..2745 "}"
+      COMMA@2745..2746 ","
+    NEWLINE@2746..2747 "\n"
+    WHITESPACE@2747..2749 "  "
+    FIELD@2749..2773
+      FIELD_NAME@2749..2755
+        TEXT@2749..2755 "langid"
+      WHITESPACE@2755..2762 "       "
+      EQUALS@2762..2763 "="
+      WHITESPACE@2763..2764 " "
+      FIELD_VALUE@2764..2772
+        LBRACE@2764..2765 "{"
+        STRING@2765..2771
+          TEXT@2765..2771 "german"
+        RBRACE@2771..2772 "}"
+      COMMA@2772..2773 ","
+    NEWLINE@2773..2774 "\n"
+    WHITESPACE@2774..2776 "  "
+    FIELD@2776..2833
+      FIELD_NAME@2776..2790
+        TEXT@2776..2790 "indexsorttitle"
+      EQUALS@2790..2791 "="
+      WHITESPACE@2791..2792 " "
+      FIELD_VALUE@2792..2832
+        LBRACE@2792..2793 "{"
+        STRING@2793..2831
+          TEXT@2793..2831 "Drei Abhandlungen ube ..."
+        RBRACE@2831..2832 "}"
+      COMMA@2832..2833 ","
+    NEWLINE@2833..2834 "\n"
+    WHITESPACE@2834..2836 "  "
+    FIELD@2836..2896
+      FIELD_NAME@2836..2846
+        TEXT@2836..2846 "indextitle"
+      WHITESPACE@2846..2849 "   "
+      EQUALS@2849..2850 "="
+      WHITESPACE@2850..2851 " "
+      FIELD_VALUE@2851..2895
+        LBRACE@2851..2852 "{"
+        STRING@2852..2894
+          TEXT@2852..2894 "Drei Abhandlungen {\\\" ..."
+        RBRACE@2894..2895 "}"
+      COMMA@2895..2896 ","
+    NEWLINE@2896..2897 "\n"
+    WHITESPACE@2897..2899 "  "
+    FIELD@2899..3020
+      FIELD_NAME@2899..2907
+        TEXT@2899..2907 "subtitle"
+      WHITESPACE@2907..2912 "     "
+      EQUALS@2912..2913 "="
+      WHITESPACE@2913..2914 " "
+      FIELD_VALUE@2914..3019
+        LBRACE@2914..2915 "{"
+        STRING@2915..3018
+          TEXT@2915..3018 "Von Averroes (Vater u ..."
+        RBRACE@3018..3019 "}"
+      COMMA@3019..3020 ","
+    NEWLINE@3020..3021 "\n"
+    WHITESPACE@3021..3023 "  "
+    FIELD@3023..3058
+      FIELD_NAME@3023..3033
+        TEXT@3023..3033 "shorttitle"
+      WHITESPACE@3033..3036 "   "
+      EQUALS@3036..3037 "="
+      WHITESPACE@3037..3038 " "
+      FIELD_VALUE@3038..3057
+        LBRACE@3038..3039 "{"
+        STRING@3039..3056
+          TEXT@3039..3056 "Drei Abhandlungen"
+        RBRACE@3056..3057 "}"
+      COMMA@3057..3058 ","
+    NEWLINE@3058..3059 "\n"
+    WHITESPACE@3059..3061 "  "
+    FIELD@3061..3284
+      FIELD_NAME@3061..3071
+        TEXT@3061..3071 "annotation"
+      WHITESPACE@3071..3074 "   "
+      EQUALS@3074..3075 "="
+      WHITESPACE@3075..3076 " "
+      FIELD_VALUE@3076..3283
+        LBRACE@3076..3077 "{"
+        STRING@3077..3282
+          TEXT@3077..3282 "A \\texttt{book} entry ..."
+        RBRACE@3282..3283 "}"
+      COMMA@3283..3284 ","
+    NEWLINE@3284..3285 "\n"
+    RBRACE@3285..3286 "}"
+  NEWLINE@3286..3287 "\n"
+  NEWLINE@3287..3288 "\n"
+  ENTRY@3288..4122
+    AT_MARK@3288..3289 "@"
+    ENTRY_TYPE@3289..3293
+      TEXT@3289..3293 "book"
+    LBRACE@3293..3294 "{"
+    ENTRY_KEY@3294..3300
+      TEXT@3294..3300 "cicero"
+    COMMA@3300..3301 ","
+    NEWLINE@3301..3302 "\n"
+    WHITESPACE@3302..3304 "  "
+    FIELD@3304..3344
+      FIELD_NAME@3304..3310
+        TEXT@3304..3310 "author"
+      WHITESPACE@3310..3317 "       "
+      EQUALS@3317..3318 "="
+      WHITESPACE@3318..3319 " "
+      FIELD_VALUE@3319..3343
+        LBRACE@3319..3320 "{"
+        STRING@3320..3342
+          TEXT@3320..3342 "Cicero, Marcus Tullius"
+        RBRACE@3342..3343 "}"
+      COMMA@3343..3344 ","
+    NEWLINE@3344..3345 "\n"
+    WHITESPACE@3345..3347 "  "
+    FIELD@3347..3416
+      FIELD_NAME@3347..3352
+        TEXT@3347..3352 "title"
+      WHITESPACE@3352..3360 "        "
+      EQUALS@3360..3361 "="
+      WHITESPACE@3361..3362 " "
+      FIELD_VALUE@3362..3415
+        LBRACE@3362..3363 "{"
+        STRING@3363..3414
+          TEXT@3363..3414 "De natura deorum. {\\\" ..."
+        RBRACE@3414..3415 "}"
+      COMMA@3415..3416 ","
+    NEWLINE@3416..3417 "\n"
+    WHITESPACE@3417..3419 "  "
+    FIELD@3419..3439
+      FIELD_NAME@3419..3423
+        TEXT@3419..3423 "date"
+      WHITESPACE@3423..3432 "         "
+      EQUALS@3432..3433 "="
+      WHITESPACE@3433..3434 " "
+      FIELD_VALUE@3434..3438
+        STRING@3434..3438
+          TEXT@3434..3438 "1995"
+      COMMA@3438..3439 ","
+    NEWLINE@3439..3440 "\n"
+    WHITESPACE@3440..3442 "  "
+    FIELD@3442..3485
+      FIELD_NAME@3442..3448
+        TEXT@3442..3448 "editor"
+      WHITESPACE@3448..3455 "       "
+      EQUALS@3455..3456 "="
+      WHITESPACE@3456..3457 " "
+      FIELD_VALUE@3457..3484
+        LBRACE@3457..3458 "{"
+        STRING@3458..3483
+          TEXT@3458..3483 "Blank-Sangmeister, Ur ..."
+        RBRACE@3483..3484 "}"
+      COMMA@3484..3485 ","
+    NEWLINE@3485..3486 "\n"
+    WHITESPACE@3486..3488 "  "
+    FIELD@3488..3531
+      FIELD_NAME@3488..3498
+        TEXT@3488..3498 "translator"
+      WHITESPACE@3498..3501 "   "
+      EQUALS@3501..3502 "="
+      WHITESPACE@3502..3503 " "
+      FIELD_VALUE@3503..3530
+        LBRACE@3503..3504 "{"
+        STRING@3504..3529
+          TEXT@3504..3529 "Blank-Sangmeister, Ur ..."
+        RBRACE@3529..3530 "}"
+      COMMA@3530..3531 ","
+    NEWLINE@3531..3532 "\n"
+    WHITESPACE@3532..3534 "  "
+    FIELD@3534..3566
+      FIELD_NAME@3534..3543
+        TEXT@3534..3543 "afterword"
+      WHITESPACE@3543..3547 "    "
+      EQUALS@3547..3548 "="
+      WHITESPACE@3548..3549 " "
+      FIELD_VALUE@3549..3565
+        LBRACE@3549..3550 "{"
+        STRING@3550..3564
+          TEXT@3550..3564 "Thraede, Klaus"
+        RBRACE@3564..3565 "}"
+      COMMA@3565..3566 ","
+    NEWLINE@3566..3567 "\n"
+    WHITESPACE@3567..3569 "  "
+    FIELD@3569..3611
+      FIELD_NAME@3569..3577
+        TEXT@3569..3577 "language"
+      WHITESPACE@3577..3582 "     "
+      EQUALS@3582..3583 "="
+      WHITESPACE@3583..3584 " "
+      FIELD_VALUE@3584..3610
+        LBRACE@3584..3585 "{"
+        STRING@3585..3609
+          TEXT@3585..3609 "langlatin and langgerman"
+        RBRACE@3609..3610 "}"
+      COMMA@3610..3611 ","
+    NEWLINE@3611..3612 "\n"
+    WHITESPACE@3612..3614 "  "
+    FIELD@3614..3638
+      FIELD_NAME@3614..3623
+        TEXT@3614..3623 "publisher"
+      WHITESPACE@3623..3627 "    "
+      EQUALS@3627..3628 "="
+      WHITESPACE@3628..3629 " "
+      FIELD_VALUE@3629..3637
+        LBRACE@3629..3630 "{"
+        STRING@3630..3636
+          TEXT@3630..3636 "Reclam"
+        RBRACE@3636..3637 "}"
+      COMMA@3637..3638 ","
+    NEWLINE@3638..3639 "\n"
+    WHITESPACE@3639..3641 "  "
+    FIELD@3641..3668
+      FIELD_NAME@3641..3649
+        TEXT@3641..3649 "location"
+      WHITESPACE@3649..3654 "     "
+      EQUALS@3654..3655 "="
+      WHITESPACE@3655..3656 " "
+      FIELD_VALUE@3656..3667
+        LBRACE@3656..3657 "{"
+        STRING@3657..3666
+          TEXT@3657..3666 "Stuttgart"
+        RBRACE@3666..3667 "}"
+      COMMA@3667..3668 ","
+    NEWLINE@3668..3669 "\n"
+    WHITESPACE@3669..3671 "  "
+    FIELD@3671..3695
+      FIELD_NAME@3671..3677
+        TEXT@3671..3677 "langid"
+      WHITESPACE@3677..3684 "       "
+      EQUALS@3684..3685 "="
+      WHITESPACE@3685..3686 " "
+      FIELD_VALUE@3686..3694
+        LBRACE@3686..3687 "{"
+        STRING@3687..3693
+          TEXT@3687..3693 "german"
+        RBRACE@3693..3694 "}"
+      COMMA@3694..3695 ","
+    NEWLINE@3695..3696 "\n"
+    WHITESPACE@3696..3698 "  "
+    FIELD@3698..3732
+      FIELD_NAME@3698..3708
+        TEXT@3698..3708 "indextitle"
+      WHITESPACE@3708..3711 "   "
+      EQUALS@3711..3712 "="
+      WHITESPACE@3712..3713 " "
+      FIELD_VALUE@3713..3731
+        LBRACE@3713..3714 "{"
+        STRING@3714..3730
+          TEXT@3714..3730 "De natura deorum"
+        RBRACE@3730..3731 "}"
+      COMMA@3731..3732 ","
+    NEWLINE@3732..3733 "\n"
+    WHITESPACE@3733..3735 "  "
+    FIELD@3735..3769
+      FIELD_NAME@3735..3745
+        TEXT@3735..3745 "shorttitle"
+      WHITESPACE@3745..3748 "   "
+      EQUALS@3748..3749 "="
+      WHITESPACE@3749..3750 " "
+      FIELD_VALUE@3750..3768
+        LBRACE@3750..3751 "{"
+        STRING@3751..3767
+          TEXT@3751..3767 "De natura deorum"
+        RBRACE@3767..3768 "}"
+      COMMA@3768..3769 ","
+    NEWLINE@3769..3770 "\n"
+    WHITESPACE@3770..3772 "  "
+    FIELD@3772..4120
+      FIELD_NAME@3772..3782
+        TEXT@3772..3782 "annotation"
+      WHITESPACE@3782..3785 "   "
+      EQUALS@3785..3786 "="
+      WHITESPACE@3786..3787 " "
+      FIELD_VALUE@3787..4119
+        LBRACE@3787..3788 "{"
+        STRING@3788..4118
+          TEXT@3788..4118 "A bilingual edition o ..."
+        RBRACE@4118..4119 "}"
+      COMMA@4119..4120 ","
+    NEWLINE@4120..4121 "\n"
+    RBRACE@4121..4122 "}"
+  NEWLINE@4122..4123 "\n"
+

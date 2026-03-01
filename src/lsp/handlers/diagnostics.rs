@@ -99,6 +99,57 @@ fn check_bibliography_files(metadata: &DocumentMetadata, text: &str) -> Vec<Diag
     diagnostics
 }
 
+fn check_bibliography_parse(metadata: &DocumentMetadata, _text: &str) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    let Some(parse) = metadata.bibliography_parse.as_ref() else {
+        return diagnostics;
+    };
+
+    for error in &parse.index.load_errors {
+        diagnostics.push(Diagnostic {
+            range: Range {
+                start: Position::default(),
+                end: Position::default(),
+            },
+            severity: Some(DiagnosticSeverity::ERROR),
+            code: Some(NumberOrString::String(
+                "bibliography-load-error".to_string(),
+            )),
+            source: Some("panache".to_string()),
+            message: format!(
+                "Failed to load bibliography {}: {}",
+                error.path.display(),
+                error.message
+            ),
+            ..Default::default()
+        });
+    }
+
+    for duplicate in &parse.index.duplicates {
+        diagnostics.push(Diagnostic {
+            range: Range {
+                start: Position::default(),
+                end: Position::default(),
+            },
+            severity: Some(DiagnosticSeverity::WARNING),
+            code: Some(NumberOrString::String(
+                "duplicate-bibliography-key".to_string(),
+            )),
+            source: Some("panache".to_string()),
+            message: format!(
+                "Duplicate bibliography key '{}' in {} and {}",
+                duplicate.key,
+                duplicate.first.file.display(),
+                duplicate.duplicate.file.display()
+            ),
+            ..Default::default()
+        });
+    }
+
+    diagnostics
+}
+
 /// Parse document and run linter, then publish diagnostics
 pub(crate) async fn lint_and_publish(
     client: &Client,
@@ -123,12 +174,14 @@ pub(crate) async fn lint_and_publish(
     };
 
     let text = doc_state.text;
+    let metadata = doc_state.metadata.clone();
     let mut all_diagnostics = Vec::new();
 
     // Check for YAML metadata errors
     if let Some(ref metadata) = doc_state.metadata {
         // Check for missing bibliography files
         all_diagnostics.extend(check_bibliography_files(metadata, &text));
+        all_diagnostics.extend(check_bibliography_parse(metadata, &text));
     } else {
         // Metadata parsing failed - try to get the error
         // Re-parse to get the error (this is a bit wasteful, but errors are rare)
@@ -147,6 +200,7 @@ pub(crate) async fn lint_and_publish(
 
     // Parse and lint (including external linters) in blocking task
     let text_clone = text.clone();
+    let metadata = metadata.clone();
     let has_external_linters = !config.linters.is_empty();
 
     let diagnostics = if has_external_linters {
@@ -155,14 +209,19 @@ pub(crate) async fn lint_and_publish(
             let tree = crate::parse(&text_clone, Some(config.clone()));
             // Create a runtime for the async lint function
             let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(linter::lint_with_external(&tree, &text_clone, &config))
+            rt.block_on(linter::lint_with_external_and_metadata(
+                &tree,
+                &text_clone,
+                &config,
+                metadata.as_ref(),
+            ))
         })
         .await
     } else {
         // Regular sync lint for built-in rules only
         tokio::task::spawn_blocking(move || {
             let tree = crate::parse(&text_clone, Some(config.clone()));
-            linter::lint(&tree, &text_clone, &config)
+            linter::lint_with_metadata(&tree, &text_clone, &config, metadata.as_ref())
         })
         .await
     };

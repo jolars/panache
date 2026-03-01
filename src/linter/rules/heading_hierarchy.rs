@@ -10,7 +10,13 @@ impl Rule for HeadingHierarchyRule {
         "heading-hierarchy"
     }
 
-    fn check(&self, tree: &SyntaxNode, input: &str, _config: &Config) -> Vec<Diagnostic> {
+    fn check(
+        &self,
+        tree: &SyntaxNode,
+        input: &str,
+        _config: &Config,
+        _metadata: Option<&crate::metadata::DocumentMetadata>,
+    ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
         let headings = collect_headings(tree);
 
@@ -109,7 +115,7 @@ mod tests {
         let tree = crate::parser::parse(input, Some(config.clone()));
 
         let rule = HeadingHierarchyRule;
-        rule.check(&tree, input, &config)
+        rule.check(&tree, input, &config, None)
     }
 
     #[test]

@@ -245,14 +245,83 @@ pub(crate) fn emit_bracketed_citation(builder: &mut GreenNodeBuilder, content: &
     // Opening bracket
     builder.token(SyntaxKind::LINK_START.into(), "[");
 
-    // The content contains the citation(s) and any prefix/suffix text
-    // We emit it as raw text for now - the formatter can handle the structure
-    builder.token(SyntaxKind::CITATION_CONTENT.into(), content);
+    // Emit prefix + citations + suffix with fine-grained tokens.
+    emit_bracketed_citation_content(builder, content);
 
     // Closing bracket
     builder.token(SyntaxKind::LINK_DEST.into(), "]");
 
     builder.finish_node();
+}
+
+fn emit_bracketed_citation_content(builder: &mut GreenNodeBuilder, content: &str) {
+    let bytes = content.as_bytes();
+    let mut pos = 0;
+    let mut text_start = 0;
+
+    while pos < bytes.len() {
+        let byte = bytes[pos];
+        if byte == b'@' || (byte == b'-' && pos + 1 < bytes.len() && bytes[pos + 1] == b'@') {
+            if pos > text_start {
+                builder.token(
+                    SyntaxKind::CITATION_CONTENT.into(),
+                    &content[text_start..pos],
+                );
+            }
+
+            let has_suppress = byte == b'-';
+            let marker_len = if has_suppress { 2 } else { 1 };
+            let marker_text = if has_suppress { "-@" } else { "@" };
+            builder.token(SyntaxKind::CITATION_MARKER.into(), marker_text);
+
+            let key_start = pos + marker_len;
+            if key_start >= bytes.len() {
+                text_start = pos + marker_len;
+                pos = key_start;
+                continue;
+            }
+
+            if let Some(key_len) = parse_citation_key(&content[key_start..]) {
+                let key_end = key_start + key_len;
+                let key = &content[key_start..key_end];
+                if key.starts_with('{') && key.ends_with('}') {
+                    builder.token(SyntaxKind::CITATION_BRACE_OPEN.into(), "{");
+                    if key.len() > 2 {
+                        builder.token(SyntaxKind::CITATION_KEY.into(), &key[1..key.len() - 1]);
+                    }
+                    builder.token(SyntaxKind::CITATION_BRACE_CLOSE.into(), "}");
+                } else {
+                    builder.token(SyntaxKind::CITATION_KEY.into(), key);
+                }
+                pos = key_end;
+                text_start = pos;
+                continue;
+            }
+
+            text_start = pos + marker_len;
+            pos = text_start;
+            continue;
+        }
+
+        if byte == b';' {
+            if pos > text_start {
+                builder.token(
+                    SyntaxKind::CITATION_CONTENT.into(),
+                    &content[text_start..pos],
+                );
+            }
+            builder.token(SyntaxKind::CITATION_SEPARATOR.into(), ";");
+            pos += 1;
+            text_start = pos;
+            continue;
+        }
+
+        pos += 1;
+    }
+
+    if text_start < content.len() {
+        builder.token(SyntaxKind::CITATION_CONTENT.into(), &content[text_start..]);
+    }
 }
 
 /// Emit a bare citation node to the builder.

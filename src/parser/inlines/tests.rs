@@ -137,6 +137,45 @@ mod link_tests {
 }
 
 #[cfg(test)]
+mod citation_tests {
+    use crate::syntax::SyntaxKind;
+
+    fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
+        crate::parser::parse(input, None)
+    }
+
+    fn find_citation_keys(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut keys = Vec::new();
+        for element in node.descendants_with_tokens() {
+            if let Some(token) = element.into_token()
+                && token.kind() == SyntaxKind::CITATION_KEY
+            {
+                keys.push(token.text().to_string());
+            }
+        }
+        keys
+    }
+
+    #[test]
+    fn test_bracketed_citation_keys() {
+        let input = "Text [@doe99; @smith2000].";
+        let inline_tree = parse_inline(input);
+
+        let keys = find_citation_keys(&inline_tree);
+        assert_eq!(keys, vec!["doe99", "smith2000"]);
+    }
+
+    #[test]
+    fn test_bare_citation_key() {
+        let input = "See @doe99 for details.";
+        let inline_tree = parse_inline(input);
+
+        let keys = find_citation_keys(&inline_tree);
+        assert_eq!(keys, vec!["doe99"]);
+    }
+}
+
+#[cfg(test)]
 mod code_tests {
 
     use crate::syntax::SyntaxKind;

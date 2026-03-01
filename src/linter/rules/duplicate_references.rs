@@ -12,7 +12,13 @@ impl Rule for DuplicateReferencesRule {
         "duplicate-reference-labels"
     }
 
-    fn check(&self, tree: &SyntaxNode, input: &str, _config: &Config) -> Vec<Diagnostic> {
+    fn check(
+        &self,
+        tree: &SyntaxNode,
+        input: &str,
+        _config: &Config,
+        _metadata: Option<&crate::metadata::DocumentMetadata>,
+    ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
 
         // Check for duplicate reference definitions
@@ -104,7 +110,7 @@ mod tests {
         let tree = crate::parser::parse(input, Some(config.clone()));
 
         let rule = DuplicateReferencesRule;
-        rule.check(&tree, input, &config)
+        rule.check(&tree, input, &config, None)
     }
 
     #[test]

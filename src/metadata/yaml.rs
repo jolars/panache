@@ -6,7 +6,9 @@ use rowan::TextSize;
 use serde::Deserialize;
 use serde_saphyr::Spanned;
 
+use super::BibliographyParse;
 use super::DocumentMetadata;
+use crate::bibtex;
 
 /// Errors that can occur during YAML parsing.
 #[derive(Debug, Clone)]
@@ -114,8 +116,14 @@ pub(super) fn parse_frontmatter(
         })
         .transpose()?;
 
+    let bibliography_parse = bibliography.as_ref().map(|info| BibliographyParse {
+        index: bibtex::load_bibliography(&info.paths),
+    });
+
     Ok(DocumentMetadata {
         bibliography,
+        bibliography_parse,
+        citations: super::CitationInfo { keys: Vec::new() },
         title: frontmatter.title,
         raw_yaml: yaml_content.to_string(),
     })
@@ -171,6 +179,7 @@ mod tests {
 
         let metadata = result.unwrap();
         assert_eq!(metadata.title.as_deref(), Some("My Document"));
+        assert!(metadata.citations.keys.is_empty());
     }
 
     #[test]

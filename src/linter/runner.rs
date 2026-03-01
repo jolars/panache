@@ -25,12 +25,22 @@ impl LintRunner {
     }
 
     pub fn run(&self, tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> {
+        self.run_with_metadata(tree, input, config, None)
+    }
+
+    pub fn run_with_metadata(
+        &self,
+        tree: &SyntaxNode,
+        input: &str,
+        config: &Config,
+        metadata: Option<&crate::metadata::DocumentMetadata>,
+    ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
 
         // Run built-in rules
         for rule in self.registry.rules() {
             log::debug!("Running lint rule: {}", rule.name());
-            let rule_diagnostics = rule.check(tree, input, config);
+            let rule_diagnostics = rule.check(tree, input, config, metadata);
             log::debug!(
                 "Rule {} found {} diagnostic(s)",
                 rule.name(),
@@ -50,8 +60,9 @@ impl LintRunner {
         tree: &SyntaxNode,
         input: &str,
         config: &Config,
+        metadata: Option<&crate::metadata::DocumentMetadata>,
     ) -> Vec<Diagnostic> {
-        let mut diagnostics = self.run(tree, input, config);
+        let mut diagnostics = self.run_with_metadata(tree, input, config, metadata);
 
         // If no external linters configured, return early
         if config.linters.is_empty() {
@@ -107,8 +118,9 @@ impl LintRunner {
         tree: &SyntaxNode,
         input: &str,
         config: &Config,
+        metadata: Option<&crate::metadata::DocumentMetadata>,
     ) -> Vec<Diagnostic> {
-        let mut diagnostics = self.run(tree, input, config);
+        let mut diagnostics = self.run_with_metadata(tree, input, config, metadata);
 
         // If no external linters configured, return early
         if config.linters.is_empty() {

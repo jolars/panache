@@ -26,7 +26,7 @@ pub fn lint(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> 
 pub fn lint_with_external_sync(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> {
     let registry = default_registry();
     let runner = LintRunner::new(registry);
-    runner.run_with_external_linters_sync(tree, input, config)
+    runner.run_with_external_linters_sync(tree, input, config, None)
 }
 
 /// Lint a document with external linters (async version for LSP).
@@ -38,7 +38,46 @@ pub async fn lint_with_external(
 ) -> Vec<Diagnostic> {
     let registry = default_registry();
     let runner = LintRunner::new(registry);
-    runner.run_with_external_linters(tree, input, config).await
+    runner
+        .run_with_external_linters(tree, input, config, None)
+        .await
+}
+
+pub fn lint_with_metadata(
+    tree: &SyntaxNode,
+    input: &str,
+    config: &Config,
+    metadata: Option<&crate::metadata::DocumentMetadata>,
+) -> Vec<Diagnostic> {
+    let registry = default_registry();
+    let runner = LintRunner::new(registry);
+    runner.run_with_metadata(tree, input, config, metadata)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn lint_with_external_sync_and_metadata(
+    tree: &SyntaxNode,
+    input: &str,
+    config: &Config,
+    metadata: Option<&crate::metadata::DocumentMetadata>,
+) -> Vec<Diagnostic> {
+    let registry = default_registry();
+    let runner = LintRunner::new(registry);
+    runner.run_with_external_linters_sync(tree, input, config, metadata)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn lint_with_external_and_metadata(
+    tree: &SyntaxNode,
+    input: &str,
+    config: &Config,
+    metadata: Option<&crate::metadata::DocumentMetadata>,
+) -> Vec<Diagnostic> {
+    let registry = default_registry();
+    let runner = LintRunner::new(registry);
+    runner
+        .run_with_external_linters(tree, input, config, metadata)
+        .await
 }
 
 /// Create the default rule registry with all built-in rules.
@@ -48,5 +87,6 @@ fn default_registry() -> RuleRegistry {
     registry.register(Box::new(
         rules::duplicate_references::DuplicateReferencesRule,
     ));
+    registry.register(Box::new(rules::citation_keys::CitationKeysRule));
     registry
 }

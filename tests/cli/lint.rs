@@ -129,3 +129,29 @@ fn test_lint_stdin() {
         .success()
         .stdout(predicate::str::contains("warning"));
 }
+
+#[test]
+fn test_lint_bibliography_integration() {
+    let temp_dir = TempDir::new().unwrap();
+    let bib_path = temp_dir.path().join("refs.bib");
+    let doc_path = temp_dir.path().join("doc.qmd");
+
+    fs::write(
+        &bib_path,
+        "@article{known,\n  title = {Known Title},\n  author = {Doe, Jane},\n  year = {2020}\n}\n",
+    )
+    .unwrap();
+
+    fs::write(
+        &doc_path,
+        "---\nbibliography: refs.bib\n---\n\nCite [@known; @missing].\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("missing-bibliography-key"))
+        .stdout(predicate::str::contains("missing"));
+}

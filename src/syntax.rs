@@ -6,6 +6,7 @@
 
 mod ast;
 mod chunk_options;
+mod citations;
 mod headings;
 mod kind;
 mod links;
@@ -15,6 +16,7 @@ mod tables;
 
 pub use ast::*;
 pub use chunk_options::*;
+pub use citations::*;
 pub use headings::*;
 pub use kind::*;
 pub use links::*;

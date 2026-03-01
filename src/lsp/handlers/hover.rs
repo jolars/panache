@@ -25,6 +25,12 @@ pub(crate) async fn hover(
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
+    let metadata = {
+        let map = document_map.lock().await;
+        map.get(&uri.to_string())
+            .and_then(|state| state.metadata.clone())
+    };
+
     let Some((content, root)) = helpers::get_document_content_and_tree(&document_map, uri).await
     else {
         return Ok(None);
@@ -40,7 +46,7 @@ pub(crate) async fn hover(
         return Ok(None);
     };
 
-    // Walk up the tree to find a footnote reference
+    // Walk up the tree to find a footnote reference or citation
     loop {
         if let Some((label, is_footnote)) = helpers::extract_reference_label(&node) {
             // Only handle footnotes (not regular references)
@@ -70,12 +76,60 @@ pub(crate) async fn hover(
             }
         }
 
+        if let Some(key) = helpers::extract_citation_key(&node)
+            && let Some(metadata) = metadata.clone()
+            && let Some(parse) = metadata.bibliography_parse
+            && let Some(entry) = parse.index.find_entry(&key)
+        {
+            let summary = format_bibtex_entry(entry);
+            if !summary.is_empty() {
+                return Ok(Some(Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: summary,
+                    }),
+                    range: None,
+                }));
+            }
+        }
+
         // Move up to parent, or return None if at root
         match node.parent() {
             Some(parent) => node = parent,
             None => return Ok(None),
         }
     }
+}
+
+fn format_bibtex_entry(entry: &crate::bibtex::BibEntry) -> String {
+    let mut parts = Vec::new();
+    if let Some(author) = entry
+        .fields
+        .iter()
+        .find(|field| field.name.eq_ignore_ascii_case("author"))
+    {
+        parts.push(author.value.trim().to_string());
+    }
+    if let Some(year) = entry
+        .fields
+        .iter()
+        .find(|field| field.name.eq_ignore_ascii_case("year"))
+    {
+        parts.push(year.value.trim().to_string());
+    }
+    if let Some(title) = entry
+        .fields
+        .iter()
+        .find(|field| field.name.eq_ignore_ascii_case("title"))
+    {
+        parts.push(format!("*{}*", title.value.trim()));
+    }
+
+    if parts.is_empty() {
+        return String::new();
+    }
+
+    parts.join(" — ")
 }
 #[cfg(test)]
 mod tests {

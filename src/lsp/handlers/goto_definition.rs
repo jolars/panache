@@ -26,6 +26,12 @@ pub(crate) async fn goto_definition(
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
+    let metadata = {
+        let map = document_map.lock().await;
+        map.get(&uri.to_string())
+            .and_then(|state| state.metadata.clone())
+    };
+
     let Some((content, root)) = helpers::get_document_content_and_tree(&document_map, uri).await
     else {
         return Ok(None);
@@ -36,7 +42,29 @@ pub(crate) async fn goto_definition(
         return Ok(None);
     };
 
-    // Find the definition at this offset
+    // First: citation definitions in bibliography
+    if let Some(node) = helpers::find_node_at_offset(&root, offset)
+        && let Some(key) = helpers::extract_citation_key(&node)
+        && let Some(metadata) = metadata
+        && let Some(parse) = metadata.bibliography_parse
+        && let Some(location) = parse.index.get(&key)
+    {
+        let target_uri = Uri::from_file_path(&location.file).unwrap_or_else(|| uri.clone());
+        let (target_text, target_uri) = if let Ok(text) = std::fs::read_to_string(&location.file) {
+            (text, target_uri)
+        } else {
+            (content.clone(), uri.clone())
+        };
+        let start = conversions::offset_to_position(&target_text, location.span.start);
+        let end = conversions::offset_to_position(&target_text, location.span.end);
+        let location = Location {
+            uri: target_uri,
+            range: Range { start, end },
+        };
+        return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+    }
+
+    // Fallback: find reference/footnote definition at this offset
     let Some(definition_range) = helpers::find_definition_at_offset(&root, offset) else {
         return Ok(None);
     };

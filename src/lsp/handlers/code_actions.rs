@@ -33,9 +33,13 @@ pub(crate) async fn code_action(
     // Run linter
     let text_clone = text.clone();
     let config_clone = config.clone();
+    let doc_path = uri.to_file_path().map(|path| path.into_owned());
     let diagnostics = tokio::task::spawn_blocking(move || {
         let tree = crate::parse(&text_clone, Some(config_clone.clone()));
-        linter::lint(&tree, &text_clone, &config_clone)
+        let metadata = doc_path
+            .as_ref()
+            .and_then(|path| crate::metadata::extract_metadata(&tree, path).ok());
+        linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref())
     })
     .await
     .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;

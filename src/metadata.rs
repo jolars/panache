@@ -29,9 +29,12 @@
 use std::path::Path;
 
 mod bibliography;
+mod citations;
 mod yaml;
 
 pub use bibliography::BibliographyInfo;
+pub use bibliography::BibliographyParse;
+pub use citations::{CitationInfo, extract_citations};
 pub use yaml::YamlError;
 
 /// Structured metadata extracted from document frontmatter.
@@ -39,6 +42,10 @@ pub use yaml::YamlError;
 pub struct DocumentMetadata {
     /// Bibliography information (files and their source positions).
     pub bibliography: Option<BibliographyInfo>,
+    /// Parsed bibliography data (if available).
+    pub bibliography_parse: Option<BibliographyParse>,
+    /// Citation keys in the document.
+    pub citations: CitationInfo,
     /// Document title.
     pub title: Option<String>,
     /// Raw YAML text for future queries.
@@ -73,7 +80,9 @@ pub fn extract_metadata(
     let yaml_offset = yaml_node.text_range().start();
 
     // Parse YAML with position tracking
-    yaml::parse_frontmatter(&yaml_text, yaml_offset, doc_path)
+    let mut metadata = yaml::parse_frontmatter(&yaml_text, yaml_offset, doc_path)?;
+    metadata.citations = extract_citations(tree);
+    Ok(metadata)
 }
 
 /// Find the first YamlMetadata node in the syntax tree.
@@ -113,5 +122,6 @@ mod tests {
 
         assert_eq!(metadata.title.as_deref(), Some("My Document"));
         assert!(metadata.bibliography.is_some());
+        assert!(metadata.citations.keys.is_empty());
     }
 }

@@ -2,12 +2,19 @@ use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
 use crate::syntax::SyntaxNode;
 
+pub mod citation_keys;
 pub mod duplicate_references;
 pub mod heading_hierarchy;
 
 pub trait Rule {
     fn name(&self) -> &str;
-    fn check(&self, tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic>;
+    fn check(
+        &self,
+        tree: &SyntaxNode,
+        input: &str,
+        config: &Config,
+        metadata: Option<&crate::metadata::DocumentMetadata>,
+    ) -> Vec<Diagnostic>;
 }
 
 pub struct RuleRegistry {

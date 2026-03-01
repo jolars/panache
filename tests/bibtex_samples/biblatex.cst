@@ -1,0 +1,392 @@
+BIBTEX_FILE@0..964
+  ENTRY@0..155
+    AT_MARK@0..1 "@"
+    ENTRY_TYPE@1..11
+      TEXT@1..11 "collection"
+    LBRACE@11..12 "{"
+    ENTRY_KEY@12..18
+      TEXT@12..18 "ng2020"
+    COMMA@18..19 ","
+    NEWLINE@19..20 "\n"
+    WHITESPACE@20..22 "  "
+    FIELD@22..67
+      FIELD_NAME@22..27
+        TEXT@22..27 "title"
+      WHITESPACE@27..36 "         "
+      EQUALS@36..37 "="
+      WHITESPACE@37..38 " "
+      FIELD_VALUE@38..66
+        LBRACE@38..39 "{"
+        STRING@39..65
+          TEXT@39..65 "Collected Studies on  ..."
+        RBRACE@65..66 "}"
+      COMMA@66..67 ","
+    NEWLINE@67..68 "\n"
+    WHITESPACE@68..70 "  "
+    FIELD@70..93
+      FIELD_NAME@70..74
+        TEXT@70..74 "year"
+      WHITESPACE@74..84 "          "
+      EQUALS@84..85 "="
+      WHITESPACE@85..86 " "
+      FIELD_VALUE@86..92
+        LBRACE@86..87 "{"
+        STRING@87..91
+          TEXT@87..91 "2020"
+        RBRACE@91..92 "}"
+      COMMA@92..93 ","
+    NEWLINE@93..94 "\n"
+    WHITESPACE@94..96 "  "
+    FIELD@96..125
+      FIELD_NAME@96..105
+        TEXT@96..105 "publisher"
+      WHITESPACE@105..110 "     "
+      EQUALS@110..111 "="
+      WHITESPACE@111..112 " "
+      FIELD_VALUE@112..124
+        LBRACE@112..113 "{"
+        STRING@113..123
+          TEXT@113..123 "Tool House"
+        RBRACE@123..124 "}"
+      COMMA@124..125 ","
+    NEWLINE@125..126 "\n"
+    WHITESPACE@126..128 "  "
+    FIELD@128..154
+      FIELD_NAME@128..134
+        TEXT@128..134 "editor"
+      WHITESPACE@134..142 "        "
+      EQUALS@142..143 "="
+      WHITESPACE@143..144 " "
+      FIELD_VALUE@144..153
+        LBRACE@144..145 "{"
+        STRING@145..152
+          TEXT@145..152 "Ng, Kai"
+        RBRACE@152..153 "}"
+      NEWLINE@153..154 "\n"
+    RBRACE@154..155 "}"
+  NEWLINE@155..156 "\n"
+  NEWLINE@156..157 "\n"
+  ENTRY@157..360
+    AT_MARK@157..158 "@"
+    ENTRY_TYPE@158..170
+      TEXT@158..170 "incollection"
+    LBRACE@170..171 "{"
+    ENTRY_KEY@171..178
+      TEXT@171..178 "rao2020"
+    COMMA@178..179 ","
+    NEWLINE@179..180 "\n"
+    WHITESPACE@180..182 "  "
+    FIELD@182..225
+      FIELD_NAME@182..187
+        TEXT@182..187 "title"
+      WHITESPACE@187..196 "         "
+      EQUALS@196..197 "="
+      WHITESPACE@197..198 " "
+      FIELD_VALUE@198..224
+        LBRACE@198..199 "{"
+        STRING@199..223
+          TEXT@199..223 "A Chapter on Instruments"
+        RBRACE@223..224 "}"
+      COMMA@224..225 ","
+    NEWLINE@225..226 "\n"
+    WHITESPACE@226..228 "  "
+    FIELD@228..257
+      FIELD_NAME@228..234
+        TEXT@228..234 "author"
+      WHITESPACE@234..242 "        "
+      EQUALS@242..243 "="
+      WHITESPACE@243..244 " "
+      FIELD_VALUE@244..256
+        LBRACE@244..245 "{"
+        STRING@245..255
+          TEXT@245..255 "Rao, Priya"
+        RBRACE@255..256 "}"
+      COMMA@256..257 ","
+    NEWLINE@257..258 "\n"
+    WHITESPACE@258..260 "  "
+    FIELD@260..283
+      FIELD_NAME@260..264
+        TEXT@260..264 "year"
+      WHITESPACE@264..274 "          "
+      EQUALS@274..275 "="
+      WHITESPACE@275..276 " "
+      FIELD_VALUE@276..282
+        LBRACE@276..277 "{"
+        STRING@277..281
+          TEXT@277..281 "2020"
+        RBRACE@281..282 "}"
+      COMMA@282..283 ","
+    NEWLINE@283..284 "\n"
+    WHITESPACE@284..286 "  "
+    FIELD@286..331
+      FIELD_NAME@286..295
+        TEXT@286..295 "booktitle"
+      WHITESPACE@295..300 "     "
+      EQUALS@300..301 "="
+      WHITESPACE@301..302 " "
+      FIELD_VALUE@302..330
+        LBRACE@302..303 "{"
+        STRING@303..329
+          TEXT@303..329 "Collected Studies on  ..."
+        RBRACE@329..330 "}"
+      COMMA@330..331 ","
+    NEWLINE@331..332 "\n"
+    WHITESPACE@332..334 "  "
+    FIELD@334..359
+      FIELD_NAME@334..339
+        TEXT@334..339 "pages"
+      WHITESPACE@339..348 "         "
+      EQUALS@348..349 "="
+      WHITESPACE@349..350 " "
+      FIELD_VALUE@350..358
+        LBRACE@350..351 "{"
+        STRING@351..357
+          TEXT@351..357 "33--50"
+        RBRACE@357..358 "}"
+      NEWLINE@358..359 "\n"
+    RBRACE@359..360 "}"
+  NEWLINE@360..361 "\n"
+  NEWLINE@361..362 "\n"
+  ENTRY@362..560
+    AT_MARK@362..363 "@"
+    ENTRY_TYPE@363..369
+      TEXT@363..369 "report"
+    LBRACE@369..370 "{"
+    ENTRY_KEY@370..379
+      TEXT@370..379 "zhang2021"
+    COMMA@379..380 ","
+    NEWLINE@380..381 "\n"
+    WHITESPACE@381..383 "  "
+    FIELD@383..426
+      FIELD_NAME@383..388
+        TEXT@383..388 "title"
+      WHITESPACE@388..397 "         "
+      EQUALS@397..398 "="
+      WHITESPACE@398..399 " "
+      FIELD_VALUE@399..425
+        LBRACE@399..400 "{"
+        STRING@400..424
+          TEXT@400..424 "Annual Report on Devices"
+        RBRACE@424..425 "}"
+      COMMA@425..426 ","
+    NEWLINE@426..427 "\n"
+    WHITESPACE@427..429 "  "
+    FIELD@429..457
+      FIELD_NAME@429..435
+        TEXT@429..435 "author"
+      WHITESPACE@435..443 "        "
+      EQUALS@443..444 "="
+      WHITESPACE@444..445 " "
+      FIELD_VALUE@445..456
+        LBRACE@445..446 "{"
+        STRING@446..455
+          TEXT@446..455 "Zhang, Li"
+        RBRACE@455..456 "}"
+      COMMA@456..457 ","
+    NEWLINE@457..458 "\n"
+    WHITESPACE@458..460 "  "
+    FIELD@460..483
+      FIELD_NAME@460..464
+        TEXT@460..464 "year"
+      WHITESPACE@464..474 "          "
+      EQUALS@474..475 "="
+      WHITESPACE@475..476 " "
+      FIELD_VALUE@476..482
+        LBRACE@476..477 "{"
+        STRING@477..481
+          TEXT@477..481 "2021"
+        RBRACE@481..482 "}"
+      COMMA@482..483 ","
+    NEWLINE@483..484 "\n"
+    WHITESPACE@484..486 "  "
+    FIELD@486..521
+      FIELD_NAME@486..497
+        TEXT@486..497 "institution"
+      WHITESPACE@497..500 "   "
+      EQUALS@500..501 "="
+      WHITESPACE@501..502 " "
+      FIELD_VALUE@502..520
+        LBRACE@502..503 "{"
+        STRING@503..519
+          TEXT@503..519 "Device Institute"
+        RBRACE@519..520 "}"
+      COMMA@520..521 ","
+    NEWLINE@521..522 "\n"
+    WHITESPACE@522..524 "  "
+    FIELD@524..559
+      FIELD_NAME@524..528
+        TEXT@524..528 "type"
+      WHITESPACE@528..538 "          "
+      EQUALS@538..539 "="
+      WHITESPACE@539..540 " "
+      FIELD_VALUE@540..558
+        LBRACE@540..541 "{"
+        STRING@541..557
+          TEXT@541..557 "Technical report"
+        RBRACE@557..558 "}"
+      NEWLINE@558..559 "\n"
+    RBRACE@559..560 "}"
+  NEWLINE@560..561 "\n"
+  NEWLINE@561..562 "\n"
+  ENTRY@562..751
+    AT_MARK@562..563 "@"
+    ENTRY_TYPE@563..571
+      TEXT@563..571 "software"
+    LBRACE@571..572 "{"
+    ENTRY_KEY@572..581
+      TEXT@572..581 "patel2022"
+    COMMA@581..582 ","
+    NEWLINE@582..583 "\n"
+    WHITESPACE@583..585 "  "
+    FIELD@585..613
+      FIELD_NAME@585..590
+        TEXT@585..590 "title"
+      WHITESPACE@590..599 "         "
+      EQUALS@599..600 "="
+      WHITESPACE@600..601 " "
+      FIELD_VALUE@601..612
+        LBRACE@601..602 "{"
+        STRING@602..611
+          TEXT@602..611 "WidgetSim"
+        RBRACE@611..612 "}"
+      COMMA@612..613 ","
+    NEWLINE@613..614 "\n"
+    WHITESPACE@614..616 "  "
+    FIELD@616..646
+      FIELD_NAME@616..622
+        TEXT@616..622 "author"
+      WHITESPACE@622..630 "        "
+      EQUALS@630..631 "="
+      WHITESPACE@631..632 " "
+      FIELD_VALUE@632..645
+        LBRACE@632..633 "{"
+        STRING@633..644
+          TEXT@633..644 "Patel, Noor"
+        RBRACE@644..645 "}"
+      COMMA@645..646 ","
+    NEWLINE@646..647 "\n"
+    WHITESPACE@647..649 "  "
+    FIELD@649..672
+      FIELD_NAME@649..653
+        TEXT@649..653 "year"
+      WHITESPACE@653..663 "          "
+      EQUALS@663..664 "="
+      WHITESPACE@664..665 " "
+      FIELD_VALUE@665..671
+        LBRACE@665..666 "{"
+        STRING@666..670
+          TEXT@666..670 "2022"
+        RBRACE@670..671 "}"
+      COMMA@671..672 ","
+    NEWLINE@672..673 "\n"
+    WHITESPACE@673..675 "  "
+    FIELD@675..723
+      FIELD_NAME@675..678
+        TEXT@675..678 "url"
+      WHITESPACE@678..689 "           "
+      EQUALS@689..690 "="
+      WHITESPACE@690..691 " "
+      FIELD_VALUE@691..722
+        LBRACE@691..692 "{"
+        STRING@692..721
+          TEXT@692..721 "https://example.com/w ..."
+        RBRACE@721..722 "}"
+      COMMA@722..723 ","
+    NEWLINE@723..724 "\n"
+    WHITESPACE@724..726 "  "
+    FIELD@726..750
+      FIELD_NAME@726..733
+        TEXT@726..733 "version"
+      WHITESPACE@733..740 "       "
+      EQUALS@740..741 "="
+      WHITESPACE@741..742 " "
+      FIELD_VALUE@742..749
+        LBRACE@742..743 "{"
+        STRING@743..748
+          TEXT@743..748 "1.4.2"
+        RBRACE@748..749 "}"
+      NEWLINE@749..750 "\n"
+    RBRACE@750..751 "}"
+  NEWLINE@751..752 "\n"
+  NEWLINE@752..753 "\n"
+  ENTRY@753..963
+    AT_MARK@753..754 "@"
+    ENTRY_TYPE@754..760
+      TEXT@754..760 "online"
+    LBRACE@760..761 "{"
+    ENTRY_KEY@761..771
+      TEXT@761..771 "carter2023"
+    COMMA@771..772 ","
+    NEWLINE@772..773 "\n"
+    WHITESPACE@773..775 "  "
+    FIELD@775..822
+      FIELD_NAME@775..780
+        TEXT@775..780 "title"
+      WHITESPACE@780..789 "         "
+      EQUALS@789..790 "="
+      WHITESPACE@790..791 " "
+      FIELD_VALUE@791..821
+        LBRACE@791..792 "{"
+        STRING@792..820
+          TEXT@792..820 "Online Resources for  ..."
+        RBRACE@820..821 "}"
+      COMMA@821..822 ","
+    NEWLINE@822..823 "\n"
+    WHITESPACE@823..825 "  "
+    FIELD@825..855
+      FIELD_NAME@825..831
+        TEXT@825..831 "author"
+      WHITESPACE@831..839 "        "
+      EQUALS@839..840 "="
+      WHITESPACE@840..841 " "
+      FIELD_VALUE@841..854
+        LBRACE@841..842 "{"
+        STRING@842..853
+          TEXT@842..853 "Carter, Mia"
+        RBRACE@853..854 "}"
+      COMMA@854..855 ","
+    NEWLINE@855..856 "\n"
+    WHITESPACE@856..858 "  "
+    FIELD@858..881
+      FIELD_NAME@858..862
+        TEXT@858..862 "year"
+      WHITESPACE@862..872 "          "
+      EQUALS@872..873 "="
+      WHITESPACE@873..874 " "
+      FIELD_VALUE@874..880
+        LBRACE@874..875 "{"
+        STRING@875..879
+          TEXT@875..879 "2023"
+        RBRACE@879..880 "}"
+      COMMA@880..881 ","
+    NEWLINE@881..882 "\n"
+    WHITESPACE@882..884 "  "
+    FIELD@884..930
+      FIELD_NAME@884..887
+        TEXT@884..887 "url"
+      WHITESPACE@887..898 "           "
+      EQUALS@898..899 "="
+      WHITESPACE@899..900 " "
+      FIELD_VALUE@900..929
+        LBRACE@900..901 "{"
+        STRING@901..928
+          TEXT@901..928 "https://example.com/w ..."
+        RBRACE@928..929 "}"
+      COMMA@929..930 ","
+    NEWLINE@930..931 "\n"
+    WHITESPACE@931..933 "  "
+    FIELD@933..962
+      FIELD_NAME@933..940
+        TEXT@933..940 "urldate"
+      WHITESPACE@940..947 "       "
+      EQUALS@947..948 "="
+      WHITESPACE@948..949 " "
+      FIELD_VALUE@949..961
+        LBRACE@949..950 "{"
+        STRING@950..960
+          TEXT@950..960 "2024-01-12"
+        RBRACE@960..961 "}"
+      NEWLINE@961..962 "\n"
+    RBRACE@962..963 "}"
+  NEWLINE@963..964 "\n"
+

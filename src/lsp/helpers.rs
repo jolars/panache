@@ -109,6 +109,17 @@ pub(crate) fn extract_reference_label(node: &SyntaxNode) -> Option<(String, bool
     }
 }
 
+pub(crate) fn extract_citation_key(node: &SyntaxNode) -> Option<String> {
+    match node.kind() {
+        SyntaxKind::CITATION_KEY => Some(node.text().to_string()),
+        SyntaxKind::CITATION => node
+            .children()
+            .find(|child| child.kind() == SyntaxKind::CITATION_KEY)
+            .map(|child| child.text().to_string()),
+        _ => None,
+    }
+}
+
 /// Extract the label from a definition node (ReferenceDefinition or FootnoteDefinition)
 fn extract_definition_label(node: &SyntaxNode) -> Option<String> {
     match node.kind() {

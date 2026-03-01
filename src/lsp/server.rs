@@ -39,6 +39,7 @@ impl LanguageServer for PanacheLsp {
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
+                completion_provider: Some(CompletionOptions::default()),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -153,6 +154,16 @@ impl LanguageServer for PanacheLsp {
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         handlers::hover::hover(
+            &self.client,
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await
+    }
+
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        handlers::completion::completion(
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
