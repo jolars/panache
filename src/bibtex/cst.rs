@@ -249,7 +249,7 @@ impl<'a> CstParser<'a> {
     fn emit_trivia_or_text(&mut self) {
         let byte = self.peek_byte().unwrap();
         if byte == b'%' {
-            let comment = self.parse_until(|b| b == b'\n').to_string();
+            let comment = self.parse_until(|b| b == b'\n' || b == b'\r').to_string();
             self.builder
                 .token(BibTexSyntaxKind::COMMENT.into(), &comment);
             return;

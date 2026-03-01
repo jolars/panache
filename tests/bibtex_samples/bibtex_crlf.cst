@@ -52,6 +52,6 @@ BIBTEX_FILE@0..112
     RBRACE@86..87 "}"
   NEWLINE@87..89 "\r\n"
   NEWLINE@89..91 "\r\n"
-  COMMENT@91..111 "% Comment with CRLF\r"
-  NEWLINE@111..112 "\n"
+  COMMENT@91..110 "% Comment with CRLF"
+  NEWLINE@110..112 "\r\n"
 
