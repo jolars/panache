@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.7.0](https://github.com/jolars/panache/compare/v2.6.3...v2.7.0) (2026-03-01)
+
+### Features
+
+* add pre-commit hook configuration ([b31ecdb](https://github.com/jolars/panache/commit/b31ecdb503fdc880552d9a0f76a41a99d31eb838)), closes [#37](https://github.com/jolars/panache/issues/37)
+
+### Bug Fixes
+
+* handle complex blocks in blockquotes ([ec69e51](https://github.com/jolars/panache/commit/ec69e518ee91fb1f94b594ff8593b86a4ee92d6f))
+* **parser:** fix bug in losing blockquote marker ([403165b](https://github.com/jolars/panache/commit/403165bddc9029401cd43291e242ecd398bfb3f3))
+
+### Performance Improvements
+
+* **lsp:** add incremental parsing ([b804ee9](https://github.com/jolars/panache/commit/b804ee947c2d5f6a2c753b256cd234670607923d))
+
 ## [2.6.3](https://github.com/jolars/panache/compare/v2.6.2...v2.6.3) (2026-02-27)
 
 ### Performance Improvements
