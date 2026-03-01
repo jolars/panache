@@ -137,6 +137,9 @@ EXAMPLES:
     # Parse a file and show CST
     panache parse document.qmd
 
+    # Parse a file and write CST JSON to disk
+    panache parse --json cst.json document.qmd
+
     # Parse from stdin
     echo '# Heading' | panache parse
 
@@ -150,6 +153,15 @@ EXAMPLES:
             The parser respects extension flags from the configuration file."
         )]
         file: Option<PathBuf>,
+
+        /// Write CST JSON output to the given file
+        #[arg(long, value_name = "PATH")]
+        #[arg(help = "Write CST JSON output to PATH")]
+        #[arg(
+            long_help = "Write the parsed CST to the given JSON file instead of printing the debug tree. \
+            The output includes node kinds, text ranges, and token text."
+        )]
+        json: Option<PathBuf>,
     },
     /// Start the Language Server Protocol server
     #[command(

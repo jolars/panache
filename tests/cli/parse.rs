@@ -85,3 +85,27 @@ fn test_parse_handles_complex_syntax() {
         .success()
         .stdout(predicate::str::contains("DOCUMENT"));
 }
+
+#[test]
+fn test_parse_json_output() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let output_file = temp_dir.path().join("cst.json");
+
+    fs::write(&test_file, "# Heading\n\nParagraph.").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "parse",
+            "--json",
+            output_file.to_str().unwrap(),
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let json_output = fs::read_to_string(&output_file).unwrap();
+    assert!(json_output.contains("\"kind\""));
+    assert!(json_output.contains("\"DOCUMENT\""));
+    assert!(json_output.contains("\"text\""));
+}

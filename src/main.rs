@@ -150,7 +150,7 @@ fn main() -> io::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Parse { file } => {
+        Commands::Parse { file, json } => {
             let start_dir = start_dir_for(&file)?;
             let (cfg, cfg_path) =
                 panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
@@ -163,7 +163,14 @@ fn main() -> io::Result<()> {
 
             let input = read_all(file.as_ref())?;
             let tree = parse(&input, Some(cfg));
-            println!("{:#?}", tree);
+            if let Some(json_path) = json {
+                let json_value = panache::syntax::cst_to_json(&tree);
+                let json_output =
+                    serde_json::to_string_pretty(&json_value).map_err(io::Error::other)?;
+                fs::write(json_path, json_output)?;
+            } else {
+                println!("{:#?}", tree);
+            }
             Ok(())
         }
         Commands::Format {

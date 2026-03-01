@@ -127,13 +127,16 @@ Parse a document and display its Concrete Syntax Tree (CST) for debugging and
 understanding how panache interprets the document structure. The CST shows all
 block and inline elements detected by the parser.
 
-**Usage:** `panache parse [FILE]`
+**Usage:** `panache parse [OPTIONS] [FILE]`
 
 EXAMPLES:
 
 ```
 # Parse a file and show CST
 panache parse document.qmd
+
+# Parse a file and write CST JSON to disk
+panache parse --json cst.json document.qmd
 
 # Parse from stdin
 echo '# Heading' | panache parse
@@ -146,6 +149,12 @@ panache parse --config .panache.toml document.qmd
 
 - `<FILE>` — Path to the input file to parse. If not provided, reads from stdin.
   The parser respects extension flags from the configuration file.
+
+###### **Options:**
+
+- `--json <PATH>` — Write the parsed CST to the given JSON file instead of
+  printing the debug tree. The output includes node kinds, text ranges, and
+  token text.
 
 ## `panache lsp`
 
