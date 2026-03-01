@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 Documentation
+    url: https://jolars.github.io/panache
+    about: Read the panache documentation
+  - name: 💬 Discussions
+    url: https://github.com/jolars/panache/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 🔍 Search Existing Issues
+    url: https://github.com/jolars/panache/issues
+    about: Check if your issue has already been reported
