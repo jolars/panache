@@ -134,3 +134,7 @@ assets = [
     { source = "target/completions/panache.fish", dest = "/usr/share/fish/vendor_completions.d/panache.fish", mode = "644" },
     { source = "target/completions/_panache", dest = "/usr/share/zsh/vendor-completions/_panache", mode = "644" },
 ]
+
+[[bench]]
+name = "formatting"
+harness = false

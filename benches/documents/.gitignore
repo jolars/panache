@@ -1,0 +1,6 @@
+# Ignore all downloaded qmd files
+*.qmd
+
+# But keep the small baseline document
+!small.qmd
+pandoc_manual.md

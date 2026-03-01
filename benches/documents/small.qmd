@@ -1,0 +1,48 @@
+# Small synthetic document for benchmarking
+
+# This is committed to git as a baseline reference
+
+---
+title: "Benchmark Document"
+author: "Test"
+format: html
+---
+
+# Introduction
+
+This is a paragraph with **bold** and *italic* text. We also have `inline code`
+and [links](https://example.com).
+
+## Lists and Tables
+
+- Item 1
+- Item 2
+  - Nested item
+- Item 3
+
+| Column 1 | Column 2 | Column 3 |
+| -------- | -------- | -------- |
+| Data 1   | Data 2   | Data 3   |
+| Data 4   | Data 5   | Data 6   |
+
+### Code Blocks
+
+```rust
+fn main() {
+    println!("Hello, world!");
+}
+```
+
+## Math
+
+Inline math: $x^2 + y^2 = z^2$
+
+Display math:
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}
+$$
+
+::: {.callout-note}
+This is a Quarto-style callout block.
+:::

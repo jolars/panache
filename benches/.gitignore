@@ -1,0 +1,12 @@
+# Benchmark results and profiling artifacts
+flamegraph.svg
+perf.data
+perf.data.old
+callgrind.out.*
+*.profdata
+benchmark_results.txt
+
+# Downloaded documents (managed by documents/download.sh)
+documents/*.qmd
+!documents/small.qmd
+documents/pandoc_manual.md

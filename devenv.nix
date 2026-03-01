@@ -7,12 +7,14 @@
   packages = [
     pkgs.air
     pkgs.bashInteractive
+    pkgs.cargo-flamegraph
     pkgs.cargo-llvm-cov
     pkgs.cmark
     pkgs.go-task
     pkgs.jarl
     pkgs.llvmPackages.bintools
     pkgs.pandoc
+    pkgs.prettier
     pkgs.quartoMinimal
     pkgs.ruff
     pkgs.shfmt

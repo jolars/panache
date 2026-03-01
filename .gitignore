@@ -23,3 +23,8 @@ result-*
 
 # Coverage files
 lcov.info
+
+# Profiler outputs
+/perf.data
+/perf.data.old
+/flamegraph.svg
