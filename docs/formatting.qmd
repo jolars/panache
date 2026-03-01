@@ -528,7 +528,7 @@ Document content starts here.
 
 ## Best Practices
 
-1. **Use consistent line width**: Set `line_width` based on your editor width
+1. **Use consistent line width**: Set `line-width` based on your editor width
 2. **Enable external formatters**: Let language-specific tools format code
    blocks
 3. **Choose appropriate flavor**: Match your document type (`quarto`,
