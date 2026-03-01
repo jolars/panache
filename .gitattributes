@@ -12,10 +12,10 @@ tests/cases/crlf_*/* -text
 tests/cases/line_ending_crlf/* -text
 tests/cases/line_ending_lf/* -text
 tests/bibtex_samples/bibtex_crlf.bib -text
-tests/bibtex_samples/bibtex_crlf.cst -text
 
 # AST files should always use LF endings (they contain literal string representations)
 tests/cases/*/cst.txt eol=lf
+tests/bibtex_samples/*.cst eol=lf
 
 # Other test cases can use LF (the default for most projects)
 # Individual test cases can override if needed
