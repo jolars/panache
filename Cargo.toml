@@ -7,8 +7,22 @@ description = "An LSP, formatter, and linter for Pandoc markdown, Quarto, and RM
 license = "MIT"
 repository = "https://github.com/jolars/panache"
 homepage = "https://jolars.github.io/panache"
-keywords = ["quarto", "pandoc", "markdown", "formatter"]
-categories = ["command-line-utilities", "text-processing"]
+keywords = [
+    "quarto",
+    "pandoc",
+    "markdown",
+    "formatter",
+    "rmarkdown",
+    "lsp",
+    "language-server",
+    "linter",
+]
+categories = [
+    "command-line-utilities",
+    "text-processing",
+    "parsing",
+    "parser-implementations",
+]
 authors = ["Johan Larsson <johan@jolars.co>"]
 
 [workspace]
