@@ -54,7 +54,10 @@
 
         files = "\.(qmd|md|Rmd)$";
 
-        excludes = [ "^(pandoc|assets|tests)" ];
+        excludes = [
+          "^(pandoc|assets|tests)"
+          "docs/cli.qmd"
+        ];
       };
     };
   };
