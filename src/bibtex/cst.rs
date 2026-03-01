@@ -276,12 +276,22 @@ impl<'a> CstParser<'a> {
                 self.pos += 1;
                 continue;
             }
+            if ch == '\r' {
+                if self.bytes.get(self.pos + 1) == Some(&b'\n') {
+                    self.builder.token(BibTexSyntaxKind::NEWLINE.into(), "\r\n");
+                    self.pos += 2;
+                    continue;
+                }
+                self.builder.token(BibTexSyntaxKind::NEWLINE.into(), "\r");
+                self.pos += 1;
+                continue;
+            }
             if ch.is_whitespace() {
                 let start = self.pos;
                 self.pos += 1;
                 while let Some(next) = self.peek_byte() {
                     let next_ch = next as char;
-                    if next_ch.is_whitespace() && next_ch != '\n' {
+                    if next_ch.is_whitespace() && next_ch != '\n' && next_ch != '\r' {
                         self.pos += 1;
                     } else {
                         break;

@@ -44,3 +44,12 @@ fn parse_generated_biblatex_entries() {
         &root.join("tests/bibtex_samples/biblatex.cst"),
     );
 }
+
+#[test]
+fn parse_bibtex_crlf_fixture() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    run_case(
+        &root.join("tests/bibtex_samples/bibtex_crlf.bib"),
+        &root.join("tests/bibtex_samples/bibtex_crlf.cst"),
+    );
+}
