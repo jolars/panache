@@ -155,6 +155,7 @@ golden_test_cases!(
     crlf_line_endings,
     crlf_raw_blocks,
     crlf_yaml_metadata,
+    citations,
     definition_list,
     definition_list_nesting,
     definition_list_wrapping,

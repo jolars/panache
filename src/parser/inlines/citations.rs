@@ -155,37 +155,25 @@ pub(crate) fn try_parse_bare_citation(text: &str) -> Option<(usize, &str, bool)>
 /// - Double internal punctuation terminates key
 /// - Trailing punctuation not included
 fn parse_citation_key(text: &str) -> Option<usize> {
-    let bytes = text.as_bytes();
-
-    if bytes.is_empty() {
+    if text.is_empty() {
         return None;
     }
 
     // Check for braced key: @{...}
-    if bytes[0] == b'{' {
+    if text.starts_with('{') {
         // Find matching closing brace
-        let mut pos = 1;
         let mut escape_next = false;
 
-        while pos < bytes.len() {
+        for (idx, ch) in text.char_indices().skip(1) {
             if escape_next {
                 escape_next = false;
-                pos += 1;
                 continue;
             }
 
-            match bytes[pos] {
-                b'\\' => {
-                    escape_next = true;
-                    pos += 1;
-                }
-                b'}' => {
-                    // Include the closing brace
-                    return Some(pos + 1);
-                }
-                _ => {
-                    pos += 1;
-                }
+            match ch {
+                '\\' => escape_next = true,
+                '}' => return Some(idx + ch.len_utf8()),
+                _ => {}
             }
         }
 
@@ -194,40 +182,47 @@ fn parse_citation_key(text: &str) -> Option<usize> {
     }
 
     // Regular key: must start with letter, digit, or _
-    let first_char = bytes[0] as char;
+    let mut iter = text.char_indices();
+    let (_, first_char) = iter.next()?;
     if !first_char.is_alphanumeric() && first_char != '_' {
         return None;
     }
 
-    let mut pos = 1;
+    let mut last_alnum_end = first_char.len_utf8();
+    let mut last_included_end = last_alnum_end;
+    let mut last_punct_start: Option<usize> = None;
     let mut prev_was_punct = false;
 
-    while pos < bytes.len() {
-        let ch = bytes[pos] as char;
-
+    for (idx, ch) in iter {
         if ch.is_alphanumeric() || ch == '_' {
             prev_was_punct = false;
-            pos += 1;
+            last_alnum_end = idx + ch.len_utf8();
+            last_included_end = last_alnum_end;
+            last_punct_start = None;
         } else if is_internal_punctuation(ch) {
             // Check if previous was also punctuation (double punct terminates)
             if prev_was_punct {
-                // Double punctuation - terminate key before this character
-                return Some(pos - 1);
+                // Double punctuation - terminate before the first punctuation
+                return Some(last_punct_start.unwrap_or(last_alnum_end));
             }
             prev_was_punct = true;
-            pos += 1;
+            last_punct_start = Some(idx);
+            last_included_end = idx + ch.len_utf8();
         } else {
             // Not a valid key character - terminate here
             break;
         }
     }
 
-    // Remove trailing punctuation
-    while pos > 0 && is_internal_punctuation(bytes[pos - 1] as char) {
-        pos -= 1;
+    if prev_was_punct {
+        return Some(last_alnum_end);
     }
 
-    if pos == 0 { None } else { Some(pos) }
+    if last_included_end == 0 {
+        None
+    } else {
+        Some(last_included_end)
+    }
 }
 
 /// Check if a character is valid internal punctuation in citation keys.
@@ -255,29 +250,31 @@ pub(crate) fn emit_bracketed_citation(builder: &mut GreenNodeBuilder, content: &
 }
 
 fn emit_bracketed_citation_content(builder: &mut GreenNodeBuilder, content: &str) {
-    let bytes = content.as_bytes();
-    let mut pos = 0;
     let mut text_start = 0;
+    let mut iter = content.char_indices().peekable();
 
-    while pos < bytes.len() {
-        let byte = bytes[pos];
-        if byte == b'@' || (byte == b'-' && pos + 1 < bytes.len() && bytes[pos + 1] == b'@') {
-            if pos > text_start {
+    while let Some((idx, ch)) = iter.next() {
+        if ch == '@' || (ch == '-' && matches!(iter.peek(), Some((_, '@')))) {
+            if idx > text_start {
                 builder.token(
                     SyntaxKind::CITATION_CONTENT.into(),
-                    &content[text_start..pos],
+                    &content[text_start..idx],
                 );
             }
 
-            let has_suppress = byte == b'-';
-            let marker_len = if has_suppress { 2 } else { 1 };
-            let marker_text = if has_suppress { "-@" } else { "@" };
+            let mut marker_len = 1;
+            let marker_text = if ch == '-' {
+                iter.next();
+                marker_len = 2;
+                "-@"
+            } else {
+                "@"
+            };
             builder.token(SyntaxKind::CITATION_MARKER.into(), marker_text);
 
-            let key_start = pos + marker_len;
-            if key_start >= bytes.len() {
-                text_start = pos + marker_len;
-                pos = key_start;
+            let key_start = idx + marker_len;
+            if key_start >= content.len() {
+                text_start = key_start;
                 continue;
             }
 
@@ -293,30 +290,28 @@ fn emit_bracketed_citation_content(builder: &mut GreenNodeBuilder, content: &str
                 } else {
                     builder.token(SyntaxKind::CITATION_KEY.into(), key);
                 }
-                pos = key_end;
-                text_start = pos;
+                while matches!(iter.peek(), Some((next_idx, _)) if *next_idx < key_end) {
+                    iter.next();
+                }
+                text_start = key_end;
                 continue;
             }
 
-            text_start = pos + marker_len;
-            pos = text_start;
+            text_start = key_start;
             continue;
         }
 
-        if byte == b';' {
-            if pos > text_start {
+        if ch == ';' {
+            if idx > text_start {
                 builder.token(
                     SyntaxKind::CITATION_CONTENT.into(),
-                    &content[text_start..pos],
+                    &content[text_start..idx],
                 );
             }
             builder.token(SyntaxKind::CITATION_SEPARATOR.into(), ";");
-            pos += 1;
-            text_start = pos;
+            text_start = idx + ch.len_utf8();
             continue;
         }
-
-        pos += 1;
     }
 
     if text_start < content.len() {
