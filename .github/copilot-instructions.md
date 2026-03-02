@@ -122,8 +122,8 @@ RUST_LOG=info ./target/release/panache format document.qmd
 3. **Block Dispatcher** (`src/parser/block_dispatcher.rs`):
    - Centralized block detection via `detect_prepared()` and emission via
      `parse_prepared()` (legacy `can_parse/parse` removed)
-   - Carries prepared payloads (e.g., blockquote markers, list metadata) to avoid
-     re-parsing during emission
+   - Carries prepared payloads (e.g., blockquote markers, list metadata) to
+     avoid re-parsing during emission
    - Parser core still owns continuation rules, blank-line handling, and list
      item buffering
 
@@ -141,18 +141,16 @@ Located in `src/formatter/`:
 - **Important**: LINK and IMAGE_LINK have special handling in `wrapping.rs` for
   delimiter reconstruction
 
-**Formatting is idempotent**: format(format(x)) == format(x)
+**Formatting must be idempotent**: format(format(x)) == format(x)
 
 ## Critical Conventions
 
 ### SyntaxKind Naming
 
-**All variants use SCREAMING_SNAKE_CASE** (not UpperCamelCase): - ✅ `HEADING`,
-`PARAGRAPH`, `CODE_BLOCK`, `LINK_TEXT_END` - ❌ ~~`Heading`~~, ~~`LinkTextEnd`~~
-(wrong - those are typed wrapper names)
+**Variants use SCREAMING_SNAKE_CASE** (not UpperCamelCase):
 
-Rationale: These are CST discriminants, not type names. Matches rust-analyzer
-pattern.
+- ✅ `HEADING`, `PARAGRAPH`, `CODE_BLOCK`, `LINK_TEXT_END`
+- ❌ ~~`Heading`~~, ~~`LinkTextEnd`~~ (wrong - those are typed wrapper names)
 
 ### Module Structure
 
@@ -162,13 +160,19 @@ pattern.
 
 ### Configuration System
 
-Hierarchical lookup: 1. Explicit `--config` path (errors if invalid)
-2. `.panache.toml` or `panache.toml` in current/parent directories 3.
-`~/.config/panache/config.toml` (XDG) 4. Built-in defaults
+Hierarchical lookup:
 
-**Key settings:** - `flavor`: Pandoc, Quarto, RMarkdown, GFM, CommonMark
-(affects enabled extensions) - `line_width`: Default 80 - `wrap`: Reflow
-(default) or Preserve - `extensions`: 60+ bool flags for Pandoc extensions
+1. Explicit `--config` path (errors if invalid)
+2. `.panache.toml` or `panache.toml` in current/parent directories
+3. `~/.config/panache/config.toml` (XDG)
+4. Built-in defaults
+
+**Key settings:**
+
+- `flavor`: Pandoc, Quarto, RMarkdown, GFM, CommonMark (affects enabled
+  extensions)
+- `line-width`: Default 80 - `wrap`: Reflow (default) or Preserve
+- `extensions`: 60+ bool flags for Pandoc extensions
 
 Config threaded through parsers: `Parser::new(input, &Config)`
 
@@ -185,9 +189,12 @@ Config threaded through parsers: `Parser::new(input, &Config)`
 
 ### Golden Tests (`tests/golden_cases.rs`)
 
-Each `tests/cases/*/` directory contains: - `input.md` (or `.qmd`, `.Rmd`)
-- `expected.md` - expected formatted output - `cst.txt` - CST snapshot for
-debugging - `panache.toml` - optional test-specific config
+Each `tests/cases/*/` directory contains:
+
+- `input.md` (or `.qmd`, `.Rmd`)
+- `expected.md`: expected formatted output
+- `cst.txt` - CST snapshot for debugging
+- `panache.toml`: optional test-specific config
 
 You need to update the list of tests in `tests/golden_cases.rs` when adding a
 new directory.
@@ -235,7 +242,9 @@ if let Some(heading) = Heading::cast(node) {
 
 ## Linter (`src/linter/`)
 
-**Components:** - `diagnostics.rs`: Core types (Diagnostic, Severity, Fix, Edit)
+**Components:**
+
+- `diagnostics.rs`: Core types (Diagnostic, Severity, Fix, Edit)
 - `runner.rs`: LintRunner orchestration - `rules.rs`: Rule trait + RuleRegistry
 - `rules/*`: Individual rule implementations
 
@@ -243,7 +252,12 @@ if let Some(heading) = Heading::cast(node) {
 provides auto-fix
 
 **Usage:**
-`bash panache lint document.qmd panache lint --check document.qmd # CI mode (exit 1 if violations) panache lint --fix document.qmd # Apply auto-fixes`
+
+```bash
+panache lint document.qmd
+panache lint --check document.qmd # CI mode (exit 1 if violations)
+panache lint --fix document.qmd # Apply auto-fixes
+```
 
 ## File Organization Principles
 
@@ -299,7 +313,7 @@ Instead of listing every file, understand the patterns:
 - Update golden test expectations without careful verification
 - Delete working files unless absolutely necessary
 - Run `cargo format`/`panache format` directly on files just to check formatting
-  - **IT FORMATS IN PLACE**. Use `cargo  format < file.md` instead.
+  **IT FORMATS IN PLACE**. Use `cargo  format < file.md` instead.
 
 ## Logging Infrastructure
 
