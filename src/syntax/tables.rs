@@ -175,7 +175,7 @@ impl TableCaption {
     /// Returns the caption text.
     pub fn text(&self) -> String {
         self.0
-            .children_with_tokens()
+            .descendants_with_tokens()
             .filter_map(|it| it.into_token())
             .filter(|token| token.kind() == SyntaxKind::TEXT)
             .map(|token| token.text().to_string())

@@ -72,7 +72,7 @@ impl LinkText {
     /// Returns the text content.
     pub fn text_content(&self) -> String {
         self.0
-            .children_with_tokens()
+            .descendants_with_tokens()
             .filter_map(|it| it.into_token())
             .filter(|token| token.kind() == SyntaxKind::TEXT)
             .map(|token| token.text().to_string())
@@ -219,7 +219,7 @@ impl ImageAlt {
     /// Returns the alt text content.
     pub fn text(&self) -> String {
         self.0
-            .children_with_tokens()
+            .descendants_with_tokens()
             .filter_map(|it| it.into_token())
             .filter(|token| token.kind() == SyntaxKind::TEXT)
             .map(|token| token.text().to_string())
