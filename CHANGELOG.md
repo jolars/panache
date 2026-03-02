@@ -16,6 +16,22 @@
 * **parser:** handle UTF-8 correctly in citation parsing ([4678265](https://github.com/jolars/panache/commit/46782655609d884919eed8916c39017f2c3a868b))
 * **parser:** handle whitespace after heading and before attr ([ee230ef](https://github.com/jolars/panache/commit/ee230ef1a5d989f317fe413161cd367c83168037))
 
+## [2.8.0](https://github.com/jolars/panache/compare/v2.7.0...v2.8.0) (2026-03-02)
+
+### Features
+
+* **cli:** add `--json` option to parse ([c84ce49](https://github.com/jolars/panache/commit/c84ce495e1af98f34af0ccaea70aa0872fb6a933))
+* **config:** consistently use kebab-case ([b01b5b1](https://github.com/jolars/panache/commit/b01b5b1768eefb5379fb10b25e44a78c0921af8f))
+* **lsp:** add support for external bibliographies ([47d5177](https://github.com/jolars/panache/commit/47d51776caa7d8aba6372a04236d65e9d9295fcb))
+* **parser:** handle CLRF line endings in bibtex parser ([0d8a2c8](https://github.com/jolars/panache/commit/0d8a2c8c5975dfaab2d82787acc014a6b3e9ac02))
+
+### Bug Fixes
+
+* correctly parse and format inline code spans with `s ([7a6336b](https://github.com/jolars/panache/commit/7a6336be417512fe1e1de92b6fcabcfaca3f0233))
+* **parser:** correctly parse CRLF newline at end ([af31e51](https://github.com/jolars/panache/commit/af31e516c1c1013647cf24418dfb2b8d2c2484f7))
+* **parser:** handle UTF-8 correctly in citation parsing ([4678265](https://github.com/jolars/panache/commit/46782655609d884919eed8916c39017f2c3a868b))
+* **parser:** handle whitespace after heading and before attr ([ee230ef](https://github.com/jolars/panache/commit/ee230ef1a5d989f317fe413161cd367c83168037))
+
 ## [2.7.0](https://github.com/jolars/panache/compare/v2.6.3...v2.7.0) (2026-03-01)
 
 ### Features
