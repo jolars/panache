@@ -1,4 +1,4 @@
-DOCUMENT@0..256
+DOCUMENT@0..342
   HEADING@0..18
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -58,4 +58,30 @@ DOCUMENT@0..256
   PARAGRAPH@239..256
     TEXT@239..255 "Final paragraph."
     NEWLINE@255..256 "\n"
+  BLANK_LINE@256..257
+    BLANK_LINE@256..257 "\n"
+  HTML_BLOCK@257..299
+    HTML_BLOCK_TAG@257..262
+      TEXT@257..261 "<!--"
+      NEWLINE@261..262 "\n"
+    HTML_BLOCK_CONTENT@262..295
+      TEXT@262..288 "Html comment with mul ..."
+      NEWLINE@288..289 "\n"
+      TEXT@289..294 "lines"
+      NEWLINE@294..295 "\n"
+    HTML_BLOCK_TAG@295..299
+      TEXT@295..298 "-->"
+      NEWLINE@298..299 "\n"
+  BLANK_LINE@299..300
+    BLANK_LINE@299..300 "\n"
+  HTML_BLOCK@300..342
+    HTML_BLOCK_TAG@300..305
+      TEXT@300..304 "<!--"
+      NEWLINE@304..305 "\n"
+    HTML_BLOCK_CONTENT@305..338
+      TEXT@305..337 "    This is an indent ..."
+      NEWLINE@337..338 "\n"
+    HTML_BLOCK_TAG@338..342
+      TEXT@338..341 "-->"
+      NEWLINE@341..342 "\n"
 

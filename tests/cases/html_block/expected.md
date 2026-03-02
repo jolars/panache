@@ -18,3 +18,12 @@ console.log('test');
 </script>
 
 Final paragraph.
+
+<!--
+Html comment with multiple
+lines
+-->
+
+<!--
+    This is an indented comment.
+-->
