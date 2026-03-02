@@ -261,11 +261,14 @@ pub(crate) fn emit_atx_heading(
     let heading_content = heading_text.trim_end_matches(|c: char| c == '#' || c.is_whitespace());
 
     // Try to parse trailing attributes
-    let (text_content, attributes) =
+    let (text_content, attributes, space_before_attrs) =
         if let Some((attrs, text_before)) = try_parse_trailing_attributes(heading_content) {
-            (text_before, Some(attrs))
+            // Find where { starts in heading_content to get the space between text and attributes
+            let start_brace_pos = heading_content.rfind('{').unwrap();
+            let space = &heading_content[text_before.len()..start_brace_pos];
+            (text_before, Some(attrs), space)
         } else {
-            (heading_content, None)
+            (heading_content, None, "")
         };
 
     // Heading content node
@@ -274,6 +277,11 @@ pub(crate) fn emit_atx_heading(
         inline_emission::emit_inlines(builder, text_content, config);
     }
     builder.finish_node();
+
+    // Emit space before attributes if present
+    if !space_before_attrs.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), space_before_attrs);
+    }
 
     // Emit attributes if present
     if let Some(attrs) = attributes {
@@ -305,6 +313,45 @@ mod tests {
     #[test]
     fn test_heading_with_leading_spaces() {
         assert_eq!(try_parse_atx_heading("   # Heading"), Some(1));
+    }
+
+    #[test]
+    fn test_atx_heading_with_attributes_losslessness() {
+        use crate::Config;
+
+        // Regression test for losslessness bug where space before attributes was dropped
+        let input = "# Test {#id}\n";
+        let config = Config::default();
+        let tree = crate::parse(input, Some(config));
+
+        // Verify losslessness: tree text should exactly match input
+        assert_eq!(
+            tree.text().to_string(),
+            input,
+            "Parser must preserve all bytes including space before attributes"
+        );
+
+        // Verify structure
+        let heading = tree.first_child().unwrap();
+        assert_eq!(heading.kind(), SyntaxKind::HEADING);
+
+        // Find the whitespace between content and attribute
+        let mut found_whitespace = false;
+        for child in heading.children_with_tokens() {
+            if child.kind() == SyntaxKind::WHITESPACE
+                && let Some(token) = child.as_token()
+            {
+                let start: usize = token.text_range().start().into();
+                if token.text() == " " && start == 6 {
+                    found_whitespace = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            found_whitespace,
+            "Whitespace token between heading content and attributes must be present"
+        );
     }
 
     #[test]

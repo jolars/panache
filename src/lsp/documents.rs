@@ -77,56 +77,46 @@ pub(crate) async fn did_change(
     {
         let mut document_map = document_map.lock().await;
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
-            let mut old_edit_start: Option<usize> = None;
-            let mut old_edit_end: Option<usize> = None;
-            let mut new_edit_start: Option<usize> = None;
-            let mut new_edit_end: Option<usize> = None;
+            // Store original state before applying changes
+            let original_text = doc_state.text.clone();
+            let original_tree = doc_state.tree.clone();
 
-            for change in params.content_changes {
-                let old_text = doc_state.text.clone();
-                if let Some(range) = &change.range {
-                    let start_offset =
-                        super::conversions::position_to_offset(&old_text, range.start).unwrap_or(0);
-                    let end_offset = super::conversions::position_to_offset(&old_text, range.end)
-                        .unwrap_or(old_text.len());
-                    old_edit_start =
-                        Some(old_edit_start.map_or(start_offset, |s| s.min(start_offset)));
-                    old_edit_end = Some(old_edit_end.map_or(end_offset, |e| e.max(end_offset)));
-
-                    let new_end = start_offset.saturating_add(change.text.len());
-                    new_edit_start =
-                        Some(new_edit_start.map_or(start_offset, |s| s.min(start_offset)));
-                    new_edit_end = Some(new_edit_end.map_or(new_end, |e| e.max(new_end)));
-                } else {
-                    old_edit_start = Some(0);
-                    old_edit_end = Some(old_text.len());
-                    new_edit_start = Some(0);
-                    new_edit_end = Some(change.text.len());
-                }
-
-                doc_state.text = apply_content_change(&doc_state.text, &change);
+            // Apply all changes to update the text
+            for change in params.content_changes.iter() {
+                doc_state.text = apply_content_change(&doc_state.text, change);
             }
 
-            let old_edit_range = if let (Some(start), Some(end)) = (old_edit_start, old_edit_end) {
-                (start, end)
-            } else {
-                (0, doc_state.text.len())
-            };
+            // Use incremental parsing for single changes, full reparse for multiple
+            let new_tree = if params.content_changes.len() == 1 {
+                let change = &params.content_changes[0];
 
-            let new_edit_range = if let (Some(start), Some(end)) = (new_edit_start, new_edit_end) {
-                (start, end)
-            } else {
-                (0, doc_state.text.len())
-            };
+                let (old_edit_start, old_edit_end, new_edit_start, new_edit_end) =
+                    if let Some(range) = &change.range {
+                        let old_start =
+                            super::conversions::position_to_offset(&original_text, range.start)
+                                .unwrap_or(0);
+                        let old_end =
+                            super::conversions::position_to_offset(&original_text, range.end)
+                                .unwrap_or(original_text.len());
+                        let new_end = old_start + change.text.len();
+                        (old_start, old_end, old_start, new_end)
+                    } else {
+                        // Full document replacement
+                        (0, original_text.len(), 0, doc_state.text.len())
+                    };
 
-            let new_tree = parse_incremental(
-                &doc_state.text,
-                Some(config.clone()),
-                &SyntaxNode::new_root(doc_state.tree.clone()),
-                old_edit_range,
-                new_edit_range,
-            )
-            .tree;
+                parse_incremental(
+                    &doc_state.text,
+                    Some(config.clone()),
+                    &SyntaxNode::new_root(original_tree),
+                    (old_edit_start, old_edit_end),
+                    (new_edit_start, new_edit_end),
+                )
+                .tree
+            } else {
+                // Multiple changes - do full reparse for now
+                crate::parse(&doc_state.text, Some(config.clone()))
+            };
 
             doc_state.tree = GreenNode::from(new_tree.green());
 

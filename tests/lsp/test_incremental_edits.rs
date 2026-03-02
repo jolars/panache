@@ -32,6 +32,43 @@ async fn test_incremental_edit_simple() {
 }
 
 #[tokio::test]
+async fn test_incremental_edit_multiple_changes_single_notification() {
+    let server = TestLspServer::new();
+
+    // Open a document
+    server
+        .open_document("file:///test.qmd", "Line 1\nLine 2\nLine 3", "quarto")
+        .await;
+    // Apply multiple changes in a single notification
+    server
+        .edit_document(
+            "file:///test.qmd",
+            vec![
+                incremental_change(0, 0, 0, 0, "Inserted line 1\nInserted line 2\n"),
+                incremental_change(4, 0, 4, 6, "Line 3 updated"),
+            ],
+        )
+        .await;
+
+    let content = server.get_document_content("file:///test.qmd").await;
+    assert_eq!(
+        content,
+        Some("Inserted line 1\nInserted line 2\nLine 1\nLine 2\nLine 3 updated".to_string())
+    );
+
+    let tree_after = server
+        .get_document_tree("file:///test.qmd")
+        .await
+        .expect("tree after edit");
+    let expected = panache::parse(
+        "Inserted line 1\nInserted line 2\nLine 1\nLine 2\nLine 3 updated",
+        None,
+    );
+    assert_eq!(tree_after.text_range(), expected.text_range());
+    assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+#[tokio::test]
 async fn test_incremental_edit_multiline() {
     let server = TestLspServer::new();
 
