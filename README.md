@@ -1,4 +1,4 @@
-# panache <img src='https://raw.githubusercontent.com/jolars/panache/refs/heads/main/images/logo.png' align="right" width="139" />
+# Panache <img src='https://raw.githubusercontent.com/jolars/panache/refs/heads/main/images/logo.png' align="right" width="139" />
 
 [![Build and
 Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
@@ -96,7 +96,7 @@ pip install pre-commit
 brew install pre-commit
 ```
 
-Then add panache to your `.pre-commit-config.yaml`:
+Then add Panache to your `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
@@ -113,39 +113,25 @@ Install the hooks:
 pre-commit install
 ```
 
-Now panache will automatically run on your staged `.qmd`, `.md`, and `.Rmd`
+Now Panache will automatically run on your staged `.qmd`, `.md`, and `.Rmd`
 files before each commit.
-
-**Hook Options:**
-
-- `panache-format` - Formats files in place
-- `panache-lint` - Lints files and applies auto-fixes
-- `panache` - Combined format + lint (convenience hook)
 
 See [examples/pre-commit-config.yaml](examples/pre-commit-config.yaml) for more
 configuration options.
 
-### Language Server (LSP)
+## Language Server
 
-panache includes a built-in Language Server Protocol implementation for editor
-integration.
+Panache includes a built-in LSP implementation for editor integration.
 
-**Features:**
-
-- Document formatting (full document and range)
-- Live diagnostics with quick fixes
-- Code actions for refactoring
-  - Convert between loose/compact lists
-  - Convert between inline/reference footnotes
-- Document symbols/outline
-- Folding ranges
-- Go to definition for references and footnotes
-
-**Start the server:**
+To start the LSP server, run:
 
 ```bash
 panache lsp
 ```
+
+But typically you will configure your editor to start the LSP server
+automatically when editing supported file types (`.qmd`, `.md`, `.Rmd`).
+
 
 **Editor Configuration:**
 
@@ -227,17 +213,29 @@ args = ["lsp"]
 
 </details>
 
-**Configuration:** The LSP automatically discovers `.panache.toml` from your
-workspace root.
+### Features
+
+The list of LSP features supported by Panache is still evolving, but currently
+includes:
+
+- Document formatting (full document and range)
+- Live diagnostics with quick fixes
+- Code actions for refactoring
+  - Convert between loose/compact lists
+  - Convert between inline/reference footnotes
+- Document symbols/outline
+- Folding ranges
+- Go to definition for references and footnotes
 
 ## Configuration
 
-panache looks for a configuration in:
+Panache looks for a configuration in:
 
 1. `.panache.toml` or `panache.toml` in current directory or parent directories
-2. `~/.config/panache/config.toml`
+2. `$XDG_CONFIG_HOME/panache/config.toml` (usually
+   `~/.config/panache/config.toml`)
 
-### Example config
+### Example
 
 ```toml
 # Markdown flavor and line width
@@ -257,11 +255,11 @@ javascript = "prettier"      # Reusable definitions
 typescript = "prettier"
 yaml = "yamlfmt"             # Formats both code blocks AND frontmatter
 
-# Customize formatters (optional)
+# Customize formatters
 [formatters.prettier]
-args = ["--print-width=100"]
+prepend-args = ["--print-width=100"]
 
-# External code linters (opt-in)
+# External code linters
 [linters]
 r = "jarl"  # Enable R linting
 ```
@@ -270,13 +268,13 @@ See `.panache.toml.example` for a complete configuration reference.
 
 ### External Code Formatters
 
-panache supports external formatters for code blocks—**opt-in and easy to
+Panache supports external formatters for code blocks—**opt-in and easy to
 enable**:
 
 ```toml
 [formatters]
-r = "air"           # Available presets: "air", "styler"
-python = "ruff"     # Available presets: "ruff", "black"
+r = "air"
+python = "ruff"    
 javascript = "prettier"
 typescript = "prettier"  # Reuse same formatter
 ```
