@@ -47,4 +47,8 @@ impl CitationKey {
     pub fn text(&self) -> String {
         self.0.text().to_string()
     }
+
+    pub fn text_range(&self) -> rowan::TextRange {
+        self.0.text_range()
+    }
 }

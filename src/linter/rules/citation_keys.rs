@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::SyntaxNode;
+use crate::syntax::{AstNode, Citation, SyntaxNode};
 
 pub struct CitationKeysRule;
 
@@ -60,12 +60,21 @@ impl Rule for CitationKeysRule {
 
         for key_text in &metadata.citations.keys {
             if parse.index.get(key_text).is_none() {
-                let location = Location::from_range(tree.text_range(), input);
-                diagnostics.push(Diagnostic::warning(
-                    location,
-                    "missing-bibliography-key",
-                    format!("Citation key '{}' not found in bibliography", key_text),
-                ));
+                // Find all citation nodes that reference this missing key
+                for citation in tree.descendants().filter_map(Citation::cast) {
+                    for citation_key in citation.keys() {
+                        if citation_key.text() == *key_text {
+                            // Use the citation node range (includes @) instead of just the key
+                            let location =
+                                Location::from_range(citation.syntax().text_range(), input);
+                            diagnostics.push(Diagnostic::warning(
+                                location,
+                                "missing-bibliography-key",
+                                format!("Citation key '{}' not found in bibliography", key_text),
+                            ));
+                        }
+                    }
+                }
             }
         }
 
@@ -116,5 +125,42 @@ mod tests {
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "missing-bibliography-key");
         assert!(diagnostics[0].message.contains("missing"));
+    }
+
+    #[test]
+    fn missing_key_reports_correct_position() {
+        let input = "Text [@missing].";
+        let metadata = crate::metadata::DocumentMetadata {
+            bibliography: None,
+            bibliography_parse: Some(crate::metadata::BibliographyParse {
+                index: crate::bibtex::BibIndex {
+                    entries: std::collections::HashMap::new(),
+                    duplicates: Vec::new(),
+                    errors: Vec::new(),
+                    files: Vec::new(),
+                    load_errors: Vec::new(),
+                },
+            }),
+            citations: crate::metadata::CitationInfo {
+                keys: vec!["missing".to_string()],
+            },
+            title: None,
+            raw_yaml: String::new(),
+        };
+
+        let diagnostics = parse_and_lint(input, Some(metadata));
+        assert_eq!(diagnostics.len(), 1);
+
+        // The citation [@missing] starts at position 5 (after "Text ")
+        // But we report it at the CITATION node level which includes brackets
+        // Line 1, column 6 (1-indexed, pointing to '[')
+        assert_eq!(diagnostics[0].location.line, 1);
+        assert_eq!(diagnostics[0].location.column, 6);
+
+        // The range should cover the entire citation including brackets
+        let start: usize = diagnostics[0].location.range.start().into();
+        let end: usize = diagnostics[0].location.range.end().into();
+        assert_eq!(start, 5); // Position of '['
+        assert_eq!(end, 15); // Position after ']'
     }
 }
