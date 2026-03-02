@@ -298,12 +298,14 @@ Instead of listing every file, understand the patterns:
 ### DO
 
 - Run full test suite after changes: `cargo test`
+- Add tests for bugs before fixing them (test-driven development)
 - Ensure clippy passes:
   `cargo clippy --all-targets --all-features -- -D warnings`
 - Auto-fix clippy warnings when possible: `cargo clippy --fix`
 - Test CLI with release binary after building
 - Consider idempotency - formatting twice should equal formatting once
 - Verify CST snapshots before updating: `UPDATE_CST=1 cargo test`
+- Update the docs in `docs/` when adding features or changing behavior.
 
 ### DON'T
 
@@ -314,6 +316,7 @@ Instead of listing every file, understand the patterns:
 - Delete working files unless absolutely necessary
 - Run `cargo format`/`panache format` directly on files just to check formatting
   **IT FORMATS IN PLACE**. Use `cargo  format < file.md` instead.
+- Update `CHANGELOG.md`. It is handled automatically by semantic release.
 
 ## Logging Infrastructure
 
