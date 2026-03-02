@@ -14,6 +14,7 @@ use crate::linter::external_linters::{ExternalLinterRegistry, LinterError};
 pub fn run_linter_sync(
     linter_name: &str,
     code: &str,
+    original_input: &str,
     registry: &ExternalLinterRegistry,
 ) -> Result<Vec<Diagnostic>, LinterError> {
     let linter_info = registry
@@ -59,7 +60,7 @@ pub fn run_linter_sync(
     }
 
     // Parse output based on linter type (reuse async parser)
-    crate::linter::external_linters::parse_linter_output(linter_name, &stdout, code)
+    crate::linter::external_linters::parse_linter_output(linter_name, &stdout, original_input)
 }
 
 #[cfg(test)]
@@ -77,7 +78,7 @@ mod tests {
         let code = "x = 1\n";
         let registry = ExternalLinterRegistry::new();
 
-        let result = run_linter_sync("jarl", code, &registry);
+        let result = run_linter_sync("jarl", code, code, &registry);
         assert!(result.is_ok());
 
         let diagnostics = result.unwrap();
@@ -96,7 +97,7 @@ mod tests {
         let code = "x <- 1\n";
         let registry = ExternalLinterRegistry::new();
 
-        let result = run_linter_sync("unknown_linter", code, &registry);
+        let result = run_linter_sync("unknown_linter", code, code, &registry);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), LinterError::SpawnFailed(_)));
     }

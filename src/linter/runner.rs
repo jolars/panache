@@ -90,7 +90,7 @@ impl LintRunner {
                 let concatenated = concatenate_with_blanks(blocks);
 
                 // Run the linter
-                match run_linter(linter_name, &concatenated, &self.external_linters).await {
+                match run_linter(linter_name, &concatenated, input, &self.external_linters).await {
                     Ok(external_diagnostics) => {
                         log::debug!(
                             "External linter '{}' found {} diagnostic(s)",
@@ -151,6 +151,7 @@ impl LintRunner {
                 match crate::linter::external_linters_sync::run_linter_sync(
                     linter_name,
                     &concatenated,
+                    input,
                     &self.external_linters,
                 ) {
                     Ok(external_diagnostics) => {

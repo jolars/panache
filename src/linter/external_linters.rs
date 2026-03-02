@@ -99,6 +99,7 @@ impl Default for ExternalLinterRegistry {
 pub async fn run_linter(
     linter_name: &str,
     code: &str,
+    original_input: &str,
     registry: &ExternalLinterRegistry,
 ) -> Result<Vec<Diagnostic>, LinterError> {
     let linter_info = registry
@@ -140,17 +141,17 @@ pub async fn run_linter(
     }
 
     // Parse output based on linter type
-    parse_linter_output(linter_name, &stdout, code)
+    parse_linter_output(linter_name, &stdout, original_input)
 }
 
 /// Parse linter output based on linter type (public for sync version to reuse).
 pub fn parse_linter_output(
     linter_name: &str,
     output: &str,
-    code: &str,
+    original_input: &str,
 ) -> Result<Vec<Diagnostic>, LinterError> {
     match linter_name {
-        "jarl" => parse_jarl_output(output, code),
+        "jarl" => parse_jarl_output(output, original_input),
         _ => Err(LinterError::ParseError(format!(
             "no parser for linter: {}",
             linter_name
@@ -200,8 +201,52 @@ struct JarlFix {
     to_skip: bool,
 }
 
+fn line_col_to_offset(input: &str, line: usize, column: usize) -> Option<usize> {
+    if line == 0 || column == 0 {
+        return None;
+    }
+
+    let mut current_line = 1;
+    let mut offset = 0;
+    let bytes = input.as_bytes();
+
+    for text_line in input.lines() {
+        if current_line == line {
+            let mut current_column = 1;
+            for (byte_idx, _ch) in text_line.char_indices() {
+                if current_column == column {
+                    return Some(offset + byte_idx);
+                }
+                current_column += 1;
+            }
+            return Some(offset + text_line.len());
+        }
+
+        let line_end_offset = offset + text_line.len();
+        let line_ending_len = if line_end_offset + 1 < input.len()
+            && bytes[line_end_offset] == b'\r'
+            && bytes[line_end_offset + 1] == b'\n'
+        {
+            2
+        } else if line_end_offset < input.len() && bytes[line_end_offset] == b'\n' {
+            1
+        } else {
+            0
+        };
+
+        offset += text_line.len() + line_ending_len;
+        current_line += 1;
+    }
+
+    if current_line == line {
+        Some(offset)
+    } else {
+        None
+    }
+}
+
 /// Parse jarl JSON output into panache diagnostics.
-fn parse_jarl_output(json: &str, _input: &str) -> Result<Vec<Diagnostic>, LinterError> {
+fn parse_jarl_output(json: &str, input: &str) -> Result<Vec<Diagnostic>, LinterError> {
     let output: JarlOutput = serde_json::from_str(json)
         .map_err(|e| LinterError::ParseError(format!("invalid jarl JSON: {}", e)))?;
 
@@ -212,11 +257,12 @@ fn parse_jarl_output(json: &str, _input: &str) -> Result<Vec<Diagnostic>, Linter
         let line = jarl_diag.location.row; // Already 1-indexed
         let column = jarl_diag.location.column + 1; // Convert to 1-indexed
 
-        // Convert byte range to TextRange
-        let range = TextRange::new(
-            (jarl_diag.range[0] as u32).into(),
-            (jarl_diag.range[1] as u32).into(),
-        );
+        let range_len = jarl_diag.range[1].saturating_sub(jarl_diag.range[0]);
+        let start_offset = line_col_to_offset(input, line, column).unwrap_or(input.len());
+        let end_offset = start_offset.saturating_add(range_len).min(input.len());
+
+        // Convert byte range to TextRange (relative to original document)
+        let range = TextRange::new((start_offset as u32).into(), (end_offset as u32).into());
 
         let location = Location {
             line,
@@ -268,6 +314,14 @@ mod tests {
     }
 
     #[test]
+    fn test_line_col_to_offset_basic() {
+        let input = "line1\n\nline3\n";
+        assert_eq!(line_col_to_offset(input, 1, 1), Some(0));
+        assert_eq!(line_col_to_offset(input, 2, 1), Some(6));
+        assert_eq!(line_col_to_offset(input, 3, 1), Some(7));
+    }
+
+    #[test]
     fn test_parse_jarl_output() {
         let json = r#"{
             "diagnostics": [
@@ -302,6 +356,8 @@ mod tests {
         assert_eq!(diagnostics[0].message, "Use `<-` for assignment.");
         assert_eq!(diagnostics[0].location.line, 1);
         assert_eq!(diagnostics[0].location.column, 1);
+        assert_eq!(usize::from(diagnostics[0].location.range.start()), 0);
+        assert_eq!(usize::from(diagnostics[0].location.range.end()), 3);
         // Auto-fixes disabled for external linters (byte offset mapping issue)
         assert!(diagnostics[0].fix.is_none());
     }
