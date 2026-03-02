@@ -15,6 +15,7 @@ fn escape_special_chars(
     skip_emphasis_delim: bool,
     prev_is_text: bool,
     next_is_text: bool,
+    escape_underscores: bool,
 ) -> String {
     let mut result = String::with_capacity(text.len() * 2);
     let chars: Vec<char> = text.chars().collect();
@@ -50,7 +51,7 @@ fn escape_special_chars(
 
                 let is_intraword = intraword_start || intraword_end;
 
-                if !skip_emphasis_delim && !is_intraword {
+                if escape_underscores && !skip_emphasis_delim && !is_intraword {
                     result.push('\\');
                 }
                 result.push(ch);
@@ -71,6 +72,35 @@ fn escape_special_chars(
     }
 
     result
+}
+
+fn normalize_link_dest(dest: &str) -> String {
+    let dest_trimmed = dest.trim();
+    let mut split_at = None;
+    for (i, ch) in dest_trimmed.char_indices() {
+        if ch.is_whitespace() {
+            split_at = Some(i);
+            break;
+        }
+    }
+
+    let Some(split_at) = split_at else {
+        return dest_trimmed.to_string();
+    };
+
+    let (url, rest) = dest_trimmed.split_at(split_at);
+    let title = rest.trim();
+    if title.is_empty() {
+        return url.to_string();
+    }
+
+    let normalized_title = if title.starts_with('\'') && title.ends_with('\'') && title.len() >= 2 {
+        format!("\"{}\"", &title[1..title.len() - 1])
+    } else {
+        title.to_string()
+    };
+
+    format!("{} {}", url, normalized_title)
 }
 
 pub(super) fn build_words<'a>(
@@ -171,8 +201,12 @@ pub(super) fn build_words<'a>(
         false
     }
 
-    fn process_node_recursive<F>(node: &SyntaxNode, b: &mut Builder, format_inline_fn: &F)
-    where
+    fn process_node_recursive<F>(
+        node: &SyntaxNode,
+        b: &mut Builder,
+        format_inline_fn: &F,
+        in_link_text: bool,
+    ) where
         F: Fn(&SyntaxNode) -> String,
     {
         let children: Vec<_> = node.children_with_tokens().collect();
@@ -187,8 +221,12 @@ pub(super) fn build_words<'a>(
                     // the formatter adds them dynamically when formatting BlockQuote nodes
                     SyntaxKind::BLOCKQUOTE_MARKER => {}
                     SyntaxKind::ESCAPED_CHAR => {
-                        // Token already includes backslash (e.g., "\*")
-                        b.push_piece(t.text());
+                        if in_link_text && t.text() == r"\_" {
+                            b.push_piece("_");
+                        } else {
+                            // Token already includes backslash (e.g., "\*")
+                            b.push_piece(t.text());
+                        }
                     }
                     SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {
                         // Skip original markers - we'll add normalized ones
@@ -232,8 +270,13 @@ pub(super) fn build_words<'a>(
                             }
                             // Always escape special characters in TEXT tokens
                             // ESCAPED_CHAR tokens are handled separately and preserve their backslashes
-                            let processed_word =
-                                escape_special_chars(word, false, prev_is_text, next_is_text);
+                            let processed_word = escape_special_chars(
+                                word,
+                                false,
+                                prev_is_text,
+                                next_is_text,
+                                !in_link_text,
+                            );
                             b.push_piece(&processed_word);
                         }
 
@@ -267,12 +310,12 @@ pub(super) fn build_words<'a>(
                             // True continuation paragraph - skip in wrapping, format separately
                         } else {
                             // Lazy continuation - include in wrapping
-                            process_node_recursive(n, b, format_inline_fn);
+                            process_node_recursive(n, b, format_inline_fn, in_link_text);
                         }
                     }
                     SyntaxKind::PARAGRAPH => {
                         // Recursively process PARAGRAPH content instead of treating it as a unit
-                        process_node_recursive(n, b, format_inline_fn);
+                        process_node_recursive(n, b, format_inline_fn, in_link_text);
                     }
                     SyntaxKind::EMPHASIS => {
                         // Check if content starts with whitespace - if so, preserve it before opening marker
@@ -281,7 +324,7 @@ pub(super) fn build_words<'a>(
                             b.skip_next_leading_whitespace = true;
                         }
                         b.push_piece("*");
-                        process_node_recursive(n, b, format_inline_fn); // Inside emphasis now
+                        process_node_recursive(n, b, format_inline_fn, in_link_text); // Inside emphasis now
                         // Reset the flag (it should have been consumed by first TEXT, but just in case)
                         b.skip_next_leading_whitespace = false;
                         // Save pending space state (from trailing whitespace in content)
@@ -299,7 +342,7 @@ pub(super) fn build_words<'a>(
                             b.skip_next_leading_whitespace = true;
                         }
                         b.push_piece("**");
-                        process_node_recursive(n, b, format_inline_fn); // Inside emphasis now
+                        process_node_recursive(n, b, format_inline_fn, in_link_text); // Inside emphasis now
                         // Reset the flag (it should have been consumed by first TEXT, but just in case)
                         b.skip_next_leading_whitespace = false;
                         // Save pending space state (from trailing whitespace in content)
@@ -320,7 +363,7 @@ pub(super) fn build_words<'a>(
                             if let NodeOrToken::Node(link_child) = child
                                 && link_child.kind() == SyntaxKind::LINK_TEXT
                             {
-                                process_node_recursive(&link_child, b, format_inline_fn);
+                                process_node_recursive(&link_child, b, format_inline_fn, true);
                             }
                         }
 
@@ -341,7 +384,13 @@ pub(super) fn build_words<'a>(
                                     | SyntaxKind::LINK_REF
                                     | SyntaxKind::ATTRIBUTE => {
                                         if past_link_text {
-                                            closing.push_str(&link_child.text().to_string());
+                                            if link_child.kind() == SyntaxKind::LINK_DEST {
+                                                closing.push_str(&normalize_link_dest(
+                                                    &link_child.text().to_string(),
+                                                ));
+                                            } else {
+                                                closing.push_str(&link_child.text().to_string());
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -376,7 +425,7 @@ pub(super) fn build_words<'a>(
                             if let NodeOrToken::Node(img_child) = child
                                 && img_child.kind() == SyntaxKind::IMAGE_ALT
                             {
-                                process_node_recursive(&img_child, b, format_inline_fn);
+                                process_node_recursive(&img_child, b, format_inline_fn, true);
                             }
                         }
 
@@ -392,7 +441,13 @@ pub(super) fn build_words<'a>(
                                     }
                                     SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE => {
                                         if past_image_alt {
-                                            closing.push_str(&img_child.text().to_string());
+                                            if img_child.kind() == SyntaxKind::LINK_DEST {
+                                                closing.push_str(&normalize_link_dest(
+                                                    &img_child.text().to_string(),
+                                                ));
+                                            } else {
+                                                closing.push_str(&img_child.text().to_string());
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -428,7 +483,7 @@ pub(super) fn build_words<'a>(
     }
 
     let mut b = Builder::new(arena);
-    process_node_recursive(node, &mut b, &format_inline_fn); // Start outside emphasis
+    process_node_recursive(node, &mut b, &format_inline_fn, false); // Start outside emphasis
 
     let mut words: Vec<textwrap::core::Word<'a>> = Vec::with_capacity(b.piece_idx.len());
     for (i, &idx) in b.piece_idx.iter().enumerate() {

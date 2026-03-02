@@ -1,4 +1,4 @@
-DOCUMENT@0..122
+DOCUMENT@0..483
   PARAGRAPH@0..122
     LINK@0..114
       LINK_START@0..1
@@ -19,4 +19,138 @@ DOCUMENT@0..122
         ATTRIBUTE@103..114 "{width=70%}"
     TEXT@114..121 " A word"
     NEWLINE@121..122 "\n"
+  BLANK_LINE@122..123
+    BLANK_LINE@122..123 "\n"
+  PARAGRAPH@123..144
+    TEXT@123..130 "Just a "
+    LINK@130..142
+      LINK_START@130..131
+        LINK_START@130..131 "["
+      LINK_TEXT@131..134
+        TEXT@131..134 "URL"
+      LINK_TEXT_END@134..135 "]"
+      LINK_DEST_START@135..136 "("
+      LINK_DEST@136..141
+        TEXT@136..141 "/url/"
+      LINK_DEST_END@141..142 ")"
+    TEXT@142..143 "."
+    NEWLINE@143..144 "\n"
+  BLANK_LINE@144..145
+    BLANK_LINE@144..145 "\n"
+  PARAGRAPH@145..177
+    LINK@145..175
+      LINK_START@145..146
+        LINK_START@145..146 "["
+      LINK_TEXT@146..159
+        TEXT@146..159 "URL and title"
+      LINK_TEXT_END@159..160 "]"
+      LINK_DEST_START@160..161 "("
+      LINK_DEST@161..174
+        TEXT@161..174 "/url/ \"title\""
+      LINK_DEST_END@174..175 ")"
+    TEXT@175..176 "."
+    NEWLINE@176..177 "\n"
+  BLANK_LINE@177..178
+    BLANK_LINE@177..178 "\n"
+  PARAGRAPH@178..234
+    LINK@178..232
+      LINK_START@178..179
+        LINK_START@178..179 "["
+      LINK_TEXT@179..192
+        TEXT@179..192 "URL and title"
+      LINK_TEXT_END@192..193 "]"
+      LINK_DEST_START@193..194 "("
+      LINK_DEST@194..231
+        TEXT@194..231 "/url/  \"title precede ..."
+      LINK_DEST_END@231..232 ")"
+    TEXT@232..233 "."
+    NEWLINE@233..234 "\n"
+  BLANK_LINE@234..235
+    BLANK_LINE@234..235 "\n"
+  PARAGRAPH@235..285
+    LINK@235..283
+      LINK_START@235..236
+        LINK_START@235..236 "["
+      LINK_TEXT@236..249
+        TEXT@236..249 "URL and title"
+      LINK_TEXT_END@249..250 "]"
+      LINK_DEST_START@250..251 "("
+      LINK_DEST@251..282
+        TEXT@251..282 "/url/\t\"title preceded ..."
+      LINK_DEST_END@282..283 ")"
+    TEXT@283..284 "."
+    NEWLINE@284..285 "\n"
+  BLANK_LINE@285..286
+    BLANK_LINE@285..286 "\n"
+  PARAGRAPH@286..337
+    LINK@286..336
+      LINK_START@286..287
+        LINK_START@286..287 "["
+      LINK_TEXT@287..300
+        TEXT@287..300 "URL and title"
+      LINK_TEXT_END@300..301 "]"
+      LINK_DEST_START@301..302 "("
+      LINK_DEST@302..335
+        TEXT@302..335 "/url/ \"title with \"qu ..."
+      LINK_DEST_END@335..336 ")"
+    NEWLINE@336..337 "\n"
+  BLANK_LINE@337..338
+    BLANK_LINE@337..338 "\n"
+  PARAGRAPH@338..388
+    LINK@338..387
+      LINK_START@338..339
+        LINK_START@338..339 "["
+      LINK_TEXT@339..352
+        TEXT@339..352 "URL and title"
+      LINK_TEXT_END@352..353 "]"
+      LINK_DEST_START@353..354 "("
+      LINK_DEST@354..386
+        TEXT@354..386 "/url/ 'title with sin ..."
+      LINK_DEST_END@386..387 ")"
+    NEWLINE@387..388 "\n"
+  BLANK_LINE@388..389
+    BLANK_LINE@388..389 "\n"
+  PARAGRAPH@389..430
+    LINK@389..429
+      LINK_START@389..390
+        LINK_START@389..390 "["
+      LINK_TEXT@390..406
+        TEXT@390..394 "with"
+        ESCAPED_CHAR@394..396 "\\_"
+        TEXT@396..406 "underscore"
+      LINK_TEXT_END@406..407 "]"
+      LINK_DEST_START@407..408 "("
+      LINK_DEST@408..428
+        TEXT@408..428 "/url/with_underscore"
+      LINK_DEST_END@428..429 ")"
+    NEWLINE@429..430 "\n"
+  BLANK_LINE@430..431
+    BLANK_LINE@430..431 "\n"
+  PARAGRAPH@431..471
+    LINK@431..470
+      LINK_START@431..432
+        LINK_START@431..432 "["
+      LINK_TEXT@432..442
+        TEXT@432..442 "Email link"
+      LINK_TEXT_END@442..443 "]"
+      LINK_DEST_START@443..444 "("
+      LINK_DEST@444..469
+        TEXT@444..469 "mailto:nobody@nowhere ..."
+      LINK_DEST_END@469..470 ")"
+    NEWLINE@470..471 "\n"
+  BLANK_LINE@471..472
+    BLANK_LINE@471..472 "\n"
+  PARAGRAPH@472..483
+    LINK@472..481
+      LINK_START@472..473
+        LINK_START@472..473 "["
+      LINK_TEXT@473..478
+        TEXT@473..478 "Empty"
+      LINK_TEXT_END@478..479 "]"
+      LINK_DEST_START@479..480 "("
+      LINK_DEST@480..480
+        TEXT@480..480 ""
+      LINK_DEST_END@480..481 ")"
+    TEXT@481..482 "."
+    NEWLINE@482..483 "\n"
 
