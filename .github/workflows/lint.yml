@@ -28,6 +28,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           components: rustfmt, clippy
+          toolchain: stable
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
