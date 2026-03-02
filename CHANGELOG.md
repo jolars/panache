@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.9.0](https://github.com/jolars/panache/compare/v2.8.0...v2.9.0) (2026-03-02)
+
+### Features
+
+* **formatter:** normalize links to match pandoc ([3b5fdce](https://github.com/jolars/panache/commit/3b5fdce1a97670bd58f18f2257d04cc9d6bdd4e1))
+
+### Bug Fixes
+
+* handle list inside fenced div ([6f1014c](https://github.com/jolars/panache/commit/6f1014c7df892ca60e1b55885f95ca628670c16d))
+* **lsp:** correctly extract text in AST wrappers ([9bacf4d](https://github.com/jolars/panache/commit/9bacf4d943801f49cf1adfabe5c83d8c4570dfd5))
+* **lsp:** correctly map external lints to buffer ([4bef1b3](https://github.com/jolars/panache/commit/4bef1b31d4d90ec94a1251498cf9c7f5dbcc84ca))
+
 ## [2.8.0](https://github.com/jolars/panache/compare/v2.7.0...v2.8.0) (2026-03-02)
 
 ### Features
