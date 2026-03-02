@@ -17,7 +17,7 @@ env:
 
 jobs:
   docs:
-    name: Clippy
+    name: Lint
     runs-on: ubuntu-latest
 
     steps:
@@ -29,10 +29,6 @@ jobs:
         with:
           components: rustfmt, clippy
           toolchain: stable
-
-      - uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          extra-packages: any::rmarkdown, any::bookdown
 
       - name: Cache cargo registry
         uses: actions/cache@v5
