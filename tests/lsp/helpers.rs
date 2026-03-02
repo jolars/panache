@@ -193,6 +193,70 @@ impl TestLspServer {
         docs.get(uri)
             .map(|state| panache::SyntaxNode::new_root(state.tree.clone()))
     }
+
+    /// Go to definition at a specific position.
+    ///
+    /// Simulates the `textDocument/definition` request.
+    pub async fn goto_definition(
+        &self,
+        uri: &str,
+        line: u32,
+        character: u32,
+    ) -> Option<GotoDefinitionResponse> {
+        let params = GotoDefinitionParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: uri.parse().unwrap(),
+                },
+                position: Position { line, character },
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+
+        self.lsp.goto_definition(params).await.unwrap()
+    }
+
+    /// Get hover information at a specific position.
+    ///
+    /// Simulates the `textDocument/hover` request.
+    pub async fn hover(&self, uri: &str, line: u32, character: u32) -> Option<Hover> {
+        let params = HoverParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: uri.parse().unwrap(),
+                },
+                position: Position { line, character },
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+
+        self.lsp.hover(params).await.unwrap()
+    }
+
+    /// Get completion items at a specific position.
+    ///
+    /// Simulates the `textDocument/completion` request.
+    pub async fn completion(
+        &self,
+        uri: &str,
+        line: u32,
+        character: u32,
+    ) -> Option<CompletionResponse> {
+        let params = CompletionParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: uri.parse().unwrap(),
+                },
+                position: Position { line, character },
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+            context: None,
+        };
+
+        self.lsp.completion(params).await.unwrap()
+    }
 }
 
 /// Wrapper that delegates all LanguageServer methods to the inner Arc<PanacheLsp>.
@@ -276,6 +340,13 @@ impl LanguageServer for LspWrapper {
 
     async fn hover(&self, params: HoverParams) -> tower_lsp_server::jsonrpc::Result<Option<Hover>> {
         self.inner.hover(params).await
+    }
+
+    async fn completion(
+        &self,
+        params: CompletionParams,
+    ) -> tower_lsp_server::jsonrpc::Result<Option<CompletionResponse>> {
+        self.inner.completion(params).await
     }
 }
 

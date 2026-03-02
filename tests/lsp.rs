@@ -10,9 +10,12 @@
 
 mod lsp {
     pub(super) mod helpers;
+    pub(super) mod test_completion;
     pub(super) mod test_diagnostics;
     pub(super) mod test_document_lifecycle;
     pub(super) mod test_formatting;
+    pub(super) mod test_goto_definition;
+    pub(super) mod test_hover;
     pub(super) mod test_incremental_edits;
     pub(super) mod test_navigation;
 }
