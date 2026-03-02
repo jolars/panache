@@ -1,4 +1,4 @@
-DOCUMENT@0..438
+DOCUMENT@0..531
   FENCED_DIV@0..72
     DIV_FENCE_OPEN@0..19
       TEXT@0..3 ":::"
@@ -115,4 +115,47 @@ DOCUMENT@0..438
       NEWLINE@436..437 "\n"
   BLANK_LINE@437..438
     BLANK_LINE@437..438 "\n"
+  PARAGRAPH@438..478
+    TEXT@438..477 "Here's a fenced div w ..."
+    NEWLINE@477..478 "\n"
+  BLANK_LINE@478..479
+    BLANK_LINE@478..479 "\n"
+  FENCED_DIV@479..504
+    DIV_FENCE_OPEN@479..492
+      TEXT@479..482 ":::"
+      WHITESPACE@482..483 " "
+      DIV_INFO@483..491
+        TEXT@483..491 "exercise"
+      NEWLINE@491..492 "\n"
+    LIST@492..500
+      LIST_ITEM@492..496
+        LIST_MARKER@492..493 "-"
+        WHITESPACE@493..494 " "
+        PLAIN@494..496
+          TEXT@494..495 "A"
+          NEWLINE@495..496 "\n"
+      LIST_ITEM@496..500
+        LIST_MARKER@496..497 "-"
+        WHITESPACE@497..498 " "
+        PLAIN@498..500
+          TEXT@498..499 "B"
+          NEWLINE@499..500 "\n"
+    DIV_FENCE_CLOSE@500..504
+      TEXT@500..503 ":::"
+      NEWLINE@503..504 "\n"
+  BLANK_LINE@504..505
+    BLANK_LINE@504..505 "\n"
+  FENCED_DIV@505..531
+    DIV_FENCE_OPEN@505..518
+      TEXT@505..508 ":::"
+      WHITESPACE@508..509 " "
+      DIV_INFO@509..517
+        TEXT@509..517 "exercise"
+      NEWLINE@517..518 "\n"
+    PARAGRAPH@518..526
+      TEXT@518..525 "foo bar"
+      NEWLINE@525..526 "\n"
+    DIV_FENCE_CLOSE@526..531
+      TEXT@526..530 "::: "
+      NEWLINE@530..531 "\n"
 

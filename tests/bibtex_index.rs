@@ -164,7 +164,7 @@ fn bib_index_load_error_handling() {
 
     // Try to load a non-existent file
     let nonexistent = PathBuf::from("/nonexistent/path/to/file.bib");
-    let index = load_bibliography(&[nonexistent.clone()]);
+    let index = load_bibliography(std::slice::from_ref(&nonexistent));
 
     // Should record load error
     assert_eq!(index.load_errors.len(), 1);

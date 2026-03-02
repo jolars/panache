@@ -81,12 +81,12 @@ async fn test_hover_on_footnote_with_formatting() {
 
     assert!(hover.is_some(), "Should have hover for formatted footnote");
 
-    if let Some(h) = hover {
-        if let HoverContents::Markup(markup) = h.contents {
-            let content = markup.value;
-            assert!(content.contains("*emphasis*"));
-            assert!(content.contains("`code`"));
-        }
+    if let Some(h) = hover
+        && let HoverContents::Markup(markup) = h.contents
+    {
+        let content = markup.value;
+        assert!(content.contains("*emphasis*"));
+        assert!(content.contains("`code`"));
     }
 }
 

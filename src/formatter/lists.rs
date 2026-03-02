@@ -146,7 +146,11 @@ impl Formatter {
             .map(|prev| matches!(prev.kind(), SyntaxKind::LIST | SyntaxKind::BLANK_LINE))
             .unwrap_or(false);
 
-        if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") && !prev_is_list
+        if indent == 0
+            && self.fenced_div_depth == 0
+            && !self.output.is_empty()
+            && !self.output.ends_with("\n\n")
+            && !prev_is_list
         {
             self.output.push('\n');
         }

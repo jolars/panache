@@ -30,3 +30,13 @@ This is a warning within a warning.
 :::
 ::::::::::::::::::
 
+Here's a fenced div with a list inside.
+
+::: exercise
+- A
+- B
+:::
+
+::: exercise
+foo bar
+::: 

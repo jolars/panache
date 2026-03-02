@@ -218,7 +218,7 @@ fn pipe_table_cast_and_rows() {
 
     // Check rows
     let rows: Vec<_> = table.rows().collect();
-    assert!(rows.len() >= 1, "Table should have at least 1 row");
+    assert!(!rows.is_empty(), "Table should have at least 1 row");
 }
 
 #[test]

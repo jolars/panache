@@ -1538,6 +1538,10 @@ impl<'a> Parser<'a> {
                     BlockDetectionResult::No => unreachable!(),
                 }
 
+                if matches!(block_match.effect, BlockEffect::CloseFencedDiv) {
+                    self.close_containers_to_fenced_div();
+                }
+
                 let lines_consumed = self.block_registry.parse_prepared(
                     block_match,
                     &dispatcher_ctx,
@@ -1552,7 +1556,7 @@ impl<'a> Parser<'a> {
                         self.containers.push(Container::FencedDiv {});
                     }
                     BlockEffect::CloseFencedDiv => {
-                        self.close_containers_to(self.containers.depth().saturating_sub(1));
+                        self.close_fenced_div();
                     }
                     BlockEffect::OpenFootnoteDefinition => {
                         self.handle_footnote_open_effect(block_match, content);
@@ -1604,6 +1608,10 @@ impl<'a> Parser<'a> {
             }
 
             if !matches!(block_match.detection, BlockDetectionResult::No) {
+                if matches!(block_match.effect, BlockEffect::CloseFencedDiv) {
+                    self.close_containers_to_fenced_div();
+                }
+
                 let lines_consumed = self.block_registry.parse_prepared(
                     block_match,
                     &dispatcher_ctx,
@@ -1618,7 +1626,7 @@ impl<'a> Parser<'a> {
                         self.containers.push(Container::FencedDiv {});
                     }
                     BlockEffect::CloseFencedDiv => {
-                        self.close_containers_to(self.containers.depth().saturating_sub(1));
+                        self.close_fenced_div();
                     }
                     BlockEffect::OpenFootnoteDefinition => {
                         self.handle_footnote_open_effect(block_match, content);
@@ -1686,6 +1694,25 @@ impl<'a> Parser<'a> {
         );
         self.pos += 1;
         true
+    }
+
+    fn fenced_div_container_index(&self) -> Option<usize> {
+        self.containers
+            .stack
+            .iter()
+            .rposition(|c| matches!(c, Container::FencedDiv { .. }))
+    }
+
+    fn close_containers_to_fenced_div(&mut self) {
+        if let Some(index) = self.fenced_div_container_index() {
+            self.close_containers_to(index + 1);
+        }
+    }
+
+    fn close_fenced_div(&mut self) {
+        if let Some(index) = self.fenced_div_container_index() {
+            self.close_containers_to(index);
+        }
     }
 
     fn in_fenced_div(&self) -> bool {
