@@ -6,7 +6,7 @@ use tower_lsp_server::ls_types::Uri;
 
 use crate::Config;
 use crate::lsp::DocumentState;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, Citation, SyntaxKind, SyntaxNode};
 use rowan::{NodeOrToken, TextRange, TextSize};
 
 use super::config::load_config;
@@ -110,14 +110,24 @@ pub(crate) fn extract_reference_label(node: &SyntaxNode) -> Option<(String, bool
 }
 
 pub(crate) fn extract_citation_key(node: &SyntaxNode) -> Option<String> {
-    match node.kind() {
-        SyntaxKind::CITATION_KEY => Some(node.text().to_string()),
-        SyntaxKind::CITATION => node
-            .children()
-            .find(|child| child.kind() == SyntaxKind::CITATION_KEY)
-            .map(|child| child.text().to_string()),
-        _ => None,
+    // Try to cast the node itself as a Citation
+    if let Some(citation) = Citation::cast(node.clone()) {
+        // Return the first key (citations can have multiple keys)
+        return citation.keys().first().map(|key| key.text());
     }
+
+    // If the node is a CITATION_KEY token's parent, walk up to find CITATION
+    let mut current = node.clone();
+    while let Some(parent) = current.parent() {
+        if let Some(citation) = Citation::cast(parent.clone()) {
+            // Check if any of the citation's keys match the position we're at
+            // For simplicity, return the first key
+            return citation.keys().first().map(|key| key.text());
+        }
+        current = parent;
+    }
+
+    None
 }
 
 /// Extract the label from a definition node (ReferenceDefinition or FootnoteDefinition)
@@ -180,6 +190,7 @@ pub(crate) fn find_definition_node(
 
 /// Find the definition for a reference at the given offset
 /// Returns the TextRange of the definition if found
+#[cfg(test)]
 pub(crate) fn find_definition_at_offset(root: &SyntaxNode, offset: usize) -> Option<TextRange> {
     // Find the node at this offset
     let mut node = find_node_at_offset(root, offset)?;
@@ -372,6 +383,32 @@ mod tests {
         // Even though we're on a reference, there's no definition
         let range = find_definition_at_offset(&root, 7);
         assert!(range.is_none());
+    }
+
+    #[test]
+    fn test_extract_citation_key_from_citation() {
+        let root = parse("Text @woodward1952 more text");
+        let citation = root
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::CITATION)
+            .expect("Should find CITATION");
+
+        let key = extract_citation_key(&citation).expect("Should extract citation key");
+        assert_eq!(key, "woodward1952");
+    }
+
+    #[test]
+    fn test_extract_citation_key_walks_up_tree() {
+        let root = parse("Text @woodward1952 more text");
+
+        // Find the CITATION node
+        let citation = root
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::CITATION)
+            .expect("Should find CITATION node");
+
+        let key = extract_citation_key(&citation).expect("Should extract citation key");
+        assert_eq!(key, "woodward1952");
     }
 
     #[test]

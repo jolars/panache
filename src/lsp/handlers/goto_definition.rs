@@ -42,47 +42,60 @@ pub(crate) async fn goto_definition(
         return Ok(None);
     };
 
-    // First: citation definitions in bibliography
-    if let Some(node) = helpers::find_node_at_offset(&root, offset)
-        && let Some(key) = helpers::extract_citation_key(&node)
-        && let Some(metadata) = metadata
-        && let Some(parse) = metadata.bibliography_parse
-        && let Some(location) = parse.index.get(&key)
-    {
-        let target_uri = Uri::from_file_path(&location.file).unwrap_or_else(|| uri.clone());
-        let (target_text, target_uri) = if let Ok(text) = std::fs::read_to_string(&location.file) {
-            (text, target_uri)
-        } else {
-            (content.clone(), uri.clone())
-        };
-        let start = conversions::offset_to_position(&target_text, location.span.start);
-        let end = conversions::offset_to_position(&target_text, location.span.end);
-        let location = Location {
-            uri: target_uri,
-            range: Range { start, end },
-        };
-        return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-    }
-
-    // Fallback: find reference/footnote definition at this offset
-    let Some(definition_range) = helpers::find_definition_at_offset(&root, offset) else {
+    // Find the node at this offset
+    let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
         return Ok(None);
     };
 
-    // Convert the definition's TextRange to LSP Location
-    let start_offset: usize = definition_range.start().into();
-    let end_offset: usize = definition_range.end().into();
+    // Walk up the tree to find a citation, reference, or footnote
+    loop {
+        // First: citation definitions in bibliography
+        if let Some(key) = helpers::extract_citation_key(&node)
+            && let Some(metadata) = metadata.clone()
+            && let Some(parse) = metadata.bibliography_parse
+            && let Some(location) = parse.index.get(&key)
+        {
+            let target_uri = Uri::from_file_path(&location.file).unwrap_or_else(|| uri.clone());
+            let (target_text, target_uri) =
+                if let Ok(text) = std::fs::read_to_string(&location.file) {
+                    (text, target_uri)
+                } else {
+                    (content.clone(), uri.clone())
+                };
+            let start = conversions::offset_to_position(&target_text, location.span.start);
+            let end = conversions::offset_to_position(&target_text, location.span.end);
+            let location = Location {
+                uri: target_uri,
+                range: Range { start, end },
+            };
+            return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+        }
 
-    let start_position = conversions::offset_to_position(&content, start_offset);
-    let end_position = conversions::offset_to_position(&content, end_offset);
+        // Fallback: find reference/footnote definition at this node
+        if let Some((label, is_footnote)) = helpers::extract_reference_label(&node)
+            && let Some(definition) = helpers::find_definition_node(&root, &label, is_footnote)
+        {
+            let start_offset: usize = definition.text_range().start().into();
+            let end_offset: usize = definition.text_range().end().into();
 
-    let location = Location {
-        uri: uri.clone(),
-        range: Range {
-            start: start_position,
-            end: end_position,
-        },
-    };
+            let start_position = conversions::offset_to_position(&content, start_offset);
+            let end_position = conversions::offset_to_position(&content, end_offset);
 
-    Ok(Some(GotoDefinitionResponse::Scalar(location)))
+            let location = Location {
+                uri: uri.clone(),
+                range: Range {
+                    start: start_position,
+                    end: end_position,
+                },
+            };
+
+            return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+        }
+
+        // Move up to parent, or return None if at root
+        match node.parent() {
+            Some(parent) => node = parent,
+            None => return Ok(None),
+        }
+    }
 }
