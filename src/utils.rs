@@ -59,6 +59,8 @@ pub struct CodeBlock {
     pub content: String,
     /// Starting line number in the document (1-indexed)
     pub start_line: usize,
+    /// Byte offset range of the content in the original document
+    pub original_range: std::ops::Range<usize>,
 }
 
 /// Collect all fenced code blocks from a syntax tree, grouped by language.
@@ -83,6 +85,7 @@ fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
     let mut language = None;
     let mut content = String::new();
     let mut content_start_offset = None;
+    let mut content_end_offset = None;
 
     for child in node.children_with_tokens() {
         if let NodeOrToken::Node(n) = child {
@@ -107,8 +110,10 @@ fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
                 }
                 SyntaxKind::CODE_CONTENT => {
                     content = n.text().to_string();
-                    // Track where the actual code content starts (not the fence)
-                    content_start_offset = Some(n.text_range().start().into());
+                    // Track where the actual code content starts and ends (not the fence)
+                    let range = n.text_range();
+                    content_start_offset = Some(range.start().into());
+                    content_end_offset = Some(range.end().into());
                 }
                 _ => {}
             }
@@ -124,17 +129,21 @@ fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
     }
 
     // Calculate start line from where content actually starts (after the fence line)
-    let start_line = if let Some(offset) = content_start_offset {
-        offset_to_line(input, offset)
-    } else {
-        // Fallback to block start if we can't find content offset
-        offset_to_line(input, node.text_range().start().into())
-    };
+    let (start_line, original_range) =
+        if let (Some(start), Some(end)) = (content_start_offset, content_end_offset) {
+            (offset_to_line(input, start), start..end)
+        } else {
+            // Fallback to block range if we can't find content offset
+            let start: usize = node.text_range().start().into();
+            let end: usize = node.text_range().end().into();
+            (offset_to_line(input, start), start..end)
+        };
 
     Some(CodeBlock {
         language,
         content,
         start_line,
+        original_range,
     })
 }
 

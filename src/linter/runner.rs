@@ -1,6 +1,6 @@
 use crate::config::Config;
 #[cfg(not(target_arch = "wasm32"))]
-use crate::linter::code_block_collector::concatenate_with_blanks;
+use crate::linter::code_block_collector::concatenate_with_blanks_and_mapping;
 use crate::linter::diagnostics::Diagnostic;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::linter::external_linters::{ExternalLinterRegistry, run_linter};
@@ -86,11 +86,19 @@ impl LintRunner {
                     language
                 );
 
-                // Concatenate blocks with line preservation
-                let concatenated = concatenate_with_blanks(blocks);
+                // Concatenate blocks with line preservation and get mappings
+                let concatenated_result = concatenate_with_blanks_and_mapping(blocks);
 
-                // Run the linter
-                match run_linter(linter_name, &concatenated, input, &self.external_linters).await {
+                // Run the linter with mapping info
+                match run_linter(
+                    linter_name,
+                    &concatenated_result.content,
+                    input,
+                    &self.external_linters,
+                    Some(&concatenated_result.mappings),
+                )
+                .await
+                {
                     Ok(external_diagnostics) => {
                         log::debug!(
                             "External linter '{}' found {} diagnostic(s)",
@@ -144,15 +152,16 @@ impl LintRunner {
                     language
                 );
 
-                // Concatenate blocks with line preservation
-                let concatenated = concatenate_with_blanks(blocks);
+                // Concatenate blocks with line preservation and get mappings
+                let concatenated_result = concatenate_with_blanks_and_mapping(blocks);
 
-                // Run the linter (sync version)
+                // Run the linter (sync version) with mapping info
                 match crate::linter::external_linters_sync::run_linter_sync(
                     linter_name,
-                    &concatenated,
+                    &concatenated_result.content,
                     input,
                     &self.external_linters,
+                    Some(&concatenated_result.mappings),
                 ) {
                     Ok(external_diagnostics) => {
                         log::debug!(

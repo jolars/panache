@@ -5,27 +5,64 @@
 
 use crate::utils::CodeBlock;
 
-/// Concatenate code blocks with blank line preservation.
+/// Mapping information for a code block in the concatenated file.
+#[derive(Debug, Clone)]
+pub struct BlockMapping {
+    /// Byte offset range in the concatenated file
+    pub concatenated_range: std::ops::Range<usize>,
+    /// Byte offset range in the original document
+    pub original_range: std::ops::Range<usize>,
+    /// Starting line number in both files (preserved by blank line padding)
+    pub start_line: usize,
+}
+
+/// Result of concatenating code blocks with mapping information.
+#[derive(Debug, Clone)]
+pub struct ConcatenatedBlocks {
+    /// The concatenated content
+    pub content: String,
+    /// Mapping information for each block
+    pub mappings: Vec<BlockMapping>,
+}
+
+/// Concatenate code blocks with blank line preservation and return mapping info.
 ///
 /// Returns the concatenated string where each block appears at its original line number,
-/// with blank lines filling the gaps.
-pub fn concatenate_with_blanks(blocks: &[CodeBlock]) -> String {
+/// with blank lines filling the gaps, plus mapping information to convert offsets back.
+pub fn concatenate_with_blanks_and_mapping(blocks: &[CodeBlock]) -> ConcatenatedBlocks {
     if blocks.is_empty() {
-        return String::new();
+        return ConcatenatedBlocks {
+            content: String::new(),
+            mappings: Vec::new(),
+        };
     }
 
-    let mut result = String::new();
+    let mut content = String::new();
+    let mut mappings = Vec::new();
     let mut current_line = 1;
 
     for block in blocks {
         // Add blank lines to reach the block's start line
         while current_line < block.start_line {
-            result.push('\n');
+            content.push('\n');
             current_line += 1;
         }
 
+        // Track the start of this block in the concatenated file
+        let concat_start = content.len();
+
         // Add the block content
-        result.push_str(&block.content);
+        content.push_str(&block.content);
+
+        // Track the end of this block in the concatenated file
+        let concat_end = content.len();
+
+        // Record the mapping
+        mappings.push(BlockMapping {
+            concatenated_range: concat_start..concat_end,
+            original_range: block.original_range.clone(),
+            start_line: block.start_line,
+        });
 
         // Update current line based on how many lines we just added
         let lines_added = block.content.lines().count().max(1);
@@ -33,12 +70,20 @@ pub fn concatenate_with_blanks(blocks: &[CodeBlock]) -> String {
 
         // Add trailing newline if block doesn't end with one
         if !block.content.ends_with('\n') {
-            result.push('\n');
+            content.push('\n');
             current_line += 1;
         }
     }
 
-    result
+    ConcatenatedBlocks { content, mappings }
+}
+
+/// Concatenate code blocks with blank line preservation.
+///
+/// Returns the concatenated string where each block appears at its original line number,
+/// with blank lines filling the gaps.
+pub fn concatenate_with_blanks(blocks: &[CodeBlock]) -> String {
+    concatenate_with_blanks_and_mapping(blocks).content
 }
 
 #[cfg(test)]
@@ -119,6 +164,7 @@ print("hello")
             language: "r".to_string(),
             content: "x <- 1\n".to_string(),
             start_line: 5,
+            original_range: 100..107, // Dummy range for test
         }];
 
         let result = concatenate_with_blanks(&blocks);
@@ -135,11 +181,13 @@ print("hello")
                 language: "r".to_string(),
                 content: "x <- 1\n".to_string(),
                 start_line: 2,
+                original_range: 50..57,
             },
             CodeBlock {
                 language: "r".to_string(),
                 content: "y <- 2\n".to_string(),
                 start_line: 6,
+                original_range: 150..157,
             },
         ];
 
@@ -166,11 +214,13 @@ print("hello")
                 language: "r".to_string(),
                 content: "a <- 1\n".to_string(),
                 start_line: 10,
+                original_range: 200..207,
             },
             CodeBlock {
                 language: "r".to_string(),
                 content: "b <- 2\n".to_string(),
                 start_line: 20,
+                original_range: 400..407,
             },
         ];
 
@@ -284,5 +334,48 @@ d <- 4
 
         let py_blocks = &blocks["python"];
         assert_eq!(py_blocks.len(), 1);
+    }
+
+    #[test]
+    fn test_concatenate_with_mapping() {
+        let blocks = vec![
+            CodeBlock {
+                language: "r".to_string(),
+                content: "x <- 1\n".to_string(),
+                start_line: 2,
+                original_range: 10..17, // Hypothetical original positions
+            },
+            CodeBlock {
+                language: "r".to_string(),
+                content: "y <- 2\n".to_string(),
+                start_line: 6,
+                original_range: 50..57,
+            },
+        ];
+
+        let result = concatenate_with_blanks_and_mapping(&blocks);
+
+        // Check content is correct
+        let lines: Vec<&str> = result.content.lines().collect();
+        assert_eq!(lines.len(), 6);
+        assert_eq!(lines[1], "x <- 1"); // Line 2
+        assert_eq!(lines[5], "y <- 2"); // Line 6
+
+        // Check mappings
+        assert_eq!(result.mappings.len(), 2);
+
+        // First block mapping
+        assert_eq!(result.mappings[0].start_line, 2);
+        assert_eq!(result.mappings[0].original_range, 10..17);
+        // In concatenated: "\n" (line 1) + "x <- 1\n" = offset 1 to 8
+        assert_eq!(result.mappings[0].concatenated_range.start, 1);
+        assert_eq!(result.mappings[0].concatenated_range.end, 8);
+
+        // Second block mapping
+        assert_eq!(result.mappings[1].start_line, 6);
+        assert_eq!(result.mappings[1].original_range, 50..57);
+        // In concatenated: 8 (after first) + "\n\n\n" (lines 3-5) = 11, then "y <- 2\n" = 11 to 18
+        assert_eq!(result.mappings[1].concatenated_range.start, 11);
+        assert_eq!(result.mappings[1].concatenated_range.end, 18);
     }
 }

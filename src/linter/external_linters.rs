@@ -2,6 +2,22 @@
 //!
 //! This module provides support for running external linters (like jarl for R)
 //! on code blocks and converting their output to panache diagnostics.
+//!
+//! ## Auto-fix Support
+//!
+//! External linters can provide auto-fixes, but there's a complexity: the linter
+//! runs on a concatenated temporary file (all code blocks with blank line padding),
+//! while fixes need to be applied to the original document.
+//!
+//! The mapping works as follows:
+//! 1. Code blocks are concatenated with `concatenate_with_blanks_and_mapping()`
+//! 2. This preserves line numbers but creates different byte offsets
+//! 3. Mapping information tracks both concatenated and original byte ranges
+//! 4. When parsing linter fixes, `map_concatenated_offset_to_original()` converts
+//!    byte offsets from the temp file back to the original document
+//!
+//! This allows linter fixes to be seamlessly applied to the correct locations
+//! in the source markdown file.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -101,6 +117,7 @@ pub async fn run_linter(
     code: &str,
     original_input: &str,
     registry: &ExternalLinterRegistry,
+    mappings: Option<&[crate::linter::code_block_collector::BlockMapping]>,
 ) -> Result<Vec<Diagnostic>, LinterError> {
     let linter_info = registry
         .get(linter_name)
@@ -141,7 +158,7 @@ pub async fn run_linter(
     }
 
     // Parse output based on linter type
-    parse_linter_output(linter_name, &stdout, original_input)
+    parse_linter_output(linter_name, &stdout, original_input, mappings)
 }
 
 /// Parse linter output based on linter type (public for sync version to reuse).
@@ -149,9 +166,10 @@ pub fn parse_linter_output(
     linter_name: &str,
     output: &str,
     original_input: &str,
+    mappings: Option<&[crate::linter::code_block_collector::BlockMapping]>,
 ) -> Result<Vec<Diagnostic>, LinterError> {
     match linter_name {
-        "jarl" => parse_jarl_output(output, original_input),
+        "jarl" => parse_jarl_output(output, original_input, mappings),
         _ => Err(LinterError::ParseError(format!(
             "no parser for linter: {}",
             linter_name
@@ -174,7 +192,6 @@ struct JarlDiagnostic {
     filename: String,
     range: [usize; 2],
     location: JarlLocation,
-    #[allow(dead_code)] // TODO: Re-enable when auto-fix byte offset mapping is implemented
     fix: JarlFix,
 }
 
@@ -193,7 +210,6 @@ struct JarlLocation {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)] // TODO: Re-enable when auto-fix byte offset mapping is implemented
 struct JarlFix {
     content: String,
     start: usize,
@@ -245,8 +261,49 @@ fn line_col_to_offset(input: &str, line: usize, column: usize) -> Option<usize> 
     }
 }
 
+/// Map a byte offset from the concatenated file to the original document.
+///
+/// Given a byte offset in the concatenated temporary file (with blank line padding),
+/// find which code block it belongs to and map it to the corresponding byte offset
+/// in the original document.
+///
+/// Returns `None` if the offset doesn't fall within any code block (e.g., it's in
+/// the blank line padding between blocks).
+fn map_concatenated_offset_to_original(
+    offset: usize,
+    mappings: &[crate::linter::code_block_collector::BlockMapping],
+) -> Option<usize> {
+    // Find which block contains this offset
+    for mapping in mappings {
+        if mapping.concatenated_range.contains(&offset) {
+            // Offset is within this block
+            // Calculate position relative to start of block in concatenated file
+            let relative_offset = offset - mapping.concatenated_range.start;
+
+            // Map to original document
+            let original_offset = mapping.original_range.start + relative_offset;
+
+            // Ensure we don't go past the end of the original block
+            if original_offset <= mapping.original_range.end {
+                return Some(original_offset);
+            }
+        }
+    }
+
+    None
+}
+
 /// Parse jarl JSON output into panache diagnostics.
-fn parse_jarl_output(json: &str, input: &str) -> Result<Vec<Diagnostic>, LinterError> {
+///
+/// If `mappings` is provided, auto-fixes from Jarl will be enabled and byte offsets
+/// will be mapped from the concatenated file back to the original document.
+fn parse_jarl_output(
+    json: &str,
+    input: &str,
+    mappings: Option<&[crate::linter::code_block_collector::BlockMapping]>,
+) -> Result<Vec<Diagnostic>, LinterError> {
+    use crate::linter::diagnostics::{Edit, Fix};
+
     let output: JarlOutput = serde_json::from_str(json)
         .map_err(|e| LinterError::ParseError(format!("invalid jarl JSON: {}", e)))?;
 
@@ -270,15 +327,38 @@ fn parse_jarl_output(json: &str, input: &str) -> Result<Vec<Diagnostic>, LinterE
             range,
         };
 
-        // Convert fix if available
-        // TODO: Auto-fixes from external linters are disabled for now.
-        // The issue: jarl's byte offsets are relative to the concatenated temp file,
-        // not the original document. To fix this properly, we'd need to:
-        // 1. Pass the original document input through to parse_jarl_output
-        // 2. Convert jarl's byte offsets → line/column in concatenated file
-        // 3. Convert line/column → byte offsets in original document
-        // This requires refactoring the parse function signature.
-        let fix = None;
+        // Convert fix if available and mappings are provided
+        let fix = if let Some(mappings) = mappings {
+            if !jarl_diag.fix.to_skip {
+                // Map Jarl's byte offsets (in concatenated file) to original document
+                if let (Some(fix_start), Some(fix_end)) = (
+                    map_concatenated_offset_to_original(jarl_diag.fix.start, mappings),
+                    map_concatenated_offset_to_original(jarl_diag.fix.end, mappings),
+                ) {
+                    let fix_range =
+                        TextRange::new((fix_start as u32).into(), (fix_end as u32).into());
+                    Some(Fix {
+                        message: format!("Apply suggested fix: {}", jarl_diag.fix.content),
+                        edits: vec![Edit {
+                            range: fix_range,
+                            replacement: jarl_diag.fix.content.clone(),
+                        }],
+                    })
+                } else {
+                    // Mapping failed - log and skip this fix
+                    log::warn!(
+                        "Failed to map Jarl fix offsets {}..{} to original document",
+                        jarl_diag.fix.start,
+                        jarl_diag.fix.end
+                    );
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         // jarl reports warnings, not errors
         let diagnostic =
@@ -349,7 +429,7 @@ mod tests {
         }"#;
 
         let input = "x = 1\n";
-        let diagnostics = parse_jarl_output(json, input).unwrap();
+        let diagnostics = parse_jarl_output(json, input, None).unwrap();
 
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "assignment");
@@ -358,7 +438,7 @@ mod tests {
         assert_eq!(diagnostics[0].location.column, 1);
         assert_eq!(usize::from(diagnostics[0].location.range.start()), 0);
         assert_eq!(usize::from(diagnostics[0].location.range.end()), 3);
-        // Auto-fixes disabled for external linters (byte offset mapping issue)
+        // Without mappings, auto-fixes are disabled
         assert!(diagnostics[0].fix.is_none());
     }
 
@@ -390,9 +470,134 @@ mod tests {
         }"#;
 
         let input = "test\n";
-        let diagnostics = parse_jarl_output(json, input).unwrap();
+        let diagnostics = parse_jarl_output(json, input, None).unwrap();
 
         assert_eq!(diagnostics.len(), 1);
         assert!(diagnostics[0].fix.is_none());
+    }
+
+    #[test]
+    fn test_map_concatenated_offset_single_block() {
+        use crate::linter::code_block_collector::BlockMapping;
+
+        let mappings = vec![BlockMapping {
+            concatenated_range: 1..8, // "\nx <- 1\n" at offset 1-8
+            original_range: 10..17,   // Original document offsets
+            start_line: 2,
+        }];
+
+        // Test mapping within the block
+        assert_eq!(map_concatenated_offset_to_original(1, &mappings), Some(10)); // Start
+        assert_eq!(map_concatenated_offset_to_original(4, &mappings), Some(13)); // Middle
+        assert_eq!(map_concatenated_offset_to_original(7, &mappings), Some(16)); // End-1
+
+        // Test offset outside the block (in blank padding)
+        assert_eq!(map_concatenated_offset_to_original(0, &mappings), None); // Before
+        assert_eq!(map_concatenated_offset_to_original(8, &mappings), None); // After
+        assert_eq!(map_concatenated_offset_to_original(100, &mappings), None); // Way past
+    }
+
+    #[test]
+    fn test_map_concatenated_offset_multiple_blocks() {
+        use crate::linter::code_block_collector::BlockMapping;
+
+        let mappings = vec![
+            BlockMapping {
+                concatenated_range: 1..8, // First block at offset 1-8
+                original_range: 10..17,
+                start_line: 2,
+            },
+            BlockMapping {
+                concatenated_range: 11..18, // Second block at offset 11-18
+                original_range: 50..57,
+                start_line: 6,
+            },
+        ];
+
+        // First block
+        assert_eq!(map_concatenated_offset_to_original(1, &mappings), Some(10));
+        assert_eq!(map_concatenated_offset_to_original(5, &mappings), Some(14));
+
+        // Gap between blocks (blank lines)
+        assert_eq!(map_concatenated_offset_to_original(8, &mappings), None);
+        assert_eq!(map_concatenated_offset_to_original(9, &mappings), None);
+        assert_eq!(map_concatenated_offset_to_original(10, &mappings), None);
+
+        // Second block
+        assert_eq!(map_concatenated_offset_to_original(11, &mappings), Some(50));
+        assert_eq!(map_concatenated_offset_to_original(15, &mappings), Some(54));
+        assert_eq!(map_concatenated_offset_to_original(17, &mappings), Some(56));
+    }
+
+    #[test]
+    fn test_map_concatenated_offset_edge_cases() {
+        use crate::linter::code_block_collector::BlockMapping;
+
+        let mappings = vec![BlockMapping {
+            concatenated_range: 0..5,
+            original_range: 100..105,
+            start_line: 1,
+        }];
+
+        // Block starting at offset 0
+        assert_eq!(map_concatenated_offset_to_original(0, &mappings), Some(100));
+        assert_eq!(map_concatenated_offset_to_original(4, &mappings), Some(104));
+
+        // Just past the end
+        assert_eq!(map_concatenated_offset_to_original(5, &mappings), None);
+    }
+
+    #[test]
+    fn test_parse_jarl_output_with_fix_and_mappings() {
+        use crate::linter::code_block_collector::BlockMapping;
+
+        // Simulates: original doc has R code at offsets 50-56 ("x = 1\n")
+        // Concatenated file has it at offsets 0-6 (no padding since it starts at line 1)
+        let json = r#"{
+            "diagnostics": [
+                {
+                    "message": {
+                        "name": "assignment",
+                        "body": "Use `<-` for assignment.",
+                        "suggestion": null
+                    },
+                    "filename": "/tmp/test.R",
+                    "range": [0, 3],
+                    "location": {
+                        "row": 1,
+                        "column": 0
+                    },
+                    "fix": {
+                        "content": "x <- 1",
+                        "start": 0,
+                        "end": 5,
+                        "to_skip": false
+                    }
+                }
+            ],
+            "errors": []
+        }"#;
+
+        let concatenated_input = "x = 1\n";
+        let mappings = vec![BlockMapping {
+            concatenated_range: 0..6,
+            original_range: 50..56,
+            start_line: 1,
+        }];
+
+        let diagnostics = parse_jarl_output(json, concatenated_input, Some(&mappings)).unwrap();
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "assignment");
+
+        // Check that fix is now present
+        assert!(diagnostics[0].fix.is_some());
+        let fix = diagnostics[0].fix.as_ref().unwrap();
+
+        assert_eq!(fix.edits.len(), 1);
+        // Fix range should be mapped from concatenated (0..5) to original (50..55)
+        assert_eq!(usize::from(fix.edits[0].range.start()), 50);
+        assert_eq!(usize::from(fix.edits[0].range.end()), 55);
+        assert_eq!(fix.edits[0].replacement, "x <- 1");
     }
 }

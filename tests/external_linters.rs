@@ -46,11 +46,17 @@ result <- T
 
         // Check line numbers are correct
         assert_eq!(assignment_diags[0].location.line, 4); // x = 1 is on line 4
-        // Note: Auto-fixes are currently disabled due to byte offset mapping complexity
+
+        // Auto-fixes should now be enabled!
         assert!(
-            assignment_diags[0].fix.is_none(),
-            "Auto-fixes should be disabled"
+            assignment_diags[0].fix.is_some(),
+            "Auto-fixes should be enabled with byte offset mapping"
         );
+
+        // Verify the fix is correct
+        let fix = assignment_diags[0].fix.as_ref().unwrap();
+        assert_eq!(fix.edits.len(), 1);
+        assert_eq!(fix.edits[0].replacement, "x <- 1");
     }
 
     #[tokio::test]
@@ -89,6 +95,10 @@ y = 2
         // Check both line numbers are correct
         assert_eq!(assignment_diags[0].location.line, 2); // First block content, line 2
         assert_eq!(assignment_diags[1].location.line, 8); // Second block content, line 8
+
+        // Both should have fixes
+        assert!(assignment_diags[0].fix.is_some());
+        assert!(assignment_diags[1].fix.is_some());
     }
 
     #[tokio::test]
@@ -129,5 +139,85 @@ x <- 1
 
         // Should handle gracefully - just skip external linting
         // Test passes if no panic occurs
+    }
+
+    #[tokio::test]
+    async fn test_fix_application_end_to_end() {
+        // This test demonstrates that auto-fixes work end-to-end:
+        // 1. Parse markdown with R code
+        // 2. Run Jarl to get diagnostics with fixes
+        // 3. Apply the fixes to the original document
+        // 4. Verify the result is correct
+
+        if which::which("jarl").is_err() {
+            println!("Skipping jarl test - jarl not installed");
+            return;
+        }
+
+        let input = r#"# Test Document
+
+Some text here.
+
+```r
+x = 1
+y = 2
+```
+
+More text.
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("r".to_string(), "jarl".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        // Get diagnostics with fixes
+        let with_fixes: Vec<_> = diagnostics.iter().filter(|d| d.fix.is_some()).collect();
+        assert!(!with_fixes.is_empty(), "Expected at least one fix");
+
+        // Simulate applying fixes (same logic as CLI --fix)
+        use panache::linter::diagnostics::Edit;
+
+        let mut edits: Vec<&Edit> = diagnostics
+            .iter()
+            .filter_map(|d| d.fix.as_ref())
+            .flat_map(|f| &f.edits)
+            .collect();
+
+        edits.sort_by_key(|e| e.range.start());
+
+        let mut output = String::new();
+        let mut last_end = 0;
+
+        for edit in &edits {
+            let start: usize = edit.range.start().into();
+            let end: usize = edit.range.end().into();
+
+            output.push_str(&input[last_end..start]);
+            output.push_str(&edit.replacement);
+            last_end = end;
+        }
+
+        output.push_str(&input[last_end..]);
+
+        // Verify the fixes were applied correctly
+        // The R code should now use <- instead of =
+        assert!(
+            output.contains("x <- 1"),
+            "Fix should replace x = 1 with x <- 1"
+        );
+        assert!(
+            output.contains("y <- 2"),
+            "Fix should replace y = 2 with y <- 2"
+        );
+
+        // Verify surrounding markdown is unchanged
+        assert!(output.contains("# Test Document"));
+        assert!(output.contains("Some text here."));
+        assert!(output.contains("More text."));
+        assert!(output.contains("```r"));
     }
 }
