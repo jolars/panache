@@ -13,6 +13,7 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
+use crate::syntax::SyntaxKind;
 
 use super::super::{conversions, helpers};
 
@@ -73,6 +74,54 @@ pub(crate) async fn goto_definition(
 
         // Fallback: find reference/footnote definition at this node
         if let Some((label, is_footnote)) = helpers::extract_reference_label(&node)
+            && let Some(definition) = helpers::find_definition_node(&root, &label, is_footnote)
+        {
+            let start_offset: usize = definition.text_range().start().into();
+            let end_offset: usize = definition.text_range().end().into();
+
+            let start_position = conversions::offset_to_position(&content, start_offset);
+            let end_position = conversions::offset_to_position(&content, end_offset);
+
+            let location = Location {
+                uri: uri.clone(),
+                range: Range {
+                    start: start_position,
+                    end: end_position,
+                },
+            };
+
+            return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+        }
+
+        if node.kind() == SyntaxKind::LINK
+            && let Some(link_ref) = node
+                .children()
+                .find(|child| child.kind() == SyntaxKind::LINK_REF)
+            && let Some((label, is_footnote)) = helpers::extract_reference_label(&link_ref)
+            && let Some(definition) = helpers::find_definition_node(&root, &label, is_footnote)
+        {
+            let start_offset: usize = definition.text_range().start().into();
+            let end_offset: usize = definition.text_range().end().into();
+
+            let start_position = conversions::offset_to_position(&content, start_offset);
+            let end_position = conversions::offset_to_position(&content, end_offset);
+
+            let location = Location {
+                uri: uri.clone(),
+                range: Range {
+                    start: start_position,
+                    end: end_position,
+                },
+            };
+
+            return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+        }
+
+        if node.kind() == SyntaxKind::IMAGE_LINK
+            && let Some(link_ref) = node
+                .children()
+                .find(|child| child.kind() == SyntaxKind::LINK_REF)
+            && let Some((label, is_footnote)) = helpers::extract_reference_label(&link_ref)
             && let Some(definition) = helpers::find_definition_node(&root, &label, is_footnote)
         {
             let start_offset: usize = definition.text_range().start().into();
