@@ -30,155 +30,210 @@ pub enum Flavor {
 /// Extensions marked with a comment indicate implementation status.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
+#[serde(rename_all = "kebab-case")]
 pub struct Extensions {
     // ===== Block-level extensions =====
 
     // Headings
     /// Require blank line before headers (default: enabled)
+    #[serde(alias = "blank_before_header")]
     pub blank_before_header: bool,
     /// Full attribute syntax on headers {#id .class key=value}
+    #[serde(alias = "header_attributes")]
     pub header_attributes: bool,
 
     // Block quotes
     /// Require blank line before blockquotes (default: enabled)
+    #[serde(alias = "blank_before_blockquote")]
     pub blank_before_blockquote: bool,
 
     // Lists
     /// Fancy list markers (roman numerals, letters, etc.)
+    #[serde(alias = "fancy_lists")]
     pub fancy_lists: bool,
     /// Start ordered lists at arbitrary numbers
+    #[serde(alias = "startnum")]
     pub startnum: bool,
     /// Example lists with (@) markers
+    #[serde(alias = "example_lists")]
     pub example_lists: bool,
     /// GitHub-style task lists - [ ] and - [x]
+    #[serde(alias = "task_lists")]
     pub task_lists: bool,
     /// Term/definition syntax
+    #[serde(alias = "definition_lists")]
     pub definition_lists: bool,
 
     // Code blocks
     /// Fenced code blocks with backticks
+    #[serde(alias = "backtick_code_blocks")]
     pub backtick_code_blocks: bool,
     /// Fenced code blocks with tildes
+    #[serde(alias = "fenced_code_blocks")]
     pub fenced_code_blocks: bool,
     /// Attributes on fenced code blocks {.language #id}
+    #[serde(alias = "fenced_code_attributes")]
     pub fenced_code_attributes: bool,
     /// Attributes on inline code
+    #[serde(alias = "inline_code_attributes")]
     pub inline_code_attributes: bool,
 
     // Tables
     /// Simple table syntax
+    #[serde(alias = "simple_tables")]
     pub simple_tables: bool,
     /// Multiline cell content in tables
+    #[serde(alias = "multiline_tables")]
     pub multiline_tables: bool,
     /// Grid-style tables
+    #[serde(alias = "grid_tables")]
     pub grid_tables: bool,
     /// Pipe tables (GitHub/PHP Markdown style)
+    #[serde(alias = "pipe_tables")]
     pub pipe_tables: bool,
     /// Table captions
+    #[serde(alias = "table_captions")]
     pub table_captions: bool,
 
     // Divs
     /// Fenced divs ::: {.class}
+    #[serde(alias = "fenced_divs")]
     pub fenced_divs: bool,
     /// HTML <div> elements
+    #[serde(alias = "native_divs")]
     pub native_divs: bool,
 
     // Other block elements
     /// Line blocks for poetry | prefix
+    #[serde(alias = "line_blocks")]
     pub line_blocks: bool,
 
     // ===== Inline elements =====
 
     // Emphasis
     /// Underscores don't trigger emphasis in snake_case
+    #[serde(alias = "intraword_underscores")]
     pub intraword_underscores: bool,
     /// Strikethrough ~~text~~
+    #[serde(alias = "strikeout")]
     pub strikeout: bool,
     /// Superscript and subscript ^super^ ~sub~
+    #[serde(alias = "superscript")]
     pub superscript: bool,
+    #[serde(alias = "subscript")]
     pub subscript: bool,
 
     // Links
     /// Inline links [text](url)
+    #[serde(alias = "inline_links")]
     pub inline_links: bool,
     /// Reference links [text][ref]
+    #[serde(alias = "reference_links")]
     pub reference_links: bool,
     /// Shortcut reference links [ref] without second []
+    #[serde(alias = "shortcut_reference_links")]
     pub shortcut_reference_links: bool,
     /// Attributes on links [text](url){.class}
+    #[serde(alias = "link_attributes")]
     pub link_attributes: bool,
     /// Automatic links <http://example.com>
+    #[serde(alias = "autolinks")]
     pub autolinks: bool,
 
     // Images
     /// Inline images ![alt](url)
+    #[serde(alias = "inline_images")]
     pub inline_images: bool,
     /// Paragraph with just image becomes figure
+    #[serde(alias = "implicit_figures")]
     pub implicit_figures: bool,
 
     // Math
     /// Dollar-delimited math $x$ and $$equation$$
+    #[serde(alias = "tex_math_dollars")]
     pub tex_math_dollars: bool,
     /// [NON-DEFAULT] Single backslash math \(...\) and \[...\] (RMarkdown default)
+    #[serde(alias = "tex_math_single_backslash")]
     pub tex_math_single_backslash: bool,
     /// [NON-DEFAULT] Double backslash math \\(...\\) and \\[...\\]
+    #[serde(alias = "tex_math_double_backslash")]
     pub tex_math_double_backslash: bool,
 
     // Footnotes
     /// Inline footnotes ^[text]
+    #[serde(alias = "inline_footnotes")]
     pub inline_footnotes: bool,
     /// Reference footnotes `[^1]` (requires footnote parsing)
+    #[serde(alias = "footnotes")]
     pub footnotes: bool,
 
     // Citations
     /// Citation syntax [@cite]
+    #[serde(alias = "citations")]
     pub citations: bool,
 
     // Spans
     /// Bracketed spans [text]{.class}
+    #[serde(alias = "bracketed_spans")]
     pub bracketed_spans: bool,
     /// HTML <span> elements
+    #[serde(alias = "native_spans")]
     pub native_spans: bool,
 
     // ===== Metadata =====
     /// YAML metadata block
+    #[serde(alias = "yaml_metadata_block")]
     pub yaml_metadata_block: bool,
     /// Pandoc title block (Title/Author/Date)
+    #[serde(alias = "pandoc_title_block")]
     pub pandoc_title_block: bool,
 
     // ===== Raw content =====
     /// Raw HTML blocks and inline
+    #[serde(alias = "raw_html")]
     pub raw_html: bool,
     /// Markdown inside HTML blocks
+    #[serde(alias = "markdown_in_html_blocks")]
     pub markdown_in_html_blocks: bool,
     /// LaTeX commands and environments
+    #[serde(alias = "raw_tex")]
     pub raw_tex: bool,
     /// Generic raw blocks with {=format} syntax
+    #[serde(alias = "raw_attribute")]
     pub raw_attribute: bool,
 
     // ===== Escapes and special characters =====
     /// Backslash escapes any symbol
+    #[serde(alias = "all_symbols_escapable")]
     pub all_symbols_escapable: bool,
     /// Backslash at line end = hard line break
+    #[serde(alias = "escaped_line_breaks")]
     pub escaped_line_breaks: bool,
 
     // ===== NON-DEFAULT EXTENSIONS =====
     // These are disabled by default in Pandoc
     /// [NON-DEFAULT] Bare URLs become links
+    #[serde(alias = "autolink_bare_uris")]
     pub autolink_bare_uris: bool,
     /// [NON-DEFAULT] Newline = <br>
+    #[serde(alias = "hard_line_breaks")]
     pub hard_line_breaks: bool,
     /// [NON-DEFAULT] :emoji: syntax
+    #[serde(alias = "emoji")]
     pub emoji: bool,
     /// [NON-DEFAULT] Highlighted ==text==
+    #[serde(alias = "mark")]
     pub mark: bool,
 
     // ===== Quarto-specific extensions =====
     /// Quarto callout blocks (.callout-note, etc.)
+    #[serde(alias = "quarto_callouts")]
     pub quarto_callouts: bool,
     /// Quarto cross-references @fig-id, @tbl-id
+    #[serde(alias = "quarto_crossrefs")]
     pub quarto_crossrefs: bool,
     /// Quarto shortcodes {{< name args >}}
+    #[serde(alias = "quarto_shortcodes")]
     pub quarto_shortcodes: bool,
 }
 
@@ -420,7 +475,7 @@ impl Extensions {
     ///
     /// This is used to support partial extension overrides in config files.
     /// For example, if a user specifies `flavor = "quarto"` and then sets
-    /// `[extensions] quarto_crossrefs = false`, we want all other extensions
+    /// `[extensions] quarto-crossrefs = false`, we want all other extensions
     /// to use Quarto defaults, not Pandoc defaults.
     ///
     /// # Arguments
@@ -443,9 +498,11 @@ impl Extensions {
             Map::new()
         };
 
-        // Apply user overrides
+        // Apply user overrides (normalize snake_case to kebab-case for consistency)
         for (key, value) in user_overrides {
-            merged.insert(key, Value::Bool(value));
+            // Normalize: convert snake_case to kebab-case
+            let normalized_key = key.replace('_', "-");
+            merged.insert(normalized_key, Value::Bool(value));
         }
 
         // Deserialize back to Extensions
@@ -532,14 +589,15 @@ pub enum FormatterValue {
 /// args = ["format", "--custom"]  # Overrides args, inherits cmd/stdin from built-in "air"
 /// ```
 ///
-/// Additionally, you can modify arguments incrementally using `prepend_args` and `append_args`:
+/// Additionally, you can modify arguments incrementally using `prepend-args` and `append-args`:
 ///
 /// ```toml
 /// [formatters.air]
-/// append_args = ["-i", "2"]  # Adds args to end: ["format", "{}", "-i", "2"]
+/// append-args = ["-i", "2"]  # Adds args to end: ["format", "{}", "-i", "2"]
 /// ```
 #[derive(Debug, Clone, Deserialize, PartialEq, Default)]
 #[serde(default)]
+#[serde(rename_all = "kebab-case")]
 pub struct FormatterDefinition {
     /// Reference to a built-in preset (e.g., "air", "black") - OLD FORMAT ONLY
     /// In new format, presets are referenced directly in [formatters] mapping
@@ -549,8 +607,10 @@ pub struct FormatterDefinition {
     /// Arguments to pass (None = inherit from preset if name matches)
     pub args: Option<Vec<String>>,
     /// Arguments to prepend to base args (from preset or explicit args)
+    #[serde(alias = "prepend_args")]
     pub prepend_args: Option<Vec<String>>,
     /// Arguments to append to base args (from preset or explicit args)
+    #[serde(alias = "append_args")]
     pub append_args: Option<Vec<String>>,
     /// Whether the formatter reads from stdin (None = inherit from preset if name matches)
     pub stdin: Option<bool>,
@@ -1169,17 +1229,27 @@ fn resolve_old_format_definition(
         let preset = get_formatter_preset(preset_name)
             .ok_or_else(|| format!("Unknown formatter preset '{}'", preset_name))?;
 
+        let mut args = definition.args.clone().unwrap_or(preset.args);
+
+        // Apply prepend/append modifiers
+        apply_arg_modifiers(&mut args, definition);
+
         Ok(FormatterConfig {
             cmd: preset.cmd,
-            args: definition.args.clone().unwrap_or(preset.args),
+            args,
             enabled: true, // enabled field checked by caller
             stdin: preset.stdin,
         })
     } else if let Some(cmd) = &definition.cmd {
         // Custom command
+        let mut args = definition.args.clone().unwrap_or_default();
+
+        // Apply prepend/append modifiers
+        apply_arg_modifiers(&mut args, definition);
+
         Ok(FormatterConfig {
             cmd: cmd.clone(),
-            args: definition.args.clone().unwrap_or_default(),
+            args,
             enabled: true,
             stdin: definition.stdin.unwrap_or(true),
         })
@@ -1292,7 +1362,102 @@ pub enum BlankLines {
 
 const CANDIDATE_NAMES: &[&str] = &[".panache.toml", "panache.toml"];
 
+/// Check for deprecated snake_case extension names and warn users.
+fn check_deprecated_extension_names(s: &str, path: &Path) {
+    // Parse as generic TOML to inspect raw keys
+    let Ok(toml_value) = toml::from_str::<toml::Value>(s) else {
+        return; // If TOML is invalid, let the main parser handle the error
+    };
+
+    let Some(extensions_table) = toml_value
+        .as_table()
+        .and_then(|t| t.get("extensions"))
+        .and_then(|v| v.as_table())
+    else {
+        return; // No [extensions] section
+    };
+
+    // List of all extension field names that should be kebab-case
+    let deprecated_names: Vec<&str> = extensions_table
+        .keys()
+        .filter(|k| k.contains('_'))
+        .map(|k| k.as_str())
+        .collect();
+
+    if !deprecated_names.is_empty() {
+        eprintln!(
+            "Warning: Deprecated snake_case extension names found in {}:",
+            path.display()
+        );
+        eprintln!("  The following extensions use deprecated snake_case naming:");
+        for name in &deprecated_names {
+            let kebab = name.replace('_', "-");
+            eprintln!("    {} -> {} (use kebab-case)", name, kebab);
+        }
+        eprintln!("  Snake_case extension names are deprecated and will be removed in v1.0.0.");
+        eprintln!(
+            "  Please update your config to use kebab-case (e.g., quarto-crossrefs instead of quarto_crossrefs)."
+        );
+    }
+}
+
+/// Check for deprecated snake_case formatter field names and warn users.
+fn check_deprecated_formatter_names(s: &str, path: &Path) {
+    // Parse as generic TOML to inspect raw keys
+    let Ok(toml_value) = toml::from_str::<toml::Value>(s) else {
+        return;
+    };
+
+    let Some(formatters_table) = toml_value
+        .as_table()
+        .and_then(|t| t.get("formatters"))
+        .and_then(|v| v.as_table())
+    else {
+        return; // No [formatters] section
+    };
+
+    // Check each formatter definition for deprecated field names
+    let mut found_deprecated = false;
+    for (formatter_name, formatter_value) in formatters_table {
+        if let Some(formatter_def) = formatter_value.as_table() {
+            let deprecated_fields: Vec<&str> = formatter_def
+                .keys()
+                .filter(|k| matches!(k.as_str(), "prepend_args" | "append_args"))
+                .map(|k| k.as_str())
+                .collect();
+
+            if !deprecated_fields.is_empty() {
+                if !found_deprecated {
+                    eprintln!(
+                        "Warning: Deprecated snake_case formatter field names found in {}:",
+                        path.display()
+                    );
+                    found_deprecated = true;
+                }
+                eprintln!("  In [formatters.{}]:", formatter_name);
+                for field in deprecated_fields {
+                    let kebab = field.replace('_', "-");
+                    eprintln!("    {} -> {}", field, kebab);
+                }
+            }
+        }
+    }
+
+    if found_deprecated {
+        eprintln!(
+            "  Snake_case formatter field names are deprecated and will be removed in v1.0.0."
+        );
+        eprintln!(
+            "  Please update your config to use kebab-case (e.g., prepend-args instead of prepend_args)."
+        );
+    }
+}
+
 fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
+    // Check for deprecated names before parsing
+    check_deprecated_extension_names(s, path);
+    check_deprecated_formatter_names(s, path);
+
     let mut config: Config = toml::from_str(s).map_err(|e| {
         io::Error::new(
             io::ErrorKind::InvalidData,
@@ -1685,7 +1850,7 @@ mod tests {
             flavor = "quarto"
             
             [extensions]
-            quarto_crossrefs = false
+            quarto-crossrefs = false
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
@@ -1762,7 +1927,7 @@ mod tests {
             flavor = "quarto"
             
             [extensions]
-            quarto_crossrefs = false
+            quarto-crossrefs = false
             citations = false
             emoji = true
         "#;
@@ -2235,7 +2400,7 @@ mod code_blocks_config_test {
             r = "air"
             
             [formatters.air]
-            append_args = ["-i", "2"]
+            append-args = ["-i", "2"]
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
@@ -2255,7 +2420,7 @@ mod code_blocks_config_test {
             r = "air"
             
             [formatters.air]
-            prepend_args = ["--verbose"]
+            prepend-args = ["--verbose"]
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
@@ -2403,4 +2568,70 @@ mod parser_config_test {
         let cfg: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(cfg.parser, ParserConfig::default());
     }
+}
+
+#[test]
+fn test_snake_case_alias_backwards_compat() {
+    // Verify that snake_case (old format) still works via aliases
+    let toml_str = r#"
+            flavor = "quarto"
+            
+            [extensions]
+            quarto_crossrefs = false
+            tex_math_dollars = true
+        "#;
+    let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+    assert!(!cfg.extensions.quarto_crossrefs);
+    assert!(cfg.extensions.tex_math_dollars);
+}
+
+#[test]
+fn test_kebab_case_new_format() {
+    // Verify that kebab-case (new format) works
+    let toml_str = r#"
+            flavor = "quarto"
+            
+            [extensions]
+            quarto-crossrefs = false
+            tex-math-dollars = true
+        "#;
+    let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+    assert!(!cfg.extensions.quarto_crossrefs);
+    assert!(cfg.extensions.tex_math_dollars);
+}
+
+#[test]
+fn test_formatter_prepend_append_args_snake_case() {
+    // Old format with snake_case
+    let toml_str = r#"
+            [formatters.test]
+            cmd = "test"
+            args = ["--middle"]
+            prepend_args = ["--before"]
+            append_args = ["--after"]
+        "#;
+    let cfg = toml::from_str::<Config>(toml_str).unwrap();
+    let fmt = &cfg.formatters.get("test").unwrap()[0];
+
+    assert_eq!(fmt.cmd, "test");
+    assert_eq!(fmt.args, vec!["--before", "--middle", "--after"]);
+}
+
+#[test]
+fn test_formatter_prepend_append_args_kebab_case() {
+    // New format with kebab-case
+    let toml_str = r#"
+            [formatters.test]
+            cmd = "test"
+            args = ["--middle"]
+            prepend-args = ["--before"]
+            append-args = ["--after"]
+        "#;
+    let cfg = toml::from_str::<Config>(toml_str).unwrap();
+    let fmt = &cfg.formatters.get("test").unwrap()[0];
+
+    assert_eq!(fmt.cmd, "test");
+    assert_eq!(fmt.args, vec!["--before", "--middle", "--after"]);
 }

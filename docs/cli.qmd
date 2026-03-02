@@ -40,10 +40,10 @@ Panache looks for configuration files in this order:
 Example .panache.toml:
 
     flavor = "quarto"
-    line_width = 80
+    line-width = 80
 
     [extensions]
-    hard_line_breaks = false
+    hard-line-breaks = false
     citations = true
 
 For more information, visit: https://github.com/jolars/panache
