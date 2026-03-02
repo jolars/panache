@@ -267,7 +267,7 @@ fn build_words_with_mode<'a>(
     }
 
     fn process_node_recursive<'cfg>(
-        config: &'cfg Config,
+        _config: &'cfg Config,
         node: &SyntaxNode,
         b: &mut Builder,
         format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
@@ -376,7 +376,7 @@ fn build_words_with_mode<'a>(
                         } else {
                             // Lazy continuation - include in wrapping
                             process_node_recursive(
-                                config,
+                                _config,
                                 n,
                                 b,
                                 format_inline_fn,
@@ -388,7 +388,7 @@ fn build_words_with_mode<'a>(
                     SyntaxKind::PARAGRAPH => {
                         // Recursively process PARAGRAPH content instead of treating it as a unit
                         process_node_recursive(
-                            config,
+                            _config,
                             n,
                             b,
                             format_inline_fn,
@@ -404,7 +404,7 @@ fn build_words_with_mode<'a>(
                         }
                         b.push_piece("*");
                         process_node_recursive(
-                            config,
+                            _config,
                             n,
                             b,
                             format_inline_fn,
@@ -429,7 +429,7 @@ fn build_words_with_mode<'a>(
                         }
                         b.push_piece("**");
                         process_node_recursive(
-                            config,
+                            _config,
                             n,
                             b,
                             format_inline_fn,
@@ -457,7 +457,7 @@ fn build_words_with_mode<'a>(
                                     && link_child.kind() == SyntaxKind::LINK_TEXT
                                 {
                                     process_node_recursive(
-                                        config,
+                                        _config,
                                         &link_child,
                                         b,
                                         format_inline_fn,
@@ -524,7 +524,7 @@ fn build_words_with_mode<'a>(
                                     && img_child.kind() == SyntaxKind::IMAGE_ALT
                                 {
                                     process_node_recursive(
-                                        config,
+                                        _config,
                                         &img_child,
                                         b,
                                         format_inline_fn,
