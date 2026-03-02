@@ -30,10 +30,43 @@ pub(crate) async fn code_action(
             None => return Ok(None),
         };
 
-    // Run linter
+    // Run linter (with external linters if available)
     let text_clone = text.clone();
     let config_clone = config.clone();
     let doc_path = uri.to_file_path().map(|path| path.into_owned());
+    let has_external_linters = !config.linters.is_empty();
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let diagnostics = if has_external_linters {
+        // Use external linters (async)
+        tokio::task::spawn_blocking(move || {
+            let tree = crate::parse(&text_clone, Some(config_clone.clone()));
+            let metadata = doc_path
+                .as_ref()
+                .and_then(|path| crate::metadata::extract_metadata(&tree, path).ok());
+            // Create a runtime for the async lint function
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(linter::lint_with_external_and_metadata(
+                &tree,
+                &text_clone,
+                &config_clone,
+                metadata.as_ref(),
+            ))
+        })
+        .await
+    } else {
+        // Regular sync lint for built-in rules only
+        tokio::task::spawn_blocking(move || {
+            let tree = crate::parse(&text_clone, Some(config_clone.clone()));
+            let metadata = doc_path
+                .as_ref()
+                .and_then(|path| crate::metadata::extract_metadata(&tree, path).ok());
+            linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref())
+        })
+        .await
+    };
+
+    #[cfg(target_arch = "wasm32")]
     let diagnostics = tokio::task::spawn_blocking(move || {
         let tree = crate::parse(&text_clone, Some(config_clone.clone()));
         let metadata = doc_path
@@ -41,8 +74,10 @@ pub(crate) async fn code_action(
             .and_then(|path| crate::metadata::extract_metadata(&tree, path).ok());
         linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref())
     })
-    .await
-    .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
+    .await;
+
+    let diagnostics =
+        diagnostics.map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
 
     let mut actions = Vec::new();
 
