@@ -5,18 +5,19 @@
 
 {
   packages = [
-    pkgs.go-task
-    pkgs.quartoMinimal
-    pkgs.wasm-pack
-    pkgs.llvmPackages.bintools
-    pkgs.bashInteractive
-    pkgs.cmark
-    pkgs.shfmt
-    pkgs.pandoc
-    pkgs.jarl
     pkgs.air
-    pkgs.yamlfmt
+    pkgs.bashInteractive
+    pkgs.cargo-llvm-cov
+    pkgs.cmark
+    pkgs.go-task
+    pkgs.jarl
+    pkgs.llvmPackages.bintools
+    pkgs.pandoc
+    pkgs.quartoMinimal
     pkgs.ruff
+    pkgs.shfmt
+    pkgs.wasm-pack
+    pkgs.yamlfmt
     (pkgs.rWrapper.override {
       packages = with pkgs.rPackages; [
         knitr

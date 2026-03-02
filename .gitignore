@@ -17,7 +17,9 @@ result-*
 # Ignore direnv folder
 .direnv/
 
-
 # Added by cargo
 
 /target
+
+# Coverage files
+lcov.info
