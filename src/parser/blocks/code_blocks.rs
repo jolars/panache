@@ -469,6 +469,11 @@ pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
         info_string_trimmed.to_string()
     };
 
+    // Pandoc forbids backticks in fenced code language identifiers.
+    if fence_char == '`' && info_string.starts_with('`') {
+        return None;
+    }
+
     Some(FenceInfo {
         fence_char,
         fence_count,

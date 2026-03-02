@@ -56,7 +56,7 @@ fn escape_special_chars(
                 result.push(ch);
             }
             // Escape special syntax characters
-            '`' | '[' | '~' => {
+            '[' | '~' | '`' => {
                 result.push('\\');
                 result.push(ch);
             }

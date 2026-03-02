@@ -31,32 +31,32 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             // Pandoc strips leading/trailing spaces from code spans
             let normalized_content = content.replace('\n', " ").trim().to_string();
 
-            // Calculate minimal backtick count needed
-            // Need enough backticks so the content doesn't contain that many consecutive backticks
-            let mut min_backticks = 1;
-            if normalized_content.contains('`') {
-                // Find the longest run of backticks in content
-                let mut max_run = 0;
-                let mut current_run = 0;
-                for ch in normalized_content.chars() {
-                    if ch == '`' {
-                        current_run += 1;
-                        max_run = max_run.max(current_run);
-                    } else {
-                        current_run = 0;
-                    }
+            let mut backtick_runs = std::collections::HashSet::new();
+            let mut current_run = 0;
+            for ch in normalized_content.chars() {
+                if ch == '`' {
+                    current_run += 1;
+                } else if current_run > 0 {
+                    backtick_runs.insert(current_run);
+                    current_run = 0;
                 }
-                min_backticks = max_run + 1;
+            }
+            if current_run > 0 {
+                backtick_runs.insert(current_run);
             }
 
-            // Use the minimum of the original count and the calculated minimum
-            // (but at least the calculated minimum)
-            let final_backtick_count = min_backticks.max(1);
+            let needs_padding =
+                normalized_content.starts_with('`') || normalized_content.ends_with('`');
+            let padding = if needs_padding { " " } else { "" };
+
+            let max_run = backtick_runs.iter().copied().max().unwrap_or(0);
+            let min_needed = (max_run + 1).max(1);
+            let final_backtick_count = min_needed;
 
             format!(
                 "{}{}{}{}",
                 "`".repeat(final_backtick_count),
-                normalized_content,
+                padding.to_string() + &normalized_content + padding,
                 "`".repeat(final_backtick_count),
                 attributes
             )
