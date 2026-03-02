@@ -47,7 +47,7 @@ This document tracks implementation status for panache's features.
   fenced divs, YAML frontmatter
 - ✅ **Go to definition** - Jump to reference link/footnote definitions
   (reference links, images, footnotes)
-- ❌ Go to definition for citations - Jump to bibliography entry for `@cite`
+- ✅ Go to definition for citations - Jump to bibliography entry for `@cite`
   keys
 - ❌ **Find references** - Find all uses of a reference link/footnote/citation
 
@@ -72,7 +72,11 @@ This document tracks implementation status for panache's features.
 
 - ❌ **Link preview** - `textDocument/hover` to show link target
 - ❌ **Reference preview** - Show reference definition on hover
-- ❌ **Citation preview** - Show bibliography entry for citation
+- 🚧 **Citation preview** - Show bibliography entry for citation
+  - ✅ Basic implementation (shows author, year, title)
+  - ❌ Need to also check `date` field (not just `year`)
+  - ❌ Consider showing more fields (journal, DOI, URL, etc.)
+  - ❌ Better formatting (maybe markdown list or proper citation format)
 - ✅ **Footnote preview** - Show footnote content inline
 
 #### Advanced
