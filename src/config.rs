@@ -1341,6 +1341,7 @@ impl ConfigBuilder {
 pub enum WrapMode {
     Preserve,
     Reflow,
+    Sentence,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -1949,14 +1950,14 @@ mod tests {
             flavor = "quarto"
             
             [style]
-            wrap = "reflow"
+            wrap = "sentence"
             blank-lines = "collapse"
             math-delimiter-style = "dollars"
             math-indent = 2
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
-        assert_eq!(cfg.wrap, Some(WrapMode::Reflow));
+        assert_eq!(cfg.wrap, Some(WrapMode::Sentence));
         assert_eq!(cfg.blank_lines, BlankLines::Collapse);
         assert_eq!(cfg.math_delimiter_style, MathDelimiterStyle::Dollars);
         assert_eq!(cfg.math_indent, 2);
@@ -2014,13 +2015,13 @@ mod tests {
             
             # New format (should take precedence)
             [style]
-            wrap = "reflow"
+            wrap = "sentence"
             math-indent = 2
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
         // New [style] section should win
-        assert_eq!(cfg.wrap, Some(WrapMode::Reflow));
+        assert_eq!(cfg.wrap, Some(WrapMode::Sentence));
         assert_eq!(cfg.math_indent, 2);
     }
 }

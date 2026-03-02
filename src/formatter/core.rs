@@ -91,9 +91,13 @@ impl Formatter {
         node: &SyntaxNode,
         width: usize,
     ) -> Vec<String> {
-        wrapping::wrapped_lines_for_paragraph(&self.config, node, width, |n| {
+        wrapping::wrapped_lines_for_paragraph(&self.config, node, width, &|n| {
             self.format_inline_node(n)
         })
+    }
+
+    pub(super) fn sentence_lines_for_paragraph(&self, node: &SyntaxNode) -> Vec<String> {
+        wrapping::sentence_lines_for_paragraph(&self.config, node, &|n| self.format_inline_node(n))
     }
 
     // Delegate to headings module
@@ -355,9 +359,17 @@ impl Formatter {
                                 .saturating_sub(indent + marker_len + 1);
 
                             // Try wrapping the paragraph to see if it fits on one line
-                            let lines = self.wrapped_lines_for_paragraph(child, first_line_space);
+                            let lines = match wrap_mode {
+                                WrapMode::Preserve => {
+                                    self.wrapped_lines_for_paragraph(child, first_line_space)
+                                }
+                                WrapMode::Reflow => {
+                                    self.wrapped_lines_for_paragraph(child, first_line_space)
+                                }
+                                WrapMode::Sentence => self.sentence_lines_for_paragraph(child),
+                            };
 
-                            if lines.len() == 1 {
+                            if lines.len() == 1 && lines[0].len() <= first_line_space {
                                 // Fits on one line - put on same line as marker
                                 self.output.push(' ');
                                 self.output.push_str(&lines[0]);
@@ -388,6 +400,14 @@ impl Formatter {
                                 WrapMode::Reflow => {
                                     let lines =
                                         self.wrapped_lines_for_paragraph(child, available_width);
+                                    for line in lines {
+                                        self.output.push_str(&" ".repeat(child_indent));
+                                        self.output.push_str(&line);
+                                        self.output.push('\n');
+                                    }
+                                }
+                                WrapMode::Sentence => {
+                                    let lines = self.sentence_lines_for_paragraph(child);
                                     for line in lines {
                                         self.output.push_str(&" ".repeat(child_indent));
                                         self.output.push_str(&line);
@@ -594,6 +614,14 @@ impl Formatter {
                                     self.output.push('\n');
                                 }
                             }
+                            WrapMode::Sentence => {
+                                let lines = self.sentence_lines_for_paragraph(&child);
+                                for line in lines {
+                                    self.output.push_str(&content_prefix);
+                                    self.output.push_str(&line);
+                                    self.output.push('\n');
+                                }
+                            }
                         },
                         SyntaxKind::BLANK_LINE => {
                             self.output.push_str(&blank_prefix);
@@ -695,6 +723,17 @@ impl Formatter {
                             self.output.push_str(line);
                         }
                     }
+                    WrapMode::Sentence => {
+                        log::trace!("Wrapping paragraph by sentence");
+                        let lines = self.sentence_lines_for_paragraph(node);
+
+                        for (i, line) in lines.iter().enumerate() {
+                            if i > 0 {
+                                self.output.push('\n');
+                            }
+                            self.output.push_str(line);
+                        }
+                    }
                 }
 
                 if !self.output.ends_with('\n') {
@@ -734,6 +773,22 @@ impl Formatter {
                             if i > 0 {
                                 self.output.push('\n');
                                 // Add continuation indent for wrapped lines
+                                self.output.push_str(&" ".repeat(indent));
+                            }
+                            self.output.push_str(line);
+                        }
+
+                        if !self.output.ends_with('\n') {
+                            self.output.push('\n');
+                        }
+                    }
+                    WrapMode::Sentence => {
+                        log::trace!("Wrapping Plain block by sentence");
+                        let lines = self.sentence_lines_for_paragraph(node);
+
+                        for (i, line) in lines.iter().enumerate() {
+                            if i > 0 {
+                                self.output.push('\n');
                                 self.output.push_str(&" ".repeat(indent));
                             }
                             self.output.push_str(line);

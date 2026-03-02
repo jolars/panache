@@ -103,11 +103,76 @@ fn normalize_link_dest(dest: &str) -> String {
     format!("{} {}", url, normalized_title)
 }
 
+fn is_sentence_boundary(word: &textwrap::core::Word<'_>, is_last: bool) -> bool {
+    let mut trimmed = word.word;
+    trimmed = trimmed.trim_end_matches(['"', '\'', ')', ']', '}']);
+
+    if trimmed.ends_with("...") || trimmed.ends_with("…") {
+        return false;
+    }
+
+    let Some(last_char) = trimmed.chars().last() else {
+        return false;
+    };
+
+    matches!(last_char, '.' | '!' | '?' | ';') && (!word.whitespace.is_empty() || is_last)
+}
+
+fn normalize_inline_for_sentence(text: &str) -> String {
+    text.replace('\n', " ")
+}
+
+pub(super) fn sentence_lines_from_words(words: &[textwrap::core::Word<'_>]) -> Vec<String> {
+    let mut out_lines = Vec::new();
+    let mut current = String::new();
+
+    for (idx, word) in words.iter().enumerate() {
+        let is_last = idx + 1 == words.len();
+        current.push_str(word.word);
+
+        if is_sentence_boundary(word, is_last) {
+            current.push_str(word.penalty);
+            if !current.is_empty() {
+                out_lines.push(current);
+                current = String::new();
+            }
+        } else {
+            current.push_str(word.whitespace);
+        }
+    }
+
+    if !current.is_empty() {
+        out_lines.push(current);
+    }
+
+    out_lines
+}
+
+fn build_words_for_sentence<'a>(
+    _config: &Config,
+    node: &SyntaxNode,
+    arena: &'a mut Vec<Box<str>>,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+) -> Vec<textwrap::core::Word<'a>> {
+    build_words_with_mode(_config, node, arena, format_inline_fn, false, true)
+}
+
 pub(super) fn build_words<'a>(
     _config: &Config,
     node: &SyntaxNode,
     arena: &'a mut Vec<Box<str>>,
-    format_inline_fn: impl Fn(&SyntaxNode) -> String,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+) -> Vec<textwrap::core::Word<'a>> {
+    build_words_with_mode(_config, node, arena, format_inline_fn, false, false)
+}
+
+fn build_words_with_mode<'a>(
+    _config: &Config,
+    node: &SyntaxNode,
+    arena: &'a mut Vec<Box<str>>,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+    in_link_text: bool,
+    atomic_links: bool,
 ) -> Vec<textwrap::core::Word<'a>> {
     struct Builder<'a> {
         arena: &'a mut Vec<Box<str>>,
@@ -201,14 +266,14 @@ pub(super) fn build_words<'a>(
         false
     }
 
-    fn process_node_recursive<F>(
+    fn process_node_recursive<'cfg>(
+        config: &'cfg Config,
         node: &SyntaxNode,
         b: &mut Builder,
-        format_inline_fn: &F,
+        format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
         in_link_text: bool,
-    ) where
-        F: Fn(&SyntaxNode) -> String,
-    {
+        atomic_links: bool,
+    ) {
         let children: Vec<_> = node.children_with_tokens().collect();
 
         for (idx, el) in children.iter().enumerate() {
@@ -310,12 +375,26 @@ pub(super) fn build_words<'a>(
                             // True continuation paragraph - skip in wrapping, format separately
                         } else {
                             // Lazy continuation - include in wrapping
-                            process_node_recursive(n, b, format_inline_fn, in_link_text);
+                            process_node_recursive(
+                                config,
+                                n,
+                                b,
+                                format_inline_fn,
+                                in_link_text,
+                                atomic_links,
+                            );
                         }
                     }
                     SyntaxKind::PARAGRAPH => {
                         // Recursively process PARAGRAPH content instead of treating it as a unit
-                        process_node_recursive(n, b, format_inline_fn, in_link_text);
+                        process_node_recursive(
+                            config,
+                            n,
+                            b,
+                            format_inline_fn,
+                            in_link_text,
+                            atomic_links,
+                        );
                     }
                     SyntaxKind::EMPHASIS => {
                         // Check if content starts with whitespace - if so, preserve it before opening marker
@@ -324,7 +403,14 @@ pub(super) fn build_words<'a>(
                             b.skip_next_leading_whitespace = true;
                         }
                         b.push_piece("*");
-                        process_node_recursive(n, b, format_inline_fn, in_link_text); // Inside emphasis now
+                        process_node_recursive(
+                            config,
+                            n,
+                            b,
+                            format_inline_fn,
+                            in_link_text,
+                            atomic_links,
+                        ); // Inside emphasis now
                         // Reset the flag (it should have been consumed by first TEXT, but just in case)
                         b.skip_next_leading_whitespace = false;
                         // Save pending space state (from trailing whitespace in content)
@@ -342,7 +428,14 @@ pub(super) fn build_words<'a>(
                             b.skip_next_leading_whitespace = true;
                         }
                         b.push_piece("**");
-                        process_node_recursive(n, b, format_inline_fn, in_link_text); // Inside emphasis now
+                        process_node_recursive(
+                            config,
+                            n,
+                            b,
+                            format_inline_fn,
+                            in_link_text,
+                            atomic_links,
+                        ); // Inside emphasis now
                         // Reset the flag (it should have been consumed by first TEXT, but just in case)
                         b.skip_next_leading_whitespace = false;
                         // Save pending space state (from trailing whitespace in content)
@@ -354,123 +447,135 @@ pub(super) fn build_words<'a>(
                         b.pending_space = had_pending_space;
                     }
                     SyntaxKind::LINK => {
-                        // Links can wrap at whitespace boundaries in link text
-                        // Two types: inline [text](url) and reference [text][ref]
-                        b.push_piece("[");
-
-                        // Process link text recursively to allow wrapping
-                        for child in n.children_with_tokens() {
-                            if let NodeOrToken::Node(link_child) = child
-                                && link_child.kind() == SyntaxKind::LINK_TEXT
-                            {
-                                process_node_recursive(&link_child, b, format_inline_fn, true);
+                        if atomic_links {
+                            let text = normalize_inline_for_sentence(&format_inline_fn(n));
+                            b.push_piece(&text);
+                        } else {
+                            b.push_piece("[");
+                            for child in n.children_with_tokens() {
+                                if let NodeOrToken::Node(link_child) = child
+                                    && link_child.kind() == SyntaxKind::LINK_TEXT
+                                {
+                                    process_node_recursive(
+                                        config,
+                                        &link_child,
+                                        b,
+                                        format_inline_fn,
+                                        true,
+                                        atomic_links,
+                                    );
+                                }
                             }
-                        }
 
-                        // Collect closing parts: depends on link type
-                        // Inline: "](" + LinkDest + ")" + Attribute
-                        // Reference: "][" + LinkRef + "]" or shortcut "]"
-                        let mut closing = String::new();
-                        let mut past_link_text = false;
+                            let mut closing = String::new();
+                            let mut past_link_text = false;
 
-                        // Collect closing syntax
-                        for child in n.children_with_tokens() {
-                            match child {
-                                NodeOrToken::Node(link_child) => match link_child.kind() {
-                                    SyntaxKind::LINK_TEXT => {
-                                        past_link_text = true;
-                                    }
-                                    SyntaxKind::LINK_DEST
-                                    | SyntaxKind::LINK_REF
-                                    | SyntaxKind::ATTRIBUTE => {
-                                        if past_link_text {
-                                            if link_child.kind() == SyntaxKind::LINK_DEST {
-                                                closing.push_str(&normalize_link_dest(
-                                                    &link_child.text().to_string(),
-                                                ));
-                                            } else {
-                                                closing.push_str(&link_child.text().to_string());
+                            for child in n.children_with_tokens() {
+                                match child {
+                                    NodeOrToken::Node(link_child) => match link_child.kind() {
+                                        SyntaxKind::LINK_TEXT => {
+                                            past_link_text = true;
+                                        }
+                                        SyntaxKind::LINK_DEST
+                                        | SyntaxKind::LINK_REF
+                                        | SyntaxKind::ATTRIBUTE => {
+                                            if past_link_text {
+                                                if link_child.kind() == SyntaxKind::LINK_DEST {
+                                                    closing.push_str(&normalize_link_dest(
+                                                        &link_child.text().to_string(),
+                                                    ));
+                                                } else {
+                                                    closing
+                                                        .push_str(&link_child.text().to_string());
+                                                }
                                             }
                                         }
-                                    }
-                                    _ => {}
-                                },
-                                NodeOrToken::Token(t) => {
-                                    if past_link_text {
-                                        match t.kind() {
-                                            SyntaxKind::LINK_TEXT_END
-                                            | SyntaxKind::LINK_DEST_START
-                                            | SyntaxKind::LINK_DEST_END => {
-                                                closing.push_str(t.text());
+                                        _ => {}
+                                    },
+                                    NodeOrToken::Token(t) => {
+                                        if past_link_text {
+                                            match t.kind() {
+                                                SyntaxKind::LINK_TEXT_END
+                                                | SyntaxKind::LINK_DEST_START
+                                                | SyntaxKind::LINK_DEST_END => {
+                                                    closing.push_str(t.text());
+                                                }
+                                                SyntaxKind::TEXT => {
+                                                    closing.push_str(t.text());
+                                                }
+                                                _ => {}
                                             }
-                                            SyntaxKind::TEXT => {
-                                                closing.push_str(t.text());
-                                            }
-                                            _ => {}
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        b.attach_to_previous(&closing);
+                            b.attach_to_previous(&closing);
+                        }
                     }
                     SyntaxKind::IMAGE_LINK => {
-                        // Image links work similarly to links but with "![" prefix
-                        // Structure: ImageLinkStart "![" + ImageAlt (wrappable) + "](" + LinkDest + ")" + Attribute
-                        b.push_piece("![");
-
-                        // Process image alt text recursively to allow wrapping
-                        for child in n.children_with_tokens() {
-                            if let NodeOrToken::Node(img_child) = child
-                                && img_child.kind() == SyntaxKind::IMAGE_ALT
-                            {
-                                process_node_recursive(&img_child, b, format_inline_fn, true);
+                        if atomic_links {
+                            let text = normalize_inline_for_sentence(&format_inline_fn(n));
+                            b.push_piece(&text);
+                        } else {
+                            b.push_piece("![");
+                            for child in n.children_with_tokens() {
+                                if let NodeOrToken::Node(img_child) = child
+                                    && img_child.kind() == SyntaxKind::IMAGE_ALT
+                                {
+                                    process_node_recursive(
+                                        config,
+                                        &img_child,
+                                        b,
+                                        format_inline_fn,
+                                        true,
+                                        atomic_links,
+                                    );
+                                }
                             }
-                        }
 
-                        // Collect closing parts: "](" + destination + ")" + attributes
-                        let mut closing = String::new();
-                        let mut past_image_alt = false;
+                            let mut closing = String::new();
+                            let mut past_image_alt = false;
 
-                        for child in n.children_with_tokens() {
-                            match child {
-                                NodeOrToken::Node(img_child) => match img_child.kind() {
-                                    SyntaxKind::IMAGE_ALT => {
-                                        past_image_alt = true;
-                                    }
-                                    SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE => {
-                                        if past_image_alt {
-                                            if img_child.kind() == SyntaxKind::LINK_DEST {
-                                                closing.push_str(&normalize_link_dest(
-                                                    &img_child.text().to_string(),
-                                                ));
-                                            } else {
-                                                closing.push_str(&img_child.text().to_string());
+                            for child in n.children_with_tokens() {
+                                match child {
+                                    NodeOrToken::Node(img_child) => match img_child.kind() {
+                                        SyntaxKind::IMAGE_ALT => {
+                                            past_image_alt = true;
+                                        }
+                                        SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE => {
+                                            if past_image_alt {
+                                                if img_child.kind() == SyntaxKind::LINK_DEST {
+                                                    closing.push_str(&normalize_link_dest(
+                                                        &img_child.text().to_string(),
+                                                    ));
+                                                } else {
+                                                    closing.push_str(&img_child.text().to_string());
+                                                }
                                             }
                                         }
-                                    }
-                                    _ => {}
-                                },
-                                NodeOrToken::Token(t) => {
-                                    if past_image_alt {
-                                        match t.kind() {
-                                            SyntaxKind::IMAGE_ALT_END
-                                            | SyntaxKind::IMAGE_DEST_START
-                                            | SyntaxKind::IMAGE_DEST_END => {
-                                                closing.push_str(t.text());
+                                        _ => {}
+                                    },
+                                    NodeOrToken::Token(t) => {
+                                        if past_image_alt {
+                                            match t.kind() {
+                                                SyntaxKind::IMAGE_ALT_END
+                                                | SyntaxKind::IMAGE_DEST_START
+                                                | SyntaxKind::IMAGE_DEST_END => {
+                                                    closing.push_str(t.text());
+                                                }
+                                                SyntaxKind::TEXT => {
+                                                    closing.push_str(t.text());
+                                                }
+                                                _ => {}
                                             }
-                                            SyntaxKind::TEXT => {
-                                                closing.push_str(t.text());
-                                            }
-                                            _ => {}
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        b.attach_to_previous(&closing);
+                            b.attach_to_previous(&closing);
+                        }
                     }
                     _ => {
                         // For other inline nodes, format and push as single piece
@@ -483,7 +588,14 @@ pub(super) fn build_words<'a>(
     }
 
     let mut b = Builder::new(arena);
-    process_node_recursive(node, &mut b, &format_inline_fn, false); // Start outside emphasis
+    process_node_recursive(
+        _config,
+        node,
+        &mut b,
+        format_inline_fn,
+        in_link_text,
+        atomic_links,
+    ); // Start outside emphasis
 
     let mut words: Vec<textwrap::core::Word<'a>> = Vec::with_capacity(b.piece_idx.len());
     for (i, &idx) in b.piece_idx.iter().enumerate() {
@@ -501,7 +613,7 @@ pub(super) fn wrapped_lines_for_paragraph(
     _config: &Config,
     node: &SyntaxNode,
     width: usize,
-    format_inline_fn: impl Fn(&SyntaxNode) -> String,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
     log::debug!("wrapped_lines_for_paragraph called with width={}", width);
 
@@ -568,4 +680,48 @@ pub(super) fn wrapped_lines_for_paragraph(
         out_lines.push(acc);
     }
     out_lines
+}
+
+pub(super) fn sentence_lines_for_paragraph(
+    _config: &Config,
+    node: &SyntaxNode,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+) -> Vec<String> {
+    log::debug!("sentence_lines_for_paragraph called");
+
+    let has_hard_breaks = node
+        .descendants_with_tokens()
+        .any(|el| el.kind() == SyntaxKind::HARD_LINE_BREAK);
+
+    if has_hard_breaks {
+        log::debug!("Paragraph contains hard line breaks - preserving them");
+
+        let mut result = String::new();
+        for child in node.children_with_tokens() {
+            match child {
+                NodeOrToken::Node(n) => {
+                    result.push_str(&format_inline_fn(&n));
+                }
+                NodeOrToken::Token(t) => {
+                    if t.kind() == SyntaxKind::HARD_LINE_BREAK {
+                        if _config.extensions.escaped_line_breaks {
+                            result.push_str("\\\n");
+                        } else {
+                            result.push_str(t.text());
+                        }
+                    } else {
+                        result.push_str(t.text());
+                    }
+                }
+            }
+        }
+
+        return result.lines().map(|s| s.to_string()).collect();
+    }
+
+    let mut arena: Vec<Box<str>> = Vec::new();
+    let words = build_words_for_sentence(_config, node, &mut arena, format_inline_fn);
+    log::debug!("Built {} words for paragraph", words.len());
+
+    sentence_lines_from_words(&words)
 }

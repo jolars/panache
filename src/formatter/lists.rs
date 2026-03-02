@@ -133,6 +133,14 @@ impl Formatter {
                     self.output.push('\n');
                 }
             }
+            WrapMode::Sentence => {
+                let lines = self.sentence_lines_for_paragraph(node);
+                for line in lines {
+                    self.output.push_str(&" ".repeat(indent));
+                    self.output.push_str(&line);
+                    self.output.push('\n');
+                }
+            }
         }
     }
 
@@ -297,12 +305,12 @@ impl Formatter {
 
         let words = if let Some(content) = content_node {
             // Extract words from Plain/PARAGRAPH child (postprocessor wraps all content in one node)
-            wrapping::build_words(&self.config, &content, &mut arena, |n| {
+            wrapping::build_words(&self.config, &content, &mut arena, &|n| {
                 self.format_inline_node(n)
             })
         } else {
             // Backwards compatibility: scan entire ListItem and remove marker/checkbox
-            let mut node_words = wrapping::build_words(&self.config, node, &mut arena, |n| {
+            let mut node_words = wrapping::build_words(&self.config, node, &mut arena, &|n| {
                 self.format_inline_node(n)
             });
 
@@ -333,9 +341,14 @@ impl Formatter {
             .any(|c| c.kind() == SyntaxKind::LIST && Self::is_empty_nested_list(&c))
             && words.is_empty();
 
+        let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
         let algo = WrapAlgorithm::new();
         let line_widths = [available_width];
         let lines = algo.wrap(&words, &line_widths);
+        let sentence_lines = match wrap_mode {
+            WrapMode::Sentence => Some(wrapping::sentence_lines_from_words(&words)),
+            _ => None,
+        };
 
         log::trace!(
             "ListItem wrapping: {} lines, hanging indent={}",
@@ -343,36 +356,63 @@ impl Formatter {
             hanging
         );
 
-        for (i, line) in lines.iter().enumerate() {
-            log::trace!("  Line {}: {} words", i, line.len());
-            if i == 0 {
-                // First line: output indent + marker padding + marker + spaces + checkbox
-                self.output.push_str(&" ".repeat(total_indent));
-                self.output
-                    .push_str(&" ".repeat(list_indent.marker_padding));
-                self.output.push_str(&marker);
-                self.output.push_str(&" ".repeat(list_indent.spaces_after));
+        if let Some(sentence_lines) = &sentence_lines {
+            for (i, text) in sentence_lines.iter().enumerate() {
+                log::trace!("  Line {}: sentence line", i);
+                if i == 0 {
+                    // First line: output indent + marker padding + marker + spaces + checkbox
+                    self.output.push_str(&" ".repeat(total_indent));
+                    self.output
+                        .push_str(&" ".repeat(list_indent.marker_padding));
+                    self.output.push_str(&marker);
+                    self.output.push_str(&" ".repeat(list_indent.spaces_after));
 
-                // Output checkbox if present
-                if let Some(ref cb) = checkbox {
-                    self.output.push_str(cb);
-                    self.output.push(' ');
-                }
-            } else {
-                // Hanging indent includes all leading whitespace
-                self.output.push_str(&" ".repeat(hanging));
-            }
-            for (j, w) in line.iter().enumerate() {
-                self.output.push_str(w.word);
-                if j + 1 < line.len() {
-                    self.output.push_str(w.whitespace);
+                    // Output checkbox if present
+                    if let Some(ref cb) = checkbox {
+                        self.output.push_str(cb);
+                        self.output.push(' ');
+                    }
                 } else {
-                    self.output.push_str(w.penalty);
+                    // Hanging indent includes all leading whitespace
+                    self.output.push_str(&" ".repeat(hanging));
+                }
+                self.output.push_str(text);
+                if !has_only_empty_nested_list {
+                    self.output.push('\n');
                 }
             }
-            // Only output newline if this item doesn't have an inline empty nested list
-            if !has_only_empty_nested_list {
-                self.output.push('\n');
+        } else {
+            for (i, line) in lines.iter().enumerate() {
+                log::trace!("  Line {}: {} words", i, line.len());
+                if i == 0 {
+                    // First line: output indent + marker padding + marker + spaces + checkbox
+                    self.output.push_str(&" ".repeat(total_indent));
+                    self.output
+                        .push_str(&" ".repeat(list_indent.marker_padding));
+                    self.output.push_str(&marker);
+                    self.output.push_str(&" ".repeat(list_indent.spaces_after));
+
+                    // Output checkbox if present
+                    if let Some(ref cb) = checkbox {
+                        self.output.push_str(cb);
+                        self.output.push(' ');
+                    }
+                } else {
+                    // Hanging indent includes all leading whitespace
+                    self.output.push_str(&" ".repeat(hanging));
+                }
+                for (j, w) in line.iter().enumerate() {
+                    self.output.push_str(w.word);
+                    if j + 1 < line.len() {
+                        self.output.push_str(w.whitespace);
+                    } else {
+                        self.output.push_str(w.penalty);
+                    }
+                }
+                // Only output newline if this item doesn't have an inline empty nested list
+                if !has_only_empty_nested_list {
+                    self.output.push('\n');
+                }
             }
         }
 

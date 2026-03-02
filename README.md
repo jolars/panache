@@ -132,7 +132,6 @@ panache lsp
 But typically you will configure your editor to start the LSP server
 automatically when editing supported file types (`.qmd`, `.md`, `.Rmd`).
 
-
 **Editor Configuration:**
 
 The LSP communicates over stdin/stdout and provides document formatting

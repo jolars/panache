@@ -8,6 +8,13 @@ fn cfg_preserve() -> Config {
     }
 }
 
+fn cfg_sentence() -> Config {
+    Config {
+        wrap: Some(WrapMode::Sentence),
+        ..Default::default()
+    }
+}
+
 #[test]
 fn paragraph_preserve_keeps_line_breaks() {
     let input = "\
@@ -40,4 +47,32 @@ fn block_quote_preserve_keeps_line_breaks() {
 
     // Preserve mode should keep quoted line breaks exactly
     assert_eq!(out, input);
+}
+
+#[test]
+fn paragraph_sentence_wraps_per_sentence() {
+    let input = "First sentence. Second sentence! Third sentence?\n";
+    let expected = "First sentence.\nSecond sentence!\nThird sentence?\n";
+
+    let out = format(input, Some(cfg_sentence()), None);
+    let out2 = format(&out, Some(cfg_sentence()), None);
+    assert_eq!(out, out2);
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn block_quote_sentence_wraps_per_sentence() {
+    let input = "\
+> First sentence. Second sentence; third sentence.
+";
+    let expected = "\
+> First sentence.
+> Second sentence;
+> third sentence.
+";
+
+    let out = format(input, Some(cfg_sentence()), None);
+    let out2 = format(&out, Some(cfg_sentence()), None);
+    assert_eq!(out, out2);
+    assert_eq!(out, expected);
 }
