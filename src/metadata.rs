@@ -196,4 +196,116 @@ mod tests {
             .collect();
         assert!(paths.contains(&"site.bib".to_string()));
     }
+
+    #[test]
+    fn test_extract_project_metadata_bookdown_index_frontmatter() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        fs::write(project_root.join("_bookdown.yml"), "output_dir: _book\n").unwrap();
+        fs::write(project_root.join("book.bib"), "@book{book,}\n").unwrap();
+        fs::write(
+            project_root.join("index.Rmd"),
+            "---\nbibliography: book.bib\n---\n\n# Title\n",
+        )
+        .unwrap();
+
+        let input = "---\n---\n\nText";
+        let tree = parse(input, None);
+        let doc_path = project_root.join("chapter1.Rmd");
+        let metadata = extract_project_metadata(&tree, &doc_path).unwrap();
+
+        let bib = metadata.bibliography.expect("bibliography");
+        let paths: Vec<_> = bib
+            .paths
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert!(paths.contains(&"book.bib".to_string()));
+    }
+
+    #[test]
+    fn test_extract_project_metadata_bookdown_first_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        fs::write(
+            project_root.join("_bookdown.yml"),
+            "rmd_files: [\"intro.Rmd\", \"chapter.Rmd\"]\n",
+        )
+        .unwrap();
+        fs::write(project_root.join("intro.bib"), "@book{intro,}\n").unwrap();
+        fs::write(
+            project_root.join("intro.Rmd"),
+            "---\nbibliography: intro.bib\n---\n\n# Intro\n",
+        )
+        .unwrap();
+
+        let input = "---\n---\n\nText";
+        let tree = parse(input, None);
+        let doc_path = project_root.join("chapter.Rmd");
+        let metadata = extract_project_metadata(&tree, &doc_path).unwrap();
+
+        let bib = metadata.bibliography.expect("bibliography");
+        let paths: Vec<_> = bib
+            .paths
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert!(paths.contains(&"intro.bib".to_string()));
+    }
+
+    #[test]
+    fn test_extract_project_metadata_bookdown_default_index_first() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        fs::write(project_root.join("_bookdown.yml"), "output_dir: _book\n").unwrap();
+        fs::write(project_root.join("index.bib"), "@book{index,}\n").unwrap();
+        fs::write(
+            project_root.join("index.Rmd"),
+            "---\nbibliography: index.bib\n---\n\n# Index\n",
+        )
+        .unwrap();
+
+        let input = "---\n---\n\nText";
+        let tree = parse(input, None);
+        let doc_path = project_root.join("chapter.Rmd");
+        let metadata = extract_project_metadata(&tree, &doc_path).unwrap();
+
+        let bib = metadata.bibliography.expect("bibliography");
+        let paths: Vec<_> = bib
+            .paths
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert!(paths.contains(&"index.bib".to_string()));
+    }
+
+    #[test]
+    fn test_extract_project_metadata_bookdown_rmd_files_by_format() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        fs::write(
+            project_root.join("_bookdown.yml"),
+            "rmd_files:\n  html:\n    - intro.Rmd\n    - chapter.Rmd\n",
+        )
+        .unwrap();
+        fs::write(project_root.join("intro.bib"), "@book{intro,}\n").unwrap();
+        fs::write(
+            project_root.join("intro.Rmd"),
+            "---\nbibliography: intro.bib\n---\n\n# Intro\n",
+        )
+        .unwrap();
+
+        let input = "---\n---\n\nText";
+        let tree = parse(input, None);
+        let doc_path = project_root.join("chapter.Rmd");
+        let metadata = extract_project_metadata(&tree, &doc_path).unwrap();
+
+        let bib = metadata.bibliography.expect("bibliography");
+        let paths: Vec<_> = bib
+            .paths
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert!(paths.contains(&"intro.bib".to_string()));
+    }
 }

@@ -2,12 +2,23 @@ use std::path::{Path, PathBuf};
 
 use rowan::TextRange;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
 
 use super::bibliography::{BibliographyInfo, BibliographyParse};
 use super::yaml::{YamlError, strip_yaml_delimiters};
 use super::{DocumentMetadata, extract_citations};
 use crate::bibtex;
 use crate::syntax::SyntaxNode;
+
+enum ProjectRoot {
+    Quarto(PathBuf),
+    Bookdown(BookdownProject),
+}
+
+struct BookdownProject {
+    root: PathBuf,
+    first_file: Option<String>,
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
@@ -44,6 +55,25 @@ where
     }
 }
 
+fn deserialize_metadata_files<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<StringOrArray>::deserialize(deserializer)?;
+    Ok(value.map(StringOrArray::into_vec).unwrap_or_default())
+}
+
+fn serialize_metadata_files<S>(value: &Vec<String>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match value.len() {
+        0 => serializer.serialize_none(),
+        1 => serializer.serialize_str(&value[0]),
+        _ => value.serialize(serializer),
+    }
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 struct MergeMetadata {
     title: Option<String>,
@@ -57,6 +87,8 @@ struct MergeMetadata {
     #[serde(
         default,
         rename = "metadata-files",
+        deserialize_with = "deserialize_metadata_files",
+        serialize_with = "serialize_metadata_files",
         skip_serializing_if = "Vec::is_empty"
     )]
     metadata_files: Vec<String>,
@@ -92,44 +124,51 @@ pub fn extract_project_metadata(
         .to_path_buf();
 
     if let Some(project_root) = find_project_root(doc_path) {
-        let project_file = project_root.join("_quarto.yml");
-        if project_file.exists() {
-            let project_meta = parse_metadata_file(&project_file)?;
-            let project_includes = project_meta.metadata_files.clone();
-            sources.push(project_meta);
+        match project_root {
+            ProjectRoot::Quarto(project_root) => {
+                let quarto_file = project_root.join("_quarto.yml");
+                if quarto_file.exists() {
+                    let project_meta = parse_metadata_file(&quarto_file)?;
+                    push_with_includes(&mut sources, &project_root, project_meta)?;
+                }
 
-            for include in project_includes {
-                if let Some(source) = load_metadata_file(&project_root, &include)? {
-                    sources.push(source);
+                let mut dirs = Vec::new();
+                let mut dir = doc_dir.as_path();
+                while dir.starts_with(&project_root) {
+                    dirs.push(dir.to_path_buf());
+                    if dir == project_root {
+                        break;
+                    }
+                    dir = dir.parent().unwrap_or(project_root.as_path());
+                }
+
+                for dir in dirs.into_iter().rev() {
+                    if let Some(source) = load_metadata_file(&dir, "_metadata.yml")? {
+                        push_with_includes(&mut sources, &dir, source)?;
+                    }
+                }
+            }
+            ProjectRoot::Bookdown(project) => {
+                for bookdown_file in ["_bookdown.yml", "_output.yml"] {
+                    let path = project.root.join(bookdown_file);
+                    if path.exists() {
+                        let meta = parse_metadata_file(&path)?;
+                        sources.push(strip_bibliography(meta));
+                    }
+                }
+
+                let first_file = project
+                    .first_file
+                    .map(|file| project.root.join(file))
+                    .unwrap_or_else(|| project.root.join("index.Rmd"));
+                if let Some(index_meta) = load_frontmatter_file(&first_file)? {
+                    push_with_includes(&mut sources, &project.root, index_meta)?;
                 }
             }
         }
-
-        let mut dirs = Vec::new();
-        let mut dir = doc_dir.as_path();
-        while dir.starts_with(&project_root) {
-            dirs.push(dir.to_path_buf());
-            if dir == project_root {
-                break;
-            }
-            dir = dir.parent().unwrap_or(project_root.as_path());
-        }
-
-        for dir in dirs.into_iter().rev() {
-            if let Some(source) = load_metadata_file(&dir, "_metadata.yml")? {
-                sources.push(source);
-            }
-        }
     }
 
-    let doc_includes = doc_meta.metadata_files.clone();
-    sources.push(doc_meta);
-
-    for include in doc_includes {
-        if let Some(source) = load_metadata_file(&doc_dir, &include)? {
-            sources.push(source);
-        }
-    }
+    push_with_includes(&mut sources, &doc_dir, doc_meta)?;
 
     let mut merged = MergeMetadata::default();
     for source in sources {
@@ -178,15 +217,90 @@ fn parse_metadata_file(path: &Path) -> Result<MergeMetadata, YamlError> {
     parse_metadata_text(&yaml)
 }
 
-fn find_project_root(doc_path: &Path) -> Option<PathBuf> {
+fn find_project_root(doc_path: &Path) -> Option<ProjectRoot> {
     let mut current = doc_path.parent()?;
     loop {
-        let candidate = current.join("_quarto.yml");
-        if candidate.exists() {
-            return Some(current.to_path_buf());
+        let quarto = current.join("_quarto.yml");
+        if quarto.exists() {
+            return Some(ProjectRoot::Quarto(current.to_path_buf()));
+        }
+        let bookdown = current.join("_bookdown.yml");
+        if bookdown.exists() {
+            return Some(ProjectRoot::Bookdown(BookdownProject {
+                root: current.to_path_buf(),
+                first_file: read_bookdown_first_file(&bookdown, current),
+            }));
         }
         current = current.parent()?;
     }
+}
+
+fn read_bookdown_first_file(path: &Path, root: &Path) -> Option<String> {
+    let yaml = std::fs::read_to_string(path).ok()?;
+    let doc: BookdownConfig = serde_saphyr::from_str(&yaml).ok()?;
+    let index_exists = root.join("index.Rmd").exists();
+    match doc.rmd_files {
+        Some(RmdFiles::List(files)) => select_first_bookdown_file(&files, index_exists),
+        Some(RmdFiles::ByFormat(formats)) => {
+            let files = formats
+                .get("html")
+                .or_else(|| formats.get("latex"))
+                .or_else(|| formats.values().next());
+            files
+                .and_then(|files| select_first_bookdown_file(files, index_exists))
+                .or_else(|| {
+                    if index_exists {
+                        Some("index.Rmd".to_string())
+                    } else {
+                        None
+                    }
+                })
+        }
+        None => default_bookdown_first_file(root, index_exists),
+    }
+}
+
+#[derive(Deserialize)]
+struct BookdownConfig {
+    rmd_files: Option<RmdFiles>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum RmdFiles {
+    List(Vec<String>),
+    ByFormat(HashMap<String, Vec<String>>),
+}
+
+fn select_first_bookdown_file(files: &[String], index_exists: bool) -> Option<String> {
+    if index_exists {
+        return Some("index.Rmd".to_string());
+    }
+    files.iter().find(|file| !file.starts_with('_')).cloned()
+}
+
+fn default_bookdown_first_file(root: &Path, index_exists: bool) -> Option<String> {
+    if index_exists {
+        return Some("index.Rmd".to_string());
+    }
+    let mut candidates = Vec::new();
+    let entries = std::fs::read_dir(root).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let name = path.file_name()?.to_string_lossy().to_string();
+        if name.starts_with('_') {
+            continue;
+        }
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if matches!(ext, "Rmd" | "rmd") {
+            candidates.push(name);
+        }
+    }
+    candidates.sort();
+    candidates.first().cloned()
 }
 
 fn load_metadata_file(base_dir: &Path, relative: &str) -> Result<Option<MergeMetadata>, YamlError> {
@@ -195,6 +309,55 @@ fn load_metadata_file(base_dir: &Path, relative: &str) -> Result<Option<MergeMet
         return Ok(None);
     }
     Ok(Some(parse_metadata_file(&path)?))
+}
+
+fn load_frontmatter_file(path: &Path) -> Result<Option<MergeMetadata>, YamlError> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let content =
+        std::fs::read_to_string(path).map_err(|err| YamlError::StructureError(err.to_string()))?;
+    let frontmatter = extract_frontmatter(&content);
+    Ok(Some(parse_metadata_text(&frontmatter)?))
+}
+
+fn extract_frontmatter(input: &str) -> String {
+    let mut lines = input.lines();
+    let Some(first) = lines.next() else {
+        return String::new();
+    };
+    if first.trim() != "---" {
+        return String::new();
+    }
+    let mut yaml_lines = Vec::new();
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed == "---" || trimmed == "..." {
+            break;
+        }
+        yaml_lines.push(line);
+    }
+    yaml_lines.join("\n")
+}
+
+fn push_with_includes(
+    sources: &mut Vec<MergeMetadata>,
+    base_dir: &Path,
+    meta: MergeMetadata,
+) -> Result<(), YamlError> {
+    let includes = meta.metadata_files.clone();
+    sources.push(meta);
+    for include in includes {
+        if let Some(source) = load_metadata_file(base_dir, &include)? {
+            push_with_includes(sources, base_dir, source)?;
+        }
+    }
+    Ok(())
+}
+
+fn strip_bibliography(mut meta: MergeMetadata) -> MergeMetadata {
+    meta.bibliography.clear();
+    meta
 }
 
 fn extract_bibliography_from_strings(
