@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.10.0](https://github.com/jolars/panache/compare/v2.9.0...v2.10.0) (2026-03-03)
+
+### Features
+
+* **formatter:** add sentence-wrapping mode ([4048f55](https://github.com/jolars/panache/commit/4048f555cf28178027170f9aef4d4d86948a832c))
+* **linter,lsp:** add auto-fixing for external linters ([f73e3be](https://github.com/jolars/panache/commit/f73e3be6beb9ddc444a06a2aa7bc6cb587674164))
+
+### Bug Fixes
+
+* **lsp,linter:** return correct range for bibliography lint ([313ca32](https://github.com/jolars/panache/commit/313ca323a450fc04f5d105c3cbf296e5d2bab3e5))
+* **lsp:** add external lint fixing code action ([1e5a847](https://github.com/jolars/panache/commit/1e5a8474dca8f96e6254adb3fd321d537917ba90))
+* **lsp:** fix go-to-definition and hover handlers for citations ([ef7d5e7](https://github.com/jolars/panache/commit/ef7d5e7e06a398e4dbc2e3f18f3af3b34af3efc3))
+* **lsp:** handle go-to-definition for references ([7a0bc17](https://github.com/jolars/panache/commit/7a0bc175fe46a4ed126864244738d25cc785fc42))
+
 ## [2.9.0](https://github.com/jolars/panache/compare/v2.8.0...v2.9.0) (2026-03-02)
 
 ### Features
