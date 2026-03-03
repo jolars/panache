@@ -1371,11 +1371,11 @@ impl BlockParser for FencedDivOpenParser {
         let div_fence = payload
             .and_then(|p| p.downcast_ref::<DivFenceInfo>())
             .cloned()
-            .or_else(|| try_parse_div_fence_open(ctx.content));
-
-        let Some(div_fence) = div_fence else {
-            return 1;
-        };
+            .or_else(|| try_parse_div_fence_open(ctx.content))
+            .unwrap_or(DivFenceInfo {
+                attributes: String::new(),
+                fence_count: 3,
+            });
 
         // Start FENCED_DIV node (container push happens in core based on `effect`).
         builder.start_node(SyntaxKind::FENCED_DIV.into());
@@ -1402,55 +1402,57 @@ impl BlockParser for FencedDivOpenParser {
         let after_colons = &trimmed[div_fence.fence_count..];
         let (content_before_newline, newline_str) = strip_newline(after_colons);
 
-        // Optional space before attributes
-        let has_leading_space = content_before_newline.starts_with(' ');
-        if has_leading_space {
-            builder.token(SyntaxKind::WHITESPACE.into(), " ");
-        }
+        if !div_fence.attributes.is_empty() {
+            // Optional space before attributes
+            let has_leading_space = content_before_newline.starts_with(' ');
+            if has_leading_space {
+                builder.token(SyntaxKind::WHITESPACE.into(), " ");
+            }
 
-        let content_after_space = if has_leading_space {
-            &content_before_newline[1..]
-        } else {
-            content_before_newline
-        };
+            let content_after_space = if has_leading_space {
+                &content_before_newline[1..]
+            } else {
+                content_before_newline
+            };
 
-        // Attributes
-        builder.start_node(SyntaxKind::DIV_INFO.into());
-        builder.token(SyntaxKind::TEXT.into(), &div_fence.attributes);
-        builder.finish_node();
+            // Attributes
+            builder.start_node(SyntaxKind::DIV_INFO.into());
+            builder.token(SyntaxKind::TEXT.into(), &div_fence.attributes);
+            builder.finish_node();
 
-        // Trailing colons (symmetric fences)
-        let (trailing_space, trailing_colons) = if div_fence.attributes.starts_with('{') {
-            if let Some(close_idx) = content_after_space.find('}') {
-                let after_attrs = &content_after_space[close_idx + 1..];
-                let trailing = after_attrs.trim_start();
-                let space_count = after_attrs.len() - trailing.len();
-                if !trailing.is_empty() && trailing.chars().all(|c| c == ':') {
-                    (space_count > 0, trailing)
+            // Trailing colons (symmetric fences)
+            let (trailing_space, trailing_colons) = if div_fence.attributes.starts_with('{') {
+                if let Some(close_idx) = content_after_space.find('}') {
+                    let after_attrs = &content_after_space[close_idx + 1..];
+                    let trailing = after_attrs.trim_start();
+                    let space_count = after_attrs.len() - trailing.len();
+                    if !trailing.is_empty() && trailing.chars().all(|c| c == ':') {
+                        (space_count > 0, trailing)
+                    } else {
+                        (false, "")
+                    }
                 } else {
                     (false, "")
                 }
             } else {
-                (false, "")
-            }
-        } else {
-            let after_attrs = &content_after_space[div_fence.attributes.len()..];
-            if let Some(after_space) = after_attrs.strip_prefix(' ') {
-                if !after_space.is_empty() && after_space.chars().all(|c| c == ':') {
-                    (true, after_space)
+                let after_attrs = &content_after_space[div_fence.attributes.len()..];
+                if let Some(after_space) = after_attrs.strip_prefix(' ') {
+                    if !after_space.is_empty() && after_space.chars().all(|c| c == ':') {
+                        (true, after_space)
+                    } else {
+                        (false, "")
+                    }
                 } else {
                     (false, "")
                 }
-            } else {
-                (false, "")
-            }
-        };
+            };
 
-        if trailing_space {
-            builder.token(SyntaxKind::WHITESPACE.into(), " ");
-        }
-        if !trailing_colons.is_empty() {
-            builder.token(SyntaxKind::TEXT.into(), trailing_colons);
+            if trailing_space {
+                builder.token(SyntaxKind::WHITESPACE.into(), " ");
+            }
+            if !trailing_colons.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), trailing_colons);
+            }
         }
 
         if !newline_str.is_empty() {

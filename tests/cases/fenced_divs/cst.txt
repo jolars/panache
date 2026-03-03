@@ -1,4 +1,4 @@
-DOCUMENT@0..531
+DOCUMENT@0..604
   FENCED_DIV@0..72
     DIV_FENCE_OPEN@0..19
       TEXT@0..3 ":::"
@@ -158,4 +158,20 @@ DOCUMENT@0..531
     DIV_FENCE_CLOSE@526..531
       TEXT@526..530 "::: "
       NEWLINE@530..531 "\n"
+  BLANK_LINE@531..532
+    BLANK_LINE@531..532 "\n"
+  FENCED_DIV@532..604
+    DIV_FENCE_OPEN@532..536
+      TEXT@532..535 ":::"
+      NEWLINE@535..536 "\n"
+    PARAGRAPH@536..600
+      LATEX_COMMAND@536..565
+        TEXT@536..565 "\\DeclareMathOperator{ ..."
+      NEWLINE@565..566 "\n"
+      LATEX_COMMAND@566..599
+        TEXT@566..599 "\\DeclareMathOperator{ ..."
+      NEWLINE@599..600 "\n"
+    DIV_FENCE_CLOSE@600..604
+      TEXT@600..603 ":::"
+      NEWLINE@603..604 "\n"
 

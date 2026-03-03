@@ -40,3 +40,8 @@ Here's a fenced div with a list inside.
 ::: exercise
 foo bar
 ::: 
+
+:::
+\DeclareMathOperator{\E}{E{}}
+\DeclareMathOperator{\Var}{Var{}}
+:::

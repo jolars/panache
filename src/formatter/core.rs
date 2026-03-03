@@ -110,6 +110,10 @@ impl Formatter {
         paragraphs::contains_inline_display_math(node)
     }
 
+    fn contains_latex_command(&self, node: &SyntaxNode) -> bool {
+        paragraphs::contains_latex_command(node)
+    }
+
     // Delegate to paragraphs module
     fn format_paragraph_with_display_math(
         &mut self,
@@ -699,6 +703,8 @@ impl Formatter {
                 }
 
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+                let preserve_newlines_for_latex =
+                    self.fenced_div_depth > 0 && self.contains_latex_command(node);
                 log::debug!(
                     "Paragraph wrap mode: {:?}, line_width: {}",
                     wrap_mode,
@@ -713,6 +719,13 @@ impl Formatter {
                         }
                     }
                     WrapMode::Reflow => {
+                        if preserve_newlines_for_latex {
+                            self.output.push_str(&text);
+                            if !self.output.ends_with('\n') {
+                                self.output.push('\n');
+                            }
+                            return;
+                        }
                         log::trace!("Reflowing paragraph to {} width", line_width);
                         let lines = self.wrapped_lines_for_paragraph(node, line_width);
 
@@ -724,6 +737,13 @@ impl Formatter {
                         }
                     }
                     WrapMode::Sentence => {
+                        if preserve_newlines_for_latex {
+                            self.output.push_str(&text);
+                            if !self.output.ends_with('\n') {
+                                self.output.push('\n');
+                            }
+                            return;
+                        }
                         log::trace!("Wrapping paragraph by sentence");
                         let lines = self.sentence_lines_for_paragraph(node);
 
@@ -1157,12 +1177,14 @@ impl Formatter {
                 }
 
                 // Emit normalized opening fence
+                self.output.push_str(&colons);
                 if let Some(attrs) = &attributes {
-                    self.output.push_str(&colons);
-                    self.output.push(' ');
-                    self.output.push_str(attrs);
-                    self.output.push('\n');
+                    if !attrs.is_empty() {
+                        self.output.push(' ');
+                        self.output.push_str(attrs);
+                    }
                 }
+                self.output.push('\n');
 
                 // Increment depth for nested content
                 self.fenced_div_depth += 1;

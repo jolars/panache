@@ -13,6 +13,12 @@ pub(super) fn contains_inline_display_math(node: &SyntaxNode) -> bool {
     false
 }
 
+/// Check if a paragraph contains raw LaTeX commands.
+pub(super) fn contains_latex_command(node: &SyntaxNode) -> bool {
+    node.descendants()
+        .any(|child| child.kind() == SyntaxKind::LATEX_COMMAND)
+}
+
 /// Format a paragraph that contains inline display math by splitting it.
 /// Converts: "Some text $$x = y$$ more text" into text with display math formatted.
 pub(super) fn format_paragraph_with_display_math(

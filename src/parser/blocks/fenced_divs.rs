@@ -46,8 +46,8 @@ pub(crate) fn try_parse_div_fence_open(content: &str) -> Option<DivFenceInfo> {
             return None;
         }
     } else if after_colons.is_empty() {
-        // No attributes, this is a closing fence
-        return None;
+        // Allow empty attributes (treat as an opening fence with no attributes).
+        String::new()
     } else {
         // Single word or words until optional trailing colons
         let content_before_colons = after_colons.trim_end_matches(':').trim_end();
@@ -112,16 +112,16 @@ mod tests {
     }
 
     #[test]
-    fn test_closing_fence_no_attributes() {
+    fn test_opening_fence_empty_attributes() {
         let line = ":::";
-        assert!(try_parse_div_fence_open(line).is_none());
+        assert!(try_parse_div_fence_open(line).is_some());
         assert!(is_div_closing_fence(line));
     }
 
     #[test]
-    fn test_closing_fence_many_colons() {
+    fn test_opening_fence_many_colons_empty_attributes() {
         let line = "::::::::::::::";
-        assert!(try_parse_div_fence_open(line).is_none());
+        assert!(try_parse_div_fence_open(line).is_some());
         assert!(is_div_closing_fence(line));
     }
 
