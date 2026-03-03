@@ -154,10 +154,10 @@ pub(crate) fn find_crossref_definition_node(root: &SyntaxNode, label: &str) -> O
             return false;
         }
         let text = node.text().to_string();
-        if let Some(attrs) = try_parse_trailing_attributes(&text).map(|(attrs, _)| attrs) {
-            if let Some(id) = attrs.identifier {
-                return normalize_label(&id) == target;
-            }
+        if let Some(attrs) = try_parse_trailing_attributes(&text).map(|(attrs, _)| attrs)
+            && let Some(id) = attrs.identifier
+        {
+            return normalize_label(&id) == target;
         }
         false
     })
