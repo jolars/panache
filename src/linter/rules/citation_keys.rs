@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, Citation, SyntaxNode};
+use crate::syntax::{AstNode, Citation, Crossref, SyntaxNode};
 
 pub struct CitationKeysRule;
 
@@ -59,6 +59,14 @@ impl Rule for CitationKeysRule {
         }
 
         for key_text in &metadata.citations.keys {
+            if tree
+                .descendants()
+                .filter_map(Crossref::cast)
+                .flat_map(|crossref| crossref.keys())
+                .any(|crossref_key| crossref_key.text() == *key_text)
+            {
+                continue;
+            }
             if parse.index.get(key_text).is_none() {
                 // Find all citation nodes that reference this missing key
                 for citation in tree.descendants().filter_map(Citation::cast) {
@@ -162,5 +170,35 @@ mod tests {
         let end: usize = diagnostics[0].location.range.end().into();
         assert_eq!(start, 5); // Position of '['
         assert_eq!(end, 15); // Position after ']'
+    }
+
+    #[test]
+    fn crossref_keys_do_not_emit_warning() {
+        let input = "See @eq-missing for details.";
+        let mut config = Config::default();
+        config.extensions.quarto_crossrefs = true;
+
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = CitationKeysRule;
+        let metadata = crate::metadata::DocumentMetadata {
+            bibliography: None,
+            bibliography_parse: Some(crate::metadata::BibliographyParse {
+                index: crate::bibtex::BibIndex {
+                    entries: std::collections::HashMap::new(),
+                    duplicates: Vec::new(),
+                    errors: Vec::new(),
+                    files: Vec::new(),
+                    load_errors: Vec::new(),
+                },
+            }),
+            citations: crate::metadata::CitationInfo {
+                keys: vec!["eq-missing".to_string()],
+            },
+            title: None,
+            raw_yaml: String::new(),
+        };
+
+        let diagnostics = rule.check(&tree, input, &config, Some(&metadata));
+        assert!(diagnostics.is_empty());
     }
 }

@@ -1517,8 +1517,13 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched bare citation at pos {}: {}", pos, &key);
-            emit_bare_citation(builder, key, has_suppress);
+            if config.extensions.quarto_crossrefs && super::citations::is_quarto_crossref_key(key) {
+                log::debug!("Matched Quarto crossref at pos {}: {}", pos, &key);
+                super::citations::emit_crossref(builder, key, has_suppress);
+            } else {
+                log::debug!("Matched bare citation at pos {}: {}", pos, &key);
+                emit_bare_citation(builder, key, has_suppress);
+            }
             pos += len;
             text_start = pos;
             continue;
@@ -1534,8 +1539,13 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched suppress-author citation at pos {}: {}", pos, &key);
-            emit_bare_citation(builder, key, has_suppress);
+            if config.extensions.quarto_crossrefs && super::citations::is_quarto_crossref_key(key) {
+                log::debug!("Matched Quarto crossref at pos {}: {}", pos, &key);
+                super::citations::emit_crossref(builder, key, has_suppress);
+            } else {
+                log::debug!("Matched suppress-author citation at pos {}: {}", pos, &key);
+                emit_bare_citation(builder, key, has_suppress);
+            }
             pos += len;
             text_start = pos;
             continue;

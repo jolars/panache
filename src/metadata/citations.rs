@@ -1,6 +1,6 @@
 //! Citation extraction from CST.
 
-use crate::syntax::{AstNode, Citation, SyntaxNode};
+use crate::syntax::{AstNode, Citation, Crossref, SyntaxNode};
 
 #[derive(Debug, Clone)]
 pub struct CitationInfo {
@@ -12,6 +12,12 @@ pub fn extract_citations(tree: &SyntaxNode) -> CitationInfo {
 
     for citation in tree.descendants().filter_map(Citation::cast) {
         for key in citation.key_texts() {
+            keys.push(key);
+        }
+    }
+
+    for crossref in tree.descendants().filter_map(Crossref::cast) {
+        for key in crossref.key_texts() {
             keys.push(key);
         }
     }

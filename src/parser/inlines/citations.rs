@@ -145,6 +145,61 @@ pub(crate) fn try_parse_bare_citation(text: &str) -> Option<(usize, &str, bool)>
     Some((total_len, key, has_suppress))
 }
 
+/// Try to parse a Quarto cross-reference key (e.g., @fig-plot, @eq-energy).
+pub(crate) fn is_quarto_crossref_key(key: &str) -> bool {
+    let lower = key.to_ascii_lowercase();
+    let mut parts = lower.splitn(2, '-');
+    let prefix = parts.next().unwrap_or("");
+    let rest = parts.next().unwrap_or("");
+    if rest.is_empty() {
+        return false;
+    }
+    matches!(
+        prefix,
+        "fig"
+            | "tbl"
+            | "lst"
+            | "tip"
+            | "nte"
+            | "wrn"
+            | "imp"
+            | "cau"
+            | "thm"
+            | "lem"
+            | "cor"
+            | "prp"
+            | "cnj"
+            | "def"
+            | "exm"
+            | "exr"
+            | "sol"
+            | "rem"
+            | "alg"
+            | "eq"
+            | "sec"
+    )
+}
+
+pub(crate) fn emit_crossref(builder: &mut GreenNodeBuilder, key: &str, has_suppress: bool) {
+    builder.start_node(SyntaxKind::CROSSREF.into());
+
+    if has_suppress {
+        builder.token(SyntaxKind::CITATION_MARKER.into(), "-@");
+    } else {
+        builder.token(SyntaxKind::CITATION_MARKER.into(), "@");
+    }
+
+    if key.starts_with('{') && key.ends_with('}') {
+        builder.token(SyntaxKind::CITATION_BRACE_OPEN.into(), "{");
+        builder.token(SyntaxKind::CITATION_KEY.into(), &key[1..key.len() - 1]);
+        builder.token(SyntaxKind::CITATION_BRACE_CLOSE.into(), "}");
+    } else {
+        builder.token(SyntaxKind::CITATION_KEY.into(), key);
+    }
+
+    builder.finish_node();
+}
+
 /// Parse a citation key following Pandoc's rules.
 /// Returns the length of the key, or None if invalid.
 ///
