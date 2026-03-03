@@ -1178,11 +1178,11 @@ impl Formatter {
 
                 // Emit normalized opening fence
                 self.output.push_str(&colons);
-                if let Some(attrs) = &attributes {
-                    if !attrs.is_empty() {
-                        self.output.push(' ');
-                        self.output.push_str(attrs);
-                    }
+                if let Some(attrs) = &attributes
+                    && !attrs.is_empty()
+                {
+                    self.output.push(' ');
+                    self.output.push_str(attrs);
                 }
                 self.output.push('\n');
 
