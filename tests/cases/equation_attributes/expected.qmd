@@ -9,3 +9,9 @@ $$
 $$ {#eq-black-scholes}
 
 Reference to @eq-black-scholes in the text.
+
+An equation with text directly before and after and attributes:
+$$
+f(x) = 1
+$$ {#eq-problem}
+Let's hope the attribute doesn't mess with the text.

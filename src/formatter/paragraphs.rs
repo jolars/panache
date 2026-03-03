@@ -56,22 +56,39 @@ pub(super) fn format_paragraph_with_display_math(
                             next_idx += 1;
                         }
 
-                        // Check for Attribute node
-                        if next_idx < children.len()
-                            && let NodeOrToken::Node(attr_node) = &children[next_idx]
-                            && attr_node.kind() == SyntaxKind::ATTRIBUTE
+                        // Attributes may be emitted as plain text right after display math in CST.
+                        let mut attr_text = None;
+                        if next_idx < children.len() {
+                            match &children[next_idx] {
+                                NodeOrToken::Node(attr_node)
+                                    if attr_node.kind() == SyntaxKind::ATTRIBUTE
+                                        && config.extensions.quarto_crossrefs =>
+                                {
+                                    attr_text = Some(attr_node.text().to_string());
+                                    i = next_idx;
+                                }
+                                NodeOrToken::Token(t)
+                                    if t.kind() == SyntaxKind::TEXT
+                                        && config.extensions.quarto_crossrefs
+                                        && t.text().trim_start().starts_with('{') =>
+                                {
+                                    attr_text = Some(t.text().to_string());
+                                    i = next_idx;
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        if let Some(attrs) = attr_text
+                            && config.extensions.quarto_crossrefs
                         {
                             // Append attribute on same line as closing $$
-                            // Remove trailing newline from formatted math
                             if formatted.ends_with('\n') {
                                 formatted.pop();
                             }
                             formatted.push(' ');
-                            formatted.push_str(&attr_node.text().to_string());
+                            formatted.push_str(attrs.trim());
                             formatted.push('\n');
-
-                            // Skip the whitespace and attribute nodes
-                            i = next_idx;
                         }
                     }
 
