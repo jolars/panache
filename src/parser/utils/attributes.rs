@@ -52,7 +52,7 @@ pub fn try_parse_trailing_attributes(text: &str) -> Option<(AttributeBlock, &str
 }
 
 /// Parse the content inside the attribute braces
-fn parse_attribute_content(content: &str) -> Option<AttributeBlock> {
+pub fn parse_attribute_content(content: &str) -> Option<AttributeBlock> {
     let mut identifier = None;
     let mut classes = Vec::new();
     let mut key_values = Vec::new();

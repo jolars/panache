@@ -6,7 +6,8 @@ use tower_lsp_server::ls_types::Uri;
 
 use crate::Config;
 use crate::lsp::DocumentState;
-use crate::syntax::{AstNode, Citation, SyntaxKind, SyntaxNode};
+use crate::parser::utils::attributes::try_parse_trailing_attributes;
+use crate::syntax::{AstNode, Citation, Crossref, SyntaxKind, SyntaxNode};
 use rowan::{NodeOrToken, TextRange, TextSize};
 
 use super::config::load_config;
@@ -128,6 +129,38 @@ pub(crate) fn extract_citation_key(node: &SyntaxNode) -> Option<String> {
     }
 
     None
+}
+
+pub(crate) fn extract_crossref_key(node: &SyntaxNode) -> Option<String> {
+    if let Some(crossref) = Crossref::cast(node.clone()) {
+        return crossref.keys().first().map(|key| key.text());
+    }
+
+    let mut current = node.clone();
+    while let Some(parent) = current.parent() {
+        if let Some(crossref) = Crossref::cast(parent.clone()) {
+            return crossref.keys().first().map(|key| key.text());
+        }
+        current = parent;
+    }
+
+    None
+}
+
+pub(crate) fn find_crossref_definition_node(root: &SyntaxNode, label: &str) -> Option<SyntaxNode> {
+    let target = normalize_label(label);
+    root.descendants().find(|node| {
+        if node.kind() != SyntaxKind::ATTRIBUTE {
+            return false;
+        }
+        let text = node.text().to_string();
+        if let Some(attrs) = try_parse_trailing_attributes(&text).map(|(attrs, _)| attrs) {
+            if let Some(id) = attrs.identifier {
+                return normalize_label(&id) == target;
+            }
+        }
+        false
+    })
 }
 
 /// Extract the label from a definition node (ReferenceDefinition or FootnoteDefinition)
@@ -340,6 +373,18 @@ mod tests {
         let root = parse("[text][ref]");
         let def = find_definition_node(&root, "ref", false);
         assert!(def.is_none());
+    }
+
+    #[test]
+    fn test_find_crossref_definition_node() {
+        let input = "See @eq-test.\n\n$$\nE = mc^2\n$$ {#eq-test}\n";
+        let mut config = Config::default();
+        config.extensions.quarto_crossrefs = true;
+        let root = crate::parser::parse(input, Some(config));
+
+        let def = find_crossref_definition_node(&root, "eq-test");
+        assert!(def.is_some());
+        assert_eq!(def.unwrap().kind(), SyntaxKind::ATTRIBUTE);
     }
 
     #[test]

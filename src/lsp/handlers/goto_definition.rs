@@ -72,6 +72,27 @@ pub(crate) async fn goto_definition(
             return Ok(Some(GotoDefinitionResponse::Scalar(location)));
         }
 
+        // Quarto crossref: jump to attribute definition
+        if let Some(label) = helpers::extract_crossref_key(&node)
+            && let Some(definition) = helpers::find_crossref_definition_node(&root, &label)
+        {
+            let start_offset: usize = definition.text_range().start().into();
+            let end_offset: usize = definition.text_range().end().into();
+
+            let start_position = conversions::offset_to_position(&content, start_offset);
+            let end_position = conversions::offset_to_position(&content, end_offset);
+
+            let location = Location {
+                uri: uri.clone(),
+                range: Range {
+                    start: start_position,
+                    end: end_position,
+                },
+            };
+
+            return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+        }
+
         // Fallback: find reference/footnote definition at this node
         if let Some((label, is_footnote)) = helpers::extract_reference_label(&node)
             && let Some(definition) = helpers::find_definition_node(&root, &label, is_footnote)
