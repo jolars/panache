@@ -135,7 +135,9 @@ automatically when editing supported file types (`.qmd`, `.md`, `.Rmd`).
 **Editor Configuration:**
 
 The LSP communicates over stdin/stdout and provides document formatting
-capabilities.
+capabilities. For Quarto projects, the LSP also reads `_quarto.yml`,
+per-directory `_metadata.yml`, and `metadata-files` includes to supply
+project-level metadata to bibliography-aware features.
 
 <details>
 <summary>Neovim </summary>

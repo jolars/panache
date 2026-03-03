@@ -46,6 +46,19 @@ impl TestLspServer {
         Self { lsp }
     }
 
+    /// Initialize the server with a workspace root.
+    pub async fn initialize(&self, root_uri: &str) {
+        let folder = WorkspaceFolder {
+            uri: root_uri.parse().unwrap(),
+            name: "workspace".to_string(),
+        };
+        let params = InitializeParams {
+            workspace_folders: Some(vec![folder]),
+            ..Default::default()
+        };
+        let _ = self.lsp.initialize(params).await;
+    }
+
     /// Open a document with the given URI and content.
     ///
     /// Simulates the `textDocument/didOpen` notification.

@@ -30,6 +30,7 @@ use std::path::Path;
 
 mod bibliography;
 mod citations;
+mod project;
 mod yaml;
 
 pub use bibliography::BibliographyInfo;
@@ -85,6 +86,14 @@ pub fn extract_metadata(
     Ok(metadata)
 }
 
+/// Extract metadata using Quarto project configuration when available.
+pub fn extract_project_metadata(
+    tree: &crate::syntax::SyntaxNode,
+    doc_path: &Path,
+) -> Result<DocumentMetadata, YamlError> {
+    project::extract_project_metadata(tree, doc_path)
+}
+
 /// Find the first YamlMetadata node in the syntax tree.
 fn find_yaml_metadata_node(tree: &crate::syntax::SyntaxNode) -> Option<crate::syntax::SyntaxNode> {
     use crate::syntax::SyntaxKind;
@@ -97,6 +106,8 @@ fn find_yaml_metadata_node(tree: &crate::syntax::SyntaxNode) -> Option<crate::sy
 mod tests {
     use super::*;
     use crate::parser::parse;
+    use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_find_yaml_metadata() {
@@ -123,5 +134,66 @@ mod tests {
         assert_eq!(metadata.title.as_deref(), Some("My Document"));
         assert!(metadata.bibliography.is_some());
         assert!(metadata.citations.keys.is_empty());
+    }
+
+    #[test]
+    fn test_extract_project_metadata_merges_sources() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        fs::write(project_root.join("_quarto.yml"), "bibliography: proj.bib\n").unwrap();
+        fs::create_dir_all(project_root.join("docs")).unwrap();
+        fs::write(
+            project_root.join("docs/_metadata.yml"),
+            "bibliography: dir.bib\n",
+        )
+        .unwrap();
+        fs::write(project_root.join("docs/refs.bib"), "@book{doc,}\n").unwrap();
+        fs::write(project_root.join("proj.bib"), "@book{proj,}\n").unwrap();
+        fs::write(project_root.join("dir.bib"), "@book{dir,}\n").unwrap();
+
+        let input = "---\nbibliography: refs.bib\n---\n\nText";
+        let tree = parse(input, None);
+        let doc_path = project_root.join("docs/doc.qmd");
+        let metadata = extract_project_metadata(&tree, &doc_path).unwrap();
+
+        let bib = metadata.bibliography.expect("bibliography");
+        let paths: Vec<_> = bib
+            .paths
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert!(paths.contains(&"proj.bib".to_string()));
+        assert!(paths.contains(&"dir.bib".to_string()));
+        assert!(paths.contains(&"refs.bib".to_string()));
+    }
+
+    #[test]
+    fn test_extract_project_metadata_includes_metadata_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        fs::write(
+            project_root.join("_quarto.yml"),
+            "metadata-files:\n  - _website.yml\n",
+        )
+        .unwrap();
+        fs::write(
+            project_root.join("_website.yml"),
+            "bibliography: site.bib\n",
+        )
+        .unwrap();
+        fs::write(project_root.join("site.bib"), "@book{site,}\n").unwrap();
+
+        let input = "---\n---\n\nText";
+        let tree = parse(input, None);
+        let doc_path = project_root.join("doc.qmd");
+        let metadata = extract_project_metadata(&tree, &doc_path).unwrap();
+
+        let bib = metadata.bibliography.expect("bibliography");
+        let paths: Vec<_> = bib
+            .paths
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert!(paths.contains(&"site.bib".to_string()));
     }
 }

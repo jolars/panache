@@ -21,7 +21,7 @@ fn parse_metadata(text: &str, uri: &Uri) -> Option<crate::metadata::DocumentMeta
     let tree = crate::parse(text, None);
 
     // Extract metadata
-    crate::metadata::extract_metadata(&tree, &file_path).ok()
+    crate::metadata::extract_project_metadata(&tree, &file_path).ok()
 }
 
 /// Handle textDocument/didOpen notification

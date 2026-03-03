@@ -187,7 +187,7 @@ pub(crate) async fn lint_and_publish(
         // Re-parse to get the error (this is a bit wasteful, but errors are rare)
         if let Some(file_path) = uri.to_file_path() {
             let tree = crate::parse(&text, None);
-            if let Err(yaml_error) = crate::metadata::extract_metadata(&tree, &file_path)
+            if let Err(yaml_error) = crate::metadata::extract_project_metadata(&tree, &file_path)
                 && !matches!(yaml_error, YamlError::NotFound(_))
             {
                 all_diagnostics.push(yaml_error_to_diagnostic(&yaml_error, &text));

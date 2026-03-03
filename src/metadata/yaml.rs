@@ -130,7 +130,7 @@ pub(super) fn parse_frontmatter(
 }
 
 /// Strip YAML delimiters (---) from frontmatter text.
-fn strip_yaml_delimiters(text: &str) -> String {
+pub(super) fn strip_yaml_delimiters(text: &str) -> String {
     let lines: Vec<&str> = text.lines().collect();
 
     if lines.is_empty() {

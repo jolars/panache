@@ -43,7 +43,7 @@ pub(crate) async fn code_action(
             let tree = crate::parse(&text_clone, Some(config_clone.clone()));
             let metadata = doc_path
                 .as_ref()
-                .and_then(|path| crate::metadata::extract_metadata(&tree, path).ok());
+                .and_then(|path| crate::metadata::extract_project_metadata(&tree, path).ok());
             // Create a runtime for the async lint function
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(linter::lint_with_external_and_metadata(
@@ -60,7 +60,7 @@ pub(crate) async fn code_action(
             let tree = crate::parse(&text_clone, Some(config_clone.clone()));
             let metadata = doc_path
                 .as_ref()
-                .and_then(|path| crate::metadata::extract_metadata(&tree, path).ok());
+                .and_then(|path| crate::metadata::extract_project_metadata(&tree, path).ok());
             linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref())
         })
         .await
@@ -71,7 +71,7 @@ pub(crate) async fn code_action(
         let tree = crate::parse(&text_clone, Some(config_clone.clone()));
         let metadata = doc_path
             .as_ref()
-            .and_then(|path| crate::metadata::extract_metadata(&tree, path).ok());
+            .and_then(|path| crate::metadata::extract_project_metadata(&tree, path).ok());
         linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref())
     })
     .await;
