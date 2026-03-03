@@ -138,7 +138,26 @@ The LSP communicates over stdin/stdout and provides document formatting
 capabilities.
 
 <details>
-<summary>Neovim (using nvim-lspconfig)</summary>
+<summary>Neovim </summary>
+
+Native LSP configuration (0.11+)
+
+```lua
+-- .config/nvim/lsp/panache.lua
+
+return {
+  cmd = { "panache", "lsp" },
+  filetypes = { "quarto", "markdown", "rmarkdown" },
+  root_markers = { ".panache.toml", "panache.toml", ".git" },
+  settings = {},
+}
+
+
+-- Enable it
+vim.lsp.enable({"panache"})
+```
+
+Nvim-lspconfig
 
 ```lua
 -- Add to your LSP config
