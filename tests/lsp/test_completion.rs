@@ -4,6 +4,7 @@ use super::helpers::*;
 use std::fs;
 use tempfile::TempDir;
 use tower_lsp_server::ls_types::CompletionResponse;
+use tower_lsp_server::ls_types::Uri;
 
 #[tokio::test]
 async fn test_completion_without_citation_context() {
@@ -60,14 +61,17 @@ async fn test_completion_with_project_bibliography() {
     fs::write(root.join("_quarto.yml"), "bibliography: refs.bib\n").unwrap();
     fs::write(root.join("refs.bib"), "@book{known,}\n").unwrap();
 
-    let root_uri = format!("file://{}", root.to_string_lossy());
-    server.initialize(&root_uri).await;
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str()).await;
 
-    let doc_uri = format!("file://{}/doc.qmd", root.to_string_lossy());
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(doc_path).expect("doc uri");
     let content = "Text [@] citation.";
-    server.open_document(&doc_uri, content, "quarto").await;
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
 
-    let result = server.completion(&doc_uri, 0, 7).await;
+    let result = server.completion(doc_uri.as_str(), 0, 7).await;
     let Some(CompletionResponse::Array(items)) = result else {
         panic!("Expected completion items");
     };
