@@ -53,7 +53,7 @@ This document tracks implementation status for panache's features.
 
 #### Completion
 
-- ❌ **Citation completion** - `textDocument/completion` for `@cite` keys from
+- ✅ **Citation completion** - `textDocument/completion` for `@cite` keys from
   bibliography
 - ❌ **Reference link completion** - Complete `[text][ref]` from defined
   references
@@ -65,19 +65,15 @@ This document tracks implementation status for panache's features.
 
 - ❌ **Link target hints** - Show link targets as inlay hints
 - ❌ **Reference definition hints** - Show reference definitions as inlay hints
-- ❌ **Citation key hints** - Show bibliography entries for `@cite` keys
+- ✅ **Citation key hints** - Show bibliography entries for `@cite` keys
 - ❌ **Footnote content hints** - Show footnote content as inlay hints
 
 #### Hover Information
 
 - ❌ **Link preview** - `textDocument/hover` to show link target
 - ❌ **Reference preview** - Show reference definition on hover
-- 🚧 **Citation preview** - Show bibliography entry for citation
-  - ✅ Basic implementation (shows author, year, title)
-  - ❌ Need to also check `date` field (not just `year`)
-  - ❌ Consider showing more fields (journal, DOI, URL, etc.)
-  - ❌ Better formatting (maybe markdown list or proper citation format)
 - ✅ **Footnote preview** - Show footnote content inline
+- ✅ **Citation preview** - Show bibliography entry for citation (approximate)
 
 #### Advanced
 
@@ -87,7 +83,7 @@ This document tracks implementation status for panache's features.
   auto-formatting triggers (not sure about this, low priority)
 - ❌ **Document links** - `textDocument/documentLink` for clickable links
 - ❌ **Semantic tokens** - Syntax highlighting via LSP
-- ❌ **Rename** - Rename reference links/footnotes/citations across document
+- ✅ **Rename** - Rename reference links/footnotes/citations across document
   and bibliography
 - ❌ **Workspace symbols** - Search for headings across all workspace documents
 - ❌ **Configuration via LSP** - `workspace/didChangeConfiguration` to reload
