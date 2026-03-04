@@ -54,7 +54,6 @@ pub struct Extensions {
     #[serde(alias = "fancy_lists")]
     pub fancy_lists: bool,
     /// Start ordered lists at arbitrary numbers
-    #[serde(alias = "startnum")]
     pub startnum: bool,
     /// Example lists with (@) markers
     #[serde(alias = "example_lists")]
@@ -117,12 +116,9 @@ pub struct Extensions {
     #[serde(alias = "intraword_underscores")]
     pub intraword_underscores: bool,
     /// Strikethrough ~~text~~
-    #[serde(alias = "strikeout")]
     pub strikeout: bool,
     /// Superscript and subscript ^super^ ~sub~
-    #[serde(alias = "superscript")]
     pub superscript: bool,
-    #[serde(alias = "subscript")]
     pub subscript: bool,
 
     // Links
@@ -139,7 +135,6 @@ pub struct Extensions {
     #[serde(alias = "link_attributes")]
     pub link_attributes: bool,
     /// Automatic links <http://example.com>
-    #[serde(alias = "autolinks")]
     pub autolinks: bool,
 
     // Images
@@ -166,12 +161,10 @@ pub struct Extensions {
     #[serde(alias = "inline_footnotes")]
     pub inline_footnotes: bool,
     /// Reference footnotes `[^1]` (requires footnote parsing)
-    #[serde(alias = "footnotes")]
     pub footnotes: bool,
 
     // Citations
     /// Citation syntax [@cite]
-    #[serde(alias = "citations")]
     pub citations: bool,
 
     // Spans
@@ -221,10 +214,8 @@ pub struct Extensions {
     #[serde(alias = "hard_line_breaks")]
     pub hard_line_breaks: bool,
     /// [NON-DEFAULT] :emoji: syntax
-    #[serde(alias = "emoji")]
     pub emoji: bool,
     /// [NON-DEFAULT] Highlighted ==text==
-    #[serde(alias = "mark")]
     pub mark: bool,
 
     // ===== Quarto-specific extensions =====
