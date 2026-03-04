@@ -17,20 +17,18 @@ async fn test_goto_definition_in_included_document() {
     .unwrap();
 
     let server = TestLspServer::new();
-    server
-        .initialize(&format!("file://{}", temp_dir.path().display()))
-        .await;
+    let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
+    let parent_uri = Uri::from_file_path(&parent_path).expect("parent uri");
+    server.initialize(root_uri.as_str()).await;
     server
         .open_document(
-            &format!("file://{}", parent_path.display()),
+            parent_uri.as_str(),
             &std::fs::read_to_string(&parent_path).unwrap(),
             "quarto",
         )
         .await;
 
-    let result = server
-        .goto_definition(&format!("file://{}", parent_path.display()), 1, 12)
-        .await;
+    let result = server.goto_definition(parent_uri.as_str(), 1, 12).await;
 
     let Some(GotoDefinitionResponse::Scalar(location)) = result else {
         panic!("Expected scalar location response");

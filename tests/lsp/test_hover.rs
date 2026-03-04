@@ -13,20 +13,18 @@ async fn test_hover_on_included_footnote() {
     std::fs::write(&parent_path, "{{< include _child.qmd >}}\nRef[^1].\n").unwrap();
 
     let server = TestLspServer::new();
-    server
-        .initialize(&format!("file://{}", temp_dir.path().display()))
-        .await;
+    let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
+    let parent_uri = Uri::from_file_path(&parent_path).expect("parent uri");
+    server.initialize(root_uri.as_str()).await;
     server
         .open_document(
-            &format!("file://{}", parent_path.display()),
+            parent_uri.as_str(),
             &std::fs::read_to_string(&parent_path).unwrap(),
             "quarto",
         )
         .await;
 
-    let hover = server
-        .hover(&format!("file://{}", parent_path.display()), 1, 4)
-        .await;
+    let hover = server.hover(parent_uri.as_str(), 1, 4).await;
 
     let Some(h) = hover else {
         panic!("Expected hover content");
