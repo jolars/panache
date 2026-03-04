@@ -4,6 +4,44 @@ use super::helpers::*;
 use tower_lsp_server::ls_types::*;
 
 #[tokio::test]
+async fn test_goto_definition_in_included_document() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let child_path = temp_dir.path().join("_child.qmd");
+    let parent_path = temp_dir.path().join("parent.qmd");
+
+    std::fs::write(&child_path, "[ref]: https://example.com\n").unwrap();
+    std::fs::write(
+        &parent_path,
+        "{{< include _child.qmd >}}\nSee [link][ref].\n",
+    )
+    .unwrap();
+
+    let server = TestLspServer::new();
+    server
+        .initialize(&format!("file://{}", temp_dir.path().display()))
+        .await;
+    server
+        .open_document(
+            &format!("file://{}", parent_path.display()),
+            &std::fs::read_to_string(&parent_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let result = server
+        .goto_definition(&format!("file://{}", parent_path.display()), 1, 12)
+        .await;
+
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(
+        location.uri,
+        Uri::from_file_path(&child_path).expect("child uri")
+    );
+}
+
+#[tokio::test]
 async fn test_goto_reference_definition() {
     let server = TestLspServer::new();
 

@@ -28,7 +28,7 @@ pub struct DefinitionLocation {
     pub line: usize,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct DefinitionIndex {
     references: HashMap<String, DefinitionLocation>,
     footnotes: HashMap<String, DefinitionLocation>,
@@ -42,7 +42,7 @@ pub enum EdgeKind {
     MetadataFile,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ProjectGraph {
     definitions: DefinitionIndex,
     diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,

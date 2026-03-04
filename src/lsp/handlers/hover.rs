@@ -17,30 +17,27 @@ use super::super::{conversions, helpers};
 
 /// Handle textDocument/hover request
 pub(crate) async fn hover(
-    client: &tower_lsp_server::Client,
+    _client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: HoverParams,
 ) -> Result<Option<Hover>> {
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
-    let metadata = {
+    let (metadata, graph) = {
         let map = document_map.lock().await;
-        map.get(&uri.to_string())
-            .and_then(|state| state.metadata.clone())
-    };
-
-    let config = helpers::get_config(client, &workspace_root, uri).await;
+        map.get(&uri.to_string()).map(|state| {
+            let metadata = state.metadata.clone();
+            let graph = state.graph.clone();
+            (metadata, graph)
+        })
+    }
+    .unwrap_or((None, crate::includes::ProjectGraph::default()));
 
     let Some((content, root)) = helpers::get_document_content_and_tree(&document_map, uri).await
     else {
         return Ok(None);
-    };
-    let graph = if let Some(doc_path) = uri.to_file_path() {
-        crate::includes::ProjectGraph::build(&doc_path, &content, &config)
-    } else {
-        crate::includes::ProjectGraph::default()
     };
 
     // Convert LSP position to byte offset

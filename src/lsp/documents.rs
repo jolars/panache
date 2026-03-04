@@ -34,7 +34,12 @@ pub(crate) async fn did_open(
     let uri = params.text_document.uri.to_string();
     let text = params.text_document.text.clone();
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
-    let tree = GreenNode::from(crate::parse(&text, Some(config)).green());
+    let tree = GreenNode::from(crate::parse(&text, Some(config.clone())).green());
+    let graph = if let Some(path) = params.text_document.uri.to_file_path() {
+        crate::includes::ProjectGraph::build(&path, &text, &config)
+    } else {
+        crate::includes::ProjectGraph::default()
+    };
 
     // Parse metadata
     let metadata = parse_metadata(&text, &params.text_document.uri);
@@ -45,6 +50,7 @@ pub(crate) async fn did_open(
         DocumentState {
             text: text.clone(),
             metadata,
+            graph,
             tree,
         },
     );
@@ -122,6 +128,11 @@ pub(crate) async fn did_change(
 
             // Re-parse metadata after changes
             doc_state.metadata = parse_metadata(&doc_state.text, &params.text_document.uri);
+            doc_state.graph = if let Some(path) = params.text_document.uri.to_file_path() {
+                crate::includes::ProjectGraph::build(&path, &doc_state.text, &config)
+            } else {
+                crate::includes::ProjectGraph::default()
+            };
         } else {
             return;
         }

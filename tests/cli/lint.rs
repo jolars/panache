@@ -172,3 +172,23 @@ fn test_lint_includes_reports_child_diagnostics() {
         .stdout(predicate::str::contains("_child.qmd"))
         .stdout(predicate::str::contains("heading-hierarchy"));
 }
+
+#[test]
+fn test_lint_includes_duplicate_reference_definitions() {
+    let temp_dir = TempDir::new().unwrap();
+    let parent_path = temp_dir.path().join("parent.qmd");
+    let child_path = temp_dir.path().join("_child.qmd");
+
+    fs::write(&child_path, "[ref]: https://example.com\n").unwrap();
+    fs::write(
+        &parent_path,
+        "{{< include _child.qmd >}}\n\n[ref]: https://example.org\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", parent_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("duplicate-reference-labels"));
+}

@@ -4,6 +4,41 @@ use super::helpers::*;
 use tower_lsp_server::ls_types::*;
 
 #[tokio::test]
+async fn test_hover_on_included_footnote() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let child_path = temp_dir.path().join("_child.qmd");
+    let parent_path = temp_dir.path().join("parent.qmd");
+
+    std::fs::write(&child_path, "[^1]: Included footnote content.\n").unwrap();
+    std::fs::write(&parent_path, "{{< include _child.qmd >}}\nRef[^1].\n").unwrap();
+
+    let server = TestLspServer::new();
+    server
+        .initialize(&format!("file://{}", temp_dir.path().display()))
+        .await;
+    server
+        .open_document(
+            &format!("file://{}", parent_path.display()),
+            &std::fs::read_to_string(&parent_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let hover = server
+        .hover(&format!("file://{}", parent_path.display()), 1, 4)
+        .await;
+
+    let Some(h) = hover else {
+        panic!("Expected hover content");
+    };
+    if let HoverContents::Markup(markup) = h.contents {
+        assert!(markup.value.contains("Included footnote content"));
+    } else {
+        panic!("Expected markup hover content");
+    }
+}
+
+#[tokio::test]
 async fn test_hover_on_footnote_reference() {
     let server = TestLspServer::new();
 

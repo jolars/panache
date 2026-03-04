@@ -20,6 +20,8 @@ pub struct DocumentState {
     pub text: String,
     /// Parsed metadata from YAML frontmatter (if present).
     pub metadata: Option<crate::metadata::DocumentMetadata>,
+    /// Cached ProjectGraph for cross-document lookups.
+    pub graph: crate::includes::ProjectGraph,
     /// Cached syntax tree for incremental parsing.
     pub tree: GreenNode,
 }

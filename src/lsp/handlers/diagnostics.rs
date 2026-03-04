@@ -18,6 +18,7 @@ fn lint_included_documents(
     text: &str,
     tree: &SyntaxNode,
     config: &crate::Config,
+    graph: &crate::includes::ProjectGraph,
 ) -> Vec<(Uri, Vec<Diagnostic>)> {
     let Some(doc_path) = root_uri.to_file_path() else {
         return Vec::new();
@@ -28,8 +29,6 @@ fn lint_included_documents(
     let project_root = crate::includes::find_quarto_root(&doc_path);
     let resolution =
         crate::includes::collect_includes(tree, text, base_dir, project_root.as_deref(), config);
-    let graph = crate::includes::ProjectGraph::build(&doc_path, text, config);
-
     let mut results = Vec::new();
     let mut root_diagnostics: Vec<Diagnostic> = resolution
         .diagnostics
@@ -243,6 +242,7 @@ pub(crate) async fn lint_and_publish(
 
     let text = doc_state.text;
     let metadata = doc_state.metadata.clone();
+    let graph = doc_state.graph.clone();
     let mut all_diagnostics = Vec::new();
 
     // Check for YAML metadata errors
@@ -309,6 +309,7 @@ pub(crate) async fn lint_and_publish(
                 &text,
                 &crate::parse(&text, Some(config.clone())),
                 &config,
+                &graph,
             );
 
             let mut published_root = false;
