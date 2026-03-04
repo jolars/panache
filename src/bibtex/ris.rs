@@ -56,15 +56,10 @@ pub(crate) fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, Stri
         .filter(|node| node.kind() == RisSyntaxKind::RECORD)
     {
         record_count += 1;
-        let status = record_status(&record);
-        if !status.has_er {
-            return Err("RIS record missing ER tag".to_string());
-        }
-        if !status.has_ty {
-            return Err("RIS record missing TY tag".to_string());
-        }
-        if let Some((id, span)) = extract_record_id(&record) {
-            entries.push((id, span));
+        match parse_record(&record) {
+            Ok(Some((id, span))) => entries.push((id, span)),
+            Ok(None) => {}
+            Err(message) => return Err(message),
         }
     }
 
@@ -75,57 +70,105 @@ pub(crate) fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, Stri
     Ok(entries)
 }
 
-struct RecordStatus {
-    has_ty: bool,
-    has_er: bool,
-}
-
-fn record_status(record: &RisNode) -> RecordStatus {
+fn parse_record(record: &RisNode) -> Result<Option<(String, Span)>, String> {
     let mut has_ty = false;
     let mut has_er = false;
-    for tag in record
-        .children()
-        .filter(|node| node.kind() == RisSyntaxKind::TAG)
-    {
-        let name = tag
-            .children()
-            .find(|node| node.kind() == RisSyntaxKind::TAG_NAME)
-            .and_then(|node| first_text(&node))
-            .unwrap_or_default();
-        match name.as_str() {
-            "TY" => has_ty = true,
-            "ER" => has_er = true,
-            _ => {}
-        }
-    }
-    RecordStatus { has_ty, has_er }
-}
+    let mut id_value: Option<(String, Span)> = None;
 
-fn extract_record_id(record: &RisNode) -> Option<(String, Span)> {
-    for tag in record
-        .children()
-        .filter(|node| node.kind() == RisSyntaxKind::TAG)
-    {
-        let name = tag
-            .children()
-            .find(|node| node.kind() == RisSyntaxKind::TAG_NAME)
-            .and_then(|node| first_text(&node))
-            .unwrap_or_default();
-        if name != "ID" {
-            continue;
-        }
-
-        if let Some((value, span)) = tag
-            .children()
-            .find(|node| node.kind() == RisSyntaxKind::TAG_VALUE)
-            .and_then(|node| extract_text_span(&node))
-        {
-            if !value.is_empty() {
-                return Some((value, span));
+    for node in record.children() {
+        match node.kind() {
+            RisSyntaxKind::TAG => {
+                let name = node
+                    .children()
+                    .find(|child| child.kind() == RisSyntaxKind::TAG_NAME)
+                    .and_then(|child| first_text(&child))
+                    .unwrap_or_default();
+                match name.as_str() {
+                    "TY" => has_ty = true,
+                    "ER" => has_er = true,
+                    "ID" => {
+                        if id_value.is_none() {
+                            if let Some((value, span)) = node
+                                .children()
+                                .find(|child| child.kind() == RisSyntaxKind::TAG_VALUE)
+                                .and_then(|child| extract_text_span(&child))
+                            {
+                                if !value.is_empty() {
+                                    id_value = Some((value, span));
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {
+                continue;
             }
         }
     }
-    None
+
+    let mut at_line_start = true;
+    let mut line_has_tag = false;
+    let mut line_has_content = false;
+    let mut line_leading_whitespace = false;
+    let mut last_line_was_tag = false;
+
+    for element in record.children_with_tokens() {
+        match element {
+            rowan::NodeOrToken::Node(node) => {
+                if node.kind() == RisSyntaxKind::TAG {
+                    line_has_tag = true;
+                    line_has_content = true;
+                    at_line_start = false;
+                }
+            }
+            rowan::NodeOrToken::Token(token) => match token.kind() {
+                RisSyntaxKind::NEWLINE => {
+                    if !line_has_content {
+                        last_line_was_tag = false;
+                    } else {
+                        last_line_was_tag = line_has_tag;
+                    }
+                    at_line_start = true;
+                    line_has_tag = false;
+                    line_has_content = false;
+                    line_leading_whitespace = false;
+                }
+                RisSyntaxKind::WHITESPACE => {
+                    if at_line_start {
+                        line_leading_whitespace = true;
+                    }
+                    line_has_content = true;
+                }
+                RisSyntaxKind::TEXT => {
+                    let text = token.text();
+                    if text.trim().is_empty() {
+                        continue;
+                    }
+                    if at_line_start {
+                        if !line_leading_whitespace || !last_line_was_tag {
+                            return Err("RIS record contains invalid content".to_string());
+                        }
+                    } else if !line_has_tag {
+                        return Err("RIS record contains invalid content".to_string());
+                    }
+                    line_has_content = true;
+                    at_line_start = false;
+                }
+                _ => {}
+            },
+        }
+    }
+
+    if !has_er {
+        return Err("RIS record missing ER tag".to_string());
+    }
+    if !has_ty {
+        return Err("RIS record missing TY tag".to_string());
+    }
+
+    Ok(id_value)
 }
 
 fn first_text(node: &RisNode) -> Option<String> {

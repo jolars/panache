@@ -253,3 +253,18 @@ fn bib_index_load_ris_missing_id() {
     assert!(index.entries.is_empty());
     assert!(index.errors.is_empty());
 }
+
+#[test]
+fn bib_index_load_ris_continuation_line() {
+    let mut file = NamedTempFile::new().expect("Failed to create temp file");
+    writeln!(file, "TY  - JOUR").unwrap();
+    writeln!(file, "ID  - first").unwrap();
+    writeln!(file, "      second").unwrap();
+    writeln!(file, "ER  - ").unwrap();
+    file.flush().unwrap();
+
+    let ris_path = file.path().with_extension("ris");
+    std::fs::rename(file.path(), &ris_path).unwrap();
+    let index = load_bibliography(&[ris_path]);
+    assert!(index.get("first").is_some(), "entries: {:?}", index.entries);
+}
