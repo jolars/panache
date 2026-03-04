@@ -109,12 +109,20 @@ pub fn extract_project_metadata(
     doc_path: &Path,
 ) -> Result<DocumentMetadata, YamlError> {
     let yaml_node = super::find_yaml_metadata_node(tree).map(|node| node.text().to_string());
+    let yaml_offset = super::find_yaml_metadata_node(tree)
+        .map(|node| node.text_range().start())
+        .unwrap_or_default();
 
-    let doc_meta = if let Some(yaml_text) = yaml_node {
+    let (doc_meta, doc_yaml, doc_yaml_offset) = if let Some(yaml_text) = yaml_node {
         let doc_yaml = strip_yaml_delimiters(&yaml_text);
-        parse_metadata_text(&doc_yaml)?
+        let doc_yaml_offset = yaml_offset + text_start_offset(&yaml_text);
+        (parse_metadata_text(&doc_yaml)?, doc_yaml, doc_yaml_offset)
     } else {
-        MergeMetadata::default()
+        (
+            MergeMetadata::default(),
+            String::new(),
+            rowan::TextSize::from(0),
+        )
     };
 
     let mut sources = Vec::new();
@@ -175,15 +183,13 @@ pub fn extract_project_metadata(
         merged.merge_from(source);
     }
 
-    let merged_yaml = serde_saphyr::to_string(&merged)
-        .map_err(|err| YamlError::StructureError(err.to_string()))?;
-
     let bibliography = if merged.bibliography.is_empty() {
         None
     } else {
         Some(extract_bibliography_from_strings(
             &merged.bibliography,
-            &merged_yaml,
+            &doc_yaml,
+            doc_yaml_offset,
             doc_path,
         ))
     };
@@ -199,7 +205,7 @@ pub fn extract_project_metadata(
         bibliography_parse,
         citations: super::CitationInfo { keys: Vec::new() },
         title: merged.title,
-        raw_yaml: merged_yaml,
+        raw_yaml: doc_yaml,
     };
     metadata.citations = extract_citations(tree);
     Ok(metadata)
@@ -365,6 +371,7 @@ fn strip_bibliography(mut meta: MergeMetadata) -> MergeMetadata {
 fn extract_bibliography_from_strings(
     paths: &[String],
     yaml_text: &str,
+    yaml_offset: rowan::TextSize,
     doc_path: &Path,
 ) -> BibliographyInfo {
     let doc_dir = doc_path.parent().unwrap_or_else(|| Path::new("."));
@@ -373,7 +380,7 @@ fn extract_bibliography_from_strings(
 
     for path_str in paths {
         resolved_paths.push(doc_dir.join(path_str));
-        let range = find_yaml_value_range(yaml_text, path_str)
+        let range = find_yaml_value_range(yaml_text, path_str, yaml_offset)
             .map(|(start, end)| TextRange::new(start, end))
             .unwrap_or_default();
         ranges.push(range);
@@ -396,9 +403,30 @@ fn collect_metadata_files(doc_path: &Path, metadata_files: &[String]) -> Vec<Pat
 fn find_yaml_value_range(
     yaml_text: &str,
     value: &str,
+    yaml_offset: rowan::TextSize,
 ) -> Option<(rowan::TextSize, rowan::TextSize)> {
     let start = yaml_text.find(value)?;
-    let start_offset = rowan::TextSize::from(start as u32);
-    let end_offset = rowan::TextSize::from((start + value.len()) as u32);
+    let start_offset = rowan::TextSize::from(start as u32) + yaml_offset;
+    let end_offset = rowan::TextSize::from((start + value.len()) as u32) + yaml_offset;
     Some((start_offset, end_offset))
+}
+
+fn text_start_offset(input: &str) -> rowan::TextSize {
+    let mut offset = rowan::TextSize::from(0);
+    let mut lines = input.lines();
+    let Some(first) = lines.next() else {
+        return offset;
+    };
+    if first.trim() != "---" {
+        return offset;
+    }
+    offset += rowan::TextSize::from(first.len() as u32 + 1);
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed == "---" || trimmed == "..." {
+            break;
+        }
+        offset += rowan::TextSize::from(line.len() as u32 + 1);
+    }
+    offset
 }
