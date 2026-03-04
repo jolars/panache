@@ -292,6 +292,28 @@ fn test_lint_ris_missing_id() {
 }
 
 #[test]
+fn test_lint_ris_invalid_tag() {
+    let temp_dir = TempDir::new().unwrap();
+    let bib_path = temp_dir.path().join("refs.ris");
+    let doc_path = temp_dir.path().join("doc.qmd");
+
+    fs::write(&bib_path, "TY  - JOUR\nID  - good\nOops\nER  - \n").unwrap();
+
+    fs::write(
+        &doc_path,
+        "---\nbibliography: refs.ris\n---\n\nCite [@good].\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("bibliography-parse-error"))
+        .stdout(predicate::str::contains("invalid content"));
+}
+
+#[test]
 fn test_lint_includes_reports_child_diagnostics() {
     let temp_dir = TempDir::new().unwrap();
     let parent_path = temp_dir.path().join("parent.qmd");

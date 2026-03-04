@@ -118,8 +118,16 @@ pub(super) fn parse_frontmatter(
         })
         .transpose()?;
 
-    let bibliography_parse = bibliography.as_ref().map(|info| BibliographyParse {
-        index: bibtex::load_bibliography(&info.paths),
+    let bibliography_parse = bibliography.as_ref().map(|info| {
+        let index = bibtex::load_bibliography(&info.paths);
+        BibliographyParse {
+            parse_errors: index
+                .errors
+                .iter()
+                .map(|error| error.message.clone())
+                .collect(),
+            index,
+        }
     });
     let inline_references = frontmatter
         .references

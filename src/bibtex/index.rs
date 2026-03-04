@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use crate::bibtex::{
     BibDatabase, BibEntry, BibError, Span, parse_bibtex, parse_csl_json_entries,
-    parse_csl_yaml_entries, parse_ris_entries,
+    parse_csl_yaml_entries, parse_ris_entries, validate_ris,
 };
 
 #[derive(Debug, Clone)]
@@ -71,7 +71,15 @@ pub fn load_bibliography(paths: &[PathBuf]) -> BibIndex {
             let parsed = if matches!(extension, "json") {
                 parse_csl_json_entries(&text)
             } else if matches!(extension, "ris") {
-                parse_ris_entries(&text)
+                if let Err(message) = validate_ris(&text) {
+                    errors.push(BibError {
+                        message: message.clone(),
+                        span: None,
+                    });
+                    continue;
+                } else {
+                    parse_ris_entries(&text)
+                }
             } else {
                 parse_csl_yaml_entries(&text)
             };

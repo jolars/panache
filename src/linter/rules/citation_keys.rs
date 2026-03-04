@@ -45,6 +45,15 @@ impl Rule for CitationKeysRule {
                 ));
             }
 
+            for message in &parse.parse_errors {
+                let location = Location::from_range(tree.text_range(), input);
+                diagnostics.push(Diagnostic::error(
+                    location,
+                    "bibliography-parse-error",
+                    format!("Invalid bibliography entry: {}", message),
+                ));
+            }
+
             for duplicate in &parse.index.duplicates {
                 let location = Location::from_range(tree.text_range(), input);
                 diagnostics.push(Diagnostic::warning(

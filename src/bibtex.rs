@@ -14,4 +14,4 @@ pub use index::{
     BibDuplicate, BibEntryLocation, BibFile, BibIndex, BibLoadError, load_bibliography,
 };
 pub use parser::{BibDatabase, BibEntry, BibError, BibField, Span, parse_bibtex};
-pub(crate) use ris::parse_ris_entries;
+pub(crate) use ris::{parse_ris_entries, validate_ris};

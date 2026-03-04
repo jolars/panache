@@ -70,6 +70,25 @@ pub(crate) fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, Stri
     Ok(entries)
 }
 
+pub(crate) fn validate_ris(input: &str) -> Result<(), String> {
+    let root = parse_ris_cst(input);
+    let mut record_count = 0;
+
+    for record in root
+        .children()
+        .filter(|node| node.kind() == RisSyntaxKind::RECORD)
+    {
+        record_count += 1;
+        parse_record(&record)?;
+    }
+
+    if record_count == 0 {
+        return Err("RIS file contains no records".to_string());
+    }
+
+    Ok(())
+}
+
 fn parse_record(record: &RisNode) -> Result<Option<(String, Span)>, String> {
     let mut has_ty = false;
     let mut has_er = false;

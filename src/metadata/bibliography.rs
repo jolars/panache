@@ -19,6 +19,7 @@ pub struct BibliographyInfo {
 #[derive(Debug, Clone)]
 pub struct BibliographyParse {
     pub index: crate::bibtex::BibIndex,
+    pub parse_errors: Vec<String>,
 }
 
 /// Extract bibliography information from a spanned YAML value.

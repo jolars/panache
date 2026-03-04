@@ -225,6 +225,22 @@ fn check_bibliography_parse(metadata: &DocumentMetadata, text: &str) -> Vec<Diag
         });
     }
 
+    for message in &parse.parse_errors {
+        diagnostics.push(Diagnostic {
+            range: Range {
+                start: fallback_start,
+                end: fallback_end,
+            },
+            severity: Some(DiagnosticSeverity::ERROR),
+            code: Some(NumberOrString::String(
+                "bibliography-parse-error".to_string(),
+            )),
+            source: Some("panache".to_string()),
+            message: format!("Invalid bibliography entry: {}", message),
+            ..Default::default()
+        });
+    }
+
     diagnostics
 }
 

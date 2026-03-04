@@ -268,3 +268,18 @@ fn bib_index_load_ris_continuation_line() {
     let index = load_bibliography(&[ris_path]);
     assert!(index.get("first").is_some(), "entries: {:?}", index.entries);
 }
+
+#[test]
+fn bib_index_load_ris_invalid_tag() {
+    let mut file = NamedTempFile::new().expect("Failed to create temp file");
+    writeln!(file, "TY  - JOUR").unwrap();
+    writeln!(file, "ID  - good").unwrap();
+    writeln!(file, "Oops").unwrap();
+    writeln!(file, "ER  - ").unwrap();
+    file.flush().unwrap();
+
+    let ris_path = file.path().with_extension("ris");
+    std::fs::rename(file.path(), &ris_path).unwrap();
+    let index = load_bibliography(&[ris_path]);
+    assert_eq!(index.errors.len(), 1);
+}

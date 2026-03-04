@@ -43,3 +43,5 @@ async fn test_diagnostics_on_heading_hierarchy_issue() {
 
     assert!(fix.is_some(), "Should have heading hierarchy fix");
 }
+
+// Document diagnostics are not currently supported in the test harness.
