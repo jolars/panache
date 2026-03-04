@@ -170,3 +170,32 @@ async fn test_completion_with_csl_json_bibliography() {
         "Expected CSL JSON bibliography completion"
     );
 }
+
+#[tokio::test]
+async fn test_completion_with_ris_bibliography() {
+    let server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    std::fs::write(root.join("refs.ris"), "TY  - JOUR\nID  - riskey\nER  - \n").unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str()).await;
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    let content = "---\nbibliography: refs.ris\n---\n\nText [@] citation.";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.completion(doc_uri.as_str(), 4, 7).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("Expected completion items");
+    };
+
+    assert!(
+        items.iter().any(|item| item.label == "riskey"),
+        "Expected RIS bibliography completion"
+    );
+}

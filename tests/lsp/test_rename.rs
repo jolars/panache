@@ -171,3 +171,43 @@ async fn test_rename_citation_updates_csl_json() {
     assert!(changes.contains_key(&doc_uri));
     assert!(changes.contains_key(&bib_uri));
 }
+
+#[tokio::test]
+async fn test_rename_citation_updates_ris() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    std::fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+
+    let bib_path = root.join("refs.ris");
+    std::fs::write(&bib_path, "TY  - JOUR\nID  - oldkey\nER  - \n").unwrap();
+
+    let doc_path = root.join("doc.qmd");
+    std::fs::write(
+        &doc_path,
+        "---\nbibliography: refs.ris\n---\n\nSee [@oldkey].\n",
+    )
+    .unwrap();
+
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let bib_uri = Uri::from_file_path(&bib_path).unwrap();
+    let root_uri = Uri::from_file_path(root).unwrap();
+
+    let server = TestLspServer::new();
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &std::fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let edit = server
+        .rename(doc_uri.as_str(), 4, 7, "newkey")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+
+    assert!(changes.contains_key(&doc_uri));
+    assert!(changes.contains_key(&bib_uri));
+}

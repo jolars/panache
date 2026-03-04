@@ -221,3 +221,21 @@ fn bib_index_load_csl_json() {
         index.entries
     );
 }
+
+#[test]
+fn bib_index_load_ris() {
+    let mut file = NamedTempFile::new().expect("Failed to create temp file");
+    writeln!(file, "TY  - JOUR").unwrap();
+    writeln!(file, "ID  - riskey").unwrap();
+    writeln!(file, "ER  - ").unwrap();
+    file.flush().unwrap();
+
+    let ris_path = file.path().with_extension("ris");
+    std::fs::rename(file.path(), &ris_path).unwrap();
+    let index = load_bibliography(&[ris_path]);
+    assert!(
+        index.get("riskey").is_some(),
+        "entries: {:?}",
+        index.entries
+    );
+}
