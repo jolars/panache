@@ -737,6 +737,14 @@ pub fn get_formatter_preset(name: &str) -> Option<FormatterConfig> {
             stdin: true,
         }),
 
+        // Shell formatters
+        "shfmt" => Some(FormatterConfig {
+            cmd: "shfmt".to_string(),
+            args: vec!["-".to_string()],
+            enabled: true,
+            stdin: true,
+        }),
+
         // R formatters
         "air" => Some(FormatterConfig {
             cmd: "air".to_string(),
