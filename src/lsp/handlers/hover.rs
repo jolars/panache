@@ -17,9 +17,9 @@ use super::super::{conversions, helpers};
 
 /// Handle textDocument/hover request
 pub(crate) async fn hover(
-    _client: &tower_lsp_server::Client,
+    client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: HoverParams,
 ) -> Result<Option<Hover>> {
     let uri = &params.text_document_position_params.text_document.uri;
@@ -31,9 +31,16 @@ pub(crate) async fn hover(
             .and_then(|state| state.metadata.clone())
     };
 
+    let config = helpers::get_config(client, &workspace_root, uri).await;
+
     let Some((content, root)) = helpers::get_document_content_and_tree(&document_map, uri).await
     else {
         return Ok(None);
+    };
+    let include_index = if let Some(doc_path) = uri.to_file_path() {
+        crate::includes::build_include_index(&doc_path, &content, &config)
+    } else {
+        crate::includes::IncludeIndex::default()
     };
 
     // Convert LSP position to byte offset
@@ -52,12 +59,27 @@ pub(crate) async fn hover(
             // Only handle footnotes (not regular references)
             if is_footnote {
                 // Find the footnote definition
-                let Some(definition) = helpers::find_definition_node(&root, &label, true) else {
-                    return Ok(None);
-                };
-
-                // Cast to FootnoteDefinition wrapper
-                let Some(footnote_def) = FootnoteDefinition::cast(definition) else {
+                let definition = helpers::find_definition_node(&root, &label, true)
+                    .and_then(FootnoteDefinition::cast)
+                    .or_else(|| {
+                        if include_index.definitions.is_empty() {
+                            return None;
+                        }
+                        include_index
+                            .definitions
+                            .find_footnote(&label)
+                            .and_then(|location| {
+                                std::fs::read_to_string(location.path())
+                                    .ok()
+                                    .and_then(|text| {
+                                        let tree = crate::parse(&text, None);
+                                        tree.descendants()
+                                            .filter_map(FootnoteDefinition::cast)
+                                            .find(|def| def.id() == label)
+                                    })
+                            })
+                    });
+                let Some(footnote_def) = definition else {
                     return Ok(None);
                 };
 

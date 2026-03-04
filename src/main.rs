@@ -351,30 +351,43 @@ fn main() -> io::Result<()> {
                     log::debug!("Using default config");
                 }
 
-                let input = fs::read_to_string(file_path)?;
-                let tree = parse(&input, Some(cfg.clone()));
-                let metadata = panache::metadata::extract_metadata(&tree, file_path).ok();
-                let diagnostics = panache::linter::lint_with_external_sync_and_metadata(
-                    &tree,
-                    &input,
-                    &cfg,
-                    metadata.as_ref(),
-                );
+                let documents = lint_documents_with_includes(file_path, &cfg)?;
+                let mut root_doc = documents.iter().find(|doc| &doc.path == file_path).cloned();
+                let mut included_docs: Vec<LintedDocument> = documents
+                    .into_iter()
+                    .filter(|doc| &doc.path != file_path)
+                    .collect();
+                included_docs.sort_by(|a, b| a.path.cmp(&b.path));
 
-                if !diagnostics.is_empty() {
+                let Some(root_doc) = root_doc.take() else {
+                    continue;
+                };
+
+                if !root_doc.diagnostics.is_empty() {
                     any_issues = true;
-                    total_issues += diagnostics.len();
+                    total_issues += root_doc.diagnostics.len();
 
                     if fix {
-                        let fixed_output = apply_fixes(&input, &diagnostics);
+                        let fixed_output = apply_fixes(&root_doc.input, &root_doc.diagnostics);
                         fs::write(file_path, fixed_output)?;
                         println!(
                             "Fixed {} issue(s) in {}",
-                            diagnostics.len(),
+                            root_doc.diagnostics.len(),
                             file_path.display()
                         );
                     } else {
-                        print_diagnostics(&diagnostics, Some(file_path));
+                        print_diagnostics(&root_doc.diagnostics, Some(file_path));
+                    }
+                }
+
+                if !fix {
+                    for doc in &included_docs {
+                        if doc.diagnostics.is_empty() {
+                            continue;
+                        }
+                        any_issues = true;
+                        total_issues += doc.diagnostics.len();
+                        print_diagnostics(&doc.diagnostics, Some(&doc.path));
                     }
                 }
             }
@@ -420,6 +433,112 @@ fn print_diagnostics(diagnostics: &[panache::linter::Diagnostic], file: Option<&
     }
 
     println!("\nFound {} issue(s)", diagnostics.len());
+}
+
+#[derive(Debug, Clone)]
+struct LintedDocument {
+    path: PathBuf,
+    input: String,
+    diagnostics: Vec<panache::linter::Diagnostic>,
+}
+
+fn lint_documents_with_includes(
+    root_path: &PathBuf,
+    cfg: &panache::Config,
+) -> io::Result<Vec<LintedDocument>> {
+    use std::collections::HashSet;
+
+    let input = fs::read_to_string(root_path)?;
+    let mut results = Vec::new();
+    let mut visited = HashSet::new();
+    let mut active = HashSet::new();
+    let include_index = panache::includes::build_include_index(root_path, &input, cfg);
+    lint_loaded_document_with_includes(
+        root_path,
+        &input,
+        cfg,
+        &mut results,
+        &mut visited,
+        &mut active,
+        &include_index,
+    )?;
+    Ok(results)
+}
+
+fn lint_loaded_document_with_includes(
+    doc_path: &PathBuf,
+    input: &str,
+    cfg: &panache::Config,
+    results: &mut Vec<LintedDocument>,
+    visited: &mut std::collections::HashSet<PathBuf>,
+    active: &mut std::collections::HashSet<PathBuf>,
+    include_index: &panache::includes::IncludeIndex,
+) -> io::Result<()> {
+    if !visited.insert(doc_path.clone()) {
+        return Ok(());
+    }
+
+    active.insert(doc_path.clone());
+
+    let tree = parse(input, Some(cfg.clone()));
+    let metadata = panache::metadata::extract_metadata(&tree, doc_path).ok();
+    let mut diagnostics =
+        panache::linter::lint_with_external_sync_and_metadata(&tree, input, cfg, metadata.as_ref());
+
+    let base_dir = doc_path.parent().unwrap_or(Path::new("."));
+    let project_root = panache::includes::find_quarto_root(doc_path);
+    let resolution =
+        panache::includes::collect_includes(&tree, input, base_dir, project_root.as_deref(), cfg);
+
+    diagnostics.extend(resolution.diagnostics);
+    if let Some(extra) = include_index.diagnostics.get(doc_path) {
+        diagnostics.extend(extra.clone());
+    }
+
+    for include in &resolution.includes {
+        if active.contains(&include.path) {
+            diagnostics.push(panache::includes::include_cycle_diagnostic(
+                input,
+                include.range,
+                &include.path,
+            ));
+            continue;
+        }
+        if visited.contains(&include.path) {
+            continue;
+        }
+        match fs::read_to_string(&include.path) {
+            Ok(include_input) => {
+                lint_loaded_document_with_includes(
+                    &include.path,
+                    &include_input,
+                    cfg,
+                    results,
+                    visited,
+                    active,
+                    include_index,
+                )?;
+            }
+            Err(err) => {
+                diagnostics.push(panache::includes::include_read_error_diagnostic(
+                    input,
+                    include.range,
+                    &include.path,
+                    &err.to_string(),
+                ));
+            }
+        }
+    }
+
+    diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
+    results.push(LintedDocument {
+        path: doc_path.clone(),
+        input: input.to_string(),
+        diagnostics,
+    });
+
+    active.remove(doc_path);
+    Ok(())
 }
 
 fn apply_fixes(input: &str, diagnostics: &[panache::linter::Diagnostic]) -> String {

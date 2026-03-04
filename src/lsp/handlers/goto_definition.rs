@@ -19,9 +19,9 @@ use super::super::{conversions, helpers};
 
 /// Handle textDocument/definition request
 pub(crate) async fn goto_definition(
-    _client: &tower_lsp_server::Client,
+    client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: GotoDefinitionParams,
 ) -> Result<Option<GotoDefinitionResponse>> {
     let uri = &params.text_document_position_params.text_document.uri;
@@ -33,9 +33,17 @@ pub(crate) async fn goto_definition(
             .and_then(|state| state.metadata.clone())
     };
 
+    let config = helpers::get_config(client, &workspace_root, uri).await;
+
     let Some((content, root)) = helpers::get_document_content_and_tree(&document_map, uri).await
     else {
         return Ok(None);
+    };
+
+    let include_index = if let Some(doc_path) = uri.to_file_path() {
+        crate::includes::build_include_index(&doc_path, &content, &config)
+    } else {
+        crate::includes::IncludeIndex::default()
     };
 
     // Convert LSP position to byte offset
@@ -93,6 +101,23 @@ pub(crate) async fn goto_definition(
             return Ok(Some(GotoDefinitionResponse::Scalar(location)));
         }
 
+        if let Some(label) = helpers::extract_crossref_key(&node)
+            && !include_index.definitions.is_empty()
+            && let Some(definition) = include_index.definitions.find_crossref(&label)
+        {
+            let target_uri = Uri::from_file_path(definition.path()).unwrap_or_else(|| uri.clone());
+            let target_text = std::fs::read_to_string(definition.path()).unwrap_or_default();
+            let start =
+                conversions::offset_to_position(&target_text, definition.range().start().into());
+            let end =
+                conversions::offset_to_position(&target_text, definition.range().end().into());
+            let location = Location {
+                uri: target_uri,
+                range: Range { start, end },
+            };
+            return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+        }
+
         // Fallback: find reference/footnote definition at this node
         if let Some((label, is_footnote)) = helpers::extract_reference_label(&node)
             && let Some(definition) = helpers::find_definition_node(&root, &label, is_footnote)
@@ -112,6 +137,33 @@ pub(crate) async fn goto_definition(
             };
 
             return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+        }
+
+        if let Some((label, is_footnote)) = helpers::extract_reference_label(&node)
+            && !include_index.definitions.is_empty()
+        {
+            let definition = if is_footnote {
+                include_index.definitions.find_footnote(&label)
+            } else {
+                include_index.definitions.find_reference(&label)
+            };
+
+            if let Some(definition) = definition {
+                let target_uri =
+                    Uri::from_file_path(definition.path()).unwrap_or_else(|| uri.clone());
+                let target_text = std::fs::read_to_string(definition.path()).unwrap_or_default();
+                let start = conversions::offset_to_position(
+                    &target_text,
+                    definition.range().start().into(),
+                );
+                let end =
+                    conversions::offset_to_position(&target_text, definition.range().end().into());
+                let location = Location {
+                    uri: target_uri,
+                    range: Range { start, end },
+                };
+                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            }
         }
 
         if node.kind() == SyntaxKind::LINK

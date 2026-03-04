@@ -8,9 +8,77 @@ use tower_lsp_server::ls_types::*;
 use crate::linter;
 use crate::lsp::DocumentState;
 use crate::metadata::{DocumentMetadata, YamlError};
+use crate::syntax::SyntaxNode;
 
 use super::super::conversions::{convert_diagnostic, offset_to_position};
 use super::super::helpers::get_config;
+
+fn lint_included_documents(
+    root_uri: &Uri,
+    text: &str,
+    tree: &SyntaxNode,
+    config: &crate::Config,
+) -> Vec<(Uri, Vec<Diagnostic>)> {
+    let Some(doc_path) = root_uri.to_file_path() else {
+        return Vec::new();
+    };
+    let base_dir = doc_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let project_root = crate::includes::find_quarto_root(&doc_path);
+    let resolution =
+        crate::includes::collect_includes(tree, text, base_dir, project_root.as_deref(), config);
+    let include_index = crate::includes::build_include_index(&doc_path, text, config);
+
+    let mut results = Vec::new();
+    let mut root_diagnostics: Vec<Diagnostic> = resolution
+        .diagnostics
+        .iter()
+        .map(|d| convert_diagnostic(d, text))
+        .collect();
+
+    if let Some(extra) = include_index.diagnostics.get(doc_path.as_ref()) {
+        root_diagnostics.extend(extra.iter().map(|d| convert_diagnostic(d, text)));
+    }
+
+    for include in resolution.includes {
+        match std::fs::read_to_string(&include.path) {
+            Ok(include_text) => {
+                let include_uri =
+                    Uri::from_file_path(&include.path).unwrap_or_else(|| root_uri.clone());
+                let include_tree = crate::parse(&include_text, Some(config.clone()));
+                let include_metadata =
+                    crate::metadata::extract_project_metadata(&include_tree, &include.path).ok();
+                let include_diagnostics = linter::lint_with_metadata(
+                    &include_tree,
+                    &include_text,
+                    config,
+                    include_metadata.as_ref(),
+                );
+                let mut mapped: Vec<Diagnostic> = include_diagnostics
+                    .iter()
+                    .map(|d| convert_diagnostic(d, &include_text))
+                    .collect();
+                if let Some(extra) = include_index.diagnostics.get(&include.path) {
+                    mapped.extend(extra.iter().map(|d| convert_diagnostic(d, &include_text)));
+                }
+                results.push((include_uri, mapped));
+            }
+            Err(err) => {
+                let diag = crate::includes::include_read_error_diagnostic(
+                    text,
+                    include.range,
+                    &include.path,
+                    &err.to_string(),
+                );
+                root_diagnostics.push(convert_diagnostic(&diag, text));
+            }
+        }
+    }
+
+    results.push((root_uri.clone(), root_diagnostics));
+    results
+}
 
 /// Create LSP diagnostic from YAML parse error
 fn yaml_error_to_diagnostic(error: &YamlError, _text: &str) -> Diagnostic {
@@ -200,19 +268,20 @@ pub(crate) async fn lint_and_publish(
 
     // Parse and lint (including external linters) in blocking task
     let text_clone = text.clone();
+    let config_clone = config.clone();
     let metadata = metadata.clone();
     let has_external_linters = !config.linters.is_empty();
 
     let diagnostics = if has_external_linters {
         // Use async runtime for external linters
         tokio::task::spawn_blocking(move || {
-            let tree = crate::parse(&text_clone, Some(config.clone()));
+            let tree = crate::parse(&text_clone, Some(config_clone.clone()));
             // Create a runtime for the async lint function
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(linter::lint_with_external_and_metadata(
                 &tree,
                 &text_clone,
-                &config,
+                &config_clone,
                 metadata.as_ref(),
             ))
         })
@@ -220,8 +289,8 @@ pub(crate) async fn lint_and_publish(
     } else {
         // Regular sync lint for built-in rules only
         tokio::task::spawn_blocking(move || {
-            let tree = crate::parse(&text_clone, Some(config.clone()));
-            linter::lint_with_metadata(&tree, &text_clone, &config, metadata.as_ref())
+            let tree = crate::parse(&text_clone, Some(config_clone.clone()));
+            linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref())
         })
         .await
     };
@@ -234,7 +303,29 @@ pub(crate) async fn lint_and_publish(
                 .collect();
 
             all_diagnostics.extend(lsp_diagnostics);
-            client.publish_diagnostics(uri, all_diagnostics, None).await;
+
+            let include_diagnostics = lint_included_documents(
+                &uri,
+                &text,
+                &crate::parse(&text, Some(config.clone())),
+                &config,
+            );
+
+            let mut published_root = false;
+            for (target_uri, diags) in include_diagnostics {
+                if target_uri == uri {
+                    let mut merged = all_diagnostics.clone();
+                    merged.extend(diags);
+                    client.publish_diagnostics(uri.clone(), merged, None).await;
+                    published_root = true;
+                } else {
+                    client.publish_diagnostics(target_uri, diags, None).await;
+                }
+            }
+
+            if !published_root {
+                client.publish_diagnostics(uri, all_diagnostics, None).await;
+            }
         }
         Err(e) => {
             client

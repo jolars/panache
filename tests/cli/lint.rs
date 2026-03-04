@@ -155,3 +155,20 @@ fn test_lint_bibliography_integration() {
         .stdout(predicate::str::contains("missing-bibliography-key"))
         .stdout(predicate::str::contains("missing"));
 }
+
+#[test]
+fn test_lint_includes_reports_child_diagnostics() {
+    let temp_dir = TempDir::new().unwrap();
+    let parent_path = temp_dir.path().join("parent.qmd");
+    let child_path = temp_dir.path().join("_child.qmd");
+
+    fs::write(&child_path, "# Heading 1\n\n### Heading 3\n").unwrap();
+    fs::write(&parent_path, "{{< include _child.qmd >}}\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", parent_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("_child.qmd"))
+        .stdout(predicate::str::contains("heading-hierarchy"));
+}

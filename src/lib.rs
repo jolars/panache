@@ -6,6 +6,7 @@ mod external_formatters_common;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod external_formatters_sync;
 pub mod formatter;
+pub mod includes;
 pub mod linter;
 #[cfg(feature = "lsp")]
 pub mod lsp;
