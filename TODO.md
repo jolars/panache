@@ -9,7 +9,10 @@ This document tracks implementation status for panache's features.
 - ❌ **Not Implemented** - Feature not yet started
 - ⏹️ **Won't Implement** - Feature intentionally not implemented
 
-## Language Server Protocol (LSP)
+## Language Server
+
+- 🚧 Incremental parsing and caching for LSP performance (Implemented, but crude
+  and often reparses entire document on change; needs optimization)
 
 ### Core LSP Capabilities
 
@@ -116,22 +119,9 @@ This document tracks implementation status for panache's features.
         `tests/cases/writer_indented_code_escapes`)
   - [x] Blockquote negative case (partial; `tests/cases/writer_blockquote_not`)
 
----
-
 ## Configuration System
 
-### Current Features
-
-- ✅ Hierarchical config loading (explicit → local → XDG → defaults)
-- ✅ Auto-detect flavor from file extension (.qmd → Quarto, .Rmd → RMarkdown)
-- ✅ `flavor` config field affects .md files and stdin
-- ✅ Global `[extensions]` overrides for all flavors
-- ✅ `[formatters.<formatter>]` configuration for external code formatters
-- ✅ `[linters]` configuration for external code linters
-
-### Future Enhancements
-
-#### Per-Flavor Extension Configuration
+### Per-Flavor Extension Configuration
 
 - ❌ **Per-flavor extension overrides** - `[extensions.gfm]`,
   `[extensions.quarto]`, `[extensions.rmarkdown]`, etc.
@@ -140,7 +130,7 @@ This document tracks implementation status for panache's features.
     CommonMark
   - Falls back to global `[extensions]` settings when not specified
 
-#### Per-File Pattern Overrides
+### Per-File Pattern Overrides
 
 - ❌ **Glob pattern flavor overrides** - `[flavor_overrides]` with file patterns
   - Override flavor for specific files or patterns
@@ -152,51 +142,7 @@ This document tracks implementation status for panache's features.
 
 ## Linter
 
-- ❌ Auto-fixing for external code linters
-
-### Current Status
-
-**✅ Implemented** - Basic linter with CLI and one rule.
-
-**Current features:**
-
-- ✅ `panache lint` CLI subcommand
-- ✅ `--check` mode for CI (exit 1 if violations found)
-- ✅ `--fix` mode for auto-fixing violations
-- ✅ Diagnostic output with file locations
-- ✅ Pluggable rule system with `RuleRegistry`
-- ✅ **Implemented rule:** `heading-hierarchy` - Warns when heading levels are
-  skipped (e.g., h1 → h3)
-
-### Architecture
-
-Follows the ruff/clippy pattern: separate concerns, shared infrastructure
-
-```
-src/linter/           # Core linting logic
-  ├── rules/          # Individual lint rules
-  │   └── heading_hierarchy.rs  # Heading level checking
-  ├── diagnostics.rs  # Diagnostic types (Diagnostic, Severity, Fix, Edit)
-  ├── rules.rs        # Rule trait and registry
-  └── runner.rs       # Rule execution
-src/main.rs           # CLI: `panache lint` subcommand
-src/lsp.rs            # LSP: TODO - integrate diagnostics
-```
-
-Both linter and formatter:
-
-- ✅ Share the same parser and AST
-- ✅ Use the same config system
-- ✅ Benefit from rowan's CST
-
-### CLI Commands
-
-```bash
-panache lint document.qmd         # Report violations
-panache lint --fix document.qmd   # Auto-fix what's possible
-panache lint --check document.qmd # CI mode: exit non-zero if violations
-panache lint --config cfg.toml    # Custom config
-```
+- ✅ Auto-fixing for external code linters
 
 ### Future Lint Rules
 
@@ -223,13 +169,6 @@ panache lint --config cfg.toml    # Custom config
 - ❌ Severity levels (error, warning, info)
 - ❌ Auto-fix capability per rule (infrastructure exists, rules need
   implementation)
-
-### Next Steps
-
-- [ ] Add more lint rules (empty links, duplicate refs, etc.)
-- [ ] Make rules configurable via `[lint]` section in config
-- [ ] LSP integration with `textDocument/publishDiagnostics`
-- [ ] Add auto-fix implementations for fixable rules
 
 ### Open Questions
 
