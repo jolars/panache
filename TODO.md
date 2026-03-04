@@ -196,10 +196,10 @@ Both linter and formatter:
 ### CLI Commands
 
 ```bash
-panache lint document.qmd           # Report violations
-panache lint --fix document.qmd     # Auto-fix what's possible
-panache lint --check document.qmd   # CI mode: exit non-zero if violations
-panache lint --config cfg.toml      # Custom config
+panache lint document.qmd         # Report violations
+panache lint --fix document.qmd   # Auto-fix what's possible
+panache lint --check document.qmd # CI mode: exit non-zero if violations
+panache lint --config cfg.toml    # Custom config
 ```
 
 ### Future Lint Rules
@@ -510,12 +510,12 @@ for initial implementation.
 ### Non-Default: Quarto-Specific
 
 - ✅ Quarto executable code cells with output
-- ❌ Quarto cross-references `@fig-id`, `@tbl-id`
+- ✅ Quarto cross-references `@fig-id`, `@tbl-id`
 
 ### Non-Default: RMarkdown-Specific
 
-- ❌ RMarkdown code chunks with output
-- ❌ Bookdown-style references (`\@ref(fig-id)`, etc.\`)
+- ✅ RMarkdown code chunks with output
+- ✅ Bookdown-style references (`\@ref(fig-id)`, etc.\`)
 
 ### Non-Default: Other
 
