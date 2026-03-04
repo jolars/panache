@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.11.0](https://github.com/jolars/panache/compare/v2.10.0...v2.11.0) (2026-03-04)
+
+### Features
+
+* add support for implicit header references ([d9fe4a3](https://github.com/jolars/panache/commit/d9fe4a368cd3e81d9a703a50279b3ea0cf974c8a))
+* **formatter:** add preset for clang-format ([d3f2a60](https://github.com/jolars/panache/commit/d3f2a600282200bfa9e1cc3ad4b63d3d1bb62bce))
+* **formatter:** add preset for shfmt ([83143a2](https://github.com/jolars/panache/commit/83143a207ef295535785a97e6c5654e16b04e28f))
+* **formatter:** add preset for taplo TOML formatter ([d5b83e5](https://github.com/jolars/panache/commit/d5b83e50f4daf3dfafc4ab7a3709273e23f1ba1f))
+* **lsp,linter:** add support for inline YAML references ([08c141d](https://github.com/jolars/panache/commit/08c141d2d22a641dc12c4dbda9ed2eaae417f476))
+* **lsp,linter:** enable bookdown project integration ([315bc50](https://github.com/jolars/panache/commit/315bc500ab12d1b86b04dafcd5bb58a7e8a47cc6))
+* **lsp,linter:** support diagnostics and more for includes ([15b61fc](https://github.com/jolars/panache/commit/15b61fcfd9f89a88e07d327b09613dda2bab08f6))
+* **lsp,linter:** use project and metadata files ([3ed27fb](https://github.com/jolars/panache/commit/3ed27fbbbc5309a85a476065c466a62e103d9c6b))
+* **lsp:** add go-to-def handler for crossrefs ([35c2a06](https://github.com/jolars/panache/commit/35c2a06e676f84234f4085707a26614aff7e94ee))
+* **lsp:** add renaming support for bibliography entries ([7bb30d0](https://github.com/jolars/panache/commit/7bb30d0ea0c28ae75ccd3886e010e73c7f6f8d3f))
+* **lsp:** handle quarto cross-references separately ([086e6ed](https://github.com/jolars/panache/commit/086e6edb69d907c94cf9683e510b1bc7c218593b))
+* **lsp:** maintain project-wide state ([6ea5356](https://github.com/jolars/panache/commit/6ea53567e8959e0759b3db97efb7b4d8ec51bceb))
+* **parser:** support bookdown crossref syntax ([45ef2eb](https://github.com/jolars/panache/commit/45ef2ebeed2538970fb4389419f0fdd6b61bd3fc))
+
+### Bug Fixes
+
+* **formatter:** handle equation attributes with line after ([eecf1a5](https://github.com/jolars/panache/commit/eecf1a54d2895d0fbce56eefca9d6e9fa0255ce8))
+* **lsp,linter:** deduplicate bibliography entries ([6602569](https://github.com/jolars/panache/commit/6602569a4d924c9a50551de92b2e9b87cdc9c962))
+* **lsp:** fix duplicate bibliography issue ([7f85ff7](https://github.com/jolars/panache/commit/7f85ff7bcb44bf7e5ef07a5318c3f00bbb39bcad))
+* **lsp:** show correct lines for bib diagnostics ([30177ae](https://github.com/jolars/panache/commit/30177ae85ee53048b45b761509a2545d8c3caaa8))
+* **lsp:** use platform-independent file Uris ([658c3a4](https://github.com/jolars/panache/commit/658c3a44d1197e6f4ca153a8bf956aebbf6b7cfc))
+* **lsp:** use platform-independent URIs ([2aecf8e](https://github.com/jolars/panache/commit/2aecf8ebfe7cf3f41d20999ee47537cad520c82e))
+* **parser, formatter:** don't wrap latex commands ([619dea5](https://github.com/jolars/panache/commit/619dea50b6c26d8396d898fa1a4e255eaa0f9230))
+
 ## [2.10.0](https://github.com/jolars/panache/compare/v2.9.0...v2.10.0) (2026-03-03)
 
 ### Features
