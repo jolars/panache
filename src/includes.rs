@@ -220,6 +220,7 @@ pub fn collect_cross_doc_duplicates(
     tree: &SyntaxNode,
     input: &str,
     doc_path: &Path,
+    config: &Config,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     for def in tree.descendants().filter_map(ReferenceDefinition::cast) {
@@ -279,7 +280,64 @@ pub fn collect_cross_doc_duplicates(
         }
     }
 
+    if config.extensions.bookdown_references {
+        collect_bookdown_definitions(index, tree, input, doc_path);
+    }
+
     diagnostics
+}
+
+fn collect_bookdown_definitions(
+    index: &mut DefinitionIndex,
+    tree: &SyntaxNode,
+    input: &str,
+    doc_path: &Path,
+) {
+    use crate::parser::inlines::bookdown::{
+        try_parse_bookdown_definition, try_parse_bookdown_text_reference,
+    };
+
+    for element in tree.descendants_with_tokens() {
+        let Some(token) = element.into_token() else {
+            continue;
+        };
+        if token.kind() != SyntaxKind::TEXT {
+            continue;
+        }
+        let text = token.text();
+        let mut offset = 0usize;
+        let bytes = text.as_bytes();
+        while offset < bytes.len() {
+            if bytes[offset] != b'(' {
+                offset += 1;
+                continue;
+            }
+            let slice = &text[offset..];
+            if let Some((len, label)) = try_parse_bookdown_definition(slice) {
+                let start: usize = token.text_range().start().into();
+                let range = rowan::TextRange::new(
+                    rowan::TextSize::from((start + offset) as u32),
+                    rowan::TextSize::from((start + offset + len) as u32),
+                );
+                let location = DefinitionLocation::new(doc_path, range, input);
+                index.insert_crossref(label, location);
+                offset += len;
+                continue;
+            }
+            if let Some((len, label)) = try_parse_bookdown_text_reference(slice) {
+                let start: usize = token.text_range().start().into();
+                let range = rowan::TextRange::new(
+                    rowan::TextSize::from((start + offset) as u32),
+                    rowan::TextSize::from((start + offset + len) as u32),
+                );
+                let location = DefinitionLocation::new(doc_path, range, input);
+                index.insert_crossref(label, location);
+                offset += len;
+                continue;
+            }
+            offset += 1;
+        }
+    }
 }
 
 pub fn include_cycle_diagnostic(input: &str, range: TextRange, path: &Path) -> Diagnostic {
@@ -467,7 +525,8 @@ fn visit_document(
     graph.documents.insert(path.to_path_buf());
 
     let tree = crate::parse(input, Some(config.clone()));
-    let diagnostics = collect_cross_doc_duplicates(&mut graph.definitions, &tree, input, path);
+    let diagnostics =
+        collect_cross_doc_duplicates(&mut graph.definitions, &tree, input, path, config);
     if !diagnostics.is_empty() {
         graph
             .diagnostics
@@ -653,5 +712,26 @@ mod tests {
         assert!(graph.documents().contains(&doc_path));
         assert!(graph.documents().contains(&other_path));
         assert!(!graph.documents().contains(&ignored_path));
+    }
+
+    #[test]
+    fn project_graph_collects_bookdown_definitions() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.Rmd");
+
+        fs::write(
+            &doc_path,
+            "See \\@ref(fig:plot).\n\n(\\#fig:plot)\n\n(ref:caption)\n",
+        )
+        .unwrap();
+
+        let input = fs::read_to_string(&doc_path).unwrap();
+        let mut config = Config::default();
+        config.extensions.bookdown_references = true;
+        let graph = ProjectGraph::build(&doc_path, &input, &config);
+
+        assert!(graph.definitions().find_crossref("fig:plot").is_some());
+        assert!(graph.definitions().find_crossref("caption").is_some());
     }
 }

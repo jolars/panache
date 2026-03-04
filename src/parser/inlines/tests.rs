@@ -138,10 +138,17 @@ mod link_tests {
 
 #[cfg(test)]
 mod citation_tests {
+    use crate::config::Config;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
         crate::parser::parse(input, None)
+    }
+
+    fn parse_inline_with_bookdown(input: &str) -> crate::syntax::SyntaxNode {
+        let mut config = Config::default();
+        config.extensions.bookdown_references = true;
+        crate::parser::parse(input, Some(config))
     }
 
     fn find_citation_keys(node: &crate::syntax::SyntaxNode) -> Vec<String> {
@@ -172,6 +179,33 @@ mod citation_tests {
 
         let keys = find_citation_keys(&inline_tree);
         assert_eq!(keys, vec!["doe99"]);
+    }
+
+    #[test]
+    fn bookdown_ref_with_prefix() {
+        let input = "See \\@ref(fig:plot).";
+        let inline_tree = parse_inline_with_bookdown(input);
+
+        let keys = find_citation_keys(&inline_tree);
+        assert_eq!(keys, vec!["fig:plot"]);
+    }
+
+    #[test]
+    fn bookdown_ref_section_without_prefix() {
+        let input = "See \\@ref(introduction).";
+        let inline_tree = parse_inline_with_bookdown(input);
+
+        let keys = find_citation_keys(&inline_tree);
+        assert_eq!(keys, vec!["introduction"]);
+    }
+
+    #[test]
+    fn bookdown_ref_rejects_unknown_prefix() {
+        let input = "See \\@ref(bad:label).";
+        let inline_tree = parse_inline_with_bookdown(input);
+
+        let keys = find_citation_keys(&inline_tree);
+        assert!(keys.is_empty());
     }
 }
 

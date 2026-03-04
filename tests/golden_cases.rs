@@ -139,6 +139,7 @@ golden_test_cases!(
     blockquote_list_blockquote,
     blockquotes,
     bracketed_spans,
+    bookdown,
     chunk_options_complex,
     code_blocks_executable,
     code_blocks_explicit_style,

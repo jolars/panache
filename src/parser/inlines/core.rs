@@ -25,6 +25,9 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 // Import inline element parsers from sibling modules
+use super::bookdown::{
+    try_parse_bookdown_definition, try_parse_bookdown_reference, try_parse_bookdown_text_reference,
+};
 use super::bracketed_spans::{emit_bracketed_span, try_parse_bracketed_span};
 use super::citations::{
     emit_bare_citation, emit_bracketed_citation, try_parse_bare_citation,
@@ -1123,7 +1126,21 @@ fn parse_inline_range_impl(
                 }
             }
 
-            // Try escapes (after backslash math)
+            // Try bookdown reference: \@ref(label)
+            if config.extensions.bookdown_references
+                && let Some((len, label)) = try_parse_bookdown_reference(&text[pos..])
+            {
+                if pos > text_start {
+                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                }
+                log::debug!("Matched bookdown reference at pos {}: {}", pos, label);
+                super::citations::emit_bookdown_crossref(builder, label);
+                pos += len;
+                text_start = pos;
+                continue;
+            }
+
+            // Try escapes (after bookdown refs and backslash math)
             if let Some((len, ch, escape_type)) = try_parse_escape(&text[pos..]) {
                 // Check if this is a hard line break and if the extension is disabled
                 if matches!(escape_type, EscapeType::HardLineBreak)
@@ -1239,6 +1256,30 @@ fn parse_inline_range_impl(
             pos += len;
             text_start = pos;
             continue;
+        }
+
+        // Try bookdown definition: (\#label) or (ref:label)
+        if byte == b'(' && config.extensions.bookdown_references {
+            if let Some((len, label)) = try_parse_bookdown_definition(&text[pos..]) {
+                if pos > text_start {
+                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                }
+                log::debug!("Matched bookdown definition at pos {}: {}", pos, label);
+                builder.token(SyntaxKind::TEXT.into(), &text[pos..pos + len]);
+                pos += len;
+                text_start = pos;
+                continue;
+            }
+            if let Some((len, label)) = try_parse_bookdown_text_reference(&text[pos..]) {
+                if pos > text_start {
+                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                }
+                log::debug!("Matched bookdown text reference at pos {}: {}", pos, label);
+                builder.token(SyntaxKind::TEXT.into(), &text[pos..pos + len]);
+                pos += len;
+                text_start = pos;
+                continue;
+            }
         }
 
         // Try subscript: ~text~

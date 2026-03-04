@@ -180,6 +180,36 @@ pub(crate) fn is_quarto_crossref_key(key: &str) -> bool {
     )
 }
 
+pub(crate) fn is_bookdown_label(label: &str) -> bool {
+    matches!(
+        label,
+        "eq" | "fig"
+            | "tab"
+            | "thm"
+            | "lem"
+            | "cor"
+            | "prp"
+            | "cnj"
+            | "def"
+            | "exm"
+            | "exr"
+            | "sol"
+            | "rem"
+            | "alg"
+            | "sec"
+    )
+}
+
+pub(crate) fn has_bookdown_prefix(label: &str) -> bool {
+    let mut parts = label.splitn(2, ':');
+    let prefix = parts.next().unwrap_or("");
+    let rest = parts.next().unwrap_or("");
+    if rest.is_empty() {
+        return false;
+    }
+    is_bookdown_label(prefix)
+}
+
 pub(crate) fn emit_crossref(builder: &mut GreenNodeBuilder, key: &str, has_suppress: bool) {
     builder.start_node(SyntaxKind::CROSSREF.into());
 
@@ -197,6 +227,14 @@ pub(crate) fn emit_crossref(builder: &mut GreenNodeBuilder, key: &str, has_suppr
         builder.token(SyntaxKind::CITATION_KEY.into(), key);
     }
 
+    builder.finish_node();
+}
+
+pub(crate) fn emit_bookdown_crossref(builder: &mut GreenNodeBuilder, key: &str) {
+    builder.start_node(SyntaxKind::CROSSREF.into());
+    builder.token(SyntaxKind::TEXT.into(), "\\@ref(");
+    builder.token(SyntaxKind::CITATION_KEY.into(), key);
+    builder.token(SyntaxKind::TEXT.into(), ")");
     builder.finish_node();
 }
 

@@ -235,6 +235,9 @@ pub struct Extensions {
     /// Quarto shortcodes {{< name args >}}
     #[serde(alias = "quarto_shortcodes")]
     pub quarto_shortcodes: bool,
+    /// Bookdown references \@ref(label) and (\#label)
+    #[serde(alias = "bookdown_references")]
+    pub bookdown_references: bool,
 }
 
 impl Default for Extensions {
@@ -347,6 +350,7 @@ impl Extensions {
             quarto_callouts: false,
             quarto_crossrefs: false,
             quarto_shortcodes: false,
+            bookdown_references: false,
         }
     }
 
@@ -362,6 +366,7 @@ impl Extensions {
         ext.quarto_callouts = true;
         ext.quarto_crossrefs = true;
         ext.quarto_shortcodes = true;
+        ext.bookdown_references = false;
 
         ext
     }
@@ -374,6 +379,7 @@ impl Extensions {
         ext.task_lists = true;
         ext.tex_math_dollars = true;
         ext.tex_math_single_backslash = true; // RMarkdown enables \(...\) and \[...\] by default
+        ext.bookdown_references = true;
 
         ext
     }
@@ -468,6 +474,7 @@ impl Extensions {
             quarto_callouts: false,
             quarto_crossrefs: false,
             quarto_shortcodes: false,
+            bookdown_references: false,
         }
     }
 

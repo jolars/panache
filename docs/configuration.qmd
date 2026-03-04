@@ -300,6 +300,13 @@ quarto-callouts = true  # .callout-note, etc.
 quarto-crossrefs = true # @fig-id, @tbl-id
 ```
 
+### Bookdown Extensions
+
+```toml
+[extensions]
+bookdown-references = true # \@ref(label) and (\#label)
+```
+
 ## External Code Formatters
 
 panache can invoke external formatters for code blocks—**but they're opt-in**.

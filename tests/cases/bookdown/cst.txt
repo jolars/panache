@@ -1,0 +1,100 @@
+DOCUMENT@0..531
+  PARAGRAPH@0..139
+    TEXT@0..9 "(ref:fig)"
+    TEXT@9..138 " A very very very ver ..."
+    NEWLINE@138..139 "\n"
+  BLANK_LINE@139..140
+    BLANK_LINE@139..140 "\n"
+  PARAGRAPH@140..170
+    TEXT@140..169 "An equation with a re ..."
+    NEWLINE@169..170 "\n"
+  LATEX_ENVIRONMENT@170..277
+    LATEX_ENV_BEGIN@170..187
+      TEXT@170..186 "\\begin{equation}"
+      NEWLINE@186..187 "\n"
+    LATEX_ENV_CONTENT@187..261
+      TEXT@187..245 "  f\\left(k\\right) = \\ ..."
+      NEWLINE@245..246 "\n"
+      TEXT@246..260 "  (\\#eq:binom)"
+      NEWLINE@260..261 "\n"
+    LATEX_ENV_END@261..277
+      TEXT@261..276 "\\end{equation} "
+      NEWLINE@276..277 "\n"
+  PARAGRAPH@277..325
+    TEXT@277..308 "We can refer to it as ..."
+    CROSSREF@308..323
+      TEXT@308..314 "\\@ref("
+      CITATION_KEY@314..322 "eq:binom"
+      TEXT@322..323 ")"
+    TEXT@323..324 "."
+    NEWLINE@324..325 "\n"
+  BLANK_LINE@325..326
+    BLANK_LINE@325..326 "\n"
+  PARAGRAPH@326..359
+    TEXT@326..358 "Here's a table with a ..."
+    NEWLINE@358..359 "\n"
+  BLANK_LINE@359..360
+    BLANK_LINE@359..360 "\n"
+  PIPE_TABLE@360..466
+    TABLE_CAPTION@360..405
+      TABLE_CAPTION_PREFIX@360..367 "Table: "
+      TEXT@367..378 "(\\#mytable)"
+      TEXT@378..404 " A table with a refer ..."
+      NEWLINE@404..405 "\n"
+    BLANK_LINE@405..406
+      BLANK_LINE@405..406 "\n"
+    TABLE_HEADER@406..426
+      TEXT@406..407 "|"
+      WHITESPACE@407..408 " "
+      TABLE_CELL@408..409
+        TEXT@408..409 "A"
+      WHITESPACE@409..412 "   "
+      TEXT@412..413 "|"
+      WHITESPACE@413..414 " "
+      TABLE_CELL@414..415
+        TEXT@414..415 "B"
+      WHITESPACE@415..418 "   "
+      TEXT@418..419 "|"
+      WHITESPACE@419..420 " "
+      TABLE_CELL@420..421
+        TEXT@420..421 "C"
+      WHITESPACE@421..424 "   "
+      TEXT@424..425 "|"
+      NEWLINE@425..426 "\n"
+    TABLE_SEPARATOR@426..446
+      TEXT@426..445 "| --- | --- | --- |"
+      NEWLINE@445..446 "\n"
+    TABLE_ROW@446..466
+      TEXT@446..447 "|"
+      WHITESPACE@447..448 " "
+      TABLE_CELL@448..449
+        TEXT@448..449 "1"
+      WHITESPACE@449..452 "   "
+      TEXT@452..453 "|"
+      WHITESPACE@453..454 " "
+      TABLE_CELL@454..455
+        TEXT@454..455 "2"
+      WHITESPACE@455..458 "   "
+      TEXT@458..459 "|"
+      WHITESPACE@459..460 " "
+      TABLE_CELL@460..461
+        TEXT@460..461 "3"
+      WHITESPACE@461..464 "   "
+      TEXT@464..465 "|"
+      NEWLINE@465..466 "\n"
+  BLANK_LINE@466..467
+    BLANK_LINE@466..467 "\n"
+  PARAGRAPH@467..531
+    TEXT@467..491 "We refer to is as Table "
+    CROSSREF@491..509
+      TEXT@491..497 "\\@ref("
+      CITATION_KEY@497..508 "tab:mytable"
+      TEXT@508..509 ")"
+    TEXT@509..515 ", not "
+    CROSSREF@515..529
+      TEXT@515..521 "\\@ref("
+      CITATION_KEY@521..528 "mytable"
+      TEXT@528..529 ")"
+    TEXT@529..530 "!"
+    NEWLINE@530..531 "\n"
+

@@ -701,6 +701,15 @@ impl Formatter {
                     self.format_paragraph_with_display_math(node, indent, line_width);
                     return;
                 }
+                if self.config.extensions.bookdown_references
+                    && paragraphs::is_bookdown_text_reference(node)
+                {
+                    self.output.push_str(&text);
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
+                    }
+                    return;
+                }
 
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
                 let preserve_newlines_for_latex =

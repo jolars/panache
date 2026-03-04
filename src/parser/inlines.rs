@@ -4,6 +4,8 @@
 //! code spans, math, citations, etc. Inline parsing is integrated into block
 //! parsing for true single-pass architecture.
 
+#[path = "inlines/bookdown.rs"]
+pub mod bookdown;
 #[path = "inlines/bracketed_spans.rs"]
 pub mod bracketed_spans;
 #[path = "inlines/citations.rs"]
