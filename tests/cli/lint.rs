@@ -196,6 +196,58 @@ fn test_lint_inline_references_in_metadata() {
 }
 
 #[test]
+fn test_lint_csl_yaml_bibliography() {
+    let temp_dir = TempDir::new().unwrap();
+    let bib_path = temp_dir.path().join("refs.yaml");
+    let doc_path = temp_dir.path().join("doc.qmd");
+
+    fs::write(
+        &bib_path,
+        "- id: known\n  title: Known Title\n- id: other\n  title: Other Title\n",
+    )
+    .unwrap();
+
+    fs::write(
+        &doc_path,
+        "---\nbibliography: refs.yaml\n---\n\nCite [@known; @missing].\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("missing-bibliography-key"))
+        .stdout(predicate::str::contains("missing"));
+}
+
+#[test]
+fn test_lint_csl_json_bibliography() {
+    let temp_dir = TempDir::new().unwrap();
+    let bib_path = temp_dir.path().join("refs.json");
+    let doc_path = temp_dir.path().join("doc.qmd");
+
+    fs::write(
+        &bib_path,
+        "[{\"id\":\"known\",\"title\":\"Known Title\"},{\"id\":\"other\",\"title\":\"Other Title\"}]",
+    )
+    .unwrap();
+
+    fs::write(
+        &doc_path,
+        "---\nbibliography: refs.json\n---\n\nCite [@known; @missing].\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("missing-bibliography-key"))
+        .stdout(predicate::str::contains("missing"));
+}
+
+#[test]
 fn test_lint_includes_reports_child_diagnostics() {
     let temp_dir = TempDir::new().unwrap();
     let parent_path = temp_dir.path().join("parent.qmd");

@@ -3,7 +3,10 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::bibtex::{BibDatabase, BibEntry, BibError, Span, parse_bibtex};
+use crate::bibtex::{
+    BibDatabase, BibEntry, BibError, Span, parse_bibtex, parse_csl_json_entries,
+    parse_csl_yaml_entries,
+};
 
 #[derive(Debug, Clone)]
 pub struct BibEntryLocation {
@@ -62,6 +65,47 @@ pub fn load_bibliography(paths: &[PathBuf]) -> BibIndex {
                 continue;
             }
         };
+
+        let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+        if matches!(extension, "yaml" | "yml" | "json") {
+            let parsed = if matches!(extension, "json") {
+                parse_csl_json_entries(&text)
+            } else {
+                parse_csl_yaml_entries(&text)
+            };
+            match parsed {
+                Ok(parsed_entries) => {
+                    for (key, span) in parsed_entries {
+                        let key_lower = key.to_lowercase();
+                        let location = BibEntryLocation {
+                            key: key.clone(),
+                            file: path.clone(),
+                            span,
+                        };
+                        if let Some(existing) = entries.get(&key_lower) {
+                            duplicates.push(BibDuplicate {
+                                key,
+                                first: existing.clone(),
+                                duplicate: location.clone(),
+                            });
+                        } else {
+                            entries.insert(key_lower, location);
+                        }
+                    }
+                    files.push(BibFile {
+                        path: path.clone(),
+                        database: BibDatabase::default(),
+                    });
+                }
+                Err(message) => {
+                    errors.push(BibError {
+                        message,
+                        span: None,
+                    });
+                }
+            }
+            continue;
+        }
 
         let database = parse_bibtex(&text);
         errors.extend(database.errors.clone());

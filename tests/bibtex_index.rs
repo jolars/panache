@@ -171,3 +171,53 @@ fn bib_index_load_error_handling() {
     assert_eq!(index.load_errors[0].path, nonexistent);
     assert!(!index.load_errors[0].message.is_empty());
 }
+
+#[test]
+fn bib_index_load_csl_yaml() {
+    let mut file = NamedTempFile::new().expect("Failed to create temp file");
+    writeln!(
+        file,
+        "- id: cslkey\n  title: Sample\n- id: otherkey\n  title: Sample 2\n"
+    )
+    .unwrap();
+    file.flush().unwrap();
+
+    let yaml_path = file.path().with_extension("yaml");
+    std::fs::rename(file.path(), &yaml_path).unwrap();
+    let index = load_bibliography(&[yaml_path]);
+    assert!(
+        index.get("cslkey").is_some(),
+        "entries: {:?}",
+        index.entries
+    );
+    assert!(
+        index.get("otherkey").is_some(),
+        "entries: {:?}",
+        index.entries
+    );
+}
+
+#[test]
+fn bib_index_load_csl_json() {
+    let mut file = NamedTempFile::new().expect("Failed to create temp file");
+    writeln!(
+        file,
+        "[{{\"id\":\"cslkey\",\"title\":\"Sample\"}},{{\"id\":\"otherkey\",\"title\":\"Sample 2\"}}]"
+    )
+    .unwrap();
+    file.flush().unwrap();
+
+    let json_path = file.path().with_extension("json");
+    std::fs::rename(file.path(), &json_path).unwrap();
+    let index = load_bibliography(&[json_path]);
+    assert!(
+        index.get("cslkey").is_some(),
+        "entries: {:?}",
+        index.entries
+    );
+    assert!(
+        index.get("otherkey").is_some(),
+        "entries: {:?}",
+        index.entries
+    );
+}

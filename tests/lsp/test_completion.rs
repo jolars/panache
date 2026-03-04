@@ -108,3 +108,65 @@ async fn test_completion_with_inline_references() {
         "Expected inline reference completion"
     );
 }
+
+#[tokio::test]
+async fn test_completion_with_csl_yaml_bibliography() {
+    let server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    std::fs::write(root.join("refs.yaml"), "- id: cslkey\n  title: Sample\n").unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str()).await;
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    let content = "---\nbibliography: refs.yaml\n---\n\nText [@] citation.";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.completion(doc_uri.as_str(), 4, 7).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("Expected completion items");
+    };
+
+    assert!(
+        items.iter().any(|item| item.label == "cslkey"),
+        "Expected CSL YAML bibliography completion"
+    );
+}
+
+#[tokio::test]
+async fn test_completion_with_csl_json_bibliography() {
+    let server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    std::fs::write(
+        root.join("refs.json"),
+        "[{\"id\":\"cslkey\",\"title\":\"Sample\"}]",
+    )
+    .unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str()).await;
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    let content = "---\nbibliography: refs.json\n---\n\nText [@] citation.";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.completion(doc_uri.as_str(), 4, 7).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("Expected completion items");
+    };
+
+    assert!(
+        items.iter().any(|item| item.label == "cslkey"),
+        "Expected CSL JSON bibliography completion"
+    );
+}

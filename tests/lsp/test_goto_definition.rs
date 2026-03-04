@@ -155,3 +155,75 @@ async fn test_goto_definition_image_reference() {
         panic!("Expected scalar location response");
     }
 }
+
+#[tokio::test]
+async fn test_goto_definition_csl_yaml_bibliography() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let bib_path = root.join("refs.yaml");
+    let doc_path = root.join("doc.qmd");
+
+    std::fs::write(&bib_path, "- id: cslkey\n  title: Sample\n").unwrap();
+    std::fs::write(
+        &doc_path,
+        "---\nbibliography: refs.yaml\n---\n\nSee [@cslkey].\n",
+    )
+    .unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &std::fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let result = server.goto_definition(doc_uri.as_str(), 4, 7).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(
+        location.uri,
+        Uri::from_file_path(&bib_path).expect("bib uri")
+    );
+}
+
+#[tokio::test]
+async fn test_goto_definition_csl_json_bibliography() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let bib_path = root.join("refs.json");
+    let doc_path = root.join("doc.qmd");
+
+    std::fs::write(&bib_path, "[{\"id\":\"cslkey\",\"title\":\"Sample\"}]").unwrap();
+    std::fs::write(
+        &doc_path,
+        "---\nbibliography: refs.json\n---\n\nSee [@cslkey].\n",
+    )
+    .unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &std::fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let result = server.goto_definition(doc_uri.as_str(), 4, 7).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(
+        location.uri,
+        Uri::from_file_path(&bib_path).expect("bib uri")
+    );
+}
