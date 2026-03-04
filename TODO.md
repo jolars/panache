@@ -27,7 +27,7 @@ This document tracks implementation status for panache's features.
 - ❌ **Lint warnings** - Configurable linting rules (e.g., heading levels, list
   consistency)
 - ❌ **Link validation** - Check for broken internal links/references
-- ❌ **Citation validation** - Validate citation keys against bibliography
+- ✅ **Citation validation** - Validate citation keys against bibliography
 - ❌ **Footnote validation** - Check for undefined footnotes (also in linter)
 
 #### Code Actions
