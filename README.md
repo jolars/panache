@@ -270,11 +270,11 @@ wrap = "reflow"
 
 # External code formatters (opt-in)
 [formatters]
-python = ["isort", "black"]  # Sequential formatting
-r = "air"                    # Built-in preset
-javascript = "prettier"      # Reusable definitions
+python = ["isort", "black"] # Sequential formatting
+r = "air"                   # Built-in preset
+javascript = "prettier"     # Reusable definitions
 typescript = "prettier"
-yaml = "yamlfmt"             # Formats both code blocks AND frontmatter
+yaml = "yamlfmt"            # Formats both code blocks AND frontmatter
 
 # Customize formatters
 [formatters.prettier]
@@ -282,7 +282,7 @@ prepend-args = ["--print-width=100"]
 
 # External code linters
 [linters]
-r = "jarl"  # Enable R linting
+r = "jarl" # Enable R linting
 ```
 
 See `.panache.toml.example` for a complete configuration reference.
@@ -295,9 +295,9 @@ enable**:
 ```toml
 [formatters]
 r = "air"
-python = "ruff"    
+python = "ruff"
 javascript = "prettier"
-typescript = "prettier"  # Reuse same formatter
+typescript = "prettier" # Reuse same formatter
 ```
 
 **Key features:**
@@ -322,11 +322,11 @@ javascript = "prettier"
 
 # Partial override - inherits cmd/stdin from built-in "air" preset
 [formatters.air]
-args = ["format", "--custom-flag", "{}"]  # Only override args
+args = ["format", "--custom-flag", "{}"] # Only override args
 
 # Incremental modification - add args without full override
 [formatters.ruff]
-append_args = ["--line-length", "100"]  # Adds to preset args
+append_args = ["--line-length", "100"] # Adds to preset args
 
 # Full custom formatter
 [formatters.prettier]
@@ -345,7 +345,7 @@ When a `[formatters.NAME]` section matches a built-in preset name (like `air`,
 r = "air"
 
 [formatters.air]
-args = ["format", "--preset=tidyverse"]  # cmd and stdin inherited from built-in
+args = ["format", "--preset=tidyverse"] # cmd and stdin inherited from built-in
 ```
 
 **Incremental argument modification:**
@@ -388,7 +388,7 @@ panache supports external linters for code blocks—**opt-in via configuration**
 ```toml
 # Enable R linting
 [linters]
-r = "jarl"  # R linter with JSON output
+r = "jarl" # R linter with JSON output
 ```
 
 **Key features:**
