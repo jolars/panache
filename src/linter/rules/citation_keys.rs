@@ -164,6 +164,7 @@ mod tests {
                     files: Vec::new(),
                     load_errors: Vec::new(),
                 },
+                parse_errors: Vec::new(),
             }),
             inline_references: Vec::new(),
             citations: crate::metadata::CitationInfo {
@@ -193,6 +194,7 @@ mod tests {
                     files: Vec::new(),
                     load_errors: Vec::new(),
                 },
+                parse_errors: Vec::new(),
             }),
             inline_references: Vec::new(),
             citations: crate::metadata::CitationInfo {
@@ -237,6 +239,7 @@ mod tests {
                     files: Vec::new(),
                     load_errors: Vec::new(),
                 },
+                parse_errors: Vec::new(),
             }),
             inline_references: Vec::new(),
             citations: crate::metadata::CitationInfo {
