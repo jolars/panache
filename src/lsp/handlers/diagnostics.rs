@@ -166,18 +166,26 @@ fn check_bibliography_files(metadata: &DocumentMetadata, text: &str) -> Vec<Diag
     diagnostics
 }
 
-fn check_bibliography_parse(metadata: &DocumentMetadata, _text: &str) -> Vec<Diagnostic> {
+fn check_bibliography_parse(metadata: &DocumentMetadata, text: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let Some(parse) = metadata.bibliography_parse.as_ref() else {
         return diagnostics;
     };
+    let source_ranges = metadata
+        .bibliography
+        .as_ref()
+        .map(|info| info.source_ranges.as_slice())
+        .unwrap_or_default();
+    let fallback_range = source_ranges.first().cloned().unwrap_or_default();
+    let fallback_start = offset_to_position(text, fallback_range.start().into());
+    let fallback_end = offset_to_position(text, fallback_range.end().into());
 
     for error in &parse.index.load_errors {
         diagnostics.push(Diagnostic {
             range: Range {
-                start: Position::default(),
-                end: Position::default(),
+                start: fallback_start,
+                end: fallback_end,
             },
             severity: Some(DiagnosticSeverity::ERROR),
             code: Some(NumberOrString::String(
@@ -196,8 +204,8 @@ fn check_bibliography_parse(metadata: &DocumentMetadata, _text: &str) -> Vec<Dia
     for duplicate in &parse.index.duplicates {
         diagnostics.push(Diagnostic {
             range: Range {
-                start: Position::default(),
-                end: Position::default(),
+                start: fallback_start,
+                end: fallback_end,
             },
             severity: Some(DiagnosticSeverity::WARNING),
             code: Some(NumberOrString::String(
