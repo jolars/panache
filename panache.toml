@@ -2,10 +2,16 @@
 r = "air"
 yaml = "yamlfmt"
 toml = "taplo"
+bash = "shfmt"
+sh = "shfmt"
 
 [formatters.taplo]
 cmd = "taplo"
 args = ["format", "-"]
+
+[formatters.shfmt]
+cmd = "shfmt"
+args = ["-"]
 
 [linters]
 r = "jarl"
