@@ -745,6 +745,14 @@ pub fn get_formatter_preset(name: &str) -> Option<FormatterConfig> {
             stdin: true,
         }),
 
+        // C and C++ formatters
+        "clang-format" => Some(FormatterConfig {
+            cmd: "clang-format".to_string(),
+            args: vec!["-".to_string()],
+            enabled: true,
+            stdin: true,
+        }),
+
         // R formatters
         "air" => Some(FormatterConfig {
             cmd: "air".to_string(),
