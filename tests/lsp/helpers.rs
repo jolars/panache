@@ -270,6 +270,28 @@ impl TestLspServer {
 
         self.lsp.completion(params).await.unwrap()
     }
+
+    /// Rename symbol at a specific position.
+    pub async fn rename(
+        &self,
+        uri: &str,
+        line: u32,
+        character: u32,
+        new_name: &str,
+    ) -> Option<WorkspaceEdit> {
+        let params = RenameParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: uri.parse().unwrap(),
+                },
+                position: Position { line, character },
+            },
+            new_name: new_name.to_string(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+
+        self.lsp.rename(params).await.unwrap()
+    }
 }
 
 /// Wrapper that delegates all LanguageServer methods to the inner Arc<PanacheLsp>.
@@ -360,6 +382,13 @@ impl LanguageServer for LspWrapper {
         params: CompletionParams,
     ) -> tower_lsp_server::jsonrpc::Result<Option<CompletionResponse>> {
         self.inner.completion(params).await
+    }
+
+    async fn rename(
+        &self,
+        params: RenameParams,
+    ) -> tower_lsp_server::jsonrpc::Result<Option<WorkspaceEdit>> {
+        self.inner.rename(params).await
     }
 }
 

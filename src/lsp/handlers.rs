@@ -8,3 +8,4 @@ pub(crate) mod formatting;
 pub(crate) mod goto_definition;
 pub(crate) mod hover;
 pub(crate) mod list_conversion;
+pub(crate) mod rename;

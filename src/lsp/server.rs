@@ -40,6 +40,7 @@ impl LanguageServer for PanacheLsp {
                 definition_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions::default()),
+                rename_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -164,6 +165,16 @@ impl LanguageServer for PanacheLsp {
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         handlers::completion::completion(
+            &self.client,
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await
+    }
+
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        handlers::rename::rename(
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),

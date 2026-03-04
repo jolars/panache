@@ -1,0 +1,58 @@
+use super::helpers::*;
+use std::fs;
+use tower_lsp_server::ls_types::Uri;
+
+#[tokio::test]
+async fn test_rename_citation_updates_bib_and_dependents() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+
+    let bib_path = root.join("refs.bib");
+    fs::write(&bib_path, "@article{oldkey,\n  title = {Old}\n}\n").unwrap();
+
+    let doc1_path = root.join("doc1.qmd");
+    let doc2_path = root.join("doc2.qmd");
+    fs::write(
+        &doc1_path,
+        "---\nbibliography: refs.bib\n---\nSee [@oldkey].\n",
+    )
+    .unwrap();
+    fs::write(
+        &doc2_path,
+        "---\nbibliography: refs.bib\n---\nAlso [@oldkey].\n",
+    )
+    .unwrap();
+
+    let doc1_uri = Uri::from_file_path(&doc1_path).unwrap();
+    let doc2_uri = Uri::from_file_path(&doc2_path).unwrap();
+    let bib_uri = Uri::from_file_path(&bib_path).unwrap();
+    let root_uri = Uri::from_file_path(root).unwrap();
+
+    let server = TestLspServer::new();
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc1_uri.as_str(),
+            &fs::read_to_string(&doc1_path).unwrap(),
+            "quarto",
+        )
+        .await;
+    server
+        .open_document(
+            doc2_uri.as_str(),
+            &fs::read_to_string(&doc2_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let edit = server
+        .rename(doc1_uri.as_str(), 3, 7, "newkey")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+
+    assert!(changes.contains_key(&doc1_uri));
+    assert!(changes.contains_key(&doc2_uri));
+    assert!(changes.contains_key(&bib_uri));
+}
