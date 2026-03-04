@@ -238,7 +238,6 @@ pub struct Extensions {
     #[serde(alias = "quarto_shortcodes")]
     pub quarto_shortcodes: bool,
     /// Bookdown references \@ref(label) and (\#label)
-    #[serde(alias = "bookdown_references")]
     pub bookdown_references: bool,
 }
 
