@@ -43,7 +43,7 @@ pub fn convert_to_loose(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
         }
 
         // Find the end of this item (right after its last newline)
-        let item_end = item.text_range().end().into();
+        let item_end = item.syntax().text_range().end().into();
 
         // Insert a blank line
         let position = offset_to_position(text, item_end);

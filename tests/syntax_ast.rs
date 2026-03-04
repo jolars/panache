@@ -217,8 +217,10 @@ fn pipe_table_cast_and_rows() {
     let table = PipeTable::cast(table_node).expect("Should cast to PipeTable");
 
     // Check rows
-    let rows: Vec<_> = table.rows().collect();
-    assert!(!rows.is_empty(), "Table should have at least 1 row");
+    assert!(
+        table.rows().next().is_some(),
+        "Table should have at least 1 row"
+    );
 }
 
 #[test]
@@ -256,8 +258,7 @@ fn table_row_and_cells() {
     let row = TableRow::cast(row_node).expect("Should cast to TableRow");
 
     // Check cells
-    let cells: Vec<_> = row.cells().collect();
-    assert!(cells.len() >= 2, "Row should have at least 2 cells");
+    assert!(row.cells().count() >= 2, "Row should have at least 2 cells");
 }
 
 #[test]
@@ -290,8 +291,7 @@ fn grid_table_cast() {
         let table = GridTable::cast(table_node).expect("Should cast to GridTable");
 
         // Check rows accessor works
-        let rows: Vec<_> = table.rows().collect();
-        assert!(!rows.is_empty(), "Grid table should have rows");
+        assert!(table.rows().next().is_some(), "Grid table should have rows");
 
         // Check caption accessor (should be None without caption)
         let _ = table.caption();
@@ -314,8 +314,10 @@ fn simple_table_cast() {
         let table = SimpleTable::cast(table_node).expect("Should cast to SimpleTable");
 
         // Check rows accessor works
-        let rows: Vec<_> = table.rows().collect();
-        assert!(!rows.is_empty(), "Simple table should have rows");
+        assert!(
+            table.rows().next().is_some(),
+            "Simple table should have rows"
+        );
 
         // Check caption accessor
         let _ = table.caption();
@@ -338,8 +340,10 @@ fn multiline_table_cast() {
         let table = MultilineTable::cast(table_node).expect("Should cast to MultilineTable");
 
         // Check rows accessor works
-        let rows: Vec<_> = table.rows().collect();
-        assert!(!rows.is_empty(), "Multiline table should have rows");
+        assert!(
+            table.rows().next().is_some(),
+            "Multiline table should have rows"
+        );
 
         // Check caption accessor
         let _ = table.caption();
@@ -567,13 +571,16 @@ fn support_children_iterator() {
         let table = PipeTable::cast(table_node).expect("Should cast to PipeTable");
 
         // support::children should iterate all TABLE_ROW children
-        let rows: Vec<_> = table.rows().collect();
-        assert!(!rows.is_empty(), "Should find TABLE_ROW children");
+        let mut rows = table.rows();
+        let first_row = rows.next();
+        assert!(first_row.is_some(), "Should find TABLE_ROW children");
 
         // Check first row has cells
-        if let Some(first_row) = rows.first() {
-            let cells: Vec<_> = first_row.cells().collect();
-            assert!(!cells.is_empty(), "Row should have TABLE_CELL children");
+        if let Some(first_row) = first_row {
+            assert!(
+                first_row.cells().next().is_some(),
+                "Row should have TABLE_CELL children"
+            );
         }
     }
 }

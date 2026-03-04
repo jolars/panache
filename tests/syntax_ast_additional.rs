@@ -4,8 +4,8 @@
 
 use panache::parse;
 use panache::syntax::{
-    AstNode, Citation, FootnoteDefinition, GridTable, List, ListItem, MultilineTable,
-    ReferenceDefinition, SimpleTable, TableCaption,
+    AstNode, Citation, FootnoteDefinition, GridTable, List, MultilineTable, ReferenceDefinition,
+    SimpleTable, TableCaption,
 };
 
 // ============================================================================
@@ -36,8 +36,7 @@ Table: Grid table caption"#;
     assert!(caption_text.contains("Grid table caption"));
 
     // Test rows
-    let rows: Vec<_> = grid.rows().collect();
-    assert_eq!(rows.len(), 2, "Should have 2 data rows");
+    assert_eq!(grid.rows().count(), 2, "Should have 2 data rows");
 }
 
 #[test]
@@ -60,8 +59,7 @@ Table: Simple table caption"#;
     assert!(caption.is_some(), "Should have caption");
 
     // Test rows
-    let rows: Vec<_> = simple.rows().collect();
-    assert!(!rows.is_empty(), "Should have rows");
+    assert!(simple.rows().next().is_some(), "Should have rows");
 }
 
 #[test]
@@ -87,8 +85,7 @@ Table: Multiline table caption"#;
     assert!(caption.is_some(), "Should have caption");
 
     // Test rows
-    let rows: Vec<_> = multiline.rows().collect();
-    assert!(!rows.is_empty(), "Should have rows");
+    assert!(multiline.rows().next().is_some(), "Should have rows");
 }
 
 #[test]
@@ -128,8 +125,7 @@ fn list_item_is_loose() {
 
     // Check list items - note: loose lists still contain PLAIN nodes in items
     // The "looseness" is determined by BLANK_LINE nodes between items
-    let items: Vec<_> = list.items().collect();
-    assert_eq!(items.len(), 2);
+    assert_eq!(list.items().count(), 2);
 }
 
 #[test]
@@ -144,8 +140,7 @@ fn list_item_is_compact() {
 
     assert!(list.is_compact(), "List should be compact");
 
-    let items: Vec<_> = list.items().collect();
-    let item = ListItem::cast(items[0].clone()).expect("Should cast to ListItem");
+    let item = list.items().next().expect("Should have list item");
     assert!(item.is_compact(), "Item in compact list should be compact");
     assert!(!item.is_loose(), "Item in compact list should not be loose");
 }
@@ -254,8 +249,7 @@ fn empty_list_items() {
         .find_map(List::cast)
         .expect("Should find List");
 
-    let items: Vec<_> = list.items().collect();
-    assert_eq!(items.len(), 2, "Should have 2 items even if empty");
+    assert_eq!(list.items().count(), 2, "Should have 2 items even if empty");
 }
 
 // ============================================================================

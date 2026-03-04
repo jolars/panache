@@ -4,6 +4,7 @@
 //! - **Compact (tight)**: List items contain PLAIN nodes (no blank lines between items)
 //! - **Loose**: List items contain PARAGRAPH nodes (blank lines between items)
 
+use super::ast::{AstChildren, support};
 use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
 
 pub struct List(SyntaxNode);
@@ -44,10 +45,8 @@ impl List {
     }
 
     /// Returns an iterator over the list items (LIST_ITEM nodes).
-    pub fn items(&self) -> impl Iterator<Item = SyntaxNode> + '_ {
-        self.0
-            .children()
-            .filter(|n| n.kind() == SyntaxKind::LIST_ITEM)
+    pub fn items(&self) -> AstChildren<ListItem> {
+        support::children(&self.0)
     }
 }
 
@@ -133,14 +132,14 @@ mod tests {
         let input = "- First item\n- Second item\n";
         let tree = parse(input, None);
 
-        let item_nodes: Vec<_> = tree
+        let list = tree
             .descendants()
-            .filter(|n| n.kind() == SyntaxKind::LIST_ITEM)
-            .collect();
+            .find_map(List::cast)
+            .expect("Should find List");
 
-        assert_eq!(item_nodes.len(), 2, "Should have 2 list items");
+        assert_eq!(list.items().count(), 2, "Should have 2 list items");
 
-        let first_item = ListItem::cast(item_nodes[0].clone()).expect("Should cast to ListItem");
+        let first_item = list.items().next().expect("Should have list item");
         assert!(
             first_item.is_compact(),
             "First item should be compact (PLAIN)"
@@ -159,12 +158,11 @@ mod tests {
             .expect("Should find LIST node");
 
         let list = List::cast(list_node).expect("Should cast to List");
-        let items: Vec<_> = list.items().collect();
 
-        assert_eq!(items.len(), 4, "Should have 4 items");
-        for item in items {
+        assert_eq!(list.items().count(), 4, "Should have 4 items");
+        for item in list.items() {
             assert_eq!(
-                item.kind(),
+                item.syntax().kind(),
                 SyntaxKind::LIST_ITEM,
                 "Each item should be LIST_ITEM"
             );

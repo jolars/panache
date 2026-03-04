@@ -1,6 +1,6 @@
 //! Table AST node wrappers.
 
-use super::ast::support;
+use super::ast::{AstChildren, support};
 use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
 
 pub struct PipeTable(SyntaxNode);
@@ -32,7 +32,7 @@ impl PipeTable {
     }
 
     /// Returns all table rows.
-    pub fn rows(&self) -> impl Iterator<Item = TableRow> + '_ {
+    pub fn rows(&self) -> AstChildren<TableRow> {
         support::children(&self.0)
     }
 }
@@ -66,7 +66,7 @@ impl GridTable {
     }
 
     /// Returns all table rows.
-    pub fn rows(&self) -> impl Iterator<Item = TableRow> + '_ {
+    pub fn rows(&self) -> AstChildren<TableRow> {
         support::children(&self.0)
     }
 }
@@ -100,7 +100,7 @@ impl SimpleTable {
     }
 
     /// Returns all table rows.
-    pub fn rows(&self) -> impl Iterator<Item = TableRow> + '_ {
+    pub fn rows(&self) -> AstChildren<TableRow> {
         support::children(&self.0)
     }
 }
@@ -134,7 +134,7 @@ impl MultilineTable {
     }
 
     /// Returns all table rows.
-    pub fn rows(&self) -> impl Iterator<Item = TableRow> + '_ {
+    pub fn rows(&self) -> AstChildren<TableRow> {
         support::children(&self.0)
     }
 }
@@ -197,7 +197,7 @@ impl AstNode for TableRow {
 
 impl TableRow {
     /// Returns all cells in this row.
-    pub fn cells(&self) -> impl Iterator<Item = TableCell> + '_ {
+    pub fn cells(&self) -> AstChildren<TableCell> {
         support::children(&self.0)
     }
 }
