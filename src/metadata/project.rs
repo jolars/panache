@@ -280,6 +280,33 @@ enum RmdFiles {
     ByFormat(HashMap<String, Vec<String>>),
 }
 
+pub(crate) enum BookdownFiles {
+    List(Vec<PathBuf>),
+    ByFormat(HashMap<String, Vec<PathBuf>>),
+}
+
+pub(crate) fn read_bookdown_files(root: &Path) -> Option<BookdownFiles> {
+    let bookdown = root.join("_bookdown.yml");
+    if !bookdown.exists() {
+        return None;
+    }
+    let yaml = std::fs::read_to_string(&bookdown).ok()?;
+    let doc: BookdownConfig = serde_saphyr::from_str(&yaml).ok()?;
+    let rmd_files = doc.rmd_files?;
+    let files = match rmd_files {
+        RmdFiles::List(files) => {
+            BookdownFiles::List(files.into_iter().map(|f| root.join(f)).collect())
+        }
+        RmdFiles::ByFormat(formats) => BookdownFiles::ByFormat(
+            formats
+                .into_iter()
+                .map(|(key, values)| (key, values.into_iter().map(|f| root.join(f)).collect()))
+                .collect(),
+        ),
+    };
+    Some(files)
+}
+
 fn select_first_bookdown_file(files: &[String], index_exists: bool) -> Option<String> {
     if index_exists {
         return Some("index.Rmd".to_string());

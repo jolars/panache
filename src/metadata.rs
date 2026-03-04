@@ -30,7 +30,7 @@ use std::path::Path;
 
 mod bibliography;
 mod citations;
-mod project;
+pub(crate) mod project;
 mod yaml;
 
 pub use bibliography::BibliographyInfo;

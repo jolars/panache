@@ -1,6 +1,7 @@
 //! Tests for incremental document synchronization.
 
 use super::helpers::*;
+use tower_lsp_server::ls_types::{GotoDefinitionResponse, Uri};
 
 #[tokio::test]
 async fn test_incremental_edit_simple() {
@@ -29,6 +30,53 @@ async fn test_incremental_edit_simple() {
     let expected = panache::parse("# Title\n\nNew text.", None);
     assert_eq!(tree_after.text_range(), expected.text_range());
     assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+#[tokio::test]
+async fn test_incremental_edit_updates_dependents() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    std::fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+
+    let doc1_path = root.join("doc1.qmd");
+    let doc2_path = root.join("doc2.qmd");
+    std::fs::write(&doc1_path, "See [link][ref].\n").unwrap();
+    std::fs::write(&doc2_path, "[ref]: https://example.com\n").unwrap();
+
+    let doc1_uri = Uri::from_file_path(&doc1_path).unwrap();
+    let doc2_uri = Uri::from_file_path(&doc2_path).unwrap();
+
+    let server = TestLspServer::new();
+    server
+        .initialize(Uri::from_file_path(root).unwrap().as_str())
+        .await;
+    server
+        .open_document(
+            doc1_uri.as_str(),
+            &std::fs::read_to_string(&doc1_path).unwrap(),
+            "quarto",
+        )
+        .await;
+    server
+        .open_document(
+            doc2_uri.as_str(),
+            &std::fs::read_to_string(&doc2_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    server
+        .edit_document(
+            doc2_uri.as_str(),
+            vec![full_document_change("[ref]: https://example.org\n")],
+        )
+        .await;
+
+    let result = server.goto_definition(doc1_uri.as_str(), 0, 12).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.uri, doc2_uri);
 }
 
 #[tokio::test]

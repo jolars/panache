@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+use crate::metadata::project::{BookdownFiles, read_bookdown_files};
 use rowan::{NodeOrToken, TextRange};
 
 use crate::config::Config;
@@ -72,7 +73,7 @@ impl ProjectGraph {
         let mut graph = ProjectGraph::default();
         let mut visited = HashSet::new();
         let base_dir = root_path.parent().unwrap_or_else(|| Path::new("."));
-        let project_root = find_quarto_root(root_path);
+        let project_root = find_quarto_root(root_path).or_else(|| find_bookdown_root(root_path));
         visit_document(
             root_path,
             root_text,
@@ -82,6 +83,43 @@ impl ProjectGraph {
             &mut graph,
             &mut visited,
         );
+        graph
+    }
+
+    pub fn build_project(root_path: &Path, root_text: &str, config: &Config) -> Self {
+        let mut graph = ProjectGraph::default();
+        let mut visited = HashSet::new();
+        let base_dir = root_path.parent().unwrap_or_else(|| Path::new("."));
+        let project_root = find_quarto_root(root_path).or_else(|| find_bookdown_root(root_path));
+
+        visit_document(
+            root_path,
+            root_text,
+            base_dir,
+            project_root.as_deref(),
+            config,
+            &mut graph,
+            &mut visited,
+        );
+
+        if let Some(root) = project_root {
+            let is_bookdown = find_bookdown_root(root_path).is_some();
+            for path in find_project_documents(&root, config, is_bookdown) {
+                if let Ok(text) = std::fs::read_to_string(&path) {
+                    let doc_base = path.parent().unwrap_or_else(|| Path::new("."));
+                    visit_document(
+                        &path,
+                        &text,
+                        doc_base,
+                        Some(&root),
+                        config,
+                        &mut graph,
+                        &mut visited,
+                    );
+                }
+            }
+        }
+
         graph
     }
 
@@ -274,6 +312,67 @@ pub fn find_quarto_root(doc_path: &Path) -> Option<PathBuf> {
         }
         current = current.parent()?;
     }
+}
+
+fn find_bookdown_root(doc_path: &Path) -> Option<PathBuf> {
+    let mut current = doc_path.parent()?;
+    loop {
+        let bookdown = current.join("_bookdown.yml");
+        if bookdown.exists() {
+            return Some(current.to_path_buf());
+        }
+        current = current.parent()?;
+    }
+}
+
+fn find_project_documents(project_root: &Path, config: &Config, is_bookdown: bool) -> Vec<PathBuf> {
+    let mut docs = Vec::new();
+    let mut seen = HashSet::new();
+    let bookdown_files = if is_bookdown {
+        read_bookdown_files(project_root)
+    } else {
+        None
+    };
+    let walker = ignore::WalkBuilder::new(project_root)
+        .hidden(false)
+        .git_ignore(true)
+        .git_global(true)
+        .build();
+
+    for entry in walker.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if let Some(files) = &bookdown_files {
+            let contains = match files {
+                BookdownFiles::List(files) => files.contains(&path.to_path_buf()),
+                BookdownFiles::ByFormat(formats) => {
+                    formats.values().flatten().any(|value| value == path)
+                }
+            };
+            if !contains {
+                continue;
+            }
+        }
+        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+            continue;
+        };
+        if !matches!(
+            ext,
+            "qmd" | "md" | "Rmd" | "rmd" | "markdown" | "mdown" | "mkd"
+        ) {
+            continue;
+        }
+        if ext == "md" && !config.extensions.quarto_shortcodes {
+            continue;
+        }
+        if seen.insert(path.to_path_buf()) {
+            docs.push(path.to_path_buf());
+        }
+    }
+
+    docs
 }
 
 fn include_not_found_diagnostic(input: &str, range: TextRange, path: &Path) -> Diagnostic {
@@ -508,5 +607,51 @@ mod tests {
 
         let bib_deps = graph.dependencies(&doc_path, Some(EdgeKind::Bibliography));
         assert!(bib_deps.contains(&root.join("proj.bib")));
+    }
+
+    #[test]
+    fn project_graph_builds_from_project_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.qmd");
+        let other_path = root.join("other.qmd");
+
+        fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+        fs::write(&doc_path, "See [link][ref].\n").unwrap();
+        fs::write(&other_path, "[ref]: https://example.com\n").unwrap();
+
+        let input = fs::read_to_string(&doc_path).unwrap();
+        let config = Config::default();
+        let graph = ProjectGraph::build_project(&doc_path, &input, &config);
+
+        assert!(graph.documents().contains(&doc_path));
+        assert!(graph.documents().contains(&other_path));
+        assert!(graph.definitions().find_reference("ref").is_some());
+    }
+
+    #[test]
+    fn project_graph_uses_bookdown_file_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+        let doc_path = root.join("index.Rmd");
+        let other_path = root.join("chapter.Rmd");
+        let ignored_path = root.join("ignored.Rmd");
+
+        fs::write(
+            root.join("_bookdown.yml"),
+            "rmd_files: [\"index.Rmd\", \"chapter.Rmd\"]\n",
+        )
+        .unwrap();
+        fs::write(&doc_path, "[ref]: https://example.com\n").unwrap();
+        fs::write(&other_path, "See [link][ref].\n").unwrap();
+        fs::write(&ignored_path, "[ignored]: https://example.org\n").unwrap();
+
+        let input = fs::read_to_string(&other_path).unwrap();
+        let config = Config::default();
+        let graph = ProjectGraph::build_project(&other_path, &input, &config);
+
+        assert!(graph.documents().contains(&doc_path));
+        assert!(graph.documents().contains(&other_path));
+        assert!(!graph.documents().contains(&ignored_path));
     }
 }

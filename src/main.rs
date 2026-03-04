@@ -452,7 +452,7 @@ fn lint_documents_with_includes(
     let mut results = Vec::new();
     let mut visited = HashSet::new();
     let mut active = HashSet::new();
-    let graph = panache::includes::ProjectGraph::build(root_path, &input, cfg);
+    let graph = panache::includes::ProjectGraph::build_project(root_path, &input, cfg);
     lint_loaded_document_with_includes(
         root_path,
         &input,

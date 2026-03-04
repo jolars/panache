@@ -36,7 +36,7 @@ pub(crate) async fn did_open(
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
     let tree = GreenNode::from(crate::parse(&text, Some(config.clone())).green());
     let graph = if let Some(path) = params.text_document.uri.to_file_path() {
-        crate::includes::ProjectGraph::build(&path, &text, &config)
+        crate::includes::ProjectGraph::build_project(&path, &text, &config)
     } else {
         crate::includes::ProjectGraph::default()
     };
@@ -80,12 +80,14 @@ pub(crate) async fn did_change(
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
 
     // Apply incremental changes sequentially
+    let mut dependent_uris: Option<Vec<Uri>> = None;
     {
         let mut document_map = document_map.lock().await;
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
             // Store original state before applying changes
             let original_text = doc_state.text.clone();
             let original_tree = doc_state.tree.clone();
+            let original_graph = doc_state.graph.clone();
 
             // Apply all changes to update the text
             for change in params.content_changes.iter() {
@@ -129,14 +131,33 @@ pub(crate) async fn did_change(
             // Re-parse metadata after changes
             doc_state.metadata = parse_metadata(&doc_state.text, &params.text_document.uri);
             doc_state.graph = if let Some(path) = params.text_document.uri.to_file_path() {
-                crate::includes::ProjectGraph::build(&path, &doc_state.text, &config)
+                crate::includes::ProjectGraph::build_project(&path, &doc_state.text, &config)
             } else {
                 crate::includes::ProjectGraph::default()
             };
+            let dependents = if let Some(path) = params.text_document.uri.to_file_path() {
+                original_graph.dependents(&path, None)
+            } else {
+                Vec::new()
+            };
+            if !dependents.is_empty() {
+                dependent_uris = Some(
+                    dependents
+                        .into_iter()
+                        .filter_map(Uri::from_file_path)
+                        .collect(),
+                );
+            }
         } else {
             return;
         }
     };
+
+    if let Some(uris) = dependent_uris {
+        for uri in uris {
+            lint_and_publish(client, &document_map, &workspace_root, uri).await;
+        }
+    }
 
     // Run linter and publish diagnostics
     lint_and_publish(
