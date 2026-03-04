@@ -728,6 +728,15 @@ pub fn get_formatter_preset(name: &str) -> Option<FormatterConfig> {
             enabled: true,
             stdin: true,
         }),
+
+        // TOML formatters
+        "taplo" => Some(FormatterConfig {
+            cmd: "taplo".to_string(),
+            args: vec!["format".to_string(), "-".to_string()],
+            enabled: true,
+            stdin: true,
+        }),
+
         // R formatters
         "air" => Some(FormatterConfig {
             cmd: "air".to_string(),
