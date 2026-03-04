@@ -5,12 +5,12 @@
 //! - **Loose**: List items contain PARAGRAPH nodes (blank lines between items)
 
 use super::ast::{AstChildren, support};
-use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
+use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
 
 pub struct List(SyntaxNode);
 
 impl AstNode for List {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LIST
@@ -53,7 +53,7 @@ impl List {
 pub struct ListItem(SyntaxNode);
 
 impl AstNode for ListItem {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LIST_ITEM

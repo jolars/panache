@@ -1,12 +1,12 @@
 //! Link and image AST node wrappers.
 
 use super::ast::support;
-use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
+use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
 
 pub struct Link(SyntaxNode);
 
 impl AstNode for Link {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LINK
@@ -45,7 +45,7 @@ impl Link {
 pub struct LinkText(SyntaxNode);
 
 impl AstNode for LinkText {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LINK_TEXT
@@ -79,7 +79,7 @@ impl LinkText {
 pub struct LinkDest(SyntaxNode);
 
 impl AstNode for LinkDest {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LINK_DEST
@@ -116,7 +116,7 @@ impl LinkDest {
 pub struct LinkRef(SyntaxNode);
 
 impl AstNode for LinkRef {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LINK_REF
@@ -150,7 +150,7 @@ impl LinkRef {
 pub struct ImageLink(SyntaxNode);
 
 impl AstNode for ImageLink {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::IMAGE_LINK
@@ -184,7 +184,7 @@ impl ImageLink {
 pub struct ImageAlt(SyntaxNode);
 
 impl AstNode for ImageAlt {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::IMAGE_ALT
@@ -218,7 +218,7 @@ impl ImageAlt {
 pub struct Figure(SyntaxNode);
 
 impl AstNode for Figure {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::FIGURE

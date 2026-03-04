@@ -1,12 +1,12 @@
 //! Heading AST node wrappers.
 
 use super::ast::support;
-use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
+use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
 
 pub struct Heading(SyntaxNode);
 
 impl AstNode for Heading {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::HEADING
@@ -69,7 +69,7 @@ impl Heading {
 pub struct HeadingContent(SyntaxNode);
 
 impl AstNode for HeadingContent {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::HEADING_CONTENT

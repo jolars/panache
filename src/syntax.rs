@@ -26,9 +26,9 @@ pub use lists::*;
 pub use references::*;
 pub use tables::*;
 
-pub type SyntaxNode = rowan::SyntaxNode<QuartoLanguage>;
-pub type SyntaxToken = rowan::SyntaxToken<QuartoLanguage>;
-pub type SyntaxElement = rowan::SyntaxElement<QuartoLanguage>;
+pub type SyntaxNode = rowan::SyntaxNode<PanacheLanguage>;
+pub type SyntaxToken = rowan::SyntaxToken<PanacheLanguage>;
+pub type SyntaxElement = rowan::SyntaxElement<PanacheLanguage>;
 
 #[cfg(test)]
 mod tests {

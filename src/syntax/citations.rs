@@ -1,11 +1,11 @@
 //! Citation AST node wrappers.
 
-use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode, SyntaxToken};
+use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode, SyntaxToken};
 
 pub struct Citation(SyntaxNode);
 
 impl AstNode for Citation {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::CITATION
@@ -42,7 +42,7 @@ impl Citation {
 pub struct Crossref(SyntaxNode);
 
 impl AstNode for Crossref {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::CROSSREF

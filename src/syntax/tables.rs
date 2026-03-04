@@ -1,12 +1,12 @@
 //! Table AST node wrappers.
 
 use super::ast::{AstChildren, support};
-use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
+use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
 
 pub struct PipeTable(SyntaxNode);
 
 impl AstNode for PipeTable {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::PIPE_TABLE
@@ -40,7 +40,7 @@ impl PipeTable {
 pub struct GridTable(SyntaxNode);
 
 impl AstNode for GridTable {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::GRID_TABLE
@@ -74,7 +74,7 @@ impl GridTable {
 pub struct SimpleTable(SyntaxNode);
 
 impl AstNode for SimpleTable {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::SIMPLE_TABLE
@@ -108,7 +108,7 @@ impl SimpleTable {
 pub struct MultilineTable(SyntaxNode);
 
 impl AstNode for MultilineTable {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::MULTILINE_TABLE
@@ -142,7 +142,7 @@ impl MultilineTable {
 pub struct TableCaption(SyntaxNode);
 
 impl AstNode for TableCaption {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::TABLE_CAPTION
@@ -176,7 +176,7 @@ impl TableCaption {
 pub struct TableRow(SyntaxNode);
 
 impl AstNode for TableRow {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::TABLE_ROW
@@ -205,7 +205,7 @@ impl TableRow {
 pub struct TableCell(SyntaxNode);
 
 impl AstNode for TableCell {
-    type Language = QuartoLanguage;
+    type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::TABLE_CELL

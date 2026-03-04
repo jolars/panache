@@ -190,9 +190,9 @@ impl From<SyntaxKind> for rowan::SyntaxKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum QuartoLanguage {}
+pub enum PanacheLanguage {}
 
-impl Language for QuartoLanguage {
+impl Language for PanacheLanguage {
     type Kind = SyntaxKind;
 
     fn kind_from_raw(raw: rowan::SyntaxKind) -> Self::Kind {
