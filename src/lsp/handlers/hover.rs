@@ -134,34 +134,75 @@ pub(crate) async fn hover(
 }
 
 fn format_bibtex_entry(entry: &crate::bibtex::BibEntry) -> String {
+    let author = find_field(entry, &["author", "editor"]).unwrap_or_default();
+    let year = find_field(entry, &["year", "date"]).unwrap_or_default();
+    let title = find_field(entry, &["title", "booktitle"]).unwrap_or_default();
+    let container = find_field(entry, &["journal", "journaltitle", "container-title"])
+        .or_else(|| find_field(entry, &["publisher"]))
+        .unwrap_or_default();
+    let locator = build_locator(entry);
+
+    let mut summary = String::new();
+    if !author.is_empty() {
+        summary.push_str(author);
+    }
+    if !year.is_empty() {
+        if !summary.is_empty() {
+            summary.push_str(" (");
+            summary.push_str(year);
+            summary.push(')');
+        } else {
+            summary.push_str(year);
+        }
+    }
+    if !title.is_empty() {
+        if !summary.is_empty() {
+            summary.push_str(". ");
+        }
+        summary.push_str(&format!("*{}*", title));
+    }
+    if !container.is_empty() {
+        summary.push_str(". ");
+        summary.push_str(container);
+    }
+    if !locator.is_empty() {
+        summary.push_str(", ");
+        summary.push_str(&locator);
+    }
+
+    summary.trim().to_string()
+}
+
+fn find_field<'a>(entry: &'a crate::bibtex::BibEntry, names: &[&str]) -> Option<&'a str> {
+    names.iter().find_map(|name| {
+        entry
+            .fields
+            .iter()
+            .find(|field| field.name.eq_ignore_ascii_case(name))
+            .map(|field| field.value.trim())
+            .filter(|value| !value.is_empty())
+    })
+}
+
+fn build_locator(entry: &crate::bibtex::BibEntry) -> String {
+    let volume = find_field(entry, &["volume"]).unwrap_or_default();
+    let number = find_field(entry, &["number", "issue"]).unwrap_or_default();
+    let pages = find_field(entry, &["pages", "page"]).unwrap_or_default();
+
     let mut parts = Vec::new();
-    if let Some(author) = entry
-        .fields
-        .iter()
-        .find(|field| field.name.eq_ignore_ascii_case("author"))
-    {
-        parts.push(author.value.trim().to_string());
+    if !volume.is_empty() {
+        if !number.is_empty() {
+            parts.push(format!("{}({})", volume, number));
+        } else {
+            parts.push(volume.to_string());
+        }
+    } else if !number.is_empty() {
+        parts.push(number.to_string());
     }
-    if let Some(year) = entry
-        .fields
-        .iter()
-        .find(|field| field.name.eq_ignore_ascii_case("year"))
-    {
-        parts.push(year.value.trim().to_string());
+    if !pages.is_empty() {
+        parts.push(pages.to_string());
     }
-    if let Some(title) = entry
-        .fields
-        .iter()
-        .find(|field| field.name.eq_ignore_ascii_case("title"))
-    {
-        parts.push(format!("*{}*", title.value.trim()));
-    }
-
-    if parts.is_empty() {
-        return String::new();
-    }
-
-    parts.join(" — ")
+    parts.join(", ")
 }
 #[cfg(test)]
 mod tests {

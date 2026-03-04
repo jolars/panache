@@ -124,6 +124,62 @@ async fn test_hover_on_footnote_with_formatting() {
 }
 
 #[tokio::test]
+async fn test_hover_on_citation_preview() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let bib_path = root.join("refs.bib");
+    let doc_path = root.join("doc.qmd");
+
+    std::fs::write(
+        &bib_path,
+        "@article{citekey,\n  author = {Doe, Jane},\n  year = {2020},\n  title = {Sample Title},\n  journal = {Journal Name},\n  volume = {12},\n  number = {3},\n  pages = {45-67}\n}\n",
+    )
+    .unwrap();
+
+    std::fs::write(
+        &doc_path,
+        "---\nbibliography: refs.bib\n---\n\nSee [@citekey].\n",
+    )
+    .unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &std::fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let result = server.hover(doc_uri.as_str(), 4, 7).await;
+    let Some(Hover { contents, .. }) = result else {
+        panic!("Expected hover content");
+    };
+    let content = match contents {
+        HoverContents::Markup(markup) => markup.value,
+        HoverContents::Scalar(scalar) => match scalar {
+            MarkedString::String(text) => text,
+            MarkedString::LanguageString(lang) => lang.value,
+        },
+        HoverContents::Array(array) => array
+            .iter()
+            .map(|item| match item {
+                MarkedString::String(text) => text.clone(),
+                MarkedString::LanguageString(lang) => lang.value.clone(),
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+    };
+    assert!(content.contains("Doe"));
+    assert!(content.contains("2020"));
+    assert!(content.contains("Sample Title"));
+    assert!(content.contains("Journal Name"));
+}
+
+#[tokio::test]
 async fn test_hover_on_undefined_footnote() {
     let server = TestLspServer::new();
 
