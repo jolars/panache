@@ -157,6 +157,45 @@ fn test_lint_bibliography_integration() {
 }
 
 #[test]
+fn test_lint_inline_references_in_metadata() {
+    let temp_dir = TempDir::new().unwrap();
+    let bib_path = temp_dir.path().join("refs.bib");
+    let doc_path = temp_dir.path().join("doc.qmd");
+
+    fs::write(
+        &bib_path,
+        "@article{known,\n  title = {Known Title},\n  author = {Doe, Jane},\n  year = {2020}\n}\n",
+    )
+    .unwrap();
+
+    fs::write(
+        &doc_path,
+        "---\nbibliography: refs.bib\nreferences:\n  - id: inline\n    title: Inline\n---\n\nCite [@inline; @known; @missing].\n",
+    )
+    .unwrap();
+
+    let dup_path = temp_dir.path().join("dup.qmd");
+    fs::write(
+        &dup_path,
+        "---\nreferences:\n  - id: dupe\n    title: One\n  - id: dupe\n    title: Two\n---\n\nText\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("missing-bibliography-key"))
+        .stdout(predicate::str::contains("missing"));
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", dup_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("duplicate-inline-reference-id"));
+}
+
+#[test]
 fn test_lint_includes_reports_child_diagnostics() {
     let temp_dir = TempDir::new().unwrap();
     let parent_path = temp_dir.path().join("parent.qmd");

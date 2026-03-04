@@ -10,6 +10,7 @@ use tower_lsp_server::ls_types::*;
 use crate::lsp::DocumentState;
 
 use super::super::helpers;
+use crate::metadata::inline_reference_map;
 
 pub(crate) async fn completion(
     _client: &tower_lsp_server::Client,
@@ -41,16 +42,36 @@ pub(crate) async fn completion(
     let Some(metadata) = metadata else {
         return Ok(None);
     };
-    let Some(parse) = metadata.bibliography_parse else {
+    let parse = metadata.bibliography_parse.as_ref();
+    if parse.is_none() && metadata.inline_references.is_empty() {
         return Ok(None);
-    };
+    }
 
+    let mut seen = std::collections::HashSet::new();
     let mut items = Vec::new();
-    for key in parse.index.iter_keys() {
+    if let Some(parse) = parse {
+        for key in parse.index.iter_keys() {
+            if !seen.insert(key.to_lowercase()) {
+                continue;
+            }
+            items.push(CompletionItem {
+                label: key.clone(),
+                kind: Some(CompletionItemKind::REFERENCE),
+                insert_text: Some(key.clone()),
+                insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                ..Default::default()
+            });
+        }
+    }
+    for (key, entries) in inline_reference_map(&metadata.inline_references) {
+        if entries.is_empty() || !seen.insert(key.clone()) {
+            continue;
+        }
+        let label = entries[0].id.clone();
         items.push(CompletionItem {
-            label: key.clone(),
+            label: label.clone(),
             kind: Some(CompletionItemKind::REFERENCE),
-            insert_text: Some(key.clone()),
+            insert_text: Some(label),
             insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
             ..Default::default()
         });

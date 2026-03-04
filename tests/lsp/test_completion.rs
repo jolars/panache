@@ -81,3 +81,30 @@ async fn test_completion_with_project_bibliography() {
         "Expected bibliography key completion"
     );
 }
+
+#[tokio::test]
+async fn test_completion_with_inline_references() {
+    let server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str()).await;
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    let content = "---\nreferences:\n  - id: inline\n    title: Inline\n---\n\nText [@] citation.";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.completion(doc_uri.as_str(), 6, 7).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("Expected completion items");
+    };
+
+    assert!(
+        items.iter().any(|item| item.label == "inline"),
+        "Expected inline reference completion"
+    );
+}

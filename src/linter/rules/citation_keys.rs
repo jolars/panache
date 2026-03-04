@@ -1,6 +1,9 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
+use crate::metadata::{
+    inline_bib_conflicts, inline_reference_contains, inline_reference_duplicates,
+};
 use crate::syntax::{AstNode, Citation, Crossref, SyntaxNode};
 
 pub struct CitationKeysRule;
@@ -27,35 +30,63 @@ impl Rule for CitationKeysRule {
             return diagnostics;
         };
 
-        let Some(parse) = metadata.bibliography_parse.as_ref() else {
-            return diagnostics;
-        };
+        let parse = metadata.bibliography_parse.as_ref();
+        if let Some(parse) = parse {
+            for error in &parse.index.load_errors {
+                let location = Location::from_range(tree.text_range(), input);
+                diagnostics.push(Diagnostic::error(
+                    location,
+                    "bibliography-load-error",
+                    format!(
+                        "Failed to load bibliography {}: {}",
+                        error.path.display(),
+                        error.message
+                    ),
+                ));
+            }
 
-        for error in &parse.index.load_errors {
-            let location = Location::from_range(tree.text_range(), input);
-            diagnostics.push(Diagnostic::error(
+            for duplicate in &parse.index.duplicates {
+                let location = Location::from_range(tree.text_range(), input);
+                diagnostics.push(Diagnostic::warning(
+                    location,
+                    "duplicate-bibliography-key",
+                    format!(
+                        "Duplicate bibliography key '{}' in {} and {}",
+                        duplicate.key,
+                        duplicate.first.file.display(),
+                        duplicate.duplicate.file.display()
+                    ),
+                ));
+            }
+        }
+
+        for duplicate in inline_reference_duplicates(&metadata.inline_references) {
+            let location = Location::from_range(duplicate.duplicate.range, input);
+            diagnostics.push(Diagnostic::warning(
                 location,
-                "bibliography-load-error",
-                format!(
-                    "Failed to load bibliography {}: {}",
-                    error.path.display(),
-                    error.message
-                ),
+                "duplicate-inline-reference-id",
+                format!("Duplicate inline reference id '{}'", duplicate.key),
             ));
         }
 
-        for duplicate in &parse.index.duplicates {
-            let location = Location::from_range(tree.text_range(), input);
-            diagnostics.push(Diagnostic::warning(
-                location,
-                "duplicate-bibliography-key",
-                format!(
-                    "Duplicate bibliography key '{}' in {} and {}",
-                    duplicate.key,
-                    duplicate.first.file.display(),
-                    duplicate.duplicate.file.display()
-                ),
-            ));
+        if let Some(parse) = parse {
+            for conflict in inline_bib_conflicts(&metadata.inline_references, &parse.index) {
+                let location = Location::from_range(conflict.inline.range, input);
+                diagnostics.push(Diagnostic::warning(
+                    location,
+                    "duplicate-inline-reference-id",
+                    format!(
+                        "Duplicate inline reference id '{}' in {} and {}",
+                        conflict.key,
+                        conflict.inline.path.display(),
+                        conflict.bib.file.display()
+                    ),
+                ));
+            }
+        }
+
+        if parse.is_none() && metadata.inline_references.is_empty() {
+            return diagnostics;
         }
 
         for key_text in &metadata.citations.keys {
@@ -67,7 +98,9 @@ impl Rule for CitationKeysRule {
             {
                 continue;
             }
-            if parse.index.get(key_text).is_none() {
+            if parse.and_then(|parse| parse.index.get(key_text)).is_none()
+                && !inline_reference_contains(&metadata.inline_references, key_text)
+            {
                 // Find all citation nodes that reference this missing key
                 for citation in tree.descendants().filter_map(Citation::cast) {
                     for citation_key in citation.keys() {
@@ -123,6 +156,7 @@ mod tests {
                     load_errors: Vec::new(),
                 },
             }),
+            inline_references: Vec::new(),
             citations: crate::metadata::CitationInfo {
                 keys: vec!["missing".to_string()],
             },
@@ -151,6 +185,7 @@ mod tests {
                     load_errors: Vec::new(),
                 },
             }),
+            inline_references: Vec::new(),
             citations: crate::metadata::CitationInfo {
                 keys: vec!["missing".to_string()],
             },
@@ -194,6 +229,7 @@ mod tests {
                     load_errors: Vec::new(),
                 },
             }),
+            inline_references: Vec::new(),
             citations: crate::metadata::CitationInfo {
                 keys: vec!["eq-missing".to_string()],
             },

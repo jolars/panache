@@ -7,6 +7,7 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
+use crate::metadata::{inline_bib_conflicts, inline_reference_map};
 use crate::syntax::{AstNode, Citation, SyntaxKind, SyntaxNode};
 
 use super::super::conversions::{offset_to_position, position_to_offset};
@@ -58,37 +59,87 @@ pub(crate) async fn rename(
     let Some(metadata) = metadata else {
         return Ok(None);
     };
-    let Some(parse) = metadata.bibliography_parse else {
-        return Ok(None);
-    };
-
-    let Some(entry) = parse.index.get(&old_key) else {
-        return Ok(None);
-    };
-
-    let bib_path = entry.file.clone();
-    let bib_text = std::fs::read_to_string(&bib_path).unwrap_or_default();
-    let bib_start = offset_to_position(&bib_text, entry.span.start);
-    let bib_end = offset_to_position(&bib_text, entry.span.end);
-
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
-    let bib_uri = Uri::from_file_path(&bib_path).unwrap_or_else(|| uri.clone());
-    changes.entry(bib_uri).or_default().push(TextEdit {
-        range: Range {
-            start: bib_start,
-            end: bib_end,
-        },
-        new_text: new_name.clone(),
-    });
+    let mut doc_paths = Vec::new();
+    let mut bib_paths = Vec::new();
+
+    if let Some(parse) = metadata.bibliography_parse.as_ref() {
+        let mut bib_entries: Vec<crate::bibtex::BibEntryLocation> = Vec::new();
+        if let Some(entry) = parse.index.get(&old_key) {
+            bib_entries.push(entry.clone());
+        } else {
+            for conflict in inline_bib_conflicts(&metadata.inline_references, &parse.index) {
+                if conflict.key.eq_ignore_ascii_case(&old_key) {
+                    bib_entries.push(conflict.bib);
+                }
+            }
+        }
+        bib_entries.sort_by(|a, b| a.file.cmp(&b.file));
+        bib_entries.dedup_by(|a, b| a.file == b.file && a.key.eq_ignore_ascii_case(&b.key));
+        for entry in bib_entries {
+            let bib_path = entry.file.clone();
+            let bib_text = std::fs::read_to_string(&bib_path).unwrap_or_default();
+            let bib_start = offset_to_position(&bib_text, entry.span.start);
+            let bib_end = offset_to_position(&bib_text, entry.span.end);
+            let bib_uri = Uri::from_file_path(&bib_path).unwrap_or_else(|| uri.clone());
+            changes.entry(bib_uri).or_default().push(TextEdit {
+                range: Range {
+                    start: bib_start,
+                    end: bib_end,
+                },
+                new_text: new_name.clone(),
+            });
+            bib_paths.push(bib_path);
+        }
+    }
 
     let doc_path = uri.to_file_path().map(|p| p.into_owned());
-    let mut doc_paths = Vec::new();
-    doc_paths.extend(graph.dependents(&bib_path, Some(crate::includes::EdgeKind::Bibliography)));
+    for bib_path in &bib_paths {
+        doc_paths.extend(graph.dependents(bib_path, Some(crate::includes::EdgeKind::Bibliography)));
+    }
+
+    let inline_refs = inline_reference_map(&metadata.inline_references);
+    if inline_refs.contains_key(&old_norm) {
+        let mut inline_doc_paths = Vec::new();
+        let mut inline_edits: Vec<(Uri, TextEdit)> = Vec::new();
+        for entry in metadata
+            .inline_references
+            .iter()
+            .filter(|entry| entry.id.eq_ignore_ascii_case(&old_key))
+        {
+            let text = if Some(entry.path.clone()) == uri.to_file_path().map(|p| p.into_owned()) {
+                content.clone()
+            } else {
+                std::fs::read_to_string(&entry.path).unwrap_or_default()
+            };
+            let start = offset_to_position(&text, entry.range.start().into());
+            let end = offset_to_position(&text, entry.range.end().into());
+            let entry_uri = Uri::from_file_path(&entry.path).unwrap_or_else(|| uri.clone());
+            inline_edits.push((
+                entry_uri,
+                TextEdit {
+                    range: Range { start, end },
+                    new_text: new_name.clone(),
+                },
+            ));
+            inline_doc_paths.push(entry.path.clone());
+        }
+        for (entry_uri, edit) in inline_edits {
+            changes.entry(entry_uri).or_default().push(edit);
+        }
+        for path in inline_doc_paths {
+            doc_paths.push(path);
+        }
+    }
+
     if let Some(path) = doc_path
         && !doc_paths.contains(&path)
     {
         doc_paths.push(path);
     }
+
+    doc_paths.sort();
+    doc_paths.dedup();
 
     for path in doc_paths {
         let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());

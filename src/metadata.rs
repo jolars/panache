@@ -31,11 +31,17 @@ use std::path::Path;
 mod bibliography;
 mod citations;
 pub(crate) mod project;
+mod references;
 mod yaml;
 
 pub use bibliography::BibliographyInfo;
 pub use bibliography::BibliographyParse;
 pub use citations::{CitationInfo, extract_citations};
+pub use references::{
+    InlineBibConflict, InlineReference, InlineReferenceDuplicate, ReferenceEntry,
+    inline_bib_conflicts, inline_reference_contains, inline_reference_duplicates,
+    inline_reference_map,
+};
 pub use yaml::YamlError;
 
 /// Structured metadata extracted from document frontmatter.
@@ -47,6 +53,8 @@ pub struct DocumentMetadata {
     pub metadata_files: Vec<std::path::PathBuf>,
     /// Parsed bibliography data (if available).
     pub bibliography_parse: Option<BibliographyParse>,
+    /// Inline references from YAML metadata.
+    pub inline_references: Vec<InlineReference>,
     /// Citation keys in the document.
     pub citations: CitationInfo,
     /// Document title.
@@ -135,7 +143,18 @@ mod tests {
 
         assert_eq!(metadata.title.as_deref(), Some("My Document"));
         assert!(metadata.bibliography.is_some());
+        assert!(metadata.inline_references.is_empty());
         assert!(metadata.citations.keys.is_empty());
+    }
+
+    #[test]
+    fn test_extract_metadata_inline_references() {
+        let input = "---\nreferences:\n  - id: InlineRef\n    title: Sample\n---\n\nContent";
+        let tree = parse(input, None);
+        let metadata = extract_metadata(&tree, Path::new("test.qmd")).unwrap();
+
+        assert_eq!(metadata.inline_references.len(), 1);
+        assert_eq!(metadata.inline_references[0].id, "InlineRef");
     }
 
     #[test]
@@ -167,6 +186,30 @@ mod tests {
         assert!(paths.contains(&"proj.bib".to_string()));
         assert!(paths.contains(&"dir.bib".to_string()));
         assert!(paths.contains(&"refs.bib".to_string()));
+    }
+
+    #[test]
+    fn test_extract_project_metadata_inline_references() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        fs::write(
+            project_root.join("_quarto.yml"),
+            "references:\n  - id: projref\n",
+        )
+        .unwrap();
+
+        let input = "---\nreferences:\n  - id: docref\n---\n\nText";
+        let tree = parse(input, None);
+        let doc_path = project_root.join("doc.qmd");
+        let metadata = extract_project_metadata(&tree, &doc_path).unwrap();
+
+        let ids: Vec<_> = metadata
+            .inline_references
+            .iter()
+            .map(|entry| entry.id.as_str())
+            .collect();
+        assert!(ids.contains(&"projref"));
+        assert!(ids.contains(&"docref"));
     }
 
     #[test]

@@ -6,8 +6,8 @@ use rowan::TextSize;
 use serde::Deserialize;
 use serde_saphyr::Spanned;
 
-use super::BibliographyParse;
-use super::DocumentMetadata;
+use super::references::extract_inline_references;
+use super::{BibliographyParse, DocumentMetadata, ReferenceEntry};
 use crate::bibtex;
 
 /// Errors that can occur during YAML parsing.
@@ -69,6 +69,8 @@ struct Frontmatter {
     title: Option<String>,
     /// Bibliography files (string or array).
     bibliography: Option<Spanned<StringOrArray>>,
+    /// Inline YAML references.
+    references: Option<Vec<ReferenceEntry>>,
     // Additional fields can be added here as needed
 }
 
@@ -119,11 +121,16 @@ pub(super) fn parse_frontmatter(
     let bibliography_parse = bibliography.as_ref().map(|info| BibliographyParse {
         index: bibtex::load_bibliography(&info.paths),
     });
+    let inline_references = frontmatter
+        .references
+        .map(|refs| extract_inline_references(refs, yaml_offset, doc_path))
+        .unwrap_or_default();
 
     Ok(DocumentMetadata {
         bibliography,
         metadata_files: Vec::new(),
         bibliography_parse,
+        inline_references,
         citations: super::CitationInfo { keys: Vec::new() },
         title: frontmatter.title,
         raw_yaml: yaml_content.to_string(),

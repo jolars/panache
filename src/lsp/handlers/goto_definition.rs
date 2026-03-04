@@ -57,23 +57,47 @@ pub(crate) async fn goto_definition(
         // First: citation definitions in bibliography
         if let Some(key) = helpers::extract_citation_key(&node)
             && let Some(metadata) = metadata.clone()
-            && let Some(parse) = metadata.bibliography_parse
-            && let Some(location) = parse.index.get(&key)
         {
-            let target_uri = Uri::from_file_path(&location.file).unwrap_or_else(|| uri.clone());
-            let (target_text, target_uri) =
-                if let Ok(text) = std::fs::read_to_string(&location.file) {
-                    (text, target_uri)
-                } else {
-                    (content.clone(), uri.clone())
+            if let Some(parse) = metadata.bibliography_parse
+                && let Some(location) = parse.index.get(&key)
+            {
+                let target_uri = Uri::from_file_path(&location.file).unwrap_or_else(|| uri.clone());
+                let (target_text, target_uri) =
+                    if let Ok(text) = std::fs::read_to_string(&location.file) {
+                        (text, target_uri)
+                    } else {
+                        (content.clone(), uri.clone())
+                    };
+                let start = conversions::offset_to_position(&target_text, location.span.start);
+                let end = conversions::offset_to_position(&target_text, location.span.end);
+                let location = Location {
+                    uri: target_uri,
+                    range: Range { start, end },
                 };
-            let start = conversions::offset_to_position(&target_text, location.span.start);
-            let end = conversions::offset_to_position(&target_text, location.span.end);
-            let location = Location {
-                uri: target_uri,
-                range: Range { start, end },
-            };
-            return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            }
+
+            if let Some(inline) = metadata
+                .inline_references
+                .iter()
+                .find(|entry| entry.id.eq_ignore_ascii_case(&key))
+            {
+                let target_uri = Uri::from_file_path(&inline.path).unwrap_or_else(|| uri.clone());
+                let target_text =
+                    if Some(inline.path.clone()) == uri.to_file_path().map(|p| p.into_owned()) {
+                        content.clone()
+                    } else {
+                        std::fs::read_to_string(&inline.path).unwrap_or_default()
+                    };
+                let start =
+                    conversions::offset_to_position(&target_text, inline.range.start().into());
+                let end = conversions::offset_to_position(&target_text, inline.range.end().into());
+                let location = Location {
+                    uri: target_uri,
+                    range: Range { start, end },
+                };
+                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            }
         }
 
         // Quarto crossref: jump to attribute definition

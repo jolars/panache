@@ -7,7 +7,10 @@ use tower_lsp_server::ls_types::*;
 
 use crate::linter;
 use crate::lsp::DocumentState;
-use crate::metadata::{DocumentMetadata, YamlError};
+use crate::metadata::{
+    DocumentMetadata, InlineBibConflict, InlineReferenceDuplicate, YamlError, inline_bib_conflicts,
+    inline_reference_duplicates,
+};
 use crate::syntax::SyntaxNode;
 
 use super::super::conversions::{convert_diagnostic, offset_to_position};
@@ -225,6 +228,64 @@ fn check_bibliography_parse(metadata: &DocumentMetadata, text: &str) -> Vec<Diag
     diagnostics
 }
 
+fn inline_reference_diagnostics(metadata: &DocumentMetadata, text: &str) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+    if metadata.inline_references.is_empty() {
+        return diagnostics;
+    }
+    let duplicates = inline_reference_duplicates(&metadata.inline_references);
+    for duplicate in duplicates {
+        diagnostics.push(inline_reference_duplicate_diagnostic(&duplicate, text));
+    }
+
+    if let Some(parse) = metadata.bibliography_parse.as_ref() {
+        let conflicts = inline_bib_conflicts(&metadata.inline_references, &parse.index);
+        for conflict in conflicts {
+            diagnostics.push(inline_reference_conflict_diagnostic(&conflict, text));
+        }
+    }
+
+    diagnostics
+}
+
+fn inline_reference_duplicate_diagnostic(
+    duplicate: &InlineReferenceDuplicate,
+    text: &str,
+) -> Diagnostic {
+    let start = offset_to_position(text, duplicate.duplicate.range.start().into());
+    let end = offset_to_position(text, duplicate.duplicate.range.end().into());
+    Diagnostic {
+        range: Range { start, end },
+        severity: Some(DiagnosticSeverity::WARNING),
+        code: Some(NumberOrString::String(
+            "duplicate-inline-reference-id".to_string(),
+        )),
+        source: Some("panache".to_string()),
+        message: format!("Duplicate inline reference id '{}'", duplicate.key),
+        ..Default::default()
+    }
+}
+
+fn inline_reference_conflict_diagnostic(conflict: &InlineBibConflict, text: &str) -> Diagnostic {
+    let start = offset_to_position(text, conflict.inline.range.start().into());
+    let end = offset_to_position(text, conflict.inline.range.end().into());
+    Diagnostic {
+        range: Range { start, end },
+        severity: Some(DiagnosticSeverity::WARNING),
+        code: Some(NumberOrString::String(
+            "duplicate-inline-reference-id".to_string(),
+        )),
+        source: Some("panache".to_string()),
+        message: format!(
+            "Duplicate inline reference id '{}' in {} and {}",
+            conflict.key,
+            conflict.inline.path.display(),
+            conflict.bib.file.display()
+        ),
+        ..Default::default()
+    }
+}
+
 /// Parse document and run linter, then publish diagnostics
 pub(crate) async fn lint_and_publish(
     client: &Client,
@@ -258,6 +319,7 @@ pub(crate) async fn lint_and_publish(
         // Check for missing bibliography files
         all_diagnostics.extend(check_bibliography_files(metadata, &text));
         all_diagnostics.extend(check_bibliography_parse(metadata, &text));
+        all_diagnostics.extend(inline_reference_diagnostics(metadata, &text));
     } else {
         // Metadata parsing failed - try to get the error
         // Re-parse to get the error (this is a bit wasteful, but errors are rare)

@@ -11,6 +11,7 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
+use crate::metadata::inline_reference_contains;
 use crate::syntax::{AstNode, FootnoteDefinition};
 
 use super::super::{conversions, helpers};
@@ -97,15 +98,27 @@ pub(crate) async fn hover(
 
         if let Some(key) = helpers::extract_citation_key(&node)
             && let Some(metadata) = metadata.clone()
-            && let Some(parse) = metadata.bibliography_parse
-            && let Some(entry) = parse.index.find_entry(&key)
         {
-            let summary = format_bibtex_entry(entry);
-            if !summary.is_empty() {
+            if let Some(parse) = metadata.bibliography_parse
+                && let Some(entry) = parse.index.find_entry(&key)
+            {
+                let summary = format_bibtex_entry(entry);
+                if !summary.is_empty() {
+                    return Ok(Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: summary,
+                        }),
+                        range: None,
+                    }));
+                }
+            }
+
+            if inline_reference_contains(&metadata.inline_references, &key) {
                 return Ok(Some(Hover {
                     contents: HoverContents::Markup(MarkupContent {
                         kind: MarkupKind::Markdown,
-                        value: summary,
+                        value: "Inline YAML reference".to_string(),
                     }),
                     range: None,
                 }));

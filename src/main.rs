@@ -299,7 +299,7 @@ fn main() -> io::Result<()> {
                 let input = read_all(None)?;
                 let tree = parse(&input, Some(cfg.clone()));
                 let metadata =
-                    panache::metadata::extract_metadata(&tree, Path::new("stdin.md")).ok();
+                    panache::metadata::extract_project_metadata(&tree, Path::new("stdin.md")).ok();
                 let diagnostics = panache::linter::lint_with_external_sync_and_metadata(
                     &tree,
                     &input,
@@ -481,7 +481,7 @@ fn lint_loaded_document_with_includes(
     active.insert(doc_path.clone());
 
     let tree = parse(input, Some(cfg.clone()));
-    let metadata = panache::metadata::extract_metadata(&tree, doc_path).ok();
+    let metadata = panache::metadata::extract_project_metadata(&tree, doc_path).ok();
     let mut diagnostics =
         panache::linter::lint_with_external_sync_and_metadata(&tree, input, cfg, metadata.as_ref());
 

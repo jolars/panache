@@ -5,8 +5,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 
 use super::bibliography::{BibliographyInfo, BibliographyParse};
+use super::references::extract_inline_references;
 use super::yaml::{YamlError, strip_yaml_delimiters};
-use super::{DocumentMetadata, extract_citations};
+use super::{DocumentMetadata, ReferenceEntry, extract_citations};
 use crate::bibtex;
 use crate::syntax::SyntaxNode;
 
@@ -92,6 +93,8 @@ struct MergeMetadata {
         skip_serializing_if = "Vec::is_empty"
     )]
     metadata_files: Vec<String>,
+    #[serde(default)]
+    references: Vec<ReferenceEntry>,
 }
 
 impl MergeMetadata {
@@ -101,6 +104,7 @@ impl MergeMetadata {
         }
         self.bibliography.extend(other.bibliography);
         self.metadata_files.extend(other.metadata_files);
+        self.references.extend(other.references);
     }
 }
 
@@ -197,12 +201,18 @@ pub fn extract_project_metadata(
     let bibliography_parse = bibliography.as_ref().map(|info| BibliographyParse {
         index: bibtex::load_bibliography(&info.paths),
     });
+    let mut inline_references =
+        extract_doc_inline_references(&doc_yaml, doc_yaml_offset, doc_path)?;
+    let project_references =
+        extract_inline_references(merged.references, rowan::TextSize::from(0), doc_path);
+    inline_references.extend(project_references);
 
     let metadata_files = collect_metadata_files(doc_path, &merged.metadata_files);
     let mut metadata = DocumentMetadata {
         bibliography,
         metadata_files,
         bibliography_parse,
+        inline_references,
         citations: super::CitationInfo { keys: Vec::new() },
         title: merged.title,
         raw_yaml: doc_yaml,
@@ -217,6 +227,26 @@ fn parse_metadata_text(yaml_text: &str) -> Result<MergeMetadata, YamlError> {
     } else {
         Ok(serde_saphyr::from_str(yaml_text)?)
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct DocFrontmatter {
+    references: Option<Vec<ReferenceEntry>>,
+}
+
+fn extract_doc_inline_references(
+    yaml_text: &str,
+    yaml_offset: rowan::TextSize,
+    doc_path: &Path,
+) -> Result<Vec<super::InlineReference>, YamlError> {
+    if yaml_text.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let frontmatter: DocFrontmatter = serde_saphyr::from_str(yaml_text)?;
+    Ok(frontmatter
+        .references
+        .map(|refs| extract_inline_references(refs, yaml_offset, doc_path))
+        .unwrap_or_default())
 }
 
 fn parse_metadata_file(path: &Path) -> Result<MergeMetadata, YamlError> {

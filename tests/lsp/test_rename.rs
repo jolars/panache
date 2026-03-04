@@ -56,3 +56,38 @@ async fn test_rename_citation_updates_bib_and_dependents() {
     assert!(changes.contains_key(&doc2_uri));
     assert!(changes.contains_key(&bib_uri));
 }
+
+#[tokio::test]
+async fn test_rename_citation_updates_inline_references() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    std::fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+
+    let doc_path = root.join("doc.qmd");
+    std::fs::write(
+        &doc_path,
+        "---\nreferences:\n  - id: oldkey\n    title: Inline\n---\n\nSee [@oldkey].\n",
+    )
+    .unwrap();
+
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let root_uri = Uri::from_file_path(root).unwrap();
+
+    let server = TestLspServer::new();
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &std::fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let edit = server
+        .rename(doc_uri.as_str(), 6, 7, "newkey")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+
+    assert!(changes.contains_key(&doc_uri));
+}
