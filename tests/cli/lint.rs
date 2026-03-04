@@ -270,6 +270,28 @@ fn test_lint_ris_bibliography() {
 }
 
 #[test]
+fn test_lint_ris_missing_id() {
+    let temp_dir = TempDir::new().unwrap();
+    let bib_path = temp_dir.path().join("refs.ris");
+    let doc_path = temp_dir.path().join("doc.qmd");
+
+    fs::write(&bib_path, "TY  - JOUR\nER  - \n").unwrap();
+
+    fs::write(
+        &doc_path,
+        "---\nbibliography: refs.ris\n---\n\nCite [@missing].\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("missing-bibliography-key"))
+        .stdout(predicate::str::contains("missing"));
+}
+
+#[test]
 fn test_lint_includes_reports_child_diagnostics() {
     let temp_dir = TempDir::new().unwrap();
     let parent_path = temp_dir.path().join("parent.qmd");

@@ -49,17 +49,56 @@ pub fn parse_ris_cst(input: &str) -> RisNode {
 pub(crate) fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
     let root = parse_ris_cst(input);
     let mut entries = Vec::new();
+    let mut record_count = 0;
 
     for record in root
         .children()
         .filter(|node| node.kind() == RisSyntaxKind::RECORD)
     {
+        record_count += 1;
+        let status = record_status(&record);
+        if !status.has_er {
+            return Err("RIS record missing ER tag".to_string());
+        }
+        if !status.has_ty {
+            return Err("RIS record missing TY tag".to_string());
+        }
         if let Some((id, span)) = extract_record_id(&record) {
             entries.push((id, span));
         }
     }
 
+    if record_count == 0 {
+        return Err("RIS file contains no records".to_string());
+    }
+
     Ok(entries)
+}
+
+struct RecordStatus {
+    has_ty: bool,
+    has_er: bool,
+}
+
+fn record_status(record: &RisNode) -> RecordStatus {
+    let mut has_ty = false;
+    let mut has_er = false;
+    for tag in record
+        .children()
+        .filter(|node| node.kind() == RisSyntaxKind::TAG)
+    {
+        let name = tag
+            .children()
+            .find(|node| node.kind() == RisSyntaxKind::TAG_NAME)
+            .and_then(|node| first_text(&node))
+            .unwrap_or_default();
+        match name.as_str() {
+            "TY" => has_ty = true,
+            "ER" => has_er = true,
+            _ => {}
+        }
+    }
+    RecordStatus { has_ty, has_er }
 }
 
 fn extract_record_id(record: &RisNode) -> Option<(String, Span)> {
