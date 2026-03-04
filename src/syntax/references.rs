@@ -2,14 +2,12 @@
 
 use super::ast::support;
 use super::links::Link;
-use super::{AstNode, SyntaxKind, SyntaxNode};
+use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
 
 pub struct ReferenceDefinition(SyntaxNode);
 
 impl AstNode for ReferenceDefinition {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::REFERENCE_DEFINITION
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::REFERENCE_DEFINITION
@@ -46,9 +44,7 @@ impl ReferenceDefinition {
 pub struct FootnoteReference(SyntaxNode);
 
 impl AstNode for FootnoteReference {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::FOOTNOTE_REFERENCE
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::FOOTNOTE_REFERENCE
@@ -89,9 +85,7 @@ impl FootnoteReference {
 pub struct FootnoteDefinition(SyntaxNode);
 
 impl AstNode for FootnoteDefinition {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::FOOTNOTE_DEFINITION
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::FOOTNOTE_DEFINITION
@@ -199,9 +193,7 @@ impl FootnoteDefinition {
 pub struct InlineFootnote(SyntaxNode);
 
 impl AstNode for InlineFootnote {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::INLINE_FOOTNOTE
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::INLINE_FOOTNOTE

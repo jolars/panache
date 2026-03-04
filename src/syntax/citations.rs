@@ -1,13 +1,11 @@
 //! Citation AST node wrappers.
 
-use super::{AstNode, SyntaxKind, SyntaxNode, SyntaxToken};
+use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode, SyntaxToken};
 
 pub struct Citation(SyntaxNode);
 
 impl AstNode for Citation {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::CITATION
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::CITATION
@@ -44,9 +42,7 @@ impl Citation {
 pub struct Crossref(SyntaxNode);
 
 impl AstNode for Crossref {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::CROSSREF
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::CROSSREF

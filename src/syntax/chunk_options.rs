@@ -1,15 +1,13 @@
 //! Chunk option AST wrappers for type-safe access to chunk options in executable code blocks.
 
-use crate::syntax::{AstNode, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
 
 /// A chunk option in an executable code block (e.g., `echo=TRUE` or `fig.cap="text"`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChunkOption(SyntaxNode);
 
 impl AstNode for ChunkOption {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::CHUNK_OPTION
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::CHUNK_OPTION
@@ -79,9 +77,7 @@ impl ChunkOption {
 pub struct ChunkLabel(SyntaxNode);
 
 impl AstNode for ChunkLabel {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::CHUNK_LABEL
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::CHUNK_LABEL

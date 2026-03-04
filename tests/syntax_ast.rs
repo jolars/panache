@@ -476,18 +476,6 @@ fn heading_can_cast_rejects_wrong_kind() {
     );
 }
 
-// =============================================================================
-// AstNode Trait Tests
-// =============================================================================
-
-#[test]
-fn astnode_kind_returns_correct_syntaxkind() {
-    assert_eq!(Link::kind(), SyntaxKind::LINK);
-    assert_eq!(ImageLink::kind(), SyntaxKind::IMAGE_LINK);
-    assert_eq!(PipeTable::kind(), SyntaxKind::PIPE_TABLE);
-    assert_eq!(Heading::kind(), SyntaxKind::HEADING);
-}
-
 #[test]
 fn astnode_can_cast_accepts_matching_kind() {
     assert!(Link::can_cast(SyntaxKind::LINK));

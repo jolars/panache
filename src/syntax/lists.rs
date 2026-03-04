@@ -4,14 +4,12 @@
 //! - **Compact (tight)**: List items contain PLAIN nodes (no blank lines between items)
 //! - **Loose**: List items contain PARAGRAPH nodes (blank lines between items)
 
-use super::{AstNode, SyntaxKind, SyntaxNode};
+use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
 
 pub struct List(SyntaxNode);
 
 impl AstNode for List {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::LIST
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LIST
@@ -56,9 +54,7 @@ impl List {
 pub struct ListItem(SyntaxNode);
 
 impl AstNode for ListItem {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::LIST_ITEM
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LIST_ITEM

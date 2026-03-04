@@ -1,14 +1,12 @@
 //! Link and image AST node wrappers.
 
 use super::ast::support;
-use super::{AstNode, SyntaxKind, SyntaxNode};
+use super::{AstNode, QuartoLanguage, SyntaxKind, SyntaxNode};
 
 pub struct Link(SyntaxNode);
 
 impl AstNode for Link {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::LINK
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LINK
@@ -47,9 +45,7 @@ impl Link {
 pub struct LinkText(SyntaxNode);
 
 impl AstNode for LinkText {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::LINK_TEXT
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LINK_TEXT
@@ -83,9 +79,7 @@ impl LinkText {
 pub struct LinkDest(SyntaxNode);
 
 impl AstNode for LinkDest {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::LINK_DEST
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LINK_DEST
@@ -122,9 +116,7 @@ impl LinkDest {
 pub struct LinkRef(SyntaxNode);
 
 impl AstNode for LinkRef {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::LINK_REF
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::LINK_REF
@@ -158,9 +150,7 @@ impl LinkRef {
 pub struct ImageLink(SyntaxNode);
 
 impl AstNode for ImageLink {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::IMAGE_LINK
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::IMAGE_LINK
@@ -194,9 +184,7 @@ impl ImageLink {
 pub struct ImageAlt(SyntaxNode);
 
 impl AstNode for ImageAlt {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::IMAGE_ALT
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::IMAGE_ALT
@@ -230,9 +218,7 @@ impl ImageAlt {
 pub struct Figure(SyntaxNode);
 
 impl AstNode for Figure {
-    fn kind() -> SyntaxKind {
-        SyntaxKind::FIGURE
-    }
+    type Language = QuartoLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
         kind == SyntaxKind::FIGURE
