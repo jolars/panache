@@ -24,14 +24,14 @@ page](https://github.com/jolars/panache/releases):
 #### Debian/Ubuntu
 
 ```bash
-wget https://github.com/jolars/panache/releases/latest/download/panache_<VERSION>_amd64.deb
+wget https://github.com/jolars/panache/releases/latest/download/panache_ <VERSION >_amd64.deb
 sudo dpkg -i panache_*.deb
 ```
 
 #### Fedora/RHEL/openSUSE
 
 ```bash
-wget https://github.com/jolars/panache/releases/latest/download/panache-<VERSION>.x86_64.rpm
+wget https://github.com/jolars/panache/releases/latest/download/panache- <VERSION >.x86_64.rpm
 sudo rpm -i panache-*.rpm
 ```
 
@@ -55,48 +55,116 @@ panache --version
 
 ## Basic Usage
 
-### Format a File
+### Formatting
 
-Format a Quarto or Markdown document to stdout:
+#### Format files in place
 
-```bash
-panache format document.qmd
-```
-
-Format a file in place:
+By default, panache formats files in place when given file paths:
 
 ```bash
 panache format document.qmd
 ```
 
-### Format from stdin
+Format multiple files:
 
-Pipe content through panache:
+```bash
+panache format file1.md file2.qmd file3.Rmd
+```
+
+Format entire directories recursively:
+
+```bash
+panache format .
+panache format docs/
+```
+
+#### Format from stdin to stdout
+
+When reading from stdin, panache always writes to stdout:
 
 ```bash
 cat document.qmd | panache format
 ```
 
-Or use input redirection:
+Using input redirection:
 
 ```bash
-panache format < document.qmd
+panache format <document.qmd
 ```
 
-### Check Formatting
+Inline formatting with echo:
 
-Check if a file is already formatted (exits with non-zero code if changes
-needed):
+```bash
+echo '# Heading' | panache format
+```
+
+#### Check formatting without changes
+
+Check if files are already formatted. Exits with code 1 if formatting is needed,
+0 if already formatted:
 
 ```bash
 panache format --check document.qmd
 ```
 
-This is useful in CI/CD pipelines:
+This is useful in CI/CD pipelines to enforce formatting:
 
 ```bash
-# Check all Quarto files
-find . -name "*.qmd" -exec panache format --check {} \;
+panache format --check .
+```
+
+### Linting
+
+#### Check for correctness issues
+
+Lint a file to check for semantic problems like heading hierarchy issues, broken
+references, and syntax errors:
+
+```bash
+panache lint document.qmd
+```
+
+Lint multiple files or directories:
+
+```bash
+panache lint file1.md file2.qmd
+panache lint .
+```
+
+Lint from stdin:
+
+```bash
+echo '# H1\n### H3' | panache lint
+```
+
+#### Apply automatic fixes
+
+Fix issues automatically where possible:
+
+```bash
+panache lint --fix document.qmd
+```
+
+#### CI mode
+
+Exit with code 1 if violations are found (useful for continuous integration):
+
+```bash
+panache lint --check .
+```
+
+### Parsing
+
+Inspect the Concrete Syntax Tree (CST) for debugging:
+
+```bash
+panache parse document.qmd
+```
+
+Export CST to JSON:
+
+```bash
+panache parse --json cst.json document.qmd
 ```
 
 ## Configuration
@@ -110,15 +178,37 @@ panache looks for configuration files in this order:
 
 ### Create a Config File
 
-Create `.panache.toml` in your project root:
+Create `.panache.toml` in your project root with your preferred settings:
 
 ```toml
-# Basic configuration
-flavor = "quarto"        # Options: pandoc, quarto, rmarkdown, gfm, commonmark
-line_width = 80          # Characters per line
-wrap = "reflow"          # Options: reflow, preserve
-blank_lines = "collapse" # Options: collapse, preserve
+flavor = "quarto"
+line-width = 80
+
+[style]
+wrap = "reflow"
+blank-lines = "collapse"
+
+[extensions]
+hard-line-breaks = false
+citations = true
 ```
+
+Available flavor options:
+
+`pandoc`
+:   Standard Pandoc Markdown (default)
+
+`quarto`
+:   Quarto-flavored Markdown
+
+`rmarkdown`
+:   R Markdown
+
+`gfm`
+:   GitHub Flavored Markdown
+
+`commonmark`
+:   CommonMark (minimal extensions)
 
 ### Use a Custom Config
 

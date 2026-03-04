@@ -13,7 +13,7 @@ Create a `.pre-commit-config.yaml` file in your repository root:
 ```yaml
 repos:
   - repo: https://github.com/jolars/panache
-    rev: v{{< meta version >}} # Use specific version
+    rev: v{{< meta version >}}
     hooks:
       - id: panache-format
       - id: panache-lint
@@ -28,12 +28,12 @@ pre-commit install
 panache provides two hook IDs:
 
 `panache-format`
-:   Automatically formats files according to panache's formatting rules.
+:   Automatically formats files according to panache's formatting rules
 
 `panache-lint`
-:   Lints files and automatically applies fixes where possible.
+:   Lints files and automatically applies fixes where possible
 
-You can pass additional arguments to panache:
+Pass additional arguments to panache:
 
 ```yaml
 repos:
@@ -60,10 +60,9 @@ repos:
 
 ## GitHub Actions
 
-Integrate panache into your CI pipeline using GitHub Actions. Here's an example
+Integrate panache into your CI pipeline using GitHub Actions:
 
 ```yaml
-# .github/workflows/panache.yml
 name: panache
 on:
   pull_request:
@@ -92,3 +91,13 @@ jobs:
       - name: Run linter
         run: panache lint --check .
 ```
+
+This workflow:
+
+1. Installs Rust and panache
+2. Caches the cargo installation for faster subsequent runs
+3. Checks that all files are formatted (`--check` mode)
+4. Runs the linter in CI mode (`--check` mode)
+
+Both steps will fail (exit code 1) if issues are found, preventing the PR from
+merging.

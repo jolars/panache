@@ -1,0 +1,556 @@
+---
+title: Linting
+---
+
+Panache includes a built-in linter that checks for correctness issues and best
+practice violations in your Markdown documents. Unlike the formatter which
+handles style consistency, the linter catches semantic problems like syntax
+errors, heading hierarchy issues, broken references, and citation problems.
+
+## Philosophy
+
+The linter focuses on semantic correctness rather than stylistic preferences,
+for which the formatter is responsible (and can act as a linter via
+`panache format --check`). It primarily tries to catch
+
+## CLI Usage
+
+### Basic Linting
+
+To lint a single file and show diagnostics, run this:
+
+```bash
+panache lint document.qmd
+```
+
+To lint multiple files at once, you can specify them one-by-one:
+
+```bash
+panache lint file1.md file2.qmd file3.Rmd
+```
+
+If you want to lint all supported files in a directory, use:
+
+```bash
+panache lint .
+panache lint docs/
+```
+
+`panache lint` supports glob patterns as well:
+
+```bash
+panache lint 'src/**/*.qmd'
+```
+
+### Lint from stdin
+
+You can also pipe content through the linter:
+
+```bash
+cat document.qmd | panache lint # or `panache lint < document.qmd`
+```
+
+Or with a here-document:
+
+```bash
+panache lint <<'EOF'
+# H1
+### H3
+EOF
+```
+
+### Apply Automatic Fixes
+
+Panache can automatically fix certain types of issues:
+
+```bash
+panache lint --fix document.qmd
+```
+
+::: {.callout-warning}
+Auto-fix modifies files in place. Always commit your changes first or use
+version control.
+:::
+
+### CI Mode
+
+If you want to enforce linting in a CI/CD pipeline, use the `--check` flag. This
+will run the linter and exit with code 1 if any violations are found:
+
+```bash
+panache lint --check .
+```
+
+This mode is ideal for enforcing linting in CI/CD pipelines:
+
+```bash
+panache lint --check . || exit 1
+```
+
+## Lint Rules
+
+Panache includes several built-in lint rules that analyze document structure
+and content.
+
+### `heading-hierarchy`
+
+Detects skipped heading levels that violate document structure best practices.
+
+Severity
+:   Warning
+
+Auto-fix
+:   Yes
+
+Description
+:   Headings should increment by at most one level (e.g., H1 → H2 → H3).
+    Skipping levels (H1 → H3) makes the document structure unclear and can break
+    table-of-contents generation.
+
+**Example violation:**
+
+```markdown
+# Main Title
+
+### Subsection
+```
+
+**Diagnostic:**
+
+```
+warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2
+  --> document.qmd:3:1
+```
+
+**Auto-fix:** Changes `### Subsection` to `## Subsection`.
+
+**Valid structure:**
+
+```markdown
+# Main Title
+
+## Section
+
+### Subsection
+```
+
+### `duplicate-reference-labels`
+
+Detects duplicate reference link and footnote definitions.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Description
+:   Each reference label and footnote ID must be unique within a document. Duplicate
+    definitions cause ambiguity—only the first definition is used, making the others
+    ineffective.
+
+**Example violation**
+
+```markdown
+See [link1] and [link2].
+
+[link1]: https://example.com
+[link1]: https://different.com
+```
+
+**Diagnostic:**
+
+```
+warning[duplicate-reference-labels]: Duplicate reference definition 'link1'
+  --> document.qmd:4:1
+note: First defined here:
+  --> document.qmd:3:1
+```
+
+**Footnote example:**
+
+```markdown
+Text with footnote[^1] and another[^2].
+
+[^1]: First footnote.
+[^1]: Duplicate footnote.
+```
+
+**Resolution:** Rename or remove the duplicate definition.
+
+### citation-keys
+
+Validates citation keys against loaded bibliographies and detects conflicts in
+inline bibliography entries.
+
+Severity
+:   Error for loading failures, Warning for undefined keys
+
+Auto-fix
+:   No
+
+Requirements
+:   Requires `extensions.citations = true` in configuration
+
+Description
+:   Checks that all cited keys (`[@key]`) exist in the configured bibliography
+    files. Also validates inline bibliography entries for duplicates and conflicts.
+
+**Example violation (undefined key):**
+
+```markdown
+---
+bibliography: refs.bib
+---
+
+See @smith2020 and @jones2021.
+```
+
+If `jones2021` doesn't exist in `refs.bib`:
+
+```
+warning[citation-keys]: Citation key 'jones2021' not found in bibliography
+  --> document.qmd:6:17
+```
+
+**Example violation (bibliography load error):**
+
+```markdown
+---
+bibliography: nonexistent.bib
+---
+```
+
+**Diagnostic:**
+
+```
+error[bibliography-load-error]: Failed to load bibliography nonexistent.bib: File not found
+  --> document.qmd:1:1
+```
+
+**When it runs:** Only when document metadata includes bibliography
+configuration and citation extension is enabled.
+
+### Parser Errors
+
+The parser emits syntax errors as lint diagnostics when it encounters malformed
+input.
+
+Severity
+:   Error
+
+Auto-fix
+:   No
+
+Description
+:   Parser errors indicate syntactically invalid Markdown that panache cannot parse
+    correctly. These should be fixed manually as they typically indicate incomplete
+    or malformed structures.
+
+**Example violations:**
+
+Unclosed code block:
+
+````markdown
+```python
+def hello():
+    print("Hello")
+````
+
+Malformed table:
+
+```markdown
+| Header |
+|-----
+| Cell |
+```
+
+**Resolution:** Fix the syntax to match valid Markdown/Pandoc specifications.
+
+## Diagnostic Format
+
+Diagnostics are displayed in a compiler-style format:
+
+```
+severity[rule-name]: message
+  --> file:line:column
+```
+
+Components:
+
+`severity`
+:   `error`, `warning`, or `info`
+
+`rule-name`
+:   The lint rule that triggered (e.g., `heading-hierarchy`)
+
+`message`
+:   Human-readable description of the issue
+
+`location`
+:   File path, line number, and column number
+
+**Multi-location diagnostics:**
+
+Some rules provide additional context:
+
+```
+warning[duplicate-reference-labels]: Duplicate reference definition 'link1'
+  --> document.qmd:4:1
+note: First defined here:
+  --> document.qmd:3:1
+```
+
+## Severity Levels
+
+panache uses three severity levels:
+
+`error`
+:   Critical issues that prevent correct parsing or rendering
+
+`warning`
+:   Likely mistakes or best practice violations
+
+`info`
+:   Informational messages (currently unused, reserved for future use)
+
+## Auto-Fix Capabilities
+
+Auto-fixes are available for select rules where the correction is unambiguous:
+
+Currently supported:
+
+- `heading-hierarchy`: Adjusts heading levels to fix skipped levels
+
+Currently unsupported:
+
+- `duplicate-reference-labels`: Multiple valid resolutions (rename, delete,
+  merge)
+- `citation-keys`: Requires external bibliography editing
+- Parser errors: Too context-dependent
+
+::: {.callout-note}
+Auto-fixes are applied in place when using `--fix`. Always use version control
+or backup files before applying automatic fixes to important documents.
+:::
+
+## External Linters
+
+panache can integrate with external code linters to check code blocks within
+your documents.
+
+### Configuration
+
+Enable external linters in your configuration file:
+
+```toml
+[linters]
+r = "jarl"
+```
+
+Available external linters:
+
+| Language | Linter | Description                    |
+| -------- | ------ | ------------------------------ |
+| R        | `jarl` | R linter with JSON diagnostics |
+
+### How External Linters Work
+
+External linters analyze code blocks using a stateful concatenation approach:
+
+1. **Collection**: All code blocks of the target language are extracted
+2. **Concatenation**: Blocks are joined with blank-line preservation to maintain
+   line numbers
+3. **Analysis**: The external linter analyzes the concatenated code
+4. **Mapping**: Diagnostics are mapped back to original document positions
+
+::: {.callout-note}
+This approach correctly handles stateful code. If a variable is defined in one
+code block and used in another, the linter sees the complete context and won't
+report false positives.
+:::
+
+### Example
+
+Document with multiple R code blocks:
+
+````markdown
+---
+title: "Analysis"
+---
+
+```{r}
+x <- 10
+```
+
+Some text between blocks.
+
+```{r}
+y <- x + 5
+```
+````
+
+With `[linters] r = "jarl"` configured, `jarl` analyzes both blocks together and
+correctly understands that `x` is defined before it's used.
+
+### Behavior
+
+Language matching
+:   Case-insensitive matching of code block language to linter configuration
+
+Error handling
+:   Missing linter executables log a warning and skip gracefully
+
+Timeout
+:   30-second timeout per linter invocation
+
+Line accuracy
+:   Diagnostics report exact line and column positions in the original document
+
+Auto-fixes
+:   Currently disabled due to byte-offset mapping complexity
+
+### Where External Linters Run
+
+CLI
+:   Diagnostics appear in `panache lint` output
+
+LSP
+:   Diagnostics appear inline in your editor with live updates
+
+## Configuration
+
+Lint rules can be configured in the `[lint]` section of your configuration file
+(planned feature):
+
+```toml
+[lint]
+# Future: Enable/disable specific rules
+# heading-hierarchy = true
+# duplicate-references = true
+```
+
+::: {.callout-note}
+Per-rule configuration is a planned feature. Currently, all rules are enabled
+by default.
+:::
+
+## LSP Integration
+
+When using the panache Language Server, lint diagnostics appear live in your
+editor as you type:
+
+- Squiggly underlines for errors and warnings
+- Hover tooltips showing diagnostic messages
+- Code actions for auto-fixes (e.g., fix heading hierarchy)
+
+See the [LSP documentation](lsp.qmd) for editor configuration details.
+
+## Examples
+
+### Example 1: Heading Hierarchy
+
+Before:
+
+```markdown
+# Main Title
+
+### Skipped Level
+
+#### Another Skip
+```
+
+Run linter:
+
+```bash
+panache lint document.qmd
+```
+
+Output:
+
+```
+warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2
+  --> document.qmd:3:1
+
+warning[heading-hierarchy]: Heading level skipped from h3 to h4; expected h3
+  --> document.qmd:5:1
+```
+
+Apply auto-fix:
+
+```bash
+panache lint --fix document.qmd
+```
+
+After:
+
+```markdown
+# Main Title
+
+## Skipped Level
+
+### Another Skip
+```
+
+### Example 2: Duplicate References
+
+Before:
+
+```markdown
+See [example1] and [example2].
+
+[example1]: https://first.com
+[example1]: https://second.com
+[example2]: https://other.com
+```
+
+Run linter:
+
+```bash
+panache lint document.qmd
+```
+
+Output:
+
+```
+warning[duplicate-reference-labels]: Duplicate reference definition 'example1'
+  --> document.qmd:4:1
+note: First defined here:
+  --> document.qmd:3:1
+```
+
+Resolution (manual):
+
+```markdown
+See [example1] and [example2].
+
+[example1]: https://first.com
+[example2]: https://other.com
+```
+
+### Example 3: Citation Validation
+
+Before (with `refs.bib` configured):
+
+```markdown
+---
+bibliography: refs.bib
+---
+
+See @existingkey and @missingkey.
+```
+
+Run linter:
+
+```bash
+panache lint document.qmd
+```
+
+Output:
+
+```
+warning[citation-keys]: Citation key 'missingkey' not found in bibliography
+  --> document.qmd:5:24
+```
+
+Resolution: Add the citation to `refs.bib` or remove the reference.

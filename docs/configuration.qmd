@@ -2,46 +2,75 @@
 title: Configuration
 ---
 
-## Configuration Files
+Panache is designed to be opinionated with sensible defaults, but also
+configurable enough to accommodate *most* formatting preferences.
 
-panache searches for configuration in this order:
+The configuration system is built around a TOML configuration file, which allows
+you to customize a wide range of options, including formatting preferences,
+linting rules, external linter and formatter integrations, and more.
+
+Panache searches for a configuration file in the following order:
 
 1. **Explicit path**: `--config <path>` (errors if invalid)
 2. **Project config**: `.panache.toml` or `panache.toml` in current or parent
    directories
-3. **User config**: `~/.config/panache/config.toml` (XDG)
-4. **Built-in defaults**: 80 char width, auto line endings, reflow wrap
+3. **User config**: `~/$XDG_CONFIG_HOME/panache/config.toml` (typically
+   `~/.config/panache/config.toml`)
 
 ## Basic Options
 
+Here, we list the top-level configuration options that control general behavior.
+
 ### Flavor
 
-Choose the Markdown flavor, which determines default extension settings:
+Choose the Markdown flavor, which determines default [extension](#extensions)
+settings:
 
 ```toml
-flavor = "quarto"
+flavor = "pandoc"
 ```
 
-**Available flavors:**
+The available flavors are:
 
-- `pandoc` - Standard Pandoc Markdown (default)
-- `quarto` - Quarto-flavored Markdown (Pandoc + Quarto extensions)
-- `rmarkdown` - R Markdown (Pandoc + R-specific extensions)
-- `gfm` - GitHub Flavored Markdown
-- `commonmark` - CommonMark (minimal extensions)
+`pandoc`
+:   Standard [Pandoc Markdown](https://pandoc.org) (default)
+
+`quarto`
+:   [Quarto](https://quarto.org)-flavored Markdown (Pandoc + Quarto extensions)
+
+`rmarkdown`
+:   R Markdown (Pandoc + R-specific extensions, including Bookdown): R Markdown
+    (Pandoc + R-specific extensions)
+
+`gfm`
+:   GitHub-Flavored Markdownb Flavored Markdown
+
+`commonmark`
+:   CommonMark (Note that we are currently **not** fully CommonMark-compliant,
+    and use this option only as a means to setup the correct set of extensions):
+    CommonMark (minimal extensions)
 
 ### Line Width
 
-Set the maximum line width for wrapping:
+Set the maximum line width for text wrapping:
 
 ```toml
-line-width = 80 # Default: 80
+line-width = 80
 ```
+
+The default is 80 characters.
 
 ## Formatting Style
 
-Formatting style preferences are organized under the `[style]` section. This
-keeps all style-related settings together.
+Formatting style preferences are organized under the `[style]` section:
+
+```toml
+[style]
+wrap = "reflow"
+blank-lines = "collapse"
+math-delimiter-style = "preserve"
+math-indent = 0
+```
 
 ### Wrapping Mode
 
@@ -49,11 +78,14 @@ Control how text is wrapped:
 
 ```toml
 [style]
-wrap = "reflow" # Options: "reflow", "preserve"
+wrap = "reflow"
 ```
 
-- `reflow` (default): Reformat paragraphs to fit within line width
-- `preserve`: Keep existing line breaks
+`reflow`
+:   Reformat paragraphs to fit within line width (default)
+
+`preserve`
+:   Keep existing line breaks
 
 ### Blank Lines
 
@@ -61,11 +93,14 @@ Control blank line handling:
 
 ```toml
 [style]
-blank-lines = "collapse" # Options: "collapse", "preserve"
+blank-lines = "collapse"
 ```
 
-- `collapse` (default): Collapse multiple blank lines into one
-- `preserve`: Keep all existing blank lines
+`collapse`
+:   Collapse multiple blank lines into one (default)
+
+`preserve`
+:   Keep all existing blank lines
 
 ### Math Formatting
 
@@ -73,13 +108,23 @@ Configure how math delimiters are formatted:
 
 ```toml
 [style]
-math-delimiter-style = "preserve" # Options: "preserve", "dollars", "backslash"
-math-indent = 0                   # Indentation for display math blocks
+math-delimiter-style = "preserve"
+math-indent = 0
 ```
 
-- `preserve` (default): Keep original delimiter style
-- `dollars`: Normalize to `$...$` and `$$...$$`
-- `backslash`: Normalize to `\(...\)` and `\[...\]`
+Math delimiter styles:
+
+`preserve`
+:   Keep original delimiter style (default)
+
+`dollars`
+:   Normalize to `$...$` and `$$...$$`
+
+`backslash`
+:   Normalize to `\(...\)` and `\[...\]`
+
+The `math-indent` field specifies indentation (in spaces) for display math
+blocks. Default is 0.
 
 ### Code Block Style
 
@@ -87,56 +132,60 @@ Configure code block formatting preferences:
 
 ```toml
 [style.code-blocks]
-fence-style = "backtick"     # Options: "backtick", "tilde", "preserve"
-attribute-style = "shortcut" # Options: "shortcut", "explicit", "preserve"
-min-fence-length = 3         # Minimum fence length (default: 3)
-normalize-indented = false   # Convert indented code to fenced blocks (default: false)
+fence-style = "backtick"
+attribute-style = "shortcut"
 ```
 
-**Fence style:**
+Fence style options:
 
-- `backtick`: Use \`\`\`\`\`\`\`\`\`\`\` fences
-- `tilde`: Use `~~~` fences
-- `preserve` (default for Pandoc): Keep original fence style
+`backtick`
+:   Use \`\`\` fences (default for Quarto/RMarkdown)
 
-**Attribute style:**
+`tilde`
+:   Use `~~~` fences
 
-- `shortcut` (default for Quarto/RMarkdown): \`\`\``python`
-- `explicit`: \`\`\``{.python}`
-- `preserve` (default for Pandoc): Keep original style
+`preserve`
+:   Keep original fence style (default for Pandoc)
 
-**Note:** These defaults vary by flavor. Quarto uses `backtick` and `shortcut`,
-while Pandoc preserves original formatting.
+Attribute style options:
+
+`shortcut`
+:   Use shortcut form like \`\`\`python (default for Quarto/RMarkdown)
+
+`explicit`
+:   Use explicit form like \`\`\`{.python}
+
+`preserve`
+:   Keep original style (default for Pandoc)
+
+::: {.callout-note}
+These defaults vary by flavor. Quarto uses `backtick` and `shortcut`, while
+Pandoc preserves original formatting.
+:::
 
 ### Backwards Compatibility
 
 For backwards compatibility, style options can still be specified at the
-top-level (deprecated):
+top-level, but this is deprecated:
 
 ```toml
-# OLD FORMAT (deprecated, but still works)
-wrap = "reflow"
-blank-lines = "collapse"
-
-# NEW FORMAT (preferred)
 [style]
 wrap = "reflow"
 blank-lines = "collapse"
 ```
 
-If both formats are present, the `[style]` section takes precedence. A warning
-will be logged when using the deprecated top-level format.
+The `[style]` section format shown above is preferred. If both formats are
+present, the `[style]` section takes precedence and a warning will be logged.
 
 ## Extensions
 
-panache supports 60+ Pandoc extensions. Each flavor has sensible defaults, but
+panache supports 66 Pandoc extensions. Each flavor has sensible defaults, but
 you can override any extension:
 
 ```toml
 flavor = "quarto"
 
 [extensions]
-# Override flavor defaults
 hard-line-breaks = false
 citations = true
 task-lists = true
@@ -148,57 +197,127 @@ task-lists = true
 
 ```toml
 [extensions]
-blank-before-header = true        # Require blank line before headers
-header-attributes = true          # {#id .class key=value} syntax
-implicit-header-references = true # [Heading] links to header
+blank-before-header = true
+header-attributes = true
+implicit-header-references = true
 ```
+
+`blank-before-header`
+:   Require blank line before headers (default: enabled)
+
+`header-attributes`
+:   Full attribute syntax on headers `{#id .class key=value}` (default: enabled)
+
+`implicit-header-references`
+:   Allow `[Heading]` links to reference headers (default: enabled)
 
 #### Block Quotes
 
 ```toml
 [extensions]
-blank-before-blockquote = true # Require blank line before blockquotes
+blank-before-blockquote = true
 ```
+
+`blank-before-blockquote`
+:   Require blank line before blockquotes (default: enabled)
 
 #### Lists
 
 ```toml
 [extensions]
-fancy-lists = true      # Roman numerals, letters
-startnum = true         # Start at arbitrary numbers
-example-lists = true    # (@) example markers
-task-lists = true       # - [ ] and - [x]
-definition-lists = true # Term/definition syntax
+fancy-lists = true
+startnum = true
+example-lists = true
+task-lists = true
+definition-lists = true
 ```
+
+`fancy-lists`
+:   Roman numerals, letters, and fancy list markers (default: enabled)
+
+`startnum`
+:   Start ordered lists at arbitrary numbers (default: enabled)
+
+`example-lists`
+:   Example lists with `(@)` markers (default: enabled)
+
+`task-lists`
+:   GitHub-style task lists `- [ ]` and `- [x]` (default: enabled)
+
+`definition-lists`
+:   Term/definition syntax (default: enabled)
 
 #### Code Blocks
 
-````toml
+```toml
 [extensions]
-backtick-code-blocks = true   # ``` fences
-fenced-code-blocks = true     # ~~~ fences
-fenced-code-attributes = true # {.language #id}
-inline-code-attributes = true # `code`{.class}
-````
+backtick-code-blocks = true
+fenced-code-blocks = true
+fenced-code-attributes = true
+inline-code-attributes = true
+```
+
+`backtick-code-blocks`
+:   Fenced code blocks with \`\`\` fences (default: enabled)
+
+`fenced-code-blocks`
+:   Fenced code blocks with `~~~` fences (default: enabled)
+
+`fenced-code-attributes`
+:   Attributes on fenced code blocks `{.language #id}` (default: enabled)
+
+`inline-code-attributes`
+:   Attributes on inline code `` `code`{.class} `` (default: enabled)
 
 #### Tables
 
 ```toml
 [extensions]
-simple-tables = true    # Simple table syntax
-multiline-tables = true # Multiline cells
-grid-tables = true      # Grid-style tables
-pipe-tables = true      # GitHub-style | tables
-table-captions = true   # Table captions
+simple-tables = true
+multiline-tables = true
+grid-tables = true
+pipe-tables = true
+table-captions = true
 ```
+
+`simple-tables`
+:   Simple table syntax (default: enabled)
+
+`multiline-tables`
+:   Multiline cells (default: enabled)
+
+`grid-tables`
+:   Grid-style tables (default: enabled)
+
+`pipe-tables`
+:   GitHub-style `|` tables (default: enabled)
+
+`table-captions`
+:   Table captions (default: enabled)
 
 #### Divs
 
 ```toml
 [extensions]
-fenced-divs = true # ::: {.class} divs
-native-divs = true # HTML <div> elements
+fenced-divs = true
+native-divs = true
 ```
+
+`fenced-divs`
+:   Fenced divs `::: {.class}` (default: enabled)
+
+`native-divs`
+:   HTML `<div>` elements (default: enabled)
+
+#### Other Blocks
+
+```toml
+[extensions]
+line-blocks = true
+```
+
+`line-blocks`
+:   Line blocks for poetry with `|` prefix (default: enabled)
 
 ### Inline Extensions
 
@@ -206,112 +325,223 @@ native-divs = true # HTML <div> elements
 
 ```toml
 [extensions]
-intraword-underscores = true # Don't trigger emphasis in snake_case
-strikeout = true             # ~~strikethrough~~
-superscript = true           # ^super^
-subscript = true             # ~sub~
+intraword-underscores = true
+strikeout = true
+superscript = true
+subscript = true
 ```
+
+`intraword-underscores`
+:   Don't trigger emphasis in `snake_case` (default: enabled)
+
+`strikeout`
+:   Strikethrough `~~text~~` (default: enabled)
+
+`superscript`
+:   Superscript `^super^` (default: enabled)
+
+`subscript`
+:   Subscript `~sub~` (default: enabled)
 
 #### Links
 
 ```toml
 [extensions]
-inline-links = true             # [text](url)
-reference-links = true          # [text][ref]
-shortcut-reference-links = true # [ref]
-link-attributes = true          # [text](url){.class}
-autolinks = true                # <http://example.com>
-autolink-bare-uris = false      # Bare URLs → links (non-default)
+inline-links = true
+reference-links = true
+shortcut-reference-links = true
+link-attributes = true
+autolinks = true
+autolink-bare-uris = false
 ```
+
+`inline-links`
+:   Inline links `[text](url)` (default: enabled)
+
+`reference-links`
+:   Reference links `[text][ref]` (default: enabled)
+
+`shortcut-reference-links`
+:   Shortcut reference links `[ref]` (default: enabled)
+
+`link-attributes`
+:   Attributes on links `[text](url){.class}` (default: enabled)
+
+`autolinks`
+:   Automatic links `<http://example.com>` (default: enabled)
+
+`autolink-bare-uris`
+:   Bare URLs become links (default: disabled, non-default extension)
 
 #### Images
 
 ```toml
 [extensions]
-inline-images = true    # ![alt](url)
-implicit-figures = true # Single image → figure
+inline-images = true
+implicit-figures = true
 ```
+
+`inline-images`
+:   Inline images `![alt](url)` (default: enabled)
+
+`implicit-figures`
+:   Single image becomes figure (default: enabled)
 
 #### Math
 
 ```toml
 [extensions]
-tex-math-dollars = true           # $x$ and $$equation$$
-tex-math-single-backslash = false # \(...\) and \[...\] (RMarkdown)
-tex-math-double-backslash = false # \\(...\\) and \\[...\\]
+tex-math-dollars = true
+tex-math-single-backslash = false
+tex-math-double-backslash = false
 ```
+
+`tex-math-dollars`
+:   Dollar-delimited math `$x$` and `$$equation$$` (default: enabled)
+
+`tex-math-single-backslash`
+:   Single backslash math `\(...\)` and `\[...\]` (default: disabled, enabled for
+    RMarkdown)
+
+`tex-math-double-backslash`
+:   Double backslash math `\\(...\\)` and `\\[...\\]` (default: disabled)
 
 #### Footnotes
 
 ```toml
 [extensions]
-inline-footnotes = true # ^[text]
-footnotes = true        # [^1] references
+inline-footnotes = true
+footnotes = true
 ```
+
+`inline-footnotes`
+:   Inline footnotes `^[text]` (default: enabled)
+
+`footnotes`
+:   Reference footnotes `[^1]` and `[^1]: content` (default: enabled)
 
 #### Citations
 
 ```toml
 [extensions]
-citations = true # [@cite] syntax
+citations = true
 ```
+
+`citations`
+:   Citation syntax `[@cite]` (default: enabled)
 
 #### Spans
 
 ```toml
 [extensions]
-bracketed-spans = true # [text]{.class}
-native-spans = true    # HTML <span> elements
+bracketed-spans = true
+native-spans = true
 ```
+
+`bracketed-spans`
+:   Bracketed spans `[text]{.class}` (default: enabled)
+
+`native-spans`
+:   HTML `<span>` elements (default: enabled)
 
 ### Metadata Extensions
 
 ```toml
 [extensions]
-yaml-metadata-block = true # --- YAML frontmatter
-pandoc-title-block = true  # % Title / % Author / % Date
+yaml-metadata-block = true
+pandoc-title-block = true
 ```
+
+`yaml-metadata-block`
+:   YAML frontmatter with `---` delimiters (default: enabled)
+
+`pandoc-title-block`
+:   Pandoc title block `% Title`, `% Author`, `% Date` (default: enabled)
 
 ### Raw Content Extensions
 
 ```toml
 [extensions]
-raw-html = true                # HTML blocks and inline
-markdown-in-html-blocks = true # Markdown inside HTML
-raw-tex = true                 # LaTeX commands
-raw-attribute = true           # {=format} raw blocks
+raw-html = true
+markdown-in-html-blocks = false
+raw-tex = true
+raw-attribute = true
 ```
+
+`raw-html`
+:   HTML blocks and inline HTML (default: enabled)
+
+`markdown-in-html-blocks`
+:   Markdown inside HTML blocks (default: disabled)
+
+`raw-tex`
+:   LaTeX commands and environments (default: enabled)
+
+`raw-attribute`
+:   Generic raw blocks with `{=format}` syntax (default: enabled)
 
 ### Special Character Extensions
 
 ```toml
 [extensions]
-all-symbols-escapable = true # Backslash escapes any symbol
-escaped-line-breaks = true   # Backslash at line end = <br>
-hard-line-breaks = false     # Newline = <br> (non-default)
-emoji = false                # :emoji: syntax (non-default)
-mark = false                 # ==highlighted== (non-default)
+all-symbols-escapable = true
+escaped-line-breaks = true
+hard-line-breaks = false
+emoji = false
+mark = false
 ```
+
+`all-symbols-escapable`
+:   Backslash escapes any symbol (default: enabled)
+
+`escaped-line-breaks`
+:   Backslash at line end creates hard line break (default: enabled)
+
+`hard-line-breaks`
+:   Newline creates hard line break (default: disabled, non-default extension)
+
+`emoji`
+:   Emoji syntax `:emoji:` (default: disabled, non-default extension)
+
+`mark`
+:   Highlighted text `==highlighted==` (default: disabled, non-default extension)
 
 ### Quarto-Specific Extensions
 
 ```toml
 [extensions]
-quarto-callouts = true  # .callout-note, etc.
-quarto-crossrefs = true # @fig-id, @tbl-id
+quarto-callouts = true
+quarto-crossrefs = true
+quarto-shortcodes = true
 ```
+
+`quarto-callouts`
+:   Quarto callout blocks `.callout-note`, `.callout-warning`, etc. (default:
+    disabled, enabled for Quarto flavor)
+
+`quarto-crossrefs`
+:   Quarto cross-references `@fig-id`, `@tbl-id` (default: disabled, enabled for
+    Quarto flavor)
+
+`quarto-shortcodes`
+:   Quarto shortcodes `{{< name args >}}` (default: disabled, enabled for Quarto
+    flavor)
 
 ### Bookdown Extensions
 
 ```toml
 [extensions]
-bookdown-references = true # \@ref(label) and (\#label)
+bookdown-references = true
 ```
+
+`bookdown-references`
+:   Bookdown references `\@ref(label)` and `(\#label)` (default: disabled, enabled
+    for RMarkdown flavor)
 
 ## External Code Formatters
 
-panache can invoke external formatters for code blocks—**but they're opt-in**.
-You choose what gets formatted.
+panache can invoke external formatters for code blocks. Formatters are
+opt-in—you choose which languages to format.
 
 ### Basic Usage
 
@@ -319,22 +549,25 @@ Map languages to formatters using built-in presets:
 
 ```toml
 [formatters]
-r = "air"               # Single formatter
-python = "ruff"         # Single formatter
+r = "air"
+python = "ruff"
 javascript = "prettier"
-typescript = "prettier" # Reuse same formatter
+typescript = "prettier"
 ```
 
-**Available presets:**
+Available presets:
 
-| Language | Preset     | Command                    | Notes                      |
-| -------- | ---------- | -------------------------- | -------------------------- |
-| `r`      | `air`      | `air format {}`            | Fast, modern               |
-| `r`      | `styler`   | `Rscript -e "styler::..."` | Requires styler R package  |
-| `python` | `ruff`     | `ruff format`              | Fast, modern               |
-| `python` | `black`    | `black -`                  | Popular alternative        |
-| `yaml`   | `yamlfmt`  | `yamlfmt -`                | YAML formatter             |
-| `yaml`   | `prettier` | `prettier --parser=yaml`   | Alternative YAML formatter |
+| Language | Preset         | Command                                 | Type       |
+| -------- | -------------- | --------------------------------------- | ---------- |
+| R        | `air`          | `air format {}`                         | File-based |
+| R        | `styler`       | `Rscript -e "styler::style_file('{}')"` | File-based |
+| Python   | `ruff`         | `ruff format`                           | Stdin      |
+| Python   | `black`        | `black -`                               | Stdin      |
+| YAML     | `yamlfmt`      | `yamlfmt -`                             | Stdin      |
+| YAML     | `prettier`     | `prettier --parser=yaml`                | Stdin      |
+| TOML     | `taplo`        | `taplo format -`                        | Stdin      |
+| Shell    | `shfmt`        | `shfmt -`                               | Stdin      |
+| C/C++    | `clang-format` | `clang-format -`                        | Stdin      |
 
 ### Sequential Formatting
 
@@ -342,7 +575,7 @@ Run multiple formatters in order by using an array:
 
 ```toml
 [formatters]
-python = ["isort", "black"] # isort first, then black
+python = ["isort", "black"]
 ```
 
 Output from the first formatter is piped to the second.
@@ -356,24 +589,27 @@ Define custom formatter configurations with the `[formatters.NAME]` syntax:
 python = ["isort", "black"]
 javascript = "prettier"
 
-# Full custom formatter
 [formatters.prettier]
 cmd = "prettier"
 args = ["--parser=babel", "--print-width=100"]
 stdin = true
 
-# Custom formatter not in presets
 [formatters.isort]
 cmd = "isort"
 args = ["-"]
-stdin = true  # Default
+stdin = true
 ```
 
-**Formatter definition fields:**
+Formatter definition fields:
 
-- `cmd`: Command to execute (required for custom formatters)
-- `args`: Command-line arguments (optional, defaults to `[]`)
-- `stdin`: Use stdin/stdout mode (default: `true`) or file-based mode (`false`)
+`cmd`
+:   Command to execute (required for custom formatters)
+
+`args`
+:   Command-line arguments (optional, defaults to empty list)
+
+`stdin`
+:   Use stdin/stdout mode (default: `true`) or file-based mode (`false`)
 
 ### Preset Inheritance
 
@@ -385,31 +621,39 @@ overrides:
 [formatters]
 r = "air"
 
-# Partial override - only customize args
 [formatters.air]
 args = ["format", "--preset=tidyverse"]
-# cmd and stdin are inherited from built-in "air" preset
 ```
 
-**How it works:**
+In this example, `cmd` and `stdin` are inherited from the built-in `air` preset,
+while `args` is customized.
+
+How it works:
 
 - If the formatter name matches a built-in preset (`air`, `black`, `ruff`,
   etc.), that preset's defaults are used as a base
 - Any fields you specify (`cmd`, `args`, `stdin`) override the preset defaults
 - Unspecified fields keep the preset values
 
-**Examples:**
+Examples:
+
+Override only args (inherits `cmd="air"`, `stdin=false`):
 
 ```toml
-# Override only args (inherits cmd="air", stdin=false)
 [formatters.air]
 args = ["format", "--custom-flag", "{}"]
+```
 
-# Override only cmd (inherits args=["format"], stdin=true)
+Override only cmd (inherits default args and `stdin`):
+
+```toml
 [formatters.ruff]
 cmd = "ruff-custom"
+```
 
-# Override everything (complete replacement)
+Override everything (complete replacement):
+
+```toml
 [formatters.black]
 cmd = "my-black"
 args = ["--fast"]
@@ -425,50 +669,41 @@ using `append-args` and `prepend-args`:
 [formatters]
 r = "air"
 
-# Add arguments to preset's base args
 [formatters.air]
-# Base args from preset: ["format", "{}"]
 append-args = ["-i", "2"]
-# Final args: ["format", "{}", "-i", "2"]
 ```
 
-**Field descriptions:**
+This adds `["-i", "2"]` after the preset's base args `["format", "{}"]`,
+resulting in final args `["format", "{}", "-i", "2"]`.
 
-- `prepend-args`: Arguments added **before** base args
-- `append-args`: Arguments added **after** base args
-- Base args come from either the preset or explicit `args` field
+Available modifiers:
 
-**Multiple modifiers:**
+`prepend-args`
+:   Arguments added before base args
+
+`append-args`
+:   Arguments added after base args
+
+Multiple modifiers example:
 
 ```toml
 [formatters.air]
 prepend-args = ["--verbose"]
 append-args = ["-i", "2", "--check"]
-# Final: ["--verbose", "format", "{}", "-i", "2", "--check"]
 ```
 
-**With explicit args (no preset):**
+This produces final args: `["--verbose", "format", "{}", "-i", "2", "--check"]`.
 
-Modifiers work with custom formatters too:
+With explicit args (no preset):
 
 ```toml
 [formatters.shfmt]
 cmd = "shfmt"
 args = ["-filename", "$FILENAME"]
 append-args = ["-i", "2", "-bn"]
-# Final: ["-filename", "$FILENAME", "-i", "2", "-bn"]
 ```
 
-**Both modifiers together:**
-
-```toml
-[formatters.custom]
-cmd = "formatter"
-args = ["--input"]
-prepend-args = ["--config", "cfg.toml"]
-append-args = ["--output", "result.txt"]
-# Final: ["--config", "cfg.toml", "--input", "--output", "result.txt"]
-```
+Final args: `["-filename", "$FILENAME", "-i", "2", "-bn"]`.
 
 ### File-Based Formatters
 
@@ -480,7 +715,7 @@ r = "air-file"
 
 [formatters.air-file]
 cmd = "air"
-args = ["format", "{}"] # {} = file path placeholder
+args = ["format", "{}"]
 stdin = false
 ```
 
@@ -489,18 +724,29 @@ appended at the end.
 
 ### Behavior
 
-- **Language matching:** Code block language (e.g., \`\`\``python`) is matched
-  to formatter key (case-insensitive)
-- **Parallel execution:** All formatters run concurrently for speed
-- **Sequential chains:** Multiple formatters per language run in order
-- **Error handling:** Failed formatters preserve original code with a warning
-- **Timeout:** 30 seconds per formatter (not per chain)
-- Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
-  etc.)
+Language matching
+:   Code block language (e.g., \`\`\`python) is matched to formatter key
+    (case-insensitive)
+
+Parallel execution
+:   All formatters run concurrently for speed
+
+Sequential chains
+:   Multiple formatters per language run in order
+
+Error handling
+:   Failed formatters preserve original code with a warning
+
+Timeout
+:   30 seconds per formatter (not per chain)
+
+Config files
+:   Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
+    etc.)
 
 ## External Code Linters
 
-panache can invoke external linters for code blocks—**but they're opt-in**. You
+panache can invoke external linters for code blocks. Linters are opt-in—you
 choose which languages to lint.
 
 ### Quick Start
@@ -508,57 +754,69 @@ choose which languages to lint.
 Enable linters for specific languages:
 
 ```toml
-# Enable R linting with jarl
 [linters]
 r = "jarl"
 ```
 
-**Available linters:**
+Available linters:
 
 | Language | Linter | Command | Notes                          |
 | -------- | ------ | ------- | ------------------------------ |
-| `r`      | `jarl` | `jarl`  | R linter with JSON diagnostics |
+| R        | `jarl` | `jarl`  | R linter with JSON diagnostics |
 
 ### How It Works
 
 External linters analyze code blocks within your document:
 
-1. **Collection**: Gathers all code blocks of the configured language
-2. **Concatenation**: Combines blocks with blank-line preservation to maintain
+1. **Collection** - Gathers all code blocks of the configured language
+2. **Concatenation** - Combines blocks with blank-line preservation to maintain
    original line numbers
-3. **Analysis**: Runs the external linter on the concatenated code
-4. **Mapping**: Maps diagnostics back to exact line/column positions in your
+3. **Analysis** - Runs the external linter on the concatenated code
+4. **Mapping** - Maps diagnostics back to exact line/column positions in your
    document
 
+::: {.callout-note}
 This approach handles **stateful code** correctly. For example, if an R variable
 is defined in one code block and used in another, the linter sees both blocks
 together and won't report false "undefined variable" errors.
+:::
 
 ### Where Linters Run
 
-- **CLI**: `panache lint` shows external linter diagnostics
-- **LSP**: Diagnostics appear inline in your editor as you type
+CLI
+:   `panache lint` shows external linter diagnostics
+
+LSP
+:   Diagnostics appear inline in your editor as you type
 
 ### Behavior
 
-- **Language matching**: Code block language (e.g., \`\`\``r`) is matched to
-  linter key (case-insensitive)
-- **Error handling**: Missing linters are gracefully ignored with a warning
-- **Timeout**: 30 seconds per linter invocation
-- **Line-accurate**: Diagnostics report exact line/column locations
-- **Limitations**: Auto-fixes from external linters are currently disabled due
-  to byte offset mapping complexity. Diagnostics work perfectly.
+Language matching
+:   Code block language (e.g., \`\`\`r) is matched to linter key (case-insensitive)
+
+Error handling
+:   Missing linters are gracefully ignored with a warning
+
+Timeout
+:   30 seconds per linter invocation
+
+Line-accurate
+:   Diagnostics report exact line/column locations
+
+Auto-fixes
+:   Currently disabled due to byte offset mapping complexity (diagnostics work
+    perfectly)
 
 ### Example
 
+Enable R linting with jarl while also formatting with air:
+
 ```toml
-# .panache.toml
 [linters]
 r = "jarl"
 
-# Still enable R formatting separately
-[formatters.r]
-preset = "air"
+[formatters]
+r = "air"
 ```
 
 ## Example Configuration
@@ -568,7 +826,7 @@ Complete example with all common options:
 ```toml
 # Markdown flavor and basic settings
 flavor = "quarto"
-line_width = 80
+line-width = 80
 
 # Formatting style (NEW: organized under [style] section)
 [style]
@@ -583,22 +841,30 @@ attribute-style = "shortcut"
 
 # Extension overrides
 [extensions]
-hard_line_breaks = false
+hard-line-breaks = false
 citations = true
-task_lists = true
+task-lists = true
+
 emoji = false
+```
 
 # External formatters (opt-in)
+
+```toml
 [formatters]
 python = ["isort", "black"] # Sequential: isort then black
 r = "air"                   # Built-in preset
 javascript = "prettier"     # Reusable definition
 typescript = "prettier"
 rust = "rustfmt"
+```
 
 # Customize formatters (optional)
+
+```toml
 [formatters.prettier]
 args = ["--print-width=100"]
+
 
 [formatters.isort]
 cmd = "isort"
@@ -608,9 +874,3 @@ args = ["-"]
 [linters]
 r = "jarl" # Enable R linting
 ```
-
-## See Also
-
-- [CLI Reference](cli.qmd) - Using `--config` flag
-- [Formatting](formatting.qmd) - How configuration affects output
-- [Getting Started](getting-started.qmd) - Basic configuration examples

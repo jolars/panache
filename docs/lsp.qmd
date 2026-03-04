@@ -9,27 +9,61 @@ provides document formatting capabilities for editors and IDEs.
 
 ## Features
 
-- Document formatting (`textDocument/formatting`)
-- Range formatting (`textDocument/rangeFormatting`)
-- **Go to definition** (`textDocument/definition`) - jump from references to
-  definitions
-  - Reference links: `[text][ref]` → `[ref]: url`
-  - Reference images: `![alt][ref]` → `[ref]: url`
-  - Footnote references: `[^id]` → `[^id]: content`
-- Document outline (`textDocument/documentSymbol`) - hierarchical view of
-  headings, tables, and figures
-- Folding ranges (`textDocument/foldingRange`) - code folding for headings, code
-  blocks, fenced divs, YAML frontmatter
-- Live diagnostics (`textDocument/publishDiagnostics`) - linting errors and
-  warnings
-- Code actions (`textDocument/codeAction`) - quick fixes and refactorings
-  - Auto-fix lint issues (e.g., heading hierarchy corrections)
-  - Convert list styles (loose ↔ compact)
-  - Convert footnote styles (inline ↔ reference)
-- Document tracking (`textDocument/didOpen/didChange/didClose`)
-- Configuration discovery from workspace root
-- Format on save support
-- Incremental parsing for LSP document updates (parser cache per document)
+Document formatting
+:   Format entire documents or selected ranges (`textDocument/formatting`,
+    `textDocument/rangeFormatting`)
+
+Go to definition
+:   Jump from references to definitions (`textDocument/definition`)
+    - Reference links: `[text][ref]` → `[ref]: url`
+    - Reference images: `![alt][ref]` → `[ref]: url`
+    - Footnote references: `[^id]` → `[^id]: content`
+
+Document outline
+:   Hierarchical view of document structure (`textDocument/documentSymbol`)
+    - Headings (H1-H6) with proper nesting
+    - Tables (with captions when available)
+    - Figures (images with alt text)
+
+Code folding
+:   Fold sections of your document (`textDocument/foldingRange`)
+    - Headings
+    - Code blocks
+    - Fenced divs
+    - YAML frontmatter
+
+Live diagnostics
+:   Real-time linting as you type (`textDocument/publishDiagnostics`)
+    - Heading hierarchy violations
+    - Duplicate references
+    - Citation validation
+    - Parser errors
+    - External linter integration (e.g., R code linting)
+
+Code actions
+:   Quick fixes and refactorings (`textDocument/codeAction`)
+    - Auto-fix lint issues (e.g., heading hierarchy corrections)
+    - Convert list styles (loose ↔ compact)
+    - Convert footnote styles (inline ↔ reference)
+
+Hover information
+:   Contextual information on hover (`textDocument/hover`)
+
+Auto-completion
+:   Smart completions for Markdown syntax (`textDocument/completion`)
+
+Symbol renaming
+:   Rename references and their definitions together (`textDocument/rename`)
+
+Document tracking
+:   Incremental synchronization for efficiency (`textDocument/didOpen`,
+    `textDocument/didChange`, `textDocument/didClose`)
+
+Configuration discovery
+:   Automatic detection from workspace root
+
+Format on save
+:   Automatic formatting when saving files
 
 ## Starting the Server
 
@@ -239,8 +273,9 @@ The LSP determines the workspace root by looking for:
 
 ### Document Formatting
 
-The LSP provides full document formatting via the `textDocument/formatting`
-request. This is the same formatting as the `panache format` CLI command.
+The LSP provides full document and range formatting via
+`textDocument/formatting` and `textDocument/rangeFormatting` requests. This uses
+the same formatting engine as the `panache format` CLI command.
 
 Format entire documents or selected ranges:
 
@@ -248,51 +283,142 @@ Format entire documents or selected ranges:
 " Neovim: format buffer
 :lua vim.lsp.buf.format()
 
-" Neovim: format selected range
+" Neovim: format selected range (visual mode)
 :'<,'>lua vim.lsp.buf.format()
 ```
 
-Format on save is supported by all major editors (see configuration above).
+Format on save is supported by all major editors. See editor configuration
+sections above for setup instructions.
+
+### Go to Definition
+
+Jump from link/footnote references to their definitions:
+
+Reference links
+:   `[text][label]` → `[label]: url`
+
+Shortcut reference links
+:   `[label]` → `[label]: url`
+
+Reference images
+:   `![alt][label]` → `[label]: url`
+
+Footnote references
+:   `[^id]` → `[^id]: content`
+
+Place your cursor on a reference and trigger "go to definition" (F12 in many
+editors).
 
 ### Document Outline
 
-The LSP provides a hierarchical document outline/symbol view showing:
+The LSP provides a hierarchical document outline showing:
 
-- **Headings** (H1-H6) with proper nesting
-- **Tables** (with captions when available)
-- **Figures** (image links with alt text)
+Headings
+:   H1-H6 with proper nesting levels
 
-This appears in:
+Tables
+:   With captions when available
 
-- VSCode: Outline view (sidebar) or breadcrumbs
-- Neovim: Telescope symbols (`<leader>ss`) or Aerial plugin
-- Helix: Symbol picker (`:symbol-picker`)
+Figures
+:   Image links with alt text
 
-The outline is automatically updated as you edit the document.
+The outline appears in:
 
-### Live Diagnostics
+- **VSCode**: Outline view (sidebar) or breadcrumbs
+- **Neovim**: Telescope symbols (`:Telescope lsp_document_symbols`) or Aerial
+  plugin
+- **Helix**: Symbol picker (`:symbol-picker`)
 
-Linting errors and warnings are shown in real-time as you type:
+The outline updates automatically as you edit.
 
-- Heading hierarchy violations
-- Future lint rules as they're added
+### Code Actions
 
-Quick fixes are available via code actions:
+Quick fixes and refactorings available at the cursor position:
+
+Auto-fix lint issues
+:   Fix heading hierarchy violations automatically
+
+Convert list styles
+:   Toggle between loose (blank lines) and compact list formatting
+
+Convert footnote styles
+:   Toggle between inline `^[text]` and reference `[^id]` footnotes
+
+Trigger code actions:
 
 ```vim
 " Neovim: show code actions at cursor
 :lua vim.lsp.buf.code_action()
 ```
 
+Most editors show a lightbulb icon when code actions are available.
+
+### Folding Ranges
+
+Fold sections of your document for easier navigation:
+
+Headings
+:   Fold sections under headings
+
+Code blocks
+:   Fold multi-line fenced code blocks
+
+Fenced divs
+:   Fold `::: {.class}` content
+
+YAML frontmatter
+:   Fold `---` delimited metadata
+
+Most editors support folding with default key bindings (e.g., `za` in Neovim,
+`Ctrl+Shift+[` in VSCode).
+
+### Live Diagnostics
+
+Linting errors and warnings appear in real-time as you type:
+
+Built-in rules
+:   Heading hierarchy, duplicate references, citation validation, parser errors
+
+External linters
+:   Code block linting (e.g., `jarl` for R when configured in `[linters]`)
+
+Diagnostics appear as:
+
+- Squiggly underlines in the editor
+- Hover tooltips with error messages
+- Problems/diagnostics panel
+
+Quick fixes are available via code actions where applicable.
+
+### Hover Information
+
+Hover over elements to see contextual information (implementation varies by
+element type).
+
+### Auto-Completion
+
+Smart completions for Markdown syntax (implementation varies by context).
+
+### Symbol Renaming
+
+Rename references and their definitions together. Place cursor on a reference
+label or definition and trigger rename (F2 in many editors).
+
 ### Document Synchronization
 
-The LSP tracks document changes using **incremental synchronization mode**:
+The LSP tracks document changes using **incremental synchronization**:
 
-- `textDocument/didOpen`: Document opened in editor
-- `textDocument/didChange`: Document content changed (incremental sync)
-- `textDocument/didClose`: Document closed
+`textDocument/didOpen`
+:   Document opened in editor
 
-This ensures the LSP always has the current document state for formatting.
+`textDocument/didChange`
+:   Document content changed (incremental deltas sent)
+
+`textDocument/didClose`
+:   Document closed
+
+This ensures the LSP always has the current document state while minimizing
+data transfer.
 
 ## Troubleshooting
 
@@ -328,11 +454,10 @@ Set `"customLsp.trace.server": "verbose"` in settings.
 
 ### Configuration Not Loading
 
-Verify your config file is valid:
+Verify your config file is valid by testing with the CLI first:
 
 ```bash
-# Test with CLI first
-panache format --config panache.toml test.qmd
+panache format --config .panache.toml test.qmd
 ```
 
 The LSP searches for config from the workspace root, not the file's directory.
@@ -341,33 +466,44 @@ The LSP searches for config from the workspace root, not the file's directory.
 
 For large documents:
 
-1. Reduce `line_width` in config
-2. Disable external formatters temporarily
-3. Use `wrap = "preserve"` instead of `"reflow"`
+Reduce line width
+:   Lower `line-width` in config to reduce rewrapping work
+
+Disable external formatters
+:   Temporarily disable external formatters for faster feedback
+
+Use preserve mode
+:   Set `wrap = "preserve"` instead of `"reflow"`
 
 ## Comparison with CLI
 
 | Feature             | LSP                      | CLI                    |
 | ------------------- | ------------------------ | ---------------------- |
 | Formatting          | ✅ Same engine           | ✅ Direct              |
+| Linting             | ✅ Live diagnostics      | ✅ On-demand           |
 | Config discovery    | ✅ From workspace root   | ✅ From file directory |
 | Format on save      | ✅ Automatic             | ❌ Manual              |
 | Multiple files      | ✅ Per-editor-tab        | ✅ Shell scripting     |
 | Error reporting     | ✅ In-editor diagnostics | ✅ stderr output       |
 | External formatters | ✅ Supported             | ✅ Supported           |
+| External linters    | ✅ Live integration      | ✅ On-demand           |
+| Go to definition    | ✅ LSP only              | ❌ Not applicable      |
+| Code actions        | ✅ LSP only              | ❌ Not applicable      |
 
 ## Best Practices
 
-1. **Place config at project root**: Put `panache.toml` at your project root for
-   consistent behavior
-2. **Use format on save**: Enable format-on-save for automatic formatting
-3. **Test CLI first**: Verify formatting with CLI before relying on LSP
-4. **Check logs**: Enable LSP logging when debugging issues
-5. **Restart after config changes**: Restart LSP server after changing
-   `.panache.toml`
+Place config at project root
+:   Put `.panache.toml` at your project root for consistent behavior across CLI
+    and LSP
 
-## See Also
+Use format on save
+:   Enable format-on-save for automatic formatting
 
-- [Configuration](configuration.qmd) - Configure formatting behavior
-- [CLI Reference](cli.qmd) - Command-line alternative
-- [Getting Started](getting-started.qmd) - Installation and basic usage
+Test CLI first
+:   Verify formatting with CLI before relying on LSP
+
+Check logs
+:   Enable LSP logging when debugging issues
+
+Restart after config changes
+:   Restart LSP server after changing `.panache.toml`
