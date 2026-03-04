@@ -41,6 +41,8 @@ pub struct Extensions {
     /// Full attribute syntax on headers {#id .class key=value}
     #[serde(alias = "header_attributes")]
     pub header_attributes: bool,
+    /// Implicit header references ([Heading] links to header)
+    pub implicit_header_references: bool,
 
     // Block quotes
     /// Require blank line before blockquotes (default: enabled)
@@ -265,6 +267,7 @@ impl Extensions {
             blank_before_header: true,
             blank_before_blockquote: true,
             header_attributes: true,
+            implicit_header_references: true,
 
             // Lists
             fancy_lists: true,
@@ -361,6 +364,7 @@ impl Extensions {
         // Quarto enables additional extensions
         ext.task_lists = true;
         ext.implicit_figures = true;
+        ext.implicit_header_references = true;
 
         // Quarto-specific
         ext.quarto_callouts = true;
@@ -380,6 +384,7 @@ impl Extensions {
         ext.tex_math_dollars = true;
         ext.tex_math_single_backslash = true; // RMarkdown enables \(...\) and \[...\] by default
         ext.bookdown_references = true;
+        ext.implicit_header_references = true;
 
         ext
     }
@@ -408,6 +413,7 @@ impl Extensions {
             blank_before_header: true,
             blank_before_blockquote: true,
             header_attributes: false,
+            implicit_header_references: false,
 
             fancy_lists: false,
             startnum: false,

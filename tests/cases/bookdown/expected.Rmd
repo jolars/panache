@@ -16,3 +16,7 @@ Table: (\#tab:mytable) A table with a reference.
 | 1   | 2   | 3   |
 
 We refer to is as Table \@ref(tab:mytable), not \@ref(mytable)!
+
+## Implicit Header
+
+We can refer to it as Section \@ref(implicit-header).

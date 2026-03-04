@@ -8,6 +8,7 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{AstNode, Citation, Crossref, SyntaxKind, SyntaxNode};
+use crate::utils::pandoc_slugify;
 use rowan::{NodeOrToken, TextRange, TextSize};
 
 use super::config::load_config;
@@ -73,6 +74,14 @@ fn normalize_label(label: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ")
         .to_lowercase()
+}
+
+fn normalize_heading_text(text: &str) -> String {
+    normalize_label(text)
+}
+
+fn implicit_header_id(text: &str) -> String {
+    pandoc_slugify(text)
 }
 
 /// Extract the reference label from a LinkRef or FootnoteReference node
@@ -161,6 +170,52 @@ pub(crate) fn find_crossref_definition_node(root: &SyntaxNode, label: &str) -> O
         }
         false
     })
+}
+
+pub(crate) fn find_implicit_header_definition_node(
+    root: &SyntaxNode,
+    label: &str,
+) -> Option<SyntaxNode> {
+    let target = normalize_label(label);
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+    for node in root.descendants() {
+        if node.kind() != SyntaxKind::HEADING {
+            continue;
+        }
+        let Some(content) = node
+            .children()
+            .find(|child| child.kind() == SyntaxKind::HEADING_CONTENT)
+        else {
+            continue;
+        };
+        let raw_text = content
+            .descendants_with_tokens()
+            .filter_map(|it| it.into_token())
+            .filter(|token| token.kind() == SyntaxKind::TEXT)
+            .map(|token| token.text().to_string())
+            .collect::<String>();
+        let cleaned = normalize_heading_text(&raw_text);
+        if cleaned.is_empty() {
+            continue;
+        }
+        let base = implicit_header_id(&cleaned);
+        if base.is_empty() {
+            continue;
+        }
+        let count = seen.entry(base.clone()).or_insert(0);
+        let id = if *count == 0 {
+            base.clone()
+        } else {
+            format!("{}-{}", base, *count)
+        };
+        *count += 1;
+
+        if normalize_label(&id) == target {
+            return Some(node.clone());
+        }
+    }
+    None
 }
 
 /// Extract the label from a definition node (ReferenceDefinition or FootnoteDefinition)
@@ -385,6 +440,26 @@ mod tests {
         let def = find_crossref_definition_node(&root, "eq-test");
         assert!(def.is_some());
         assert_eq!(def.unwrap().kind(), SyntaxKind::ATTRIBUTE);
+    }
+
+    #[test]
+    fn test_find_implicit_header_definition_node() {
+        let input = "# Implicit Header\n\nSee \\@ref(implicit-header).\n";
+        let root = parse(input);
+
+        let def = find_implicit_header_definition_node(&root, "implicit-header");
+        assert!(def.is_some());
+        assert_eq!(def.unwrap().kind(), SyntaxKind::HEADING);
+    }
+
+    #[test]
+    fn test_find_implicit_header_definition_node_duplicates() {
+        let input = "# Implicit Header\n\n# Implicit Header\n";
+        let root = parse(input);
+
+        let def = find_implicit_header_definition_node(&root, "implicit-header-1");
+        assert!(def.is_some());
+        assert_eq!(def.unwrap().kind(), SyntaxKind::HEADING);
     }
 
     #[test]

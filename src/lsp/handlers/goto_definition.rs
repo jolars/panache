@@ -19,13 +19,14 @@ use super::super::{conversions, helpers};
 
 /// Handle textDocument/definition request
 pub(crate) async fn goto_definition(
-    _client: &tower_lsp_server::Client,
+    client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: GotoDefinitionParams,
 ) -> Result<Option<GotoDefinitionResponse>> {
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
+    let config = helpers::get_config(client, &workspace_root, uri).await;
 
     let (metadata, graph) = {
         let map = document_map.lock().await;
@@ -103,6 +104,27 @@ pub(crate) async fn goto_definition(
         // Quarto crossref: jump to attribute definition
         if let Some(label) = helpers::extract_crossref_key(&node)
             && let Some(definition) = helpers::find_crossref_definition_node(&root, &label)
+        {
+            let start_offset: usize = definition.text_range().start().into();
+            let end_offset: usize = definition.text_range().end().into();
+
+            let start_position = conversions::offset_to_position(&content, start_offset);
+            let end_position = conversions::offset_to_position(&content, end_offset);
+
+            let location = Location {
+                uri: uri.clone(),
+                range: Range {
+                    start: start_position,
+                    end: end_position,
+                },
+            };
+
+            return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+        }
+
+        if config.extensions.implicit_header_references
+            && let Some(label) = helpers::extract_crossref_key(&node)
+            && let Some(definition) = helpers::find_implicit_header_definition_node(&root, &label)
         {
             let start_offset: usize = definition.text_range().start().into();
             let end_offset: usize = definition.text_range().end().into();

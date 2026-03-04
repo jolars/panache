@@ -285,8 +285,7 @@ are implemented.
   (default behavior)
 - ✅ Extension: `header_attributes` - Full attribute syntax
   `{#id .class key=value}`
-- ⏹️ Extension: `implicit_header_references` - Auto-generate reference links
-  (conversion feature, not formatting concern)
+- ✅ Extension: `implicit_header_references` - Auto-generate reference links
 
 ### Block Quotations ✅
 

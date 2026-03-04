@@ -1,4 +1,4 @@
-DOCUMENT@0..535
+DOCUMENT@0..610
   PARAGRAPH@0..139
     TEXT@0..9 "(ref:fig)"
     TEXT@9..138 " A very very very ver ..."
@@ -97,4 +97,23 @@ DOCUMENT@0..535
       TEXT@532..533 ")"
     TEXT@533..534 "!"
     NEWLINE@534..535 "\n"
+  BLANK_LINE@535..536
+    BLANK_LINE@535..536 "\n"
+  HEADING@536..555
+    ATX_HEADING_MARKER@536..538
+      ATX_HEADING_MARKER@536..538 "##"
+    WHITESPACE@538..539 " "
+    HEADING_CONTENT@539..554
+      TEXT@539..554 "Implicit Header"
+    NEWLINE@554..555 "\n"
+  BLANK_LINE@555..556
+    BLANK_LINE@555..556 "\n"
+  PARAGRAPH@556..610
+    TEXT@556..586 "We can refer to it as ..."
+    CROSSREF@586..608
+      TEXT@586..592 "\\@ref("
+      CITATION_KEY@592..607 "implicit-header"
+      TEXT@607..608 ")"
+    TEXT@608..609 "."
+    NEWLINE@609..610 "\n"
 

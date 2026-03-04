@@ -167,3 +167,32 @@ pub fn normalize_label(label: &str) -> String {
         .join(" ")
         .to_lowercase()
 }
+
+/// Generate a Pandoc-style auto identifier from heading text.
+pub fn pandoc_slugify(text: &str) -> String {
+    let mut out = String::new();
+    let mut prev_dash = false;
+
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            if !out.is_empty() && !prev_dash {
+                out.push('-');
+                prev_dash = true;
+            }
+            continue;
+        }
+
+        for lc in ch.to_lowercase() {
+            if lc.is_alphanumeric() || lc == '_' || lc == '-' || lc == '.' {
+                out.push(lc);
+                prev_dash = lc == '-';
+            }
+        }
+    }
+
+    while out.ends_with('-') {
+        out.pop();
+    }
+
+    out
+}

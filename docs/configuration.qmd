@@ -148,8 +148,9 @@ task-lists = true
 
 ```toml
 [extensions]
-blank-before-header = true # Require blank line before headers
-header-attributes = true   # {#id .class key=value} syntax
+blank-before-header = true        # Require blank line before headers
+header-attributes = true          # {#id .class key=value} syntax
+implicit-header-references = true # [Heading] links to header
 ```
 
 #### Block Quotes
