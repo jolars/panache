@@ -35,11 +35,20 @@ pub struct DefinitionIndex {
     crossrefs: HashMap<String, DefinitionLocation>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EdgeKind {
+    Include,
+    Bibliography,
+    MetadataFile,
+}
+
 #[derive(Debug, Default)]
-pub struct IncludeIndex {
-    pub definitions: DefinitionIndex,
-    pub diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
-    pub paths: HashSet<PathBuf>,
+pub struct ProjectGraph {
+    definitions: DefinitionIndex,
+    diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
+    documents: HashSet<PathBuf>,
+    edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
+    reverse_edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
 }
 
 impl DefinitionIndex {
@@ -47,6 +56,7 @@ impl DefinitionIndex {
         self.references.is_empty() && self.footnotes.is_empty() && self.crossrefs.is_empty()
     }
 }
+
 impl DefinitionLocation {
     pub fn path(&self) -> &Path {
         &self.path
@@ -54,6 +64,63 @@ impl DefinitionLocation {
 
     pub fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+impl ProjectGraph {
+    pub fn build(root_path: &Path, root_text: &str, config: &Config) -> Self {
+        let mut graph = ProjectGraph::default();
+        let mut visited = HashSet::new();
+        let base_dir = root_path.parent().unwrap_or_else(|| Path::new("."));
+        let project_root = find_quarto_root(root_path);
+        visit_document(
+            root_path,
+            root_text,
+            base_dir,
+            project_root.as_deref(),
+            config,
+            &mut graph,
+            &mut visited,
+        );
+        graph
+    }
+
+    pub fn definitions(&self) -> &DefinitionIndex {
+        &self.definitions
+    }
+
+    pub fn diagnostics(&self) -> &HashMap<PathBuf, Vec<Diagnostic>> {
+        &self.diagnostics
+    }
+
+    pub fn documents(&self) -> &HashSet<PathBuf> {
+        &self.documents
+    }
+
+    pub fn dependents(&self, path: &Path, kind: Option<EdgeKind>) -> Vec<PathBuf> {
+        self.reverse_edges
+            .get(path)
+            .map(|edges| {
+                edges
+                    .iter()
+                    .filter(|(_, edge_kind)| kind.is_none_or(|k| k == *edge_kind))
+                    .map(|(from, _)| from.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn dependencies(&self, path: &Path, kind: Option<EdgeKind>) -> Vec<PathBuf> {
+        self.edges
+            .get(path)
+            .map(|edges| {
+                edges
+                    .iter()
+                    .filter(|(_, edge_kind)| kind.is_none_or(|k| k == *edge_kind))
+                    .map(|(to, _)| to.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -108,23 +175,6 @@ pub fn collect_includes(
     }
 
     resolution
-}
-
-pub fn build_include_index(root_path: &Path, root_text: &str, config: &Config) -> IncludeIndex {
-    let mut index = IncludeIndex::default();
-    let mut visited = HashSet::new();
-    let base_dir = root_path.parent().unwrap_or_else(|| Path::new("."));
-    let project_root = find_quarto_root(root_path);
-    visit_includes(
-        root_path,
-        root_text,
-        base_dir,
-        project_root.as_deref(),
-        config,
-        &mut index,
-        &mut visited,
-    );
-    index
 }
 
 pub fn collect_cross_doc_duplicates(
@@ -303,24 +353,24 @@ impl DefinitionIndex {
     }
 }
 
-fn visit_includes(
+fn visit_document(
     path: &Path,
     input: &str,
     base_dir: &Path,
     project_root: Option<&Path>,
     config: &Config,
-    index: &mut IncludeIndex,
+    graph: &mut ProjectGraph,
     visited: &mut HashSet<PathBuf>,
 ) {
     if !visited.insert(path.to_path_buf()) {
         return;
     }
-    index.paths.insert(path.to_path_buf());
+    graph.documents.insert(path.to_path_buf());
 
     let tree = crate::parse(input, Some(config.clone()));
-    let diagnostics = collect_cross_doc_duplicates(&mut index.definitions, &tree, input, path);
+    let diagnostics = collect_cross_doc_duplicates(&mut graph.definitions, &tree, input, path);
     if !diagnostics.is_empty() {
-        index
+        graph
             .diagnostics
             .entry(path.to_path_buf())
             .or_default()
@@ -329,25 +379,50 @@ fn visit_includes(
 
     let resolution = collect_includes(&tree, input, base_dir, project_root, config);
     if !resolution.diagnostics.is_empty() {
-        index
+        graph
             .diagnostics
             .entry(path.to_path_buf())
             .or_default()
             .extend(resolution.diagnostics);
     }
     for include in resolution.includes {
+        graph.add_edge(path, &include.path, EdgeKind::Include);
         if let Ok(include_input) = std::fs::read_to_string(&include.path) {
             let include_base = include.path.parent().unwrap_or_else(|| Path::new("."));
-            visit_includes(
+            visit_document(
                 &include.path,
                 &include_input,
                 include_base,
                 project_root,
                 config,
-                index,
+                graph,
                 visited,
             );
         }
+    }
+
+    if let Ok(metadata) = crate::metadata::extract_project_metadata(&tree, path) {
+        for metadata_file in &metadata.metadata_files {
+            graph.add_edge(path, metadata_file, EdgeKind::MetadataFile);
+        }
+        if let Some(bibliography) = metadata.bibliography {
+            for bib in bibliography.paths {
+                graph.add_edge(path, &bib, EdgeKind::Bibliography);
+            }
+        }
+    }
+}
+
+impl ProjectGraph {
+    fn add_edge(&mut self, from: &Path, to: &Path, kind: EdgeKind) {
+        self.edges
+            .entry(from.to_path_buf())
+            .or_default()
+            .insert((to.to_path_buf(), kind));
+        self.reverse_edges
+            .entry(to.to_path_buf())
+            .or_default()
+            .insert((from.to_path_buf(), kind));
     }
 }
 
@@ -401,4 +476,37 @@ fn split_shortcode_args(content: &str) -> Vec<String> {
     }
 
     args
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn project_graph_tracks_metadata_and_bibliography_edges() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.qmd");
+
+        fs::write(
+            root.join("_quarto.yml"),
+            "metadata-files:\n  - _site.yml\nbibliography: proj.bib\n",
+        )
+        .unwrap();
+        fs::write(root.join("_site.yml"), "title: Site\n").unwrap();
+        fs::write(root.join("proj.bib"), "@book{proj,}\n").unwrap();
+        fs::write(&doc_path, "---\n---\n\nText").unwrap();
+
+        let input = fs::read_to_string(&doc_path).unwrap();
+        let config = Config::default();
+        let graph = ProjectGraph::build(&doc_path, &input, &config);
+
+        let metadata_deps = graph.dependencies(&doc_path, Some(EdgeKind::MetadataFile));
+        assert!(metadata_deps.contains(&root.join("_site.yml")));
+
+        let bib_deps = graph.dependencies(&doc_path, Some(EdgeKind::Bibliography));
+        assert!(bib_deps.contains(&root.join("proj.bib")));
+    }
 }

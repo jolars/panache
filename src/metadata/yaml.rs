@@ -122,6 +122,7 @@ pub(super) fn parse_frontmatter(
 
     Ok(DocumentMetadata {
         bibliography,
+        metadata_files: Vec::new(),
         bibliography_parse,
         citations: super::CitationInfo { keys: Vec::new() },
         title: frontmatter.title,

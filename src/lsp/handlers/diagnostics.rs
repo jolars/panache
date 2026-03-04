@@ -28,7 +28,7 @@ fn lint_included_documents(
     let project_root = crate::includes::find_quarto_root(&doc_path);
     let resolution =
         crate::includes::collect_includes(tree, text, base_dir, project_root.as_deref(), config);
-    let include_index = crate::includes::build_include_index(&doc_path, text, config);
+    let graph = crate::includes::ProjectGraph::build(&doc_path, text, config);
 
     let mut results = Vec::new();
     let mut root_diagnostics: Vec<Diagnostic> = resolution
@@ -37,7 +37,7 @@ fn lint_included_documents(
         .map(|d| convert_diagnostic(d, text))
         .collect();
 
-    if let Some(extra) = include_index.diagnostics.get(doc_path.as_ref()) {
+    if let Some(extra) = graph.diagnostics().get(doc_path.as_ref()) {
         root_diagnostics.extend(extra.iter().map(|d| convert_diagnostic(d, text)));
     }
 
@@ -59,7 +59,7 @@ fn lint_included_documents(
                     .iter()
                     .map(|d| convert_diagnostic(d, &include_text))
                     .collect();
-                if let Some(extra) = include_index.diagnostics.get(&include.path) {
+                if let Some(extra) = graph.diagnostics().get(&include.path) {
                     mapped.extend(extra.iter().map(|d| convert_diagnostic(d, &include_text)));
                 }
                 results.push((include_uri, mapped));

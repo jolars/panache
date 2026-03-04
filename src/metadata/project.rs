@@ -192,8 +192,10 @@ pub fn extract_project_metadata(
         index: bibtex::load_bibliography(&info.paths),
     });
 
+    let metadata_files = collect_metadata_files(doc_path, &merged.metadata_files);
     let mut metadata = DocumentMetadata {
         bibliography,
+        metadata_files,
         bibliography_parse,
         citations: super::CitationInfo { keys: Vec::new() },
         title: merged.title,
@@ -381,6 +383,14 @@ fn extract_bibliography_from_strings(
         paths: resolved_paths,
         source_ranges: ranges,
     }
+}
+
+fn collect_metadata_files(doc_path: &Path, metadata_files: &[String]) -> Vec<PathBuf> {
+    let doc_dir = doc_path.parent().unwrap_or_else(|| Path::new("."));
+    metadata_files
+        .iter()
+        .map(|path| doc_dir.join(path))
+        .collect()
 }
 
 fn find_yaml_value_range(

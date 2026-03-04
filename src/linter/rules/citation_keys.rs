@@ -113,6 +113,7 @@ mod tests {
         let input = "Text [@missing].";
         let metadata = crate::metadata::DocumentMetadata {
             bibliography: None,
+            metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
                 index: crate::bibtex::BibIndex {
                     entries: std::collections::HashMap::new(),
@@ -140,6 +141,7 @@ mod tests {
         let input = "Text [@missing].";
         let metadata = crate::metadata::DocumentMetadata {
             bibliography: None,
+            metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
                 index: crate::bibtex::BibIndex {
                     entries: std::collections::HashMap::new(),
@@ -182,6 +184,7 @@ mod tests {
         let rule = CitationKeysRule;
         let metadata = crate::metadata::DocumentMetadata {
             bibliography: None,
+            metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
                 index: crate::bibtex::BibIndex {
                     entries: std::collections::HashMap::new(),

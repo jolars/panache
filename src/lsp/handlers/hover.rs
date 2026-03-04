@@ -37,10 +37,10 @@ pub(crate) async fn hover(
     else {
         return Ok(None);
     };
-    let include_index = if let Some(doc_path) = uri.to_file_path() {
-        crate::includes::build_include_index(&doc_path, &content, &config)
+    let graph = if let Some(doc_path) = uri.to_file_path() {
+        crate::includes::ProjectGraph::build(&doc_path, &content, &config)
     } else {
-        crate::includes::IncludeIndex::default()
+        crate::includes::ProjectGraph::default()
     };
 
     // Convert LSP position to byte offset
@@ -62,11 +62,11 @@ pub(crate) async fn hover(
                 let definition = helpers::find_definition_node(&root, &label, true)
                     .and_then(FootnoteDefinition::cast)
                     .or_else(|| {
-                        if include_index.definitions.is_empty() {
+                        if graph.definitions().is_empty() {
                             return None;
                         }
-                        include_index
-                            .definitions
+                        graph
+                            .definitions()
                             .find_footnote(&label)
                             .and_then(|location| {
                                 std::fs::read_to_string(location.path())

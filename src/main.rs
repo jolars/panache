@@ -452,7 +452,7 @@ fn lint_documents_with_includes(
     let mut results = Vec::new();
     let mut visited = HashSet::new();
     let mut active = HashSet::new();
-    let include_index = panache::includes::build_include_index(root_path, &input, cfg);
+    let graph = panache::includes::ProjectGraph::build(root_path, &input, cfg);
     lint_loaded_document_with_includes(
         root_path,
         &input,
@@ -460,7 +460,7 @@ fn lint_documents_with_includes(
         &mut results,
         &mut visited,
         &mut active,
-        &include_index,
+        &graph,
     )?;
     Ok(results)
 }
@@ -472,7 +472,7 @@ fn lint_loaded_document_with_includes(
     results: &mut Vec<LintedDocument>,
     visited: &mut std::collections::HashSet<PathBuf>,
     active: &mut std::collections::HashSet<PathBuf>,
-    include_index: &panache::includes::IncludeIndex,
+    graph: &panache::includes::ProjectGraph,
 ) -> io::Result<()> {
     if !visited.insert(doc_path.clone()) {
         return Ok(());
@@ -491,7 +491,7 @@ fn lint_loaded_document_with_includes(
         panache::includes::collect_includes(&tree, input, base_dir, project_root.as_deref(), cfg);
 
     diagnostics.extend(resolution.diagnostics);
-    if let Some(extra) = include_index.diagnostics.get(doc_path) {
+    if let Some(extra) = graph.diagnostics().get(doc_path) {
         diagnostics.extend(extra.clone());
     }
 
@@ -516,7 +516,7 @@ fn lint_loaded_document_with_includes(
                     results,
                     visited,
                     active,
-                    include_index,
+                    graph,
                 )?;
             }
             Err(err) => {

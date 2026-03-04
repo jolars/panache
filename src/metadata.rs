@@ -43,6 +43,8 @@ pub use yaml::YamlError;
 pub struct DocumentMetadata {
     /// Bibliography information (files and their source positions).
     pub bibliography: Option<BibliographyInfo>,
+    /// Metadata file dependencies (resolved paths).
+    pub metadata_files: Vec<std::path::PathBuf>,
     /// Parsed bibliography data (if available).
     pub bibliography_parse: Option<BibliographyParse>,
     /// Citation keys in the document.

@@ -40,10 +40,10 @@ pub(crate) async fn goto_definition(
         return Ok(None);
     };
 
-    let include_index = if let Some(doc_path) = uri.to_file_path() {
-        crate::includes::build_include_index(&doc_path, &content, &config)
+    let graph = if let Some(doc_path) = uri.to_file_path() {
+        crate::includes::ProjectGraph::build(&doc_path, &content, &config)
     } else {
-        crate::includes::IncludeIndex::default()
+        crate::includes::ProjectGraph::default()
     };
 
     // Convert LSP position to byte offset
@@ -102,8 +102,8 @@ pub(crate) async fn goto_definition(
         }
 
         if let Some(label) = helpers::extract_crossref_key(&node)
-            && !include_index.definitions.is_empty()
-            && let Some(definition) = include_index.definitions.find_crossref(&label)
+            && !graph.definitions().is_empty()
+            && let Some(definition) = graph.definitions().find_crossref(&label)
         {
             let target_uri = Uri::from_file_path(definition.path()).unwrap_or_else(|| uri.clone());
             let target_text = std::fs::read_to_string(definition.path()).unwrap_or_default();
@@ -140,12 +140,12 @@ pub(crate) async fn goto_definition(
         }
 
         if let Some((label, is_footnote)) = helpers::extract_reference_label(&node)
-            && !include_index.definitions.is_empty()
+            && !graph.definitions().is_empty()
         {
             let definition = if is_footnote {
-                include_index.definitions.find_footnote(&label)
+                graph.definitions().find_footnote(&label)
             } else {
-                include_index.definitions.find_reference(&label)
+                graph.definitions().find_reference(&label)
             };
 
             if let Some(definition) = definition {
