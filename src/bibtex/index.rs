@@ -46,8 +46,12 @@ pub fn load_bibliography(paths: &[PathBuf]) -> BibIndex {
     let mut errors = Vec::new();
     let mut files = Vec::new();
     let mut load_errors = Vec::new();
+    let mut seen_paths = std::collections::HashSet::new();
 
     for path in paths {
+        if !seen_paths.insert(path.clone()) {
+            continue;
+        }
         let text = match std::fs::read_to_string(path) {
             Ok(text) => text,
             Err(err) => {
@@ -116,5 +120,22 @@ impl BibIndex {
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn load_bibliography_dedupes_paths() {
+        let temp_dir = TempDir::new().unwrap();
+        let bib_path = temp_dir.path().join("refs.bib");
+        std::fs::write(&bib_path, "@book{Test,}\n").unwrap();
+
+        let index = load_bibliography(&[bib_path.clone(), bib_path]);
+        assert!(index.duplicates.is_empty());
+        assert_eq!(index.files.len(), 1);
     }
 }
