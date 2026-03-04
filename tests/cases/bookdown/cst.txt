@@ -1,4 +1,4 @@
-DOCUMENT@0..531
+DOCUMENT@0..535
   PARAGRAPH@0..139
     TEXT@0..9 "(ref:fig)"
     TEXT@9..138 " A very very very ver ..."
@@ -35,66 +35,66 @@ DOCUMENT@0..531
     NEWLINE@358..359 "\n"
   BLANK_LINE@359..360
     BLANK_LINE@359..360 "\n"
-  PIPE_TABLE@360..466
-    TABLE_CAPTION@360..405
+  PIPE_TABLE@360..470
+    TABLE_CAPTION@360..409
       TABLE_CAPTION_PREFIX@360..367 "Table: "
-      TEXT@367..378 "(\\#mytable)"
-      TEXT@378..404 " A table with a refer ..."
-      NEWLINE@404..405 "\n"
-    BLANK_LINE@405..406
-      BLANK_LINE@405..406 "\n"
-    TABLE_HEADER@406..426
-      TEXT@406..407 "|"
-      WHITESPACE@407..408 " "
-      TABLE_CELL@408..409
-        TEXT@408..409 "A"
-      WHITESPACE@409..412 "   "
-      TEXT@412..413 "|"
-      WHITESPACE@413..414 " "
-      TABLE_CELL@414..415
-        TEXT@414..415 "B"
-      WHITESPACE@415..418 "   "
-      TEXT@418..419 "|"
-      WHITESPACE@419..420 " "
-      TABLE_CELL@420..421
-        TEXT@420..421 "C"
-      WHITESPACE@421..424 "   "
-      TEXT@424..425 "|"
-      NEWLINE@425..426 "\n"
-    TABLE_SEPARATOR@426..446
-      TEXT@426..445 "| --- | --- | --- |"
-      NEWLINE@445..446 "\n"
-    TABLE_ROW@446..466
-      TEXT@446..447 "|"
-      WHITESPACE@447..448 " "
-      TABLE_CELL@448..449
-        TEXT@448..449 "1"
-      WHITESPACE@449..452 "   "
-      TEXT@452..453 "|"
-      WHITESPACE@453..454 " "
-      TABLE_CELL@454..455
-        TEXT@454..455 "2"
-      WHITESPACE@455..458 "   "
-      TEXT@458..459 "|"
-      WHITESPACE@459..460 " "
-      TABLE_CELL@460..461
-        TEXT@460..461 "3"
-      WHITESPACE@461..464 "   "
-      TEXT@464..465 "|"
-      NEWLINE@465..466 "\n"
-  BLANK_LINE@466..467
-    BLANK_LINE@466..467 "\n"
-  PARAGRAPH@467..531
-    TEXT@467..491 "We refer to is as Table "
-    CROSSREF@491..509
-      TEXT@491..497 "\\@ref("
-      CITATION_KEY@497..508 "tab:mytable"
-      TEXT@508..509 ")"
-    TEXT@509..515 ", not "
-    CROSSREF@515..529
-      TEXT@515..521 "\\@ref("
-      CITATION_KEY@521..528 "mytable"
-      TEXT@528..529 ")"
-    TEXT@529..530 "!"
-    NEWLINE@530..531 "\n"
+      TEXT@367..382 "(\\#tab:mytable)"
+      TEXT@382..408 " A table with a refer ..."
+      NEWLINE@408..409 "\n"
+    BLANK_LINE@409..410
+      BLANK_LINE@409..410 "\n"
+    TABLE_HEADER@410..430
+      TEXT@410..411 "|"
+      WHITESPACE@411..412 " "
+      TABLE_CELL@412..413
+        TEXT@412..413 "A"
+      WHITESPACE@413..416 "   "
+      TEXT@416..417 "|"
+      WHITESPACE@417..418 " "
+      TABLE_CELL@418..419
+        TEXT@418..419 "B"
+      WHITESPACE@419..422 "   "
+      TEXT@422..423 "|"
+      WHITESPACE@423..424 " "
+      TABLE_CELL@424..425
+        TEXT@424..425 "C"
+      WHITESPACE@425..428 "   "
+      TEXT@428..429 "|"
+      NEWLINE@429..430 "\n"
+    TABLE_SEPARATOR@430..450
+      TEXT@430..449 "| --- | --- | --- |"
+      NEWLINE@449..450 "\n"
+    TABLE_ROW@450..470
+      TEXT@450..451 "|"
+      WHITESPACE@451..452 " "
+      TABLE_CELL@452..453
+        TEXT@452..453 "1"
+      WHITESPACE@453..456 "   "
+      TEXT@456..457 "|"
+      WHITESPACE@457..458 " "
+      TABLE_CELL@458..459
+        TEXT@458..459 "2"
+      WHITESPACE@459..462 "   "
+      TEXT@462..463 "|"
+      WHITESPACE@463..464 " "
+      TABLE_CELL@464..465
+        TEXT@464..465 "3"
+      WHITESPACE@465..468 "   "
+      TEXT@468..469 "|"
+      NEWLINE@469..470 "\n"
+  BLANK_LINE@470..471
+    BLANK_LINE@470..471 "\n"
+  PARAGRAPH@471..535
+    TEXT@471..495 "We refer to is as Table "
+    CROSSREF@495..513
+      TEXT@495..501 "\\@ref("
+      CITATION_KEY@501..512 "tab:mytable"
+      TEXT@512..513 ")"
+    TEXT@513..519 ", not "
+    CROSSREF@519..533
+      TEXT@519..525 "\\@ref("
+      CITATION_KEY@525..532 "mytable"
+      TEXT@532..533 ")"
+    TEXT@533..534 "!"
+    NEWLINE@534..535 "\n"
 
