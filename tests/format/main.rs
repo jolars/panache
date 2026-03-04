@@ -1,3 +1,4 @@
+mod bare_uris;
 mod bullet_standardization;
 mod code_chunks;
 mod comments;

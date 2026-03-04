@@ -223,6 +223,64 @@ pub fn emit_autolink(builder: &mut GreenNodeBuilder, _text: &str, url: &str) {
     builder.finish_node();
 }
 
+pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
+    let mut chars = text.char_indices();
+    let Some((_, first)) = chars.next() else {
+        return None;
+    };
+    if !first.is_ascii_alphabetic() {
+        return None;
+    }
+
+    let mut scheme_end = None;
+    for (idx, ch) in text.char_indices() {
+        if ch == ':' {
+            scheme_end = Some(idx);
+            break;
+        }
+        if !ch.is_ascii_alphanumeric() && ch != '+' && ch != '-' && ch != '.' {
+            return None;
+        }
+    }
+    let scheme_end = scheme_end?;
+    if scheme_end == 0 {
+        return None;
+    }
+
+    let mut end = scheme_end + 1;
+    let bytes = text.as_bytes();
+    while end < text.len() {
+        let b = bytes[end];
+        if b.is_ascii_whitespace() {
+            break;
+        }
+        if matches!(b, b'<' | b'>' | b'`' | b'"' | b'\'') {
+            break;
+        }
+        end += 1;
+    }
+
+    if end == scheme_end + 1 {
+        return None;
+    }
+
+    let mut trimmed = end;
+    while trimmed > scheme_end + 1 {
+        let ch = text[..trimmed].chars().last().unwrap();
+        if matches!(ch, '.' | ',' | ';' | ':' | ')' | ']' | '}') {
+            trimmed -= ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+
+    if trimmed <= scheme_end + 1 {
+        return None;
+    }
+
+    Some((trimmed, &text[..trimmed]))
+}
+
 /// Try to parse an inline link starting at the current position.
 ///
 /// Inline links have the form `[text](url)` or `[text](url "title")`.
@@ -367,6 +425,29 @@ pub fn emit_inline_link(
         builder.token(SyntaxKind::ATTRIBUTE.into(), raw_attrs);
         builder.finish_node();
     }
+
+    builder.finish_node();
+}
+
+pub fn emit_bare_uri_link(builder: &mut GreenNodeBuilder, uri: &str, _config: &Config) {
+    builder.start_node(SyntaxKind::LINK.into());
+
+    builder.start_node(SyntaxKind::LINK_START.into());
+    builder.token(SyntaxKind::LINK_START.into(), "[");
+    builder.finish_node();
+
+    builder.start_node(SyntaxKind::LINK_TEXT.into());
+    builder.token(SyntaxKind::TEXT.into(), uri);
+    builder.finish_node();
+
+    builder.token(SyntaxKind::LINK_TEXT_END.into(), "]");
+    builder.token(SyntaxKind::LINK_DEST_START.into(), "(");
+
+    builder.start_node(SyntaxKind::LINK_DEST.into());
+    builder.token(SyntaxKind::TEXT.into(), uri);
+    builder.finish_node();
+
+    builder.token(SyntaxKind::LINK_DEST_END.into(), ")");
 
     builder.finish_node();
 }
