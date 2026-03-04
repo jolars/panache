@@ -1,6 +1,11 @@
 [formatters]
 r = "air"
 yaml = "yamlfmt"
+toml = "taplo"
+
+[formatters.taplo]
+cmd = "taplo"
+args = ["format", "-"]
 
 [linters]
 r = "jarl"

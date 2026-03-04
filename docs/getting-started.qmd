@@ -114,10 +114,10 @@ Create `.panache.toml` in your project root:
 
 ```toml
 # Basic configuration
-flavor = "quarto"      # Options: pandoc, quarto, rmarkdown, gfm, commonmark
-line_width = 80        # Characters per line
-wrap = "reflow"        # Options: reflow, preserve
-blank_lines = "collapse"  # Options: collapse, preserve
+flavor = "quarto"        # Options: pandoc, quarto, rmarkdown, gfm, commonmark
+line_width = 80          # Characters per line
+wrap = "reflow"          # Options: reflow, preserve
+blank_lines = "collapse" # Options: collapse, preserve
 ```
 
 ### Use a Custom Config

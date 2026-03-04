@@ -45,7 +45,7 @@ Second line (forced break)
 Configure wrapping behavior:
 
 ```toml
-wrap = "reflow"    # Reformat paragraphs (default)
+wrap = "reflow" # Reformat paragraphs (default)
 # wrap = "preserve"  # Keep existing line breaks
 ```
 

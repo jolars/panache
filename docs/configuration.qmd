@@ -35,7 +35,7 @@ flavor = "quarto"
 Set the maximum line width for wrapping:
 
 ```toml
-line-width = 80  # Default: 80
+line-width = 80 # Default: 80
 ```
 
 ## Formatting Style
@@ -49,7 +49,7 @@ Control how text is wrapped:
 
 ```toml
 [style]
-wrap = "reflow"  # Options: "reflow", "preserve"
+wrap = "reflow" # Options: "reflow", "preserve"
 ```
 
 - `reflow` (default): Reformat paragraphs to fit within line width
@@ -61,7 +61,7 @@ Control blank line handling:
 
 ```toml
 [style]
-blank-lines = "collapse"  # Options: "collapse", "preserve"
+blank-lines = "collapse" # Options: "collapse", "preserve"
 ```
 
 - `collapse` (default): Collapse multiple blank lines into one
@@ -73,8 +73,8 @@ Configure how math delimiters are formatted:
 
 ```toml
 [style]
-math-delimiter-style = "preserve"  # Options: "preserve", "dollars", "backslash"
-math-indent = 0  # Indentation for display math blocks
+math-delimiter-style = "preserve" # Options: "preserve", "dollars", "backslash"
+math-indent = 0                   # Indentation for display math blocks
 ```
 
 - `preserve` (default): Keep original delimiter style
@@ -87,10 +87,10 @@ Configure code block formatting preferences:
 
 ```toml
 [style.code-blocks]
-fence-style = "backtick"       # Options: "backtick", "tilde", "preserve"
-attribute-style = "shortcut"   # Options: "shortcut", "explicit", "preserve"
-min-fence-length = 3           # Minimum fence length (default: 3)
-normalize-indented = false     # Convert indented code to fenced blocks (default: false)
+fence-style = "backtick"     # Options: "backtick", "tilde", "preserve"
+attribute-style = "shortcut" # Options: "shortcut", "explicit", "preserve"
+min-fence-length = 3         # Minimum fence length (default: 3)
+normalize-indented = false   # Convert indented code to fenced blocks (default: false)
 ```
 
 **Fence style:**
@@ -148,55 +148,55 @@ task-lists = true
 
 ```toml
 [extensions]
-blank-before-header = true       # Require blank line before headers
-header-attributes = true         # {#id .class key=value} syntax
+blank-before-header = true # Require blank line before headers
+header-attributes = true   # {#id .class key=value} syntax
 ```
 
 #### Block Quotes
 
 ```toml
 [extensions]
-blank-before-blockquote = true   # Require blank line before blockquotes
+blank-before-blockquote = true # Require blank line before blockquotes
 ```
 
 #### Lists
 
 ```toml
 [extensions]
-fancy-lists = true               # Roman numerals, letters
-startnum = true                  # Start at arbitrary numbers
-example-lists = true             # (@) example markers
-task-lists = true                # - [ ] and - [x]
-definition-lists = true          # Term/definition syntax
+fancy-lists = true      # Roman numerals, letters
+startnum = true         # Start at arbitrary numbers
+example-lists = true    # (@) example markers
+task-lists = true       # - [ ] and - [x]
+definition-lists = true # Term/definition syntax
 ```
 
 #### Code Blocks
 
 ````toml
 [extensions]
-backtick-code-blocks = true      # ``` fences
-fenced-code-blocks = true        # ~~~ fences
-fenced-code-attributes = true    # {.language #id}
-inline-code-attributes = true    # `code`{.class}
+backtick-code-blocks = true   # ``` fences
+fenced-code-blocks = true     # ~~~ fences
+fenced-code-attributes = true # {.language #id}
+inline-code-attributes = true # `code`{.class}
 ````
 
 #### Tables
 
 ```toml
 [extensions]
-simple-tables = true             # Simple table syntax
-multiline-tables = true          # Multiline cells
-grid-tables = true               # Grid-style tables
-pipe-tables = true               # GitHub-style | tables
-table-captions = true            # Table captions
+simple-tables = true    # Simple table syntax
+multiline-tables = true # Multiline cells
+grid-tables = true      # Grid-style tables
+pipe-tables = true      # GitHub-style | tables
+table-captions = true   # Table captions
 ```
 
 #### Divs
 
 ```toml
 [extensions]
-fenced-divs = true               # ::: {.class} divs
-native-divs = true               # HTML <div> elements
+fenced-divs = true # ::: {.class} divs
+native-divs = true # HTML <div> elements
 ```
 
 ### Inline Extensions
@@ -205,99 +205,99 @@ native-divs = true               # HTML <div> elements
 
 ```toml
 [extensions]
-intraword-underscores = true     # Don't trigger emphasis in snake_case
-strikeout = true                 # ~~strikethrough~~
-superscript = true               # ^super^
-subscript = true                 # ~sub~
+intraword-underscores = true # Don't trigger emphasis in snake_case
+strikeout = true             # ~~strikethrough~~
+superscript = true           # ^super^
+subscript = true             # ~sub~
 ```
 
 #### Links
 
 ```toml
 [extensions]
-inline-links = true              # [text](url)
-reference-links = true           # [text][ref]
-shortcut-reference-links = true  # [ref]
-link-attributes = true           # [text](url){.class}
-autolinks = true                 # <http://example.com>
-autolink-bare-uris = false       # Bare URLs → links (non-default)
+inline-links = true             # [text](url)
+reference-links = true          # [text][ref]
+shortcut-reference-links = true # [ref]
+link-attributes = true          # [text](url){.class}
+autolinks = true                # <http://example.com>
+autolink-bare-uris = false      # Bare URLs → links (non-default)
 ```
 
 #### Images
 
 ```toml
 [extensions]
-inline-images = true             # ![alt](url)
-implicit-figures = true          # Single image → figure
+inline-images = true    # ![alt](url)
+implicit-figures = true # Single image → figure
 ```
 
 #### Math
 
 ```toml
 [extensions]
-tex-math-dollars = true          # $x$ and $$equation$$
-tex-math-single-backslash = false  # \(...\) and \[...\] (RMarkdown)
-tex-math-double-backslash = false  # \\(...\\) and \\[...\\]
+tex-math-dollars = true           # $x$ and $$equation$$
+tex-math-single-backslash = false # \(...\) and \[...\] (RMarkdown)
+tex-math-double-backslash = false # \\(...\\) and \\[...\\]
 ```
 
 #### Footnotes
 
 ```toml
 [extensions]
-inline-footnotes = true          # ^[text]
-footnotes = true                 # [^1] references
+inline-footnotes = true # ^[text]
+footnotes = true        # [^1] references
 ```
 
 #### Citations
 
 ```toml
 [extensions]
-citations = true                 # [@cite] syntax
+citations = true # [@cite] syntax
 ```
 
 #### Spans
 
 ```toml
 [extensions]
-bracketed-spans = true           # [text]{.class}
-native-spans = true              # HTML <span> elements
+bracketed-spans = true # [text]{.class}
+native-spans = true    # HTML <span> elements
 ```
 
 ### Metadata Extensions
 
 ```toml
 [extensions]
-yaml-metadata-block = true       # --- YAML frontmatter
-pandoc-title-block = true        # % Title / % Author / % Date
+yaml-metadata-block = true # --- YAML frontmatter
+pandoc-title-block = true  # % Title / % Author / % Date
 ```
 
 ### Raw Content Extensions
 
 ```toml
 [extensions]
-raw-html = true                  # HTML blocks and inline
-markdown-in-html-blocks = true   # Markdown inside HTML
-raw-tex = true                   # LaTeX commands
-raw-attribute = true             # {=format} raw blocks
+raw-html = true                # HTML blocks and inline
+markdown-in-html-blocks = true # Markdown inside HTML
+raw-tex = true                 # LaTeX commands
+raw-attribute = true           # {=format} raw blocks
 ```
 
 ### Special Character Extensions
 
 ```toml
 [extensions]
-all-symbols-escapable = true     # Backslash escapes any symbol
-escaped-line-breaks = true       # Backslash at line end = <br>
-hard-line-breaks = false         # Newline = <br> (non-default)
-emoji = false                    # :emoji: syntax (non-default)
-mark = false                     # ==highlighted== (non-default)
+all-symbols-escapable = true # Backslash escapes any symbol
+escaped-line-breaks = true   # Backslash at line end = <br>
+hard-line-breaks = false     # Newline = <br> (non-default)
+emoji = false                # :emoji: syntax (non-default)
+mark = false                 # ==highlighted== (non-default)
 ```
 
 ### Quarto-Specific Extensions
 
 ```toml
 [extensions]
-quarto-callouts = true           # .callout-note, etc.
-quarto-crossrefs = true          # @fig-id, @tbl-id
+quarto-callouts = true  # .callout-note, etc.
+quarto-crossrefs = true # @fig-id, @tbl-id
 ```
 
 ## External Code Formatters
@@ -311,10 +311,10 @@ Map languages to formatters using built-in presets:
 
 ```toml
 [formatters]
-r = "air"           # Single formatter
-python = "ruff"     # Single formatter
+r = "air"               # Single formatter
+python = "ruff"         # Single formatter
 javascript = "prettier"
-typescript = "prettier"  # Reuse same formatter
+typescript = "prettier" # Reuse same formatter
 ```
 
 **Available presets:**
@@ -334,7 +334,7 @@ Run multiple formatters in order by using an array:
 
 ```toml
 [formatters]
-python = ["isort", "black"]  # isort first, then black
+python = ["isort", "black"] # isort first, then black
 ```
 
 Output from the first formatter is piped to the second.
@@ -472,7 +472,7 @@ r = "air-file"
 
 [formatters.air-file]
 cmd = "air"
-args = ["format", "{}"]  # {} = file path placeholder
+args = ["format", "{}"] # {} = file path placeholder
 stdin = false
 ```
 
@@ -582,9 +582,9 @@ emoji = false
 
 # External formatters (opt-in)
 [formatters]
-python = ["isort", "black"]  # Sequential: isort then black
-r = "air"                    # Built-in preset
-javascript = "prettier"      # Reusable definition
+python = ["isort", "black"] # Sequential: isort then black
+r = "air"                   # Built-in preset
+javascript = "prettier"     # Reusable definition
 typescript = "prettier"
 rust = "rustfmt"
 
@@ -598,7 +598,7 @@ args = ["-"]
 
 # External linters (opt-in)
 [linters]
-r = "jarl"  # Enable R linting
+r = "jarl" # Enable R linting
 ```
 
 ## See Also
