@@ -142,6 +142,18 @@ pub(crate) async fn format_range(
         return Ok(None);
     }
 
+    if let Some((start_offset, end_offset)) = expanded_range {
+        client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "Range formatting expanded to byte range {}..{}",
+                    start_offset, end_offset
+                ),
+            )
+            .await;
+    }
+
     // Calculate the actual range that was formatted (expanded to block boundaries)
     // For simplicity, we'll replace the entire selected range with the formatted output
     // The range expansion is already handled by panache's range_utils
