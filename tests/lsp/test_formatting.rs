@@ -112,19 +112,21 @@ async fn test_range_formatting_executable_chunk_case_file() {
 async fn test_range_formatting_definition_list_case_file() {
     let server = TestLspServer::new();
 
-    let content = include_str!("../../docs/lsp.qmd");
+    let content = include_str!("fixtures/definition_list.qmd");
     server
-        .open_document("file:///lsp.qmd", content, "quarto")
+        .open_document("file:///definition_list.qmd", content, "quarto")
         .await;
 
-    // Line 66 in the file (0-indexed line 65). Use full-line selection.
-    let edits = server.format_range("file:///lsp.qmd", 65, 0, 66, 0).await;
+    // Line 6 in the fixture (0-indexed line 5). Use full-line selection.
+    let edits = server
+        .format_range("file:///definition_list.qmd", 5, 0, 6, 0)
+        .await;
     assert!(edits.is_some());
     let edit = &edits.unwrap()[0];
-    assert_eq!(edit.new_text.matches("Format on save").count(), 1);
+    assert_eq!(edit.new_text.matches("Headings").count(), 1);
     assert!(
         edit.new_text
-            .contains(":   Automatic formatting when saving files")
+            .contains(":   H1-H6 with proper nesting levels")
     );
 }
 
@@ -132,13 +134,15 @@ async fn test_range_formatting_definition_list_case_file() {
 async fn test_range_formatting_definition_list_minimal_case() {
     let server = TestLspServer::new();
 
-    let content = include_str!("../../docs/lsp.qmd");
+    let content = include_str!("fixtures/definition_list.qmd");
     server
-        .open_document("file:///lsp.qmd", content, "quarto")
+        .open_document("file:///definition_list.qmd", content, "quarto")
         .await;
 
-    // Line 316 in the file (0-indexed line 315). Use full-line selection.
-    let edits = server.format_range("file:///lsp.qmd", 315, 0, 316, 0).await;
+    // Line 6 in the fixture (0-indexed line 5). Use full-line selection.
+    let edits = server
+        .format_range("file:///definition_list.qmd", 5, 0, 6, 0)
+        .await;
     assert!(edits.is_some());
     let edit = &edits.unwrap()[0];
     assert_eq!(edit.new_text.matches("Headings").count(), 1);
@@ -152,12 +156,14 @@ async fn test_range_formatting_definition_list_minimal_case() {
 async fn test_range_formatting_definition_list_minimal_case_no_panic() {
     let server = TestLspServer::new();
 
-    let content = include_str!("../../docs/lsp.qmd");
+    let content = include_str!("fixtures/definition_list.qmd");
     server
-        .open_document("file:///lsp.qmd", content, "quarto")
+        .open_document("file:///definition_list.qmd", content, "quarto")
         .await;
 
-    // Match line 316 selection from editor, then request range formatting.
-    let edits = server.format_range("file:///lsp.qmd", 315, 0, 316, 0).await;
+    // Match line 6 selection from editor, then request range formatting.
+    let edits = server
+        .format_range("file:///definition_list.qmd", 5, 0, 6, 0)
+        .await;
     assert!(edits.is_some());
 }

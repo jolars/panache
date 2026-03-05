@@ -1,0 +1,6 @@
+# Document Outline
+
+The LSP provides a hierarchical document outline showing:
+
+Headings
+:   H1-H6 with proper nesting levels
