@@ -178,6 +178,14 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         lines: &[&str],
         pos: usize,
     ) -> bool {
+        let prev_line_blank = if pos > 0 {
+            let prev_line = lines[pos - 1];
+            let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
+            prev_line.trim().is_empty() || (prev_bq_depth > 0 && prev_inner.trim().is_empty())
+        } else {
+            false
+        };
+
         // A blank line that isn't indented to the definition content column ends the definition.
         let (indent_cols, _) = leading_indent(raw_content);
         if raw_content.trim().is_empty() && indent_cols < content_indent {
@@ -203,7 +211,9 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
             }
         }
         if lists::try_parse_list_marker(stripped_content, self.config).is_some() {
-            return false;
+            if prev_line_blank {
+                return false;
+            }
         }
         if count_blockquote_markers(stripped_content).0 > 0 {
             return false;
@@ -220,6 +230,11 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         }
 
         if let Some(match_result) = self.block_registry.detect_prepared(block_ctx, lines, pos) {
+            if match_result.effect == crate::parser::block_dispatcher::BlockEffect::OpenList
+                && !prev_line_blank
+            {
+                return true;
+            }
             if match_result.effect
                 == crate::parser::block_dispatcher::BlockEffect::OpenDefinitionList
                 && match_result

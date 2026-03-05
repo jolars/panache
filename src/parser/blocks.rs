@@ -45,6 +45,8 @@ pub mod tests {
     pub mod blockquotes;
     #[path = "code_blocks.rs"]
     pub mod code_blocks;
+    #[path = "definition_lists.rs"]
+    pub mod definition_lists;
     #[path = "headings.rs"]
     pub mod headings;
     #[path = "helpers.rs"]

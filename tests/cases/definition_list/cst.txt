@@ -1,4 +1,4 @@
-DOCUMENT@0..911
+DOCUMENT@0..1004
   HEADING@0..19
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -236,4 +236,21 @@ DOCUMENT@0..911
           CODE_FENCE_CLOSE@907..911
             CODE_FENCE_MARKER@907..910 "```"
             NEWLINE@910..911 "\n"
+  BLANK_LINE@911..912
+    BLANK_LINE@911..912 "\n"
+  DEFINITION_LIST@912..1004
+    DEFINITION_ITEM@912..1004
+      TERM@912..948
+        TEXT@912..947 "A definition list wit ..."
+        NEWLINE@947..948 "\n"
+      DEFINITION@948..1004
+        DEFINITION_MARKER@948..949 ":"
+        WHITESPACE@949..952 "   "
+        PLAIN@952..1004
+          TEXT@952..987 "Here comes a list (or ..."
+          NEWLINE@987..988 "\n"
+          TEXT@988..995 "    - A"
+          NEWLINE@995..996 "\n"
+          TEXT@996..1003 "    - B"
+          NEWLINE@1003..1004 "\n"
 

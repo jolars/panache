@@ -53,3 +53,6 @@ Example violation
 :   ``` r
     a <- 1
     ```
+
+A definition list with nested items
+:   Here comes a list (or wait, is it?) - A - B
