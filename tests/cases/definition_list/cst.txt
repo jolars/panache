@@ -32,8 +32,9 @@ DOCUMENT@0..1113
         TEXT@70..76 "Term 2"
         NEWLINE@76..77 "\n"
       DEFINITION@77..94
-        DEFINITION_MARKER@77..78 ":"
-        WHITESPACE@78..81 "   "
+        WHITESPACE@77..79 "  "
+        DEFINITION_MARKER@79..80 ":"
+        WHITESPACE@80..81 " "
         PLAIN@81..94
           TEXT@81..93 "Definition 2"
           NEWLINE@93..94 "\n"
@@ -69,14 +70,16 @@ DOCUMENT@0..1113
         TEXT@190..196 "Term B"
         NEWLINE@196..197 "\n"
       DEFINITION@197..230
-        DEFINITION_MARKER@197..198 ":"
-        WHITESPACE@198..201 "   "
+        WHITESPACE@197..198 " "
+        DEFINITION_MARKER@198..199 ":"
+        WHITESPACE@199..201 "  "
         PLAIN@201..230
           TEXT@201..229 "Definition with tilde ..."
           NEWLINE@229..230 "\n"
       DEFINITION@230..259
-        DEFINITION_MARKER@230..231 ":"
-        WHITESPACE@231..234 "   "
+        WHITESPACE@230..231 " "
+        DEFINITION_MARKER@231..232 ":"
+        WHITESPACE@232..234 "  "
         PLAIN@234..259
           TEXT@234..258 "Another tilde definition"
           NEWLINE@258..259 "\n"

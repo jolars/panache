@@ -6,7 +6,7 @@ Term 1
 :   Definition 1
 
 Term 2
-:   Definition 2
+  : Definition 2
 
 Multiple definitions per term:
 
@@ -15,8 +15,8 @@ Term A
 :   Second definition for A
 
 Term B
-:   Definition with tilde marker
-:   Another tilde definition
+ :  Definition with tilde marker
+ :  Another tilde definition
 
 Complex example with inline markup:
 
