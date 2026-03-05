@@ -183,6 +183,15 @@ pub(crate) async fn format_range(
         start: offset_to_position(&text, start_offset),
         end: offset_to_position(&text, end_offset.min(text.len())),
     };
+    client
+        .log_message(
+            MessageType::INFO,
+            format!(
+                "Range formatting edit range {:?}..{:?}",
+                edit_range.start, edit_range.end
+            ),
+        )
+        .await;
 
     Ok(Some(vec![TextEdit {
         range: edit_range,
