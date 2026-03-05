@@ -1388,15 +1388,29 @@ impl Formatter {
                 self.fenced_div_depth += 1;
 
                 // Process content
-                for child in node.children() {
-                    if !matches!(
-                        child.kind(),
-                        SyntaxKind::DIV_FENCE_OPEN
-                            | SyntaxKind::DIV_INFO
-                            | SyntaxKind::DIV_FENCE_CLOSE
-                    ) {
-                        self.format_node_sync(&child, indent);
-                    }
+                let content_children: Vec<_> = node
+                    .children()
+                    .filter(|child| {
+                        !matches!(
+                            child.kind(),
+                            SyntaxKind::DIV_FENCE_OPEN
+                                | SyntaxKind::DIV_INFO
+                                | SyntaxKind::DIV_FENCE_CLOSE
+                        )
+                    })
+                    .collect();
+
+                let mut start = 0usize;
+                let mut end = content_children.len();
+                while start < end && content_children[start].kind() == SyntaxKind::BLANK_LINE {
+                    start += 1;
+                }
+                while end > start && content_children[end - 1].kind() == SyntaxKind::BLANK_LINE {
+                    end -= 1;
+                }
+
+                for child in &content_children[start..end] {
+                    self.format_node_sync(child, indent);
                 }
 
                 // Decrement depth after processing content
