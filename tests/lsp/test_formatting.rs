@@ -66,3 +66,98 @@ async fn test_format_after_edit() {
     let edits = server.format_document("file:///test.qmd").await;
     assert!(edits.is_some());
 }
+
+#[tokio::test]
+async fn test_range_formatting_fenced_code_case_file() {
+    let server = TestLspServer::new();
+
+    let content = include_str!("../cases/fenced_code/input.md");
+    server
+        .open_document("file:///fenced_code.md", content, "markdown")
+        .await;
+
+    // Lines 44-48 in the fixture (0-indexed 43..48)
+    let edits = server
+        .format_range("file:///fenced_code.md", 43, 0, 48, 0)
+        .await;
+    assert!(edits.is_some());
+    let edit = &edits.unwrap()[0];
+    assert!(edit.new_text.contains("```r"));
+    assert!(edit.new_text.contains("a <- 1"));
+    assert!(edit.new_text.contains("b <- 2"));
+}
+
+#[tokio::test]
+async fn test_range_formatting_executable_chunk_case_file() {
+    let server = TestLspServer::new();
+
+    let content = include_str!("../cases/code_blocks_executable/input.qmd");
+    server
+        .open_document("file:///code_blocks_executable.qmd", content, "quarto")
+        .await;
+
+    // Line 14 in the fixture (0-indexed line 13). Use a cursor-style range at C2.
+    let edits = server
+        .format_range("file:///code_blocks_executable.qmd", 13, 1, 13, 1)
+        .await;
+    assert!(edits.is_some());
+    let edit = &edits.unwrap()[0];
+    assert_eq!(edit.new_text.matches("```{r}").count(), 1);
+    assert!(edit.new_text.contains("#| echo: false"));
+    assert!(edit.new_text.contains("#| fig-width: 8"));
+    assert!(edit.new_text.contains("plot(1:10)"));
+}
+
+#[tokio::test]
+async fn test_range_formatting_definition_list_case_file() {
+    let server = TestLspServer::new();
+
+    let content = include_str!("../../docs/lsp.qmd");
+    server
+        .open_document("file:///lsp.qmd", content, "quarto")
+        .await;
+
+    // Line 66 in the file (0-indexed line 65). Use full-line selection.
+    let edits = server.format_range("file:///lsp.qmd", 65, 0, 66, 0).await;
+    assert!(edits.is_some());
+    let edit = &edits.unwrap()[0];
+    assert_eq!(edit.new_text.matches("Format on save").count(), 1);
+    assert!(
+        edit.new_text
+            .contains(":   Automatic formatting when saving files")
+    );
+}
+
+#[tokio::test]
+async fn test_range_formatting_definition_list_minimal_case() {
+    let server = TestLspServer::new();
+
+    let content = include_str!("../../docs/lsp.qmd");
+    server
+        .open_document("file:///lsp.qmd", content, "quarto")
+        .await;
+
+    // Line 316 in the file (0-indexed line 315). Use full-line selection.
+    let edits = server.format_range("file:///lsp.qmd", 315, 0, 316, 0).await;
+    assert!(edits.is_some());
+    let edit = &edits.unwrap()[0];
+    assert_eq!(edit.new_text.matches("Headings").count(), 1);
+    assert!(
+        edit.new_text
+            .contains(":   H1-H6 with proper nesting levels")
+    );
+}
+
+#[tokio::test]
+async fn test_range_formatting_definition_list_minimal_case_no_panic() {
+    let server = TestLspServer::new();
+
+    let content = include_str!("../../docs/lsp.qmd");
+    server
+        .open_document("file:///lsp.qmd", content, "quarto")
+        .await;
+
+    // Match line 316 selection from editor, then request range formatting.
+    let edits = server.format_range("file:///lsp.qmd", 315, 0, 316, 0).await;
+    assert!(edits.is_some());
+}

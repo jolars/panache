@@ -122,11 +122,11 @@ impl DirectiveTracker {
             }
             Directive::End(kind) => {
                 // Check if the top of the stack matches
-                if let Some(top) = self.stack.last() {
-                    if top == kind {
-                        self.stack.pop();
-                        return true;
-                    }
+                if let Some(top) = self.stack.last()
+                    && top == kind
+                {
+                    self.stack.pop();
+                    return true;
                 }
                 // Mismatch or end without start
                 false

@@ -123,6 +123,42 @@ impl TestLspServer {
         self.lsp.formatting(params).await.unwrap()
     }
 
+    /// Format a document range.
+    ///
+    /// Simulates the `textDocument/rangeFormatting` request.
+    pub async fn format_range(
+        &self,
+        uri: &str,
+        start_line: u32,
+        start_char: u32,
+        end_line: u32,
+        end_char: u32,
+    ) -> Option<Vec<TextEdit>> {
+        let params = DocumentRangeFormattingParams {
+            text_document: TextDocumentIdentifier {
+                uri: uri.parse().unwrap(),
+            },
+            range: Range {
+                start: Position {
+                    line: start_line,
+                    character: start_char,
+                },
+                end: Position {
+                    line: end_line,
+                    character: end_char,
+                },
+            },
+            options: FormattingOptions {
+                tab_size: 2,
+                insert_spaces: true,
+                ..Default::default()
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+
+        self.lsp.range_formatting(params).await.unwrap()
+    }
+
     /// Get document symbols.
     ///
     /// Simulates the `textDocument/documentSymbol` request.

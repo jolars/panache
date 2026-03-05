@@ -255,10 +255,10 @@ impl Formatter {
     pub(super) fn format_list_item(&mut self, node: &SyntaxNode, indent: usize) {
         // Pre-pass: Process any directive comments to update tracker state
         for child in node.children() {
-            if matches!(child.kind(), SyntaxKind::HTML_BLOCK | SyntaxKind::COMMENT) {
-                if let Some(directive) = crate::directives::extract_directive_from_node(&child) {
-                    self.directive_tracker.process_directive(&directive);
-                }
+            if matches!(child.kind(), SyntaxKind::HTML_BLOCK | SyntaxKind::COMMENT)
+                && let Some(directive) = crate::directives::extract_directive_from_node(&child)
+            {
+                self.directive_tracker.process_directive(&directive);
             }
         }
 

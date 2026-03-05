@@ -9,6 +9,7 @@ use tower_lsp_server::ls_types::*;
 use super::super::conversions::offset_to_position;
 use super::super::helpers::get_document_and_config;
 use crate::lsp::DocumentState;
+use crate::{parser, range_utils};
 
 /// Handle textDocument/formatting request
 pub(crate) async fn format_document(
@@ -107,23 +108,34 @@ pub(crate) async fn format_range(
             }
         };
 
-    // Convert LSP range (0-indexed lines) to panache range (1-indexed lines)
+    // Convert LSP range (0-indexed lines, end-exclusive) to panache range (1-indexed, inclusive)
     let start_line = (range.start.line + 1) as usize;
-    let end_line = (range.end.line + 1) as usize;
+    let mut end_line = (range.end.line + 1) as usize;
+    if range.end.character == 0 && range.end.line > range.start.line {
+        end_line = range.end.line as usize;
+    }
 
     // Run range formatting in a blocking task
     let text_clone = text.clone();
+    let config_clone = config.clone();
     let formatted = tokio::task::spawn_blocking(move || {
-        tokio::runtime::Runtime::new()
+        let tree = parser::parse(&text_clone, Some(config_clone.clone()));
+        let expanded_range =
+            range_utils::expand_line_range_to_blocks(&tree, &text_clone, start_line, end_line);
+
+        let output = tokio::runtime::Runtime::new()
             .expect("Failed to create runtime")
             .block_on(crate::format_async(
                 &text_clone,
-                Some(config),
+                Some(config_clone),
                 Some((start_line, end_line)),
-            ))
+            ));
+        (output, expanded_range)
     })
     .await
     .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
+
+    let (formatted, expanded_range) = formatted;
 
     // If the formatted range is empty or unchanged, return None
     if formatted.is_empty() || formatted == text {
@@ -138,24 +150,14 @@ pub(crate) async fn format_range(
     // Since range formatting returns only the formatted blocks, we need to determine
     // the byte offsets in the original text to replace
 
-    // Convert line range to byte offsets in original text
-    let start_offset = text
-        .lines()
-        .take(start_line.saturating_sub(1))
-        .map(|l| l.len() + 1) // +1 for newline
-        .sum::<usize>();
-
-    let end_offset = text
-        .lines()
-        .take(end_line)
-        .map(|l| l.len() + 1)
-        .sum::<usize>()
-        .min(text.len());
+    let Some((start_offset, end_offset)) = expanded_range else {
+        return Ok(None);
+    };
 
     // Create the edit range
     let edit_range = Range {
         start: offset_to_position(&text, start_offset),
-        end: offset_to_position(&text, end_offset),
+        end: offset_to_position(&text, end_offset.min(text.len())),
     };
 
     Ok(Some(vec![TextEdit {
