@@ -180,6 +180,8 @@ Hierarchical lookup:
 
 Config threaded through parsers: `Parser::new(input, &Config)`
 
+Use kebab-case for config keys (e.g., `line-width`, not `line_width`).
+
 ## Testing Strategy
 
 - Unit tests: Embedded in source modules
