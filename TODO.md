@@ -2,197 +2,199 @@
 
 This document tracks implementation status for panache's features.
 
-**Status Legend**
-
-- ✅ **Implemented** - Feature is fully or mostly implemented
-- 🚧 **Partial** - Feature is partially implemented or needs work
-- ❌ **Not Implemented** - Feature not yet started
-- ⏹️ **Won't Implement** - Feature intentionally not implemented
-
 ## Language Server
 
-- 🚧 Incremental parsing and caching for LSP performance (Implemented, but crude
-  and often reparses entire document on change; needs optimization)
+- [ ] Incremental parsing and caching for LSP performance (Implemented, but
+      crude and often reparses entire document on change; needs optimization)
 
 ### Core LSP Capabilities
 
-- ✅ `textDocument/formatting` - Full document formatting
-- ✅ `textDocument/didOpen` - Track document opens
-- ✅ `textDocument/didChange` - Track document changes (incremental sync)
-- ✅ `textDocument/didClose` - Track document closes
-- ✅ Configuration discovery from workspace root (`.panache.toml`)
+- [X] `textDocument/formatting` - Full document formatting
+- [X] `textDocument/didOpen` - Track document opens
+- [X] `textDocument/didChange` - Track document changes (incremental sync)
+- [X] `textDocument/didClose` - Track document closes
+- [X] Configuration discovery from workspace root (`.panache.toml`)
 
 ### Future LSP Features
 
 #### Diagnostics
 
-- ❌ **Syntax error diagnostics** - Report parsing errors as diagnostics
-- ❌ **Lint warnings** - Configurable linting rules (e.g., heading levels, list
-  consistency)
-- ❌ **Link validation** - Check for broken internal links/references
-- ✅ **Citation validation** - Validate citation keys against bibliography
-- ❌ **Footnote validation** - Check for undefined footnotes (also in linter)
+- [ ] Syntax error diagnostics - Report parsing errors as diagnostics
+- [ ] Lint warnings - Configurable linting rules (e.g., heading levels, list
+      consistency)
+- [ ] Link validation - Check for broken internal links/references
+- [X] Citation validation - Validate citation keys against bibliography
+- [ ] Footnote validation - Check for undefined footnotes (also in linter)
 
 #### Code Actions
 
-- ❌ **Convert lists** - Convert between bullet/ordered lists
-- ✅ **Convert loose/compact lists** - Toggle between loose and compact list
-- ❌ Convert bullet list to task list - Convert `- item` to `- [ ] item`
-- ❌ **Convert table** - Convert between table styles (simple, pipe, grid)
-- ❌ **Convert link styles** - Convert between inline/reference links
-- ✅ **Convert footnote styles** - Convert between inline/reference footnotes
+- [ ] Convert between bullet/ordered lists
+- [X] Convert loose/compact lists
+- [ ] Convert bullet list to task list - Convert `- item` to `- [ ] item`
+- [ ] Convert between table styles (simple, pipe, grid)
+- [ ] Convert between inline/reference links
+- [X] Convert between inline/reference footnotes
 
 #### Navigation & Symbols
 
-- ✅ **Document outline** - `textDocument/documentSymbol` for headings, tables,
-  figures
-- ✅ **Folding ranges** - `textDocument/foldingRange` for headings, code blocks,
-  fenced divs, YAML frontmatter
-- ✅ **Go to definition** - Jump to reference link/footnote definitions
-  (reference links, images, footnotes)
-- ✅ Go to definition for citations - Jump to bibliography entry for `@cite`
-  keys
-- ❌ **Find references** - Find all uses of a reference link/footnote/citation
+- [x] Document outline - `textDocument/documentSymbol` for headings, tables,
+      figures
+- [x] Folding ranges - `textDocument/foldingRange`
+      - [x] Code blocks
+      - [x] Sections (headings)
+- [ ] Go to definition links, images, footnotes). Enabled for some, but not all,
+      reference types.
+      - [x] Go to definition for reference links - Jump to `[ref]: url`
+            definition
+      - [x] Go to definition for citations - Jump to bibliography entry for
+            `@cite` keys
+      - [ ] Go to definition for headings - Jump to heading target for internal
+            links
+- [ ] Find references - Find all uses of a reference link/footnote/citation
+      - [ ] Find references for citations - Find all `@cite` uses of a
+            bibliography entry
+      - [ ] Find references for headings - Find all internal links to a heading
+      - [ ] Find references for reference links - Find all `[text][ref]` links
 
 #### Completion
 
-- ✅ **Citation completion** - `textDocument/completion` for `@cite` keys from
-  bibliography
-- ❌ **Reference link completion** - Complete `[text][ref]` from defined
-  references
-- ❌ **Heading link completion** - Complete internal links to headings
-- ❌ **Attribute completion** - Complete class names and attributes in
-  `{.class #id}`
+- [x] Citation completion - `textDocument/completion` for `@cite` keys from
+      bibliography
+- [ ] Reference link completion - Complete `[text][ref]` from defined references
+- [ ] Heading link completion
+- [ ] Attribute completion - Complete class names and attributes in
+      `{.class #id}`
 
 #### Inlay Hints (low priority)
 
-- ❌ **Link target hints** - Show link targets as inlay hints
-- ❌ **Reference definition hints** - Show reference definitions as inlay hints
-- ✅ **Citation key hints** - Show bibliography entries for `@cite` keys
-- ❌ **Footnote content hints** - Show footnote content as inlay hints
+Personally I think inlay hints are distractive and I am not sure what we want
+to support.
+
+- [ ] Link target hints - Show link targets as inlay hints
+- [ ] Reference definition hints - Show reference definitions as inlay hints
+- [ ] Citation key hints - Show bibliography entries for `@cite` keys
+- [ ] Footnote content hints - Show footnote content as inlay hints
 
 #### Hover Information
 
-- ❌ **Link preview** - `textDocument/hover` to show link target
-- ❌ **Reference preview** - Show reference definition on hover
-- ✅ **Footnote preview** - Show footnote content inline
-- ✅ **Citation preview** - Show bibliography entry for citation (approximate)
+- [ ] Link preview - `textDocument/hover` to show link target
+- [ ] Reference preview - Show reference definition on hover
+- [x] Footnote preview - Show footnote content inline
+- [x] Citation preview - Show bibliography entry for citation (approximate)
 
 #### Advanced
 
-- ✅ **Range formatting** - `textDocument/rangeFormatting` for selected text
-  only
-- ❌ **On-type formatting** - `textDocument/onTypeFormatting` for
-  auto-formatting triggers (not sure about this, low priority)
-- ❌ **Document links** - `textDocument/documentLink` for clickable links
-- ❌ **Semantic tokens** - Syntax highlighting via LSP
-- ✅ **Rename** - Rename reference links/footnotes/citations across document
-  and bibliography
-- ❌ **Workspace symbols** - Search for headings across all workspace documents
-- ❌ **Configuration via LSP** - `workspace/didChangeConfiguration` to reload
-  config
+- [x] Range formatting - `textDocument/rangeFormatting` for selected text only
+- [ ] On-type formatting - `textDocument/onTypeFormatting` for auto-formatting
+      triggers (not sure about this, low priority)
+- [ ] **Document links** - `textDocument/documentLink` for clickable links
+- [ ] **Semantic tokens** - Syntax highlighting via LSP
+- [ ] Rename
+      - [x] Citations - Rename `@cite` keys and update bibliography
+      - [x] Reference links - Rename `[ref]` labels and update definitions
+      - [ ] Headings - Rename heading text and update internal links
+- [ ] Workspace symbols
+      - [ ] General support for pandoc etc
+      - [ ] Quarto - project-wide symbol search for figures, tables, sections
+      - [ ] Rmarkdown (Bookdown)
+- [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload
+      config
 
 ## Pandoc Test Adoption
 
-- 🚧 **Pandoc Reader Tests (Markdown.hs)**
-  - [ ] Autolinks/bare URIs
-  - [ ] Links/references edge cases
-  - [ ] Headers/implicit refs
-  - [ ] Emphasis/strong
-  - [ ] Lists/definition lists
-  - [ ] Footnotes/citations
-- 🚧 **Pandoc Reader Tests (markdown-reader-more.txt)**
-  - [ ] URLs with spaces/punctuation
-  - [ ] Multilingual URLs
-  - [ ] Entities in links/titles
-  - [ ] Parentheses/backslashes in URLs
-  - [ ] Reference link fallbacks
-- 🚧 **Pandoc Writer Tests (writer.markdown)**
-  - [x] Autolinks and email autolinks (`tests/cases/writer_autolinks`)
-  - [x] Links and titles (partial; `tests/cases/writer_autolinks`)
-  - [x] Headers (partial; `tests/cases/writer_headers`)
-  - [x] Paragraphs (partial; `tests/cases/writer_paragraphs`)
-  - [x] Lists and definition lists (partial;
-        `tests/cases/writer_definition_lists_multiblock`)
-  - [x] HTML blocks (partial; `tests/cases/writer_html_blocks`)
-  - [x] Indented code blocks + escape preservation (partial;
-        `tests/cases/writer_indented_code_escapes`)
-  - [x] Blockquote negative case (partial; `tests/cases/writer_blockquote_not`)
+- [ ] Pandoc Reader Tests (Markdown.hs)
+      - [x] Autolinks/bare URIs
+      - [ ] Links/references edge cases
+      - [ ] Headers/implicit refs
+      - [ ] Emphasis/strong
+      - [ ] Lists/definition lists
+      - [ ] Footnotes/citations
+- [ ] Pandoc Reader Tests (markdown-reader-more.txt)
+      - [ ] URLs with spaces/punctuation
+      - [ ] Multilingual URLs
+      - [ ] Entities in links/titles
+      - [ ] Parentheses/backslashes in URLs
+      - [ ] Reference link fallbacks
 
 ## Configuration System
 
 ### Per-Flavor Extension Configuration
 
-- ❌ **Per-flavor extension overrides** - `[extensions.gfm]`,
-  `[extensions.quarto]`, `[extensions.rmarkdown]`, etc.
-  - Allow fine-grained control of extensions for specific flavors
-  - Example: Enable `task_lists` only for GFM, disable `citations` for
-    CommonMark
-  - Falls back to global `[extensions]` settings when not specified
+- [ ] Per-flavor extension overrides - `[extensions.gfm]`,
+      `[extensions.quarto]`, `[extensions.rmarkdown]`, etc.
+      - Allow fine-grained control of extensions for specific flavors
+      - Example: Enable `task_lists` only for GFM, disable `citations` for
+        CommonMark
+      - Falls back to global `[extensions]` settings when not specified
 
 ### Per-File Pattern Overrides
 
-- ❌ **Glob pattern flavor overrides** - `[flavor_overrides]` with file patterns
-  - Override flavor for specific files or patterns
-  - Example: `"README.md" = "gfm"` or `"docs/**/*.md" = "gfm"`
-  - Useful for projects with mixed Markdown files (e.g., README.md as GFM, docs
-    as Pandoc)
-  - Could potentially extend to per-pattern extension overrides:
-    `[pattern_overrides."docs/**/*.md".extensions]`
+- [ ] Glob pattern flavor overrides - `[flavor_overrides]` with file patterns
+      - Override flavor for specific files or patterns
+      - Example: `"README.md" = "gfm"` or `"docs/**/*.md" = "gfm"`
+      - Useful for projects with mixed Markdown files (e.g., README.md as GFM,
+        docs as Pandoc)
+      - Could potentially extend to per-pattern extension overrides:
+        `[pattern_overrides."docs/**/*.md".extensions]`
 
 ## Linter
 
-- ✅ Auto-fixing for external code linters
+- [ ] Add support for comments to disable linting on specific lines or blocks
+      (e.g., `<!-- something -->`)
+- [x] Auto-fixing for external code linters
 
 ### Future Lint Rules
 
-**Syntax correctness:**
+#### Syntax correctness
 
-- ❌ Malformed fenced divs (unclosed, invalid attributes)
-- ❌ Broken table structures
-- ❌ Invalid citation syntax (`@citekey` malformations)
-- ❌ Unclosed inline math/code spans
-- ❌ Invalid shortcode syntax (Quarto-specific)
+- [ ] Malformed fenced divs (unclosed, invalid attributes)
+- [ ] Broken table structures
+- [ ] Invalid citation syntax (`@citekey` malformations)
+- [ ] Unclosed inline math/code spans
+- [ ] Invalid shortcode syntax (Quarto-specific)
 
-**Style/Best practices:**
+#### Style/Best practices
 
-- ✅ Inconsistent heading hierarchy (skip levels)
-- ❌ Multiple top-level headings
-- ❌ Empty links/images
-- ✅ Duplicate reference labels
-- ❌ Unused reference definitions
-- ❌ Hard-wrapped text in code blocks
+- [x] Inconsistent heading hierarchy (skip levels)
+- [x] Duplicate reference labels
+- [ ] Multiple top-level headings
+- [ ] Empty links/images
+- [ ] Unused reference definitions
+- [ ] Hard-wrapped text in code blocks
+- [ ] Use blanklines around horizontal rules
 
-**Configuration:**
+### Configuration
 
-- ❌ Per-rule enable/disable in `.panache.toml` `[lint]` section
-- ❌ Severity levels (error, warning, info)
-- ❌ Auto-fix capability per rule (infrastructure exists, rules need
-  implementation)
+- [ ] Per-rule enable/disable in `.panache.toml` `[lint]` section
+- [ ] Severity levels (error, warning, info)
+- [ ] Auto-fix capability per rule (infrastructure exists, rules need
+      implementation)
 
 ### Open Questions
 
-- Should linter rules be pluggable (external crates)?
 - How to balance parser error recovery vs. strict linting?
 - Performance: incremental linting for LSP mode?
 - LSP: incremental parsing cache (tree reuse on didChange)
 
 ## Formatter
 
+- [ ] Add support for comments to disable formatting on specific lines or blocks
+      (e.g., `<!-- something-->`)
+
 ### Tables
 
-- ✅ Simple tables
-- ✅ Pipe tables
-- ✅ Grid tables
-- ✅ Multiline tables
+- [x] Simple tables
+- [x] Pipe tables
+- [x] Grid tables
+- [x] Multiline tables
 
 ## Parser
 
 ### Performance
 
-- 🚧 Avoid temporary green tree when injecting `BLOCKQUOTE_MARKER` tokens into
-  inline-parsed paragraphs (current approach parses inlines into a temp tree,
-  then replays while inserting markers)
+- [ ] Avoid temporary green tree when injecting `BLOCKQUOTE_MARKER` tokens into
+      inline-parsed paragraphs (current approach parses inlines into a temp
+      tree, then replays while inserting markers)
 
 ## Parser - Coverage
 
@@ -224,265 +226,261 @@ are implemented.
 
 ### Block Quotations ✅
 
-- ✅ Basic block quotes (`> text`)
-- ✅ Nested block quotes (`> > nested`)
-- ✅ Block quotes with paragraphs
-- ✅ Extension: `blank_before_blockquote` - Require blank before quote (default
-  behavior)
-- ✅ Block quotes containing lists
-- ✅ Block quotes containing code blocks
+- [x] Basic block quotes (`> text`)
+- [x] Nested block quotes (`> > nested`)
+- [x] Block quotes with paragraphs
+- [x] Extension: `blank_before_blockquote` - Require blank before quote (default
+      behavior)
+- [x] Block quotes containing lists
+- [x] Block quotes containing code blocks
 
 ### Lists 🚧
 
-- ✅ Bullet lists (`-`, `+`, `*`)
-- ✅ Ordered lists (`1.`, `2.`, etc.)
-- ✅ Nested lists
-- ✅ List item continuation
-- ✅ Complex nested mixed lists
-- ✅ Extension: `fancy_lists` - Roman numerals, letters `(a)`, `A)`, etc.
-- ❌ Extension: `startnum` - Start ordered lists at arbitrary number (low
-  priority)
-- ✅ Extension: `example_lists` - Example lists with `(@)` markers
-- ✅ Extension: `task_lists` - GitHub-style `- [ ]` and `- [x]`
-- ✅ Extension: `definition_lists` - Term/definition syntax
+- [x] Bullet lists (`-`, `+`, `*`)
+- [x] Ordered lists (`1.`, `2.`, etc.)
+- [x] Nested lists
+- [x] List item continuation
+- [x] Complex nested mixed lists
+- [x] Extension: `fancy_lists` - Roman numerals, letters `(a)`, `A)`, etc.
+- [ ] Extension: `startnum` - Start ordered lists at arbitrary number (low
+      priority, if we even should support this)
+- [x] Extension: `example_lists` - Example lists with `(@)` markers
+- [x] Extension: `task_lists` - GitHub-style `- [ ]` and `- [x]`
+- [x] Extension: `definition_lists` - Term/definition syntax
 
-### Code Blocks ✅
+### Code Blocks
 
-- ✅ Fenced code blocks (backticks and tildes)
-- ✅ Code block attributes (language, etc.)
-- ✅ Indented code blocks (4-space indent)
-- ✅ Extension: `fenced_code_attributes` - `{.language #id}`
-- ✅ Extension: `backtick_code_blocks` - Backtick-only fences
-- ✅ Extension: `inline_code_attributes` - Attributes on inline code
+- [x] Fenced code blocks (backticks and tildes)
+- [x] Code block attributes (language, etc.)
+- [x] Indented code blocks (4-space indent)
+- [x] Extension: `fenced_code_attributes` - `{.language #id}`
+- [x] Extension: `backtick_code_blocks` - Backtick-only fences
+- [x] Extension: `inline_code_attributes` - Attributes on inline code
 
-### Horizontal Rules ✅
+### Horizontal Rules
 
-- ✅ Basic horizontal rules (`---`, `***`, `___`)
+- [x] Basic horizontal rules (`---`, `***`, `___`)
 
-### Fenced Divs ✅
+### Fenced Divs
 
-- ✅ Basic fenced divs (`::: {.class}`)
-- ✅ Nested fenced divs
-- ✅ Colon count normalization based on nesting
-- ✅ Proper formatting with attribute preservation
+- [x] Basic fenced divs (`::: {.class}`)
+- [x] Nested fenced divs
+- [x] Colon count normalization based on nesting
+- [x] Proper formatting with attribute preservation
 
-### Tables ✅
+### Tables
 
-- ✅ Extension: `simple_tables` - Simple table syntax (parsing complete,
-  formatting deferred)
-- ✅ Extension: `table_captions` - Table captions (both before and after tables)
-- ✅ Extension: `pipe_tables` - GitHub/PHP Markdown tables (all alignments,
-  orgtbl variant)
-- ✅ Extension: `multiline_tables` - Multiline cell content (parsing complete,
-  formatting deferred)
-- ✅ Extension: `grid_tables` - Grid-style tables (parsing complete, formatting
-  deferred)
+- [x] Extension: `simple_tables` - Simple table syntax (parsing complete,
+      formatting deferred)
+- [x] Extension: `table_captions` - Table captions (both before and after
+      tables)
+- [x] Extension: `pipe_tables` - GitHub/PHP Markdown tables (all alignments,
+      orgtbl variant)
+- [x] Extension: `multiline_tables` - Multiline cell content (parsing complete,
+      formatting deferred)
+- [x] Extension: `grid_tables` - Grid-style tables (parsing complete, formatting
+      deferred)
 
-### Line Blocks ✅
+### Line Blocks
 
-- ✅ Extension: `line_blocks` - Poetry/verse with `|` prefix
+- [x] Extension: `line_blocks` - Poetry/verse with `|` prefix
 
-## Inline Elements
+### Inline Elements
 
-### Emphasis & Formatting ✅
+#### Emphasis & Formatting
 
-- ✅ `*italic*` and `_italic_`
-- ✅ `**bold**` and `__bold__`
-- ✅ Nested emphasis (e.g., `***bold italic***`)
-- ✅ Overlapping and adjacent emphasis handling
-- ✅ Extension: `intraword_underscores` - `snake_case` handling
-- ✅ Extension: `strikeout` - `~~strikethrough~~`
-- ✅ Extension: `superscript` - `^super^`
-- ✅ Extension: `subscript` - `~sub~`
-- ✅ Extension: `bracketed_spans` - Small caps `[text]{.smallcaps}`, underline
-  `[text]{.underline}`, etc.
+- [x] `*italic*` and `_italic_`
+- [x] `**bold**` and `__bold__`
+- [x] Nested emphasis (e.g., `***bold italic***`)
+- [x] Overlapping and adjacent emphasis handling
+- [x] Extension: `intraword_underscores` - `snake_case` handling
+- [x] Extension: `strikeout` - `~~strikethrough~~`
+- [x] Extension: `superscript` - `^super^`
+- [x] Extension: `subscript` - `~sub~`
+- [x] Extension: `bracketed_spans` - Small caps `[text]{.smallcaps}`, underline
+      `[text]{.underline}`, etc.
 
-### Code & Verbatim ✅
+#### Code & Verbatim
 
-- ✅ Inline code (`code`)
-- ✅ Multi-backtick code spans (\`\`\`\`\`)
-- ✅ Code spans containing backticks
-- ✅ Proper whitespace preservation in code spans
-- ✅ Fenced code blocks (\`\`\` and \~\~\~)
-- ✅ Indented code blocks
+- [x] Inline code (`code`)
+- [x] Multi-backtick code spans (\`\`\`\`\`)
+- [x] Code spans containing backticks
+- [x] Proper whitespace preservation in code spans
+- [x] Fenced code blocks (\`\`\` and \~\~\~)
+- [x] Indented code blocks
 
-### Links ✅
+#### Links
 
-- ✅ Inline links `[text](url)`
-- ✅ Automatic links `<http://example.com>`
-- ✅ Nested inline elements in link text (code, emphasis, math)
-- ✅ Reference links `[text][ref]`
-- ✅ Extension: `shortcut_reference_links` - `[ref]` without second `[]`
-- ✅ Extension: `link_attributes` - `[text](url){.class}`
-- ⏹️ Extension: `implicit_header_references` - `[Heading Name]` links to header
-  (conversion feature, not formatting concern)
+- [x] Inline links `[text](url)`
+- [x] Automatic links `<http://example.com>`
+- [x] Nested inline elements in link text (code, emphasis, math)
+- [x] Reference links `[text][ref]`
+- [x] Extension: `shortcut_reference_links` - `[ref]` without second `[]`
+- [x] Extension: `link_attributes` - `[text](url){.class}`
+- [x] Extension: `implicit_header_references` - `[Heading Name]` links to header
 
-### Images ✅
+#### Images
 
-- ✅ Inline images `![alt](url)`
-- ✅ Nested inline elements in alt text (code, emphasis, math)
-- ✅ Reference images `![alt][ref]`
-- ✅ Image attributes `![alt](url){#id .class key=value}`
-- ⏹️ Extension: `implicit_figures` - Conversion feature, not formatting concern
+- [x] Inline images `![alt](url)`
+- [x] Nested inline elements in alt text (code, emphasis, math)
+- [x] Reference images `![alt][ref]`
+- [x] Image attributes `![alt](url){#id .class key=value}`
+- [ ] Extension: `implicit_figures`
 
-### Math ✅
+#### Math
 
-- ✅ Inline math `$x = y$`
-- ✅ Display math `$$equation$$`
-- ✅ Multi-dollar math spans (e.g., `$$$ $$ $$$`)
-- ✅ Math containing special characters
-- ✅ Extension: `tex_math_dollars` - Dollar-delimited math
+- [x] Inline math `$x = y$`
+- [x] Display math `$$equation$$`
+- [x] Multi-dollar math spans (e.g., `$$$ $$ $$$`)
+- [x] Math containing special characters
+- [x] Extension: `tex_math_dollars` - Dollar-delimited math
 
-### Footnotes ✅
+#### Footnotes
 
-- ✅ Inline footnotes `^[note text]`
-- ✅ Reference footnotes `[^1]` with definition block
-- ✅ Extension: `inline_notes` - Inline note syntax
-- ✅ Extension: `footnotes` - Reference-style footnotes
+- [x] Inline footnotes `^[note text]`
+- [x] Reference footnotes `[^1]` with definition block
+- [x] Extension: `inline_notes` - Inline note syntax
+- [x] Extension: `footnotes` - Reference-style footnotes
 
-### Citations ✅
+#### Citations
 
-- ✅ Extension: `citations` - `[@cite]` and `@cite` syntax with complex key
-  support
+- [x] Extension: `citations` - `[@cite]` and `@cite` syntax with complex key
+      support
 
-### Spans ✅
+#### Spans
 
-- ✅ Extension: `bracketed_spans` - `[text]{.class}` inline
-- ✅ Extension: `native_spans` - HTML `<span>` elements with markdown content
+- [x] Extension: `bracketed_spans` - `[text]{.class}` inline
+- [x] Extension: `native_spans` - HTML `<span>` elements with markdown content
 
----
+### Metadata & Front Matter
 
-## Metadata & Front Matter
+#### Metadata Blocks
 
-### Metadata Blocks ✅
+- [x] Extension: `yaml_metadata_block` - YAML frontmatter
+- [x] Extension: `pandoc_title_block` - Title/author/date at top
 
-- ✅ Extension: `yaml_metadata_block` - YAML frontmatter
-- ✅ Extension: `pandoc_title_block` - Title/author/date at top
+### Raw Content & Special Syntax
 
-## Raw Content & Special Syntax
+#### Raw HTML
 
-### Raw HTML ✅
+- [x] Extension: `raw_html` - Inline and block HTML
+- [ ] Extension: `markdown_in_html_blocks` - Markdown inside HTML blocks
 
-- ✅ Extension: `raw_html` - Inline and block HTML
-- ❌ Extension: `markdown_in_html_blocks` - Markdown inside HTML blocks
+#### Raw LaTeX
 
-### Raw LaTeX ✅
+- [x] Extension: `raw_tex` - Inline LaTeX commands (`\cite{ref}`,
+      `\textbf{text}`, etc.)
+- [x] Extension: `raw_tex` - Block LaTeX environments
+      (`\begin{tabular}...\end{tabular}`)
+- [x] Extension: `latex_macros` - Expand LaTeX macros (conversion feature, not
+      formatting concern)
 
-- ✅ Extension: `raw_tex` - Inline LaTeX commands (`\cite{ref}`,
-  `\textbf{text}`, etc.)
-- ✅ Extension: `raw_tex` - Block LaTeX environments
-  (`\begin{tabular}...\end{tabular}`)
-- ⏹️ Extension: `latex_macros` - Expand LaTeX macros (conversion feature, not
-  formatting concern)
+#### Other Raw
 
-### Other Raw
+- [x] Extension: `raw_attribute` - Generic raw blocks `{=format}`
 
-- ✅ Extension: `raw_attribute` - Generic raw blocks `{=format}` (blocks ✅,
-  inline spans ✅)
+### Escapes & Special Characters
 
-## Escapes & Special Characters
+#### Backslash Escapes
 
-### Backslash Escapes ✅
+- [x] Extension: `all_symbols_escapable` - Backslash escapes any symbol
+- [x] Extension: `angle_brackets_escapable` - Escape `<` and `>`
+- [x] Escape sequences in inline elements (emphasis, code, math)
 
-- ✅ Extension: `all_symbols_escapable` - Backslash escapes any symbol
-- ✅ Extension: `angle_brackets_escapable` - Escape `<` and `>`
-- ✅ Escape sequences in inline elements (emphasis, code, math)
+#### Line Breaks
 
-### Line Breaks ✅
+- [x] Extension: `escaped_line_breaks` - Backslash at line end = `<br>`
 
-- ✅ Extension: `escaped_line_breaks` - Backslash at line end = `<br>`
-
-## Non-Default Extensions (Future Consideration)
+### Non-Default Extensions (Future Consideration)
 
 These extensions are **not enabled by default** in Pandoc and are lower priority
 for initial implementation.
 
-### Non-Default: Emphasis & Formatting
+#### Non-Default: Emphasis & Formatting
 
-- ❌ Extension: `mark` - `==highlighted==` text (non-default)
+- [ ] Extension: `mark` - `==highlighted==` text (non-default)
 
-### Non-Default: Links
+#### Non-Default: Links
 
-- ❌ Extension: `autolink_bare_uris` - Bare URLs as links (non-default)
-- ❌ Extension: `mmd_link_attributes` - MultiMarkdown link attributes
-  (non-default)
+- [ ] Extension: `autolink_bare_uris` - Bare URLs as links (non-default)
+- [ ] Extension: `mmd_link_attributes` - MultiMarkdown link attributes
+      (non-default)
 
-### Non-Default: Math
+#### Non-Default: Math
 
-- ✅ Extension: `tex_math_single_backslash` - `\( \)` and `\[ \]` (non-default,
-  enabled for RMarkdown)
-- ✅ Extension: `tex_math_double_backslash` - `\\( \\)` and `\\[ \\]`
-  (non-default)
-- ❌ Extension: `tex_math_gfm` - GitHub Flavored Markdown math (non-default)
+- [x] Extension: `tex_math_single_backslash` - `\( \)` and `\[ \]` (non-default,
+      enabled for RMarkdown)
+- [x] Extension: `tex_math_double_backslash` - `\\( \\)` and `\\[ \\]`
+      (non-default)
+- [ ] Extension: `tex_math_gfm` - GitHub Flavored Markdown math (non-default)
 
-### Non-Default: Metadata
+#### Non-Default: Metadata
 
-- ❌ Extension: `mmd_title_block` - MultiMarkdown metadata (non-default)
+- [ ] Extension: `mmd_title_block` - MultiMarkdown metadata (non-default)
 
-### Non-Default: Headings
+#### Non-Default: Headings
 
-- ❌ Extension: `mmd_header_identifiers` - MultiMarkdown style IDs (non-default)
+- [ ] Extension: `mmd_header_identifiers` - MultiMarkdown style IDs
+      (non-default)
 
-### Non-Default: Lists
+#### Non-Default: Lists
 
-- ❌ Extension: `lists_without_preceding_blankline` (non-default)
-- ❌ Extension: `four_space_rule` - Four space vs two space list indent
-  (non-default)
+- [ ] Extension: `lists_without_preceding_blankline` (non-default)
+- [ ] Extension: `four_space_rule` - Four space vs two space list indent
+      (non-default)
 
-### Non-Default: Line Breaks
+#### Non-Default: Line Breaks
 
-- ❌ Extension: `hard_line_breaks` - Newline = `<br>` (non-default)
-- ❌ Extension: `ignore_line_breaks` - Ignore single newlines (non-default)
-- ❌ Extension: `east_asian_line_breaks` - Smart line breaks for CJK
-  (non-default)
+- [ ] Extension: `hard_line_breaks` - Newline = `<br>` (non-default)
+- [ ] Extension: `ignore_line_breaks` - Ignore single newlines (non-default)
+- [ ] Extension: `east_asian_line_breaks` - Smart line breaks for CJK
+      (non-default)
 
-### Non-Default: GitHub-specific
+#### Non-Default: GitHub-specific
 
-- ❌ Extension: `alerts` - GitHub/Quarto alert/callout boxes (non-default)
-- ❌ Extension: `emoji` - `:emoji:` syntax (non-default)
-- ❌ Extension: `wikilinks_title_after_pipe` - `[[link|title]]` (non-default)
+- [ ] Extension: `alerts` - GitHub/Quarto alert/callout boxes (non-default)
+- [ ] Extension: `emoji` - `:emoji:` syntax (non-default)
+- [ ] Extension: `wikilinks_title_after_pipe` - `[[link|title]]` (non-default)
 
-### Non-Default: Quarto-Specific
+#### Non-Default: Quarto-Specific
 
-- ✅ Quarto executable code cells with output
-- ✅ Quarto cross-references `@fig-id`, `@tbl-id`
+- [x] Quarto executable code cells with output
+- [x] Quarto cross-references `@fig-id`, `@tbl-id`
 
-### Non-Default: RMarkdown-Specific
+#### Non-Default: RMarkdown-Specific
 
-- ✅ RMarkdown code chunks with output
-- ✅ Bookdown-style references (`\@ref(fig-id)`, etc.\`)
+- [x] RMarkdown code chunks with output
+- [x] Bookdown-style references (`\@ref(fig-id)`, etc.\`)
 
-### Non-Default: Other
+#### Non-Default: Other
 
-- ❌ Extension: `abbreviations` - Abbreviation definitions (non-default)
-- ❌ Extension: `attributes` - Universal attribute syntax (non-default,
-  commonmark only)
-- ❌ Extension: `gutenberg` - Project Gutenberg conventions (non-default)
-- ❌ Extension: `markdown_attribute` - `markdown="1"` in HTML (non-default)
-- ❌ Extension: `old_dashes` - Old-style em/en dash parsing (non-default)
-- ❌ Extension: `rebase_relative_paths` - Rebase relative paths (non-default)
-- ❌ Extension: `short_subsuperscripts` - MultiMarkdown `x^2` style
-  (non-default)
-- ❌ Extension: `sourcepos` - Include source position info (non-default)
-- ❌ Extension: `space_in_atx_header` - Allow no space after `#` (non-default)
-- ❌ Extension: `spaced_reference_links` - Allow space in `[ref] [def]`
-  (non-default)
+- [ ] Extension: `abbreviations` - Abbreviation definitions (non-default)
+- [ ] Extension: `attributes` - Universal attribute syntax (non-default,
+      commonmark only)
+- [ ] Extension: `gutenberg` - Project Gutenberg conventions (non-default)
+- [ ] Extension: `markdown_attribute` - `markdown="1"` in HTML (non-default)
+- [ ] Extension: `old_dashes` - Old-style em/en dash parsing (non-default)
+- [ ] Extension: `rebase_relative_paths` - Rebase relative paths (non-default)
+- [ ] Extension: `short_subsuperscripts` - MultiMarkdown `x^2` style
+      (non-default)
+- [ ] Extension: `sourcepos` - Include source position info (non-default)
+- [ ] Extension: `space_in_atx_header` - Allow no space after `#` (non-default)
+- [ ] Extension: `spaced_reference_links` - Allow space in `[ref] [def]`
+      (non-default)
 
----
-
-## Won't Implement
+### Won't Implement
 
 - Format-specific output conventions (e.g., `gutenberg` for plain text output)
 
-## Quarto Shortcodes
+### Quarto Shortcodes
 
-- ✅ Parser support for `{{< name args >}}` syntax
-- ✅ Parser support for `{{{< name args >}}}` escape syntax
-- ✅ Formatter with normalized spacing
-- ✅ Extension flag `quarto_shortcodes` (enabled for Quarto flavor)
-- ✅ Golden test coverage
-- ❌ LSP diagnostics for malformed shortcodes (future)
-- ❌ Completion for built-in shortcode names (future)
+- [x] Parser support for `{{< name args >}}` syntax
+- [x] Parser support for `{{{< name args >}}}` escape syntax
+- [x] Formatter with normalized spacing
+- [x] Extension flag `quarto_shortcodes` (enabled for Quarto flavor)
+- [x] Golden test coverage
+- [ ] LSP diagnostics for malformed shortcodes (future)
+- [ ] Completion for built-in shortcode names (future)
 
 ### Known Differences from Pandoc
 
@@ -516,3 +514,7 @@ links.
 
 **Decision**: Accept current behavior until a real-world use case requires
 matching Pandoc's AST structure exactly.
+
+## Architecture
+
+- [ ] Separate out some functionality into separate crates (long-term)
