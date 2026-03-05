@@ -138,8 +138,6 @@ Located in `src/formatter/`:
 - `wrapping.rs`: Word-breaking and line-wrapping logic
 - Specialized modules: `paragraphs.rs`, `inline.rs`, `headings.rs`, `lists.rs`,
   `tables.rs`, etc.
-- **Important**: LINK and IMAGE_LINK have special handling in `wrapping.rs` for
-  delimiter reconstruction
 
 **Formatting must be idempotent**: format(format(x)) == format(x)
 
@@ -171,8 +169,14 @@ Hierarchical lookup:
 
 - `flavor`: Pandoc, Quarto, RMarkdown, GFM, CommonMark (affects enabled
   extensions)
-- `line-width`: Default 80 - `wrap`: Reflow (default) or Preserve
-- `extensions`: 60+ bool flags for Pandoc extensions
+- `line-width`: Default 80 - `wrap`: reflow (default), preserve, or sentence.
+- `extensions`: many bool flags for Pandoc extensions
+- `[style]` section for formatting preferences
+- `[lint]` section for linter rule configuration
+- `[formatters]` section for external formatter integration (e.g., black for
+  python code blocks)
+- `[linters]` section for external linter integration (e.g., flake8 for python
+  code blocks)
 
 Config threaded through parsers: `Parser::new(input, &Config)`
 
@@ -256,7 +260,7 @@ provides auto-fix
 ```bash
 panache lint document.qmd
 panache lint --check document.qmd # CI mode (exit 1 if violations)
-panache lint --fix document.qmd # Apply auto-fixes
+panache lint --fix document.qmd   # Apply auto-fixes
 ```
 
 ## File Organization Principles
