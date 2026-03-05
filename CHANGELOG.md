@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.12.0](https://github.com/jolars/panache/compare/v2.11.0...v2.12.0) (2026-03-05)
+
+### Features
+
+* add RIS bibliography support ([128eaf0](https://github.com/jolars/panache/commit/128eaf0b9baee65a7a4d2e58af912ae704a4f13c))
+* **formatter,linter:** support ignore directives ([17a3df2](https://github.com/jolars/panache/commit/17a3df2a8306b8330acf4b5ab952589cc08a849c))
+* **formatter:** add blanklines between definitions if loose ([c6a3d14](https://github.com/jolars/panache/commit/c6a3d144d6ef071ce92a3fb01c302e9689410969))
+* improve hover preview for citations ([45e0f11](https://github.com/jolars/panache/commit/45e0f11bbed0d6d9cd14047d1106a9a596d0a355))
+* support JSON bibliographies ([3a9ee26](https://github.com/jolars/panache/commit/3a9ee26f4186d3ef0531cbbc6dccc9eb17ac5f3e))
+
+### Bug Fixes
+
+* fix compilation error ([194858a](https://github.com/jolars/panache/commit/194858acf577426944974de5f81de4330ca9d6d8))
+* **formatter:** handle indentation in indented code blocks ([9112856](https://github.com/jolars/panache/commit/911285687aa0bc45ade15b767ae5fdbd32f67f74))
+* handle code block on first line of definition item ([4bb42f5](https://github.com/jolars/panache/commit/4bb42f5b75ecd5691cb211bc08e6e68b704eea05))
+* **lsp:** expand selection for edit range to top-level block ([0a39399](https://github.com/jolars/panache/commit/0a393990dac59bf44e4f46316f831dd13464bd06))
+* **lsp:** improve expansion handling for range formatting ([11c4d51](https://github.com/jolars/panache/commit/11c4d51eb49d37f01aa90e999e5ab628453c917e))
+* **lsp:** replace correct segment when using range format ([5968b6a](https://github.com/jolars/panache/commit/5968b6a1ae0f8bc737dfe2d218f4857e1f255931))
+* **parser, formatter:** correctly handle blocks in deflist ([4ffc8bc](https://github.com/jolars/panache/commit/4ffc8bc42facad1cf8b5b02f82152b769ccc7c56))
+* **parser,formatter:** handle loose/compact definitions ([063f9f3](https://github.com/jolars/panache/commit/063f9f36b90c9a5b101d9cd2951ddb456cf37868)), closes [#45](https://github.com/jolars/panache/issues/45)
+* **parser:** don't treat indented lists and code blocks ([7b14077](https://github.com/jolars/panache/commit/7b140778e3bf278aee14ce0f465210f7ab45b3c7))
+* **parser:** require blankline before list in definition ([ac971c0](https://github.com/jolars/panache/commit/ac971c0d90727750ea70e0df7bb06b7274b97bdf))
+* resolve bibliography paths relative to metadata files ([3a878bc](https://github.com/jolars/panache/commit/3a878bc385977f3af9a6cc2a53ebb14714a2a978)), closes [#44](https://github.com/jolars/panache/issues/44)
+
 ## [2.11.0](https://github.com/jolars/panache/compare/v2.10.0...v2.11.0) (2026-03-04)
 
 ### Features
