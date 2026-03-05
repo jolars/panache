@@ -1,4 +1,4 @@
-DOCUMENT@0..93
+DOCUMENT@0..176
   PARAGRAPH@0..5
     TEXT@0..4 "Test"
     NEWLINE@4..5 "\n"
@@ -14,4 +14,22 @@ DOCUMENT@0..93
   PARAGRAPH@16..93
     TEXT@16..92 "Again, I want to than ..."
     NEWLINE@92..93 "\n"
+  BLANK_LINE@93..94
+    BLANK_LINE@93..94 "\n"
+  PARAGRAPH@94..143
+    TEXT@94..142 "Here's an indented co ..."
+    NEWLINE@142..143 "\n"
+  BLANK_LINE@143..144
+    BLANK_LINE@143..144 "\n"
+  CODE_BLOCK@144..176
+    CODE_CONTENT@144..176
+      WHITESPACE@144..148 "    "
+      TEXT@148..153 "* one"
+      NEWLINE@153..154 "\n"
+      WHITESPACE@154..158 "    "
+      TEXT@158..163 "* two"
+      NEWLINE@163..164 "\n"
+      WHITESPACE@164..168 "    "
+      TEXT@168..175 "* three"
+      NEWLINE@175..176 "\n"
 

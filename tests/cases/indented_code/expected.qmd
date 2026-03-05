@@ -5,3 +5,11 @@ code
 ```
 
 Again, I want to thank LUSEM and all of the people who helped me on the way.
+
+Here's an indented code block with a list in it:
+
+```
+* one
+* two
+* three
+```

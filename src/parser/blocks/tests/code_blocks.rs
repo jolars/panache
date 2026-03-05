@@ -287,6 +287,16 @@ fn indented_code_with_tab() {
 }
 
 #[test]
+fn indented_code_with_list_marker() {
+    let input = "
+    * one
+    * two";
+    let tree = parse_blocks(input);
+
+    assert_eq!(find_all(&tree, SyntaxKind::CODE_BLOCK).len(), 1);
+}
+
+#[test]
 fn indented_code_in_blockquote() {
     let input = ">
 >     code in blockquote";

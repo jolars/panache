@@ -41,7 +41,7 @@ use super::blocks::tables::{
     try_parse_pipe_table, try_parse_simple_table,
 };
 use super::inlines::links::try_parse_inline_image;
-use super::utils::container_stack::byte_index_at_column;
+use super::utils::container_stack::{byte_index_at_column, leading_indent};
 use super::utils::helpers::strip_newline;
 use super::utils::marker_utils::parse_blockquote_marker_info;
 
@@ -1553,8 +1553,9 @@ impl BlockParser for IndentedCodeBlockParser {
             return None;
         }
 
-        // Don't treat as code if it's a list marker (list takes precedence).
-        if try_parse_list_marker(ctx.content, ctx.config).is_some() {
+        let (indent_cols, _) = leading_indent(ctx.content);
+        // Don't treat as code if it's a list marker and not indented enough for code.
+        if indent_cols < 4 && try_parse_list_marker(ctx.content, ctx.config).is_some() {
             return None;
         }
 
