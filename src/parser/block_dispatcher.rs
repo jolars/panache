@@ -35,6 +35,8 @@ use super::blocks::latex_envs::{LatexEnvInfo, parse_latex_environment, try_parse
 use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
 use super::blocks::lists::{ListMarker, is_content_nested_bullet_marker, try_parse_list_marker};
 use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
+use super::blocks::paragraphs;
+use super::blocks::raw_blocks;
 use super::blocks::reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
 use super::blocks::tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
@@ -1285,6 +1287,52 @@ impl BlockParser for LatexEnvironmentParser {
 }
 
 // ============================================================================
+// Raw TeX Block Parser (position #12)
+// ============================================================================
+
+pub(crate) struct RawTexBlockParser;
+
+impl BlockParser for RawTexBlockParser {
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        _line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.raw_tex {
+            return None;
+        }
+
+        // Raw TeX blocks require blank line before (cannot interrupt paragraphs)
+        // This is important to avoid intercepting display math content
+        if !ctx.has_blank_before && !ctx.at_document_start {
+            return None;
+        }
+
+        if !raw_blocks::can_start_raw_block(ctx.content, ctx.config) {
+            return None;
+        }
+
+        Some((BlockDetectionResult::Yes, None))
+    }
+
+    fn parse_prepared(
+        &self,
+        ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        raw_blocks::parse_raw_tex_block(builder, lines, line_pos, ctx.blockquote_depth)
+    }
+
+    fn name(&self) -> &'static str {
+        "raw_tex_block"
+    }
+}
+
+// ============================================================================
 // Line Block Parser (position #13)
 // ============================================================================
 
@@ -1718,6 +1766,8 @@ impl BlockParserRegistry {
             Box::new(IndentedCodeBlockParser),
             // (12) LaTeX environment blocks
             Box::new(LatexEnvironmentParser),
+            // (12) Raw TeX blocks (macro definitions, etc.)
+            Box::new(RawTexBlockParser),
             // (13) Line blocks
             Box::new(LineBlockParser),
             // (14) Block quotes (detection-only for now)

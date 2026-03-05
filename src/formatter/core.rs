@@ -626,6 +626,27 @@ impl Formatter {
                 // Don't add extra newlines for standalone LaTeX commands
             }
 
+            SyntaxKind::TEX_BLOCK => {
+                log::trace!("Formatting TeX block");
+                // Raw blocks (LaTeX commands, etc.) - preserve verbatim
+                // Just output all content as-is
+                for child in node.children_with_tokens() {
+                    match child {
+                        rowan::NodeOrToken::Token(t) => {
+                            self.output.push_str(t.text());
+                        }
+                        rowan::NodeOrToken::Node(_) => {
+                            // No child nodes in the simplified structure
+                        }
+                    }
+                }
+
+                // Ensure newline at end of raw block
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
+            }
+
             SyntaxKind::BLOCKQUOTE => {
                 log::trace!("Formatting blockquote");
                 // Determine nesting depth by counting ancestor BlockQuote nodes (including self)

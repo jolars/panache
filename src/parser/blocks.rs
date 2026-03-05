@@ -31,6 +31,8 @@ pub mod lists;
 pub mod metadata;
 #[path = "blocks/paragraphs.rs"]
 pub mod paragraphs;
+#[path = "blocks/raw_blocks.rs"]
+pub mod raw_blocks;
 #[path = "blocks/reference_links.rs"]
 pub mod reference_links;
 #[path = "blocks/tables.rs"]

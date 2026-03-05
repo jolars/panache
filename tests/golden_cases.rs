@@ -223,6 +223,7 @@ golden_test_cases!(
     quarto_hashpipe,
     quarto_shortcodes,
     raw_blocks,
+    raw_tex_commands,
     reference_footnotes,
     reference_images,
     reference_links,

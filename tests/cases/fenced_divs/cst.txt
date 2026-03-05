@@ -167,12 +167,10 @@ DOCUMENT@0..734
       DIV_INFO@536..547
         TEXT@536..547 "mathdeclare"
       NEWLINE@547..548 "\n"
-    PARAGRAPH@548..612
-      LATEX_COMMAND@548..577
-        TEXT@548..577 "\\DeclareMathOperator{ ..."
+    TEX_BLOCK@548..612
+      TEXT@548..577 "\\DeclareMathOperator{ ..."
       NEWLINE@577..578 "\n"
-      LATEX_COMMAND@578..611
-        TEXT@578..611 "\\DeclareMathOperator{ ..."
+      TEXT@578..611 "\\DeclareMathOperator{ ..."
       NEWLINE@611..612 "\n"
     DIV_FENCE_CLOSE@612..616
       TEXT@612..615 ":::"

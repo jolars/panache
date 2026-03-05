@@ -134,6 +134,9 @@ pub enum SyntaxKind {
     HTML_BLOCK_TAG,     // Opening/closing tags
     HTML_BLOCK_CONTENT, // Content between tags
 
+    // TeX blocks
+    TEX_BLOCK, // Raw tex block (e.g., LaTeX commands)
+
     // Headings
     HEADING,
     HEADING_CONTENT,
