@@ -13,7 +13,7 @@ contains seeds, crisp, pleasant to taste
 :   orange fruit
 
     ```
-    { orange code block }
+        { orange code block }
     ```
 
     > orange block quote

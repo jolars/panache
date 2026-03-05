@@ -20,12 +20,22 @@ pub(super) fn format_code_block(
 ) {
     let mut info_node: Option<SyntaxNode> = None;
     let mut content = String::new();
+    let mut has_fence = false;
+    let mut fence_indent = String::new();
+    let mut fence_indent_cols = 0usize;
 
     // Extract info node and content from the AST
     for child in node.children_with_tokens() {
-        if let NodeOrToken::Node(n) = child {
-            match n.kind() {
+        match child {
+            NodeOrToken::Token(t) => {
+                if t.kind() == SyntaxKind::WHITESPACE && !has_fence {
+                    fence_indent = t.text().to_string();
+                }
+            }
+            NodeOrToken::Node(n) => match n.kind() {
                 SyntaxKind::CODE_FENCE_OPEN => {
+                    has_fence = true;
+                    fence_indent_cols = indent_columns(&fence_indent);
                     // Find the info string - now it's a node, not a token
                     for child_token in n.children_with_tokens() {
                         if let NodeOrToken::Node(node) = child_token
@@ -36,26 +46,52 @@ pub(super) fn format_code_block(
                     }
                 }
                 SyntaxKind::CODE_CONTENT => {
-                    // Extract content, stripping leading WHITESPACE tokens on each line
-                    // (for lossless parsing, indented code blocks preserve indentation as WHITESPACE)
+                    let base_indent_cols = if has_fence { fence_indent_cols } else { 4 };
+                    let mut line_content = String::new();
+                    let mut line_indent = String::new();
+                    let mut at_line_start = true;
+
+                    // Extract content, stripping only the base indent for indented code blocks.
                     for token in n.children_with_tokens() {
                         if let NodeOrToken::Token(t) = token {
                             match t.kind() {
-                                SyntaxKind::WHITESPACE => {
-                                    // Skip leading whitespace tokens (indentation)
-                                    // They're preserved in the AST for losslessness, but
-                                    // formatter strips them when converting to fenced code
+                                SyntaxKind::WHITESPACE if at_line_start => {
+                                    line_indent.push_str(t.text());
                                 }
-                                SyntaxKind::TEXT | SyntaxKind::NEWLINE => {
-                                    content.push_str(t.text());
+                                SyntaxKind::TEXT => {
+                                    if at_line_start && t.text().is_empty() {
+                                        continue;
+                                    }
+                                    if at_line_start {
+                                        line_content.push_str(&strip_indent_columns(
+                                            &line_indent,
+                                            base_indent_cols,
+                                        ));
+                                        line_indent.clear();
+                                        at_line_start = false;
+                                    }
+                                    line_content.push_str(t.text());
+                                }
+                                SyntaxKind::NEWLINE => {
+                                    if !at_line_start {
+                                        content.push_str(&line_content);
+                                    }
+                                    content.push('\n');
+                                    line_content.clear();
+                                    line_indent.clear();
+                                    at_line_start = true;
                                 }
                                 _ => {}
                             }
                         }
                     }
+
+                    if !at_line_start {
+                        content.push_str(&line_content);
+                    }
                 }
                 _ => {}
-            }
+            },
         }
     }
 
@@ -138,6 +174,40 @@ pub(super) fn format_code_block(
         output.push(fence_char);
     }
     output.push('\n');
+}
+
+fn strip_indent_columns(indent: &str, columns: usize) -> String {
+    let mut remaining = columns;
+    let mut idx = 0;
+    for (i, ch) in indent.char_indices() {
+        if remaining == 0 {
+            break;
+        }
+        match ch {
+            ' ' => {
+                remaining = remaining.saturating_sub(1);
+                idx = i + 1;
+            }
+            '\t' => {
+                remaining = remaining.saturating_sub(4);
+                idx = i + 1;
+            }
+            _ => break,
+        }
+    }
+    indent[idx..].to_string()
+}
+
+fn indent_columns(indent: &str) -> usize {
+    let mut cols = 0usize;
+    for ch in indent.chars() {
+        match ch {
+            ' ' => cols += 1,
+            '\t' => cols += 4 - (cols % 4),
+            _ => break,
+        }
+    }
+    cols
 }
 
 /// Determine the minimum fence length needed to avoid conflicts with content

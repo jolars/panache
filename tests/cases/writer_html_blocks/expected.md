@@ -40,7 +40,7 @@ This should be a code block, though:
 
 ```
 <div>
-foo
+    foo
 </div>
 ```
 

@@ -8,7 +8,7 @@ Code:
 ---- (should be four hyphens)
 
 sub status {
-print "working";
+    print "working";
 }
 
 These should not be escaped:  $ \\ > [ {
