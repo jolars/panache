@@ -21,3 +21,22 @@ as by name.
 A list needs a blankline before. This is not a list:
 - One
 - Two
+
+This is one list:
+
+1.  one
+2.  two
+
+1.  uno
+2.  dos
+
+If you need to have two consecutive lists,
+you can separate them with a comment:
+
+1.  one
+2.  two
+
+<!-- -->
+
+1.  uno
+2.  dos

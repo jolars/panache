@@ -1,4 +1,4 @@
-DOCUMENT@0..759
+DOCUMENT@0..938
   PARAGRAPH@0..22
     TEXT@0..21 "A simple bullet list:"
     NEWLINE@21..22 "\n"
@@ -86,4 +86,81 @@ DOCUMENT@0..759
     NEWLINE@752..753 "\n"
     TEXT@753..758 "- Two"
     NEWLINE@758..759 "\n"
+  BLANK_LINE@759..760
+    BLANK_LINE@759..760 "\n"
+  PARAGRAPH@760..778
+    TEXT@760..777 "This is one list:"
+    NEWLINE@777..778 "\n"
+  BLANK_LINE@778..779
+    BLANK_LINE@778..779 "\n"
+  LIST@779..812
+    LIST_ITEM@779..787
+      LIST_MARKER@779..781 "1."
+      WHITESPACE@781..783 "  "
+      PLAIN@783..787
+        TEXT@783..786 "one"
+        NEWLINE@786..787 "\n"
+    LIST_ITEM@787..795
+      LIST_MARKER@787..789 "2."
+      WHITESPACE@789..791 "  "
+      PLAIN@791..795
+        TEXT@791..794 "two"
+        NEWLINE@794..795 "\n"
+    BLANK_LINE@795..796
+      BLANK_LINE@795..796 "\n"
+    LIST_ITEM@796..804
+      LIST_MARKER@796..798 "1."
+      WHITESPACE@798..800 "  "
+      PLAIN@800..804
+        TEXT@800..803 "uno"
+        NEWLINE@803..804 "\n"
+    LIST_ITEM@804..812
+      LIST_MARKER@804..806 "2."
+      WHITESPACE@806..808 "  "
+      PLAIN@808..812
+        TEXT@808..811 "dos"
+        NEWLINE@811..812 "\n"
+  BLANK_LINE@812..813
+    BLANK_LINE@812..813 "\n"
+  PARAGRAPH@813..894
+    TEXT@813..855 "If you need to have t ..."
+    NEWLINE@855..856 "\n"
+    TEXT@856..893 "you can separate them ..."
+    NEWLINE@893..894 "\n"
+  BLANK_LINE@894..895
+    BLANK_LINE@894..895 "\n"
+  LIST@895..911
+    LIST_ITEM@895..903
+      LIST_MARKER@895..897 "1."
+      WHITESPACE@897..899 "  "
+      PLAIN@899..903
+        TEXT@899..902 "one"
+        NEWLINE@902..903 "\n"
+    LIST_ITEM@903..911
+      LIST_MARKER@903..905 "2."
+      WHITESPACE@905..907 "  "
+      PLAIN@907..911
+        TEXT@907..910 "two"
+        NEWLINE@910..911 "\n"
+  BLANK_LINE@911..912
+    BLANK_LINE@911..912 "\n"
+  HTML_BLOCK@912..921
+    HTML_BLOCK_TAG@912..921
+      TEXT@912..920 "<!-- -->"
+      NEWLINE@920..921 "\n"
+  BLANK_LINE@921..922
+    BLANK_LINE@921..922 "\n"
+  LIST@922..938
+    LIST_ITEM@922..930
+      LIST_MARKER@922..924 "1."
+      WHITESPACE@924..926 "  "
+      PLAIN@926..930
+        TEXT@926..929 "uno"
+        NEWLINE@929..930 "\n"
+    LIST_ITEM@930..938
+      LIST_MARKER@930..932 "2."
+      WHITESPACE@932..934 "  "
+      PLAIN@934..938
+        TEXT@934..937 "dos"
+        NEWLINE@937..938 "\n"
 
