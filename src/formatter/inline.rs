@@ -4,7 +4,6 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
 /// Format an inline node to normalized string (e.g., emphasis with asterisks)
-#[allow(clippy::only_used_in_recursion)]
 pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
     match node.kind() {
         SyntaxKind::CODE_SPAN => {

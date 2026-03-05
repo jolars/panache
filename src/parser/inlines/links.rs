@@ -225,9 +225,7 @@ pub fn emit_autolink(builder: &mut GreenNodeBuilder, _text: &str, url: &str) {
 
 pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
     let mut chars = text.char_indices();
-    let Some((_, first)) = chars.next() else {
-        return None;
-    };
+    let (_, first) = chars.next()?;
     if !first.is_ascii_alphabetic() {
         return None;
     }

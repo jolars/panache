@@ -992,11 +992,49 @@ impl Formatter {
                             // Handle continuation content with proper indentation
                             match n.kind() {
                                 SyntaxKind::CODE_BLOCK => {
-                                    // Add blank line before code block if needed
-                                    if !self.output.ends_with("\n\n") {
-                                        self.output.push('\n');
+                                    if self.output.ends_with(":   ") {
+                                        let saved_output = self.output.clone();
+                                        self.output.clear();
+                                        self.format_code_block(n);
+                                        let formatted = self.output.clone();
+                                        self.output = saved_output;
+
+                                        let mut lines = formatted.lines();
+                                        if let Some(first_line) = lines.next() {
+                                            let trimmed = first_line.trim_start();
+                                            let rest =
+                                                if let Some(info) = trimmed.strip_prefix("```") {
+                                                    if info.is_empty() || info.starts_with(' ') {
+                                                        trimmed.to_string()
+                                                    } else {
+                                                        format!("``` {}", info)
+                                                    }
+                                                } else {
+                                                    trimmed.to_string()
+                                                };
+                                            self.output.push_str(&rest);
+                                            self.output.push('\n');
+                                        }
+                                        let mut lines_vec: Vec<&str> = lines.collect();
+                                        if !lines_vec.is_empty() {
+                                            // Remove trailing closing fence line to control its indent
+                                            let closing = lines_vec.pop().unwrap();
+                                            for line in &lines_vec {
+                                                self.output.push_str(&" ".repeat(def_indent));
+                                                self.output.push_str(line.trim_start());
+                                                self.output.push('\n');
+                                            }
+                                            self.output.push_str(&" ".repeat(def_indent));
+                                            self.output.push_str(closing.trim_start());
+                                            self.output.push('\n');
+                                        }
+                                    } else {
+                                        // Add blank line before code block if needed
+                                        if !self.output.ends_with("\n\n") {
+                                            self.output.push('\n');
+                                        }
+                                        self.format_indented_code_block(n, def_indent);
                                     }
-                                    self.format_indented_code_block(n, def_indent);
                                 }
                                 SyntaxKind::PLAIN => {
                                     // Plain block in definition - format inline with potential wrapping

@@ -48,3 +48,8 @@ Term 2 with *inline markup*
 
 Term 3
 :   Definition with lazy continuation. Second paragraph of the definition.
+
+Example violation
+: ```r
+  a <- 1
+  ```

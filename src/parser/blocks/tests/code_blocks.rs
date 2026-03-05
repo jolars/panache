@@ -124,7 +124,7 @@ fn bare_fence_requires_blank_line() {
         .collect();
     assert_eq!(paragraphs.len(), 1, "Should have one paragraph");
 
-    // The ``` should be parsed as inline code by the inline parser
+    // Pandoc treats this as an inline code span spanning lines.
     let code_span = tree
         .descendants()
         .find(|n| n.kind() == SyntaxKind::CODE_SPAN);

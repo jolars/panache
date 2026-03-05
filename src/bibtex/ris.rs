@@ -3,6 +3,7 @@ use rowan::{GreenNodeBuilder, Language, SyntaxNode};
 use crate::bibtex::Span;
 
 #[allow(non_camel_case_types)]
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 pub enum RisSyntaxKind {
@@ -106,16 +107,14 @@ fn parse_record(record: &RisNode) -> Result<Option<(String, Span)>, String> {
                     "TY" => has_ty = true,
                     "ER" => has_er = true,
                     "ID" => {
-                        if id_value.is_none() {
-                            if let Some((value, span)) = node
+                        if id_value.is_none()
+                            && let Some((value, span)) = node
                                 .children()
                                 .find(|child| child.kind() == RisSyntaxKind::TAG_VALUE)
                                 .and_then(|child| extract_text_span(&child))
-                            {
-                                if !value.is_empty() {
-                                    id_value = Some((value, span));
-                                }
-                            }
+                            && !value.is_empty()
+                        {
+                            id_value = Some((value, span));
                         }
                     }
                     _ => {}
@@ -429,5 +428,5 @@ impl<'a> RisCstParser<'a> {
 }
 
 fn is_tag_char(b: u8) -> bool {
-    (b'A'..=b'Z').contains(&b) || (b'0'..=b'9').contains(&b)
+    b.is_ascii_uppercase() || b.is_ascii_digit()
 }

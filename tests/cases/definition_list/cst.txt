@@ -1,4 +1,4 @@
-DOCUMENT@0..870
+DOCUMENT@0..911
   HEADING@0..19
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -212,4 +212,28 @@ DOCUMENT@0..870
         PLAIN@799..870
           TEXT@799..869 "Definition with lazy  ..."
           NEWLINE@869..870 "\n"
+  BLANK_LINE@870..871
+    BLANK_LINE@870..871 "\n"
+  DEFINITION_LIST@871..911
+    DEFINITION_ITEM@871..911
+      TERM@871..889
+        TEXT@871..888 "Example violation"
+        NEWLINE@888..889 "\n"
+      DEFINITION@889..911
+        DEFINITION_MARKER@889..890 ":"
+        WHITESPACE@890..891 " "
+        CODE_BLOCK@891..911
+          CODE_FENCE_OPEN@891..896
+            CODE_FENCE_MARKER@891..894 "```"
+            CODE_INFO@894..895
+              CODE_LANGUAGE@894..895 "r"
+            NEWLINE@895..896 "\n"
+          CODE_CONTENT@896..905
+            WHITESPACE@896..898 "  "
+            TEXT@898..904 "a <- 1"
+            NEWLINE@904..905 "\n"
+          WHITESPACE@905..907 "  "
+          CODE_FENCE_CLOSE@907..911
+            CODE_FENCE_MARKER@907..910 "```"
+            NEWLINE@910..911 "\n"
 

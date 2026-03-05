@@ -7,6 +7,7 @@ use super::block_dispatcher::{
     PreparedBlockMatch,
 };
 use super::blocks::blockquotes;
+use super::blocks::code_blocks;
 use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
 use super::blocks::line_blocks;
@@ -591,13 +592,42 @@ impl<'a> Parser<'a> {
 
                 if *has_content {
                     let current_line = self.lines[self.pos];
-                    let (_, newline_str) = strip_newline(current_line);
-                    let line_with_newline = if !newline_str.is_empty() {
-                        format!("{}{}", after_marker_and_spaces.trim_end(), newline_str)
+                    let (trimmed_line, _) = strip_newline(current_line);
+
+                    let content_start = content_col.min(trimmed_line.len());
+                    let content_slice = &trimmed_line[content_start..];
+
+                    if let Some(fence) = code_blocks::try_parse_fence_open(content_slice) {
+                        let bq_depth = self.current_blockquote_depth();
+                        if let Some(indent_str) = indent_to_emit {
+                            self.builder
+                                .token(SyntaxKind::WHITESPACE.into(), indent_str);
+                        }
+                        let fence_line = current_line[content_start..].to_string();
+                        let new_pos = code_blocks::parse_fenced_code_block(
+                            &mut self.builder,
+                            &self.lines,
+                            self.pos,
+                            fence,
+                            bq_depth,
+                            content_col,
+                            Some(&fence_line),
+                        );
+                        self.pos = new_pos - 1;
                     } else {
-                        after_marker_and_spaces.trim_end().to_string()
-                    };
-                    plain_buffer.push_line(line_with_newline);
+                        let (_, newline_str) = strip_newline(current_line);
+                        let trimmed_content = after_marker_and_spaces.trim_end();
+                        if trimmed_content.is_empty() {
+                            plain_buffer.push_line(newline_str);
+                        } else {
+                            let line_with_newline = if !newline_str.is_empty() {
+                                format!("{}{}", trimmed_content, newline_str)
+                            } else {
+                                trimmed_content.to_string()
+                            };
+                            plain_buffer.push_line(line_with_newline);
+                        }
+                    }
                 }
 
                 self.containers.push(Container::Definition {

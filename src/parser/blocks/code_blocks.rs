@@ -776,27 +776,33 @@ pub(crate) fn parse_fenced_code_block(
     fence: FenceInfo,
     bq_depth: usize,
     base_indent: usize,
+    first_line_override: Option<&str>,
 ) -> usize {
     // Start code block
     builder.start_node(SyntaxKind::CODE_BLOCK.into());
 
     // Opening fence
-    let first_line = lines[start_pos];
+    let first_line = first_line_override.unwrap_or(lines[start_pos]);
     // Only strip blockquote markers for the *surrounding* blockquote depth.
     // Anything beyond that (e.g. a literal `>` inside the code block) must be preserved.
-    let first_inner = if bq_depth > 0 {
+    let first_inner = if bq_depth > 0 && first_line_override.is_none() {
         strip_n_blockquote_markers(first_line, bq_depth)
     } else {
         first_line
     };
 
     // For lossless parsing: emit the base indent before stripping it
-    let first_stripped = if base_indent > 0 && first_inner.len() >= base_indent {
-        let indent_str = &first_inner[..base_indent];
+    let first_base_indent = if first_line_override.is_some() {
+        0
+    } else {
+        base_indent
+    };
+    let first_stripped = if first_base_indent > 0 && first_inner.len() >= first_base_indent {
+        let indent_str = &first_inner[..first_base_indent];
         if !indent_str.is_empty() {
             builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
         }
-        &first_inner[base_indent..]
+        &first_inner[first_base_indent..]
     } else {
         first_inner
     };

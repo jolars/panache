@@ -1167,6 +1167,7 @@ impl BlockParser for FencedCodeBlockParser {
             fence,
             ctx.blockquote_depth,
             total_indent,
+            None,
         );
 
         new_pos - line_pos
