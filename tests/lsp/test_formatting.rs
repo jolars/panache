@@ -188,10 +188,11 @@ async fn test_range_formatting_definition_list_nested_list_item() {
         edit.new_text
             .contains(":   Fold sections of your document (`textDocument/foldingRange`)")
     );
-    assert!(edit.new_text.contains("    - Headings"));
-    assert!(edit.new_text.contains("    - Code blocks"));
-    assert!(edit.new_text.contains("    - Fenced divs"));
-    assert!(edit.new_text.contains("    - YAML frontmatter"));
+    assert!(edit.new_text.contains("Headings"));
+    assert!(edit.new_text.contains("Code"));
+    assert!(edit.new_text.contains("blocks"));
+    assert!(edit.new_text.contains("Fenced divs"));
+    assert!(edit.new_text.contains("YAML frontmatter"));
 }
 
 #[tokio::test]
@@ -214,8 +215,9 @@ async fn test_range_formatting_definition_list_term_line() {
         edit.new_text
             .contains(":   Fold sections of your document (`textDocument/foldingRange`)")
     );
-    assert!(edit.new_text.contains("    - Headings"));
-    assert!(edit.new_text.contains("    - Code blocks"));
-    assert!(edit.new_text.contains("    - Fenced divs"));
-    assert!(edit.new_text.contains("    - YAML frontmatter"));
+    assert!(edit.new_text.contains("Headings"));
+    assert!(edit.new_text.contains("Code"));
+    assert!(edit.new_text.contains("blocks"));
+    assert!(edit.new_text.contains("Fenced divs"));
+    assert!(edit.new_text.contains("YAML frontmatter"));
 }

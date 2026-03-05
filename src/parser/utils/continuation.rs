@@ -210,10 +210,9 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                 return false;
             }
         }
-        if lists::try_parse_list_marker(stripped_content, self.config).is_some() {
-            if prev_line_blank {
-                return false;
-            }
+        if lists::try_parse_list_marker(stripped_content, self.config).is_some() && prev_line_blank
+        {
+            return false;
         }
         if count_blockquote_markers(stripped_content).0 > 0 {
             return false;
