@@ -105,7 +105,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                     // indent must be measured relative to any outer content containers (e.g.
                     // footnotes). Otherwise a line indented only for the footnote would wrongly
                     // continue the definition.
-                    let min_indent = (*content_col).max(4);
+                    let min_indent = *content_col;
                     let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
                     if effective_indent >= min_indent {
                         keep_level = i + 1;

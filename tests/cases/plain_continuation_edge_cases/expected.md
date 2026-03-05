@@ -14,7 +14,7 @@ Term 2
 Term with blank
 :   Definition starts here
 
-Continues after blank line with more content.
+    Continues after blank line with more content.
 
 ## Definition Followed by Nested List
 

@@ -7,7 +7,7 @@ Multiple blocks with italics:
 *apple*
 :   red fruit
 
-contains seeds, crisp, pleasant to taste
+    contains seeds, crisp, pleasant to taste
 
 *orange*
 :   orange fruit

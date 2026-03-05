@@ -836,11 +836,22 @@ impl Formatter {
                 log::debug!("Formatting Plain block, text length: {}", text.len());
 
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+                let needs_indent = indent > 0
+                    && (self.output.ends_with('\n') || self.output.is_empty())
+                    && !self.output.ends_with(":   ");
                 match wrap_mode {
                     WrapMode::Preserve => {
-                        self.output.push_str(&text);
-                        if !self.output.ends_with('\n') {
-                            self.output.push('\n');
+                        if needs_indent {
+                            for line in text.lines() {
+                                self.output.push_str(&" ".repeat(indent));
+                                self.output.push_str(line.trim_start());
+                                self.output.push('\n');
+                            }
+                        } else {
+                            self.output.push_str(&text);
+                            if !self.output.ends_with('\n') {
+                                self.output.push('\n');
+                            }
                         }
                     }
                     WrapMode::Reflow => {
@@ -851,6 +862,8 @@ impl Formatter {
                             if i > 0 {
                                 self.output.push('\n');
                                 // Add continuation indent for wrapped lines
+                                self.output.push_str(&" ".repeat(indent));
+                            } else if needs_indent {
                                 self.output.push_str(&" ".repeat(indent));
                             }
                             self.output.push_str(line);
@@ -867,6 +880,8 @@ impl Formatter {
                         for (i, line) in lines.iter().enumerate() {
                             if i > 0 {
                                 self.output.push('\n');
+                                self.output.push_str(&" ".repeat(indent));
+                            } else if needs_indent {
                                 self.output.push_str(&" ".repeat(indent));
                             }
                             self.output.push_str(line);
