@@ -960,11 +960,8 @@ impl Formatter {
             }
 
             SyntaxKind::DEFINITION_ITEM => {
-                // Format term and definitions in compact format (no blank lines)
+                // Preserve compact vs loose definition lists based on BlankLine nodes.
                 for child in node.children() {
-                    if child.kind() == SyntaxKind::BLANK_LINE {
-                        continue; // Skip blank lines for compact format
-                    }
                     self.format_node_sync(&child, indent);
                 }
             }

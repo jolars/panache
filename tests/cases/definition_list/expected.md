@@ -29,6 +29,15 @@ REST
 GraphQL
 :   A query language for APIs developed by *Facebook*
 
+Loose format (blank line before definition):
+
+Term Loose 1
+
+:   Definition 1
+
+Term Loose 2
+:   Definition 2
+
 Compact format (no blank before definition):
 
 Apple

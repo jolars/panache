@@ -225,15 +225,19 @@ GitHub-style task lists use the standardized `-` marker:
 
 ### Definition Lists
 
-Definition lists are formatted with proper spacing:
+Definition lists preserve loose vs compact spacing:
 
 ```markdown
 Term 1
+
 : Definition 1
 
 Term 2
 : Definition 2a
 : Definition 2b
+
+Term 3
+: Definition 3
 ```
 
 ## Blockquotes

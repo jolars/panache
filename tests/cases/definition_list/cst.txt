@@ -1,4 +1,4 @@
-DOCUMENT@0..1004
+DOCUMENT@0..1113
   HEADING@0..19
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -131,126 +131,159 @@ DOCUMENT@0..1004
   BLANK_LINE@444..445
     BLANK_LINE@444..445 "\n"
   PARAGRAPH@445..490
-    TEXT@445..489 "Compact format (no bl ..."
+    TEXT@445..489 "Loose format (blank l ..."
     NEWLINE@489..490 "\n"
   BLANK_LINE@490..491
     BLANK_LINE@490..491 "\n"
-  DEFINITION_LIST@491..509
-    DEFINITION_ITEM@491..509
-      TERM@491..497
-        TEXT@491..496 "Apple"
-        NEWLINE@496..497 "\n"
-      DEFINITION@497..509
-        DEFINITION_MARKER@497..498 ":"
-        WHITESPACE@498..501 "   "
-        PLAIN@501..509
-          TEXT@501..508 "A fruit"
-          NEWLINE@508..509 "\n"
-  BLANK_LINE@509..510
-    BLANK_LINE@509..510 "\n"
-  DEFINITION_LIST@510..551
-    DEFINITION_ITEM@510..551
-      TERM@510..517
-        TEXT@510..516 "Orange"
-        NEWLINE@516..517 "\n"
-      DEFINITION@517..534
-        DEFINITION_MARKER@517..518 ":"
-        WHITESPACE@518..521 "   "
-        PLAIN@521..534
-          TEXT@521..533 "Also a fruit"
-          NEWLINE@533..534 "\n"
-      DEFINITION@534..551
-        DEFINITION_MARKER@534..535 ":"
-        WHITESPACE@535..538 "   "
-        PLAIN@538..551
-          TEXT@538..550 "Also a color"
-          NEWLINE@550..551 "\n"
-  BLANK_LINE@551..552
-    BLANK_LINE@551..552 "\n"
-  DEFINITION_LIST@552..576
-    DEFINITION_ITEM@552..576
-      TERM@552..559
-        TEXT@552..558 "Term 1"
-        NEWLINE@558..559 "\n"
-      DEFINITION@559..576
-        DEFINITION_MARKER@559..560 ":"
-        WHITESPACE@560..563 "   "
-        PLAIN@563..576
-          TEXT@563..575 "Definition 1"
-          NEWLINE@575..576 "\n"
-  BLANK_LINE@576..577
-    BLANK_LINE@576..577 "\n"
-  DEFINITION_LIST@577..787
-    DEFINITION_ITEM@577..787
-      TERM@577..605
-        TEXT@577..589 "Term 2 with "
-        EMPHASIS@589..604
-          EMPHASIS_MARKER@589..590 "*"
-          TEXT@590..603 "inline markup"
-          EMPHASIS_MARKER@603..604 "*"
-        NEWLINE@604..605 "\n"
-      DEFINITION@605..787
-        DEFINITION_MARKER@605..606 ":"
-        WHITESPACE@606..609 "   "
-        PLAIN@609..787
-          TEXT@609..687 "Definition 2 { some c ..."
-          NEWLINE@687..688 "\n"
-          TEXT@688..772 "    2, quite long so  ..."
-          NEWLINE@772..773 "\n"
-          TEXT@773..786 "    properly."
-          NEWLINE@786..787 "\n"
-  BLANK_LINE@787..788
-    BLANK_LINE@787..788 "\n"
-  DEFINITION_LIST@788..870
-    DEFINITION_ITEM@788..870
-      TERM@788..795
-        TEXT@788..794 "Term 3"
-        NEWLINE@794..795 "\n"
-      DEFINITION@795..870
-        DEFINITION_MARKER@795..796 ":"
-        WHITESPACE@796..799 "   "
-        PLAIN@799..870
-          TEXT@799..869 "Definition with lazy  ..."
-          NEWLINE@869..870 "\n"
-  BLANK_LINE@870..871
-    BLANK_LINE@870..871 "\n"
-  DEFINITION_LIST@871..911
-    DEFINITION_ITEM@871..911
-      TERM@871..889
-        TEXT@871..888 "Example violation"
-        NEWLINE@888..889 "\n"
-      DEFINITION@889..911
-        DEFINITION_MARKER@889..890 ":"
-        WHITESPACE@890..891 " "
-        CODE_BLOCK@891..911
-          CODE_FENCE_OPEN@891..896
-            CODE_FENCE_MARKER@891..894 "```"
-            CODE_INFO@894..895
-              CODE_LANGUAGE@894..895 "r"
-            NEWLINE@895..896 "\n"
-          CODE_CONTENT@896..905
-            WHITESPACE@896..898 "  "
-            TEXT@898..904 "a <- 1"
-            NEWLINE@904..905 "\n"
-          WHITESPACE@905..907 "  "
-          CODE_FENCE_CLOSE@907..911
-            CODE_FENCE_MARKER@907..910 "```"
-            NEWLINE@910..911 "\n"
-  BLANK_LINE@911..912
-    BLANK_LINE@911..912 "\n"
-  DEFINITION_LIST@912..1004
-    DEFINITION_ITEM@912..1004
-      TERM@912..948
-        TEXT@912..947 "A definition list wit ..."
-        NEWLINE@947..948 "\n"
-      DEFINITION@948..1004
-        DEFINITION_MARKER@948..949 ":"
-        WHITESPACE@949..952 "   "
-        PLAIN@952..1004
-          TEXT@952..987 "Here comes a list (or ..."
-          NEWLINE@987..988 "\n"
-          TEXT@988..995 "    - A"
-          NEWLINE@995..996 "\n"
-          TEXT@996..1003 "    - B"
-          NEWLINE@1003..1004 "\n"
+  DEFINITION_LIST@491..522
+    DEFINITION_ITEM@491..522
+      TERM@491..504
+        TEXT@491..503 "Term Loose 1"
+        NEWLINE@503..504 "\n"
+      BLANK_LINE@504..505
+        BLANK_LINE@504..505 "\n"
+      DEFINITION@505..522
+        DEFINITION_MARKER@505..506 ":"
+        WHITESPACE@506..509 "   "
+        PLAIN@509..522
+          TEXT@509..521 "Definition 1"
+          NEWLINE@521..522 "\n"
+  BLANK_LINE@522..523
+    BLANK_LINE@522..523 "\n"
+  DEFINITION_LIST@523..553
+    DEFINITION_ITEM@523..553
+      TERM@523..536
+        TEXT@523..535 "Term Loose 2"
+        NEWLINE@535..536 "\n"
+      DEFINITION@536..553
+        DEFINITION_MARKER@536..537 ":"
+        WHITESPACE@537..540 "   "
+        PLAIN@540..553
+          TEXT@540..552 "Definition 2"
+          NEWLINE@552..553 "\n"
+  BLANK_LINE@553..554
+    BLANK_LINE@553..554 "\n"
+  PARAGRAPH@554..599
+    TEXT@554..598 "Compact format (no bl ..."
+    NEWLINE@598..599 "\n"
+  BLANK_LINE@599..600
+    BLANK_LINE@599..600 "\n"
+  DEFINITION_LIST@600..618
+    DEFINITION_ITEM@600..618
+      TERM@600..606
+        TEXT@600..605 "Apple"
+        NEWLINE@605..606 "\n"
+      DEFINITION@606..618
+        DEFINITION_MARKER@606..607 ":"
+        WHITESPACE@607..610 "   "
+        PLAIN@610..618
+          TEXT@610..617 "A fruit"
+          NEWLINE@617..618 "\n"
+  BLANK_LINE@618..619
+    BLANK_LINE@618..619 "\n"
+  DEFINITION_LIST@619..660
+    DEFINITION_ITEM@619..660
+      TERM@619..626
+        TEXT@619..625 "Orange"
+        NEWLINE@625..626 "\n"
+      DEFINITION@626..643
+        DEFINITION_MARKER@626..627 ":"
+        WHITESPACE@627..630 "   "
+        PLAIN@630..643
+          TEXT@630..642 "Also a fruit"
+          NEWLINE@642..643 "\n"
+      DEFINITION@643..660
+        DEFINITION_MARKER@643..644 ":"
+        WHITESPACE@644..647 "   "
+        PLAIN@647..660
+          TEXT@647..659 "Also a color"
+          NEWLINE@659..660 "\n"
+  BLANK_LINE@660..661
+    BLANK_LINE@660..661 "\n"
+  DEFINITION_LIST@661..685
+    DEFINITION_ITEM@661..685
+      TERM@661..668
+        TEXT@661..667 "Term 1"
+        NEWLINE@667..668 "\n"
+      DEFINITION@668..685
+        DEFINITION_MARKER@668..669 ":"
+        WHITESPACE@669..672 "   "
+        PLAIN@672..685
+          TEXT@672..684 "Definition 1"
+          NEWLINE@684..685 "\n"
+  BLANK_LINE@685..686
+    BLANK_LINE@685..686 "\n"
+  DEFINITION_LIST@686..896
+    DEFINITION_ITEM@686..896
+      TERM@686..714
+        TEXT@686..698 "Term 2 with "
+        EMPHASIS@698..713
+          EMPHASIS_MARKER@698..699 "*"
+          TEXT@699..712 "inline markup"
+          EMPHASIS_MARKER@712..713 "*"
+        NEWLINE@713..714 "\n"
+      DEFINITION@714..896
+        DEFINITION_MARKER@714..715 ":"
+        WHITESPACE@715..718 "   "
+        PLAIN@718..896
+          TEXT@718..796 "Definition 2 { some c ..."
+          NEWLINE@796..797 "\n"
+          TEXT@797..881 "    2, quite long so  ..."
+          NEWLINE@881..882 "\n"
+          TEXT@882..895 "    properly."
+          NEWLINE@895..896 "\n"
+  BLANK_LINE@896..897
+    BLANK_LINE@896..897 "\n"
+  DEFINITION_LIST@897..979
+    DEFINITION_ITEM@897..979
+      TERM@897..904
+        TEXT@897..903 "Term 3"
+        NEWLINE@903..904 "\n"
+      DEFINITION@904..979
+        DEFINITION_MARKER@904..905 ":"
+        WHITESPACE@905..908 "   "
+        PLAIN@908..979
+          TEXT@908..978 "Definition with lazy  ..."
+          NEWLINE@978..979 "\n"
+  BLANK_LINE@979..980
+    BLANK_LINE@979..980 "\n"
+  DEFINITION_LIST@980..1020
+    DEFINITION_ITEM@980..1020
+      TERM@980..998
+        TEXT@980..997 "Example violation"
+        NEWLINE@997..998 "\n"
+      DEFINITION@998..1020
+        DEFINITION_MARKER@998..999 ":"
+        WHITESPACE@999..1000 " "
+        CODE_BLOCK@1000..1020
+          CODE_FENCE_OPEN@1000..1005
+            CODE_FENCE_MARKER@1000..1003 "```"
+            CODE_INFO@1003..1004
+              CODE_LANGUAGE@1003..1004 "r"
+            NEWLINE@1004..1005 "\n"
+          CODE_CONTENT@1005..1014
+            WHITESPACE@1005..1007 "  "
+            TEXT@1007..1013 "a <- 1"
+            NEWLINE@1013..1014 "\n"
+          WHITESPACE@1014..1016 "  "
+          CODE_FENCE_CLOSE@1016..1020
+            CODE_FENCE_MARKER@1016..1019 "```"
+            NEWLINE@1019..1020 "\n"
+  BLANK_LINE@1020..1021
+    BLANK_LINE@1020..1021 "\n"
+  DEFINITION_LIST@1021..1113
+    DEFINITION_ITEM@1021..1113
+      TERM@1021..1057
+        TEXT@1021..1056 "A definition list wit ..."
+        NEWLINE@1056..1057 "\n"
+      DEFINITION@1057..1113
+        DEFINITION_MARKER@1057..1058 ":"
+        WHITESPACE@1058..1061 "   "
+        PLAIN@1061..1113
+          TEXT@1061..1096 "Here comes a list (or ..."
+          NEWLINE@1096..1097 "\n"
+          TEXT@1097..1104 "    - A"
+          NEWLINE@1104..1105 "\n"
+          TEXT@1105..1112 "    - B"
+          NEWLINE@1112..1113 "\n"
 
