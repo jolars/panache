@@ -15,18 +15,21 @@ Document formatting
 
 Go to definition
 :   Jump from references to definitions (`textDocument/definition`)
+
     - Reference links: `[text][ref]` → `[ref]: url`
     - Reference images: `![alt][ref]` → `[ref]: url`
     - Footnote references: `[^id]` → `[^id]: content`
 
 Document outline
 :   Hierarchical view of document structure (`textDocument/documentSymbol`)
+
     - Headings (H1-H6) with proper nesting
     - Tables (with captions when available)
     - Figures (images with alt text)
 
 Code folding
 :   Fold sections of your document (`textDocument/foldingRange`)
+
     - Headings
     - Code blocks
     - Fenced divs
@@ -34,6 +37,7 @@ Code folding
 
 Live diagnostics
 :   Real-time linting as you type (`textDocument/publishDiagnostics`)
+
     - Heading hierarchy violations
     - Duplicate references
     - Citation validation
@@ -42,6 +46,7 @@ Live diagnostics
 
 Code actions
 :   Quick fixes and refactorings (`textDocument/codeAction`)
+
     - Auto-fix lint issues (e.g., heading hierarchy corrections)
     - Convert list styles (loose ↔ compact)
     - Convert footnote styles (inline ↔ reference)
