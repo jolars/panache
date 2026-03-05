@@ -121,6 +121,40 @@ impl Formatter {
         paragraphs::contains_latex_command(node)
     }
 
+    fn bare_fence_paragraph_line(&self, node: &SyntaxNode) -> Option<String> {
+        let mut atoms = Vec::new();
+
+        for child in node.children_with_tokens() {
+            match child {
+                NodeOrToken::Token(t)
+                    if matches!(
+                        t.kind(),
+                        SyntaxKind::TEXT | SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE
+                    ) =>
+                {
+                    if t.kind() == SyntaxKind::TEXT {
+                        atoms.extend(t.text().split_whitespace().map(|s| s.to_string()));
+                    }
+                }
+                NodeOrToken::Node(n) => {
+                    let formatted = self.format_inline_node(&n);
+                    if formatted.contains('\n') {
+                        return None;
+                    }
+                    atoms.push(formatted);
+                }
+                _ => return None,
+            }
+        }
+
+        if atoms.len() < 2 || atoms.first()? != ":::" || atoms.last()? != ":::" {
+            return None;
+        }
+
+        let middle = atoms[1..atoms.len() - 1].join(" ");
+        Some(format!("::: {} :::", middle))
+    }
+
     // Delegate to paragraphs module
     fn format_paragraph_with_display_math(
         &mut self,
@@ -312,6 +346,7 @@ impl Formatter {
                     && !self.output.ends_with("\n\n")
                 {
                     self.output.push('\n');
+                    self.consecutive_blank_lines = 1;
                 }
             }
 
@@ -744,6 +779,13 @@ impl Formatter {
                 let text = node.text().to_string();
                 log::debug!("Formatting paragraph, text length: {}", text.len());
 
+                // Pandoc formats bare fenced div paragraphs on a single line ("::: A :::").
+                if let Some(line) = self.bare_fence_paragraph_line(node) {
+                    self.output.push_str(&line);
+                    self.output.push('\n');
+                    return;
+                }
+
                 // Check if paragraph contains inline display math ($$...$$)
                 if self.contains_inline_display_math(node) {
                     log::debug!("Paragraph has display math");
@@ -763,6 +805,13 @@ impl Formatter {
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
                 let preserve_newlines_for_latex =
                     self.fenced_div_depth > 0 && self.contains_latex_command(node);
+                if preserve_newlines_for_latex && self.fenced_div_depth > 0 {
+                    self.output.push_str(&text);
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
+                    }
+                    return;
+                }
                 log::debug!(
                     "Paragraph wrap mode: {:?}, line_width: {}",
                     wrap_mode,
@@ -777,13 +826,6 @@ impl Formatter {
                         }
                     }
                     WrapMode::Reflow => {
-                        if preserve_newlines_for_latex {
-                            self.output.push_str(&text);
-                            if !self.output.ends_with('\n') {
-                                self.output.push('\n');
-                            }
-                            return;
-                        }
                         log::trace!("Reflowing paragraph to {} width", line_width);
                         let lines = self.wrapped_lines_for_paragraph(node, line_width);
 
@@ -795,13 +837,6 @@ impl Formatter {
                         }
                     }
                     WrapMode::Sentence => {
-                        if preserve_newlines_for_latex {
-                            self.output.push_str(&text);
-                            if !self.output.ends_with('\n') {
-                                self.output.push('\n');
-                            }
-                            return;
-                        }
                         log::trace!("Wrapping paragraph by sentence");
                         let lines = self.sentence_lines_for_paragraph(node);
 
@@ -1266,20 +1301,50 @@ impl Formatter {
             }
 
             SyntaxKind::FENCED_DIV => {
+                let has_close = node
+                    .children()
+                    .any(|child| child.kind() == SyntaxKind::DIV_FENCE_CLOSE);
+                let has_content = node.children().any(|child| {
+                    !matches!(
+                        child.kind(),
+                        SyntaxKind::DIV_FENCE_OPEN
+                            | SyntaxKind::DIV_INFO
+                            | SyntaxKind::DIV_FENCE_CLOSE
+                    )
+                });
+
                 // Use more colons for nested divs: 3 base + 2 per depth level
                 let colon_count = 3 + (self.fenced_div_depth * 2);
                 let colons = ":".repeat(colon_count);
 
                 let mut attributes = None;
+                let mut trailing_colons = None;
+                let mut saw_info = false;
 
                 for child in node.children() {
                     match child.kind() {
                         SyntaxKind::DIV_FENCE_OPEN => {
                             // Extract attributes from DivInfo child node
-                            for fence_child in child.children() {
-                                if fence_child.kind() == SyntaxKind::DIV_INFO {
-                                    attributes = Some(fence_child.text().to_string());
-                                    break;
+                            for fence_child in child.children_with_tokens() {
+                                match fence_child {
+                                    NodeOrToken::Node(node)
+                                        if node.kind() == SyntaxKind::DIV_INFO =>
+                                    {
+                                        attributes = Some(node.text().to_string());
+                                        saw_info = true;
+                                    }
+                                    NodeOrToken::Token(token)
+                                        if token.kind() == SyntaxKind::TEXT =>
+                                    {
+                                        let text = token.text().trim();
+                                        if saw_info
+                                            && !text.is_empty()
+                                            && text.chars().all(|c| c == ':')
+                                        {
+                                            trailing_colons = Some(text.to_string());
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -1294,14 +1359,30 @@ impl Formatter {
                 }
 
                 // Emit normalized opening fence
-                self.output.push_str(&colons);
-                if let Some(attrs) = &attributes
-                    && !attrs.is_empty()
-                {
-                    self.output.push(' ');
-                    self.output.push_str(attrs);
+                if !has_close && !has_content {
+                    if let Some(attrs) = &attributes
+                        && !attrs.is_empty()
+                    {
+                        self.output.push_str(&colons);
+                        self.output.push(' ');
+                        self.output.push_str(attrs);
+                        if let Some(trailing) = &trailing_colons {
+                            self.output.push(' ');
+                            self.output.push_str(trailing);
+                        }
+                        self.output.push('\n');
+                        return;
+                    }
+                } else {
+                    self.output.push_str(&colons);
+                    if let Some(attrs) = &attributes
+                        && !attrs.is_empty()
+                    {
+                        self.output.push(' ');
+                        self.output.push_str(attrs);
+                    }
+                    self.output.push('\n');
                 }
-                self.output.push('\n');
 
                 // Increment depth for nested content
                 self.fenced_div_depth += 1;
@@ -1327,6 +1408,18 @@ impl Formatter {
                 }
                 self.output.push_str(&colons);
                 self.output.push('\n');
+
+                // Reset blank line tracking so outer blocks don't suppress separation.
+                self.consecutive_blank_lines = 0;
+
+                // Ensure blank line after if followed by block element
+                if let Some(next) = node.next_sibling()
+                    && is_block_element(next.kind())
+                    && !self.output.ends_with("\n\n")
+                {
+                    self.output.push('\n');
+                    self.consecutive_blank_lines = 1;
+                }
             }
 
             SyntaxKind::INLINE_MATH_MARKER => {

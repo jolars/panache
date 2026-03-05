@@ -41,7 +41,22 @@ Here's a fenced div with a list inside.
 foo bar
 ::: 
 
-:::
+::: mathdeclare
 \DeclareMathOperator{\E}{E{}}
 \DeclareMathOperator{\Var}{Var{}}
+:::
+
+::: declare
+
+A
+
+:::
+
+B
+
+Pandoc requires that opening fences have attributes, so this is not a fenced
+div:
+
+:::
+A
 :::

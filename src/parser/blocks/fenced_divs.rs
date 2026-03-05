@@ -46,19 +46,41 @@ pub(crate) fn try_parse_div_fence_open(content: &str) -> Option<DivFenceInfo> {
             return None;
         }
     } else if after_colons.is_empty() {
-        // Allow empty attributes (treat as an opening fence with no attributes).
-        String::new()
+        // No attributes - this is a closing fence.
+        return None;
     } else {
-        // Single word or words until optional trailing colons
-        let content_before_colons = after_colons.trim_end_matches(':').trim_end();
-
-        if content_before_colons.is_empty() {
-            // Only colons, no attributes
+        // Single word (treated as class), optionally followed by trailing colons.
+        let word_end = after_colons
+            .find(|c: char| c.is_whitespace() || c == ':')
+            .unwrap_or(after_colons.len());
+        let (first, rest) = after_colons.split_at(word_end);
+        if first.is_empty() {
             return None;
         }
 
-        // Take the first word as the class name
-        content_before_colons.split_whitespace().next()?.to_string()
+        let trailing = rest.trim();
+        if !trailing.is_empty() {
+            if trailing.chars().any(|c| c != ':') {
+                return None;
+            }
+            // Require at least 3 trailing colons when extra content follows the class.
+            if trailing.len() < 3 {
+                return None;
+            }
+        } else {
+            // No whitespace, but trailing colons may be present (e.g. "Warning:::::").
+            let trailing_colons = after_colons[first.len()..].trim();
+            if !trailing_colons.is_empty() {
+                if trailing_colons.chars().any(|c| c != ':') {
+                    return None;
+                }
+                if trailing_colons.len() < 3 {
+                    return None;
+                }
+            }
+        }
+
+        first.to_string()
     };
 
     Some(DivFenceInfo {
@@ -114,14 +136,14 @@ mod tests {
     #[test]
     fn test_opening_fence_empty_attributes() {
         let line = ":::";
-        assert!(try_parse_div_fence_open(line).is_some());
+        assert!(try_parse_div_fence_open(line).is_none());
         assert!(is_div_closing_fence(line));
     }
 
     #[test]
     fn test_opening_fence_many_colons_empty_attributes() {
         let line = "::::::::::::::";
-        assert!(try_parse_div_fence_open(line).is_some());
+        assert!(try_parse_div_fence_open(line).is_none());
         assert!(is_div_closing_fence(line));
     }
 
