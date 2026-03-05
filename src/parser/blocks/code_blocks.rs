@@ -481,6 +481,43 @@ pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
     })
 }
 
+fn prepare_fence_open_line<'a>(
+    builder: &mut GreenNodeBuilder<'static>,
+    source_line: &'a str,
+    first_line_override: Option<&'a str>,
+    bq_depth: usize,
+    base_indent: usize,
+) -> (&'a str, &'a str) {
+    let first_line = first_line_override.unwrap_or(source_line);
+
+    // Only strip blockquote markers for the *surrounding* blockquote depth.
+    // Anything beyond that (e.g. a literal `>` inside the code block) must be preserved.
+    let first_inner = if bq_depth > 0 && first_line_override.is_none() {
+        strip_n_blockquote_markers(first_line, bq_depth)
+    } else {
+        first_line
+    };
+
+    // For lossless parsing: emit the base indent before stripping it
+    let first_base_indent = if first_line_override.is_some() {
+        0
+    } else {
+        base_indent
+    };
+    let first_stripped = if first_base_indent > 0 && first_inner.len() >= first_base_indent {
+        let indent_str = &first_inner[..first_base_indent];
+        if !indent_str.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
+        &first_inner[first_base_indent..]
+    } else {
+        first_inner
+    };
+
+    let first_trimmed = strip_leading_spaces(first_stripped);
+    (first_trimmed, first_inner)
+}
+
 /// Check if a line is a valid closing fence for the given fence info.
 pub(crate) fn is_closing_fence(content: &str, fence: &FenceInfo) -> bool {
     let trimmed = strip_leading_spaces(content);
@@ -782,31 +819,13 @@ pub(crate) fn parse_fenced_code_block(
     builder.start_node(SyntaxKind::CODE_BLOCK.into());
 
     // Opening fence
-    let first_line = first_line_override.unwrap_or(lines[start_pos]);
-    // Only strip blockquote markers for the *surrounding* blockquote depth.
-    // Anything beyond that (e.g. a literal `>` inside the code block) must be preserved.
-    let first_inner = if bq_depth > 0 && first_line_override.is_none() {
-        strip_n_blockquote_markers(first_line, bq_depth)
-    } else {
-        first_line
-    };
-
-    // For lossless parsing: emit the base indent before stripping it
-    let first_base_indent = if first_line_override.is_some() {
-        0
-    } else {
-        base_indent
-    };
-    let first_stripped = if first_base_indent > 0 && first_inner.len() >= first_base_indent {
-        let indent_str = &first_inner[..first_base_indent];
-        if !indent_str.is_empty() {
-            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
-        }
-        &first_inner[first_base_indent..]
-    } else {
-        first_inner
-    };
-    let first_trimmed = strip_leading_spaces(first_stripped);
+    let (first_trimmed, _first_inner) = prepare_fence_open_line(
+        builder,
+        lines[start_pos],
+        first_line_override,
+        bq_depth,
+        base_indent,
+    );
 
     builder.start_node(SyntaxKind::CODE_FENCE_OPEN.into());
     builder.token(

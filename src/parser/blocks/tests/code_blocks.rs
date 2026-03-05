@@ -238,6 +238,24 @@ fn code_block_with_leading_spaces() {
     assert_eq!(content, "  print(\"hello\")\n");
 }
 
+#[test]
+fn definition_list_inline_fence_parses_as_code_block() {
+    let input = "Term\n: ```r\n  a <- 1\n  ```\n";
+    let node = parse_blocks_quarto(input);
+
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK);
+    assert!(
+        code_block.is_some(),
+        "Expected code block inside definition list"
+    );
+
+    let content = get_code_content(&node).unwrap();
+    assert_eq!(content, "  a <- 1\n");
+
+    let info = get_code_info(&node).unwrap();
+    assert_eq!(info, "r");
+}
+
 // Indented code block tests
 
 #[test]
