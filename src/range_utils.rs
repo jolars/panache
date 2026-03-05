@@ -62,27 +62,29 @@ fn find_enclosing_block(node: &SyntaxNode, offset: usize) -> Option<SyntaxNode> 
 fn find_expandable_container(node: &SyntaxNode) -> Option<SyntaxNode> {
     let mut current = node.clone();
     let mut best: Option<SyntaxNode> = None;
+    let mut best_priority = 0u8;
 
     loop {
-        match current.kind() {
-            // Lists should be formatted as a whole unit
-            SyntaxKind::LIST => {
-                if best.is_none() {
-                    best = Some(current.clone());
-                }
-            }
-            // BlockQuotes should be formatted as a whole unit
-            SyntaxKind::BLOCKQUOTE
-            | SyntaxKind::FENCED_DIV
-            | SyntaxKind::DEFINITION_LIST
-            | SyntaxKind::LINE_BLOCK => {
-                best = Some(current.clone());
-            }
-            _ => {}
+        let priority = match current.kind() {
+            SyntaxKind::LIST => 1,
+            SyntaxKind::DEFINITION_LIST => 2,
+            SyntaxKind::DEFINITION_ITEM => 3,
+            SyntaxKind::LINE_BLOCK => 2,
+            SyntaxKind::BLOCKQUOTE | SyntaxKind::FENCED_DIV => 4,
+            _ => 0,
+        };
+        if priority >= best_priority && priority > 0 {
+            best_priority = priority;
+            best = Some(current.clone());
         }
 
-        current = current.parent()?;
+        let Some(parent) = current.parent() else {
+            break;
+        };
+        current = parent;
     }
+
+    best
 }
 
 /// Expand a byte range to encompass complete block-level elements (internal helper).
