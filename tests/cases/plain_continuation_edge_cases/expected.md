@@ -50,6 +50,12 @@ Shared term
 
 :   Second definition also continues
 
+Shared loose term
+
+:   First definition continues here
+
+:   Second definition also continues
+
 ## End with Definition
 
 Final term

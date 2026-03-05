@@ -1,4 +1,4 @@
-DOCUMENT@0..1146
+DOCUMENT@0..1248
   HEADING@0..32
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -265,26 +265,55 @@ DOCUMENT@0..1146
           NEWLINE@1058..1059 "\n"
   BLANK_LINE@1059..1060
     BLANK_LINE@1059..1060 "\n"
-  HEADING@1060..1083
-    ATX_HEADING_MARKER@1060..1062
-      ATX_HEADING_MARKER@1060..1062 "##"
-    WHITESPACE@1062..1063 " "
-    HEADING_CONTENT@1063..1082
-      TEXT@1063..1082 "End with Definition"
-    NEWLINE@1082..1083 "\n"
-  BLANK_LINE@1083..1084
-    BLANK_LINE@1083..1084 "\n"
-  DEFINITION_LIST@1084..1146
-    DEFINITION_ITEM@1084..1146
-      TERM@1084..1095
-        TEXT@1084..1094 "Final term"
-        NEWLINE@1094..1095 "\n"
-      DEFINITION@1095..1146
-        DEFINITION_MARKER@1095..1096 ":"
-        WHITESPACE@1096..1099 "   "
-        PLAIN@1099..1146
-          TEXT@1099..1124 "Last definition conti ..."
-          NEWLINE@1124..1125 "\n"
-          TEXT@1125..1145 "    to the very end."
-          NEWLINE@1145..1146 "\n"
+  DEFINITION_LIST@1060..1119
+    DEFINITION_ITEM@1060..1119
+      TERM@1060..1078
+        TEXT@1060..1077 "Shared loose term"
+        NEWLINE@1077..1078 "\n"
+      BLANK_LINE@1078..1079
+        BLANK_LINE@1078..1079 "\n"
+      DEFINITION@1079..1119
+        DEFINITION_MARKER@1079..1080 ":"
+        WHITESPACE@1080..1083 "   "
+        PLAIN@1083..1119
+          TEXT@1083..1099 "First definition"
+          NEWLINE@1099..1100 "\n"
+          TEXT@1100..1118 "    continues here"
+          NEWLINE@1118..1119 "\n"
+  BLANK_LINE@1119..1120
+    BLANK_LINE@1119..1120 "\n"
+  DEFINITION_LIST@1120..1161
+    DEFINITION_ITEM@1120..1161
+      DEFINITION@1120..1161
+        DEFINITION_MARKER@1120..1121 ":"
+        WHITESPACE@1121..1124 "   "
+        PLAIN@1124..1161
+          TEXT@1124..1141 "Second definition"
+          NEWLINE@1141..1142 "\n"
+          TEXT@1142..1160 "    also continues"
+          NEWLINE@1160..1161 "\n"
+  BLANK_LINE@1161..1162
+    BLANK_LINE@1161..1162 "\n"
+  HEADING@1162..1185
+    ATX_HEADING_MARKER@1162..1164
+      ATX_HEADING_MARKER@1162..1164 "##"
+    WHITESPACE@1164..1165 " "
+    HEADING_CONTENT@1165..1184
+      TEXT@1165..1184 "End with Definition"
+    NEWLINE@1184..1185 "\n"
+  BLANK_LINE@1185..1186
+    BLANK_LINE@1185..1186 "\n"
+  DEFINITION_LIST@1186..1248
+    DEFINITION_ITEM@1186..1248
+      TERM@1186..1197
+        TEXT@1186..1196 "Final term"
+        NEWLINE@1196..1197 "\n"
+      DEFINITION@1197..1248
+        DEFINITION_MARKER@1197..1198 ":"
+        WHITESPACE@1198..1201 "   "
+        PLAIN@1201..1248
+          TEXT@1201..1226 "Last definition conti ..."
+          NEWLINE@1226..1227 "\n"
+          TEXT@1227..1247 "    to the very end."
+          NEWLINE@1247..1248 "\n"
 

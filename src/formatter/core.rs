@@ -961,7 +961,16 @@ impl Formatter {
 
             SyntaxKind::DEFINITION_ITEM => {
                 // Preserve compact vs loose definition lists based on BlankLine nodes.
+                let mut saw_term_blank = false;
                 for child in node.children() {
+                    if child.kind() == SyntaxKind::BLANK_LINE {
+                        saw_term_blank = true;
+                    } else if child.kind() == SyntaxKind::DEFINITION && saw_term_blank {
+                        if !self.output.ends_with("\n\n") {
+                            self.output.push('\n');
+                        }
+                        saw_term_blank = false;
+                    }
                     self.format_node_sync(&child, indent);
                 }
             }
