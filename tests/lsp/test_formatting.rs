@@ -167,3 +167,55 @@ async fn test_range_formatting_definition_list_minimal_case_no_panic() {
         .await;
     assert!(edits.is_some());
 }
+
+#[tokio::test]
+async fn test_range_formatting_definition_list_nested_list_item() {
+    let server = TestLspServer::new();
+
+    let content = include_str!("fixtures/code_folding.qmd");
+    server
+        .open_document("file:///code_folding.qmd", content, "quarto")
+        .await;
+
+    // Line 10 in the fixture (0-indexed line 9). Use full-line selection.
+    let edits = server
+        .format_range("file:///code_folding.qmd", 9, 0, 10, 0)
+        .await;
+    assert!(edits.is_some());
+    let edit = &edits.unwrap()[0];
+    assert_eq!(edit.new_text.matches("Code folding").count(), 1);
+    assert!(
+        edit.new_text
+            .contains(":   Fold sections of your document (`textDocument/foldingRange`)")
+    );
+    assert!(edit.new_text.contains("    - Headings"));
+    assert!(edit.new_text.contains("    - Code blocks"));
+    assert!(edit.new_text.contains("    - Fenced divs"));
+    assert!(edit.new_text.contains("    - YAML frontmatter"));
+}
+
+#[tokio::test]
+async fn test_range_formatting_definition_list_term_line() {
+    let server = TestLspServer::new();
+
+    let content = include_str!("fixtures/code_folding.qmd");
+    server
+        .open_document("file:///code_folding.qmd", content, "quarto")
+        .await;
+
+    // Line 6 in the fixture (0-indexed line 5). Use term-only selection.
+    let edits = server
+        .format_range("file:///code_folding.qmd", 5, 0, 6, 0)
+        .await;
+    assert!(edits.is_some());
+    let edit = &edits.unwrap()[0];
+    assert_eq!(edit.new_text.matches("Code folding").count(), 1);
+    assert!(
+        edit.new_text
+            .contains(":   Fold sections of your document (`textDocument/foldingRange`)")
+    );
+    assert!(edit.new_text.contains("    - Headings"));
+    assert!(edit.new_text.contains("    - Code blocks"));
+    assert!(edit.new_text.contains("    - Fenced divs"));
+    assert!(edit.new_text.contains("    - YAML frontmatter"));
+}

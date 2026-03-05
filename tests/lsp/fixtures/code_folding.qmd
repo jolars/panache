@@ -1,0 +1,10 @@
+Document outline
+:   Hierarchical view of document structure (`textDocument/documentSymbol`)
+    - Headings (H1-H6) with proper nesting
+
+Code folding
+:   Fold sections of your document (`textDocument/foldingRange`)
+    - Headings
+    - Code blocks
+    - Fenced divs
+    - YAML frontmatter

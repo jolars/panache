@@ -61,19 +61,23 @@ fn find_enclosing_block(node: &SyntaxNode, offset: usize) -> Option<SyntaxNode> 
 /// Check if a node or any of its ancestors is a container that should be expanded as a unit
 fn find_expandable_container(node: &SyntaxNode) -> Option<SyntaxNode> {
     let mut current = node.clone();
+    let mut best: Option<SyntaxNode> = None;
 
     loop {
         match current.kind() {
             // Lists should be formatted as a whole unit
-            SyntaxKind::LIST => return Some(current),
+            SyntaxKind::LIST => {
+                if best.is_none() {
+                    best = Some(current.clone());
+                }
+            }
             // BlockQuotes should be formatted as a whole unit
-            SyntaxKind::BLOCKQUOTE => return Some(current),
-            // FencedDivs should be formatted as a whole unit
-            SyntaxKind::FENCED_DIV => return Some(current),
-            // Definition lists should be formatted as a whole unit
-            SyntaxKind::DEFINITION_LIST => return Some(current),
-            // Line blocks should be formatted as a whole unit
-            SyntaxKind::LINE_BLOCK => return Some(current),
+            SyntaxKind::BLOCKQUOTE
+            | SyntaxKind::FENCED_DIV
+            | SyntaxKind::DEFINITION_LIST
+            | SyntaxKind::LINE_BLOCK => {
+                best = Some(current.clone());
+            }
             _ => {}
         }
 
