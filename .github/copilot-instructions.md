@@ -88,8 +88,8 @@ RUST_LOG=info ./target/release/panache format document.qmd
 
 **CST (Concrete Syntax Tree)**:
 
-- Built with `rowan` crate - preserves **every byte** including whitespace and
-  markers
+- Built with `rowan` crate - must preserve **every byte**, including whitespace
+  and markers
 - Essential for lossless parsing and LSP features
 - Example: `ATX_HEADING_MARKER@0..1 "#"`, `WHITESPACE@1..2 " "`
 
@@ -308,14 +308,13 @@ Instead of listing every file, understand the patterns:
 - Ensure clippy passes:
   `cargo clippy --all-targets --all-features -- -D warnings`
 - Auto-fix clippy warnings when possible: `cargo clippy --fix`
-- Test CLI with release binary after building
 - Consider idempotency - formatting twice should equal formatting once
-- Verify CST snapshots before updating: `UPDATE_CST=1 cargo test`
+- Verify CST snapshots and expected outputs before updating them.
 - Update the docs in `docs/` when adding features or changing behavior.
 
 ### DON'T
 
-- Break the hierarchical config system
+- Fix a bug without a test that reproduces that bug first
 - Format code in the parser (parser preserves bytes, formatter applies rules)
 - Change core formatting without extensive golden test verification
 - Update golden test expectations without careful verification
