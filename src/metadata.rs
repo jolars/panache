@@ -189,6 +189,32 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_project_metadata_resolves_quarto_bibliography_from_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        fs::write(
+            project_root.join("_quarto.yml"),
+            "bibliography: references.bib\n",
+        )
+        .unwrap();
+        fs::write(
+            project_root.join("references.bib"),
+            "@article{smith2020,}\n",
+        )
+        .unwrap();
+        fs::create_dir_all(project_root.join("notebooks")).unwrap();
+
+        let input = "# Test\n";
+        let tree = parse(input, None);
+        let doc_path = project_root.join("notebooks/study_I.qmd");
+        let metadata = extract_project_metadata(&tree, &doc_path).unwrap();
+
+        let bib = metadata.bibliography.expect("bibliography");
+        assert_eq!(bib.paths.len(), 1);
+        assert_eq!(bib.paths[0], project_root.join("references.bib"));
+    }
+
+    #[test]
     fn test_extract_project_metadata_inline_references() {
         let temp_dir = TempDir::new().unwrap();
         let project_root = temp_dir.path();

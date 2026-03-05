@@ -129,7 +129,7 @@ pub fn extract_project_metadata(
         )
     };
 
-    let mut sources = Vec::new();
+    let mut sources: Vec<(MergeMetadata, PathBuf)> = Vec::new();
     let doc_dir = doc_path
         .parent()
         .unwrap_or_else(|| Path::new("."))
@@ -165,7 +165,7 @@ pub fn extract_project_metadata(
                     let path = project.root.join(bookdown_file);
                     if path.exists() {
                         let meta = parse_metadata_file(&path)?;
-                        sources.push(strip_bibliography(meta));
+                        sources.push((strip_bibliography(meta), project.root.clone()));
                     }
                 }
 
@@ -183,20 +183,11 @@ pub fn extract_project_metadata(
     push_with_includes(&mut sources, &doc_dir, doc_meta)?;
 
     let mut merged = MergeMetadata::default();
-    for source in sources {
-        merged.merge_from(source);
+    for (source, _) in &sources {
+        merged.merge_from(source.clone());
     }
 
-    let bibliography = if merged.bibliography.is_empty() {
-        None
-    } else {
-        Some(extract_bibliography_from_strings(
-            &merged.bibliography,
-            &doc_yaml,
-            doc_yaml_offset,
-            doc_path,
-        ))
-    };
+    let bibliography = extract_bibliography_from_sources(&sources, &doc_yaml, doc_yaml_offset);
 
     let bibliography_parse = bibliography.as_ref().map(|info| {
         let index = bibtex::load_bibliography(&info.paths);
@@ -414,12 +405,12 @@ fn extract_frontmatter(input: &str) -> String {
 }
 
 fn push_with_includes(
-    sources: &mut Vec<MergeMetadata>,
+    sources: &mut Vec<(MergeMetadata, PathBuf)>,
     base_dir: &Path,
     meta: MergeMetadata,
 ) -> Result<(), YamlError> {
     let includes = meta.metadata_files.clone();
-    sources.push(meta);
+    sources.push((meta, base_dir.to_path_buf()));
     for include in includes {
         if let Some(source) = load_metadata_file(base_dir, &include)? {
             push_with_includes(sources, base_dir, source)?;
@@ -433,28 +424,32 @@ fn strip_bibliography(mut meta: MergeMetadata) -> MergeMetadata {
     meta
 }
 
-fn extract_bibliography_from_strings(
-    paths: &[String],
+fn extract_bibliography_from_sources(
+    sources: &[(MergeMetadata, PathBuf)],
     yaml_text: &str,
     yaml_offset: rowan::TextSize,
-    doc_path: &Path,
-) -> BibliographyInfo {
-    let doc_dir = doc_path.parent().unwrap_or_else(|| Path::new("."));
+) -> Option<BibliographyInfo> {
     let mut resolved_paths = Vec::new();
     let mut ranges = Vec::new();
 
-    for path_str in paths {
-        resolved_paths.push(doc_dir.join(path_str));
-        let range = find_yaml_value_range(yaml_text, path_str, yaml_offset)
-            .map(|(start, end)| TextRange::new(start, end))
-            .unwrap_or_default();
-        ranges.push(range);
+    for (source, base_dir) in sources {
+        for path_str in &source.bibliography {
+            resolved_paths.push(base_dir.join(path_str));
+            let range = find_yaml_value_range(yaml_text, path_str, yaml_offset)
+                .map(|(start, end)| TextRange::new(start, end))
+                .unwrap_or_default();
+            ranges.push(range);
+        }
     }
 
-    BibliographyInfo {
+    if resolved_paths.is_empty() {
+        return None;
+    }
+
+    Some(BibliographyInfo {
         paths: resolved_paths,
         source_ranges: ranges,
-    }
+    })
 }
 
 fn collect_metadata_files(doc_path: &Path, metadata_files: &[String]) -> Vec<PathBuf> {
