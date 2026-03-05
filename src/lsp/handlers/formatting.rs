@@ -115,6 +115,18 @@ pub(crate) async fn format_range(
         end_line = range.end.line as usize;
     }
 
+    let start_offset = super::super::conversions::position_to_offset(&text, range.start);
+    let end_offset = super::super::conversions::position_to_offset(&text, range.end);
+    client
+        .log_message(
+            MessageType::INFO,
+            format!(
+                "Range formatting selection bytes {:?}..{:?} (start {:?}, end {:?})",
+                start_offset, end_offset, range.start, range.end
+            ),
+        )
+        .await;
+
     // Run range formatting in a blocking task
     let text_clone = text.clone();
     let config_clone = config.clone();
