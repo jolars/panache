@@ -418,6 +418,54 @@ CLI
 LSP
 :   Diagnostics appear inline in your editor with live updates
 
+## Ignore Directives
+
+You can selectively disable linting for specific regions using HTML comment
+directives:
+
+### Ignore Linting Only
+
+Use `panache-ignore-lint-start` and `panache-ignore-lint-end` to suppress lint
+warnings:
+
+```markdown
+Normal content will be linted.
+
+<!-- panache-ignore-lint-start -->
+#### This heading skip won't trigger heading-hierarchy warning
+<!-- panache-ignore-lint-end -->
+
+Back to normal linting.
+```
+
+This is useful for:
+
+- Intentional heading level skips for specific formatting
+- Generated content with unusual structure
+- Third-party content you don't control
+- Documentation examples showing bad practices
+
+#### Ignore Both Formatting and Linting
+
+Use `panache-ignore-start` and `panache-ignore-end` to disable both:
+
+```markdown
+<!-- panache-ignore-start -->
+#### Unusual   structure   here
+Both formatting and linting ignored in this region
+<!-- panache-ignore-end -->
+```
+
+::: {.callout-note}
+**Note on Directive Behavior**: Lint rules still "see" content in ignored
+regions when tracking context (e.g., for heading hierarchy), but diagnostics
+from ignored regions are filtered out. This ensures rules maintain proper state
+across the document.
+:::
+
+See [Formatting](formatting.qmd) for more information about formatting-specific
+ignore directives.
+
 ## Configuration
 
 Lint rules can be configured in the `[lint]` section of your configuration file

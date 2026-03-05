@@ -1,5 +1,6 @@
 pub mod bibtex;
 pub mod config;
+pub mod directives;
 #[cfg(feature = "lsp")]
 pub mod external_formatters;
 mod external_formatters_common;

@@ -14,6 +14,10 @@ tables, definition lists, inline footnotes, and more.
 - **Math formatting**: Intelligent formatting for inline and display math
 - **External formatter integration**: Hook into language-specific formatters (R,
   Python, Rust, etc.) for code blocks
+- **Ignore directives**: Selectively disable formatting and linting for specific
+  regions
+- **Built-in linter**: Check for heading hierarchy, duplicate references, and
+  citation issues
 - **Language Server Protocol**: Built-in LSP for editor integration with
   format-on-save
 - **Fast and configurable**: Written in Rust with sensible defaults

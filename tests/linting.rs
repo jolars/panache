@@ -20,6 +20,32 @@ fn lint_file(filename: &str) -> Vec<panache::linter::Diagnostic> {
 }
 
 #[test]
+fn test_ignore_directives() {
+    let diagnostics = lint_file("ignore_directives.md");
+    let hierarchy_issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "heading-hierarchy")
+        .collect();
+
+    // Should find 1 heading hierarchy issue:
+    // Line 3: Skip from h1 to h4
+    // The h5 on line 9 is in an ignore region and won't be reported
+    // Note: The rule still sees headings in ignore regions when tracking context,
+    // so h2 after h5 doesn't violate because prev_level is updated to h5
+    assert_eq!(
+        hierarchy_issues.len(),
+        1,
+        "Should find 1 heading hierarchy issue"
+    );
+
+    // Check that we found the right violation
+    assert_eq!(
+        hierarchy_issues[0].location.line, 3,
+        "Should warn about h4 at line 3"
+    );
+}
+
+#[test]
 fn test_duplicate_references() {
     let diagnostics = lint_file("duplicate_references.md");
     let dup: Vec<_> = diagnostics

@@ -220,6 +220,52 @@ panache format --config custom.toml document.qmd
 
 See the [Configuration](configuration.qmd) guide for all options.
 
+## Ignore Directives
+
+Sometimes you need to preserve specific formatting or suppress lint warnings for
+certain regions. Panache supports ignore directives using HTML comments:
+
+### Preserve Formatting
+
+Use `panache-ignore-format-start` and `panache-ignore-format-end`:
+
+```markdown
+Normal text will be formatted.
+
+<!-- panache-ignore-format-start -->
+This    text   has    custom     spacing
+that  will   be   preserved   exactly.
+<!-- panache-ignore-format-end -->
+
+Back to normal formatting.
+```
+
+### Suppress Linting
+
+Use `panache-ignore-lint-start` and `panache-ignore-lint-end`:
+
+```markdown
+<!-- panache-ignore-lint-start -->
+#### Unusual heading structure won't trigger warnings
+<!-- panache-ignore-lint-end -->
+```
+
+### Ignore Both
+
+Use `panache-ignore-start` and `panache-ignore-end`:
+
+```markdown
+<!-- panache-ignore-start -->
+Custom    formatting   and   no    lint    warnings
+<!-- panache-ignore-end -->
+```
+
+These directives work anywhere in your document, including inside lists,
+blockquotes, and other nested structures.
+
+See the [Formatting](formatting.qmd) and [Linting](linting.qmd) guides for more
+details.
+
 ## Getting Help
 
 - **GitHub Issues**:

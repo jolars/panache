@@ -551,6 +551,62 @@ Test incrementally
 Use version control
 :   Always commit before formatting large documents
 
+## Ignore Directives
+
+You can selectively disable formatting for specific regions using HTML comment
+directives:
+
+### Ignore Formatting Only
+
+Use `panache-ignore-format-start` and `panache-ignore-format-end` to preserve
+specific formatting:
+
+```markdown
+Normal paragraph will be wrapped and formatted.
+
+<!-- panache-ignore-format-start -->
+This    paragraph   has    custom     spacing
+that  will   be   preserved   exactly.
+<!-- panache-ignore-format-end -->
+
+Back to normal formatting.
+```
+
+This is useful for:
+
+- ASCII art or diagrams
+- Tables with specific spacing
+- Pre-formatted text blocks
+- Code examples that aren't in code blocks
+
+### Ignore Both Formatting and Linting
+
+Use `panache-ignore-start` and `panache-ignore-end` to disable both formatting
+and linting:
+
+```markdown
+<!-- panache-ignore-start -->
+#### Heading with unusual spacing
+Custom    formatting   and   linting   rules   ignored
+<!-- panache-ignore-end -->
+```
+
+### Nested Structures
+
+Ignore directives work inside lists, blockquotes, and other nested structures:
+
+```markdown
+- List item 1
+- List item 2
+  <!-- panache-ignore-format-start -->
+  Nested    content   with    custom   spacing
+  <!-- panache-ignore-format-end -->
+- List item 3
+```
+
+See [Linting](linting.qmd) for information about linting-specific ignore
+directives.
+
 ## Formatting Preservation
 
 panache preserves:
@@ -565,7 +621,11 @@ panache preserves:
 
 - Attribute syntax and values
 
-- Raw HTML/LaTeX blocks ## See Also
+- Raw HTML/LaTeX blocks
+
+- Content within ignore directive regions
+
+## See Also
 
 - [Configuration](configuration.qmd) - Control formatting behavior
 

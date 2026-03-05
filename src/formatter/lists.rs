@@ -253,6 +253,15 @@ impl Formatter {
 
     /// Format a ListItem node
     pub(super) fn format_list_item(&mut self, node: &SyntaxNode, indent: usize) {
+        // Pre-pass: Process any directive comments to update tracker state
+        for child in node.children() {
+            if matches!(child.kind(), SyntaxKind::HTML_BLOCK | SyntaxKind::COMMENT) {
+                if let Some(directive) = crate::directives::extract_directive_from_node(&child) {
+                    self.directive_tracker.process_directive(&directive);
+                }
+            }
+        }
+
         // Compute indent, marker, and checkbox from leading tokens
         let mut marker = String::new();
         let mut original_marker = String::new(); // Track original for word removal
@@ -438,9 +447,18 @@ impl Formatter {
                         .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
                         .unwrap_or(false);
 
-                    if has_blank_before {
+                    // Also process if we're in an ignore region (content should be preserved exactly)
+                    let in_ignore_region = self.directive_tracker.is_formatting_ignored();
+
+                    if has_blank_before || in_ignore_region {
                         let content_indent = list_indent.hanging_indent(total_indent);
-                        self.format_list_continuation_paragraph(&child, content_indent);
+                        // If in ignore region, just call format_node_sync which preserves content
+                        // The indent parameter isn't used when in ignore mode, so we don't add it
+                        if in_ignore_region {
+                            self.format_node_sync(&child, 0);
+                        } else {
+                            self.format_list_continuation_paragraph(&child, content_indent);
+                        }
                     }
                     // Otherwise skip - already handled
                 }
@@ -478,7 +496,9 @@ impl Formatter {
                     self.output.push('\n');
                 }
                 _ => {
-                    // Other block elements
+                    // Other block elements - format with proper indentation
+                    let content_indent = list_indent.hanging_indent(total_indent);
+                    self.format_node_sync(&child, content_indent);
                 }
             }
         }

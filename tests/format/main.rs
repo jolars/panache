@@ -6,6 +6,7 @@ mod external_formatters;
 mod frontmatter;
 mod header_attributes;
 mod headings;
+mod ignore_directives;
 mod image_attributes;
 mod inline_code_attributes;
 mod line_blocks;

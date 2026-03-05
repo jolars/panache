@@ -1,4 +1,5 @@
 use crate::config::{Config, WrapMode};
+use crate::directives::{DirectiveTracker, extract_directive_from_node};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;
@@ -21,6 +22,10 @@ pub struct Formatter {
     pub(super) max_marker_widths: Vec<usize>,
     /// Optional byte range to format (start, end). If None, format entire document.
     range: Option<(usize, usize)>,
+    /// Track ignore directives for formatting
+    pub(super) directive_tracker: DirectiveTracker,
+    /// Depth of ignore region (for preserving content exactly)
+    ignore_region_start: Option<usize>,
 }
 
 impl Formatter {
@@ -37,6 +42,8 @@ impl Formatter {
             formatted_code,
             max_marker_widths: Vec::new(),
             range,
+            directive_tracker: DirectiveTracker::new(),
+            ignore_region_start: None,
         }
     }
     pub fn format(mut self, node: &SyntaxNode) -> String {
@@ -166,6 +173,18 @@ impl Formatter {
     // The large format_node_sync method - keeping it here for now, can extract later
     #[allow(clippy::too_many_lines)]
     pub(super) fn format_node_sync(&mut self, node: &SyntaxNode, indent: usize) {
+        // Check if formatting is ignored - if so, preserve content exactly
+        // Exception: Always process DOCUMENT, COMMENT, and HTML_BLOCK nodes (may contain directives)
+        if self.directive_tracker.is_formatting_ignored()
+            && node.kind() != SyntaxKind::DOCUMENT
+            && node.kind() != SyntaxKind::COMMENT
+            && node.kind() != SyntaxKind::HTML_BLOCK
+        {
+            let text = node.text().to_string();
+            self.output.push_str(&text);
+            return;
+        }
+
         // Reset blank line counter when we hit a non-blank node
         if node.kind() != SyntaxKind::BLANK_LINE {
             self.consecutive_blank_lines = 0;
@@ -519,6 +538,20 @@ impl Formatter {
             }
 
             SyntaxKind::HTML_BLOCK => {
+                // Check if this is a directive comment
+                if let Some(directive) = extract_directive_from_node(node) {
+                    // Process the directive to update tracker state
+                    self.directive_tracker.process_directive(&directive);
+
+                    // Track when we enter an ignore region to preserve content
+                    if matches!(directive, crate::directives::Directive::Start(_))
+                        && self.directive_tracker.is_formatting_ignored()
+                        && self.ignore_region_start.is_none()
+                    {
+                        self.ignore_region_start = Some(self.output.len());
+                    }
+                }
+
                 // Output HTML block exactly as written
                 let text = node.text().to_string();
                 self.output.push_str(&text);
@@ -529,6 +562,22 @@ impl Formatter {
 
             SyntaxKind::COMMENT => {
                 let text = node.text().to_string();
+
+                // Check if this is a directive
+                if let Some(directive) = extract_directive_from_node(node) {
+                    // Process the directive to update tracker state
+                    self.directive_tracker.process_directive(&directive);
+
+                    // Track when we enter an ignore region to preserve content
+                    if matches!(directive, crate::directives::Directive::Start(_))
+                        && self.directive_tracker.is_formatting_ignored()
+                        && self.ignore_region_start.is_none()
+                    {
+                        self.ignore_region_start = Some(self.output.len());
+                    }
+                }
+
+                // Always output the comment itself
                 self.output.push_str(&text);
                 if !text.ends_with('\n') {
                     self.output.push('\n');

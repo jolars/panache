@@ -183,6 +183,7 @@ golden_test_cases!(
     headerless_table,
     horizontal_rules,
     html_block,
+    ignore_directives,
     images,
     indented_code,
     inline_code,
