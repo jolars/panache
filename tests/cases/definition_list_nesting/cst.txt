@@ -1,4 +1,4 @@
-DOCUMENT@0..114
+DOCUMENT@0..108
   DEFINITION_LIST@0..22
     DEFINITION_ITEM@0..22
       TERM@0..5
@@ -19,36 +19,36 @@ DOCUMENT@0..114
     NEWLINE@39..40 "\n"
   BLANK_LINE@40..41
     BLANK_LINE@40..41 "\n"
-  LIST@41..114
-    LIST_ITEM@41..92
+  LIST@41..108
+    LIST_ITEM@41..86
       WHITESPACE@41..44 "   "
       LIST_MARKER@44..45 "-"
       WHITESPACE@45..47 "  "
       PLAIN@47..54
         TEXT@47..53 "Bullet"
         NEWLINE@53..54 "\n"
-      BLANK_LINE@54..61
-        BLANK_LINE@54..61 "      \n"
-      CODE_BLOCK@61..92
-        WHITESPACE@61..67 "      "
-        CODE_FENCE_OPEN@67..71
-          CODE_FENCE_MARKER@67..70 "```"
-          NEWLINE@70..71 "\n"
-        CODE_CONTENT@71..82
-          WHITESPACE@71..77 "      "
-          TEXT@77..81 "code"
-          NEWLINE@81..82 "\n"
-        WHITESPACE@82..88 "      "
-        CODE_FENCE_CLOSE@88..92
-          CODE_FENCE_MARKER@88..91 "```"
-          NEWLINE@91..92 "\n"
-    BLANK_LINE@92..93
-      BLANK_LINE@92..93 "\n"
-    LIST_ITEM@93..114
-      WHITESPACE@93..96 "   "
-      LIST_MARKER@96..97 "-"
-      WHITESPACE@97..99 "  "
-      PLAIN@99..114
-        TEXT@99..113 "Another bullet"
-        NEWLINE@113..114 "\n"
+      BLANK_LINE@54..55
+        BLANK_LINE@54..55 "\n"
+      CODE_BLOCK@55..86
+        WHITESPACE@55..61 "      "
+        CODE_FENCE_OPEN@61..65
+          CODE_FENCE_MARKER@61..64 "```"
+          NEWLINE@64..65 "\n"
+        CODE_CONTENT@65..76
+          WHITESPACE@65..71 "      "
+          TEXT@71..75 "code"
+          NEWLINE@75..76 "\n"
+        WHITESPACE@76..82 "      "
+        CODE_FENCE_CLOSE@82..86
+          CODE_FENCE_MARKER@82..85 "```"
+          NEWLINE@85..86 "\n"
+    BLANK_LINE@86..87
+      BLANK_LINE@86..87 "\n"
+    LIST_ITEM@87..108
+      WHITESPACE@87..90 "   "
+      LIST_MARKER@90..91 "-"
+      WHITESPACE@91..93 "  "
+      PLAIN@93..108
+        TEXT@93..107 "Another bullet"
+        NEWLINE@107..108 "\n"
 

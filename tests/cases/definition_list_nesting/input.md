@@ -5,7 +5,7 @@ Term
    Another list:
 
    -  Bullet
-      
+
       ```
       code
       ```
