@@ -60,17 +60,18 @@ pub(crate) async fn goto_definition(
             && let Some(metadata) = metadata.clone()
         {
             if let Some(parse) = metadata.bibliography_parse
-                && let Some(location) = parse.index.get(&key)
+                && let Some(entry) = parse.index.get(&key)
             {
-                let target_uri = Uri::from_file_path(&location.file).unwrap_or_else(|| uri.clone());
+                let target_uri =
+                    Uri::from_file_path(&entry.source_file).unwrap_or_else(|| uri.clone());
                 let (target_text, target_uri) =
-                    if let Ok(text) = std::fs::read_to_string(&location.file) {
+                    if let Ok(text) = std::fs::read_to_string(&entry.source_file) {
                         (text, target_uri)
                     } else {
                         (content.clone(), uri.clone())
                     };
-                let start = conversions::offset_to_position(&target_text, location.span.start);
-                let end = conversions::offset_to_position(&target_text, location.span.end);
+                let start = conversions::offset_to_position(&target_text, entry.span.start);
+                let end = conversions::offset_to_position(&target_text, entry.span.end);
                 let location = Location {
                     uri: target_uri,
                     range: Range { start, end },

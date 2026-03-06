@@ -278,7 +278,7 @@ fn inline_reference_conflict_diagnostic(conflict: &InlineBibConflict, text: &str
             "Duplicate inline reference id '{}' in {} and {}",
             conflict.key,
             conflict.inline.path.display(),
-            conflict.bib.file.display()
+            conflict.bib.source_file.display()
         ),
         ..Default::default()
     }
@@ -436,7 +436,6 @@ mod tests {
                     entries: HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
-                    files: Vec::new(),
                     load_errors: vec![BibLoadError {
                         path: path.clone(),
                         message: "No such file or directory (os error 2)".to_string(),

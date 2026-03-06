@@ -2,44 +2,51 @@
 
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Span {
-    pub start: usize,
-    pub end: usize,
-}
+use crate::bib::{BibError, BibtexDatabase, ParsedEntry, Span};
 
 #[derive(Debug, Clone)]
-pub struct BibError {
-    pub message: String,
-    pub span: Option<Span>,
-}
-
-#[derive(Debug, Clone)]
-pub struct BibField {
+pub struct BibtexField {
     pub name: String,
     pub value: String,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
-pub struct BibEntry {
+pub struct BibtexEntry {
     pub entry_type: String,
     pub key: String,
     pub key_span: Span,
-    pub fields: Vec<BibField>,
+    pub fields: Vec<BibtexField>,
     pub span: Span,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct BibDatabase {
-    pub entries: Vec<BibEntry>,
-    pub entry_index: HashMap<String, usize>,
-    pub errors: Vec<BibError>,
-}
-
-pub fn parse_bibtex(input: &str) -> BibDatabase {
+pub fn parse_bibtex(input: &str) -> BibtexDatabase {
     let mut parser = Parser::new(input);
     parser.parse_database()
+}
+
+/// Parse BibTeX file and return unified entry format.
+///
+/// Returns (entries, errors) where entries is Vec<ParsedEntry>.
+pub fn parse_bibtex_full(input: &str) -> (Vec<ParsedEntry>, Vec<BibError>) {
+    let database = parse_bibtex(input);
+    let mut entries = Vec::new();
+
+    for entry in &database.entries {
+        let mut fields = HashMap::new();
+        for field in &entry.fields {
+            fields.insert(field.name.clone(), field.value.clone());
+        }
+
+        entries.push((
+            entry.key.clone(),
+            Some(entry.entry_type.clone()),
+            fields,
+            entry.key_span,
+        ));
+    }
+
+    (entries, database.errors)
 }
 
 struct Parser<'a> {
@@ -59,7 +66,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_database(&mut self) -> BibDatabase {
+    fn parse_database(&mut self) -> BibtexDatabase {
         let mut entries = Vec::new();
         let mut entry_index = HashMap::new();
 
@@ -84,14 +91,14 @@ impl<'a> Parser<'a> {
             }
         }
 
-        BibDatabase {
+        BibtexDatabase {
             entries,
             entry_index,
             errors: std::mem::take(&mut self.errors),
         }
     }
 
-    fn parse_entry(&mut self) -> Option<BibEntry> {
+    fn parse_entry(&mut self) -> Option<BibtexEntry> {
         let entry_start = self.pos;
         self.pos += 1;
 
@@ -166,7 +173,7 @@ impl<'a> Parser<'a> {
         }
 
         let entry_end = self.pos;
-        Some(BibEntry {
+        Some(BibtexEntry {
             entry_type,
             key: key.to_string(),
             key_span,
@@ -178,7 +185,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_field(&mut self) -> Option<BibField> {
+    fn parse_field(&mut self) -> Option<BibtexField> {
         let start = self.pos;
         let name = self.parse_identifier();
         if name.is_empty() {
@@ -215,7 +222,7 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
 
-        Some(BibField {
+        Some(BibtexField {
             name,
             value,
             span: Span {

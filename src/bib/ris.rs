@@ -1,432 +1,353 @@
-use rowan::{GreenNodeBuilder, Language, SyntaxNode};
+//! Simple line-based RIS parser.
+//!
+//! RIS format is line-based with `TAG  - value` structure.
+//! No CST needed - just parse line by line.
 
-use crate::bib::Span;
+use std::collections::HashMap;
 
-#[allow(non_camel_case_types)]
-#[allow(clippy::upper_case_acronyms)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u16)]
-pub enum RisSyntaxKind {
-    WHITESPACE = 0,
-    NEWLINE,
-    TEXT,
-    DASH,
+use crate::bib::{ParsedEntry, Span};
 
-    RIS_FILE,
-    RECORD,
-    TAG,
-    TAG_NAME,
-    TAG_VALUE,
-}
+/// Parse RIS file and extract full entry data (id, type, fields).
+///
+/// Returns a vector of (id, entry_type, fields, span) tuples.
+pub fn parse_ris_full(input: &str) -> Result<Vec<ParsedEntry>, String> {
+    let records = parse_records(input)?;
 
-impl From<RisSyntaxKind> for rowan::SyntaxKind {
-    fn from(kind: RisSyntaxKind) -> Self {
-        Self(kind as u16)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum RisLanguage {}
-
-impl Language for RisLanguage {
-    type Kind = RisSyntaxKind;
-
-    fn kind_from_raw(raw: rowan::SyntaxKind) -> Self::Kind {
-        unsafe { std::mem::transmute::<u16, RisSyntaxKind>(raw.0) }
-    }
-
-    fn kind_to_raw(kind: Self::Kind) -> rowan::SyntaxKind {
-        kind.into()
-    }
-}
-
-pub type RisNode = SyntaxNode<RisLanguage>;
-
-pub fn parse_ris_cst(input: &str) -> RisNode {
-    let parser = RisCstParser::new(input);
-    parser.parse()
-}
-
-pub fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
-    let root = parse_ris_cst(input);
-    let mut entries = Vec::new();
-    let mut record_count = 0;
-
-    for record in root
-        .children()
-        .filter(|node| node.kind() == RisSyntaxKind::RECORD)
-    {
-        record_count += 1;
-        match parse_record(&record) {
-            Ok(Some((id, span))) => entries.push((id, span)),
-            Ok(None) => {}
-            Err(message) => return Err(message),
-        }
-    }
-
-    if record_count == 0 {
+    if records.is_empty() {
         return Err("RIS file contains no records".to_string());
+    }
+
+    let mut entries = Vec::new();
+    for record in records {
+        if let Some(entry) = extract_full_entry(&record)? {
+            entries.push(entry);
+        }
     }
 
     Ok(entries)
 }
 
-pub fn validate_ris(input: &str) -> Result<(), String> {
-    let root = parse_ris_cst(input);
-    let mut record_count = 0;
+/// Legacy function: extract only citation keys.
+pub fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
+    let records = parse_records(input)?;
 
-    for record in root
-        .children()
-        .filter(|node| node.kind() == RisSyntaxKind::RECORD)
-    {
-        record_count += 1;
-        parse_record(&record)?;
-    }
-
-    if record_count == 0 {
+    if records.is_empty() {
         return Err("RIS file contains no records".to_string());
     }
 
+    let mut entries = Vec::new();
+    for record in records {
+        if let Some((id, span)) = extract_id(&record)? {
+            entries.push((id, span));
+        }
+    }
+
+    Ok(entries)
+}
+
+/// Validate RIS file structure.
+pub fn validate_ris(input: &str) -> Result<(), String> {
+    let records = parse_records(input)?;
+
+    if records.is_empty() {
+        return Err("RIS file contains no records".to_string());
+    }
+
+    // Validation happens during parse_records
     Ok(())
 }
 
-fn parse_record(record: &RisNode) -> Result<Option<(String, Span)>, String> {
+/// A parsed RIS record with its tags.
+#[derive(Debug)]
+struct RisRecord {
+    tags: Vec<RisTag>,
+    #[allow(dead_code)] // May be useful for future error reporting
+    start: usize,
+    end: usize,
+}
+
+/// A single RIS tag with name, value, and position.
+#[derive(Debug)]
+struct RisTag {
+    name: String,
+    value: String,
+    value_start: usize,
+    value_end: usize,
+}
+
+/// Parse input into records (one record = TY...ER block).
+fn parse_records(input: &str) -> Result<Vec<RisRecord>, String> {
+    let mut records = Vec::new();
+    let mut current_record: Option<RisRecord> = None;
+    let mut line_start = 0;
+
+    for line in input.lines() {
+        let line_end = line_start + line.len();
+
+        // Parse tag if present
+        if let Some(tag) = parse_tag_line(line, line_start)? {
+            // Start new record on TY
+            if tag.name == "TY" {
+                if let Some(_record) = current_record.take() {
+                    return Err("RIS record missing ER tag".to_string());
+                }
+                current_record = Some(RisRecord {
+                    tags: vec![tag],
+                    start: line_start,
+                    end: line_end,
+                });
+            }
+            // End record on ER
+            else if tag.name == "ER" {
+                match current_record.as_mut() {
+                    Some(record) => {
+                        record.tags.push(tag);
+                        record.end = line_end;
+                        records.push(current_record.take().unwrap());
+                    }
+                    None => {
+                        return Err("RIS record has ER tag without TY tag".to_string());
+                    }
+                }
+            }
+            // Regular tag
+            else {
+                match current_record.as_mut() {
+                    Some(record) => {
+                        record.tags.push(tag);
+                        record.end = line_end;
+                    }
+                    None => {
+                        return Err("RIS record contains tags outside TY/ER block".to_string());
+                    }
+                }
+            }
+        }
+        // Handle continuation lines (leading whitespace)
+        else if line.starts_with(|c: char| c.is_whitespace()) && !line.trim().is_empty() {
+            match current_record.as_mut() {
+                Some(record) => {
+                    // Append to last tag's value (but not for ID, TY, or ER tags)
+                    if let Some(last_tag) = record.tags.last_mut()
+                        && last_tag.name != "ID"
+                        && last_tag.name != "TY"
+                        && last_tag.name != "ER"
+                    {
+                        if !last_tag.value.is_empty() {
+                            last_tag.value.push(' ');
+                        }
+                        last_tag.value.push_str(line.trim());
+                    }
+                }
+                None => {
+                    return Err("RIS record contains invalid content".to_string());
+                }
+            }
+        }
+        // Empty lines are okay
+        else if line.trim().is_empty() {
+            // Skip
+        }
+        // Non-tag, non-continuation, non-empty lines are invalid
+        else if !line.trim().is_empty() {
+            return Err("RIS record contains invalid content".to_string());
+        }
+
+        line_start = line_end + 1; // +1 for newline
+    }
+
+    // Check for unclosed record
+    if current_record.is_some() {
+        return Err("RIS record missing ER tag".to_string());
+    }
+
+    Ok(records)
+}
+
+/// Parse a single line for a tag.
+/// Returns None if line is not a tag line.
+fn parse_tag_line(line: &str, line_start: usize) -> Result<Option<RisTag>, String> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    // Tag format: "AA  - value" where AA is 2 uppercase letters
+    let bytes = trimmed.as_bytes();
+
+    // Must start with 2 letters
+    if bytes.len() < 2 {
+        return Ok(None);
+    }
+
+    if !bytes[0].is_ascii_uppercase() || !bytes[1].is_ascii_uppercase() {
+        return Ok(None);
+    }
+
+    let name = &trimmed[0..2];
+    let rest = &trimmed[2..];
+
+    // Should have whitespace and dash
+    let rest = rest.trim_start();
+    if !rest.starts_with('-') {
+        return Ok(None);
+    }
+
+    let value = rest[1..].trim_start().to_string();
+
+    // Calculate span for value (for ID tag)
+    let value_offset = line.find(&value).unwrap_or(0);
+    let value_start = line_start + value_offset;
+    let value_end = value_start + value.len();
+
+    Ok(Some(RisTag {
+        name: name.to_string(),
+        value,
+        value_start,
+        value_end,
+    }))
+}
+
+/// Extract full entry data from a record.
+fn extract_full_entry(record: &RisRecord) -> Result<Option<ParsedEntry>, String> {
+    let mut has_ty = false;
+    let mut has_er = false;
+    let mut id_value: Option<(String, Span)> = None;
+    let mut entry_type: Option<String> = None;
+    let mut fields: HashMap<String, String> = HashMap::new();
+
+    for tag in &record.tags {
+        match tag.name.as_str() {
+            "TY" => {
+                has_ty = true;
+                entry_type = Some(tag.value.clone());
+            }
+            "ER" => {
+                has_er = true;
+            }
+            "ID" => {
+                if id_value.is_none() && !tag.value.is_empty() {
+                    id_value = Some((
+                        tag.value.clone(),
+                        Span {
+                            start: tag.value_start,
+                            end: tag.value_end,
+                        },
+                    ));
+                }
+            }
+            _ => {
+                // Store other fields
+                fields.insert(tag.name.clone(), tag.value.clone());
+            }
+        }
+    }
+
+    if !has_ty {
+        return Err("RIS record missing TY tag".to_string());
+    }
+    if !has_er {
+        return Err("RIS record missing ER tag".to_string());
+    }
+
+    match id_value {
+        Some((id, span)) => Ok(Some((id, entry_type, fields, span))),
+        None => Ok(None),
+    }
+}
+
+/// Extract only ID from a record.
+fn extract_id(record: &RisRecord) -> Result<Option<(String, Span)>, String> {
     let mut has_ty = false;
     let mut has_er = false;
     let mut id_value: Option<(String, Span)> = None;
 
-    for node in record.children() {
-        match node.kind() {
-            RisSyntaxKind::TAG => {
-                let name = node
-                    .children()
-                    .find(|child| child.kind() == RisSyntaxKind::TAG_NAME)
-                    .and_then(|child| first_text(&child))
-                    .unwrap_or_default();
-                match name.as_str() {
-                    "TY" => has_ty = true,
-                    "ER" => has_er = true,
-                    "ID" => {
-                        if id_value.is_none()
-                            && let Some((value, span)) = node
-                                .children()
-                                .find(|child| child.kind() == RisSyntaxKind::TAG_VALUE)
-                                .and_then(|child| extract_text_span(&child))
-                            && !value.is_empty()
-                        {
-                            id_value = Some((value, span));
-                        }
-                    }
-                    _ => {}
+    for tag in &record.tags {
+        match tag.name.as_str() {
+            "TY" => has_ty = true,
+            "ER" => has_er = true,
+            "ID" => {
+                if id_value.is_none() && !tag.value.is_empty() {
+                    id_value = Some((
+                        tag.value.clone(),
+                        Span {
+                            start: tag.value_start,
+                            end: tag.value_end,
+                        },
+                    ));
                 }
             }
-            _ => {
-                continue;
-            }
+            _ => {}
         }
     }
 
-    let mut at_line_start = true;
-    let mut line_has_tag = false;
-    let mut line_has_content = false;
-    let mut line_leading_whitespace = false;
-    let mut last_line_was_tag = false;
-
-    for element in record.children_with_tokens() {
-        match element {
-            rowan::NodeOrToken::Node(node) => {
-                if node.kind() == RisSyntaxKind::TAG {
-                    line_has_tag = true;
-                    line_has_content = true;
-                    at_line_start = false;
-                }
-            }
-            rowan::NodeOrToken::Token(token) => match token.kind() {
-                RisSyntaxKind::NEWLINE => {
-                    if !line_has_content {
-                        last_line_was_tag = false;
-                    } else {
-                        last_line_was_tag = line_has_tag;
-                    }
-                    at_line_start = true;
-                    line_has_tag = false;
-                    line_has_content = false;
-                    line_leading_whitespace = false;
-                }
-                RisSyntaxKind::WHITESPACE => {
-                    if at_line_start {
-                        line_leading_whitespace = true;
-                    }
-                    line_has_content = true;
-                }
-                RisSyntaxKind::TEXT => {
-                    let text = token.text();
-                    if text.trim().is_empty() {
-                        continue;
-                    }
-                    if at_line_start {
-                        if !line_leading_whitespace || !last_line_was_tag {
-                            return Err("RIS record contains invalid content".to_string());
-                        }
-                    } else if !line_has_tag {
-                        return Err("RIS record contains invalid content".to_string());
-                    }
-                    line_has_content = true;
-                    at_line_start = false;
-                }
-                _ => {}
-            },
-        }
-    }
-
-    if !has_er {
-        return Err("RIS record missing ER tag".to_string());
-    }
     if !has_ty {
         return Err("RIS record missing TY tag".to_string());
+    }
+    if !has_er {
+        return Err("RIS record missing ER tag".to_string());
     }
 
     Ok(id_value)
 }
 
-fn first_text(node: &RisNode) -> Option<String> {
-    node.children_with_tokens()
-        .filter_map(|element| element.into_token())
-        .find(|token| token.kind() == RisSyntaxKind::TEXT)
-        .map(|token| token.text().to_string())
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn extract_text_span(node: &RisNode) -> Option<(String, Span)> {
-    let token = node
-        .children_with_tokens()
-        .filter_map(|element| element.into_token())
-        .find(|token| token.kind() == RisSyntaxKind::TEXT)?;
-    let raw = token.text();
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let leading = raw.find(trimmed).unwrap_or(0);
-    let start = usize::from(token.text_range().start()) + leading;
-    let end = start + trimmed.len();
-    Some((trimmed.to_string(), Span { start, end }))
-}
-
-struct RisCstParser<'a> {
-    input: &'a str,
-    bytes: &'a [u8],
-    pos: usize,
-    builder: GreenNodeBuilder<'a>,
-}
-
-impl<'a> RisCstParser<'a> {
-    fn new(input: &'a str) -> Self {
-        Self {
-            input,
-            bytes: input.as_bytes(),
-            pos: 0,
-            builder: GreenNodeBuilder::new(),
-        }
+    #[test]
+    fn test_basic_ris() {
+        let input = "TY  - JOUR
+ID  - Smith2020
+AU  - Smith, John
+TI  - Test Article
+PY  - 2020
+ER  - 
+";
+        let result = parse_ris_full(input).unwrap();
+        assert_eq!(result.len(), 1);
+        let (id, entry_type, fields, _span) = &result[0];
+        assert_eq!(id, "Smith2020");
+        assert_eq!(entry_type, &Some("JOUR".to_string()));
+        assert_eq!(fields.get("AU"), Some(&"Smith, John".to_string()));
+        assert_eq!(fields.get("TI"), Some(&"Test Article".to_string()));
+        assert_eq!(fields.get("PY"), Some(&"2020".to_string()));
     }
 
-    fn parse(mut self) -> RisNode {
-        self.builder.start_node(RisSyntaxKind::RIS_FILE.into());
-        while self.pos < self.bytes.len() {
-            self.emit_record();
-        }
-        self.builder.finish_node();
-        RisNode::new_root(self.builder.finish())
-    }
-
-    fn emit_record(&mut self) {
-        self.builder.start_node(RisSyntaxKind::RECORD.into());
-        let mut at_line_start = true;
-        while self.pos < self.bytes.len() {
-            if at_line_start && self.is_tag_start() {
-                let name = self.parse_tag_name();
-                let is_end = self.emit_tag(&name);
-                at_line_start = true;
-                if is_end {
-                    break;
-                }
-                continue;
-            }
-
-            if self.emit_newline() {
-                at_line_start = true;
-                continue;
-            }
-            if self.emit_whitespace(at_line_start) {
-                continue;
-            }
-            self.emit_text_run();
-            at_line_start = false;
-        }
-        self.builder.finish_node();
-    }
-
-    fn emit_tag(&mut self, name: &str) -> bool {
-        self.builder.start_node(RisSyntaxKind::TAG.into());
-        self.builder.start_node(RisSyntaxKind::TAG_NAME.into());
-        self.builder.token(RisSyntaxKind::TEXT.into(), name);
-        self.builder.finish_node();
-
-        self.emit_whitespace(false);
-        if self.peek_byte() == Some(b'-') {
-            self.builder.token(RisSyntaxKind::DASH.into(), "-");
-            self.pos += 1;
-        }
-
-        let (value_start, value_end, newline) = self.parse_tag_value();
-        self.builder.start_node(RisSyntaxKind::TAG_VALUE.into());
-        if value_end > value_start {
-            self.builder.token(
-                RisSyntaxKind::TEXT.into(),
-                &self.input[value_start..value_end],
-            );
-        }
-        self.builder.finish_node();
-
-        self.builder.finish_node();
-
-        if let Some(text) = newline {
-            self.builder.token(RisSyntaxKind::NEWLINE.into(), text);
-        }
-
-        name == "ER"
-    }
-
-    fn emit_whitespace(&mut self, _preserve_line_start: bool) -> bool {
-        let start = self.pos;
-        while let Some(b) = self.peek_byte() {
-            if b == b' ' || b == b'\t' {
-                self.pos += 1;
-            } else {
-                break;
-            }
-        }
-        if self.pos == start {
-            return false;
-        }
-        self.builder.token(
-            RisSyntaxKind::WHITESPACE.into(),
-            &self.input[start..self.pos],
+    #[test]
+    fn test_multiline_value() {
+        let input = "TY  - JOUR
+ID  - Test
+TI  - First line
+  Second line
+  Third line
+ER  - 
+";
+        let result = parse_ris_full(input).unwrap();
+        assert_eq!(result.len(), 1);
+        let (_id, _entry_type, fields, _span) = &result[0];
+        assert_eq!(
+            fields.get("TI"),
+            Some(&"First line Second line Third line".to_string())
         );
-        true
     }
 
-    fn emit_newline(&mut self) -> bool {
-        match self.peek_byte() {
-            Some(b'\n') => {
-                self.builder.token(RisSyntaxKind::NEWLINE.into(), "\n");
-                self.pos += 1;
-                true
-            }
-            Some(b'\r') => {
-                if self.peek_next_byte() == Some(b'\n') {
-                    self.builder.token(RisSyntaxKind::NEWLINE.into(), "\r\n");
-                    self.pos += 2;
-                } else {
-                    self.builder.token(RisSyntaxKind::NEWLINE.into(), "\r");
-                    self.pos += 1;
-                }
-                true
-            }
-            _ => false,
-        }
+    #[test]
+    fn test_missing_er() {
+        let input = "TY  - JOUR
+ID  - Test
+";
+        let result = parse_ris_full(input);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("missing ER"));
     }
 
-    fn emit_text_run(&mut self) {
-        let start = self.pos;
-        while let Some(b) = self.peek_byte() {
-            if b == b'\n' || b == b'\r' || b == b' ' || b == b'\t' {
-                break;
-            }
-            self.pos += 1;
-        }
-        if self.pos > start {
-            self.builder
-                .token(RisSyntaxKind::TEXT.into(), &self.input[start..self.pos]);
-        } else if let Some(ch) = self.input[self.pos..].chars().next() {
-            let mut buf = [0u8; 4];
-            let text = ch.encode_utf8(&mut buf);
-            self.pos += ch.len_utf8();
-            self.builder.token(RisSyntaxKind::TEXT.into(), text);
-        }
+    #[test]
+    fn test_missing_ty() {
+        let input = "ID  - Test
+ER  - 
+";
+        let result = parse_ris_full(input);
+        assert!(result.is_err());
     }
-
-    fn is_tag_start(&self) -> bool {
-        if self.pos + 3 > self.bytes.len() {
-            return false;
-        }
-        let first = self.bytes[self.pos];
-        let second = self.bytes[self.pos + 1];
-        if !is_tag_char(first) || !is_tag_char(second) {
-            return false;
-        }
-        let mut idx = self.pos + 2;
-        let mut saw_space = false;
-        while let Some(b) = self.bytes.get(idx).copied() {
-            if b == b' ' || b == b'\t' {
-                saw_space = true;
-                idx += 1;
-                continue;
-            }
-            break;
-        }
-        saw_space && self.bytes.get(idx) == Some(&b'-')
-    }
-
-    fn parse_tag_name(&mut self) -> String {
-        if self.pos + 2 > self.bytes.len() {
-            return String::new();
-        }
-        let first = self.bytes[self.pos];
-        let second = self.bytes[self.pos + 1];
-        if !is_tag_char(first) || !is_tag_char(second) {
-            return String::new();
-        }
-        self.pos += 2;
-        self.input[self.pos - 2..self.pos].to_string()
-    }
-
-    fn parse_tag_value(&mut self) -> (usize, usize, Option<&'a str>) {
-        let start = self.pos;
-        while let Some(b) = self.peek_byte() {
-            if b == b'\n' || b == b'\r' {
-                break;
-            }
-            self.pos += 1;
-        }
-        let end = self.pos;
-        let newline = match self.peek_byte() {
-            Some(b'\n') => {
-                self.pos += 1;
-                Some("\n")
-            }
-            Some(b'\r') => {
-                if self.peek_next_byte() == Some(b'\n') {
-                    self.pos += 2;
-                    Some("\r\n")
-                } else {
-                    self.pos += 1;
-                    Some("\r")
-                }
-            }
-            _ => None,
-        };
-        (start, end, newline)
-    }
-
-    fn peek_byte(&self) -> Option<u8> {
-        self.bytes.get(self.pos).copied()
-    }
-
-    fn peek_next_byte(&self) -> Option<u8> {
-        self.bytes.get(self.pos + 1).copied()
-    }
-}
-
-fn is_tag_char(b: u8) -> bool {
-    b.is_ascii_uppercase() || b.is_ascii_digit()
 }

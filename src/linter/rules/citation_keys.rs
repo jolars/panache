@@ -99,7 +99,7 @@ impl Rule for CitationKeysRule {
                         "Duplicate inline reference id '{}' in {} and {}",
                         conflict.key,
                         conflict.inline.path.display(),
-                        conflict.bib.file.display()
+                        conflict.bib.source_file.display()
                     ),
                 ));
             }
@@ -178,7 +178,6 @@ mod tests {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
-                    files: Vec::new(),
                     load_errors: Vec::new(),
                 },
                 parse_errors: Vec::new(),
@@ -208,7 +207,6 @@ mod tests {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
-                    files: Vec::new(),
                     load_errors: Vec::new(),
                 },
                 parse_errors: Vec::new(),
@@ -255,7 +253,6 @@ mod tests {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
-                    files: Vec::new(),
                     load_errors: vec![crate::bib::BibLoadError {
                         path,
                         message: "No such file or directory (os error 2)".to_string(),
@@ -293,7 +290,6 @@ mod tests {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
-                    files: Vec::new(),
                     load_errors: Vec::new(),
                 },
                 parse_errors: Vec::new(),
@@ -326,7 +322,6 @@ mod tests {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
-                    files: Vec::new(),
                     load_errors: Vec::new(),
                 },
                 parse_errors: Vec::new(),

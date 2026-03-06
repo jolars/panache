@@ -5,7 +5,7 @@ use rowan::{TextRange, TextSize};
 use serde::{Deserialize, Serialize};
 use serde_saphyr::Spanned;
 
-use crate::bib::BibEntryLocation;
+use crate::bib::BibEntry;
 
 #[derive(Debug, Clone)]
 pub struct InlineReference {
@@ -56,7 +56,7 @@ pub struct InlineReferenceDuplicate {
 pub struct InlineBibConflict {
     pub key: String,
     pub inline: InlineReference,
-    pub bib: BibEntryLocation,
+    pub bib: BibEntry,
 }
 
 pub fn inline_reference_map(inline: &[InlineReference]) -> HashMap<String, Vec<InlineReference>> {

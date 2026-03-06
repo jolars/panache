@@ -60,17 +60,17 @@ fn bib_index_find_entry() {
 
     let index = load_bibliography(&[file.path().to_path_buf()]);
 
-    // Test find_entry() - should find entry by key
-    let entry = index.find_entry("testkey");
+    // Test get() - should find entry by key
+    let entry = index.get("testkey");
     assert!(entry.is_some(), "Should find entry by key");
 
     let entry = entry.unwrap();
     assert_eq!(entry.key, "testkey");
-    assert_eq!(entry.entry_type, "article");
+    assert_eq!(entry.entry_type, Some("article".to_string()));
 
     // Check that we can access fields
     assert!(!entry.fields.is_empty());
-    let has_title = entry.fields.iter().any(|f| f.name == "title");
+    let has_title = entry.fields.contains_key("title");
     assert!(has_title, "Should have a title field");
 }
 
@@ -87,9 +87,9 @@ fn bib_index_find_entry_case_insensitive() {
     let index = load_bibliography(&[file.path().to_path_buf()]);
 
     // Test case-insensitive lookup
-    assert!(index.find_entry("mykey").is_some());
-    assert!(index.find_entry("MyKey").is_some());
-    assert!(index.find_entry("MYKEY").is_some());
+    assert!(index.get("mykey").is_some());
+    assert!(index.get("MyKey").is_some());
+    assert!(index.get("MYKEY").is_some());
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn bib_index_find_entry_not_found() {
     let index = load_bibliography(&[file.path().to_path_buf()]);
 
     // Test with non-existent key
-    let entry = index.find_entry("nonexistent");
+    let entry = index.get("nonexistent");
     assert!(entry.is_none(), "Should return None for non-existent key");
 }
 

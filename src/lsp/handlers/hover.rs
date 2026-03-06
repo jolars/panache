@@ -100,9 +100,9 @@ pub(crate) async fn hover(
             && let Some(metadata) = metadata.clone()
         {
             if let Some(parse) = metadata.bibliography_parse
-                && let Some(entry) = parse.index.find_entry(&key)
+                && let Some(entry) = parse.index.get(&key)
             {
-                let summary = format_bibtex_entry(entry);
+                let summary = format_bibliography_entry(entry);
                 if !summary.is_empty() {
                     return Ok(Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
@@ -133,14 +133,42 @@ pub(crate) async fn hover(
     }
 }
 
-fn format_bibtex_entry(entry: &crate::bib::BibEntry) -> String {
-    let author = find_field(entry, &["author", "editor"]).unwrap_or_default();
-    let year = find_field(entry, &["year", "date"]).unwrap_or_default();
-    let title = find_field(entry, &["title", "booktitle"]).unwrap_or_default();
-    let container = find_field(entry, &["journal", "journaltitle", "container-title"])
-        .or_else(|| find_field(entry, &["publisher"]))
+/// Format a bibliography entry for hover display.
+///
+/// Works with any bibliography format (BibTeX, CSL-JSON, CSL-YAML, RIS).
+fn format_bibliography_entry(entry: &crate::bib::BibEntry) -> String {
+    let author = entry
+        .fields
+        .get("author")
+        .or_else(|| entry.fields.get("editor"))
+        .map(|s| s.as_str())
         .unwrap_or_default();
-    let locator = build_locator(entry);
+
+    let year = entry
+        .fields
+        .get("year")
+        .or_else(|| entry.fields.get("date"))
+        .or_else(|| entry.fields.get("issued"))
+        .map(|s| s.as_str())
+        .unwrap_or_default();
+
+    let title = entry
+        .fields
+        .get("title")
+        .or_else(|| entry.fields.get("booktitle"))
+        .map(|s| s.as_str())
+        .unwrap_or_default();
+
+    let container = entry
+        .fields
+        .get("journal")
+        .or_else(|| entry.fields.get("journaltitle"))
+        .or_else(|| entry.fields.get("container-title"))
+        .or_else(|| entry.fields.get("publisher"))
+        .map(|s| s.as_str())
+        .unwrap_or_default();
+
+    let locator = build_locator_unified(entry);
 
     let mut summary = String::new();
     if !author.is_empty() {
@@ -173,21 +201,24 @@ fn format_bibtex_entry(entry: &crate::bib::BibEntry) -> String {
     summary.trim().to_string()
 }
 
-fn find_field<'a>(entry: &'a crate::bib::BibEntry, names: &[&str]) -> Option<&'a str> {
-    names.iter().find_map(|name| {
-        entry
-            .fields
-            .iter()
-            .find(|field| field.name.eq_ignore_ascii_case(name))
-            .map(|field| field.value.trim())
-            .filter(|value| !value.is_empty())
-    })
-}
-
-fn build_locator(entry: &crate::bib::BibEntry) -> String {
-    let volume = find_field(entry, &["volume"]).unwrap_or_default();
-    let number = find_field(entry, &["number", "issue"]).unwrap_or_default();
-    let pages = find_field(entry, &["pages", "page"]).unwrap_or_default();
+fn build_locator_unified(entry: &crate::bib::BibEntry) -> String {
+    let volume = entry
+        .fields
+        .get("volume")
+        .map(|s| s.as_str())
+        .unwrap_or_default();
+    let number = entry
+        .fields
+        .get("number")
+        .or_else(|| entry.fields.get("issue"))
+        .map(|s| s.as_str())
+        .unwrap_or_default();
+    let pages = entry
+        .fields
+        .get("pages")
+        .or_else(|| entry.fields.get("page"))
+        .map(|s| s.as_str())
+        .unwrap_or_default();
 
     let mut parts = Vec::new();
     if !volume.is_empty() {

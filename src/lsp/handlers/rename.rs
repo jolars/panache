@@ -64,20 +64,21 @@ pub(crate) async fn rename(
     let mut bib_paths = Vec::new();
 
     if let Some(parse) = metadata.bibliography_parse.as_ref() {
-        let mut bib_entries: Vec<crate::bib::BibEntryLocation> = Vec::new();
+        let mut bib_entries: Vec<crate::bib::BibEntry> = Vec::new();
         if let Some(entry) = parse.index.get(&old_key) {
             bib_entries.push(entry.clone());
         } else {
             for conflict in inline_bib_conflicts(&metadata.inline_references, &parse.index) {
                 if conflict.key.eq_ignore_ascii_case(&old_key) {
-                    bib_entries.push(conflict.bib);
+                    bib_entries.push(conflict.bib.clone());
                 }
             }
         }
-        bib_entries.sort_by(|a, b| a.file.cmp(&b.file));
-        bib_entries.dedup_by(|a, b| a.file == b.file && a.key.eq_ignore_ascii_case(&b.key));
+        bib_entries.sort_by(|a, b| a.source_file.cmp(&b.source_file));
+        bib_entries
+            .dedup_by(|a, b| a.source_file == b.source_file && a.key.eq_ignore_ascii_case(&b.key));
         for entry in bib_entries {
-            let bib_path = entry.file.clone();
+            let bib_path = entry.source_file.clone();
             let bib_text = std::fs::read_to_string(&bib_path).unwrap_or_default();
             let bib_start = offset_to_position(&bib_text, entry.span.start);
             let bib_end = offset_to_position(&bib_text, entry.span.end);
