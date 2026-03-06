@@ -14,8 +14,8 @@ use cli::{Cli, Commands};
 const SUPPORTED_EXTENSIONS: &[&str] = &["md", "qmd", "Rmd", "markdown", "mdown", "mkd"];
 
 fn init_logger(debug_log: Option<&Path>) {
-    let mut builder = env_logger::Builder::from_default_env();
     if let Some(path) = debug_log {
+        let mut builder = env_logger::Builder::new();
         if let Ok(file) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -26,9 +26,11 @@ fn init_logger(debug_log: Option<&Path>) {
         builder.filter_level(log::LevelFilter::Info);
         builder.filter_module("panache::lsp", log::LevelFilter::Debug);
         builder.format_timestamp_millis();
+        builder.init();
         log::info!("LSP debug logging enabled at {}", path.display());
+        return;
     }
-    builder.init();
+    env_logger::Builder::from_default_env().init();
 }
 
 fn init_lsp_debug_log() -> io::Result<PathBuf> {

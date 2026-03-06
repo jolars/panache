@@ -61,6 +61,7 @@ impl LanguageServer for PanacheLsp {
         self.client
             .log_message(MessageType::INFO, "panache LSP server initialized")
             .await;
+        log::debug!("initialized LSP server");
 
         // Register file watchers for bibliography files
         if let Ok(options) = serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
