@@ -6,12 +6,15 @@ use tower_lsp_server::{Client, LspService, Server};
 
 use rowan::GreenNode;
 
+mod bibliography_cache;
 mod config;
 mod conversions;
 mod documents;
 mod handlers;
 mod helpers;
 mod server;
+
+pub use bibliography_cache::BibliographyCache;
 
 /// State for a single document in the LSP.
 #[derive(Clone)]
@@ -31,6 +34,7 @@ pub struct PanacheLsp {
     // Use String keys since Uri doesn't implement Send
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    bibliography_cache: Arc<Mutex<BibliographyCache>>,
 }
 
 impl PanacheLsp {
@@ -39,7 +43,14 @@ impl PanacheLsp {
             client,
             document_map: Arc::new(Mutex::new(HashMap::new())),
             workspace_root: Arc::new(Mutex::new(None)),
+            bibliography_cache: Arc::new(Mutex::new(BibliographyCache::new())),
         }
+    }
+
+    /// Get access to the bibliography cache for testing purposes.
+    #[doc(hidden)]
+    pub fn bibliography_cache(&self) -> Arc<Mutex<BibliographyCache>> {
+        Arc::clone(&self.bibliography_cache)
     }
 
     /// Get access to the document map for testing purposes.

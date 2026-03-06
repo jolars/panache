@@ -1,6 +1,6 @@
 use crate::bib::Span;
 
-pub(crate) fn parse_csl_yaml_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
+pub fn parse_csl_yaml_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
     let mut entries = Vec::new();
     let mut offset = 0usize;
 

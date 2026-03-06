@@ -13,15 +13,30 @@ use crate::syntax::SyntaxNode;
 use rowan::GreenNode;
 
 /// Parse metadata from document text
-fn parse_metadata(text: &str, uri: &Uri) -> Option<crate::metadata::DocumentMetadata> {
-    // Convert URI to file path - to_file_path() returns Option<Cow<Path>>
+fn parse_metadata(
+    text: &str,
+    uri: &Uri,
+    bib_cache: &mut crate::lsp::BibliographyCache,
+) -> Option<crate::metadata::DocumentMetadata> {
+    // Convert URI to file path
     let file_path = uri.to_file_path()?.into_owned();
 
     // Parse the document
     let tree = crate::parse(text, None);
 
-    // Extract metadata
-    crate::metadata::extract_project_metadata(&tree, &file_path).ok()
+    // Extract metadata (but don't parse bibliography yet)
+    let mut metadata = crate::metadata::extract_project_metadata(&tree, &file_path).ok()?;
+
+    // Use cache to build bibliography index if needed
+    if let Some(bib_info) = &metadata.bibliography {
+        let index = bib_cache.build_index(&bib_info.paths);
+        metadata.bibliography_parse = Some(crate::metadata::BibliographyParse {
+            parse_errors: index.errors.iter().map(|e| e.message.clone()).collect(),
+            index,
+        });
+    }
+
+    Some(metadata)
 }
 
 /// Handle textDocument/didOpen notification
@@ -29,6 +44,7 @@ pub(crate) async fn did_open(
     client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
+    bib_cache: Arc<Mutex<crate::lsp::BibliographyCache>>,
     params: DidOpenTextDocumentParams,
 ) {
     let uri = params.text_document.uri.to_string();
@@ -41,8 +57,11 @@ pub(crate) async fn did_open(
         crate::includes::ProjectGraph::default()
     };
 
-    // Parse metadata
-    let metadata = parse_metadata(&text, &params.text_document.uri);
+    // Parse metadata with bibliography cache
+    let metadata = {
+        let mut cache = bib_cache.lock().await;
+        parse_metadata(&text, &params.text_document.uri, &mut cache)
+    };
 
     // Store document state with metadata
     document_map.lock().await.insert(
@@ -73,6 +92,7 @@ pub(crate) async fn did_open(
 pub(crate) async fn did_change(
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
+    bib_cache: Arc<Mutex<crate::lsp::BibliographyCache>>,
     client: &Client,
     params: DidChangeTextDocumentParams,
 ) {
@@ -127,9 +147,6 @@ pub(crate) async fn did_change(
             };
 
             doc_state.tree = GreenNode::from(new_tree.green());
-
-            // Re-parse metadata after changes
-            doc_state.metadata = parse_metadata(&doc_state.text, &params.text_document.uri);
             doc_state.graph = if let Some(path) = params.text_document.uri.to_file_path() {
                 crate::includes::ProjectGraph::build_project(&path, &doc_state.text, &config)
             } else {
@@ -152,6 +169,30 @@ pub(crate) async fn did_change(
             return;
         }
     };
+
+    // Re-parse metadata after changes (using cache) - done outside the lock
+    // First, get the text we need
+    let current_text = {
+        let document_map = document_map.lock().await;
+        document_map
+            .get(&uri_string)
+            .map(|state| state.text.clone())
+    };
+
+    let metadata = if let Some(text) = current_text {
+        let mut cache = bib_cache.lock().await;
+        parse_metadata(&text, &params.text_document.uri, &mut cache)
+    } else {
+        None
+    };
+
+    // Update metadata in document state
+    {
+        let mut document_map = document_map.lock().await;
+        if let Some(doc_state) = document_map.get_mut(&uri_string) {
+            doc_state.metadata = metadata;
+        }
+    }
 
     if let Some(uris) = dependent_uris {
         for uri in uris {

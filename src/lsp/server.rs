@@ -41,6 +41,13 @@ impl LanguageServer for PanacheLsp {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions::default()),
                 rename_provider: Some(OneOf::Left(true)),
+                workspace: Some(WorkspaceServerCapabilities {
+                    workspace_folders: Some(WorkspaceFoldersServerCapabilities {
+                        supported: Some(true),
+                        change_notifications: Some(OneOf::Left(true)),
+                    }),
+                    file_operations: None,
+                }),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -54,6 +61,47 @@ impl LanguageServer for PanacheLsp {
         self.client
             .log_message(MessageType::INFO, "panache LSP server initialized")
             .await;
+
+        // Register file watchers for bibliography files
+        if let Ok(options) = serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
+            watchers: vec![
+                FileSystemWatcher {
+                    glob_pattern: GlobPattern::String("**/*.bib".to_string()),
+                    kind: Some(WatchKind::all()),
+                },
+                FileSystemWatcher {
+                    glob_pattern: GlobPattern::String("**/*.json".to_string()),
+                    kind: Some(WatchKind::all()),
+                },
+                FileSystemWatcher {
+                    glob_pattern: GlobPattern::String("**/*.yaml".to_string()),
+                    kind: Some(WatchKind::all()),
+                },
+                FileSystemWatcher {
+                    glob_pattern: GlobPattern::String("**/*.yml".to_string()),
+                    kind: Some(WatchKind::all()),
+                },
+                FileSystemWatcher {
+                    glob_pattern: GlobPattern::String("**/*.ris".to_string()),
+                    kind: Some(WatchKind::all()),
+                },
+            ],
+        }) {
+            let registrations = vec![Registration {
+                id: "watch-bibliography-files".to_string(),
+                method: "workspace/didChangeWatchedFiles".to_string(),
+                register_options: Some(options),
+            }];
+
+            if let Err(e) = self.client.register_capability(registrations).await {
+                self.client
+                    .log_message(
+                        MessageType::WARNING,
+                        format!("Failed to register file watchers: {:?}", e),
+                    )
+                    .await;
+            }
+        }
     }
 
     async fn shutdown(&self) -> Result<()> {
@@ -65,6 +113,7 @@ impl LanguageServer for PanacheLsp {
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
+            Arc::clone(&self.bibliography_cache),
             params,
         )
         .await;
@@ -74,6 +123,7 @@ impl LanguageServer for PanacheLsp {
         documents::did_change(
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
+            Arc::clone(&self.bibliography_cache),
             &self.client,
             params,
         )
@@ -181,5 +231,16 @@ impl LanguageServer for PanacheLsp {
             params,
         )
         .await
+    }
+
+    async fn did_change_watched_files(&self, params: DidChangeWatchedFilesParams) {
+        handlers::file_watcher::did_change_watched_files(
+            &self.client,
+            Arc::clone(&self.bibliography_cache),
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await;
     }
 }

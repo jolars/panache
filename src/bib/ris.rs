@@ -47,7 +47,7 @@ pub fn parse_ris_cst(input: &str) -> RisNode {
     parser.parse()
 }
 
-pub(crate) fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
+pub fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
     let root = parse_ris_cst(input);
     let mut entries = Vec::new();
     let mut record_count = 0;
@@ -71,7 +71,7 @@ pub(crate) fn parse_ris_entries(input: &str) -> Result<Vec<(String, Span)>, Stri
     Ok(entries)
 }
 
-pub(crate) fn validate_ris(input: &str) -> Result<(), String> {
+pub fn validate_ris(input: &str) -> Result<(), String> {
     let root = parse_ris_cst(input);
     let mut record_count = 0;
 
