@@ -25,6 +25,7 @@ fn init_logger(debug_log: Option<&Path>) {
         }
         builder.filter_level(log::LevelFilter::Info);
         builder.filter_module("panache::lsp", log::LevelFilter::Debug);
+        builder.filter_module("panache::includes", log::LevelFilter::Debug);
         builder.format_timestamp_millis();
         builder.init();
         log::info!("LSP debug logging enabled at {}", path.display());

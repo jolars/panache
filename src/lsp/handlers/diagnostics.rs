@@ -312,12 +312,6 @@ pub(crate) async fn lint_and_publish(
     let metadata = doc_state.metadata.clone();
     let graph = doc_state.graph.clone();
     let mut all_diagnostics = Vec::new();
-    log::debug!(
-        "lint_and_publish bytes={} has_metadata={}",
-        text.len(),
-        metadata.is_some()
-    );
-
     // Check for YAML metadata errors
     if let Some(ref metadata) = doc_state.metadata {
         all_diagnostics.extend(check_bibliography_parse(metadata, &text));
@@ -369,10 +363,6 @@ pub(crate) async fn lint_and_publish(
 
     match diagnostics {
         Ok(panache_diagnostics) => {
-            log::debug!(
-                "lint_and_publish diagnostics_count={}",
-                panache_diagnostics.len()
-            );
             let lsp_diagnostics: Vec<Diagnostic> = panache_diagnostics
                 .iter()
                 .filter(|d| {
@@ -394,10 +384,6 @@ pub(crate) async fn lint_and_publish(
                 &crate::parse(&text, Some(config.clone())),
                 &config,
                 &graph,
-            );
-            log::debug!(
-                "lint_and_publish include_documents={}",
-                include_diagnostics.len()
             );
 
             let mut published_root = false;

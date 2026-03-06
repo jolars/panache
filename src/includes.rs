@@ -541,6 +541,9 @@ fn visit_document(
     }
     for include in resolution.includes {
         graph.add_edge(path, &include.path, EdgeKind::Include);
+        if include.path == path {
+            continue;
+        }
         if let Ok(include_input) = std::fs::read_to_string(&include.path) {
             let include_base = include.path.parent().unwrap_or_else(|| Path::new("."));
             visit_document(
