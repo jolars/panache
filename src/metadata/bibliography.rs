@@ -20,7 +20,7 @@ pub struct BibliographyInfo {
 
 #[derive(Debug, Clone)]
 pub struct BibliographyParse {
-    pub index: crate::bibtex::BibIndex,
+    pub index: crate::bib::BibIndex,
     pub parse_errors: Vec<String>,
 }
 

@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use panache::bibtex::parse_bibtex_cst;
+use panache::bib::parse_bibtex_cst;
 
 fn run_case(input_path: &Path, snapshot_path: &Path) {
     let input = fs::read_to_string(input_path).unwrap();

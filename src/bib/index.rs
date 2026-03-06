@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::bibtex::{
+use crate::bib::{
     BibDatabase, BibEntry, BibError, Span, parse_bibtex, parse_csl_json_entries,
     parse_csl_yaml_entries, parse_ris_entries, validate_ris,
 };

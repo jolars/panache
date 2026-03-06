@@ -1,4 +1,4 @@
-pub mod bibtex;
+pub mod bib;
 pub mod config;
 pub mod directives;
 #[cfg(feature = "lsp")]

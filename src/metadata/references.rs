@@ -5,7 +5,7 @@ use rowan::{TextRange, TextSize};
 use serde::{Deserialize, Serialize};
 use serde_saphyr::Spanned;
 
-use crate::bibtex::BibEntryLocation;
+use crate::bib::BibEntryLocation;
 
 #[derive(Debug, Clone)]
 pub struct InlineReference {
@@ -90,7 +90,7 @@ pub fn inline_reference_duplicates(inline: &[InlineReference]) -> Vec<InlineRefe
 
 pub fn inline_bib_conflicts(
     inline: &[InlineReference],
-    index: &crate::bibtex::BibIndex,
+    index: &crate::bib::BibIndex,
 ) -> Vec<InlineBibConflict> {
     let mut conflicts = Vec::new();
     for entry in inline {

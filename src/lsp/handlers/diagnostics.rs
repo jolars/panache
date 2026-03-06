@@ -413,7 +413,7 @@ pub(crate) async fn lint_and_publish(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bibtex::{BibIndex, BibLoadError};
+    use crate::bib::{BibIndex, BibLoadError};
     use crate::metadata::{BibliographyInfo, BibliographyParse, CitationInfo, DocumentMetadata};
     use rowan::{TextRange, TextSize};
 

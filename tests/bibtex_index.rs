@@ -2,7 +2,7 @@
 //!
 //! These tests cover the bibtex/index.rs module to improve coverage.
 
-use panache::bibtex::load_bibliography;
+use panache::bib::load_bibliography;
 use std::io::Write;
 use tempfile::NamedTempFile;
 

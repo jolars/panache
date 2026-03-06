@@ -8,7 +8,7 @@ use serde_saphyr::Spanned;
 
 use super::references::extract_inline_references;
 use super::{BibliographyParse, DocumentMetadata, ReferenceEntry};
-use crate::bibtex;
+use crate::bib;
 
 /// Errors that can occur during YAML parsing.
 #[derive(Debug, Clone)]
@@ -119,7 +119,7 @@ pub(super) fn parse_frontmatter(
         .transpose()?;
 
     let bibliography_parse = bibliography.as_ref().map(|info| {
-        let index = bibtex::load_bibliography(&info.paths);
+        let index = bib::load_bibliography(&info.paths);
         BibliographyParse {
             parse_errors: index
                 .errors

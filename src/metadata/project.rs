@@ -8,7 +8,7 @@ use super::bibliography::{BibliographyInfo, BibliographyParse};
 use super::references::extract_inline_references;
 use super::yaml::{YamlError, strip_yaml_delimiters};
 use super::{DocumentMetadata, ReferenceEntry, extract_citations};
-use crate::bibtex;
+use crate::bib;
 use crate::syntax::SyntaxNode;
 
 enum ProjectRoot {
@@ -190,7 +190,7 @@ pub fn extract_project_metadata(
     let bibliography = extract_bibliography_from_sources(&sources, &doc_yaml, doc_yaml_offset);
 
     let bibliography_parse = bibliography.as_ref().map(|info| {
-        let index = bibtex::load_bibliography(&info.paths);
+        let index = bib::load_bibliography(&info.paths);
         BibliographyParse {
             parse_errors: index
                 .errors

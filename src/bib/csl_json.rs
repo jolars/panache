@@ -1,4 +1,4 @@
-use crate::bibtex::Span;
+use crate::bib::Span;
 
 pub(crate) fn parse_csl_json_entries(input: &str) -> Result<Vec<(String, Span)>, String> {
     let mut entries = Vec::new();

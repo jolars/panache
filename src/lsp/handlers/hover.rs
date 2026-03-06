@@ -133,7 +133,7 @@ pub(crate) async fn hover(
     }
 }
 
-fn format_bibtex_entry(entry: &crate::bibtex::BibEntry) -> String {
+fn format_bibtex_entry(entry: &crate::bib::BibEntry) -> String {
     let author = find_field(entry, &["author", "editor"]).unwrap_or_default();
     let year = find_field(entry, &["year", "date"]).unwrap_or_default();
     let title = find_field(entry, &["title", "booktitle"]).unwrap_or_default();
@@ -173,7 +173,7 @@ fn format_bibtex_entry(entry: &crate::bibtex::BibEntry) -> String {
     summary.trim().to_string()
 }
 
-fn find_field<'a>(entry: &'a crate::bibtex::BibEntry, names: &[&str]) -> Option<&'a str> {
+fn find_field<'a>(entry: &'a crate::bib::BibEntry, names: &[&str]) -> Option<&'a str> {
     names.iter().find_map(|name| {
         entry
             .fields
@@ -184,7 +184,7 @@ fn find_field<'a>(entry: &'a crate::bibtex::BibEntry, names: &[&str]) -> Option<
     })
 }
 
-fn build_locator(entry: &crate::bibtex::BibEntry) -> String {
+fn build_locator(entry: &crate::bib::BibEntry) -> String {
     let volume = find_field(entry, &["volume"]).unwrap_or_default();
     let number = find_field(entry, &["number", "issue"]).unwrap_or_default();
     let pages = find_field(entry, &["pages", "page"]).unwrap_or_default();

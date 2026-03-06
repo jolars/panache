@@ -64,7 +64,7 @@ pub(crate) async fn rename(
     let mut bib_paths = Vec::new();
 
     if let Some(parse) = metadata.bibliography_parse.as_ref() {
-        let mut bib_entries: Vec<crate::bibtex::BibEntryLocation> = Vec::new();
+        let mut bib_entries: Vec<crate::bib::BibEntryLocation> = Vec::new();
         if let Some(entry) = parse.index.get(&old_key) {
             bib_entries.push(entry.clone());
         } else {

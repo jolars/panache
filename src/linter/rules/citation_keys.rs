@@ -174,7 +174,7 @@ mod tests {
             bibliography: None,
             metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
-                index: crate::bibtex::BibIndex {
+                index: crate::bib::BibIndex {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
@@ -204,7 +204,7 @@ mod tests {
             bibliography: None,
             metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
-                index: crate::bibtex::BibIndex {
+                index: crate::bib::BibIndex {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
@@ -251,12 +251,12 @@ mod tests {
             }),
             metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
-                index: crate::bibtex::BibIndex {
+                index: crate::bib::BibIndex {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
                     files: Vec::new(),
-                    load_errors: vec![crate::bibtex::BibLoadError {
+                    load_errors: vec![crate::bib::BibLoadError {
                         path,
                         message: "No such file or directory (os error 2)".to_string(),
                     }],
@@ -289,7 +289,7 @@ mod tests {
             bibliography: None,
             metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
-                index: crate::bibtex::BibIndex {
+                index: crate::bib::BibIndex {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
@@ -322,7 +322,7 @@ mod tests {
             bibliography: None,
             metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
-                index: crate::bibtex::BibIndex {
+                index: crate::bib::BibIndex {
                     entries: std::collections::HashMap::new(),
                     duplicates: Vec::new(),
                     errors: Vec::new(),
