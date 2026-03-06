@@ -132,21 +132,32 @@ pub fn parse_raw_tex_block(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
-    _blockquote_depth: usize,
+    blockquote_depth: usize,
 ) -> usize {
     log::debug!("Starting raw TeX block at line {}", start_pos);
 
     builder.start_node(SyntaxKind::TEX_BLOCK.into());
 
     let first_line = lines[start_pos];
+    let first_line_inner = crate::parser::blocks::blockquotes::strip_n_blockquote_markers(
+        first_line,
+        blockquote_depth,
+    );
+    if !is_latex_command_line(first_line_inner)
+        && extract_environment_name(first_line_inner).is_none()
+    {
+        builder.finish_node();
+        log::debug!("Finished raw TeX block, consumed 0 lines");
+        return 0;
+    }
 
     // Check if this is an environment
-    let lines_consumed = if let Some(env_name) = extract_environment_name(first_line) {
+    let lines_consumed = if let Some(env_name) = extract_environment_name(first_line_inner) {
         // Parse environment: \begin{env}...content...\end{env}
-        parse_tex_environment_lines(builder, lines, start_pos, &env_name)
+        parse_tex_environment_lines(builder, lines, start_pos, &env_name, blockquote_depth)
     } else {
         // Parse consecutive LaTeX command lines
-        parse_tex_command_lines(builder, lines, start_pos)
+        parse_tex_command_lines(builder, lines, start_pos, blockquote_depth)
     };
 
     builder.finish_node(); // TEX_BLOCK
@@ -160,22 +171,25 @@ fn parse_tex_command_lines(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
+    blockquote_depth: usize,
 ) -> usize {
     let mut lines_consumed = 0;
     let mut first_line = true;
 
     for line in &lines[start_pos..] {
+        let inner =
+            crate::parser::blocks::blockquotes::strip_n_blockquote_markers(line, blockquote_depth);
         // Stop at blank lines
-        if line.trim().is_empty() {
+        if inner.trim().is_empty() {
             break;
         }
 
         // Stop if not a LaTeX command line
-        if !is_latex_command_line(line) {
+        if !is_latex_command_line(inner) {
             break;
         }
 
-        log::trace!("  Raw block line: {:?}", line);
+        log::trace!("  Raw block line: {:?}", inner);
 
         if !first_line {
             builder.token(SyntaxKind::NEWLINE.into(), "\n");
@@ -183,7 +197,7 @@ fn parse_tex_command_lines(
         first_line = false;
 
         // Emit the line content (strip newline)
-        let content = line.trim_end_matches(&['\r', '\n'][..]);
+        let content = inner.trim_end_matches(&['\r', '\n'][..]);
         builder.token(SyntaxKind::TEXT.into(), content);
 
         lines_consumed += 1;
@@ -203,13 +217,16 @@ fn parse_tex_environment_lines(
     lines: &[&str],
     start_pos: usize,
     env_name: &str,
+    blockquote_depth: usize,
 ) -> usize {
     let mut lines_consumed = 0;
     let mut first_line = true;
     let end_marker = format!("\\end{{{}}}", env_name);
 
     for line in &lines[start_pos..] {
-        log::trace!("  Environment line: {:?}", line);
+        let inner =
+            crate::parser::blocks::blockquotes::strip_n_blockquote_markers(line, blockquote_depth);
+        log::trace!("  Environment line: {:?}", inner);
 
         if !first_line {
             builder.token(SyntaxKind::NEWLINE.into(), "\n");
@@ -217,13 +234,13 @@ fn parse_tex_environment_lines(
         first_line = false;
 
         // Emit the line content (strip newline)
-        let content = line.trim_end_matches(&['\r', '\n'][..]);
+        let content = inner.trim_end_matches(&['\r', '\n'][..]);
         builder.token(SyntaxKind::TEXT.into(), content);
 
         lines_consumed += 1;
 
         // Check if this line contains the end marker
-        if line.trim_start().starts_with(&end_marker) {
+        if inner.trim_start().starts_with(&end_marker) {
             break;
         }
     }
@@ -335,6 +352,24 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
 
         let consumed = parse_raw_tex_block(&mut builder, &lines, 0, 0);
+        assert_eq!(consumed, 1);
+    }
+
+    #[test]
+    fn test_blockquote_line_does_not_loop() {
+        let lines = vec!["> \\medskip\n"];
+        let mut builder = GreenNodeBuilder::new();
+
+        let consumed = parse_raw_tex_block(&mut builder, &lines, 0, 0);
+        assert_eq!(consumed, 0);
+    }
+
+    #[test]
+    fn test_blockquote_line_parses_tex_command() {
+        let lines = vec!["> \\medskip\n"];
+        let mut builder = GreenNodeBuilder::new();
+
+        let consumed = parse_raw_tex_block(&mut builder, &lines, 0, 1);
         assert_eq!(consumed, 1);
     }
 }
