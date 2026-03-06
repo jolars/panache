@@ -391,11 +391,7 @@ fn find_project_documents(project_root: &Path, config: &Config, is_bookdown: boo
     } else {
         None
     };
-    let walker = ignore::WalkBuilder::new(project_root)
-        .hidden(false)
-        .git_ignore(true)
-        .git_global(true)
-        .build();
+    let walker = ignore::WalkBuilder::new(project_root).build();
 
     for entry in walker.flatten() {
         let path = entry.path();
