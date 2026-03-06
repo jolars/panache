@@ -14,6 +14,7 @@ pub mod lsp;
 pub mod metadata;
 pub mod parser;
 pub mod range_utils;
+pub mod salsa;
 pub mod syntax;
 mod utils;
 

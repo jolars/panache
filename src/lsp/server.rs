@@ -115,6 +115,7 @@ impl LanguageServer for PanacheLsp {
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
             Arc::clone(&self.bibliography_cache),
+            Arc::clone(&self.salsa_db),
             params,
         )
         .await;
@@ -125,6 +126,7 @@ impl LanguageServer for PanacheLsp {
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
             Arc::clone(&self.bibliography_cache),
+            Arc::clone(&self.salsa_db),
             &self.client,
             params,
         )

@@ -11,6 +11,7 @@ use crate::lsp::DocumentState;
 use crate::parser::parse_incremental;
 use crate::syntax::SyntaxNode;
 use rowan::GreenNode;
+use salsa::Setter;
 use std::time::Instant;
 
 /// Parse metadata from document text
@@ -46,6 +47,7 @@ pub(crate) async fn did_open(
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
     bib_cache: Arc<Mutex<crate::lsp::BibliographyCache>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     params: DidOpenTextDocumentParams,
 ) {
     let uri = params.text_document.uri.to_string();
@@ -54,6 +56,13 @@ pub(crate) async fn did_open(
     let start = Instant::now();
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
     let tree = GreenNode::from(crate::parse(&text, Some(config.clone())).green());
+    let (salsa_file, salsa_config) = {
+        let db = salsa_db.lock().await;
+        (
+            crate::salsa::FileText::new(&*db, text.clone()),
+            crate::salsa::FileConfig::new(&*db, config.clone()),
+        )
+    };
     let doc_path = params.text_document.uri.to_file_path();
     let has_other_docs = { !document_map.lock().await.is_empty() };
     let graph = if let Some(path) = doc_path.as_ref() {
@@ -85,6 +94,8 @@ pub(crate) async fn did_open(
             DocumentState {
                 text: text.clone(),
                 metadata,
+                salsa_file,
+                salsa_config,
                 graph,
                 tree,
             },
@@ -111,6 +122,7 @@ pub(crate) async fn did_change(
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
     bib_cache: Arc<Mutex<crate::lsp::BibliographyCache>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     client: &Client,
     params: DidChangeTextDocumentParams,
 ) {
@@ -122,8 +134,9 @@ pub(crate) async fn did_change(
 
     // Apply incremental changes sequentially
     let mut dependent_uris: Option<Vec<Uri>> = None;
-    let (graph_text, graph_path, rebuild_full_graph) = {
+    let (graph_text, graph_path, rebuild_full_graph, salsa_file) = {
         let mut document_map = document_map.lock().await;
+        let has_multiple_docs = document_map.len() > 1;
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
             // Store original state before applying changes
             let original_text = doc_state.text.clone();
@@ -175,12 +188,24 @@ pub(crate) async fn did_change(
                     .uri
                     .to_file_path()
                     .map(|p| p.into_owned()),
-                document_map.len() > 1,
+                has_multiple_docs,
+                doc_state.salsa_file,
             )
         } else {
             return;
         }
     };
+    {
+        let mut db = salsa_db.lock().await;
+        if let Some(text) = graph_text.as_ref() {
+            salsa_file.set_text(&mut *db).to(text.clone());
+        }
+        let config_input = crate::salsa::FileConfig::new(&*db, config.clone());
+        drop(db);
+        if let Some(state) = document_map.lock().await.get_mut(&uri_string) {
+            state.salsa_config = config_input;
+        }
+    }
     let new_graph = if let (Some(path), Some(text)) = (graph_path.as_ref(), graph_text.as_ref()) {
         if rebuild_full_graph {
             crate::includes::ProjectGraph::build_project(path, text, &config)

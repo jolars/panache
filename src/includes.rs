@@ -372,7 +372,7 @@ pub fn find_quarto_root(doc_path: &Path) -> Option<PathBuf> {
     }
 }
 
-fn find_bookdown_root(doc_path: &Path) -> Option<PathBuf> {
+pub fn find_bookdown_root(doc_path: &Path) -> Option<PathBuf> {
     let mut current = doc_path.parent()?;
     loop {
         let bookdown = current.join("_bookdown.yml");
@@ -437,7 +437,7 @@ fn include_not_found_diagnostic(input: &str, range: TextRange, path: &Path) -> D
     )
 }
 
-fn resolve_include_path(raw: &str, base_dir: &Path, project_root: Option<&Path>) -> PathBuf {
+pub fn resolve_include_path(raw: &str, base_dir: &Path, project_root: Option<&Path>) -> PathBuf {
     let trimmed = raw.trim();
     if let Some(path) = trimmed.strip_prefix('/')
         && let Some(root) = project_root
@@ -583,7 +583,7 @@ impl ProjectGraph {
     }
 }
 
-fn is_escaped_shortcode(node: &SyntaxNode) -> bool {
+pub fn is_escaped_shortcode(node: &SyntaxNode) -> bool {
     node.children_with_tokens().any(|child| match child {
         NodeOrToken::Token(token) => {
             token.kind() == SyntaxKind::SHORTCODE_MARKER_OPEN && token.text() == "{{{<"
@@ -592,7 +592,7 @@ fn is_escaped_shortcode(node: &SyntaxNode) -> bool {
     })
 }
 
-fn extract_shortcode_content(node: &SyntaxNode) -> Option<String> {
+pub fn extract_shortcode_content(node: &SyntaxNode) -> Option<String> {
     node.children().find_map(|child| {
         if child.kind() == SyntaxKind::SHORTCODE_CONTENT {
             Some(child.text().to_string())
@@ -602,7 +602,7 @@ fn extract_shortcode_content(node: &SyntaxNode) -> Option<String> {
     })
 }
 
-fn split_shortcode_args(content: &str) -> Vec<String> {
+pub fn split_shortcode_args(content: &str) -> Vec<String> {
     let mut args = Vec::new();
     let mut current = String::new();
     let mut in_quotes = false;

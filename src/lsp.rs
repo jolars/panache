@@ -23,6 +23,10 @@ pub struct DocumentState {
     pub text: String,
     /// Parsed metadata from YAML frontmatter (if present).
     pub metadata: Option<crate::metadata::DocumentMetadata>,
+    /// Salsa input for this document's text.
+    pub salsa_file: crate::salsa::FileText,
+    /// Salsa input for this document's config.
+    pub salsa_config: crate::salsa::FileConfig,
     /// Cached ProjectGraph for cross-document lookups.
     pub graph: crate::includes::ProjectGraph,
     /// Cached syntax tree for incremental parsing.
@@ -35,6 +39,7 @@ pub struct PanacheLsp {
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     bibliography_cache: Arc<Mutex<BibliographyCache>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
 }
 
 impl PanacheLsp {
@@ -44,6 +49,7 @@ impl PanacheLsp {
             document_map: Arc::new(Mutex::new(HashMap::new())),
             workspace_root: Arc::new(Mutex::new(None)),
             bibliography_cache: Arc::new(Mutex::new(BibliographyCache::new())),
+            salsa_db: Arc::new(Mutex::new(crate::salsa::SalsaDb::default())),
         }
     }
 
@@ -69,6 +75,12 @@ impl PanacheLsp {
     #[doc(hidden)]
     pub fn workspace_root(&self) -> Arc<Mutex<Option<PathBuf>>> {
         Arc::clone(&self.workspace_root)
+    }
+
+    /// Get access to the salsa database for testing purposes.
+    #[doc(hidden)]
+    pub fn salsa_db(&self) -> Arc<Mutex<crate::salsa::SalsaDb>> {
+        Arc::clone(&self.salsa_db)
     }
 }
 
