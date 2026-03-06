@@ -1,13 +1,13 @@
 Term
 
-:  Definition 2
+:   Definition 2
 
-   Another list:
+    Another list:
 
-   -  Bullet
+    -  Bullet
 
-      ```
-      code
-      ```
+       ```
+       code
+       ```
 
-   -  Another bullet
+    -  Another bullet
