@@ -54,16 +54,14 @@ pub(crate) async fn did_open(
     let start = Instant::now();
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
     let tree = GreenNode::from(crate::parse(&text, Some(config.clone())).green());
-    let graph = if let Some(path) = params.text_document.uri.to_file_path() {
-        let graph_start = Instant::now();
-        let graph = crate::includes::ProjectGraph::build_project(&path, &text, &config);
-        log::debug!(
-            "did_open graph build in {:?}, docs={}, deps={}",
-            graph_start.elapsed(),
-            graph.documents().len(),
-            graph.dependencies(&path, None).len()
-        );
-        graph
+    let doc_path = params.text_document.uri.to_file_path();
+    let has_other_docs = { !document_map.lock().await.is_empty() };
+    let graph = if let Some(path) = doc_path.as_ref() {
+        if has_other_docs {
+            crate::includes::ProjectGraph::build_project(path, &text, &config)
+        } else {
+            crate::includes::ProjectGraph::build(path, &text, &config)
+        }
     } else {
         crate::includes::ProjectGraph::default()
     };
@@ -75,15 +73,23 @@ pub(crate) async fn did_open(
     };
 
     // Store document state with metadata
-    document_map.lock().await.insert(
-        uri.clone(),
-        DocumentState {
-            text: text.clone(),
-            metadata,
-            graph,
-            tree,
-        },
-    );
+    {
+        let mut map = document_map.lock().await;
+        if has_other_docs {
+            for state in map.values_mut() {
+                state.graph = graph.clone();
+            }
+        }
+        map.insert(
+            uri.clone(),
+            DocumentState {
+                text: text.clone(),
+                metadata,
+                graph,
+                tree,
+            },
+        );
+    }
 
     client
         .log_message(MessageType::INFO, format!("Opened document: {}", uri))
@@ -116,13 +122,13 @@ pub(crate) async fn did_change(
 
     // Apply incremental changes sequentially
     let mut dependent_uris: Option<Vec<Uri>> = None;
-    {
+    let (graph_text, graph_path, rebuild_full_graph) = {
         let mut document_map = document_map.lock().await;
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
             // Store original state before applying changes
             let original_text = doc_state.text.clone();
             let original_tree = doc_state.tree.clone();
-            let original_graph = doc_state.graph.clone();
+            let _original_graph = doc_state.graph.clone();
 
             // Apply all changes to update the text
             for change in params.content_changes.iter() {
@@ -162,37 +168,41 @@ pub(crate) async fn did_change(
             };
 
             doc_state.tree = GreenNode::from(new_tree.green());
-            doc_state.graph = if let Some(path) = params.text_document.uri.to_file_path() {
-                let graph_start = Instant::now();
-                let graph =
-                    crate::includes::ProjectGraph::build_project(&path, &doc_state.text, &config);
-                log::debug!(
-                    "did_change graph build in {:?}, docs={}, deps={}",
-                    graph_start.elapsed(),
-                    graph.documents().len(),
-                    graph.dependencies(&path, None).len()
-                );
-                graph
-            } else {
-                crate::includes::ProjectGraph::default()
-            };
-            let dependents = if let Some(path) = params.text_document.uri.to_file_path() {
-                original_graph.dependents(&path, None)
-            } else {
-                Vec::new()
-            };
-            if !dependents.is_empty() {
-                dependent_uris = Some(
-                    dependents
-                        .into_iter()
-                        .filter_map(Uri::from_file_path)
-                        .collect(),
-                );
-            }
+            (
+                Some(doc_state.text.clone()),
+                params
+                    .text_document
+                    .uri
+                    .to_file_path()
+                    .map(|p| p.into_owned()),
+                document_map.len() > 1,
+            )
         } else {
             return;
         }
     };
+    let new_graph = if let (Some(path), Some(text)) = (graph_path.as_ref(), graph_text.as_ref()) {
+        if rebuild_full_graph {
+            crate::includes::ProjectGraph::build_project(path, text, &config)
+        } else {
+            crate::includes::ProjectGraph::build(path, text, &config)
+        }
+    } else {
+        crate::includes::ProjectGraph::default()
+    };
+    if let Some(path) = graph_path.as_ref()
+        && rebuild_full_graph
+    {
+        let dependents = new_graph.dependents(path, None);
+        if !dependents.is_empty() {
+            dependent_uris = Some(
+                dependents
+                    .into_iter()
+                    .filter_map(Uri::from_file_path)
+                    .collect(),
+            );
+        }
+    }
 
     // Re-parse metadata after changes (using cache) - done outside the lock
     // First, get the text we need
@@ -215,6 +225,13 @@ pub(crate) async fn did_change(
         let mut document_map = document_map.lock().await;
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
             doc_state.metadata = metadata;
+            if rebuild_full_graph {
+                for state in document_map.values_mut() {
+                    state.graph = new_graph.clone();
+                }
+            } else {
+                doc_state.graph = new_graph.clone();
+            }
         }
     }
 
