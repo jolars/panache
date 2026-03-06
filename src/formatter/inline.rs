@@ -3,14 +3,14 @@ use crate::formatter::shortcodes::format_shortcode;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
-fn expand_tabs_code_span(text: &str) -> String {
+fn expand_tabs_code_span(text: &str, tab_width: usize) -> String {
     let mut out = String::with_capacity(text.len());
     let mut col = 0usize;
     for ch in text.chars() {
         match ch {
             '\t' => {
-                let mut spaces = 4 - (col % 4);
-                if col == 0 && spaces == 4 {
+                let mut spaces = tab_width - (col % tab_width);
+                if col == 0 && spaces == tab_width {
                     spaces = 1;
                 }
                 out.push_str(&" ".repeat(spaces));
@@ -58,7 +58,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 if matches!(config.tab_stops, crate::config::TabStopMode::Preserve) {
                     content.replace('\n', " ").trim().to_string()
                 } else {
-                    expand_tabs_code_span(&content)
+                    expand_tabs_code_span(&content, config.tab_width)
                 };
 
             let mut backtick_runs = std::collections::HashSet::new();

@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::parser::utils::container_stack::expand_tabs;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use textwrap::wrap_algorithms::WrapAlgorithm;
@@ -73,6 +72,29 @@ fn escape_special_chars(
     }
 
     result
+}
+
+fn expand_tabs_with_width(text: &str, tab_width: usize) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut col = 0usize;
+    for ch in text.chars() {
+        match ch {
+            '\t' => {
+                let spaces = tab_width - (col % tab_width);
+                out.push_str(&" ".repeat(spaces));
+                col += spaces;
+            }
+            '\n' => {
+                out.push('\n');
+                col = 0;
+            }
+            _ => {
+                out.push(ch);
+                col += 1;
+            }
+        }
+    }
+    out
 }
 
 fn normalize_link_dest(dest: &str) -> String {
@@ -298,7 +320,7 @@ fn build_words_with_mode<'a>(
                         // Skip original markers - we'll add normalized ones
                     }
                     SyntaxKind::TEXT => {
-                        let text = expand_tabs(t.text());
+                        let text = expand_tabs_with_width(t.text(), _config.tab_width);
 
                         // Check if prev/next siblings are TEXT (for intraword underscore detection)
                         let prev_is_text = idx > 0

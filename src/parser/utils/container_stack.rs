@@ -104,27 +104,3 @@ pub(crate) fn byte_index_at_column(line: &str, target_col: usize) -> usize {
     }
     idx
 }
-
-/// Expand tabs to spaces using tab stop = 4.
-pub(crate) fn expand_tabs(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut col = 0usize;
-    for ch in text.chars() {
-        match ch {
-            '\t' => {
-                let spaces = TAB_STOP - (col % TAB_STOP);
-                out.push_str(&" ".repeat(spaces));
-                col += spaces;
-            }
-            '\n' => {
-                out.push('\n');
-                col = 0;
-            }
-            _ => {
-                out.push(ch);
-                col += 1;
-            }
-        }
-    }
-    out
-}

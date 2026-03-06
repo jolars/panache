@@ -71,6 +71,7 @@ blank-lines = "collapse"
 math-delimiter-style = "preserve"
 math-indent = 0
 tab-stops = "normalize"
+tab-width = 4
 ```
 
 ### Wrapping Mode
@@ -134,14 +135,18 @@ Control how tabs are handled during formatting:
 ```toml
 [style]
 tab-stops = "normalize"
+tab-width = 4
 ```
 
 `normalize`
-:   Convert tabs to spaces (4-column tab stop). Default.
+:   Convert tabs to spaces using `tab-width` (default 4).
 
 `preserve`
 :   Preserve tabs in literal code spans and fenced/indented code blocks. Tabs in
     regular text are always normalized to spaces.
+
+`tab-width`
+:   Number of spaces per tab when normalizing (default 4).
 
 ### Code Block Style
 

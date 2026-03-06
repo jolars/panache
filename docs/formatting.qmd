@@ -135,6 +135,7 @@ literal code spans and code blocks, set:
 ```toml
 [style]
 tab-stops = "preserve"
+tab-width = 4
 ```
 
 ### Code Blocks

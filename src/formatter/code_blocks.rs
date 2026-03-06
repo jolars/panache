@@ -2,7 +2,6 @@ use crate::config::{AttributeStyle, Config, FenceStyle, Flavor};
 #[cfg(feature = "lsp")]
 use crate::external_formatters::format_code_async;
 use crate::parser::blocks::code_blocks::{CodeBlockType, InfoString};
-use crate::parser::utils::container_stack::expand_tabs;
 use crate::syntax::{AstNode, SyntaxKind, SyntaxNode};
 use crate::utils;
 use rowan::NodeOrToken;
@@ -102,7 +101,7 @@ pub(super) fn format_code_block(
             // No info string, just output basic fence
             let mut final_content = content;
             if !matches!(config.tab_stops, crate::config::TabStopMode::Preserve) {
-                final_content = expand_tabs(&final_content);
+                final_content = expand_tabs_with_width(&final_content, config.tab_width);
             }
             let fence_char = match config.code_blocks.fence_style {
                 FenceStyle::Backtick => '`',
@@ -126,7 +125,7 @@ pub(super) fn format_code_block(
     // Check if we have formatted version from external formatter
     let mut final_content = formatted_code.get(&content).cloned().unwrap_or(content);
     if !matches!(config.tab_stops, crate::config::TabStopMode::Preserve) {
-        final_content = expand_tabs(&final_content);
+        final_content = expand_tabs_with_width(&final_content, config.tab_width);
     }
 
     // Determine fence character based on config
@@ -182,6 +181,29 @@ pub(super) fn format_code_block(
         output.push(fence_char);
     }
     output.push('\n');
+}
+
+fn expand_tabs_with_width(text: &str, tab_width: usize) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut col = 0usize;
+    for ch in text.chars() {
+        match ch {
+            '\t' => {
+                let spaces = tab_width - (col % tab_width);
+                out.push_str(&" ".repeat(spaces));
+                col += spaces;
+            }
+            '\n' => {
+                out.push('\n');
+                col = 0;
+            }
+            _ => {
+                out.push(ch);
+                col += 1;
+            }
+        }
+    }
+    out
 }
 
 fn strip_indent_columns(indent: &str, columns: usize) -> String {

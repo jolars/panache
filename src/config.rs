@@ -834,6 +834,8 @@ pub struct StyleConfig {
     pub math_indent: usize,
     /// Tab stop handling (normalize or preserve)
     pub tab_stops: TabStopMode,
+    /// Tab width for expanding tabs when normalizing
+    pub tab_width: usize,
     /// Code block formatting preferences
     pub code_blocks: Option<CodeBlockConfig>,
 }
@@ -846,6 +848,7 @@ impl Default for StyleConfig {
             math_delimiter_style: MathDelimiterStyle::default(),
             math_indent: 0,
             tab_stops: TabStopMode::Normalize,
+            tab_width: 4,
             code_blocks: None,
         }
     }
@@ -893,6 +896,8 @@ struct RawConfig {
     blank_lines: BlankLines,
     #[serde(default)]
     tab_stops: TabStopMode,
+    #[serde(default = "default_tab_width")]
+    tab_width: usize,
     #[serde(default)]
     code_blocks: Option<CodeBlockConfig>,
 
@@ -915,6 +920,10 @@ fn default_line_width() -> usize {
 
 fn default_blank_lines() -> BlankLines {
     BlankLines::Collapse
+}
+
+fn default_tab_width() -> usize {
+    4
 }
 
 /// Resolve a single formatter name to a FormatterConfig.
@@ -1066,7 +1075,8 @@ impl RawConfig {
             || self.math_indent != 0
             || self.math_delimiter_style != MathDelimiterStyle::default()
             || self.blank_lines != default_blank_lines()
-            || self.tab_stops != TabStopMode::Normalize;
+            || self.tab_stops != TabStopMode::Normalize
+            || self.tab_width != default_tab_width();
 
         if has_deprecated_fields && self.style.is_none() {
             eprintln!(
@@ -1102,6 +1112,7 @@ impl RawConfig {
                 math_delimiter_style: self.math_delimiter_style,
                 math_indent: self.math_indent,
                 tab_stops: self.tab_stops,
+                tab_width: self.tab_width,
                 code_blocks: Some(code_blocks),
             }
         };
@@ -1119,6 +1130,7 @@ impl RawConfig {
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
             tab_stops: style.tab_stops,
+            tab_width: style.tab_width,
             code_blocks: style.code_blocks.unwrap_or_default(),
             formatters: resolve_formatters(self.formatters),
             linters: self.linters,
@@ -1314,6 +1326,7 @@ pub struct Config {
     pub math_indent: usize,
     pub math_delimiter_style: MathDelimiterStyle,
     pub tab_stops: TabStopMode,
+    pub tab_width: usize,
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
     pub code_blocks: CodeBlockConfig,
@@ -1344,6 +1357,7 @@ impl Default for Config {
             math_indent: 0,
             math_delimiter_style: MathDelimiterStyle::default(),
             tab_stops: TabStopMode::Normalize,
+            tab_width: 4,
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             code_blocks: CodeBlockConfig::default(),
@@ -1367,6 +1381,11 @@ impl ConfigBuilder {
 
     pub fn tab_stops(mut self, mode: TabStopMode) -> Self {
         self.config.tab_stops = mode;
+        self
+    }
+
+    pub fn tab_width(mut self, width: usize) -> Self {
+        self.config.tab_width = width;
         self
     }
 
@@ -2009,6 +2028,7 @@ mod tests {
             math-delimiter-style = "dollars"
             math-indent = 2
             tab-stops = "preserve"
+            tab-width = 4
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
@@ -2017,6 +2037,7 @@ mod tests {
         assert_eq!(cfg.math_delimiter_style, MathDelimiterStyle::Dollars);
         assert_eq!(cfg.math_indent, 2);
         assert_eq!(cfg.tab_stops, TabStopMode::Preserve);
+        assert_eq!(cfg.tab_width, 4);
 
         // code-blocks should get flavor defaults
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
