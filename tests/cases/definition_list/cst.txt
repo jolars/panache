@@ -1,4 +1,4 @@
-DOCUMENT@0..1223
+DOCUMENT@0..1430
   HEADING@0..19
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -302,4 +302,29 @@ DOCUMENT@0..1223
         PLAIN@1123..1223
           TEXT@1123..1222 "Definition 2, with a  ..."
           NEWLINE@1222..1223 "\n"
+  BLANK_LINE@1223..1224
+    BLANK_LINE@1223..1224 "\n"
+  PARAGRAPH@1224..1362
+    TEXT@1224..1291 "   Continuation of th ..."
+    NEWLINE@1291..1292 "\n"
+    TEXT@1292..1361 "   this is not a cont ..."
+    NEWLINE@1361..1362 "\n"
+  BLANK_LINE@1362..1363
+    BLANK_LINE@1362..1363 "\n"
+  DEFINITION_LIST@1363..1413
+    DEFINITION_ITEM@1363..1413
+      TERM@1363..1368
+        TEXT@1363..1367 "Term"
+        NEWLINE@1367..1368 "\n"
+      DEFINITION@1368..1413
+        DEFINITION_MARKER@1368..1369 ":"
+        WHITESPACE@1369..1371 "  "
+        PLAIN@1371..1413
+          TEXT@1371..1412 "The following is also ..."
+          NEWLINE@1412..1413 "\n"
+  BLANK_LINE@1413..1414
+    BLANK_LINE@1413..1414 "\n"
+  PARAGRAPH@1414..1430
+    TEXT@1414..1429 "   A paragraph."
+    NEWLINE@1429..1430 "\n"
 

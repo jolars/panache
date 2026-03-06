@@ -70,3 +70,11 @@ A definition list with nested items
 
 Term
 :   Definition 2, with a very long ling, we should wrap this and total line width should not exceed 80.
+
+   Continuation of the definition requires four spaces or a tab, so
+   this is not a continuation of the definition, but a new paragraph.
+
+Term
+:  The following is also not a continuation.
+
+   A paragraph.

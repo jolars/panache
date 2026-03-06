@@ -105,7 +105,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                     // indent must be measured relative to any outer content containers (e.g.
                     // footnotes). Otherwise a line indented only for the footnote would wrongly
                     // continue the definition.
-                    let min_indent = *content_col;
+                    let min_indent = (*content_col).max(4);
                     let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
                     if effective_indent >= min_indent {
                         keep_level = i + 1;
@@ -189,6 +189,10 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         // A blank line that isn't indented to the definition content column ends the definition.
         let (indent_cols, _) = leading_indent(raw_content);
         if raw_content.trim().is_empty() && indent_cols < content_indent {
+            return false;
+        }
+        let min_block_indent = content_indent.max(4);
+        if prev_line_blank && indent_cols < min_block_indent {
             return false;
         }
 
