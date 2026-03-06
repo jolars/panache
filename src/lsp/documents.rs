@@ -49,7 +49,6 @@ pub(crate) async fn did_open(
 ) {
     let uri = params.text_document.uri.to_string();
     let text = params.text_document.text.clone();
-    log::debug!("did_open uri={}, bytes={}", uri, text.len());
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
     let tree = GreenNode::from(crate::parse(&text, Some(config.clone())).green());
     let graph = if let Some(path) = params.text_document.uri.to_file_path() {

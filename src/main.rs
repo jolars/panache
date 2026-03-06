@@ -23,8 +23,10 @@ fn init_logger(debug_log: Option<&Path>) {
         {
             builder.target(env_logger::Target::Pipe(Box::new(file)));
         }
-        builder.filter_level(log::LevelFilter::Debug);
+        builder.filter_level(log::LevelFilter::Info);
+        builder.filter_module("panache::lsp", log::LevelFilter::Debug);
         builder.format_timestamp_millis();
+        log::info!("LSP debug logging enabled at {}", path.display());
     }
     builder.init();
 }
