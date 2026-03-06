@@ -1,10 +1,12 @@
 //! Bibliography extraction from YAML frontmatter.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rowan::{TextRange, TextSize};
 use serde_saphyr::Spanned;
 
+use super::DocumentMetadata;
 use super::yaml::{StringOrArray, YamlError};
 
 /// Information about bibliography files extracted from frontmatter.
@@ -20,6 +22,24 @@ pub struct BibliographyInfo {
 pub struct BibliographyParse {
     pub index: crate::bibtex::BibIndex,
     pub parse_errors: Vec<String>,
+}
+
+pub fn bibliography_range_map(metadata: &DocumentMetadata) -> HashMap<PathBuf, TextRange> {
+    let mut map = HashMap::new();
+    if let Some(info) = metadata.bibliography.as_ref() {
+        for (path, range) in info.paths.iter().zip(info.source_ranges.iter()) {
+            map.insert(path.clone(), *range);
+        }
+    }
+    map
+}
+
+pub fn format_bibliography_load_error(message: &str) -> String {
+    if message.contains("No such file or directory") {
+        "File not found".to_string()
+    } else {
+        message.to_string()
+    }
 }
 
 /// Extract bibliography information from a spanned YAML value.

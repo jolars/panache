@@ -34,8 +34,9 @@ pub(crate) mod project;
 mod references;
 mod yaml;
 
-pub use bibliography::BibliographyInfo;
-pub use bibliography::BibliographyParse;
+pub use bibliography::{
+    BibliographyInfo, BibliographyParse, bibliography_range_map, format_bibliography_load_error,
+};
 pub use citations::{CitationInfo, extract_citations};
 pub use references::{
     InlineBibConflict, InlineReference, InlineReferenceDuplicate, ReferenceEntry,

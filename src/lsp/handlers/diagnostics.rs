@@ -8,7 +8,8 @@ use tower_lsp_server::ls_types::*;
 use crate::linter;
 use crate::lsp::DocumentState;
 use crate::metadata::{
-    DocumentMetadata, InlineBibConflict, InlineReferenceDuplicate, YamlError, inline_bib_conflicts,
+    DocumentMetadata, InlineBibConflict, InlineReferenceDuplicate, YamlError,
+    bibliography_range_map, format_bibliography_load_error, inline_bib_conflicts,
     inline_reference_duplicates,
 };
 use crate::syntax::SyntaxNode;
@@ -141,40 +142,13 @@ fn yaml_error_to_diagnostic(error: &YamlError, _text: &str) -> Diagnostic {
     }
 }
 
-/// Check bibliography paths and create diagnostics for missing files
-fn check_bibliography_files(metadata: &DocumentMetadata, text: &str) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    if let Some(ref bib_info) = metadata.bibliography {
-        for (path, range) in bib_info.paths.iter().zip(bib_info.source_ranges.iter()) {
-            if !path.exists() {
-                let start_pos = offset_to_position(text, range.start().into());
-                let end_pos = offset_to_position(text, range.end().into());
-
-                diagnostics.push(Diagnostic {
-                    range: Range {
-                        start: start_pos,
-                        end: end_pos,
-                    },
-                    severity: Some(DiagnosticSeverity::ERROR),
-                    code: Some(NumberOrString::String("missing-bibliography".to_string())),
-                    source: Some("panache".to_string()),
-                    message: format!("Bibliography file not found: {}", path.display()),
-                    ..Default::default()
-                });
-            }
-        }
-    }
-
-    diagnostics
-}
-
 fn check_bibliography_parse(metadata: &DocumentMetadata, text: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     let Some(parse) = metadata.bibliography_parse.as_ref() else {
         return diagnostics;
     };
+    let range_by_path = bibliography_range_map(metadata);
     let source_ranges = metadata
         .bibliography
         .as_ref()
@@ -185,11 +159,15 @@ fn check_bibliography_parse(metadata: &DocumentMetadata, text: &str) -> Vec<Diag
     let fallback_end = offset_to_position(text, fallback_range.end().into());
 
     for error in &parse.index.load_errors {
+        let range = range_by_path
+            .get(&error.path)
+            .copied()
+            .unwrap_or(fallback_range);
+        let start = offset_to_position(text, range.start().into());
+        let end = offset_to_position(text, range.end().into());
+        let message = format_bibliography_load_error(&error.message);
         diagnostics.push(Diagnostic {
-            range: Range {
-                start: fallback_start,
-                end: fallback_end,
-            },
+            range: Range { start, end },
             severity: Some(DiagnosticSeverity::ERROR),
             code: Some(NumberOrString::String(
                 "bibliography-load-error".to_string(),
@@ -198,18 +176,22 @@ fn check_bibliography_parse(metadata: &DocumentMetadata, text: &str) -> Vec<Diag
             message: format!(
                 "Failed to load bibliography {}: {}",
                 error.path.display(),
-                error.message
+                message
             ),
             ..Default::default()
         });
     }
 
     for duplicate in &parse.index.duplicates {
+        let range = range_by_path
+            .get(&duplicate.first.file)
+            .or_else(|| range_by_path.get(&duplicate.duplicate.file))
+            .copied()
+            .unwrap_or(fallback_range);
+        let start = offset_to_position(text, range.start().into());
+        let end = offset_to_position(text, range.end().into());
         diagnostics.push(Diagnostic {
-            range: Range {
-                start: fallback_start,
-                end: fallback_end,
-            },
+            range: Range { start, end },
             severity: Some(DiagnosticSeverity::WARNING),
             code: Some(NumberOrString::String(
                 "duplicate-bibliography-key".to_string(),
@@ -332,8 +314,6 @@ pub(crate) async fn lint_and_publish(
 
     // Check for YAML metadata errors
     if let Some(ref metadata) = doc_state.metadata {
-        // Check for missing bibliography files
-        all_diagnostics.extend(check_bibliography_files(metadata, &text));
         all_diagnostics.extend(check_bibliography_parse(metadata, &text));
         all_diagnostics.extend(inline_reference_diagnostics(metadata, &text));
     } else {
@@ -385,6 +365,14 @@ pub(crate) async fn lint_and_publish(
         Ok(panache_diagnostics) => {
             let lsp_diagnostics: Vec<Diagnostic> = panache_diagnostics
                 .iter()
+                .filter(|d| {
+                    !matches!(
+                        d.code.as_str(),
+                        "bibliography-load-error"
+                            | "bibliography-parse-error"
+                            | "duplicate-bibliography-key"
+                    )
+                })
                 .map(|d| convert_diagnostic(d, &text))
                 .collect();
 
@@ -419,5 +407,59 @@ pub(crate) async fn lint_and_publish(
                 .log_message(MessageType::ERROR, format!("Linting task failed: {}", e))
                 .await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bibtex::{BibIndex, BibLoadError};
+    use crate::metadata::{BibliographyInfo, BibliographyParse, CitationInfo, DocumentMetadata};
+    use rowan::{TextRange, TextSize};
+
+    #[test]
+    fn bibliography_load_error_uses_source_range() {
+        let text = "---\nbibliography: test.bib\n---\n\nText\n";
+        let start = text.find("test.bib").unwrap();
+        let end = start + "test.bib".len();
+        let range = TextRange::new(TextSize::from(start as u32), TextSize::from(end as u32));
+        let path = PathBuf::from("/tmp/test.bib");
+
+        let metadata = DocumentMetadata {
+            bibliography: Some(BibliographyInfo {
+                paths: vec![path.clone()],
+                source_ranges: vec![range],
+            }),
+            metadata_files: Vec::new(),
+            bibliography_parse: Some(BibliographyParse {
+                index: BibIndex {
+                    entries: HashMap::new(),
+                    duplicates: Vec::new(),
+                    errors: Vec::new(),
+                    files: Vec::new(),
+                    load_errors: vec![BibLoadError {
+                        path: path.clone(),
+                        message: "No such file or directory (os error 2)".to_string(),
+                    }],
+                },
+                parse_errors: Vec::new(),
+            }),
+            inline_references: Vec::new(),
+            citations: CitationInfo { keys: Vec::new() },
+            title: None,
+            raw_yaml: String::new(),
+        };
+
+        let diagnostics = check_bibliography_parse(&metadata, text);
+        assert_eq!(diagnostics.len(), 1);
+        let diag = &diagnostics[0];
+        let expected_start = offset_to_position(text, start);
+        let expected_end = offset_to_position(text, end);
+        assert_eq!(diag.range.start, expected_start);
+        assert_eq!(diag.range.end, expected_end);
+        assert_eq!(
+            diag.message,
+            "Failed to load bibliography /tmp/test.bib: File not found"
+        );
     }
 }
