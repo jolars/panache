@@ -174,7 +174,17 @@ The LSP server communicates via stdin/stdout and is typically launched automatic
 editor's LSP client. You generally don't need to run this command manually.
 
 For editor configuration examples, see: https://github.com/jolars/panache#editor-integration")]
-    Lsp,
+    Lsp {
+        /// Enable debug logging to ~/.local/state/panache/lsp-debug.log
+        #[arg(long)]
+        #[arg(help = "Enable LSP debug logging to ~/.local/state/panache/lsp-debug.log")]
+        #[arg(
+            long_help = "Enable verbose LSP debug logging to ~/.local/state/panache/lsp-debug.log \
+            (or $XDG_STATE_HOME/panache/lsp-debug.log when XDG_STATE_HOME is set). \
+            Logs are written to file to avoid interfering with the LSP protocol over stdout."
+        )]
+        debug: bool,
+    },
     /// Lint a Quarto, Pandoc, or Markdown document
     #[command(
         long_about = "Lint a document to check for correctness issues and best practice \

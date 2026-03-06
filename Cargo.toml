@@ -26,6 +26,7 @@ required-features = ["cli"]
 
 [dependencies]
 clap = { version = "4.5.60", features = ["derive"], optional = true }
+dirs = "6.0.0"
 env_logger = "0.11.8"
 ignore = { version = "0.4", optional = true }
 log = { version = "0.4.28", features = ["release_max_level_info"] }

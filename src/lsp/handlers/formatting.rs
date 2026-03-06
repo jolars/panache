@@ -19,6 +19,7 @@ pub(crate) async fn format_document(
     params: DocumentFormattingParams,
 ) -> Result<Option<Vec<TextEdit>>> {
     let uri = params.text_document.uri;
+    log::debug!("format_document uri={}", *uri);
 
     client
         .log_message(
@@ -42,6 +43,7 @@ pub(crate) async fn format_document(
     // Run formatting in a blocking task (because rowan::SyntaxNode isn't Send)
     // but use format_async inside to support external formatters
     let text_clone = text.clone();
+    let text_len = text.len();
     let formatted = tokio::task::spawn_blocking(move || {
         // Create a new tokio runtime for async external formatters
         tokio::runtime::Runtime::new()
@@ -55,6 +57,11 @@ pub(crate) async fn format_document(
     if formatted == text {
         return Ok(None);
     }
+    log::debug!(
+        "format_document bytes_in={} bytes_out={}",
+        text_len,
+        formatted.len()
+    );
 
     // Calculate the range to replace (entire document)
     // Use text.len() to ensure we include any trailing newlines
@@ -83,6 +90,12 @@ pub(crate) async fn format_range(
 ) -> Result<Option<Vec<TextEdit>>> {
     let uri = params.text_document.uri;
     let range = params.range;
+    log::debug!(
+        "format_range uri={} start={:?} end={:?}",
+        *uri,
+        range.start,
+        range.end
+    );
 
     client
         .log_message(
@@ -153,6 +166,11 @@ pub(crate) async fn format_range(
     if formatted.is_empty() || formatted == text {
         return Ok(None);
     }
+    log::debug!(
+        "format_range bytes_in={} bytes_out={}",
+        text.len(),
+        formatted.len()
+    );
 
     if let Some((start_offset, end_offset)) = expanded_range {
         client

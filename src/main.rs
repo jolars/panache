@@ -13,6 +13,30 @@ use cli::{Cli, Commands};
 /// Supported file extensions for formatting
 const SUPPORTED_EXTENSIONS: &[&str] = &["md", "qmd", "Rmd", "markdown", "mdown", "mkd"];
 
+fn init_logger(debug_log: Option<&Path>) {
+    let mut builder = env_logger::Builder::from_default_env();
+    if let Some(path) = debug_log {
+        if let Ok(file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            builder.target(env_logger::Target::Pipe(Box::new(file)));
+        }
+        builder.filter_level(log::LevelFilter::Debug);
+        builder.format_timestamp_millis();
+    }
+    builder.init();
+}
+
+fn init_lsp_debug_log() -> io::Result<PathBuf> {
+    let mut base = dirs::state_dir().unwrap_or_else(|| PathBuf::from("."));
+    base.push("panache");
+    fs::create_dir_all(&base)?;
+    base.push("lsp-debug.log");
+    Ok(base)
+}
+
 /// Expand paths to include all supported files, recursively handling directories
 fn expand_paths(paths: &[PathBuf]) -> io::Result<Vec<PathBuf>> {
     use ignore::WalkBuilder;
@@ -145,9 +169,12 @@ fn print_diff(file_path: &str, original: &str, formatted: &str) {
 }
 
 fn main() -> io::Result<()> {
-    env_logger::init();
-
     let cli = Cli::parse();
+    let debug_log = match &cli.command {
+        Commands::Lsp { debug } if *debug => Some(init_lsp_debug_log()?),
+        _ => None,
+    };
+    init_logger(debug_log.as_deref());
 
     match cli.command {
         Commands::Parse { file, json } => {
@@ -277,7 +304,7 @@ fn main() -> io::Result<()> {
             Ok(())
         }
         #[cfg(feature = "lsp")]
-        Commands::Lsp => {
+        Commands::Lsp { .. } => {
             // LSP needs tokio runtime
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(async { panache::lsp::run().await })?;

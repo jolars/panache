@@ -18,6 +18,7 @@ pub(crate) async fn did_change_watched_files(
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: DidChangeWatchedFilesParams,
 ) {
+    log::debug!("did_change_watched_files changes={}", params.changes.len());
     // Process each file change
     for change in params.changes {
         let Some(path) = change.uri.to_file_path() else {
@@ -69,6 +70,7 @@ pub(crate) async fn did_change_watched_files(
 
         // Re-lint each affected document
         for uri in affected_documents {
+            log::debug!("did_change_watched_files relint uri={}", *uri);
             lint_and_publish(client, &document_map, &workspace_root, uri).await;
         }
     }

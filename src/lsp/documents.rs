@@ -49,6 +49,7 @@ pub(crate) async fn did_open(
 ) {
     let uri = params.text_document.uri.to_string();
     let text = params.text_document.text.clone();
+    log::debug!("did_open uri={}, bytes={}", uri, text.len());
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
     let tree = GreenNode::from(crate::parse(&text, Some(config.clone())).green());
     let graph = if let Some(path) = params.text_document.uri.to_file_path() {
@@ -97,6 +98,8 @@ pub(crate) async fn did_change(
     params: DidChangeTextDocumentParams,
 ) {
     let uri_string = params.text_document.uri.to_string();
+    let change_count = params.content_changes.len();
+    log::debug!("did_change uri={}, changes={}", uri_string, change_count);
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
 
     // Apply incremental changes sequentially
@@ -104,6 +107,7 @@ pub(crate) async fn did_change(
     {
         let mut document_map = document_map.lock().await;
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
+            log::debug!("did_change before bytes={}", doc_state.text.len());
             // Store original state before applying changes
             let original_text = doc_state.text.clone();
             let original_tree = doc_state.tree.clone();
@@ -111,8 +115,14 @@ pub(crate) async fn did_change(
 
             // Apply all changes to update the text
             for change in params.content_changes.iter() {
+                log::debug!(
+                    "did_change apply range={:?} new_bytes={}",
+                    change.range,
+                    change.text.len()
+                );
                 doc_state.text = apply_content_change(&doc_state.text, change);
             }
+            log::debug!("did_change after bytes={}", doc_state.text.len());
 
             // Use incremental parsing for single changes, full reparse for multiple
             let new_tree = if params.content_changes.len() == 1 {
@@ -145,6 +155,14 @@ pub(crate) async fn did_change(
                 // Multiple changes - do full reparse for now
                 crate::parse(&doc_state.text, Some(config.clone()))
             };
+            log::debug!(
+                "did_change parse mode={}",
+                if change_count == 1 {
+                    "incremental"
+                } else {
+                    "full"
+                }
+            );
 
             doc_state.tree = GreenNode::from(new_tree.green());
             doc_state.graph = if let Some(path) = params.text_document.uri.to_file_path() {
@@ -158,6 +176,7 @@ pub(crate) async fn did_change(
                 Vec::new()
             };
             if !dependents.is_empty() {
+                log::debug!("did_change dependents={}", dependents.len());
                 dependent_uris = Some(
                     dependents
                         .into_iter()
