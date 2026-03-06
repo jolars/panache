@@ -563,15 +563,6 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::LATEX_ENVIRONMENT => {
-                // Output the environment exactly as written
-                let text = node.text().to_string();
-                self.output.push_str(&text);
-                if !text.ends_with('\n') {
-                    self.output.push('\n');
-                }
-            }
-
             SyntaxKind::HTML_BLOCK => {
                 // Check if this is a directive comment
                 if let Some(directive) = extract_directive_from_node(node) {
@@ -1488,14 +1479,33 @@ impl Formatter {
                 // Default to $$ if markers not found
                 let opening = opening_marker.as_deref().unwrap_or("$$");
                 let closing_from_tree = closing_marker.as_deref().unwrap_or("$$");
+                let is_environment =
+                    opening.starts_with("\\begin{") && closing_from_tree.starts_with("\\end{");
 
                 // Apply delimiter style preference
                 use crate::config::MathDelimiterStyle;
-                let (open, close) = match self.config.math_delimiter_style {
-                    MathDelimiterStyle::Preserve => (opening, closing_from_tree),
-                    MathDelimiterStyle::Dollars => ("$$", "$$"),
-                    MathDelimiterStyle::Backslash => (r"\[", r"\]"),
+                let (open, close) = if is_environment {
+                    (opening, closing_from_tree)
+                } else {
+                    match self.config.math_delimiter_style {
+                        MathDelimiterStyle::Preserve => (opening, closing_from_tree),
+                        MathDelimiterStyle::Dollars => ("$$", "$$"),
+                        MathDelimiterStyle::Backslash => (r"\[", r"\]"),
+                    }
                 };
+
+                if is_environment {
+                    self.output.push_str(open);
+                    if let Some(content) = math_content {
+                        self.output.push_str(&content);
+                        if !content.ends_with('\n') {
+                            self.output.push('\n');
+                        }
+                    }
+                    self.output.push_str(close);
+                    self.output.push('\n');
+                    return;
+                }
 
                 // Opening fence
                 self.output.push('\n');

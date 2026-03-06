@@ -46,11 +46,12 @@ use super::links::{
     try_parse_inline_link, try_parse_reference_image, try_parse_reference_link,
 };
 use super::math::{
-    emit_display_math, emit_double_backslash_display_math, emit_double_backslash_inline_math,
-    emit_inline_math, emit_single_backslash_display_math, emit_single_backslash_inline_math,
-    try_parse_display_math, try_parse_double_backslash_display_math,
-    try_parse_double_backslash_inline_math, try_parse_inline_math,
-    try_parse_single_backslash_display_math, try_parse_single_backslash_inline_math,
+    emit_display_math, emit_display_math_environment, emit_double_backslash_display_math,
+    emit_double_backslash_inline_math, emit_inline_math, emit_single_backslash_display_math,
+    emit_single_backslash_inline_math, try_parse_display_math,
+    try_parse_double_backslash_display_math, try_parse_double_backslash_inline_math,
+    try_parse_inline_math, try_parse_math_environment, try_parse_single_backslash_display_math,
+    try_parse_single_backslash_inline_math,
 };
 use super::native_spans::{emit_native_span, try_parse_native_span};
 use super::raw_inline::is_raw_inline;
@@ -1124,6 +1125,21 @@ fn parse_inline_range_impl(
                     text_start = pos;
                     continue;
                 }
+            }
+
+            // Try math environments \begin{equation}...\end{equation}
+            if config.extensions.raw_tex
+                && let Some((len, begin_marker, content, end_marker)) =
+                    try_parse_math_environment(&text[pos..])
+            {
+                if pos > text_start {
+                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                }
+                log::debug!("Matched math environment at pos {}", pos);
+                emit_display_math_environment(builder, begin_marker, content, end_marker);
+                pos += len;
+                text_start = pos;
+                continue;
             }
 
             // Try bookdown reference: \@ref(label)

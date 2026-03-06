@@ -1,29 +1,98 @@
-//! Raw block parsing (LaTeX commands, etc.)
+//! Raw TeX block parsing (LaTeX commands and non-math environments)
 //!
-//! This module handles block-level raw content, primarily LaTeX commands
-//! that appear at the start of lines. Examples:
-//! - `\DeclareMathOperator{\E}{E{}}`
-//! - `\newcommand{\foo}{bar}`
-//! - `\usepackage{amsmath}`
+//! This module handles block-level raw TeX content:
+//! 1. LaTeX commands: `\DeclareMathOperator`, `\newcommand`, etc.
+//! 2. Non-math environments: `\begin{tabular}`, `\begin{figure}`, etc.
+//!
+//! Math environments (equation, align, etc.) are handled as INLINE content
+//! in paragraphs, not as blocks. See INLINE_MATH_ENVIRONMENTS list below.
 //!
 //! Per Pandoc behavior:
-//! - Consecutive LaTeX command lines are grouped into a single RAW_BLOCK
+//! - Consecutive LaTeX command lines are grouped into a single TEX_BLOCK
+//! - Non-math environments become TEX_BLOCK
+//! - Math environments are parsed inline (in paragraphs)
 //! - Blank lines or non-LaTeX content terminate the block
 //! - Only enabled when `raw_tex` extension is active
 
 use crate::config::Config;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
+
+/// Inline math environments from Pandoc (parsed as RawInline in Para).
+/// These should NOT be parsed as block-level environments.
+///
+/// Source: pandoc/src/Text/Pandoc/Readers/LaTeX/Math.hs:L97-L123
+const INLINE_MATH_ENVIRONMENTS: &[&str] = &[
+    "displaymath",
+    "math",
+    "equation",
+    "equation*",
+    "gather",
+    "gather*",
+    "multline",
+    "multline*",
+    "eqnarray",
+    "eqnarray*",
+    "align",
+    "align*",
+    "alignat",
+    "alignat*",
+    "flalign",
+    "flalign*",
+    "dmath",
+    "dmath*",
+    "dgroup",
+    "dgroup*",
+    "darray",
+    "darray*",
+    "subequations",
+];
+
+/// Check if an environment name is an inline math environment.
+pub fn is_inline_math_environment(name: &str) -> bool {
+    INLINE_MATH_ENVIRONMENTS.contains(&name)
+}
+
+/// Extract environment name from `\begin{name}` line.
+/// Returns None if not a valid \begin{...} line.
+pub fn extract_environment_name(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+
+    if !trimmed.starts_with("\\begin{") {
+        return None;
+    }
+
+    let after_begin = &trimmed[7..]; // Skip "\begin{"
+    let close_brace = after_begin.find('}')?;
+    let env_name = &after_begin[..close_brace];
+
+    if env_name.is_empty() {
+        return None;
+    }
+
+    Some(env_name.to_string())
+}
 
 /// Check if content could start a raw TeX block.
 ///
 /// Requirements:
 /// - `raw_tex` extension must be enabled
 /// - Line must start with backslash followed by a letter
+/// - If it's a `\begin{env}`, the environment must NOT be an inline math env
 pub fn can_start_raw_block(content: &str, config: &Config) -> bool {
     // Must have raw_tex extension enabled
     if !config.extensions.raw_tex {
         return false;
+    }
+
+    // Check if it's a \begin{env} line
+    if let Some(env_name) = extract_environment_name(content) {
+        // Skip inline math environments - they should be parsed inline in paragraphs
+        if is_inline_math_environment(&env_name) {
+            return false;
+        }
+        // Non-math environment: parse as block
+        return true;
     }
 
     // Check if we're at the start of a line with a LaTeX command
@@ -69,6 +138,29 @@ pub fn parse_raw_tex_block(
 
     builder.start_node(SyntaxKind::TEX_BLOCK.into());
 
+    let first_line = lines[start_pos];
+
+    // Check if this is an environment
+    let lines_consumed = if let Some(env_name) = extract_environment_name(first_line) {
+        // Parse environment: \begin{env}...content...\end{env}
+        parse_tex_environment_lines(builder, lines, start_pos, &env_name)
+    } else {
+        // Parse consecutive LaTeX command lines
+        parse_tex_command_lines(builder, lines, start_pos)
+    };
+
+    builder.finish_node(); // TEX_BLOCK
+
+    log::debug!("Finished raw TeX block, consumed {} lines", lines_consumed);
+    lines_consumed
+}
+
+/// Parse consecutive LaTeX command lines.
+fn parse_tex_command_lines(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    start_pos: usize,
+) -> usize {
     let mut lines_consumed = 0;
     let mut first_line = true;
 
@@ -102,9 +194,45 @@ pub fn parse_raw_tex_block(
         builder.token(SyntaxKind::NEWLINE.into(), "\n");
     }
 
-    builder.finish_node(); // TEX_BLOCK
+    lines_consumed
+}
 
-    log::debug!("Finished raw TeX block, consumed {} lines", lines_consumed);
+/// Parse a LaTeX environment from \begin{env} to \end{env}.
+fn parse_tex_environment_lines(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    start_pos: usize,
+    env_name: &str,
+) -> usize {
+    let mut lines_consumed = 0;
+    let mut first_line = true;
+    let end_marker = format!("\\end{{{}}}", env_name);
+
+    for line in &lines[start_pos..] {
+        log::trace!("  Environment line: {:?}", line);
+
+        if !first_line {
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        }
+        first_line = false;
+
+        // Emit the line content (strip newline)
+        let content = line.trim_end_matches(&['\r', '\n'][..]);
+        builder.token(SyntaxKind::TEXT.into(), content);
+
+        lines_consumed += 1;
+
+        // Check if this line contains the end marker
+        if line.trim_start().starts_with(&end_marker) {
+            break;
+        }
+    }
+
+    // Emit final newline
+    if lines_consumed > 0 {
+        builder.token(SyntaxKind::NEWLINE.into(), "\n");
+    }
+
     lines_consumed
 }
 
@@ -112,6 +240,7 @@ pub fn parse_raw_tex_block(
 mod tests {
     use super::*;
     use crate::config::Config;
+    use crate::syntax::SyntaxNode;
 
     #[test]
     fn test_is_latex_command_line() {

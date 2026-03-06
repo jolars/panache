@@ -8,7 +8,7 @@ use crate::config::Config;
 
 use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
 use crate::parser::blocks::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
-use crate::parser::blocks::{definition_lists, html_blocks, latex_envs, lists};
+use crate::parser::blocks::{definition_lists, html_blocks, lists, raw_blocks};
 use crate::parser::utils::container_stack::{ContainerStack, leading_indent};
 
 pub(crate) struct ContinuationPolicy<'a, 'cfg> {
@@ -223,7 +223,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
             return false;
         }
         if self.config.extensions.raw_tex
-            && latex_envs::try_parse_latex_env_begin(stripped_content).is_some()
+            && raw_blocks::extract_environment_name(stripped_content).is_some()
         {
             return false;
         }

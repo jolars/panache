@@ -288,6 +288,16 @@ mod math_tests {
         math
     }
 
+    fn find_display_math(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut math = Vec::new();
+        for child in node.descendants() {
+            if child.kind() == SyntaxKind::DISPLAY_MATH {
+                math.push(child.to_string());
+            }
+        }
+        math
+    }
+
     #[test]
     fn test_simple_inline_math() {
         let input = "This has $x = y$ in it.";
@@ -336,6 +346,16 @@ mod math_tests {
         let math = find_inline_math(&inline_tree);
         assert_eq!(math.len(), 1);
         assert_eq!(math[0], "$y$");
+    }
+
+    #[test]
+    fn test_math_environment_inline_display() {
+        let input = "\\begin{equation}\n  x = y\n\\end{equation}\n";
+        let inline_tree = parse_inline(input);
+
+        let math = find_display_math(&inline_tree);
+        assert_eq!(math.len(), 1);
+        assert_eq!(math[0], input);
     }
 }
 

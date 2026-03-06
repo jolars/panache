@@ -5,22 +5,13 @@ DOCUMENT@0..610
     NEWLINE@138..139 "\n"
   BLANK_LINE@139..140
     BLANK_LINE@139..140 "\n"
-  PARAGRAPH@140..170
+  PARAGRAPH@140..325
     TEXT@140..169 "An equation with a re ..."
     NEWLINE@169..170 "\n"
-  LATEX_ENVIRONMENT@170..277
-    LATEX_ENV_BEGIN@170..187
-      TEXT@170..186 "\\begin{equation}"
-      NEWLINE@186..187 "\n"
-    LATEX_ENV_CONTENT@187..261
-      TEXT@187..245 "  f\\left(k\\right) = \\ ..."
-      NEWLINE@245..246 "\n"
-      TEXT@246..260 "  (\\#eq:binom)"
-      NEWLINE@260..261 "\n"
-    LATEX_ENV_END@261..277
-      TEXT@261..276 "\\end{equation} "
-      NEWLINE@276..277 "\n"
-  PARAGRAPH@277..325
+    DISPLAY_MATH@170..277
+      DISPLAY_MATH_MARKER@170..186 "\\begin{equation}"
+      TEXT@186..261 "\n  f\\left(k\\right) =  ..."
+      DISPLAY_MATH_MARKER@261..277 "\\end{equation} \n"
     TEXT@277..308 "We can refer to it as ..."
     CROSSREF@308..323
       TEXT@308..314 "\\@ref("

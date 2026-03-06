@@ -143,12 +143,8 @@ pub enum SyntaxKind {
     ATX_HEADING_MARKER,       // leading #####
     SETEXT_HEADING_UNDERLINE, // ===== or -----
 
-    // LaTeX environments
-    LATEX_COMMAND,     // \command{...}
-    LATEX_ENVIRONMENT, // \begin{...}...\end{...}
-    LATEX_ENV_BEGIN,   // \begin{...}
-    LATEX_ENV_END,     // \end{...}
-    LATEX_ENV_CONTENT, //
+    // LaTeX inline commands
+    LATEX_COMMAND, // \command{...}
 
     // Tables
     SIMPLE_TABLE,

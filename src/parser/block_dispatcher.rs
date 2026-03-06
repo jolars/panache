@@ -31,12 +31,12 @@ use super::blocks::headings::{
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::html_blocks::{HtmlBlockType, parse_html_block, try_parse_html_block_start};
 use super::blocks::indented_code::{is_indented_code_line, parse_indented_code_block};
-use super::blocks::latex_envs::{LatexEnvInfo, parse_latex_environment, try_parse_latex_env_begin};
+use super::blocks::latex_envs::LatexEnvInfo;
 use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
 use super::blocks::lists::{ListMarker, is_content_nested_bullet_marker, try_parse_list_marker};
 use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
-use super::blocks::paragraphs;
 use super::blocks::raw_blocks;
+use super::blocks::raw_blocks::extract_environment_name;
 use super::blocks::reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
 use super::blocks::tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
@@ -1250,7 +1250,15 @@ impl BlockParser for LatexEnvironmentParser {
             return None;
         }
 
-        let env_info = try_parse_latex_env_begin(ctx.content)?;
+        let env_name = extract_environment_name(ctx.content)?;
+        let env_info = LatexEnvInfo { env_name };
+
+        // Skip inline math environments - they should be parsed inline in paragraphs
+        // Import and use the function from raw_blocks module
+        use super::blocks::raw_blocks::is_inline_math_environment;
+        if is_inline_math_environment(&env_info.env_name) {
+            return None;
+        }
 
         // Like HTML blocks, raw TeX blocks should be able to interrupt paragraphs.
         let detection = if ctx.has_blank_before || ctx.at_document_start {
@@ -1270,15 +1278,51 @@ impl BlockParser for LatexEnvironmentParser {
         line_pos: usize,
         payload: Option<&dyn Any>,
     ) -> usize {
+        use crate::syntax::SyntaxKind;
+
         let env_info = if let Some(info) = payload.and_then(|p| p.downcast_ref::<LatexEnvInfo>()) {
             info.clone()
         } else {
-            try_parse_latex_env_begin(ctx.content).expect("LaTeX env info should exist")
+            let env_name =
+                extract_environment_name(ctx.content).expect("LaTeX env info should exist");
+            LatexEnvInfo { env_name }
         };
 
-        let new_pos =
-            parse_latex_environment(builder, lines, line_pos, env_info, ctx.blockquote_depth);
-        new_pos - line_pos
+        // Use TEX_BLOCK for all non-math environments
+        builder.start_node(SyntaxKind::TEX_BLOCK.into());
+
+        let mut current_pos = line_pos;
+        let end_marker = format!("\\end{{{}}}", env_info.env_name);
+        let mut first_line = true;
+
+        while current_pos < lines.len() {
+            let line = lines[current_pos];
+
+            if !first_line {
+                builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            }
+            first_line = false;
+
+            // Emit the line content (strip newline)
+            let content = line.trim_end_matches(&['\r', '\n'][..]);
+            builder.token(SyntaxKind::TEXT.into(), content);
+
+            current_pos += 1;
+
+            // Check if this line contains the end marker
+            if line.trim_start().starts_with(&end_marker) {
+                break;
+            }
+        }
+
+        // Emit final newline
+        if current_pos > line_pos {
+            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+        }
+
+        builder.finish_node(); // TEX_BLOCK
+
+        current_pos - line_pos
     }
 
     fn name(&self) -> &'static str {

@@ -109,10 +109,10 @@ pub(super) fn format_paragraph_with_display_math(
                 }
             }
             NodeOrToken::Token(t) => {
-                if t.kind() != SyntaxKind::NEWLINE {
-                    current_text.push_str(t.text());
-                } else {
+                if t.kind() == SyntaxKind::NEWLINE {
                     current_text.push(' '); // Replace newlines with spaces for wrapping
+                } else if t.kind() != SyntaxKind::DISPLAY_MATH_MARKER {
+                    current_text.push_str(t.text());
                 }
             }
         }

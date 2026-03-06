@@ -267,22 +267,36 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 }
             }
 
+            let opening = opening_marker.as_deref().unwrap_or("$$");
+            let closing = closing_marker.as_deref().unwrap_or("$$");
+            let is_environment = opening.starts_with("\\begin{") && closing.starts_with("\\end{");
+
             // Apply delimiter style preference
-            let (open, close) = match config.math_delimiter_style {
-                MathDelimiterStyle::Preserve => {
-                    let opening = opening_marker.as_deref().unwrap_or("$$");
-                    let closing = closing_marker.as_deref().unwrap_or("$$");
-                    (opening, closing)
+            let (open, close) = if is_environment {
+                (opening, closing)
+            } else {
+                match config.math_delimiter_style {
+                    MathDelimiterStyle::Preserve => (opening, closing),
+                    MathDelimiterStyle::Dollars => ("$$", "$$"),
+                    MathDelimiterStyle::Backslash => (r"\[", r"\]"),
                 }
-                MathDelimiterStyle::Dollars => ("$$", "$$"),
-                MathDelimiterStyle::Backslash => (r"\[", r"\]"),
             };
+
+            let mut result = String::new();
+            if is_environment {
+                result.push_str(open);
+                result.push_str(&content);
+                if !content.ends_with('\n') {
+                    result.push('\n');
+                }
+                result.push_str(close);
+                return result;
+            }
 
             // Normalize content:
             // 1. Trim leading/trailing whitespace (including newlines)
             // 2. Ensure content is on separate lines from delimiters
             // 3. Strip common leading whitespace from all lines (preserve relative indentation)
-            let mut result = String::new();
             result.push_str(open);
             result.push('\n');
 

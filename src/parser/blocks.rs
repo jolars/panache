@@ -21,8 +21,6 @@ pub mod horizontal_rules;
 pub mod html_blocks;
 #[path = "blocks/indented_code.rs"]
 pub mod indented_code;
-#[path = "blocks/latex_envs.rs"]
-pub mod latex_envs;
 #[path = "blocks/line_blocks.rs"]
 pub mod line_blocks;
 #[path = "blocks/lists.rs"]
@@ -58,3 +56,5 @@ pub mod tests {
     #[path = "losslessness.rs"]
     pub mod losslessness;
 }
+#[path = "blocks/latex_envs.rs"]
+pub mod latex_envs;
