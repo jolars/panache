@@ -920,7 +920,18 @@ impl Formatter {
                     }
                     WrapMode::Reflow => {
                         log::trace!("Reflowing Plain block to {} width", line_width);
-                        let lines = self.wrapped_lines_for_paragraph(node, line_width);
+                        let in_definition = self.output.ends_with(":   ");
+                        let lines = if in_definition {
+                            let marker_len = ":   ".len();
+                            let marker_indent = indent.saturating_sub(4);
+                            let first_line_space =
+                                line_width.saturating_sub(marker_indent + marker_len);
+                            let continuation_width = line_width.saturating_sub(indent);
+                            let widths = [first_line_space, continuation_width];
+                            self.wrapped_lines_for_paragraph_with_widths(node, &widths)
+                        } else {
+                            self.wrapped_lines_for_paragraph(node, line_width)
+                        };
 
                         for (i, line) in lines.iter().enumerate() {
                             if i > 0 {
@@ -1062,6 +1073,7 @@ impl Formatter {
                 // The definition marker itself is at the base indent level
                 // Definition content is indented 4 spaces from the margin
                 let def_indent = indent + 4;
+                let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
 
                 // Emit base indentation before the marker
                 if indent > 0 {
@@ -1177,9 +1189,39 @@ impl Formatter {
                                 }
                                 SyntaxKind::PARAGRAPH => {
                                     if first_para_idx == Some(i) {
-                                        // First paragraph - lazy continuation (inline)
-                                        let text = n.text().to_string();
-                                        self.output.push_str(text.trim());
+                                        // First paragraph - lazy continuation (inline, wrapped)
+                                        let marker_len = ":   ".len();
+                                        let first_line_space = self
+                                            .config
+                                            .line_width
+                                            .saturating_sub(indent + marker_len);
+                                        let available_width =
+                                            self.config.line_width.saturating_sub(def_indent);
+                                        let widths = [first_line_space, available_width];
+
+                                        let lines = match wrap_mode {
+                                            WrapMode::Preserve => {
+                                                let text = n.text().to_string();
+                                                text.lines().map(|line| line.to_string()).collect()
+                                            }
+                                            WrapMode::Reflow => self
+                                                .wrapped_lines_for_paragraph_with_widths(
+                                                    n, &widths,
+                                                ),
+                                            WrapMode::Sentence => {
+                                                self.sentence_lines_for_paragraph(n)
+                                            }
+                                        };
+
+                                        if !lines.is_empty() {
+                                            self.output.push_str(&lines[0]);
+                                            self.output.push('\n');
+                                            for line in lines.iter().skip(1) {
+                                                self.output.push_str(&" ".repeat(def_indent));
+                                                self.output.push_str(line);
+                                                self.output.push('\n');
+                                            }
+                                        }
                                     } else {
                                         // Subsequent paragraphs - indented continuation
                                         if !self.output.ends_with("\n\n") {

@@ -67,3 +67,6 @@ A definition list with nested items
 :   Here comes a list (or wait, is it?)
     - A
     - B
+
+Term
+:   Definition 2, with a very long ling, we should wrap this and total line width should not exceed 80.

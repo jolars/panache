@@ -27,8 +27,8 @@ Term before list
 ## Definition with Inline Markup
 
 **Bold term**
-:   Definition with *emphasis* and **bold** continues with `code` on next line and
-    [link](http://example.com) here.
+:   Definition with *emphasis* and **bold** continues with `code` on next line
+    and [link](http://example.com) here.
 
 ## Definition Followed by Blockquote
 
@@ -40,8 +40,8 @@ Regular term
 ## Lazy Continuation
 
 Lazy term
-:   Definition line one continues without indent (lazy continuation) still part of
-    the definition.
+:   Definition line one continues without indent (lazy continuation) still part
+    of the definition.
 
 ## Multiple Definitions for Same Term
 
