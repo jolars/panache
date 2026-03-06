@@ -118,6 +118,11 @@ impl Rule for CitationKeysRule {
             {
                 continue;
             }
+            if config.extensions.quarto_crossrefs
+                && crate::parser::inlines::citations::is_quarto_crossref_key(key_text)
+            {
+                continue;
+            }
             if parse.and_then(|parse| parse.index.get(key_text)).is_none()
                 && !inline_reference_contains(&metadata.inline_references, key_text)
             {
@@ -296,6 +301,39 @@ mod tests {
             inline_references: Vec::new(),
             citations: crate::metadata::CitationInfo {
                 keys: vec!["eq-missing".to_string()],
+            },
+            title: None,
+            raw_yaml: String::new(),
+        };
+
+        let diagnostics = rule.check(&tree, input, &config, Some(&metadata));
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn bracketed_crossref_keys_do_not_emit_warning() {
+        let input = "See [@fig-missing].";
+        let mut config = Config::default();
+        config.extensions.quarto_crossrefs = true;
+
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = CitationKeysRule;
+        let metadata = crate::metadata::DocumentMetadata {
+            bibliography: None,
+            metadata_files: Vec::new(),
+            bibliography_parse: Some(crate::metadata::BibliographyParse {
+                index: crate::bibtex::BibIndex {
+                    entries: std::collections::HashMap::new(),
+                    duplicates: Vec::new(),
+                    errors: Vec::new(),
+                    files: Vec::new(),
+                    load_errors: Vec::new(),
+                },
+                parse_errors: Vec::new(),
+            }),
+            inline_references: Vec::new(),
+            citations: crate::metadata::CitationInfo {
+                keys: vec!["fig-missing".to_string()],
             },
             title: None,
             raw_yaml: String::new(),
