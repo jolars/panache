@@ -118,8 +118,9 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                     ..
                 } => {
                     let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
-                    let continues_list = if let Some((ref nm, _, _)) = next_marker {
-                        lists::markers_match(marker, nm) && effective_indent <= base_indent_cols + 3
+                    let continues_list = if let Some(ref marker_match) = next_marker {
+                        lists::markers_match(marker, &marker_match.marker)
+                            && effective_indent <= base_indent_cols + 3
                     } else {
                         let item_content_col = containers
                             .stack
@@ -200,7 +201,6 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         if definition_lists::try_parse_definition_marker(stripped_content).is_some()
             && leading_indent(raw_content).0 <= 3
             && !stripped_content.starts_with(':')
-            && stripped_content.contains(':')
         {
             let is_next_definition = self
                 .block_registry

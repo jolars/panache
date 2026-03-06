@@ -807,6 +807,17 @@ pub enum MathDelimiterStyle {
     Backslash,
 }
 
+/// Tab stop handling for formatter output.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum TabStopMode {
+    /// Normalize tabs to spaces (4-column tab stop).
+    #[default]
+    Normalize,
+    /// Preserve tabs in literal code spans/blocks.
+    Preserve,
+}
+
 /// Formatting style configuration.
 /// Groups all style-related settings together.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -821,6 +832,8 @@ pub struct StyleConfig {
     pub math_delimiter_style: MathDelimiterStyle,
     /// Math indentation (spaces)
     pub math_indent: usize,
+    /// Tab stop handling (normalize or preserve)
+    pub tab_stops: TabStopMode,
     /// Code block formatting preferences
     pub code_blocks: Option<CodeBlockConfig>,
 }
@@ -832,6 +845,7 @@ impl Default for StyleConfig {
             blank_lines: BlankLines::Collapse,
             math_delimiter_style: MathDelimiterStyle::default(),
             math_indent: 0,
+            tab_stops: TabStopMode::Normalize,
             code_blocks: None,
         }
     }
@@ -877,6 +891,8 @@ struct RawConfig {
     wrap: Option<WrapMode>,
     #[serde(default = "default_blank_lines")]
     blank_lines: BlankLines,
+    #[serde(default)]
+    tab_stops: TabStopMode,
     #[serde(default)]
     code_blocks: Option<CodeBlockConfig>,
 
@@ -1049,7 +1065,8 @@ impl RawConfig {
             || self.code_blocks.is_some()
             || self.math_indent != 0
             || self.math_delimiter_style != MathDelimiterStyle::default()
-            || self.blank_lines != default_blank_lines();
+            || self.blank_lines != default_blank_lines()
+            || self.tab_stops != TabStopMode::Normalize;
 
         if has_deprecated_fields && self.style.is_none() {
             eprintln!(
@@ -1084,6 +1101,7 @@ impl RawConfig {
                 blank_lines: self.blank_lines,
                 math_delimiter_style: self.math_delimiter_style,
                 math_indent: self.math_indent,
+                tab_stops: self.tab_stops,
                 code_blocks: Some(code_blocks),
             }
         };
@@ -1100,6 +1118,7 @@ impl RawConfig {
             blank_lines: style.blank_lines,
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
+            tab_stops: style.tab_stops,
             code_blocks: style.code_blocks.unwrap_or_default(),
             formatters: resolve_formatters(self.formatters),
             linters: self.linters,
@@ -1294,6 +1313,7 @@ pub struct Config {
     pub line_width: usize,
     pub math_indent: usize,
     pub math_delimiter_style: MathDelimiterStyle,
+    pub tab_stops: TabStopMode,
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
     pub code_blocks: CodeBlockConfig,
@@ -1323,6 +1343,7 @@ impl Default for Config {
             line_width: 80,
             math_indent: 0,
             math_delimiter_style: MathDelimiterStyle::default(),
+            tab_stops: TabStopMode::Normalize,
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             code_blocks: CodeBlockConfig::default(),
@@ -1341,6 +1362,11 @@ pub struct ConfigBuilder {
 impl ConfigBuilder {
     pub fn math_indent(mut self, indent: usize) -> Self {
         self.config.math_indent = indent;
+        self
+    }
+
+    pub fn tab_stops(mut self, mode: TabStopMode) -> Self {
+        self.config.tab_stops = mode;
         self
     }
 
@@ -1982,6 +2008,7 @@ mod tests {
             blank-lines = "collapse"
             math-delimiter-style = "dollars"
             math-indent = 2
+            tab-stops = "preserve"
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
@@ -1989,6 +2016,7 @@ mod tests {
         assert_eq!(cfg.blank_lines, BlankLines::Collapse);
         assert_eq!(cfg.math_delimiter_style, MathDelimiterStyle::Dollars);
         assert_eq!(cfg.math_indent, 2);
+        assert_eq!(cfg.tab_stops, TabStopMode::Preserve);
 
         // code-blocks should get flavor defaults
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);

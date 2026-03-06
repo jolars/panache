@@ -70,6 +70,7 @@ wrap = "reflow"
 blank-lines = "collapse"
 math-delimiter-style = "preserve"
 math-indent = 0
+tab-stops = "normalize"
 ```
 
 ### Wrapping Mode
@@ -125,6 +126,22 @@ Math delimiter styles:
 
 The `math-indent` field specifies indentation (in spaces) for display math
 blocks. Default is 0.
+
+### Tab Stops
+
+Control how tabs are handled during formatting:
+
+```toml
+[style]
+tab-stops = "normalize"
+```
+
+`normalize`
+:   Convert tabs to spaces (4-column tab stop). Default.
+
+`preserve`
+:   Preserve tabs in literal code spans and fenced/indented code blocks. Tabs in
+    regular text are always normalized to spaces.
 
 ### Code Block Style
 

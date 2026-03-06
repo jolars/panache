@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-use crate::parser::utils::container_stack::{Container, ContainerStack};
+use crate::parser::utils::container_stack::{Container, ContainerStack, leading_indent};
 use crate::parser::utils::helpers::strip_newline;
 use crate::parser::utils::list_item_buffer::ListItemBuffer;
 
@@ -45,6 +45,14 @@ pub(crate) enum ListDelimiter {
     Period,
     RightParen,
     Parens,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ListMarkerMatch {
+    pub(crate) marker: ListMarker,
+    pub(crate) marker_len: usize,
+    pub(crate) spaces_after_cols: usize,
+    pub(crate) spaces_after_bytes: usize,
 }
 
 /// Parse a Roman numeral (lower or upper case).
@@ -137,11 +145,9 @@ fn try_parse_roman_numeral(text: &str, uppercase: bool) -> Option<(String, usize
     Some((numeral.to_string(), count))
 }
 
-pub(crate) fn try_parse_list_marker(
-    line: &str,
-    config: &Config,
-) -> Option<(ListMarker, usize, usize)> {
-    let trimmed = line.trim_start_matches([' ', '\t']);
+pub(crate) fn try_parse_list_marker(line: &str, config: &Config) -> Option<ListMarkerMatch> {
+    let (_indent_cols, indent_bytes) = leading_indent(line);
+    let trimmed = &line[indent_bytes..];
 
     // Try bullet markers (including task lists)
     if let Some(ch) = trimmed.chars().next()
@@ -165,11 +171,13 @@ pub(crate) fn try_parse_list_marker(
             || after_marker.is_empty()
             || is_task
         {
-            let spaces_after = after_marker
-                .chars()
-                .take_while(|c| c.is_whitespace())
-                .count();
-            return Some((ListMarker::Bullet(ch), 1, spaces_after));
+            let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+            return Some(ListMarkerMatch {
+                marker: ListMarker::Bullet(ch),
+                marker_len: 1,
+                spaces_after_cols,
+                spaces_after_bytes,
+            });
         }
     }
 
@@ -179,11 +187,13 @@ pub(crate) fn try_parse_list_marker(
             || after_marker.starts_with('\t')
             || after_marker.is_empty())
     {
-        let spaces_after = after_marker
-            .chars()
-            .take_while(|c| c.is_whitespace())
-            .count();
-        return Some((ListMarker::Ordered(OrderedMarker::Hash), 2, spaces_after));
+        let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+        return Some(ListMarkerMatch {
+            marker: ListMarker::Ordered(OrderedMarker::Hash),
+            marker_len: 2,
+            spaces_after_cols,
+            spaces_after_bytes,
+        });
     }
 
     // Try example lists: (@) or (@label)
@@ -209,16 +219,14 @@ pub(crate) fn try_parse_list_marker(
                 || after_marker.starts_with('\t')
                 || after_marker.is_empty()
             {
-                let spaces_after = after_marker
-                    .chars()
-                    .take_while(|c| c.is_whitespace())
-                    .count();
+                let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
                 let marker_len = 2 + label_end + 1; // "(@" + label + ")"
-                return Some((
-                    ListMarker::Ordered(OrderedMarker::Example { label }),
+                return Some(ListMarkerMatch {
+                    marker: ListMarker::Ordered(OrderedMarker::Example { label }),
                     marker_len,
-                    spaces_after,
-                ));
+                    spaces_after_cols,
+                    spaces_after_bytes,
+                });
             }
         }
     }
@@ -235,19 +243,17 @@ pub(crate) fn try_parse_list_marker(
                 || after_marker.starts_with('\t')
                 || after_marker.is_empty()
             {
-                let spaces_after = after_marker
-                    .chars()
-                    .take_while(|c| c.is_whitespace())
-                    .count();
+                let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
                 let marker_len = 2 + digit_count;
-                return Some((
-                    ListMarker::Ordered(OrderedMarker::Decimal {
+                return Some(ListMarkerMatch {
+                    marker: ListMarker::Ordered(OrderedMarker::Decimal {
                         number: number.to_string(),
                         style: ListDelimiter::Parens,
                     }),
                     marker_len,
-                    spaces_after,
-                ));
+                    spaces_after_cols,
+                    spaces_after_bytes,
+                });
             }
         }
 
@@ -265,18 +271,16 @@ pub(crate) fn try_parse_list_marker(
                     || after_marker.starts_with('\t')
                     || after_marker.is_empty()
                 {
-                    let spaces_after = after_marker
-                        .chars()
-                        .take_while(|c| c.is_whitespace())
-                        .count();
-                    return Some((
-                        ListMarker::Ordered(OrderedMarker::LowerRoman {
+                    let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+                    return Some(ListMarkerMatch {
+                        marker: ListMarker::Ordered(OrderedMarker::LowerRoman {
                             numeral,
                             style: ListDelimiter::Parens,
                         }),
-                        len + 2,
-                        spaces_after,
-                    ));
+                        marker_len: len + 2,
+                        spaces_after_cols,
+                        spaces_after_bytes,
+                    });
                 }
             }
 
@@ -290,18 +294,16 @@ pub(crate) fn try_parse_list_marker(
                     || after_marker.starts_with('\t')
                     || after_marker.is_empty()
                 {
-                    let spaces_after = after_marker
-                        .chars()
-                        .take_while(|c| c.is_whitespace())
-                        .count();
-                    return Some((
-                        ListMarker::Ordered(OrderedMarker::UpperRoman {
+                    let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+                    return Some(ListMarkerMatch {
+                        marker: ListMarker::Ordered(OrderedMarker::UpperRoman {
                             numeral,
                             style: ListDelimiter::Parens,
                         }),
-                        len + 2,
-                        spaces_after,
-                    ));
+                        marker_len: len + 2,
+                        spaces_after_cols,
+                        spaces_after_bytes,
+                    });
                 }
             }
 
@@ -316,18 +318,16 @@ pub(crate) fn try_parse_list_marker(
                     || after_marker.starts_with('\t')
                     || after_marker.is_empty()
                 {
-                    let spaces_after = after_marker
-                        .chars()
-                        .take_while(|c| c.is_whitespace())
-                        .count();
-                    return Some((
-                        ListMarker::Ordered(OrderedMarker::LowerAlpha {
+                    let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+                    return Some(ListMarkerMatch {
+                        marker: ListMarker::Ordered(OrderedMarker::LowerAlpha {
                             letter: ch,
                             style: ListDelimiter::Parens,
                         }),
-                        3,
-                        spaces_after,
-                    ));
+                        marker_len: 3,
+                        spaces_after_cols,
+                        spaces_after_bytes,
+                    });
                 }
             }
 
@@ -342,18 +342,16 @@ pub(crate) fn try_parse_list_marker(
                     || after_marker.starts_with('\t')
                     || after_marker.is_empty()
                 {
-                    let spaces_after = after_marker
-                        .chars()
-                        .take_while(|c| c.is_whitespace())
-                        .count();
-                    return Some((
-                        ListMarker::Ordered(OrderedMarker::UpperAlpha {
+                    let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+                    return Some(ListMarkerMatch {
+                        marker: ListMarker::Ordered(OrderedMarker::UpperAlpha {
                             letter: ch,
                             style: ListDelimiter::Parens,
                         }),
-                        3,
-                        spaces_after,
-                    ));
+                        marker_len: 3,
+                        spaces_after_cols,
+                        spaces_after_bytes,
+                    });
                 }
             }
         }
@@ -376,18 +374,16 @@ pub(crate) fn try_parse_list_marker(
             || after_marker.starts_with('\t')
             || after_marker.is_empty()
         {
-            let spaces_after = after_marker
-                .chars()
-                .take_while(|c| c.is_whitespace())
-                .count();
-            return Some((
-                ListMarker::Ordered(OrderedMarker::Decimal {
+            let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+            return Some(ListMarkerMatch {
+                marker: ListMarker::Ordered(OrderedMarker::Decimal {
                     number: number.to_string(),
                     style,
                 }),
                 marker_len,
-                spaces_after,
-            ));
+                spaces_after_cols,
+                spaces_after_bytes,
+            });
         }
     }
 
@@ -413,15 +409,13 @@ pub(crate) fn try_parse_list_marker(
                 || after_marker.starts_with('\t')
                 || after_marker.is_empty()
             {
-                let spaces_after = after_marker
-                    .chars()
-                    .take_while(|c| c.is_whitespace())
-                    .count();
-                return Some((
-                    ListMarker::Ordered(OrderedMarker::LowerRoman { numeral, style }),
+                let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+                return Some(ListMarkerMatch {
+                    marker: ListMarker::Ordered(OrderedMarker::LowerRoman { numeral, style }),
                     marker_len,
-                    spaces_after,
-                ));
+                    spaces_after_cols,
+                    spaces_after_bytes,
+                });
             }
         }
 
@@ -443,15 +437,13 @@ pub(crate) fn try_parse_list_marker(
                 || after_marker.starts_with('\t')
                 || after_marker.is_empty()
             {
-                let spaces_after = after_marker
-                    .chars()
-                    .take_while(|c| c.is_whitespace())
-                    .count();
-                return Some((
-                    ListMarker::Ordered(OrderedMarker::UpperRoman { numeral, style }),
+                let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+                return Some(ListMarkerMatch {
+                    marker: ListMarker::Ordered(OrderedMarker::UpperRoman { numeral, style }),
                     marker_len,
-                    spaces_after,
-                ));
+                    spaces_after_cols,
+                    spaces_after_bytes,
+                });
             }
         }
 
@@ -474,15 +466,13 @@ pub(crate) fn try_parse_list_marker(
                 || after_marker.starts_with('\t')
                 || after_marker.is_empty()
             {
-                let spaces_after = after_marker
-                    .chars()
-                    .take_while(|c| c.is_whitespace())
-                    .count();
-                return Some((
-                    ListMarker::Ordered(OrderedMarker::LowerAlpha { letter: ch, style }),
+                let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+                return Some(ListMarkerMatch {
+                    marker: ListMarker::Ordered(OrderedMarker::LowerAlpha { letter: ch, style }),
                     marker_len,
-                    spaces_after,
-                ));
+                    spaces_after_cols,
+                    spaces_after_bytes,
+                });
             }
         }
 
@@ -503,19 +493,17 @@ pub(crate) fn try_parse_list_marker(
             let after_marker = &trimmed[marker_len..];
             // Special rule: uppercase letter with period needs 2 spaces minimum
             let min_spaces = if delim == '.' { 2 } else { 1 };
-            let spaces_after = after_marker
-                .chars()
-                .take_while(|c| c.is_whitespace())
-                .count();
+            let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
 
             if (after_marker.starts_with(' ') || after_marker.starts_with('\t'))
-                && spaces_after >= min_spaces
+                && spaces_after_cols >= min_spaces
             {
-                return Some((
-                    ListMarker::Ordered(OrderedMarker::UpperAlpha { letter: ch, style }),
+                return Some(ListMarkerMatch {
+                    marker: ListMarker::Ordered(OrderedMarker::UpperAlpha { letter: ch, style }),
                     marker_len,
-                    spaces_after,
-                ));
+                    spaces_after_cols,
+                    spaces_after_bytes,
+                });
             }
         }
     }
@@ -565,7 +553,8 @@ pub(crate) fn emit_list_item(
     builder: &mut GreenNodeBuilder<'static>,
     content: &str,
     marker_len: usize,
-    spaces_after: usize,
+    spaces_after_cols: usize,
+    spaces_after_bytes: usize,
     indent_cols: usize,
     indent_bytes: usize,
 ) -> (usize, String) {
@@ -579,9 +568,9 @@ pub(crate) fn emit_list_item(
     let marker_text = &content[indent_bytes..indent_bytes + marker_len];
     builder.token(SyntaxKind::LIST_MARKER.into(), marker_text);
 
-    if spaces_after > 0 {
+    if spaces_after_bytes > 0 {
         let space_start = indent_bytes + marker_len;
-        let space_end = space_start + spaces_after;
+        let space_end = space_start + spaces_after_bytes;
         if space_end <= content.len() {
             builder.token(
                 SyntaxKind::WHITESPACE.into(),
@@ -590,8 +579,8 @@ pub(crate) fn emit_list_item(
         }
     }
 
-    let content_col = indent_cols + marker_len + spaces_after;
-    let content_start = indent_bytes + marker_len + spaces_after;
+    let content_col = indent_cols + marker_len + spaces_after_cols;
+    let content_start = indent_bytes + marker_len + spaces_after_bytes;
 
     // Extract text content to be buffered (instead of emitting it directly).
     // If the item starts with a task checkbox, emit it as a dedicated token so it
@@ -625,6 +614,7 @@ mod tests {
     fn detects_bullet_markers() {
         let config = Config::default();
         assert!(try_parse_list_marker("* item", &config).is_some());
+        assert!(try_parse_list_marker("*\titem", &config).is_some());
     }
 
     #[test]
@@ -918,7 +908,8 @@ pub(in crate::parser) fn start_nested_list(
     content: &str,
     marker: &ListMarker,
     marker_len: usize,
-    spaces_after: usize,
+    spaces_after_cols: usize,
+    spaces_after_bytes: usize,
     indent_cols: usize,
     indent_bytes: usize,
     indent_to_emit: Option<&str>,
@@ -941,7 +932,8 @@ pub(in crate::parser) fn start_nested_list(
         builder,
         content,
         marker_len,
-        spaces_after,
+        spaces_after_cols,
+        spaces_after_bytes,
         indent_cols,
         indent_bytes,
     );
@@ -960,10 +952,10 @@ pub(in crate::parser) fn start_nested_list(
 pub(in crate::parser) fn is_content_nested_bullet_marker(
     content: &str,
     marker_len: usize,
-    spaces_after: usize,
+    spaces_after_bytes: usize,
 ) -> Option<char> {
-    let indent_bytes = content.len() - content.trim_start().len();
-    let content_start = indent_bytes + marker_len + spaces_after;
+    let (_, indent_bytes) = leading_indent(content);
+    let content_start = indent_bytes + marker_len + spaces_after_bytes;
 
     if content_start >= content.len() {
         return None;
@@ -992,7 +984,8 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
     builder: &mut GreenNodeBuilder<'static>,
     content: &str,
     marker_len: usize,
-    spaces_after: usize,
+    spaces_after_cols: usize,
+    spaces_after_bytes: usize,
     indent_cols: usize,
     indent_bytes: usize,
     nested_marker: char,
@@ -1008,9 +1001,9 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
     let marker_text = &content[indent_bytes..indent_bytes + marker_len];
     builder.token(SyntaxKind::LIST_MARKER.into(), marker_text);
 
-    if spaces_after > 0 {
+    if spaces_after_bytes > 0 {
         let space_start = indent_bytes + marker_len;
-        let space_end = space_start + spaces_after;
+        let space_end = space_start + spaces_after_bytes;
         if space_end <= content.len() {
             builder.token(
                 SyntaxKind::WHITESPACE.into(),
@@ -1027,7 +1020,7 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
     builder.token(SyntaxKind::LIST_MARKER.into(), &nested_marker.to_string());
 
     // Extract and emit the newline from original content (lossless)
-    let content_start = indent_bytes + marker_len + spaces_after;
+    let content_start = indent_bytes + marker_len + spaces_after_bytes;
     if content_start < content.len() {
         let remaining = &content[content_start..];
         // Skip the nested marker character (1 byte) and get the newline
@@ -1043,7 +1036,7 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
     builder.finish_node(); // Close nested LIST
 
     // Push container for the outer list item
-    let content_col = indent_cols + marker_len + spaces_after;
+    let content_col = indent_cols + marker_len + spaces_after_cols;
     containers.push(Container::ListItem {
         content_col,
         buffer: ListItemBuffer::new(),
@@ -1051,12 +1044,14 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
 }
 
 /// Add a list item to the current list.
+#[allow(clippy::too_many_arguments)]
 pub(in crate::parser) fn add_list_item(
     containers: &mut ContainerStack,
     builder: &mut GreenNodeBuilder<'static>,
     content: &str,
     marker_len: usize,
-    spaces_after: usize,
+    spaces_after_cols: usize,
+    spaces_after_bytes: usize,
     indent_cols: usize,
     indent_bytes: usize,
 ) {
@@ -1064,7 +1059,8 @@ pub(in crate::parser) fn add_list_item(
         builder,
         content,
         marker_len,
-        spaces_after,
+        spaces_after_cols,
+        spaces_after_bytes,
         indent_cols,
         indent_bytes,
     );

@@ -237,6 +237,8 @@ golden_test_cases!(
     sentence_wrap_lists,
     sentence_wrap_ellipsis,
     table_with_caption,
+    tab_handling,
+    tab_preserve,
     trailing_blanklines,
     writer_autolinks,
     writer_blockquote_not,

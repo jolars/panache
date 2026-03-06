@@ -2,6 +2,7 @@ use crate::config::{AttributeStyle, Config, FenceStyle, Flavor};
 #[cfg(feature = "lsp")]
 use crate::external_formatters::format_code_async;
 use crate::parser::blocks::code_blocks::{CodeBlockType, InfoString};
+use crate::parser::utils::container_stack::expand_tabs;
 use crate::syntax::{AstNode, SyntaxKind, SyntaxNode};
 use crate::utils;
 use rowan::NodeOrToken;
@@ -99,15 +100,19 @@ pub(super) fn format_code_block(
         Some(node) => node,
         None => {
             // No info string, just output basic fence
+            let mut final_content = content;
+            if !matches!(config.tab_stops, crate::config::TabStopMode::Preserve) {
+                final_content = expand_tabs(&final_content);
+            }
             let fence_char = match config.code_blocks.fence_style {
                 FenceStyle::Backtick => '`',
                 FenceStyle::Tilde => '~',
                 FenceStyle::Preserve => '`',
             };
-            let fence_length = determine_fence_length(&content, fence_char);
+            let fence_length = determine_fence_length(&final_content, fence_char);
             output.push_str(&fence_char.to_string().repeat(fence_length));
             output.push('\n');
-            output.push_str(&content);
+            output.push_str(&final_content);
             output.push_str(&fence_char.to_string().repeat(fence_length));
             output.push('\n');
             return;
@@ -119,7 +124,10 @@ pub(super) fn format_code_block(
     let info = InfoString::parse(&info_string_raw);
 
     // Check if we have formatted version from external formatter
-    let final_content = formatted_code.get(&content).unwrap_or(&content);
+    let mut final_content = formatted_code.get(&content).cloned().unwrap_or(content);
+    if !matches!(config.tab_stops, crate::config::TabStopMode::Preserve) {
+        final_content = expand_tabs(&final_content);
+    }
 
     // Determine fence character based on config
     let fence_char = match config.code_blocks.fence_style {
@@ -133,7 +141,7 @@ pub(super) fn format_code_block(
     };
 
     // Determine fence length (check for nested fences in content)
-    let fence_length = determine_fence_length(final_content, fence_char);
+    let fence_length = determine_fence_length(&final_content, fence_char);
 
     // Check if we should use hashpipe format for Quarto executable chunks
     let use_hashpipe = matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown)
@@ -145,7 +153,7 @@ pub(super) fn format_code_block(
         if format_code_block_hashpipe(
             &info_node,
             &info,
-            final_content,
+            &final_content,
             fence_char,
             fence_length,
             config,
@@ -169,7 +177,7 @@ pub(super) fn format_code_block(
         output.push_str(&formatted_info);
     }
     output.push('\n');
-    output.push_str(final_content);
+    output.push_str(&final_content);
     for _ in 0..fence_length {
         output.push(fence_char);
     }

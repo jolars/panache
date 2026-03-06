@@ -449,6 +449,7 @@ pub(crate) struct ListPrepared {
     pub marker: ListMarker,
     pub marker_len: usize,
     pub spaces_after: usize,
+    pub spaces_after_cols: usize,
     pub indent_cols: usize,
     pub indent_bytes: usize,
     pub nested_marker: Option<char>,
@@ -463,6 +464,7 @@ pub(crate) enum DefinitionPrepared {
         marker_char: char,
         indent: usize,
         spaces_after: usize,
+        spaces_after_cols: usize,
         has_content: bool,
     },
 }
@@ -487,8 +489,8 @@ impl BlockParser for ListParser {
         _lines: &[&str],
         _line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        let (marker, marker_len, spaces_after) = try_parse_list_marker(ctx.content, ctx.config)?;
-        if spaces_after == 0 {
+        let marker_match = try_parse_list_marker(ctx.content, ctx.config)?;
+        if marker_match.spaces_after_cols == 0 {
             return None;
         }
         if (ctx.has_blank_before || ctx.at_document_start)
@@ -503,7 +505,11 @@ impl BlockParser for ListParser {
             return None;
         }
 
-        let nested_marker = is_content_nested_bullet_marker(ctx.content, marker_len, spaces_after);
+        let nested_marker = is_content_nested_bullet_marker(
+            ctx.content,
+            marker_match.marker_len,
+            marker_match.spaces_after_bytes,
+        );
         let detection = if ctx.has_blank_before || ctx.at_document_start {
             BlockDetectionResult::Yes
         } else {
@@ -513,9 +519,10 @@ impl BlockParser for ListParser {
         Some((
             detection,
             Some(Box::new(ListPrepared {
-                marker,
-                marker_len,
-                spaces_after,
+                marker: marker_match.marker,
+                marker_len: marker_match.marker_len,
+                spaces_after: marker_match.spaces_after_bytes,
+                spaces_after_cols: marker_match.spaces_after_cols,
                 indent_cols,
                 indent_bytes,
                 nested_marker,
@@ -639,15 +646,23 @@ impl BlockParser for DefinitionListParser {
         lines: &[&str],
         line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        if let Some((marker_char, indent, spaces_after)) = try_parse_definition_marker(ctx.content)
+        if let Some((marker_char, indent, spaces_after_cols, spaces_after_bytes)) =
+            try_parse_definition_marker(ctx.content)
         {
-            let has_content = !ctx.content[indent + 1 + spaces_after..].trim().is_empty();
+            let indent_bytes =
+                super::utils::container_stack::byte_index_at_column(ctx.content, indent);
+            let has_content = ctx
+                .content
+                .get(indent_bytes + 1 + spaces_after_bytes..)
+                .map(|slice| !slice.trim().is_empty())
+                .unwrap_or(false);
             return Some((
                 BlockDetectionResult::YesCanInterrupt,
                 Some(Box::new(DefinitionPrepared::Definition {
                     marker_char,
                     indent,
-                    spaces_after,
+                    spaces_after: spaces_after_bytes,
+                    spaces_after_cols,
                     has_content,
                 })),
             ));

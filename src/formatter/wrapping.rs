@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::parser::utils::container_stack::expand_tabs;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use textwrap::wrap_algorithms::WrapAlgorithm;
@@ -297,7 +298,7 @@ fn build_words_with_mode<'a>(
                         // Skip original markers - we'll add normalized ones
                     }
                     SyntaxKind::TEXT => {
-                        let text = t.text();
+                        let text = expand_tabs(t.text());
 
                         // Check if prev/next siblings are TEXT (for intraword underscore detection)
                         let prev_is_text = idx > 0
@@ -316,7 +317,7 @@ fn build_words_with_mode<'a>(
                         // will be re-indented by the formatter
 
                         // Check if text starts with whitespace
-                        let mut text_to_process = text;
+                        let mut text_to_process = text.as_str();
                         if !text.is_empty() && text.starts_with(char::is_whitespace) {
                             if b.skip_next_leading_whitespace {
                                 // Skip the leading whitespace - it's been moved outside the emphasis/strong

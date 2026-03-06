@@ -42,6 +42,8 @@ pub(crate) struct ContainerStack {
     pub(crate) stack: Vec<Container>,
 }
 
+const TAB_STOP: usize = 4;
+
 impl ContainerStack {
     pub(crate) fn new() -> Self {
         Self { stack: Vec::new() }
@@ -71,7 +73,7 @@ pub(crate) fn leading_indent(line: &str) -> (usize, usize) {
                 bytes += 1;
             }
             b'\t' => {
-                cols += 4 - (cols % 4);
+                cols += TAB_STOP - (cols % TAB_STOP);
                 bytes += 1;
             }
             _ => break,
@@ -94,11 +96,35 @@ pub(crate) fn byte_index_at_column(line: &str, target_col: usize) -> usize {
                 idx = i + 1;
             }
             b'\t' => {
-                col += 4 - (col % 4);
+                col += TAB_STOP - (col % TAB_STOP);
                 idx = i + 1;
             }
             _ => break,
         }
     }
     idx
+}
+
+/// Expand tabs to spaces using tab stop = 4.
+pub(crate) fn expand_tabs(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut col = 0usize;
+    for ch in text.chars() {
+        match ch {
+            '\t' => {
+                let spaces = TAB_STOP - (col % TAB_STOP);
+                out.push_str(&" ".repeat(spaces));
+                col += spaces;
+            }
+            '\n' => {
+                out.push('\n');
+                col = 0;
+            }
+            _ => {
+                out.push(ch);
+                col += 1;
+            }
+        }
+    }
+    out
 }

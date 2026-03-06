@@ -406,6 +406,7 @@ impl<'a> Parser<'a> {
                             &mut self.builder,
                             content,
                             prepared.marker_len,
+                            prepared.spaces_after_cols,
                             prepared.spaces_after,
                             prepared.indent_cols,
                             prepared.indent_bytes,
@@ -417,6 +418,7 @@ impl<'a> Parser<'a> {
                             &mut self.builder,
                             content,
                             prepared.marker_len,
+                            prepared.spaces_after_cols,
                             prepared.spaces_after,
                             prepared.indent_cols,
                             prepared.indent_bytes,
@@ -434,6 +436,7 @@ impl<'a> Parser<'a> {
                 content,
                 &prepared.marker,
                 prepared.marker_len,
+                prepared.spaces_after_cols,
                 prepared.spaces_after,
                 prepared.indent_cols,
                 prepared.indent_bytes,
@@ -463,6 +466,7 @@ impl<'a> Parser<'a> {
                     &mut self.builder,
                     content,
                     prepared.marker_len,
+                    prepared.spaces_after_cols,
                     prepared.spaces_after,
                     prepared.indent_cols,
                     prepared.indent_bytes,
@@ -474,6 +478,7 @@ impl<'a> Parser<'a> {
                     &mut self.builder,
                     content,
                     prepared.marker_len,
+                    prepared.spaces_after_cols,
                     prepared.spaces_after,
                     prepared.indent_cols,
                     prepared.indent_bytes,
@@ -509,6 +514,7 @@ impl<'a> Parser<'a> {
                 &mut self.builder,
                 content,
                 prepared.marker_len,
+                prepared.spaces_after_cols,
                 prepared.spaces_after,
                 prepared.indent_cols,
                 prepared.indent_bytes,
@@ -520,6 +526,7 @@ impl<'a> Parser<'a> {
                 &mut self.builder,
                 content,
                 prepared.marker_len,
+                prepared.spaces_after_cols,
                 prepared.spaces_after,
                 prepared.indent_cols,
                 prepared.indent_bytes,
@@ -548,6 +555,7 @@ impl<'a> Parser<'a> {
                 marker_char,
                 indent,
                 spaces_after,
+                spaces_after_cols,
                 has_content,
             } => {
                 self.emit_buffered_plain_if_needed();
@@ -581,20 +589,28 @@ impl<'a> Parser<'a> {
                 }
 
                 emit_definition_marker(&mut self.builder, *marker_char, *indent);
+                let indent_bytes = byte_index_at_column(content, *indent);
                 if *spaces_after > 0 {
-                    self.builder
-                        .token(SyntaxKind::WHITESPACE.into(), &" ".repeat(*spaces_after));
+                    let space_start = indent_bytes + 1;
+                    let space_end = space_start + *spaces_after;
+                    if space_end <= content.len() {
+                        self.builder.token(
+                            SyntaxKind::WHITESPACE.into(),
+                            &content[space_start..space_end],
+                        );
+                    }
                 }
 
-                let content_col = *indent + 1 + *spaces_after;
-                let after_marker_and_spaces = &content[content_col..];
+                let content_col = *indent + 1 + *spaces_after_cols;
+                let content_start_bytes = indent_bytes + 1 + *spaces_after;
+                let after_marker_and_spaces = content.get(content_start_bytes..).unwrap_or("");
                 let mut plain_buffer = TextBuffer::new();
 
                 if *has_content {
                     let current_line = self.lines[self.pos];
                     let (trimmed_line, _) = strip_newline(current_line);
 
-                    let content_start = content_col.min(trimmed_line.len());
+                    let content_start = content_start_bytes.min(trimmed_line.len());
                     let content_slice = &trimmed_line[content_start..];
 
                     if let Some(fence) = code_blocks::try_parse_fence_open(content_slice) {
@@ -1081,13 +1097,14 @@ impl<'a> Parser<'a> {
                 // Check for lazy list continuation - if we're in a list item and
                 // this line looks like a list item with matching marker
                 if lists::in_blockquote_list(&self.containers)
-                    && let Some((marker, marker_len, spaces_after)) =
-                        try_parse_list_marker(line, self.config)
+                    && let Some(marker_match) = try_parse_list_marker(line, self.config)
                 {
                     let (indent_cols, indent_bytes) = leading_indent(line);
-                    if let Some(level) =
-                        lists::find_matching_list_level(&self.containers, &marker, indent_cols)
-                    {
+                    if let Some(level) = lists::find_matching_list_level(
+                        &self.containers,
+                        &marker_match.marker,
+                        indent_cols,
+                    ) {
                         // Continue the list inside the blockquote
                         // Close containers to the target level, emitting buffers properly
                         self.close_containers_to(level + 1);
@@ -1101,15 +1118,18 @@ impl<'a> Parser<'a> {
                         }
 
                         // Check if content is a nested bullet marker
-                        if let Some(nested_marker) =
-                            is_content_nested_bullet_marker(line, marker_len, spaces_after)
-                        {
+                        if let Some(nested_marker) = is_content_nested_bullet_marker(
+                            line,
+                            marker_match.marker_len,
+                            marker_match.spaces_after_bytes,
+                        ) {
                             lists::add_list_item_with_nested_empty_list(
                                 &mut self.containers,
                                 &mut self.builder,
                                 line,
-                                marker_len,
-                                spaces_after,
+                                marker_match.marker_len,
+                                marker_match.spaces_after_cols,
+                                marker_match.spaces_after_bytes,
                                 indent_cols,
                                 indent_bytes,
                                 nested_marker,
@@ -1119,8 +1139,9 @@ impl<'a> Parser<'a> {
                                 &mut self.containers,
                                 &mut self.builder,
                                 line,
-                                marker_len,
-                                spaces_after,
+                                marker_match.marker_len,
+                                marker_match.spaces_after_cols,
+                                marker_match.spaces_after_bytes,
                                 indent_cols,
                                 indent_bytes,
                             );
@@ -1175,13 +1196,12 @@ impl<'a> Parser<'a> {
                 };
 
                 // Check if this line starts a new list item at outer level
-                let is_new_item_at_outer_level = if let Some((_marker, _, _)) =
-                    try_parse_list_marker(inner_content, self.config)
-                {
-                    effective_indent < content_col
-                } else {
-                    false
-                };
+                let is_new_item_at_outer_level =
+                    if try_parse_list_marker(inner_content, self.config).is_some() {
+                        effective_indent < content_col
+                    } else {
+                        false
+                    };
 
                 // Close ListItem if:
                 // 1. It's a new list item at an outer (or same) level, OR
@@ -1233,13 +1253,14 @@ impl<'a> Parser<'a> {
 
             // Check for lazy list continuation
             if lists::in_blockquote_list(&self.containers)
-                && let Some((marker, marker_len, spaces_after)) =
-                    try_parse_list_marker(line, self.config)
+                && let Some(marker_match) = try_parse_list_marker(line, self.config)
             {
                 let (indent_cols, indent_bytes) = leading_indent(line);
-                if let Some(level) =
-                    lists::find_matching_list_level(&self.containers, &marker, indent_cols)
-                {
+                if let Some(level) = lists::find_matching_list_level(
+                    &self.containers,
+                    &marker_match.marker,
+                    indent_cols,
+                ) {
                     // Close containers to the target level, emitting buffers properly
                     self.close_containers_to(level + 1);
 
@@ -1252,15 +1273,18 @@ impl<'a> Parser<'a> {
                     }
 
                     // Check if content is a nested bullet marker
-                    if let Some(nested_marker) =
-                        is_content_nested_bullet_marker(line, marker_len, spaces_after)
-                    {
+                    if let Some(nested_marker) = is_content_nested_bullet_marker(
+                        line,
+                        marker_match.marker_len,
+                        marker_match.spaces_after_bytes,
+                    ) {
                         lists::add_list_item_with_nested_empty_list(
                             &mut self.containers,
                             &mut self.builder,
                             line,
-                            marker_len,
-                            spaces_after,
+                            marker_match.marker_len,
+                            marker_match.spaces_after_cols,
+                            marker_match.spaces_after_bytes,
                             indent_cols,
                             indent_bytes,
                             nested_marker,
@@ -1270,8 +1294,9 @@ impl<'a> Parser<'a> {
                             &mut self.containers,
                             &mut self.builder,
                             line,
-                            marker_len,
-                            spaces_after,
+                            marker_match.marker_len,
+                            marker_match.spaces_after_cols,
+                            marker_match.spaces_after_bytes,
                             indent_cols,
                             indent_bytes,
                         );
@@ -1340,10 +1365,7 @@ impl<'a> Parser<'a> {
         if matches!(self.containers.last(), Some(Container::Definition { .. })) {
             let is_definition_marker =
                 definition_lists::try_parse_definition_marker(stripped_content).is_some()
-                    && !stripped_content.starts_with(':')
-                    && stripped_content.contains(':')
-                    && !stripped_content.trim().contains(' ')
-                    && !stripped_content.contains(':');
+                    && !stripped_content.starts_with(':');
             if content_indent == 0 && is_definition_marker {
                 // Definition markers at top-level should start a new definition.
             } else {

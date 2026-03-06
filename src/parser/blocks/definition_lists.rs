@@ -2,21 +2,22 @@ use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use crate::parser::utils::container_stack::leading_indent;
 use crate::parser::utils::helpers::strip_newline;
 use crate::parser::utils::inline_emission;
 
 /// Tries to parse a definition list marker (`:` or `~`)
 ///
-/// Returns Some((marker_char, indent, spaces_after)) if found, None otherwise.
+/// Returns Some((marker_char, indent_cols, spaces_after_cols, spaces_after_bytes)) if found, None otherwise.
 /// The marker can be indented 0-3 spaces and must be followed by whitespace.
-pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, usize)> {
-    // Count leading spaces (0-3 allowed)
-    let indent = line.chars().take_while(|&c| c == ' ').count();
-    if indent > 3 {
+pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, usize, usize)> {
+    // Count leading whitespace in columns (0-3 allowed)
+    let (indent_cols, indent_bytes) = leading_indent(line);
+    if indent_cols > 3 {
         return None;
     }
 
-    let after_indent = &line[indent..];
+    let after_indent = &line[indent_bytes..];
 
     // Check for : or ~ marker
     let marker = after_indent.chars().next()?;
@@ -32,12 +33,9 @@ pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, us
         return None;
     }
 
-    let spaces_after = after_marker
-        .chars()
-        .take_while(|&c| c == ' ' || c == '\t')
-        .count();
+    let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
 
-    Some((marker, indent, spaces_after))
+    Some((marker, indent_cols, spaces_after_cols, spaces_after_bytes))
 }
 
 /// Emit a term line into the syntax tree
@@ -61,10 +59,10 @@ pub(crate) fn emit_term(builder: &mut GreenNodeBuilder<'static>, line: &str, con
 pub(crate) fn emit_definition_marker(
     builder: &mut GreenNodeBuilder<'static>,
     marker: char,
-    indent: usize,
+    indent_cols: usize,
 ) {
-    if indent > 0 {
-        builder.token(SyntaxKind::WHITESPACE.into(), &" ".repeat(indent));
+    if indent_cols > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &" ".repeat(indent_cols));
     }
     builder.token(SyntaxKind::DEFINITION_MARKER.into(), &marker.to_string());
 }
@@ -113,7 +111,7 @@ mod tests {
     fn test_parse_definition_marker_colon() {
         assert_eq!(
             try_parse_definition_marker(":   Definition"),
-            Some((':', 0, 3))
+            Some((':', 0, 3, 3))
         );
     }
 
@@ -121,7 +119,7 @@ mod tests {
     fn test_parse_definition_marker_tilde() {
         assert_eq!(
             try_parse_definition_marker("~   Definition"),
-            Some(('~', 0, 3))
+            Some(('~', 0, 3, 3))
         );
     }
 
@@ -129,12 +127,13 @@ mod tests {
     fn test_parse_definition_marker_indented() {
         assert_eq!(
             try_parse_definition_marker("  : Definition"),
-            Some((':', 2, 1))
+            Some((':', 2, 1, 1))
         );
         assert_eq!(
             try_parse_definition_marker("   ~ Definition"),
-            Some(('~', 3, 1))
+            Some(('~', 3, 1, 1))
         );
+        assert_eq!(try_parse_definition_marker("\t: Definition"), None);
     }
 
     #[test]
@@ -149,6 +148,6 @@ mod tests {
 
     #[test]
     fn test_parse_definition_marker_at_eol() {
-        assert_eq!(try_parse_definition_marker(":"), Some((':', 0, 0)));
+        assert_eq!(try_parse_definition_marker(":"), Some((':', 0, 0, 0)));
     }
 }

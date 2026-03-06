@@ -3,6 +3,32 @@ use crate::formatter::shortcodes::format_shortcode;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
+fn expand_tabs_code_span(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut col = 0usize;
+    for ch in text.chars() {
+        match ch {
+            '\t' => {
+                let mut spaces = 4 - (col % 4);
+                if col == 0 && spaces == 4 {
+                    spaces = 1;
+                }
+                out.push_str(&" ".repeat(spaces));
+                col += spaces;
+            }
+            '\n' => {
+                out.push(' ');
+                col += 1;
+            }
+            _ => {
+                out.push(ch);
+                col += 1;
+            }
+        }
+    }
+    out.trim().to_string()
+}
+
 /// Format an inline node to normalized string (e.g., emphasis with asterisks)
 pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
     match node.kind() {
@@ -28,7 +54,12 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
 
             // Normalize content: replace newlines with spaces and trim
             // Pandoc strips leading/trailing spaces from code spans
-            let normalized_content = content.replace('\n', " ").trim().to_string();
+            let normalized_content =
+                if matches!(config.tab_stops, crate::config::TabStopMode::Preserve) {
+                    content.replace('\n', " ").trim().to_string()
+                } else {
+                    expand_tabs_code_span(&content)
+                };
 
             let mut backtick_runs = std::collections::HashSet::new();
             let mut current_run = 0;

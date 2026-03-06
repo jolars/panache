@@ -127,6 +127,16 @@ Use `code` for inline code.
 Use ``code with ` backtick`` for code containing backticks.
 ```
 
+### Tab Stops in Code
+
+Tabs in regular text are always normalized to spaces. To preserve tabs in
+literal code spans and code blocks, set:
+
+```toml
+[style]
+tab-stops = "preserve"
+```
+
 ### Code Blocks
 
 Fenced code blocks are formatted consistently:
