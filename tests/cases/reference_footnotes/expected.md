@@ -42,3 +42,9 @@ Here's one with multiple blocks[^longnote].
     multi-paragraph footnotes work like multi-paragraph list items.
 
 This paragraph won't be part of the note, because it isn't indented.
+
+A footnote[^9]
+
+[^9]: This is typically the case when we are fitting a regularization path. We
+    start with a penalty that's large enough to make every coefficient zero and
+    then progressively increase it.

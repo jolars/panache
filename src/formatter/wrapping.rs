@@ -682,6 +682,74 @@ pub(super) fn wrapped_lines_for_paragraph(
     out_lines
 }
 
+pub(super) fn wrapped_lines_for_paragraph_with_widths(
+    _config: &Config,
+    node: &SyntaxNode,
+    widths: &[usize],
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+) -> Vec<String> {
+    log::debug!("wrapped_lines_for_paragraph_with_widths called");
+
+    // Check if paragraph contains hard line breaks
+    let has_hard_breaks = node
+        .descendants_with_tokens()
+        .any(|el| el.kind() == SyntaxKind::HARD_LINE_BREAK);
+
+    if has_hard_breaks {
+        // Don't wrap paragraphs with hard line breaks - preserve the breaks
+        // But normalize hard breaks and format inline elements
+        log::debug!("Paragraph contains hard line breaks - preserving them");
+
+        let mut result = String::new();
+        for child in node.children_with_tokens() {
+            match child {
+                NodeOrToken::Node(n) => {
+                    result.push_str(&format_inline_fn(&n));
+                }
+                NodeOrToken::Token(t) => {
+                    if t.kind() == SyntaxKind::HARD_LINE_BREAK {
+                        // Normalize to backslash-newline if extension enabled
+                        if _config.extensions.escaped_line_breaks {
+                            result.push_str("\\\n");
+                        } else {
+                            result.push_str(t.text());
+                        }
+                    } else {
+                        result.push_str(t.text());
+                    }
+                }
+            }
+        }
+
+        return result.lines().map(|s| s.to_string()).collect();
+    }
+
+    let mut arena: Vec<Box<str>> = Vec::new();
+    let words = build_words(_config, node, &mut arena, format_inline_fn);
+    log::debug!("Built {} words for paragraph", words.len());
+
+    let algo = WrapAlgorithm::new();
+    let line_widths = if widths.is_empty() { &[1] } else { widths };
+    let lines = algo.wrap(&words, line_widths);
+    log::debug!("Wrapped into {} lines", lines.len());
+
+    let mut out_lines = Vec::with_capacity(lines.len());
+
+    for line in lines {
+        let mut acc = String::new();
+        for (i, w) in line.iter().enumerate() {
+            acc.push_str(w.word);
+            if i + 1 < line.len() {
+                acc.push_str(w.whitespace);
+            } else {
+                acc.push_str(w.penalty);
+            }
+        }
+        out_lines.push(acc);
+    }
+    out_lines
+}
+
 pub(super) fn sentence_lines_for_paragraph(
     _config: &Config,
     node: &SyntaxNode,

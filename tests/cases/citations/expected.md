@@ -68,7 +68,6 @@ proponent in this longer sentence.
 
 Footnote with citations.[^1]
 
-[^1]:
-    @пункт3 [p. 12] and a citation
+[^1]: @пункт3 [p. 12] and a citation
     without locators [@пункт3] in a
     longer note sentence.

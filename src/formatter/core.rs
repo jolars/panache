@@ -103,6 +103,16 @@ impl Formatter {
         })
     }
 
+    pub(super) fn wrapped_lines_for_paragraph_with_widths(
+        &self,
+        node: &SyntaxNode,
+        widths: &[usize],
+    ) -> Vec<String> {
+        wrapping::wrapped_lines_for_paragraph_with_widths(&self.config, node, widths, &|n| {
+            self.format_inline_node(n)
+        })
+    }
+
     pub(super) fn sentence_lines_for_paragraph(&self, node: &SyntaxNode) -> Vec<String> {
         wrapping::sentence_lines_for_paragraph(&self.config, node, &|n| self.format_inline_node(n))
     }
@@ -416,22 +426,29 @@ impl Formatter {
                                 .line_width
                                 .saturating_sub(indent + marker_len + 1);
 
-                            // Try wrapping the paragraph to see if it fits on one line
+                            let available_width =
+                                self.config.line_width.saturating_sub(child_indent);
+                            let widths = [first_line_space, available_width];
                             let lines = match wrap_mode {
                                 WrapMode::Preserve => {
-                                    self.wrapped_lines_for_paragraph(child, first_line_space)
+                                    let text = child.text().to_string();
+                                    text.lines().map(|line| line.to_string()).collect()
                                 }
                                 WrapMode::Reflow => {
-                                    self.wrapped_lines_for_paragraph(child, first_line_space)
+                                    self.wrapped_lines_for_paragraph_with_widths(child, &widths)
                                 }
                                 WrapMode::Sentence => self.sentence_lines_for_paragraph(child),
                             };
 
-                            if lines.len() == 1 && lines[0].len() <= first_line_space {
-                                // Fits on one line - put on same line as marker
+                            if !lines.is_empty() {
                                 self.output.push(' ');
                                 self.output.push_str(&lines[0]);
                                 self.output.push('\n');
+                                for line in lines.iter().skip(1) {
+                                    self.output.push_str(&" ".repeat(child_indent));
+                                    self.output.push_str(line);
+                                    self.output.push('\n');
+                                }
                                 continue;
                             }
                         }

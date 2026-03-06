@@ -1,4 +1,4 @@
-DOCUMENT@0..1028
+DOCUMENT@0..1240
   HEADING@0..22
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -184,4 +184,24 @@ DOCUMENT@0..1028
     NEWLINE@1011..1012 "\n"
     TEXT@1012..1027 "isn't indented."
     NEWLINE@1027..1028 "\n"
+  BLANK_LINE@1028..1029
+    BLANK_LINE@1028..1029 "\n"
+  PARAGRAPH@1029..1044
+    TEXT@1029..1039 "A footnote"
+    FOOTNOTE_REFERENCE@1039..1043
+      TEXT@1039..1041 "[^"
+      TEXT@1041..1042 "9"
+      TEXT@1042..1043 "]"
+    NEWLINE@1043..1044 "\n"
+  BLANK_LINE@1044..1045
+    BLANK_LINE@1044..1045 "\n"
+  FOOTNOTE_DEFINITION@1045..1240
+    FOOTNOTE_REFERENCE@1045..1051 "[^9]: "
+    PARAGRAPH@1051..1240
+      TEXT@1051..1099 "This is typically the ..."
+      NEWLINE@1099..1100 "\n"
+      TEXT@1100..1176 "    regularization pa ..."
+      NEWLINE@1176..1177 "\n"
+      TEXT@1177..1239 "    every coefficient ..."
+      NEWLINE@1239..1240 "\n"
 
