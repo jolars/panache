@@ -36,22 +36,6 @@ pub struct DefinitionIndex {
     crossrefs: HashMap<String, DefinitionLocation>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum EdgeKind {
-    Include,
-    Bibliography,
-    MetadataFile,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct ProjectGraph {
-    definitions: DefinitionIndex,
-    diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
-    documents: HashSet<PathBuf>,
-    edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
-    reverse_edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
-}
-
 impl DefinitionIndex {
     pub fn is_empty(&self) -> bool {
         self.references.is_empty() && self.footnotes.is_empty() && self.crossrefs.is_empty()
@@ -65,100 +49,6 @@ impl DefinitionLocation {
 
     pub fn range(&self) -> TextRange {
         self.range
-    }
-}
-
-impl ProjectGraph {
-    pub fn build(root_path: &Path, root_text: &str, config: &Config) -> Self {
-        let mut graph = ProjectGraph::default();
-        let mut visited = HashSet::new();
-        let base_dir = root_path.parent().unwrap_or_else(|| Path::new("."));
-        let project_root = find_quarto_root(root_path).or_else(|| find_bookdown_root(root_path));
-        visit_document(
-            root_path,
-            root_text,
-            base_dir,
-            project_root.as_deref(),
-            config,
-            &mut graph,
-            &mut visited,
-        );
-        graph
-    }
-
-    pub fn build_project(root_path: &Path, root_text: &str, config: &Config) -> Self {
-        let mut graph = ProjectGraph::default();
-        let mut visited = HashSet::new();
-        let base_dir = root_path.parent().unwrap_or_else(|| Path::new("."));
-        let project_root = find_quarto_root(root_path).or_else(|| find_bookdown_root(root_path));
-
-        visit_document(
-            root_path,
-            root_text,
-            base_dir,
-            project_root.as_deref(),
-            config,
-            &mut graph,
-            &mut visited,
-        );
-
-        if let Some(root) = project_root {
-            let is_bookdown = find_bookdown_root(root_path).is_some();
-            for path in find_project_documents(&root, config, is_bookdown) {
-                if let Ok(text) = std::fs::read_to_string(&path) {
-                    let doc_base = path.parent().unwrap_or_else(|| Path::new("."));
-                    visit_document(
-                        &path,
-                        &text,
-                        doc_base,
-                        Some(&root),
-                        config,
-                        &mut graph,
-                        &mut visited,
-                    );
-                }
-            }
-        }
-
-        graph
-    }
-
-    pub fn definitions(&self) -> &DefinitionIndex {
-        &self.definitions
-    }
-
-    pub fn diagnostics(&self) -> &HashMap<PathBuf, Vec<Diagnostic>> {
-        &self.diagnostics
-    }
-
-    pub fn documents(&self) -> &HashSet<PathBuf> {
-        &self.documents
-    }
-
-    pub fn dependents(&self, path: &Path, kind: Option<EdgeKind>) -> Vec<PathBuf> {
-        self.reverse_edges
-            .get(path)
-            .map(|edges| {
-                edges
-                    .iter()
-                    .filter(|(_, edge_kind)| kind.is_none_or(|k| k == *edge_kind))
-                    .map(|(from, _)| from.clone())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    pub fn dependencies(&self, path: &Path, kind: Option<EdgeKind>) -> Vec<PathBuf> {
-        self.edges
-            .get(path)
-            .map(|edges| {
-                edges
-                    .iter()
-                    .filter(|(_, edge_kind)| kind.is_none_or(|k| k == *edge_kind))
-                    .map(|(to, _)| to.clone())
-                    .collect()
-            })
-            .unwrap_or_default()
     }
 }
 
@@ -510,83 +400,6 @@ impl DefinitionIndex {
     }
 }
 
-fn visit_document(
-    path: &Path,
-    input: &str,
-    base_dir: &Path,
-    project_root: Option<&Path>,
-    config: &Config,
-    graph: &mut ProjectGraph,
-    visited: &mut HashSet<PathBuf>,
-) {
-    if !visited.insert(path.to_path_buf()) {
-        return;
-    }
-    graph.documents.insert(path.to_path_buf());
-
-    let tree = crate::parse(input, Some(config.clone()));
-    let diagnostics =
-        collect_cross_doc_duplicates(&mut graph.definitions, &tree, input, path, config);
-    if !diagnostics.is_empty() {
-        graph
-            .diagnostics
-            .entry(path.to_path_buf())
-            .or_default()
-            .extend(diagnostics);
-    }
-
-    let resolution = collect_includes(&tree, input, base_dir, project_root, config);
-    if !resolution.diagnostics.is_empty() {
-        graph
-            .diagnostics
-            .entry(path.to_path_buf())
-            .or_default()
-            .extend(resolution.diagnostics);
-    }
-    for include in resolution.includes {
-        graph.add_edge(path, &include.path, EdgeKind::Include);
-        if include.path == path {
-            continue;
-        }
-        if let Ok(include_input) = std::fs::read_to_string(&include.path) {
-            let include_base = include.path.parent().unwrap_or_else(|| Path::new("."));
-            visit_document(
-                &include.path,
-                &include_input,
-                include_base,
-                project_root,
-                config,
-                graph,
-                visited,
-            );
-        }
-    }
-
-    if let Ok(metadata) = crate::metadata::extract_project_metadata(&tree, path) {
-        for metadata_file in &metadata.metadata_files {
-            graph.add_edge(path, metadata_file, EdgeKind::MetadataFile);
-        }
-        if let Some(bibliography) = metadata.bibliography {
-            for bib in bibliography.paths {
-                graph.add_edge(path, &bib, EdgeKind::Bibliography);
-            }
-        }
-    }
-}
-
-impl ProjectGraph {
-    fn add_edge(&mut self, from: &Path, to: &Path, kind: EdgeKind) {
-        self.edges
-            .entry(from.to_path_buf())
-            .or_default()
-            .insert((to.to_path_buf(), kind));
-        self.reverse_edges
-            .entry(to.to_path_buf())
-            .or_default()
-            .insert((from.to_path_buf(), kind));
-    }
-}
-
 pub fn is_escaped_shortcode(node: &SyntaxNode) -> bool {
     node.children_with_tokens().any(|child| match child {
         NodeOrToken::Token(token) => {
@@ -662,12 +475,18 @@ mod tests {
 
         let input = fs::read_to_string(&doc_path).unwrap();
         let config = Config::default();
-        let graph = ProjectGraph::build(&doc_path, &input, &config);
+        let graph = {
+            let db = crate::salsa::SalsaDb::default();
+            let file = crate::salsa::FileText::new(&db, input.clone());
+            let config_input = crate::salsa::FileConfig::new(&db, config.clone());
+            crate::salsa::project_graph(&db, file, config_input, doc_path.clone()).clone()
+        };
 
-        let metadata_deps = graph.dependencies(&doc_path, Some(EdgeKind::MetadataFile));
+        let metadata_deps =
+            graph.dependencies(&doc_path, Some(crate::salsa::EdgeKind::MetadataFile));
         assert!(metadata_deps.contains(&root.join("_site.yml")));
 
-        let bib_deps = graph.dependencies(&doc_path, Some(EdgeKind::Bibliography));
+        let bib_deps = graph.dependencies(&doc_path, Some(crate::salsa::EdgeKind::Bibliography));
         assert!(bib_deps.contains(&root.join("proj.bib")));
     }
 
@@ -684,11 +503,30 @@ mod tests {
 
         let input = fs::read_to_string(&doc_path).unwrap();
         let config = Config::default();
-        let graph = ProjectGraph::build_project(&doc_path, &input, &config);
+        let graph = {
+            let db = crate::salsa::SalsaDb::default();
+            let file = crate::salsa::FileText::new(&db, input.clone());
+            let config_input = crate::salsa::FileConfig::new(&db, config.clone());
+            crate::salsa::project_graph(&db, file, config_input, doc_path.clone()).clone()
+        };
 
         assert!(graph.documents().contains(&doc_path));
         assert!(graph.documents().contains(&other_path));
-        assert!(graph.definitions().find_reference("ref").is_some());
+        let mut definitions = DefinitionIndex::default();
+        for path in graph.documents() {
+            let Ok(text) = fs::read_to_string(path) else {
+                continue;
+            };
+            let tree = crate::parse(&text, Some(config.clone()));
+            crate::includes::collect_cross_doc_duplicates(
+                &mut definitions,
+                &tree,
+                &text,
+                path,
+                &config,
+            );
+        }
+        assert!(definitions.find_reference("ref").is_some());
     }
 
     #[test]
@@ -710,7 +548,12 @@ mod tests {
 
         let input = fs::read_to_string(&other_path).unwrap();
         let config = Config::default();
-        let graph = ProjectGraph::build_project(&other_path, &input, &config);
+        let graph = {
+            let db = crate::salsa::SalsaDb::default();
+            let file = crate::salsa::FileText::new(&db, input.clone());
+            let config_input = crate::salsa::FileConfig::new(&db, config.clone());
+            crate::salsa::project_graph(&db, file, config_input, other_path.clone()).clone()
+        };
 
         assert!(graph.documents().contains(&doc_path));
         assert!(graph.documents().contains(&other_path));
@@ -732,9 +575,23 @@ mod tests {
         let input = fs::read_to_string(&doc_path).unwrap();
         let mut config = Config::default();
         config.extensions.bookdown_references = true;
-        let graph = ProjectGraph::build(&doc_path, &input, &config);
+        let _graph = {
+            let db = crate::salsa::SalsaDb::default();
+            let file = crate::salsa::FileText::new(&db, input.clone());
+            let config_input = crate::salsa::FileConfig::new(&db, config.clone());
+            crate::salsa::project_graph(&db, file, config_input, doc_path.clone()).clone()
+        };
 
-        assert!(graph.definitions().find_crossref("fig:plot").is_some());
-        assert!(graph.definitions().find_crossref("caption").is_some());
+        let mut definitions = DefinitionIndex::default();
+        let tree = crate::parse(&input, Some(config.clone()));
+        crate::includes::collect_cross_doc_duplicates(
+            &mut definitions,
+            &tree,
+            &input,
+            &doc_path,
+            &config,
+        );
+        assert!(definitions.find_crossref("fig:plot").is_some());
+        assert!(definitions.find_crossref("caption").is_some());
     }
 }

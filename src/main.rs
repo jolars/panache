@@ -484,7 +484,12 @@ fn lint_documents_with_includes(
     let mut results = Vec::new();
     let mut visited = HashSet::new();
     let mut active = HashSet::new();
-    let graph = panache::includes::ProjectGraph::build_project(root_path, &input, cfg);
+    let graph = {
+        let db = panache::salsa::SalsaDb::default();
+        let file = panache::salsa::FileText::new(&db, input.clone());
+        let config = panache::salsa::FileConfig::new(&db, cfg.clone());
+        panache::salsa::project_graph(&db, file, config, root_path.clone()).clone()
+    };
     lint_loaded_document_with_includes(
         root_path,
         &input,
@@ -504,7 +509,7 @@ fn lint_loaded_document_with_includes(
     results: &mut Vec<LintedDocument>,
     visited: &mut std::collections::HashSet<PathBuf>,
     active: &mut std::collections::HashSet<PathBuf>,
-    graph: &panache::includes::ProjectGraph,
+    graph: &panache::salsa::ProjectGraph,
 ) -> io::Result<()> {
     if !visited.insert(doc_path.clone()) {
         return Ok(());
