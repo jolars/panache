@@ -118,8 +118,8 @@ pub async fn format_tree_async(
         && !formatted_code.is_empty()
     {
         log::debug!("Applying {} formatted code blocks", formatted_code.len());
-        for result in &formatted_code {
-            output = output.replace(&result.original, &result.formatted);
+        for (original, formatted) in &formatted_code {
+            output = output.replace(original, formatted);
         }
     }
 
@@ -168,10 +168,10 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
             );
             code_blocks::spawn_and_await_formatters_sync(code_blocks, config)
         } else {
-            Vec::new()
+            HashMap::new()
         }
     } else {
-        Vec::new()
+        HashMap::new()
     };
 
     // Step 1b: Run YAML frontmatter formatter synchronously if configured (uses same config as yaml code blocks)
@@ -240,8 +240,8 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     // Step 3: Apply formatted code blocks if any
     if !formatted_code.is_empty() {
         log::debug!("Applying {} formatted code blocks", formatted_code.len());
-        for result in &formatted_code {
-            output = output.replace(&result.original, &result.formatted);
+        for (original, formatted) in &formatted_code {
+            output = output.replace(original, formatted);
         }
     }
 

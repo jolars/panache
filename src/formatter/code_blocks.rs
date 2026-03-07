@@ -19,12 +19,6 @@ pub struct ExternalCodeBlock {
     pub hashpipe_prefix: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-pub struct ExternalFormatResult {
-    pub original: String,
-    pub formatted: String,
-}
-
 /// Format a code block, normalizing fence markers and attributes based on config
 pub(super) fn format_code_block(
     node: &SyntaxNode,
@@ -33,6 +27,11 @@ pub(super) fn format_code_block(
     output: &mut String,
 ) {
     let (info_node, _language, content) = extract_code_block_parts(node);
+
+    if let Some(formatted) = formatted_code.get(&content) {
+        output.push_str(formatted);
+        return;
+    }
 
     let info_node = match info_node {
         Some(node) => node,
@@ -62,7 +61,7 @@ pub(super) fn format_code_block(
     let info = InfoString::parse(&info_string_raw);
 
     // Check if we have formatted version from external formatter
-    let mut final_content = formatted_code.get(&content).cloned().unwrap_or(content);
+    let mut final_content = content;
     if !matches!(config.tab_stops, crate::config::TabStopMode::Preserve) {
         final_content = expand_tabs_with_width(&final_content, config.tab_width);
     }
@@ -685,7 +684,7 @@ pub fn collect_code_blocks(
 pub async fn spawn_and_await_formatters(
     blocks: Vec<ExternalCodeBlock>,
     config: &Config,
-) -> Vec<ExternalFormatResult> {
+) -> HashMap<String, String> {
     let mut tasks = Vec::new();
     let timeout = Duration::from_secs(30);
 
@@ -741,7 +740,7 @@ pub async fn spawn_and_await_formatters(
         }
     }
 
-    let mut formatted = Vec::new();
+    let mut formatted = HashMap::new();
 
     // Await all results
     for task in tasks {
@@ -755,10 +754,7 @@ pub async fn spawn_and_await_formatters(
                         } else {
                             formatted_code
                         };
-                        formatted.push(ExternalFormatResult {
-                            original: original_code,
-                            formatted: combined,
-                        });
+                        formatted.insert(original_code, combined);
                     }
                 }
                 Err(e) => {
@@ -778,22 +774,11 @@ pub async fn spawn_and_await_formatters(
 pub fn spawn_and_await_formatters_sync(
     blocks: Vec<ExternalCodeBlock>,
     config: &Config,
-) -> Vec<ExternalFormatResult> {
+) -> HashMap<String, String> {
     use std::time::Duration;
     let timeout = Duration::from_secs(30);
 
-    let results = crate::external_formatters_sync::run_formatters_parallel(
-        blocks,
-        &config.formatters,
-        timeout,
-    );
-    results
-        .into_iter()
-        .map(|(original, formatted)| ExternalFormatResult {
-            original,
-            formatted,
-        })
-        .collect()
+    crate::external_formatters_sync::run_formatters_parallel(blocks, &config.formatters, timeout)
 }
 
 /// WASM version that returns empty HashMap (no external formatters in WASM)
@@ -801,6 +786,6 @@ pub fn spawn_and_await_formatters_sync(
 pub fn spawn_and_await_formatters_sync(
     _blocks: Vec<ExternalCodeBlock>,
     _config: &Config,
-) -> Vec<ExternalFormatResult> {
-    Vec::new()
+) -> HashMap<String, String> {
+    HashMap::new()
 }
