@@ -29,15 +29,18 @@ pub(crate) async fn goto_definition(
     let position = params.text_document_position_params.position;
     let config = helpers::get_config(client, &workspace_root, uri).await;
 
-    let (metadata, graph) = {
+    let (metadata, _definition_index) = {
         let map = document_map.lock().await;
         map.get(&uri.to_string()).map(|state| {
             let metadata = state.metadata.clone();
-            let graph = state.graph.clone();
-            (metadata, graph)
+            let definition_index = state.definition_index.clone();
+            (metadata, definition_index)
         })
     }
-    .unwrap_or((None, crate::includes::ProjectGraph::default()));
+    .unwrap_or((None, crate::salsa::DefinitionIndex::default()));
+
+    let definition_index =
+        helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
 
     let Some((content, root)) =
         helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
@@ -147,8 +150,8 @@ pub(crate) async fn goto_definition(
         }
 
         if let Some(label) = helpers::extract_crossref_key(&node)
-            && !graph.definitions().is_empty()
-            && let Some(definition) = graph.definitions().find_crossref(&label)
+            && !definition_index.is_empty()
+            && let Some(definition) = definition_index.find_crossref(&label)
         {
             let target_uri = Uri::from_file_path(definition.path()).unwrap_or_else(|| uri.clone());
             let target_text = std::fs::read_to_string(definition.path()).unwrap_or_default();
@@ -185,12 +188,12 @@ pub(crate) async fn goto_definition(
         }
 
         if let Some((label, is_footnote)) = helpers::extract_reference_label(&node)
-            && !graph.definitions().is_empty()
+            && !definition_index.is_empty()
         {
             let definition = if is_footnote {
-                graph.definitions().find_footnote(&label)
+                definition_index.find_footnote(&label)
             } else {
-                graph.definitions().find_reference(&label)
+                definition_index.find_reference(&label)
             };
 
             if let Some(definition) = definition {

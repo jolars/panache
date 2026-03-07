@@ -27,15 +27,18 @@ pub(crate) async fn hover(
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
-    let (metadata, graph) = {
+    let (metadata, _definition_index) = {
         let map = document_map.lock().await;
         map.get(&uri.to_string()).map(|state| {
             let metadata = state.metadata.clone();
-            let graph = state.graph.clone();
-            (metadata, graph)
+            let definition_index = state.definition_index.clone();
+            (metadata, definition_index)
         })
     }
-    .unwrap_or((None, crate::includes::ProjectGraph::default()));
+    .unwrap_or((None, crate::salsa::DefinitionIndex::default()));
+
+    let definition_index =
+        helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
 
     let Some((content, root)) =
         helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
@@ -62,22 +65,19 @@ pub(crate) async fn hover(
                 let definition = helpers::find_definition_node(&root, &label, true)
                     .and_then(FootnoteDefinition::cast)
                     .or_else(|| {
-                        if graph.definitions().is_empty() {
+                        if definition_index.is_empty() {
                             return None;
                         }
-                        graph
-                            .definitions()
-                            .find_footnote(&label)
-                            .and_then(|location| {
-                                std::fs::read_to_string(location.path())
-                                    .ok()
-                                    .and_then(|text| {
-                                        let tree = crate::parse(&text, None);
-                                        tree.descendants()
-                                            .filter_map(FootnoteDefinition::cast)
-                                            .find(|def| def.id() == label)
-                                    })
-                            })
+                        definition_index.find_footnote(&label).and_then(|location| {
+                            std::fs::read_to_string(location.path())
+                                .ok()
+                                .and_then(|text| {
+                                    let tree = crate::parse(&text, None);
+                                    tree.descendants()
+                                        .filter_map(FootnoteDefinition::cast)
+                                        .find(|def| def.id() == label)
+                                })
+                        })
                     });
                 let Some(footnote_def) = definition else {
                     return Ok(None);

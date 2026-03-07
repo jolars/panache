@@ -183,6 +183,55 @@ fn insert_crossref(index: &mut DefinitionIndex, id: &str, location: DefinitionLo
     index.crossrefs.entry(key).or_insert(location);
 }
 
+impl DefinitionIndex {
+    pub fn is_empty(&self) -> bool {
+        self.references.is_empty() && self.footnotes.is_empty() && self.crossrefs.is_empty()
+    }
+
+    pub fn find_reference(&self, label: &str) -> Option<&DefinitionLocation> {
+        let key = normalize_label(label);
+        self.references.get(&key)
+    }
+
+    pub fn find_footnote(&self, id: &str) -> Option<&DefinitionLocation> {
+        let key = normalize_label(id);
+        self.footnotes.get(&key)
+    }
+
+    pub fn find_crossref(&self, id: &str) -> Option<&DefinitionLocation> {
+        let key = normalize_label(id);
+        self.crossrefs.get(&key)
+    }
+
+    pub fn merge_from(&mut self, other: &DefinitionIndex) {
+        for (key, value) in &other.references {
+            self.references
+                .entry(key.clone())
+                .or_insert_with(|| value.clone());
+        }
+        for (key, value) in &other.footnotes {
+            self.footnotes
+                .entry(key.clone())
+                .or_insert_with(|| value.clone());
+        }
+        for (key, value) in &other.crossrefs {
+            self.crossrefs
+                .entry(key.clone())
+                .or_insert_with(|| value.clone());
+        }
+    }
+}
+
+impl DefinitionLocation {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn range(&self) -> rowan::TextRange {
+        self.range
+    }
+}
+
 fn collect_bookdown_definitions(index: &mut DefinitionIndex, tree: &SyntaxNode, path: &Path) {
     use crate::parser::inlines::bookdown::{
         try_parse_bookdown_definition, try_parse_bookdown_text_reference,

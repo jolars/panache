@@ -67,6 +67,35 @@ pub(crate) async fn get_document_and_config(
     Some((content, config))
 }
 
+pub(crate) async fn get_definition_index_with_includes(
+    document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+    uri: &Uri,
+) -> crate::salsa::DefinitionIndex {
+    let (base_index, salsa_config, graph) = {
+        let doc_map = document_map.lock().await;
+        let Some(state) = doc_map.get(&uri.to_string()) else {
+            return crate::salsa::DefinitionIndex::default();
+        };
+        (
+            state.definition_index.clone(),
+            state.salsa_config,
+            state.graph.clone(),
+        )
+    };
+    let db = salsa_db.lock().await;
+    let mut index = base_index.clone();
+    for path in graph.documents().iter() {
+        if let Ok(include_text) = std::fs::read_to_string(path) {
+            let include_file = crate::salsa::FileText::new(&*db, include_text);
+            let include_index =
+                crate::salsa::definition_index(&*db, include_file, salsa_config, path.clone());
+            index.merge_from(include_index);
+        }
+    }
+    index
+}
+
 /// Find the syntax node at the given byte offset
 pub(crate) fn find_node_at_offset(root: &SyntaxNode, offset: usize) -> Option<SyntaxNode> {
     let text_size = TextSize::from(offset as u32);
