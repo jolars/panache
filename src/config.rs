@@ -770,7 +770,12 @@ pub fn get_formatter_preset(name: &str) -> Option<FormatterConfig> {
         // Python formatters
         "ruff" => Some(FormatterConfig {
             cmd: "ruff".to_string(),
-            args: vec!["format".to_string()],
+            args: vec![
+                "format".to_string(),
+                "--stdin-filename".to_string(),
+                "stdin.py".to_string(),
+                "-".to_string(),
+            ],
             enabled: true,
             stdin: true,
         }),
@@ -1769,7 +1774,10 @@ mod tests {
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
         let py_fmt = &cfg.formatters.get("python").unwrap()[0];
         assert_eq!(py_fmt.cmd, "ruff");
-        assert_eq!(py_fmt.args, vec!["format"]);
+        assert_eq!(
+            py_fmt.args,
+            vec!["format", "--stdin-filename", "stdin.py", "-"]
+        );
         assert!(py_fmt.stdin);
         assert!(py_fmt.enabled);
     }
