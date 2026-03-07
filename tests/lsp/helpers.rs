@@ -8,6 +8,7 @@ use tower_lsp_server::ls_types::*;
 use tower_lsp_server::{LanguageServer, LspService};
 
 use panache::lsp::PanacheLsp;
+use panache::salsa::Db;
 
 /// Test harness for LSP integration tests.
 ///
@@ -239,6 +240,20 @@ impl TestLspServer {
         let db = self.lsp.salsa_db();
         let db = db.lock().await;
         Some(state.salsa_file.text(&*db).clone())
+    }
+
+    /// Get a cached file's text from the salsa db (test-only).
+    pub async fn get_cached_file_text(&self, path: &std::path::Path) -> Option<String> {
+        let db = self.lsp.salsa_db();
+        let db = db.lock().await;
+        let file = db.file_text(path.to_path_buf())?;
+        Some(file.text(&*db).clone())
+    }
+
+    /// Trigger the file watcher handler (test-only).
+    pub async fn did_change_watched_files(&self, files: Vec<FileEvent>) {
+        let params = DidChangeWatchedFilesParams { changes: files };
+        self.lsp.did_change_watched_files(params).await;
     }
 
     /// Get the current syntax tree for a document (test-only).

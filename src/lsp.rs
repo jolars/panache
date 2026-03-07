@@ -82,6 +82,23 @@ impl PanacheLsp {
     pub fn salsa_db(&self) -> Arc<Mutex<crate::salsa::SalsaDb>> {
         Arc::clone(&self.salsa_db)
     }
+
+    /// Trigger didChangeWatchedFiles for tests.
+    #[doc(hidden)]
+    pub async fn did_change_watched_files(
+        &self,
+        params: tower_lsp_server::ls_types::DidChangeWatchedFilesParams,
+    ) {
+        crate::lsp::handlers::file_watcher::did_change_watched_files(
+            &self.client,
+            Arc::clone(&self.bibliography_cache),
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await;
+    }
 }
 
 pub async fn run() -> std::io::Result<()> {

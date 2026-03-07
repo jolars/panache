@@ -13,6 +13,7 @@ mod lsp {
     pub(super) mod test_completion;
     pub(super) mod test_diagnostics;
     pub(super) mod test_document_lifecycle;
+    pub(super) mod test_file_watcher;
     pub(super) mod test_formatting;
     pub(super) mod test_goto_definition;
     pub(super) mod test_hover;
