@@ -246,7 +246,7 @@ pub(crate) async fn lint_and_publish(
         doc_state.salsa_file.text(&*db).clone()
     };
     let metadata = doc_state.metadata.clone();
-    let graph = doc_state.graph.clone();
+    let _graph = doc_state.graph.clone();
     let mut all_diagnostics = Vec::new();
     // Check for YAML metadata errors
     if let Some(ref metadata) = doc_state.metadata {
@@ -315,7 +315,28 @@ pub(crate) async fn lint_and_publish(
             all_diagnostics.extend(lsp_diagnostics);
 
             let mut published_root = false;
-            for (path, diags) in graph.diagnostics() {
+            let by_path: HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> = {
+                let db = salsa_db.lock().await;
+                let root_path = uri
+                    .to_file_path()
+                    .map(|p| p.into_owned())
+                    .unwrap_or_else(|| PathBuf::from("<memory>"));
+                let mut by_path: HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> =
+                    HashMap::new();
+                for entry in crate::salsa::project_graph::accumulated::<crate::salsa::GraphDiagnostic>(
+                    &*db,
+                    doc_state.salsa_file,
+                    doc_state.salsa_config,
+                    root_path,
+                ) {
+                    by_path
+                        .entry(entry.0.path.clone())
+                        .or_default()
+                        .push(entry.0.diagnostic.clone());
+                }
+                by_path
+            };
+            for (path, diags) in by_path {
                 let Some(target_uri) = Uri::from_file_path(path) else {
                     continue;
                 };

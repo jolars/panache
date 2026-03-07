@@ -484,8 +484,8 @@ fn lint_documents_with_includes(
     let mut results = Vec::new();
     let mut visited = HashSet::new();
     let mut active = HashSet::new();
+    let db = panache::salsa::SalsaDb::default();
     let graph = {
-        let db = panache::salsa::SalsaDb::default();
         let file = panache::salsa::FileText::new(&db, input.clone());
         let config = panache::salsa::FileConfig::new(&db, cfg.clone());
         panache::salsa::project_graph(&db, file, config, root_path.clone()).clone()
@@ -498,10 +498,12 @@ fn lint_documents_with_includes(
         &mut visited,
         &mut active,
         &graph,
+        &db,
     )?;
     Ok(results)
 }
 
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 fn lint_loaded_document_with_includes(
     doc_path: &PathBuf,
     input: &str,
@@ -510,6 +512,7 @@ fn lint_loaded_document_with_includes(
     visited: &mut std::collections::HashSet<PathBuf>,
     active: &mut std::collections::HashSet<PathBuf>,
     graph: &panache::salsa::ProjectGraph,
+    db: &panache::salsa::SalsaDb,
 ) -> io::Result<()> {
     if !visited.insert(doc_path.clone()) {
         return Ok(());
@@ -528,8 +531,16 @@ fn lint_loaded_document_with_includes(
         panache::includes::collect_includes(&tree, input, base_dir, project_root.as_deref(), cfg);
 
     diagnostics.extend(resolution.diagnostics);
-    if let Some(extra) = graph.diagnostics().get(doc_path) {
-        diagnostics.extend(extra.clone());
+    let graph_diags = panache::salsa::project_graph::accumulated::<panache::salsa::GraphDiagnostic>(
+        db,
+        panache::salsa::FileText::new(db, input.to_string()),
+        panache::salsa::FileConfig::new(db, cfg.clone()),
+        doc_path.clone(),
+    );
+    for entry in graph_diags {
+        if entry.0.path == *doc_path {
+            diagnostics.push(entry.0.diagnostic.clone());
+        }
     }
 
     for include in &resolution.includes {
@@ -554,6 +565,7 @@ fn lint_loaded_document_with_includes(
                     visited,
                     active,
                     graph,
+                    db,
                 )?;
             }
             Err(err) => {

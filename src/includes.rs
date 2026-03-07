@@ -306,10 +306,7 @@ pub fn find_project_documents(
         let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
             continue;
         };
-        if !matches!(
-            ext,
-            "qmd" | "md" | "Rmd" | "rmd" | "markdown" | "mdown" | "mkd"
-        ) {
+        if !crate::all_document_extensions().contains(&ext) {
             continue;
         }
         if ext == "md" && !config.extensions.quarto_shortcodes {

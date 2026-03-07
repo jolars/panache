@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
@@ -7,6 +8,7 @@ use crate::metadata::DocumentMetadata;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{AstNode, FootnoteDefinition, ReferenceDefinition, SyntaxKind, SyntaxNode};
 use crate::utils::normalize_label;
+use salsa::{Accumulator, Setter};
 
 #[salsa::input]
 pub struct FileText {
@@ -22,7 +24,7 @@ pub struct FileConfig {
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
 pub fn metadata(
-    db: &dyn salsa::Database,
+    db: &dyn Db,
     file: FileText,
     config: FileConfig,
     path: PathBuf,
@@ -58,7 +60,7 @@ pub struct DefinitionIndex {
 
 #[salsa::tracked(returns(ref))]
 pub fn definition_index(
-    db: &dyn salsa::Database,
+    db: &dyn Db,
     file: FileText,
     config: FileConfig,
     path: PathBuf,
@@ -241,7 +243,6 @@ pub enum EdgeKind {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ProjectGraph {
     documents: HashSet<PathBuf>,
-    diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
     edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
     reverse_edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
 }
@@ -249,10 +250,6 @@ pub struct ProjectGraph {
 impl ProjectGraph {
     pub fn documents(&self) -> &HashSet<PathBuf> {
         &self.documents
-    }
-
-    pub fn diagnostics(&self) -> &HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> {
-        &self.diagnostics
     }
 
     pub fn dependents(&self, path: &Path, kind: Option<EdgeKind>) -> Vec<PathBuf> {
@@ -295,9 +292,18 @@ impl ProjectGraph {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct GraphDiagnosticEntry {
+    pub path: PathBuf,
+    pub diagnostic: Diagnostic,
+}
+
+#[salsa::accumulator]
+pub struct GraphDiagnostic(pub GraphDiagnosticEntry);
+
 #[salsa::tracked(returns(ref))]
 pub fn project_graph(
-    db: &dyn salsa::Database,
+    db: &dyn Db,
     root_file: FileText,
     config: FileConfig,
     root_path: PathBuf,
@@ -326,8 +332,7 @@ pub fn project_graph(
             if visited.contains(&path) {
                 continue;
             }
-            if let Ok(text) = std::fs::read_to_string(&path) {
-                let include_file = FileText::new(db, text);
+            if let Some(include_file) = db.file_text(path.clone()) {
                 visit_document(
                     db,
                     &include_file,
@@ -344,7 +349,7 @@ pub fn project_graph(
 }
 
 fn visit_document(
-    db: &dyn salsa::Database,
+    db: &dyn Db,
     file: &FileText,
     config: FileConfig,
     path: &Path,
@@ -373,9 +378,7 @@ fn visit_document(
         if include.path == *path {
             continue;
         }
-        if let Ok(include_input) = std::fs::read_to_string(&include.path) {
-            let _include_base = include.path.parent().unwrap_or_else(|| Path::new("."));
-            let include_file = FileText::new(db, include_input);
+        if let Some(include_file) = db.file_text(include.path.clone()) {
             visit_document(
                 db,
                 &include_file,
@@ -388,11 +391,13 @@ fn visit_document(
         }
     }
     if !resolution.diagnostics.is_empty() {
-        graph
-            .diagnostics
-            .entry(path.to_path_buf())
-            .or_default()
-            .extend(resolution.diagnostics);
+        for diagnostic in resolution.diagnostics {
+            GraphDiagnostic(GraphDiagnosticEntry {
+                path: path.to_path_buf(),
+                diagnostic,
+            })
+            .accumulate(db);
+        }
     }
 
     let duplicate_diagnostics = crate::includes::collect_cross_doc_duplicates(
@@ -403,11 +408,13 @@ fn visit_document(
         config.config(db),
     );
     if !duplicate_diagnostics.is_empty() {
-        graph
-            .diagnostics
-            .entry(path.to_path_buf())
-            .or_default()
-            .extend(duplicate_diagnostics);
+        for diagnostic in duplicate_diagnostics {
+            GraphDiagnostic(GraphDiagnosticEntry {
+                path: path.to_path_buf(),
+                diagnostic,
+            })
+            .accumulate(db);
+        }
     }
     if let Ok(metadata) = crate::metadata::extract_project_metadata(&tree, path) {
         for metadata_file in &metadata.metadata_files {
@@ -421,10 +428,77 @@ fn visit_document(
     }
 }
 #[salsa::db]
-#[derive(Default, Clone)]
+pub trait Db: salsa::Database {
+    fn file_text(&self, path: PathBuf) -> Option<FileText>;
+}
+
+#[salsa::db]
+#[derive(Clone)]
 pub struct SalsaDb {
     storage: salsa::Storage<Self>,
+    file_cache: Arc<Mutex<HashMap<PathBuf, FileText>>>,
+}
+
+impl Default for SalsaDb {
+    fn default() -> Self {
+        Self {
+            storage: salsa::Storage::default(),
+            file_cache: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+}
+
+impl SalsaDb {
+    fn get_or_load_file_text(&self, path: PathBuf) -> Option<FileText> {
+        let mut cache = self.file_cache.lock().ok()?;
+        if let Some(file) = cache.get(&path) {
+            return Some(*file);
+        }
+        let contents = std::fs::read_to_string(&path).ok()?;
+        let file = FileText::new(self, contents);
+        cache.insert(path, file);
+        Some(file)
+    }
+
+    pub fn update_file_text(&mut self, path: PathBuf, text: String) -> FileText {
+        let existing = {
+            let cache = self.file_cache.lock().expect("file cache lock poisoned");
+            cache.get(&path).copied()
+        };
+        if let Some(file) = existing {
+            file.set_text(self).to(text);
+            return file;
+        }
+        let file = FileText::new(self, text);
+        let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
+        cache.insert(path, file);
+        file
+    }
+
+    pub fn update_file_text_if_cached(&mut self, path: &Path, text: String) -> bool {
+        let file = {
+            let cache = self.file_cache.lock().expect("file cache lock poisoned");
+            cache.get(path).copied()
+        };
+        let Some(file) = file else {
+            return false;
+        };
+        file.set_text(self).to(text);
+        true
+    }
+
+    pub fn evict_file_text(&mut self, path: &Path) -> bool {
+        let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
+        cache.remove(path).is_some()
+    }
 }
 
 #[salsa::db]
 impl salsa::Database for SalsaDb {}
+
+#[salsa::db]
+impl Db for SalsaDb {
+    fn file_text(&self, path: PathBuf) -> Option<FileText> {
+        self.get_or_load_file_text(path)
+    }
+}

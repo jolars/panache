@@ -27,6 +27,16 @@ pub use formatter::format_tree_async;
 pub use parser::parse;
 pub use syntax::SyntaxNode;
 
+pub fn markdown_extensions() -> &'static [&'static str] {
+    &["md", "markdown", "mdown", "mkd", "mkdn"]
+}
+
+pub fn all_document_extensions() -> &'static [&'static str] {
+    &[
+        "qmd", "Rmd", "rmd", "md", "markdown", "mdown", "mkd", "mkdn",
+    ]
+}
+
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
 }

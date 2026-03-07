@@ -57,9 +57,15 @@ pub(crate) async fn did_open(
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
     let tree = GreenNode::from(crate::parse(&text, Some(config.clone())).green());
     let (salsa_file, salsa_config) = {
-        let db = salsa_db.lock().await;
+        let mut db = salsa_db.lock().await;
+        let path = params
+            .text_document
+            .uri
+            .to_file_path()
+            .map(|p| p.into_owned())
+            .unwrap_or_else(|| std::path::PathBuf::from("<memory>"));
         (
-            crate::salsa::FileText::new(&*db, text.clone()),
+            db.update_file_text(path, text.clone()),
             crate::salsa::FileConfig::new(&*db, config.clone()),
         )
     };
@@ -212,7 +218,11 @@ pub(crate) async fn did_change(
     let config_input = {
         let mut db = salsa_db.lock().await;
         if let Some(text) = graph_text.as_ref() {
-            salsa_file.set_text(&mut *db).to(text.clone());
+            if let Some(path) = graph_path.clone() {
+                db.update_file_text(path, text.clone());
+            } else {
+                salsa_file.set_text(&mut *db).to(text.clone());
+            }
         }
         let config_input = crate::salsa::FileConfig::new(&*db, config.clone());
         drop(db);
@@ -299,10 +309,15 @@ pub(crate) async fn did_change(
 pub(crate) async fn did_close(
     client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     params: DidCloseTextDocumentParams,
 ) {
     let uri = params.text_document.uri.to_string();
     document_map.lock().await.remove(&uri);
+    if let Some(path) = params.text_document.uri.to_file_path() {
+        let mut db = salsa_db.lock().await;
+        db.evict_file_text(&path);
+    }
 
     // Clear diagnostics
     client

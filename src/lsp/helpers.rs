@@ -7,6 +7,7 @@ use tower_lsp_server::ls_types::Uri;
 use crate::Config;
 use crate::lsp::DocumentState;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
+use crate::salsa::Db;
 use crate::syntax::{AstNode, Citation, Crossref, SyntaxKind, SyntaxNode};
 use crate::utils::pandoc_slugify;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -86,8 +87,7 @@ pub(crate) async fn get_definition_index_with_includes(
     let db = salsa_db.lock().await;
     let mut index = base_index.clone();
     for path in graph.documents().iter() {
-        if let Ok(include_text) = std::fs::read_to_string(path) {
-            let include_file = crate::salsa::FileText::new(&*db, include_text);
+        if let Some(include_file) = db.file_text(path.clone()) {
             let include_index =
                 crate::salsa::definition_index(&*db, include_file, salsa_config, path.clone());
             index.merge_from(include_index);

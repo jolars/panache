@@ -5,6 +5,16 @@ use tower_lsp_server::ls_types::*;
 
 use super::{PanacheLsp, documents, handlers};
 
+fn watched_document_glob() -> Vec<FileSystemWatcher> {
+    crate::all_document_extensions()
+        .iter()
+        .map(|ext| FileSystemWatcher {
+            glob_pattern: GlobPattern::String(format!("**/*.{ext}")),
+            kind: Some(WatchKind::all()),
+        })
+        .collect()
+}
+
 impl LanguageServer for PanacheLsp {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         // Store workspace root for config discovery
@@ -65,28 +75,32 @@ impl LanguageServer for PanacheLsp {
 
         // Register file watchers for bibliography files
         if let Ok(options) = serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
-            watchers: vec![
-                FileSystemWatcher {
-                    glob_pattern: GlobPattern::String("**/*.bib".to_string()),
-                    kind: Some(WatchKind::all()),
-                },
-                FileSystemWatcher {
-                    glob_pattern: GlobPattern::String("**/*.json".to_string()),
-                    kind: Some(WatchKind::all()),
-                },
-                FileSystemWatcher {
-                    glob_pattern: GlobPattern::String("**/*.yaml".to_string()),
-                    kind: Some(WatchKind::all()),
-                },
-                FileSystemWatcher {
-                    glob_pattern: GlobPattern::String("**/*.yml".to_string()),
-                    kind: Some(WatchKind::all()),
-                },
-                FileSystemWatcher {
-                    glob_pattern: GlobPattern::String("**/*.ris".to_string()),
-                    kind: Some(WatchKind::all()),
-                },
-            ],
+            watchers: {
+                let mut watchers = vec![
+                    FileSystemWatcher {
+                        glob_pattern: GlobPattern::String("**/*.bib".to_string()),
+                        kind: Some(WatchKind::all()),
+                    },
+                    FileSystemWatcher {
+                        glob_pattern: GlobPattern::String("**/*.json".to_string()),
+                        kind: Some(WatchKind::all()),
+                    },
+                    FileSystemWatcher {
+                        glob_pattern: GlobPattern::String("**/*.yaml".to_string()),
+                        kind: Some(WatchKind::all()),
+                    },
+                    FileSystemWatcher {
+                        glob_pattern: GlobPattern::String("**/*.yml".to_string()),
+                        kind: Some(WatchKind::all()),
+                    },
+                    FileSystemWatcher {
+                        glob_pattern: GlobPattern::String("**/*.ris".to_string()),
+                        kind: Some(WatchKind::all()),
+                    },
+                ];
+                watchers.extend(watched_document_glob());
+                watchers
+            },
         }) {
             let registrations = vec![Registration {
                 id: "watch-bibliography-files".to_string(),
@@ -134,7 +148,13 @@ impl LanguageServer for PanacheLsp {
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        documents::did_close(&self.client, Arc::clone(&self.document_map), params).await;
+        documents::did_close(
+            &self.client,
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
+            params,
+        )
+        .await;
     }
 
     async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
