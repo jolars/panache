@@ -11,6 +11,20 @@ use std::time::Duration;
 
 use super::hashpipe;
 
+#[derive(Debug, Clone)]
+pub struct ExternalCodeBlock {
+    pub language: String,
+    pub original: String,
+    pub formatter_input: String,
+    pub hashpipe_prefix: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalFormatResult {
+    pub original: String,
+    pub formatted: String,
+}
+
 /// Format a code block, normalizing fence markers and attributes based on config
 pub(super) fn format_code_block(
     node: &SyntaxNode,
@@ -18,82 +32,7 @@ pub(super) fn format_code_block(
     formatted_code: &HashMap<String, String>,
     output: &mut String,
 ) {
-    let mut info_node: Option<SyntaxNode> = None;
-    let mut content = String::new();
-    let mut has_fence = false;
-    let mut fence_indent = String::new();
-    let mut fence_indent_cols = 0usize;
-
-    // Extract info node and content from the AST
-    for child in node.children_with_tokens() {
-        match child {
-            NodeOrToken::Token(t) => {
-                if t.kind() == SyntaxKind::WHITESPACE && !has_fence {
-                    fence_indent = t.text().to_string();
-                }
-            }
-            NodeOrToken::Node(n) => match n.kind() {
-                SyntaxKind::CODE_FENCE_OPEN => {
-                    has_fence = true;
-                    fence_indent_cols = indent_columns(&fence_indent);
-                    // Find the info string - now it's a node, not a token
-                    for child_token in n.children_with_tokens() {
-                        if let NodeOrToken::Node(node) = child_token
-                            && node.kind() == SyntaxKind::CODE_INFO
-                        {
-                            info_node = Some(node);
-                        }
-                    }
-                }
-                SyntaxKind::CODE_CONTENT => {
-                    let base_indent_cols = if has_fence { fence_indent_cols } else { 4 };
-                    let mut line_content = String::new();
-                    let mut line_indent = String::new();
-                    let mut at_line_start = true;
-
-                    // Extract content, stripping only the base indent for indented code blocks.
-                    for token in n.children_with_tokens() {
-                        if let NodeOrToken::Token(t) = token {
-                            match t.kind() {
-                                SyntaxKind::WHITESPACE if at_line_start => {
-                                    line_indent.push_str(t.text());
-                                }
-                                SyntaxKind::TEXT => {
-                                    if at_line_start && t.text().is_empty() {
-                                        continue;
-                                    }
-                                    if at_line_start {
-                                        line_content.push_str(&strip_indent_columns(
-                                            &line_indent,
-                                            base_indent_cols,
-                                        ));
-                                        line_indent.clear();
-                                        at_line_start = false;
-                                    }
-                                    line_content.push_str(t.text());
-                                }
-                                SyntaxKind::NEWLINE => {
-                                    if !at_line_start {
-                                        content.push_str(&line_content);
-                                    }
-                                    content.push('\n');
-                                    line_content.clear();
-                                    line_indent.clear();
-                                    at_line_start = true;
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-
-                    if !at_line_start {
-                        content.push_str(&line_content);
-                    }
-                }
-                _ => {}
-            },
-        }
-    }
+    let (info_node, _language, content) = extract_code_block_parts(node);
 
     let info_node = match info_node {
         Some(node) => node,
@@ -238,6 +177,116 @@ fn indent_columns(indent: &str) -> usize {
         }
     }
     cols
+}
+
+fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<String>, String) {
+    let mut info_node: Option<SyntaxNode> = None;
+    let mut language: Option<String> = None;
+    let mut content = String::new();
+    let mut has_fence = false;
+    let mut fence_indent = String::new();
+    let mut fence_indent_cols = 0usize;
+
+    for child in node.children_with_tokens() {
+        match child {
+            NodeOrToken::Token(t) => {
+                if t.kind() == SyntaxKind::WHITESPACE && !has_fence {
+                    fence_indent = t.text().to_string();
+                }
+            }
+            NodeOrToken::Node(n) => match n.kind() {
+                SyntaxKind::CODE_FENCE_OPEN => {
+                    has_fence = true;
+                    fence_indent_cols = indent_columns(&fence_indent);
+                    for child_token in n.children_with_tokens() {
+                        if let NodeOrToken::Node(node) = child_token
+                            && node.kind() == SyntaxKind::CODE_INFO
+                        {
+                            for info_token in node.children_with_tokens() {
+                                if let NodeOrToken::Token(t) = info_token
+                                    && t.kind() == SyntaxKind::CODE_LANGUAGE
+                                {
+                                    language = Some(t.text().to_string());
+                                }
+                            }
+                            info_node = Some(node);
+                        }
+                    }
+                }
+                SyntaxKind::CODE_CONTENT => {
+                    let base_indent_cols = if has_fence { fence_indent_cols } else { 4 };
+                    let mut line_content = String::new();
+                    let mut line_indent = String::new();
+                    let mut at_line_start = true;
+
+                    for token in n.children_with_tokens() {
+                        if let NodeOrToken::Token(t) = token {
+                            match t.kind() {
+                                SyntaxKind::WHITESPACE if at_line_start => {
+                                    line_indent.push_str(t.text());
+                                }
+                                SyntaxKind::TEXT => {
+                                    if at_line_start && t.text().is_empty() {
+                                        continue;
+                                    }
+                                    if at_line_start {
+                                        line_content.push_str(&strip_indent_columns(
+                                            &line_indent,
+                                            base_indent_cols,
+                                        ));
+                                        line_indent.clear();
+                                        at_line_start = false;
+                                    }
+                                    line_content.push_str(t.text());
+                                }
+                                SyntaxKind::NEWLINE => {
+                                    if !at_line_start {
+                                        content.push_str(&line_content);
+                                    }
+                                    content.push('\n');
+                                    line_content.clear();
+                                    line_indent.clear();
+                                    at_line_start = true;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+
+                    if !at_line_start {
+                        content.push_str(&line_content);
+                    }
+                }
+                _ => {}
+            },
+        }
+    }
+
+    (info_node, language, content)
+}
+
+fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)> {
+    let mut header_end = 0usize;
+    let mut saw_prefix = false;
+
+    for line in content.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with(prefix) {
+            saw_prefix = true;
+            header_end += line.len();
+            continue;
+        }
+        break;
+    }
+
+    if saw_prefix {
+        Some((
+            content[..header_end].to_string(),
+            content[header_end..].to_string(),
+        ))
+    } else {
+        None
+    }
 }
 
 /// Determine the minimum fence length needed to avoid conflicts with content
@@ -556,39 +605,102 @@ fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool
 /// Collect all code blocks and their info strings from the syntax tree.
 /// Collect all code blocks from the syntax tree for external formatting.
 /// Returns a flat list of (language, content) pairs.
-pub fn collect_code_blocks(tree: &SyntaxNode, input: &str) -> Vec<(String, String)> {
+pub fn collect_code_blocks(
+    tree: &SyntaxNode,
+    input: &str,
+    config: &Config,
+) -> Vec<ExternalCodeBlock> {
     let blocks_by_language = utils::collect_code_blocks(tree, input);
-
     let mut result = Vec::new();
     for (_language, blocks) in blocks_by_language {
         for block in blocks {
-            result.push((block.language, block.content));
+            result.push(ExternalCodeBlock {
+                language: block.language,
+                original: block.content.clone(),
+                formatter_input: block.content,
+                hashpipe_prefix: None,
+            });
         }
     }
 
-    result
+    if !matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown) {
+        return result;
+    }
+
+    let mut updated = Vec::with_capacity(result.len());
+    for block in result {
+        let mut formatter_input = block.formatter_input.clone();
+        let mut prefix = None;
+
+        for node in tree.descendants() {
+            if node.kind() != SyntaxKind::CODE_BLOCK {
+                continue;
+            }
+
+            let (info_node, language, content) = extract_code_block_parts(&node);
+            if content != block.original {
+                continue;
+            }
+
+            let info_node = match info_node {
+                Some(node) => node,
+                None => break,
+            };
+
+            let info_raw = info_node.text().to_string();
+            let info = InfoString::parse(&info_raw);
+            let is_executable = matches!(info.block_type, CodeBlockType::Executable { .. });
+            if !is_executable {
+                break;
+            }
+
+            let language = language.unwrap_or_else(|| match info.block_type {
+                CodeBlockType::Executable { language } => language,
+                _ => String::new(),
+            });
+
+            if let Some(prefix_str) = hashpipe::get_comment_prefix(&language)
+                && let Some((header, body)) = split_hashpipe_header(&content, prefix_str)
+            {
+                formatter_input = body;
+                prefix = Some(header);
+            }
+            break;
+        }
+
+        updated.push(ExternalCodeBlock {
+            language: block.language,
+            original: block.original,
+            formatter_input,
+            hashpipe_prefix: prefix,
+        });
+    }
+
+    updated
 }
 
 /// Spawn external formatters for code blocks and await results.
 /// Returns a HashMap of original code -> formatted code (only successful formats).
 #[cfg(feature = "lsp")]
 pub async fn spawn_and_await_formatters(
-    blocks: Vec<(String, String)>,
+    blocks: Vec<ExternalCodeBlock>,
     config: &Config,
-) -> HashMap<String, String> {
+) -> Vec<ExternalFormatResult> {
     let mut tasks = Vec::new();
     let timeout = Duration::from_secs(30);
 
     // Spawn all formatter tasks immediately (one task per language)
-    for (lang, code) in blocks {
+    for block in blocks {
+        let lang = block.language.clone();
         if let Some(formatter_configs) = config.formatters.get(&lang) {
             if formatter_configs.is_empty() {
                 continue; // Empty formatter list means no formatting
             }
 
             let formatter_configs = formatter_configs.clone();
-            let code = code.clone();
-            let lang = lang.clone();
+            let code = block.formatter_input.clone();
+            let original = block.original.clone();
+            let hashpipe_prefix = block.hashpipe_prefix.clone();
 
             let task = tokio::spawn(async move {
                 // Format sequentially through the formatter chain
@@ -617,38 +729,40 @@ pub async fn spawn_and_await_formatters(
                                 lang, formatter_cfg.cmd, e
                             );
                             // Stop the chain on error and return original
-                            return (lang, code, Err(e));
+                            return (original, hashpipe_prefix, Err(e));
                         }
                     }
                 }
 
-                (lang, code, Ok(current_code))
+                (original, hashpipe_prefix, Ok(current_code))
             });
 
             tasks.push(task);
         }
     }
 
-    let mut formatted = HashMap::new();
+    let mut formatted = Vec::new();
 
     // Await all results
     for task in tasks {
-        if let Ok((lang, original_code, result)) = task.await {
+        if let Ok((original_code, hashpipe_prefix, result)) = task.await {
             match result {
                 Ok(formatted_code) => {
-                    log::debug!(
-                        "Successfully formatted {} code: {} bytes -> {} bytes",
-                        lang,
-                        original_code.len(),
-                        formatted_code.len()
-                    );
                     // Only store if content changed
                     if formatted_code != original_code {
-                        formatted.insert(original_code, formatted_code);
+                        let combined = if let Some(prefix) = hashpipe_prefix {
+                            format!("{}{}", prefix, formatted_code)
+                        } else {
+                            formatted_code
+                        };
+                        formatted.push(ExternalFormatResult {
+                            original: original_code,
+                            formatted: combined,
+                        });
                     }
                 }
                 Err(e) => {
-                    log::warn!("Failed to format {} code: {}", lang, e);
+                    log::warn!("Failed to format code: {}", e);
                     // Original code will be used (not in map)
                 }
             }
@@ -662,20 +776,31 @@ pub async fn spawn_and_await_formatters(
 /// Returns a HashMap of original code -> formatted code (only successful formats).
 #[cfg(not(target_arch = "wasm32"))]
 pub fn spawn_and_await_formatters_sync(
-    blocks: Vec<(String, String)>,
+    blocks: Vec<ExternalCodeBlock>,
     config: &Config,
-) -> HashMap<String, String> {
+) -> Vec<ExternalFormatResult> {
     use std::time::Duration;
     let timeout = Duration::from_secs(30);
 
-    crate::external_formatters_sync::run_formatters_parallel(blocks, &config.formatters, timeout)
+    let results = crate::external_formatters_sync::run_formatters_parallel(
+        blocks,
+        &config.formatters,
+        timeout,
+    );
+    results
+        .into_iter()
+        .map(|(original, formatted)| ExternalFormatResult {
+            original,
+            formatted,
+        })
+        .collect()
 }
 
 /// WASM version that returns empty HashMap (no external formatters in WASM)
 #[cfg(target_arch = "wasm32")]
 pub fn spawn_and_await_formatters_sync(
-    _blocks: Vec<(String, String)>,
+    _blocks: Vec<ExternalCodeBlock>,
     _config: &Config,
-) -> HashMap<String, String> {
-    HashMap::new()
+) -> Vec<ExternalFormatResult> {
+    Vec::new()
 }

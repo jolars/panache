@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use crate::config::FormatterConfig;
 pub use crate::external_formatters_common::FormatterError;
+use crate::formatter::code_blocks::ExternalCodeBlock;
 
 /// Format a code block using an external formatter (synchronous).
 ///
@@ -215,14 +216,14 @@ fn format_with_file(
 /// Run external formatters in parallel using threads.
 ///
 /// # Arguments
-/// * `blocks` - Vector of (language, code) pairs to format
+/// * `blocks` - Vector of code blocks to format
 /// * `formatters` - Map of language to formatter config
 /// * `timeout` - Timeout per formatter invocation
 ///
 /// # Returns
 /// HashMap of original code -> formatted code (only successful formats)
 pub fn run_formatters_parallel(
-    blocks: Vec<(String, String)>,
+    blocks: Vec<ExternalCodeBlock>,
     formatters: &std::collections::HashMap<String, Vec<FormatterConfig>>,
     timeout: Duration,
 ) -> std::collections::HashMap<String, String> {
@@ -233,15 +234,17 @@ pub fn run_formatters_parallel(
     thread::scope(|s| {
         let mut handles = Vec::new();
 
-        for (lang, code) in blocks {
+        for block in blocks {
+            let lang = block.language.clone();
             if let Some(formatter_configs) = formatters.get(&lang) {
                 if formatter_configs.is_empty() {
                     continue; // Empty list means no formatting
                 }
 
                 let formatter_configs = formatter_configs.clone();
-                let code = code.clone();
-                let lang = lang.clone();
+                let code = block.formatter_input.clone();
+                let original = block.original.clone();
+                let hashpipe_prefix = block.hashpipe_prefix.clone();
                 let results = Arc::clone(&results);
 
                 let handle = s.spawn(move || {
@@ -279,8 +282,13 @@ pub fn run_formatters_parallel(
                     }
 
                     // Only store if content changed
-                    if current_code != code {
-                        results.lock().unwrap().insert(code, current_code);
+                    if current_code != original {
+                        let output = if let Some(prefix) = hashpipe_prefix {
+                            format!("{}{}", prefix, current_code)
+                        } else {
+                            current_code
+                        };
+                        results.lock().unwrap().insert(original, output);
                     }
                 });
 

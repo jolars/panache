@@ -3,7 +3,7 @@ use crate::syntax::SyntaxNode;
 use std::collections::HashMap;
 
 mod blockquotes;
-mod code_blocks;
+pub mod code_blocks;
 mod core;
 mod fenced_divs;
 mod hashpipe;
@@ -38,7 +38,7 @@ pub async fn format_tree_async(
 
     // Step 1: Spawn external formatters immediately (run in background)
     let formatted_code_future = if !config.formatters.is_empty() {
-        let code_blocks = code_blocks::collect_code_blocks(tree, &input);
+        let code_blocks = code_blocks::collect_code_blocks(tree, &input, config);
         if !code_blocks.is_empty() {
             log::debug!(
                 "Found {} code blocks, spawning formatters...",
@@ -118,9 +118,8 @@ pub async fn format_tree_async(
         && !formatted_code.is_empty()
     {
         log::debug!("Applying {} formatted code blocks", formatted_code.len());
-        // Replace code in the output
-        for (original, formatted) in &formatted_code {
-            output = output.replace(original, formatted);
+        for result in &formatted_code {
+            output = output.replace(&result.original, &result.formatted);
         }
     }
 
@@ -161,7 +160,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
 
     // Step 1: Run external formatters synchronously if configured
     let formatted_code = if !config.formatters.is_empty() {
-        let code_blocks = code_blocks::collect_code_blocks(tree, &input);
+        let code_blocks = code_blocks::collect_code_blocks(tree, &input, config);
         if !code_blocks.is_empty() {
             log::debug!(
                 "Found {} code blocks, spawning formatters...",
@@ -169,10 +168,10 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
             );
             code_blocks::spawn_and_await_formatters_sync(code_blocks, config)
         } else {
-            HashMap::new()
+            Vec::new()
         }
     } else {
-        HashMap::new()
+        Vec::new()
     };
 
     // Step 1b: Run YAML frontmatter formatter synchronously if configured (uses same config as yaml code blocks)
@@ -236,13 +235,13 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     let formatted_yaml: Option<(String, String)> = None;
 
     // Step 2: Format markdown with formatted code blocks
-    let mut output = Formatter::new(config.clone(), formatted_code.clone(), range).format(tree);
+    let mut output = Formatter::new(config.clone(), HashMap::new(), range).format(tree);
 
     // Step 3: Apply formatted code blocks if any
     if !formatted_code.is_empty() {
         log::debug!("Applying {} formatted code blocks", formatted_code.len());
-        for (original, formatted) in &formatted_code {
-            output = output.replace(original, formatted);
+        for result in &formatted_code {
+            output = output.replace(&result.original, &result.formatted);
         }
     }
 

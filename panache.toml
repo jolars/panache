@@ -4,6 +4,7 @@ yaml = "yamlfmt"
 toml = "taplo"
 bash = "shfmt"
 sh = "shfmt"
+python = "ruff"
 
 [formatters.taplo]
 cmd = "taplo"
@@ -12,6 +13,10 @@ args = ["format", "-"]
 [formatters.shfmt]
 cmd = "shfmt"
 args = ["-"]
+
+[formatters.ruff]
+cmd = "ruff"
+args = ["format", "--stdin-filename", "{}", "-"]
 
 [linters]
 r = "jarl"

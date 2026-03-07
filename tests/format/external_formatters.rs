@@ -1,3 +1,4 @@
+use panache::config::{Extensions, Flavor};
 use panache::{Config, format};
 use std::collections::HashMap;
 
@@ -150,4 +151,43 @@ hello world
     // Code should be unchanged on formatter failure
     assert!(output.contains("hello world"));
     assert!(!output.contains("HELLO WORLD"));
+}
+
+#[test]
+fn python_hashpipe_prefix_preserved_with_external_formatter() {
+    let mut formatters = HashMap::new();
+    formatters.insert(
+        "python".to_string(),
+        vec![panache::config::FormatterConfig {
+            cmd: "tr".to_string(),
+            args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
+            enabled: true,
+            stdin: true,
+        }],
+    );
+
+    let flavor = Flavor::Quarto;
+    let config = Config {
+        flavor,
+        extensions: Extensions::for_flavor(flavor),
+        formatters,
+        ..Default::default()
+    };
+
+    let input = r#"
+```{python}
+#| label: setup
+#| fig-cap: "My figure"
+
+print("ok")
+```
+"#
+    .trim_start();
+
+    let output = format(input, Some(config), None);
+
+    assert!(output.contains("#| label: setup"));
+    assert!(output.contains("#| fig-cap: \"My figure\""));
+    assert!(output.contains("PRINT(\"OK\")"));
+    assert!(!output.contains("# |"));
 }
