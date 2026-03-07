@@ -349,3 +349,18 @@ fn test_lint_includes_duplicate_reference_definitions() {
         .success()
         .stdout(predicate::str::contains("duplicate-reference-labels"));
 }
+
+#[test]
+fn test_lint_includes_missing_file_reports_diagnostic() {
+    let temp_dir = TempDir::new().unwrap();
+    let parent_path = temp_dir.path().join("parent.qmd");
+
+    fs::write(&parent_path, "{{< include missing.qmd >}}\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", parent_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("include-not-found"))
+        .stdout(predicate::str::contains("missing.qmd"));
+}
