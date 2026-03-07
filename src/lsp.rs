@@ -28,7 +28,7 @@ pub struct DocumentState {
     /// Cached definition index for cross-document lookups.
     pub definition_index: crate::salsa::DefinitionIndex,
     /// Cached ProjectGraph for cross-document lookups.
-    pub graph: crate::includes::ProjectGraph,
+    pub graph: crate::salsa::ProjectGraph,
     /// Cached syntax tree for incremental parsing.
     pub tree: GreenNode,
 }

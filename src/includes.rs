@@ -383,7 +383,11 @@ pub fn find_bookdown_root(doc_path: &Path) -> Option<PathBuf> {
     }
 }
 
-fn find_project_documents(project_root: &Path, config: &Config, is_bookdown: bool) -> Vec<PathBuf> {
+pub fn find_project_documents(
+    project_root: &Path,
+    config: &Config,
+    is_bookdown: bool,
+) -> Vec<PathBuf> {
     let mut docs = Vec::new();
     let mut seen = HashSet::new();
     let bookdown_files = if is_bookdown {

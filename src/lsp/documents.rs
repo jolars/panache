@@ -64,15 +64,11 @@ pub(crate) async fn did_open(
         )
     };
     let doc_path = params.text_document.uri.to_file_path();
-    let has_other_docs = { !document_map.lock().await.is_empty() };
     let graph = if let Some(path) = doc_path.as_ref() {
-        if has_other_docs {
-            crate::includes::ProjectGraph::build_project(path, &text, &config)
-        } else {
-            crate::includes::ProjectGraph::build(path, &text, &config)
-        }
+        let db = salsa_db.lock().await;
+        crate::salsa::project_graph(&*db, salsa_file, salsa_config, path.to_path_buf()).clone()
     } else {
-        crate::includes::ProjectGraph::default()
+        crate::salsa::ProjectGraph::default()
     };
     let definition_index = if let Some(path) = doc_path.as_ref() {
         let db = salsa_db.lock().await;
@@ -90,11 +86,6 @@ pub(crate) async fn did_open(
     // Store document state with metadata
     {
         let mut map = document_map.lock().await;
-        if has_other_docs {
-            for state in map.values_mut() {
-                state.graph = graph.clone();
-            }
-        }
         map.insert(
             uri.clone(),
             DocumentState {
@@ -141,7 +132,7 @@ pub(crate) async fn did_change(
 
     // Apply incremental changes sequentially
     let mut dependent_uris: Option<Vec<Uri>> = None;
-    let (graph_text, graph_path, rebuild_full_graph, salsa_file) = {
+    let (graph_text, graph_path, _rebuild_full_graph, salsa_file) = {
         let (salsa_file, original_tree, has_multiple_docs) = {
             let document_map = document_map.lock().await;
             let Some(doc_state) = document_map.get(&uri_string) else {
@@ -236,18 +227,13 @@ pub(crate) async fn did_change(
     } else {
         crate::salsa::DefinitionIndex::default()
     };
-    let new_graph = if let (Some(path), Some(text)) = (graph_path.as_ref(), graph_text.as_ref()) {
-        if rebuild_full_graph {
-            crate::includes::ProjectGraph::build_project(path, text, &config)
-        } else {
-            crate::includes::ProjectGraph::build(path, text, &config)
-        }
+    let new_graph = if let Some(path) = graph_path.as_ref() {
+        let db = salsa_db.lock().await;
+        crate::salsa::project_graph(&*db, salsa_file, config_input, path.to_path_buf()).clone()
     } else {
-        crate::includes::ProjectGraph::default()
+        crate::salsa::ProjectGraph::default()
     };
-    if let Some(path) = graph_path.as_ref()
-        && rebuild_full_graph
-    {
+    if let Some(path) = graph_path.as_ref() {
         let dependents = new_graph.dependents(path, None);
         if !dependents.is_empty() {
             dependent_uris = Some(
@@ -287,13 +273,7 @@ pub(crate) async fn did_change(
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
             doc_state.metadata = metadata;
             doc_state.definition_index = new_definition_index.clone();
-            if rebuild_full_graph {
-                for state in document_map.values_mut() {
-                    state.graph = new_graph.clone();
-                }
-            } else {
-                doc_state.graph = new_graph.clone();
-            }
+            doc_state.graph = new_graph.clone();
         }
     }
 

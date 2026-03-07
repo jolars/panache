@@ -98,7 +98,7 @@ pub(crate) async fn rename(
 
     let doc_path = uri.to_file_path().map(|p| p.into_owned());
     for bib_path in &bib_paths {
-        doc_paths.extend(graph.dependents(bib_path, Some(crate::includes::EdgeKind::Bibliography)));
+        doc_paths.extend(graph.dependents(bib_path, Some(crate::salsa::EdgeKind::Bibliography)));
     }
 
     let inline_refs = inline_reference_map(&metadata.inline_references);

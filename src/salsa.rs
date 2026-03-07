@@ -318,6 +318,19 @@ impl ProjectGraph {
             .unwrap_or_default()
     }
 
+    pub fn dependencies(&self, path: &Path, kind: Option<EdgeKind>) -> Vec<PathBuf> {
+        self.edges
+            .get(path)
+            .map(|edges| {
+                edges
+                    .iter()
+                    .filter(|(_, edge_kind)| kind.is_none_or(|k| k == *edge_kind))
+                    .map(|(to, _)| to.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     fn add_edge(&mut self, from: &Path, to: &Path, kind: EdgeKind) {
         let from = from.to_path_buf();
         let to = to.to_path_buf();
@@ -344,6 +357,22 @@ pub fn project_graph(
     let _project_root = crate::includes::find_quarto_root(&root_path)
         .or_else(|| crate::includes::find_bookdown_root(&root_path));
     visit_document(db, &root_file, config, &root_path, &mut graph, &mut visited);
+    if let Some(project_root) = crate::includes::find_quarto_root(&root_path)
+        .or_else(|| crate::includes::find_bookdown_root(&root_path))
+    {
+        let is_bookdown = crate::includes::find_bookdown_root(&root_path).is_some();
+        for path in
+            crate::includes::find_project_documents(&project_root, config.config(db), is_bookdown)
+        {
+            if visited.contains(&path) {
+                continue;
+            }
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                let include_file = FileText::new(db, text);
+                visit_document(db, &include_file, config, &path, &mut graph, &mut visited);
+            }
+        }
+    }
     graph
 }
 
@@ -369,6 +398,18 @@ fn visit_document(
             let _include_base = include.path.parent().unwrap_or_else(|| Path::new("."));
             let include_file = FileText::new(db, include_input);
             visit_document(db, &include_file, config, &include.path, graph, visited);
+        }
+    }
+
+    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    if let Ok(metadata) = crate::metadata::extract_project_metadata(&tree, path) {
+        for metadata_file in &metadata.metadata_files {
+            graph.add_edge(path, metadata_file, EdgeKind::MetadataFile);
+        }
+        if let Some(bibliography) = metadata.bibliography {
+            for bib in bibliography.paths {
+                graph.add_edge(path, &bib, EdgeKind::Bibliography);
+            }
         }
     }
 }

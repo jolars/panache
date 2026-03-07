@@ -22,7 +22,7 @@ fn lint_included_documents(
     text: &str,
     tree: &SyntaxNode,
     config: &crate::Config,
-    graph: &crate::includes::ProjectGraph,
+    graph: &crate::salsa::ProjectGraph,
 ) -> Vec<(Uri, Vec<Diagnostic>)> {
     let Some(doc_path) = root_uri.to_file_path() else {
         return Vec::new();
@@ -40,9 +40,7 @@ fn lint_included_documents(
         .map(|d| convert_diagnostic(d, text))
         .collect();
 
-    if let Some(extra) = graph.diagnostics().get(doc_path.as_ref()) {
-        root_diagnostics.extend(extra.iter().map(|d| convert_diagnostic(d, text)));
-    }
+    let _ = graph;
 
     for include in resolution.includes {
         match std::fs::read_to_string(&include.path) {
@@ -58,13 +56,10 @@ fn lint_included_documents(
                     config,
                     include_metadata.as_ref(),
                 );
-                let mut mapped: Vec<Diagnostic> = include_diagnostics
+                let mapped: Vec<Diagnostic> = include_diagnostics
                     .iter()
                     .map(|d| convert_diagnostic(d, &include_text))
                     .collect();
-                if let Some(extra) = graph.diagnostics().get(&include.path) {
-                    mapped.extend(extra.iter().map(|d| convert_diagnostic(d, &include_text)));
-                }
                 results.push((include_uri, mapped));
             }
             Err(err) => {
