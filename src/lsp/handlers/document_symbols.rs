@@ -17,6 +17,7 @@ use crate::syntax::{
 pub async fn document_symbol(
     _client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     _workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: DocumentSymbolParams,
 ) -> Result<Option<DocumentSymbolResponse>> {
@@ -24,13 +25,14 @@ pub async fn document_symbol(
     log::debug!("document_symbol request for: {}", *uri);
 
     // Use helper to get document content and tree
-    let (content, syntax_tree) = match get_document_content_and_tree(&document_map, &uri).await {
-        Some(result) => result,
-        None => {
-            log::warn!("Document not found in document_map: {}", *uri);
-            return Ok(None);
-        }
-    };
+    let (content, syntax_tree) =
+        match get_document_content_and_tree(&document_map, &salsa_db, &uri).await {
+            Some(result) => result,
+            None => {
+                log::warn!("Document not found in document_map: {}", *uri);
+                return Ok(None);
+            }
+        };
     log::debug!("Document content length: {} bytes", content.len());
 
     // Build symbols synchronously (SyntaxNode is not Send)

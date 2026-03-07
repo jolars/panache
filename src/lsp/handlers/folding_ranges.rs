@@ -14,16 +14,18 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 pub async fn folding_range(
     _client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     _workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: FoldingRangeParams,
 ) -> Result<Option<Vec<FoldingRange>>> {
     let uri = params.text_document.uri;
 
     // Use helper to get document content and tree
-    let (content, syntax_tree) = match get_document_content_and_tree(&document_map, &uri).await {
-        Some(result) => result,
-        None => return Ok(None),
-    };
+    let (content, syntax_tree) =
+        match get_document_content_and_tree(&document_map, &salsa_db, &uri).await {
+            Some(result) => result,
+            None => return Ok(None),
+        };
 
     // Build folding ranges synchronously (SyntaxNode is not Send)
     let ranges = build_folding_ranges(&syntax_tree, &content);

@@ -92,7 +92,6 @@ pub(crate) async fn did_open(
         map.insert(
             uri.clone(),
             DocumentState {
-                text: text.clone(),
                 metadata,
                 salsa_file,
                 salsa_config,
@@ -110,6 +109,7 @@ pub(crate) async fn did_open(
     lint_and_publish(
         client,
         &document_map,
+        &salsa_db,
         &workspace_root,
         params.text_document.uri,
     )
@@ -135,20 +135,30 @@ pub(crate) async fn did_change(
     // Apply incremental changes sequentially
     let mut dependent_uris: Option<Vec<Uri>> = None;
     let (graph_text, graph_path, rebuild_full_graph, salsa_file) = {
-        let mut document_map = document_map.lock().await;
-        let has_multiple_docs = document_map.len() > 1;
-        if let Some(doc_state) = document_map.get_mut(&uri_string) {
-            // Store original state before applying changes
-            let original_text = doc_state.text.clone();
-            let original_tree = doc_state.tree.clone();
-            let _original_graph = doc_state.graph.clone();
+        let (salsa_file, original_tree, has_multiple_docs) = {
+            let document_map = document_map.lock().await;
+            let Some(doc_state) = document_map.get(&uri_string) else {
+                return;
+            };
+            (
+                doc_state.salsa_file,
+                doc_state.tree.clone(),
+                document_map.len() > 1,
+            )
+        };
+        let original_text = {
+            let db = salsa_db.lock().await;
+            salsa_file.text(&*db).clone()
+        };
 
-            // Apply all changes to update the text
-            for change in params.content_changes.iter() {
-                doc_state.text = apply_content_change(&doc_state.text, change);
-            }
+        // Apply all changes to update the text
+        let mut updated_text = original_text.clone();
+        for change in params.content_changes.iter() {
+            updated_text = apply_content_change(&updated_text, change);
+        }
 
-            // Use incremental parsing for single changes, full reparse for multiple
+        // Use incremental parsing for single changes, full reparse for multiple
+        let green = {
             let new_tree = if params.content_changes.len() == 1 {
                 let change = &params.content_changes[0];
 
@@ -164,11 +174,11 @@ pub(crate) async fn did_change(
                         (old_start, old_end, old_start, new_end)
                     } else {
                         // Full document replacement
-                        (0, original_text.len(), 0, doc_state.text.len())
+                        (0, original_text.len(), 0, updated_text.len())
                     };
 
                 parse_incremental(
-                    &doc_state.text,
+                    &updated_text,
                     Some(config.clone()),
                     &SyntaxNode::new_root(original_tree),
                     (old_edit_start, old_edit_end),
@@ -177,25 +187,31 @@ pub(crate) async fn did_change(
                 .tree
             } else {
                 // Multiple changes - do full reparse for now
-                crate::parse(&doc_state.text, Some(config.clone()))
+                crate::parse(&updated_text, Some(config.clone()))
             };
 
-            doc_state.tree = GreenNode::from(new_tree.green());
-            (
-                Some(doc_state.text.clone()),
-                params
-                    .text_document
-                    .uri
-                    .to_file_path()
-                    .map(|p| p.into_owned()),
-                has_multiple_docs,
-                doc_state.salsa_file,
-            )
-        } else {
-            return;
+            GreenNode::from(new_tree.green())
+        };
+        {
+            let mut document_map = document_map.lock().await;
+            let Some(doc_state) = document_map.get_mut(&uri_string) else {
+                return;
+            };
+            doc_state.tree = green;
         }
+
+        (
+            Some(updated_text),
+            params
+                .text_document
+                .uri
+                .to_file_path()
+                .map(|p| p.into_owned()),
+            has_multiple_docs,
+            salsa_file,
+        )
     };
-    {
+    let _config_input = {
         let mut db = salsa_db.lock().await;
         if let Some(text) = graph_text.as_ref() {
             salsa_file.set_text(&mut *db).to(text.clone());
@@ -205,7 +221,8 @@ pub(crate) async fn did_change(
         if let Some(state) = document_map.lock().await.get_mut(&uri_string) {
             state.salsa_config = config_input;
         }
-    }
+        config_input
+    };
     let new_graph = if let (Some(path), Some(text)) = (graph_path.as_ref(), graph_text.as_ref()) {
         if rebuild_full_graph {
             crate::includes::ProjectGraph::build_project(path, text, &config)
@@ -232,10 +249,16 @@ pub(crate) async fn did_change(
     // Re-parse metadata after changes (using cache) - done outside the lock
     // First, get the text we need
     let current_text = {
-        let document_map = document_map.lock().await;
-        document_map
-            .get(&uri_string)
-            .map(|state| state.text.clone())
+        let salsa_file = {
+            let document_map = document_map.lock().await;
+            document_map.get(&uri_string).map(|state| state.salsa_file)
+        };
+        if let Some(salsa_file) = salsa_file {
+            let db = salsa_db.lock().await;
+            Some(salsa_file.text(&*db).clone())
+        } else {
+            None
+        }
     };
 
     let metadata = if let Some(text) = current_text {
@@ -262,7 +285,7 @@ pub(crate) async fn did_change(
 
     if let Some(uris) = dependent_uris {
         for uri in uris {
-            lint_and_publish(client, &document_map, &workspace_root, uri).await;
+            lint_and_publish(client, &document_map, &salsa_db, &workspace_root, uri).await;
         }
     }
 
@@ -270,6 +293,7 @@ pub(crate) async fn did_change(
     lint_and_publish(
         client,
         &document_map,
+        &salsa_db,
         &workspace_root,
         params.text_document.uri,
     )

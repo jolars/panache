@@ -15,6 +15,7 @@ pub(crate) async fn did_change_watched_files(
     client: &Client,
     bib_cache: Arc<Mutex<BibliographyCache>>,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: DidChangeWatchedFilesParams,
 ) {
@@ -69,7 +70,14 @@ pub(crate) async fn did_change_watched_files(
 
         // Re-lint each affected document
         for uri in &affected_documents {
-            lint_and_publish(client, &document_map, &workspace_root, uri.clone()).await;
+            lint_and_publish(
+                client,
+                &document_map,
+                &salsa_db,
+                &workspace_root,
+                uri.clone(),
+            )
+            .await;
         }
     }
 }

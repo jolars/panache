@@ -288,6 +288,7 @@ fn inline_reference_conflict_diagnostic(conflict: &InlineBibConflict, text: &str
 pub(crate) async fn lint_and_publish(
     client: &Client,
     document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
     workspace_root: &Arc<Mutex<Option<PathBuf>>>,
     uri: Uri,
 ) {
@@ -308,7 +309,10 @@ pub(crate) async fn lint_and_publish(
         return;
     };
 
-    let text = doc_state.text;
+    let text = {
+        let db = salsa_db.lock().await;
+        doc_state.salsa_file.text(&*db).clone()
+    };
     let metadata = doc_state.metadata.clone();
     let graph = doc_state.graph.clone();
     let mut all_diagnostics = Vec::new();

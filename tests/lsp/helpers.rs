@@ -231,8 +231,14 @@ impl TestLspServer {
     /// This is a test-only method to inspect internal state.
     pub async fn get_document_content(&self, uri: &str) -> Option<String> {
         let doc_map = self.lsp.document_map();
-        let docs = doc_map.lock().await;
-        docs.get(uri).map(|state| state.text.clone())
+        let state = {
+            let docs = doc_map.lock().await;
+            docs.get(uri).cloned()
+        };
+        let state = state?;
+        let db = self.lsp.salsa_db();
+        let db = db.lock().await;
+        Some(state.salsa_file.text(&*db).clone())
     }
 
     /// Get the current syntax tree for a document (test-only).

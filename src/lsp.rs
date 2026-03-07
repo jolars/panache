@@ -19,8 +19,6 @@ pub use bibliography_cache::BibliographyCache;
 /// State for a single document in the LSP.
 #[derive(Clone)]
 pub struct DocumentState {
-    /// The document text content.
-    pub text: String,
     /// Parsed metadata from YAML frontmatter (if present).
     pub metadata: Option<crate::metadata::DocumentMetadata>,
     /// Salsa input for this document's text.

@@ -16,23 +16,32 @@ use super::config::load_config;
 /// Helper to get document content from the document map
 pub(crate) async fn get_document_content(
     document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
     uri: &Uri,
 ) -> Option<String> {
-    let doc_map = document_map.lock().await;
-    doc_map
-        .get(&uri.to_string())
-        .map(|state| state.text.clone())
+    let state = {
+        let doc_map = document_map.lock().await;
+        doc_map.get(&uri.to_string())?.clone()
+    };
+    let db = salsa_db.lock().await;
+    Some(state.salsa_file.text(&*db).clone())
 }
 
 /// Helper to get document content and tree from the document map
 pub(crate) async fn get_document_content_and_tree(
     document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
     uri: &Uri,
 ) -> Option<(String, SyntaxNode)> {
-    let doc_map = document_map.lock().await;
-    doc_map
-        .get(&uri.to_string())
-        .map(|state| (state.text.clone(), SyntaxNode::new_root(state.tree.clone())))
+    let state = {
+        let doc_map = document_map.lock().await;
+        doc_map.get(&uri.to_string())?.clone()
+    };
+    let db = salsa_db.lock().await;
+    Some((
+        state.salsa_file.text(&*db).clone(),
+        SyntaxNode::new_root(state.tree.clone()),
+    ))
 }
 
 /// Helper to load config with URI-based flavor detection
@@ -49,10 +58,11 @@ pub(crate) async fn get_config(
 pub(crate) async fn get_document_and_config(
     client: &tower_lsp_server::Client,
     document_map: &Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
     workspace_root: &Arc<Mutex<Option<PathBuf>>>,
     uri: &Uri,
 ) -> Option<(String, Config)> {
-    let content = get_document_content(document_map, uri).await?;
+    let content = get_document_content(document_map, salsa_db, uri).await?;
     let config = get_config(client, workspace_root, uri).await;
     Some((content, config))
 }

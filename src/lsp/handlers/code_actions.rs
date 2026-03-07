@@ -18,17 +18,25 @@ use super::{footnote_conversion, list_conversion};
 pub(crate) async fn code_action(
     client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: CodeActionParams,
 ) -> Result<Option<CodeActionResponse>> {
     let uri = params.text_document.uri;
 
     // Use helper to get document and config
-    let (text, config) =
-        match get_document_and_config(client, &document_map, &workspace_root, &uri).await {
-            Some(result) => result,
-            None => return Ok(None),
-        };
+    let (text, config) = match get_document_and_config(
+        client,
+        &document_map,
+        &salsa_db,
+        &workspace_root,
+        &uri,
+    )
+    .await
+    {
+        Some(result) => result,
+        None => return Ok(None),
+    };
 
     // Run linter (with external linters if available)
     let text_clone = text.clone();

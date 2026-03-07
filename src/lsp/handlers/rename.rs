@@ -17,6 +17,7 @@ use crate::utils::normalize_label;
 pub(crate) async fn rename(
     _client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     _workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: RenameParams,
 ) -> Result<Option<WorkspaceEdit>> {
@@ -29,10 +30,11 @@ pub(crate) async fn rename(
         let Some(state) = map.get(&uri.to_string()) else {
             return Ok(None);
         };
+        let db = salsa_db.lock().await;
         (
             state.metadata.clone(),
             state.graph.clone(),
-            state.text.clone(),
+            state.salsa_file.text(&*db).clone(),
             SyntaxNode::new_root(state.tree.clone()),
         )
     };

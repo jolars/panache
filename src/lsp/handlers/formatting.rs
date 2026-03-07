@@ -15,6 +15,7 @@ use crate::{parser, range_utils};
 pub(crate) async fn format_document(
     client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: DocumentFormattingParams,
 ) -> Result<Option<Vec<TextEdit>>> {
@@ -29,16 +30,23 @@ pub(crate) async fn format_document(
         .await;
 
     // Use helper to get document and config
-    let (text, config) =
-        match get_document_and_config(client, &document_map, &workspace_root, &uri).await {
-            Some(result) => result,
-            None => {
-                client
-                    .log_message(MessageType::ERROR, format!("Document not found: {}", *uri))
-                    .await;
-                return Ok(None);
-            }
-        };
+    let (text, config) = match get_document_and_config(
+        client,
+        &document_map,
+        &salsa_db,
+        &workspace_root,
+        &uri,
+    )
+    .await
+    {
+        Some(result) => result,
+        None => {
+            client
+                .log_message(MessageType::ERROR, format!("Document not found: {}", *uri))
+                .await;
+            return Ok(None);
+        }
+    };
 
     // Run formatting in a blocking task (because rowan::SyntaxNode isn't Send)
     // but use format_async inside to support external formatters
@@ -79,6 +87,7 @@ pub(crate) async fn format_document(
 pub(crate) async fn format_range(
     client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: DocumentRangeFormattingParams,
 ) -> Result<Option<Vec<TextEdit>>> {
@@ -104,16 +113,23 @@ pub(crate) async fn format_range(
         .await;
 
     // Use helper to get document and config
-    let (text, config) =
-        match get_document_and_config(client, &document_map, &workspace_root, &uri).await {
-            Some(result) => result,
-            None => {
-                client
-                    .log_message(MessageType::ERROR, format!("Document not found: {}", *uri))
-                    .await;
-                return Ok(None);
-            }
-        };
+    let (text, config) = match get_document_and_config(
+        client,
+        &document_map,
+        &salsa_db,
+        &workspace_root,
+        &uri,
+    )
+    .await
+    {
+        Some(result) => result,
+        None => {
+            client
+                .log_message(MessageType::ERROR, format!("Document not found: {}", *uri))
+                .await;
+            return Ok(None);
+        }
+    };
 
     // Convert LSP range (0-indexed lines, end-exclusive) to panache range (1-indexed, inclusive)
     let start_line = (range.start.line + 1) as usize;

@@ -141,6 +141,7 @@ impl LanguageServer for PanacheLsp {
         handlers::formatting::format_document(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )
@@ -154,6 +155,7 @@ impl LanguageServer for PanacheLsp {
         handlers::formatting::format_range(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )
@@ -164,6 +166,7 @@ impl LanguageServer for PanacheLsp {
         handlers::code_actions::code_action(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )
@@ -177,6 +180,7 @@ impl LanguageServer for PanacheLsp {
         handlers::document_symbols::document_symbol(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )
@@ -187,6 +191,7 @@ impl LanguageServer for PanacheLsp {
         handlers::folding_ranges::folding_range(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )
@@ -200,6 +205,7 @@ impl LanguageServer for PanacheLsp {
         handlers::goto_definition::goto_definition(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )
@@ -210,6 +216,7 @@ impl LanguageServer for PanacheLsp {
         handlers::hover::hover(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )
@@ -220,6 +227,7 @@ impl LanguageServer for PanacheLsp {
         handlers::completion::completion(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )
@@ -230,6 +238,7 @@ impl LanguageServer for PanacheLsp {
         handlers::rename::rename(
             &self.client,
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )
@@ -241,6 +250,7 @@ impl LanguageServer for PanacheLsp {
             &self.client,
             Arc::clone(&self.bibliography_cache),
             Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),
             params,
         )

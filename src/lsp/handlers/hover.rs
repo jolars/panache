@@ -20,6 +20,7 @@ use super::super::{conversions, helpers};
 pub(crate) async fn hover(
     _client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     _workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: HoverParams,
 ) -> Result<Option<Hover>> {
@@ -36,7 +37,8 @@ pub(crate) async fn hover(
     }
     .unwrap_or((None, crate::includes::ProjectGraph::default()));
 
-    let Some((content, root)) = helpers::get_document_content_and_tree(&document_map, uri).await
+    let Some((content, root)) =
+        helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
     else {
         return Ok(None);
     };

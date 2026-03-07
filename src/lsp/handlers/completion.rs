@@ -15,13 +15,14 @@ use crate::metadata::inline_reference_map;
 pub(crate) async fn completion(
     _client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
+    salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     _workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: CompletionParams,
 ) -> Result<Option<CompletionResponse>> {
     let uri = &params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
 
-    let Some(text) = helpers::get_document_content(&document_map, uri).await else {
+    let Some(text) = helpers::get_document_content(&document_map, &salsa_db, uri).await else {
         return Ok(None);
     };
 
