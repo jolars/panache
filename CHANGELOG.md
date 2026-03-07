@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.13.0](https://github.com/jolars/panache/compare/v2.12.0...v2.13.0) (2026-03-07)
+
+### Features
+
+* **formatter:** add `tab-width` setting ([3e02336](https://github.com/jolars/panache/commit/3e023369ad5853de80c47325d8a94f7324e4fc95))
+* **formatter:** normalize spacing inside fenced div ([6aa73d0](https://github.com/jolars/panache/commit/6aa73d046bd96c1b37e9506832c0bc1edfd89c04))
+* **formatter:** wrap multiline footnote refs as Pandoc ([722c76a](https://github.com/jolars/panache/commit/722c76acc974b66542be8fb1a34974c77ec5b097))
+* **lsp:** add `--debug` flag ([ad5d81a](https://github.com/jolars/panache/commit/ad5d81a090cca6f12802c5f6d3bae639621401c5))
+* **parser:** add support for raw tex blocks ([841a663](https://github.com/jolars/panache/commit/841a6637dcd2f2357e89274445d7216f7811e824))
+
+### Bug Fixes
+
+* **formatter:** fix wrapping for definition lists ([4dd084b](https://github.com/jolars/panache/commit/4dd084b36cf00acf0296862b6ddb45703313a844))
+* **formatter:** omit quarto/knitr comments from formatting ([36ceccb](https://github.com/jolars/panache/commit/36ceccba17531817db4f7014730c3114232e68ef))
+* **formatter:** use correct ruff args ([408d330](https://github.com/jolars/panache/commit/408d3307362d537d31392ab67bd0a0e6c976ee5d)), closes [#46](https://github.com/jolars/panache/issues/46)
+* **linter:** mitigate spurious warning for quarto crossrefs ([a0e0769](https://github.com/jolars/panache/commit/a0e076929780c631ffbcd25a17e0c82cad79b267))
+* **lsp,linter:** correct bib file found range, deduplicate ([9d5dfbb](https://github.com/jolars/panache/commit/9d5dfbba272ff1e105b23b854ccbf84a3fef7ee2))
+* **parser,formatter:** align with pandoc's fenced div parse ([1982972](https://github.com/jolars/panache/commit/1982972ee509f591922383c6780dacc81f573557))
+* **parser:** fix infinite recursiong bug in tex cmd parse ([1f71833](https://github.com/jolars/panache/commit/1f718334ca981486200fbe61942db380c5652973))
+* **parser:** handle tab stops gracefully ([9f8aa96](https://github.com/jolars/panache/commit/9f8aa96aacabd5e94039bf2e53deeea0ccd518f6))
+* **parser:** only accept four spaces-indented def lists ([11fb109](https://github.com/jolars/panache/commit/11fb109cf93c28cfa668c3f5b8e9020fea153a89))
+
+### Performance Improvements
+
+* **lsp:** build graph lazily ([0efcc0d](https://github.com/jolars/panache/commit/0efcc0d7898de35780e9d73ae77e4df248a258d3))
+* **lsp:** cache bibliography data ([edecc10](https://github.com/jolars/panache/commit/edecc106b3eb17684d1a3fcf15c8994477ed30d5))
+
 ## [2.12.0](https://github.com/jolars/panache/compare/v2.11.0...v2.12.0) (2026-03-05)
 
 ### Features
