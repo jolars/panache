@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::config::Config;
+use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{AstNode, FootnoteDefinition, ReferenceDefinition, SyntaxKind, SyntaxNode};
@@ -40,63 +41,7 @@ pub fn metadata(
     })
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IncludeOccurrence {
-    pub path: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IncludeResolution {
-    pub includes: Vec<IncludeOccurrence>,
-}
-
-#[salsa::tracked(returns(ref))]
-pub fn includes(
-    db: &dyn salsa::Database,
-    file: FileText,
-    config: FileConfig,
-    path: PathBuf,
-) -> IncludeResolution {
-    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
-    let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
-    let project_root = crate::includes::find_quarto_root(&path)
-        .or_else(|| crate::includes::find_bookdown_root(&path));
-    let mut resolution = IncludeResolution {
-        includes: Vec::new(),
-    };
-
-    if !config.config(db).extensions.quarto_shortcodes {
-        return resolution;
-    }
-
-    for node in tree.descendants() {
-        if node.kind() != SyntaxKind::SHORTCODE {
-            continue;
-        }
-        if crate::includes::is_escaped_shortcode(&node) {
-            continue;
-        }
-        let Some(content) = crate::includes::extract_shortcode_content(&node) else {
-            continue;
-        };
-        let args = crate::includes::split_shortcode_args(&content);
-        if args.first().map(String::as_str) != Some("include") {
-            continue;
-        }
-        let Some(raw_path) = args.get(1) else {
-            continue;
-        };
-        let resolved =
-            crate::includes::resolve_include_path(raw_path, base_dir, project_root.as_deref());
-        if resolved.exists() && resolved.is_file() {
-            resolution
-                .includes
-                .push(IncludeOccurrence { path: resolved });
-        }
-    }
-
-    resolution
-}
+// includes resolution logic lives in crate::includes.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DefinitionLocation {
@@ -296,6 +241,7 @@ pub enum EdgeKind {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ProjectGraph {
     documents: HashSet<PathBuf>,
+    diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
     edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
     reverse_edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
 }
@@ -303,6 +249,10 @@ pub struct ProjectGraph {
 impl ProjectGraph {
     pub fn documents(&self) -> &HashSet<PathBuf> {
         &self.documents
+    }
+
+    pub fn diagnostics(&self) -> &HashMap<PathBuf, Vec<crate::linter::diagnostics::Diagnostic>> {
+        &self.diagnostics
     }
 
     pub fn dependents(&self, path: &Path, kind: Option<EdgeKind>) -> Vec<PathBuf> {
@@ -354,9 +304,18 @@ pub fn project_graph(
 ) -> ProjectGraph {
     let mut graph = ProjectGraph::default();
     let mut visited = HashSet::new();
+    let mut definitions = crate::includes::DefinitionIndex::default();
     let _project_root = crate::includes::find_quarto_root(&root_path)
         .or_else(|| crate::includes::find_bookdown_root(&root_path));
-    visit_document(db, &root_file, config, &root_path, &mut graph, &mut visited);
+    visit_document(
+        db,
+        &root_file,
+        config,
+        &root_path,
+        &mut graph,
+        &mut visited,
+        &mut definitions,
+    );
     if let Some(project_root) = crate::includes::find_quarto_root(&root_path)
         .or_else(|| crate::includes::find_bookdown_root(&root_path))
     {
@@ -369,7 +328,15 @@ pub fn project_graph(
             }
             if let Ok(text) = std::fs::read_to_string(&path) {
                 let include_file = FileText::new(db, text);
-                visit_document(db, &include_file, config, &path, &mut graph, &mut visited);
+                visit_document(
+                    db,
+                    &include_file,
+                    config,
+                    &path,
+                    &mut graph,
+                    &mut visited,
+                    &mut definitions,
+                );
             }
         }
     }
@@ -383,12 +350,24 @@ fn visit_document(
     path: &Path,
     graph: &mut ProjectGraph,
     visited: &mut HashSet<PathBuf>,
+    definitions: &mut crate::includes::DefinitionIndex,
 ) {
     if !visited.insert(path.to_path_buf()) {
         return;
     }
     graph.documents.insert(path.to_path_buf());
-    let resolution = includes(db, *file, config, path.to_path_buf());
+    let text = file.text(db);
+    let tree = crate::parse(text, Some(config.config(db).clone()));
+    let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
+    let project_root = crate::includes::find_quarto_root(path)
+        .or_else(|| crate::includes::find_bookdown_root(path));
+    let resolution = crate::includes::collect_includes(
+        &tree,
+        text,
+        base_dir,
+        project_root.as_deref(),
+        config.config(db),
+    );
     for include in resolution.includes.iter() {
         graph.add_edge(path, &include.path, EdgeKind::Include);
         if include.path == *path {
@@ -397,11 +376,39 @@ fn visit_document(
         if let Ok(include_input) = std::fs::read_to_string(&include.path) {
             let _include_base = include.path.parent().unwrap_or_else(|| Path::new("."));
             let include_file = FileText::new(db, include_input);
-            visit_document(db, &include_file, config, &include.path, graph, visited);
+            visit_document(
+                db,
+                &include_file,
+                config,
+                &include.path,
+                graph,
+                visited,
+                definitions,
+            );
         }
     }
+    if !resolution.diagnostics.is_empty() {
+        graph
+            .diagnostics
+            .entry(path.to_path_buf())
+            .or_default()
+            .extend(resolution.diagnostics);
+    }
 
-    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    let duplicate_diagnostics = crate::includes::collect_cross_doc_duplicates(
+        definitions,
+        &tree,
+        text,
+        path,
+        config.config(db),
+    );
+    if !duplicate_diagnostics.is_empty() {
+        graph
+            .diagnostics
+            .entry(path.to_path_buf())
+            .or_default()
+            .extend(duplicate_diagnostics);
+    }
     if let Ok(metadata) = crate::metadata::extract_project_metadata(&tree, path) {
         for metadata_file in &metadata.metadata_files {
             graph.add_edge(path, metadata_file, EdgeKind::MetadataFile);
