@@ -14,9 +14,8 @@ async fn test_watched_file_updates_cached_text() {
     fs::write(&parent_path, "{{< include child.qmd >}}\n").unwrap();
 
     let server = TestLspServer::new();
-    server
-        .initialize(&format!("file://{}", root.display()))
-        .await;
+    let root_uri = Uri::from_file_path(&root).unwrap().to_string();
+    server.initialize(&root_uri).await;
     server
         .open_document(
             &Uri::from_file_path(&parent_path).unwrap().to_string(),
