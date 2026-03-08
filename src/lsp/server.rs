@@ -128,7 +128,6 @@ impl LanguageServer for PanacheLsp {
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
-            Arc::clone(&self.bibliography_cache),
             Arc::clone(&self.salsa_db),
             params,
         )
@@ -139,7 +138,6 @@ impl LanguageServer for PanacheLsp {
         documents::did_change(
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
-            Arc::clone(&self.bibliography_cache),
             Arc::clone(&self.salsa_db),
             &self.client,
             params,
@@ -268,7 +266,6 @@ impl LanguageServer for PanacheLsp {
     async fn did_change_watched_files(&self, params: DidChangeWatchedFilesParams) {
         handlers::file_watcher::did_change_watched_files(
             &self.client,
-            Arc::clone(&self.bibliography_cache),
             Arc::clone(&self.document_map),
             Arc::clone(&self.salsa_db),
             Arc::clone(&self.workspace_root),

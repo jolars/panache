@@ -7,13 +7,12 @@ use tokio::sync::Mutex;
 use tower_lsp_server::Client;
 use tower_lsp_server::ls_types::*;
 
-use crate::lsp::{BibliographyCache, DocumentState};
+use crate::lsp::DocumentState;
 
 use super::diagnostics::lint_and_publish;
 
 pub(crate) async fn did_change_watched_files(
     client: &Client,
-    bib_cache: Arc<Mutex<BibliographyCache>>,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
@@ -54,13 +53,6 @@ pub(crate) async fn did_change_watched_files(
                 format!("Bibliography file changed: {}", path.display()),
             )
             .await;
-
-        // NOTE: Bibliography parsing is routed through salsa now.
-        // Keep this invalidation for now (it will become a no-op once the cache is removed).
-        {
-            let mut cache = bib_cache.lock().await;
-            cache.invalidate(&path);
-        }
 
         // Find all documents that reference this bibliography file and re-lint them
         let affected_documents: Vec<Uri> = {

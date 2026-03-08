@@ -42,7 +42,6 @@ pub(crate) async fn did_open(
     client: &Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
-    _bib_cache: Arc<Mutex<crate::lsp::BibliographyCache>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     params: DidOpenTextDocumentParams,
 ) {
@@ -112,7 +111,6 @@ pub(crate) async fn did_open(
 pub(crate) async fn did_change(
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
-    _bib_cache: Arc<Mutex<crate::lsp::BibliographyCache>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
     client: &Client,
     params: DidChangeTextDocumentParams,
