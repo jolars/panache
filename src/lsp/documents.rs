@@ -69,7 +69,11 @@ pub(crate) async fn did_open(
             crate::salsa::FileConfig::new(&*db, config.clone()),
         )
     };
-    let doc_path = params.text_document.uri.to_file_path();
+    let doc_path = params
+        .text_document
+        .uri
+        .to_file_path()
+        .map(|p| p.into_owned());
     let definition_index = if let Some(path) = doc_path.as_ref() {
         let db = salsa_db.lock().await;
         crate::salsa::definition_index(&*db, salsa_file, salsa_config, path.to_path_buf()).clone()
@@ -90,6 +94,7 @@ pub(crate) async fn did_open(
             uri.clone(),
             DocumentState {
                 metadata,
+                path: doc_path.clone(),
                 salsa_file,
                 salsa_config,
                 definition_index,
@@ -221,6 +226,7 @@ pub(crate) async fn did_change(
         drop(db);
         if let Some(state) = document_map.lock().await.get_mut(&uri_string) {
             state.salsa_config = config_input;
+            state.path = graph_path.clone();
         }
         config_input
     };

@@ -78,9 +78,9 @@ pub(crate) async fn get_definition_index_with_includes(
         let Some(state) = doc_map.get(&uri.to_string()) else {
             return crate::salsa::DefinitionIndex::default();
         };
-        let root_path = uri
-            .to_file_path()
-            .map(|p| p.into_owned())
+        let root_path = state
+            .path
+            .clone()
             .unwrap_or_else(|| PathBuf::from("<memory>"));
         (
             state.definition_index.clone(),

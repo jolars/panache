@@ -21,6 +21,8 @@ pub use bibliography_cache::BibliographyCache;
 pub struct DocumentState {
     /// Parsed metadata from YAML frontmatter (if present).
     pub metadata: Option<crate::metadata::DocumentMetadata>,
+    /// Canonical file path for this document (if it exists on disk).
+    pub path: Option<PathBuf>,
     /// Salsa input for this document's text.
     pub salsa_file: crate::salsa::FileText,
     /// Salsa input for this document's config.

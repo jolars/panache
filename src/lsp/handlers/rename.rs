@@ -30,13 +30,12 @@ pub(crate) async fn rename(
         let Some(state) = map.get(&uri.to_string()) else {
             return Ok(None);
         };
-        let doc_path = uri.to_file_path().map(|p| p.into_owned());
         let db = salsa_db.lock().await;
         (
             state.metadata.clone(),
             state.salsa_file,
             state.salsa_config,
-            doc_path,
+            state.path.clone(),
             state.salsa_file.text(&*db).clone(),
             state.tree.clone(),
         )
@@ -100,14 +99,17 @@ pub(crate) async fn rename(
         }
     }
 
-    if let Some(root_path) = doc_path.as_ref() {
+    let graph = if let Some(root_path) = doc_path.as_ref() {
+        let db = salsa_db.lock().await;
+        Some(crate::salsa::project_graph(&*db, salsa_file, salsa_config, root_path.clone()).clone())
+    } else {
+        None
+    };
+
+    if let Some(graph) = graph.as_ref() {
         for bib_path in &bib_paths {
-            let dependents = {
-                let db = salsa_db.lock().await;
-                crate::salsa::project_graph(&*db, salsa_file, salsa_config, root_path.clone())
-                    .dependents(bib_path, Some(crate::salsa::EdgeKind::Bibliography))
-            };
-            doc_paths.extend(dependents);
+            doc_paths
+                .extend(graph.dependents(bib_path, Some(crate::salsa::EdgeKind::Bibliography)));
         }
     }
 
@@ -120,7 +122,7 @@ pub(crate) async fn rename(
             .iter()
             .filter(|entry| entry.id.eq_ignore_ascii_case(&old_key))
         {
-            let text = if Some(entry.path.clone()) == uri.to_file_path().map(|p| p.into_owned()) {
+            let text = if Some(entry.path.clone()) == doc_path.clone() {
                 content.clone()
             } else {
                 std::fs::read_to_string(&entry.path).unwrap_or_default()

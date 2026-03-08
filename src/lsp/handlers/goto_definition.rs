@@ -42,6 +42,12 @@ pub(crate) async fn goto_definition(
     let definition_index =
         helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
 
+    let this_path = {
+        let map = document_map.lock().await;
+        map.get(&uri.to_string())
+            .and_then(|state| state.path.clone())
+    };
+
     let Some((content, root)) =
         helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
     else {
@@ -90,12 +96,11 @@ pub(crate) async fn goto_definition(
                 .find(|entry| entry.id.eq_ignore_ascii_case(&key))
             {
                 let target_uri = Uri::from_file_path(&inline.path).unwrap_or_else(|| uri.clone());
-                let target_text =
-                    if Some(inline.path.clone()) == uri.to_file_path().map(|p| p.into_owned()) {
-                        content.clone()
-                    } else {
-                        std::fs::read_to_string(&inline.path).unwrap_or_default()
-                    };
+                let target_text = if Some(inline.path.clone()) == this_path {
+                    content.clone()
+                } else {
+                    std::fs::read_to_string(&inline.path).unwrap_or_default()
+                };
                 let start =
                     conversions::offset_to_position(&target_text, inline.range.start().into());
                 let end = conversions::offset_to_position(&target_text, inline.range.end().into());
