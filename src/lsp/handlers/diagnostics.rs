@@ -245,10 +245,22 @@ pub(crate) async fn lint_and_publish(
         let db = salsa_db.lock().await;
         doc_state.salsa_file.text(&*db).clone()
     };
-    let metadata = doc_state.metadata.clone();
+    let metadata = if doc_state.metadata.is_some() {
+        if let Some(path) = doc_state.path.clone() {
+            let db = salsa_db.lock().await;
+            Some(
+                crate::salsa::metadata(&*db, doc_state.salsa_file, doc_state.salsa_config, path)
+                    .clone(),
+            )
+        } else {
+            None
+        }
+    } else {
+        None
+    };
     let mut all_diagnostics = Vec::new();
     // Check for YAML metadata errors
-    if let Some(ref metadata) = doc_state.metadata {
+    if let Some(ref metadata) = metadata {
         all_diagnostics.extend(check_bibliography_parse(metadata, &text));
         all_diagnostics.extend(inline_reference_diagnostics(metadata, &text));
     } else {

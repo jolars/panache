@@ -29,10 +29,28 @@ pub(crate) async fn goto_definition(
     let position = params.text_document_position_params.position;
     let config = helpers::get_config(client, &workspace_root, uri).await;
 
-    let metadata = {
+    let (salsa_file, salsa_config, doc_path, had_metadata) = {
         let map = document_map.lock().await;
-        map.get(&uri.to_string())
-            .and_then(|state| state.metadata.clone())
+        match map.get(&uri.to_string()) {
+            Some(state) => (
+                state.salsa_file,
+                state.salsa_config,
+                state.path.clone(),
+                state.metadata.is_some(),
+            ),
+            None => return Ok(None),
+        }
+    };
+
+    let metadata = if had_metadata {
+        if let Some(doc_path) = doc_path.clone() {
+            let db = salsa_db.lock().await;
+            Some(crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path).clone())
+        } else {
+            None
+        }
+    } else {
+        None
     };
 
     let this_path = {

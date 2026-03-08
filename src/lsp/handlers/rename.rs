@@ -25,20 +25,33 @@ pub(crate) async fn rename(
     let position = params.text_document_position.position;
     let new_name = params.new_name;
 
-    let (metadata, salsa_file, salsa_config, doc_path, content, green_tree) = {
+    let (salsa_file, salsa_config, doc_path, had_metadata, content, green_tree) = {
         let map = document_map.lock().await;
         let Some(state) = map.get(&uri.to_string()) else {
             return Ok(None);
         };
         let db = salsa_db.lock().await;
         (
-            state.metadata.clone(),
             state.salsa_file,
             state.salsa_config,
             state.path.clone(),
+            state.metadata.is_some(),
             state.salsa_file.text(&*db).clone(),
             state.tree.clone(),
         )
+    };
+
+    if !had_metadata {
+        return Ok(None);
+    }
+
+    let Some(doc_path) = doc_path.clone() else {
+        return Ok(None);
+    };
+
+    let metadata = {
+        let db = salsa_db.lock().await;
+        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
     let (old_key, old_norm) = {
         let root = SyntaxNode::new_root(green_tree.clone());
@@ -61,9 +74,6 @@ pub(crate) async fn rename(
         (old_key, old_norm)
     };
 
-    let Some(metadata) = metadata else {
-        return Ok(None);
-    };
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
     let mut doc_paths = Vec::new();
     let mut bib_paths = Vec::new();
@@ -99,18 +109,13 @@ pub(crate) async fn rename(
         }
     }
 
-    let graph = if let Some(root_path) = doc_path.as_ref() {
+    let graph = {
         let db = salsa_db.lock().await;
-        Some(crate::salsa::project_graph(&*db, salsa_file, salsa_config, root_path.clone()).clone())
-    } else {
-        None
+        crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
 
-    if let Some(graph) = graph.as_ref() {
-        for bib_path in &bib_paths {
-            doc_paths
-                .extend(graph.dependents(bib_path, Some(crate::salsa::EdgeKind::Bibliography)));
-        }
+    for bib_path in &bib_paths {
+        doc_paths.extend(graph.dependents(bib_path, Some(crate::salsa::EdgeKind::Bibliography)));
     }
 
     let inline_refs = inline_reference_map(&metadata.inline_references);
@@ -122,7 +127,7 @@ pub(crate) async fn rename(
             .iter()
             .filter(|entry| entry.id.eq_ignore_ascii_case(&old_key))
         {
-            let text = if Some(entry.path.clone()) == doc_path.clone() {
+            let text = if entry.path == doc_path {
                 content.clone()
             } else {
                 std::fs::read_to_string(&entry.path).unwrap_or_default()
@@ -147,10 +152,8 @@ pub(crate) async fn rename(
         }
     }
 
-    if let Some(path) = doc_path
-        && !doc_paths.contains(&path)
-    {
-        doc_paths.push(path);
+    if !doc_paths.contains(&doc_path) {
+        doc_paths.push(doc_path.clone());
     }
 
     doc_paths.sort();

@@ -27,10 +27,30 @@ pub(crate) async fn hover(
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
-    let metadata = {
+    let (salsa_file, salsa_config, doc_path, had_metadata) = {
         let map = document_map.lock().await;
-        map.get(&uri.to_string())
-            .and_then(|state| state.metadata.clone())
+        match map.get(&uri.to_string()) {
+            Some(state) => (
+                state.salsa_file,
+                state.salsa_config,
+                state.path.clone(),
+                state.metadata.is_some(),
+            ),
+            None => return Ok(None),
+        }
+    };
+
+    if !had_metadata {
+        return Ok(None);
+    }
+
+    let Some(doc_path) = doc_path else {
+        return Ok(None);
+    };
+
+    let metadata = {
+        let db = salsa_db.lock().await;
+        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path).clone()
     };
 
     let pending_footnote = {
@@ -74,10 +94,8 @@ pub(crate) async fn hover(
                 }
             }
 
-            if let Some(key) = helpers::extract_citation_key(&node)
-                && let Some(metadata) = metadata.clone()
-            {
-                if let Some(parse) = metadata.bibliography_parse
+            if let Some(key) = helpers::extract_citation_key(&node) {
+                if let Some(ref parse) = metadata.bibliography_parse
                     && let Some(entry) = parse.index.get(&key)
                 {
                     let summary = format_bibliography_entry(entry);
