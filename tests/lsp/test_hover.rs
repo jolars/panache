@@ -37,6 +37,49 @@ async fn test_hover_on_included_footnote() {
 }
 
 #[tokio::test]
+async fn test_hover_included_updates_after_watcher_change() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let child_path = temp_dir.path().join("_child.qmd");
+    let parent_path = temp_dir.path().join("parent.qmd");
+
+    std::fs::write(&child_path, "[^1]: Included footnote content.\n").unwrap();
+    std::fs::write(&parent_path, "{{< include _child.qmd >}}\nRef[^1].\n").unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
+    let parent_uri = Uri::from_file_path(&parent_path).expect("parent uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            parent_uri.as_str(),
+            &std::fs::read_to_string(&parent_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    // First hover caches the included file and its definition index.
+    assert!(
+        server.hover(parent_uri.as_str(), 1, 4).await.is_some(),
+        "Sanity check: should resolve hover before edit"
+    );
+
+    // Change the included file on disk so the footnote no longer exists.
+    std::fs::write(&child_path, "[^2]: Included footnote content.\n").unwrap();
+    server
+        .did_change_watched_files(vec![FileEvent {
+            uri: Uri::from_file_path(&child_path).expect("child uri"),
+            typ: FileChangeType::CHANGED,
+        }])
+        .await;
+
+    let hover = server.hover(parent_uri.as_str(), 1, 4).await;
+    assert!(
+        hover.is_none(),
+        "After watcher update, hover should no longer resolve"
+    );
+}
+
+#[tokio::test]
 async fn test_hover_on_footnote_reference() {
     let server = TestLspServer::new();
 

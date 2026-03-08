@@ -40,6 +40,56 @@ async fn test_goto_definition_in_included_document() {
 }
 
 #[tokio::test]
+async fn test_goto_definition_included_updates_after_watcher_change() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let child_path = temp_dir.path().join("_child.qmd");
+    let parent_path = temp_dir.path().join("parent.qmd");
+
+    std::fs::write(&child_path, "[ref]: https://example.com\n").unwrap();
+    std::fs::write(
+        &parent_path,
+        "{{< include _child.qmd >}}\nSee [link][ref].\n",
+    )
+    .unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
+    let parent_uri = Uri::from_file_path(&parent_path).expect("parent uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            parent_uri.as_str(),
+            &std::fs::read_to_string(&parent_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    // First request caches the included file and its definition index.
+    assert!(
+        server
+            .goto_definition(parent_uri.as_str(), 1, 12)
+            .await
+            .is_some(),
+        "Sanity check: should resolve definition before edit"
+    );
+
+    // Change the included file on disk so the reference no longer exists.
+    std::fs::write(&child_path, "[ref2]: https://example.com\n").unwrap();
+    server
+        .did_change_watched_files(vec![FileEvent {
+            uri: Uri::from_file_path(&child_path).expect("child uri"),
+            typ: FileChangeType::CHANGED,
+        }])
+        .await;
+
+    let result = server.goto_definition(parent_uri.as_str(), 1, 12).await;
+    assert!(
+        result.is_none(),
+        "After watcher update, definition should no longer resolve"
+    );
+}
+
+#[tokio::test]
 async fn test_goto_reference_definition() {
     let server = TestLspServer::new();
 
