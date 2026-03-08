@@ -25,23 +25,26 @@ pub(crate) async fn did_change_watched_files(
             continue;
         };
 
-        // Check if this is a bibliography file
         let extension = path.extension().and_then(|e| e.to_str());
-        if !matches!(
+        let is_bibliography = matches!(
             extension,
             Some("bib") | Some("json") | Some("yaml") | Some("yml") | Some("ris")
-        ) {
-            if let Ok(contents) = std::fs::read_to_string(&path) {
-                let mut db = salsa_db.lock().await;
-                if db.update_file_text_if_cached(&path, contents) {
-                    client
-                        .log_message(
-                            MessageType::INFO,
-                            format!("Updated cached file: {}", path.display()),
-                        )
-                        .await;
-                }
+        );
+
+        // Always keep salsa's cached file text in sync when possible.
+        if let Ok(contents) = std::fs::read_to_string(&path) {
+            let mut db = salsa_db.lock().await;
+            if db.update_file_text_if_cached(&path, contents) {
+                client
+                    .log_message(
+                        MessageType::INFO,
+                        format!("Updated cached file: {}", path.display()),
+                    )
+                    .await;
             }
+        }
+
+        if !is_bibliography {
             continue;
         }
 
@@ -52,7 +55,8 @@ pub(crate) async fn did_change_watched_files(
             )
             .await;
 
-        // Invalidate the cache for this file
+        // NOTE: Bibliography parsing is routed through salsa now.
+        // Keep this invalidation for now (it will become a no-op once the cache is removed).
         {
             let mut cache = bib_cache.lock().await;
             cache.invalidate(&path);

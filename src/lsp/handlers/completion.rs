@@ -34,14 +34,31 @@ pub(crate) async fn completion(
         return Ok(None);
     }
 
-    let metadata = {
+    let (salsa_file, salsa_config, doc_path, had_metadata) = {
         let map = document_map.lock().await;
-        map.get(&uri.to_string())
-            .and_then(|state| state.metadata.clone())
+        match map.get(&uri.to_string()) {
+            Some(state) => (
+                state.salsa_file,
+                state.salsa_config,
+                state.path.clone(),
+                state.metadata.is_some(),
+            ),
+            None => return Ok(None),
+        }
     };
 
-    let Some(metadata) = metadata else {
+    // If YAML metadata failed to parse on open/change, keep treating metadata as absent.
+    if !had_metadata {
         return Ok(None);
+    }
+
+    let Some(doc_path) = doc_path else {
+        return Ok(None);
+    };
+
+    let metadata = {
+        let db = salsa_db.lock().await;
+        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path).clone()
     };
     let parse = metadata.bibliography_parse.as_ref();
     if parse.is_none() && metadata.inline_references.is_empty() {
