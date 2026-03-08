@@ -74,12 +74,6 @@ pub(crate) async fn did_open(
         .uri
         .to_file_path()
         .map(|p| p.into_owned());
-    let definition_index = if let Some(path) = doc_path.as_ref() {
-        let db = salsa_db.lock().await;
-        crate::salsa::definition_index(&*db, salsa_file, salsa_config, path.to_path_buf()).clone()
-    } else {
-        crate::salsa::DefinitionIndex::default()
-    };
 
     // Parse metadata with bibliography cache
     let metadata = {
@@ -97,7 +91,6 @@ pub(crate) async fn did_open(
                 path: doc_path.clone(),
                 salsa_file,
                 salsa_config,
-                definition_index,
                 tree,
             },
         );
@@ -230,12 +223,6 @@ pub(crate) async fn did_change(
         }
         config_input
     };
-    let new_definition_index = if let Some(path) = graph_path.as_ref() {
-        let db = salsa_db.lock().await;
-        crate::salsa::definition_index(&*db, salsa_file, config_input, path.to_path_buf()).clone()
-    } else {
-        crate::salsa::DefinitionIndex::default()
-    };
     if let Some(path) = graph_path.as_ref() {
         let dependents = {
             let db = salsa_db.lock().await;
@@ -279,7 +266,6 @@ pub(crate) async fn did_change(
         let mut document_map = document_map.lock().await;
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
             doc_state.metadata = metadata;
-            doc_state.definition_index = new_definition_index.clone();
         }
     }
 

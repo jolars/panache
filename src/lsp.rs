@@ -27,8 +27,6 @@ pub struct DocumentState {
     pub salsa_file: crate::salsa::FileText,
     /// Salsa input for this document's config.
     pub salsa_config: crate::salsa::FileConfig,
-    /// Cached definition index for cross-document lookups.
-    pub definition_index: crate::salsa::DefinitionIndex,
     /// Cached syntax tree for incremental parsing.
     pub tree: GreenNode,
 }

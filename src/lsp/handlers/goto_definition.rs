@@ -29,15 +29,11 @@ pub(crate) async fn goto_definition(
     let position = params.text_document_position_params.position;
     let config = helpers::get_config(client, &workspace_root, uri).await;
 
-    let (metadata, _definition_index) = {
+    let metadata = {
         let map = document_map.lock().await;
-        map.get(&uri.to_string()).map(|state| {
-            let metadata = state.metadata.clone();
-            let definition_index = state.definition_index.clone();
-            (metadata, definition_index)
-        })
-    }
-    .unwrap_or((None, crate::salsa::DefinitionIndex::default()));
+        map.get(&uri.to_string())
+            .and_then(|state| state.metadata.clone())
+    };
 
     let definition_index =
         helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
