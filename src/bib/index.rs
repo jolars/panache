@@ -1,7 +1,7 @@
 //! Indexing and loading bibliography files.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::bib::{BibError, ParsedEntry, Span, validate_ris};
 
@@ -73,10 +73,12 @@ pub struct BibLoadError {
 }
 
 pub fn load_bibliography(paths: &[PathBuf]) -> BibIndex {
-    let mut entries: HashMap<String, BibEntry> = HashMap::new();
-    let mut duplicates = Vec::new();
-    let mut errors = Vec::new();
-    let mut load_errors = Vec::new();
+    let mut index = BibIndex {
+        entries: HashMap::new(),
+        duplicates: Vec::new(),
+        errors: Vec::new(),
+        load_errors: Vec::new(),
+    };
     let mut seen_paths = std::collections::HashSet::new();
 
     for path in paths {
@@ -86,93 +88,108 @@ pub fn load_bibliography(paths: &[PathBuf]) -> BibIndex {
         let text = match std::fs::read_to_string(path) {
             Ok(text) => text,
             Err(err) => {
-                load_errors.push(BibLoadError {
+                index.load_errors.push(BibLoadError {
                     path: path.clone(),
                     message: err.to_string(),
                 });
                 continue;
             }
         };
+        index.merge_from(load_bibliography_from_text(&text, path));
+    }
 
-        let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+    index
+}
 
-        // Determine format and parse accordingly
-        let (format, parsed_result, parse_errors): (
-            BibFormat,
-            Result<Vec<ParsedEntry>, String>,
-            Vec<BibError>,
-        ) = match extension {
-            "json" => {
-                use crate::bib::parse_csl_json_full;
-                (BibFormat::CslJson, parse_csl_json_full(&text), Vec::new())
-            }
-            "yaml" | "yml" => {
-                use crate::bib::parse_csl_yaml_full;
-                (BibFormat::CslYaml, parse_csl_yaml_full(&text), Vec::new())
-            }
-            "ris" => {
-                use crate::bib::parse_ris_full;
-                // Validate first
-                if let Err(message) = validate_ris(&text) {
-                    errors.push(BibError {
-                        message: message.clone(),
-                        span: None,
-                    });
-                    continue;
-                }
-                (BibFormat::Ris, parse_ris_full(&text), Vec::new())
-            }
-            _ => {
-                // BibTeX
-                use crate::bib::parse_bibtex_full;
-                let (entries, parse_errors) = parse_bibtex_full(&text);
-                (BibFormat::BibTeX, Ok(entries), parse_errors)
-            }
-        };
+pub fn load_bibliography_from_text(text: &str, path: &Path) -> BibIndex {
+    let mut entries: HashMap<String, BibEntry> = HashMap::new();
+    let mut duplicates = Vec::new();
+    let mut errors = Vec::new();
+    let load_errors = Vec::new();
 
-        // Add any parse errors
-        errors.extend(parse_errors);
+    let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
 
-        // Handle all formats uniformly
-        match parsed_result {
-            Ok(parsed_entries) => {
-                for (key, entry_type, entry_fields, span) in parsed_entries {
-                    let key_lower = key.to_lowercase();
-
-                    let unified_entry = BibEntry {
-                        key: key.clone(),
-                        entry_type,
-                        fields: entry_fields,
-                        source_file: path.clone(),
-                        span,
-                        format,
-                    };
-
-                    if let Some(existing) = entries.get(&key_lower) {
-                        duplicates.push(BibDuplicate {
-                            key: key.clone(),
-                            first: BibEntryLocation {
-                                key: existing.key.clone(),
-                                file: existing.source_file.clone(),
-                                span: existing.span,
-                            },
-                            duplicate: BibEntryLocation {
-                                key: key.clone(),
-                                file: path.clone(),
-                                span,
-                            },
-                        });
-                    } else {
-                        entries.insert(key_lower, unified_entry);
-                    }
-                }
-            }
-            Err(message) => {
+    // Determine format and parse accordingly
+    let (format, parsed_result, parse_errors): (
+        BibFormat,
+        Result<Vec<ParsedEntry>, String>,
+        Vec<BibError>,
+    ) = match extension {
+        "json" => {
+            use crate::bib::parse_csl_json_full;
+            (BibFormat::CslJson, parse_csl_json_full(text), Vec::new())
+        }
+        "yaml" | "yml" => {
+            use crate::bib::parse_csl_yaml_full;
+            (BibFormat::CslYaml, parse_csl_yaml_full(text), Vec::new())
+        }
+        "ris" => {
+            use crate::bib::parse_ris_full;
+            // Validate first
+            if let Err(message) = validate_ris(text) {
                 errors.push(BibError {
-                    message,
+                    message: message.clone(),
                     span: None,
                 });
+                return BibIndex {
+                    entries,
+                    duplicates,
+                    errors,
+                    load_errors,
+                };
             }
+            (BibFormat::Ris, parse_ris_full(text), Vec::new())
+        }
+        _ => {
+            // BibTeX
+            use crate::bib::parse_bibtex_full;
+            let (entries, parse_errors) = parse_bibtex_full(text);
+            (BibFormat::BibTeX, Ok(entries), parse_errors)
+        }
+    };
+
+    // Add any parse errors
+    errors.extend(parse_errors);
+
+    // Handle all formats uniformly
+    match parsed_result {
+        Ok(parsed_entries) => {
+            for (key, entry_type, entry_fields, span) in parsed_entries {
+                let key_lower = key.to_lowercase();
+
+                let unified_entry = BibEntry {
+                    key: key.clone(),
+                    entry_type,
+                    fields: entry_fields,
+                    source_file: path.to_path_buf(),
+                    span,
+                    format,
+                };
+
+                if let Some(existing) = entries.get(&key_lower) {
+                    duplicates.push(BibDuplicate {
+                        key: key.clone(),
+                        first: BibEntryLocation {
+                            key: existing.key.clone(),
+                            file: existing.source_file.clone(),
+                            span: existing.span,
+                        },
+                        duplicate: BibEntryLocation {
+                            key: key.clone(),
+                            file: path.to_path_buf(),
+                            span,
+                        },
+                    });
+                } else {
+                    entries.insert(key_lower, unified_entry);
+                }
+            }
+        }
+        Err(message) => {
+            errors.push(BibError {
+                message,
+                span: None,
+            });
         }
     }
 
@@ -185,6 +202,32 @@ pub fn load_bibliography(paths: &[PathBuf]) -> BibIndex {
 }
 
 impl BibIndex {
+    pub fn merge_from(&mut self, other: BibIndex) {
+        self.errors.extend(other.errors);
+        self.load_errors.extend(other.load_errors);
+        self.duplicates.extend(other.duplicates);
+
+        for (key, entry) in other.entries {
+            if let Some(existing) = self.entries.get(&key) {
+                self.duplicates.push(BibDuplicate {
+                    key: entry.key.clone(),
+                    first: BibEntryLocation {
+                        key: existing.key.clone(),
+                        file: existing.source_file.clone(),
+                        span: existing.span,
+                    },
+                    duplicate: BibEntryLocation {
+                        key: entry.key.clone(),
+                        file: entry.source_file.clone(),
+                        span: entry.span,
+                    },
+                });
+            } else {
+                self.entries.insert(key, entry);
+            }
+        }
+    }
+
     /// Get a unified entry by citation key (case-insensitive).
     pub fn get(&self, key: &str) -> Option<&BibEntry> {
         self.entries.get(&key.to_lowercase())

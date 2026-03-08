@@ -105,6 +105,16 @@ pub fn extract_project_metadata(
     project::extract_project_metadata(tree, doc_path)
 }
 
+/// Extract project metadata without parsing bibliography files.
+///
+/// This is useful when bibliography parsing is handled separately (e.g. through salsa caching).
+pub fn extract_project_metadata_without_bibliography_parse(
+    tree: &crate::syntax::SyntaxNode,
+    doc_path: &Path,
+) -> Result<DocumentMetadata, YamlError> {
+    project::extract_project_metadata_without_bibliography_parse(tree, doc_path)
+}
+
 /// Find the first YamlMetadata node in the syntax tree.
 fn find_yaml_metadata_node(tree: &crate::syntax::SyntaxNode) -> Option<crate::syntax::SyntaxNode> {
     use crate::syntax::SyntaxKind;

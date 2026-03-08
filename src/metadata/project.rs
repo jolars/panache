@@ -112,6 +112,21 @@ pub fn extract_project_metadata(
     tree: &SyntaxNode,
     doc_path: &Path,
 ) -> Result<DocumentMetadata, YamlError> {
+    extract_project_metadata_impl(tree, doc_path, true)
+}
+
+pub fn extract_project_metadata_without_bibliography_parse(
+    tree: &SyntaxNode,
+    doc_path: &Path,
+) -> Result<DocumentMetadata, YamlError> {
+    extract_project_metadata_impl(tree, doc_path, false)
+}
+
+fn extract_project_metadata_impl(
+    tree: &SyntaxNode,
+    doc_path: &Path,
+    parse_bibliography: bool,
+) -> Result<DocumentMetadata, YamlError> {
     let yaml_node = super::find_yaml_metadata_node(tree).map(|node| node.text().to_string());
     let yaml_offset = super::find_yaml_metadata_node(tree)
         .map(|node| node.text_range().start())
@@ -189,17 +204,21 @@ pub fn extract_project_metadata(
 
     let bibliography = extract_bibliography_from_sources(&sources, &doc_yaml, doc_yaml_offset);
 
-    let bibliography_parse = bibliography.as_ref().map(|info| {
-        let index = bib::load_bibliography(&info.paths);
-        BibliographyParse {
-            parse_errors: index
-                .errors
-                .iter()
-                .map(|error| error.message.clone())
-                .collect(),
-            index,
-        }
-    });
+    let bibliography_parse = if parse_bibliography {
+        bibliography.as_ref().map(|info| {
+            let index = bib::load_bibliography(&info.paths);
+            BibliographyParse {
+                parse_errors: index
+                    .errors
+                    .iter()
+                    .map(|error| error.message.clone())
+                    .collect(),
+                index,
+            }
+        })
+    } else {
+        None
+    };
     let mut inline_references =
         extract_doc_inline_references(&doc_yaml, doc_yaml_offset, doc_path)?;
     let project_references =

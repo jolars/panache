@@ -30,17 +30,57 @@ pub fn metadata(
     path: PathBuf,
 ) -> DocumentMetadata {
     let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
-    crate::metadata::extract_project_metadata(&tree, &path).unwrap_or_else(|_| {
-        crate::metadata::DocumentMetadata {
-            bibliography: None,
-            metadata_files: Vec::new(),
-            bibliography_parse: None,
-            inline_references: Vec::new(),
-            citations: crate::metadata::CitationInfo { keys: Vec::new() },
-            title: None,
-            raw_yaml: String::new(),
+    let mut metadata =
+        crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path)
+            .unwrap_or_else(|_| crate::metadata::DocumentMetadata {
+                bibliography: None,
+                metadata_files: Vec::new(),
+                bibliography_parse: None,
+                inline_references: Vec::new(),
+                citations: crate::metadata::CitationInfo { keys: Vec::new() },
+                title: None,
+                raw_yaml: String::new(),
+            });
+
+    // Route bibliography parsing through salsa so each bibliography file is cached and
+    // invalidated via `Db::file_text` updates.
+    if let Some(info) = metadata.bibliography.as_ref() {
+        let mut index = crate::bib::BibIndex {
+            entries: HashMap::new(),
+            duplicates: Vec::new(),
+            errors: Vec::new(),
+            load_errors: Vec::new(),
+        };
+        let mut seen_paths = HashSet::new();
+
+        for bib_path in &info.paths {
+            if !seen_paths.insert(bib_path.clone()) {
+                continue;
+            }
+            let Some(bib_file) = db.file_text(bib_path.clone()) else {
+                index.load_errors.push(crate::bib::BibLoadError {
+                    path: bib_path.clone(),
+                    message: "Failed to read file".to_string(),
+                });
+                continue;
+            };
+
+            index.merge_from(bibliography_index(db, bib_file, bib_path.clone()).clone());
         }
-    })
+
+        let parse_errors = index.errors.iter().map(|e| e.message.clone()).collect();
+        metadata.bibliography_parse = Some(crate::metadata::BibliographyParse {
+            index,
+            parse_errors,
+        });
+    }
+
+    metadata
+}
+
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+pub fn bibliography_index(db: &dyn Db, file: FileText, path: PathBuf) -> crate::bib::BibIndex {
+    crate::bib::load_bibliography_from_text(file.text(db), &path)
 }
 
 // includes resolution logic lives in crate::includes.
