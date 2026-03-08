@@ -33,102 +33,124 @@ pub(crate) async fn hover(
             .and_then(|state| state.metadata.clone())
     };
 
-    let definition_index =
-        helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
+    let pending_footnote = {
+        let Some((content, root)) =
+            helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
+        else {
+            return Ok(None);
+        };
 
-    let Some((content, root)) =
-        helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
-    else {
-        return Ok(None);
-    };
+        // Convert LSP position to byte offset
+        let Some(offset) = conversions::position_to_offset(&content, position) else {
+            return Ok(None);
+        };
 
-    // Convert LSP position to byte offset
-    let Some(offset) = conversions::position_to_offset(&content, position) else {
-        return Ok(None);
-    };
+        // Find the node at this offset
+        let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
+            return Ok(None);
+        };
 
-    // Find the node at this offset
-    let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
-        return Ok(None);
-    };
+        // Walk up the tree to find a footnote reference or citation
+        loop {
+            if let Some((label, is_footnote)) = helpers::extract_reference_label(&node) {
+                // Only handle footnotes (not regular references)
+                if is_footnote {
+                    // First try local definition (no cross-document index needed)
+                    if let Some(footnote_def) = helpers::find_definition_node(&root, &label, true)
+                        .and_then(FootnoteDefinition::cast)
+                    {
+                        let content = footnote_def.content();
+                        let trimmed = content.trim();
+                        return Ok(Some(Hover {
+                            contents: HoverContents::Markup(MarkupContent {
+                                kind: MarkupKind::Markdown,
+                                value: trimmed.to_string(),
+                            }),
+                            range: None,
+                        }));
+                    }
 
-    // Walk up the tree to find a footnote reference or citation
-    loop {
-        if let Some((label, is_footnote)) = helpers::extract_reference_label(&node) {
-            // Only handle footnotes (not regular references)
-            if is_footnote {
-                // Find the footnote definition
-                let definition = helpers::find_definition_node(&root, &label, true)
-                    .and_then(FootnoteDefinition::cast)
-                    .or_else(|| {
-                        if definition_index.is_empty() {
-                            return None;
-                        }
-                        definition_index.find_footnote(&label).and_then(|location| {
-                            std::fs::read_to_string(location.path())
-                                .ok()
-                                .and_then(|text| {
-                                    let tree = crate::parse(&text, None);
-                                    tree.descendants()
-                                        .filter_map(FootnoteDefinition::cast)
-                                        .find(|def| def.id() == label)
-                                })
-                        })
-                    });
-                let Some(footnote_def) = definition else {
-                    return Ok(None);
-                };
-
-                // Extract content
-                let content = footnote_def.content();
-                let trimmed = content.trim();
-
-                // Return hover with markdown content
-                return Ok(Some(Hover {
-                    contents: HoverContents::Markup(MarkupContent {
-                        kind: MarkupKind::Markdown,
-                        value: trimmed.to_string(),
-                    }),
-                    range: None,
-                }));
+                    break Some(label);
+                }
             }
-        }
 
-        if let Some(key) = helpers::extract_citation_key(&node)
-            && let Some(metadata) = metadata.clone()
-        {
-            if let Some(parse) = metadata.bibliography_parse
-                && let Some(entry) = parse.index.get(&key)
+            if let Some(key) = helpers::extract_citation_key(&node)
+                && let Some(metadata) = metadata.clone()
             {
-                let summary = format_bibliography_entry(entry);
-                if !summary.is_empty() {
+                if let Some(parse) = metadata.bibliography_parse
+                    && let Some(entry) = parse.index.get(&key)
+                {
+                    let summary = format_bibliography_entry(entry);
+                    if !summary.is_empty() {
+                        return Ok(Some(Hover {
+                            contents: HoverContents::Markup(MarkupContent {
+                                kind: MarkupKind::Markdown,
+                                value: summary,
+                            }),
+                            range: None,
+                        }));
+                    }
+                }
+
+                if inline_reference_contains(&metadata.inline_references, &key) {
                     return Ok(Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
-                            value: summary,
+                            value: "Inline YAML reference".to_string(),
                         }),
                         range: None,
                     }));
                 }
             }
 
-            if inline_reference_contains(&metadata.inline_references, &key) {
-                return Ok(Some(Hover {
-                    contents: HoverContents::Markup(MarkupContent {
-                        kind: MarkupKind::Markdown,
-                        value: "Inline YAML reference".to_string(),
-                    }),
-                    range: None,
-                }));
+            // Move up to parent, or return None if at root
+            match node.parent() {
+                Some(parent) => node = parent,
+                None => break None,
             }
         }
+    };
 
-        // Move up to parent, or return None if at root
-        match node.parent() {
-            Some(parent) => node = parent,
-            None => return Ok(None),
-        }
-    }
+    let Some(label) = pending_footnote else {
+        return Ok(None);
+    };
+
+    // Cross-document footnote lookup (done after CST traversal to avoid holding non-Send nodes
+    // across await points).
+    let definition_index =
+        helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
+    let Some(location) = definition_index.find_footnote(&label) else {
+        return Ok(None);
+    };
+
+    let text = {
+        let db = salsa_db.lock().await;
+        db.file_text_if_cached(location.path())
+            .map(|file| file.text(&*db).clone())
+            .or_else(|| std::fs::read_to_string(location.path()).ok())
+    };
+
+    let Some(text) = text else {
+        return Ok(None);
+    };
+
+    let tree = crate::parse(&text, None);
+    let Some(footnote_def) = tree
+        .descendants()
+        .filter_map(FootnoteDefinition::cast)
+        .find(|def| def.id() == label)
+    else {
+        return Ok(None);
+    };
+
+    let trimmed = footnote_def.content().trim().to_string();
+    Ok(Some(Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: trimmed,
+        }),
+        range: None,
+    }))
 }
 
 /// Format a bibliography entry for hover display.

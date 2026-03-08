@@ -460,6 +460,11 @@ impl SalsaDb {
         Some(file)
     }
 
+    pub fn file_text_if_cached(&self, path: &Path) -> Option<FileText> {
+        let cache = self.file_cache.lock().expect("file cache lock poisoned");
+        cache.get(path).copied()
+    }
+
     pub fn update_file_text(&mut self, path: PathBuf, text: String) -> FileText {
         let existing = {
             let cache = self.file_cache.lock().expect("file cache lock poisoned");
