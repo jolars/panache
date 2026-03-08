@@ -70,12 +70,6 @@ pub(crate) async fn did_open(
         )
     };
     let doc_path = params.text_document.uri.to_file_path();
-    let graph = if let Some(path) = doc_path.as_ref() {
-        let db = salsa_db.lock().await;
-        crate::salsa::project_graph(&*db, salsa_file, salsa_config, path.to_path_buf()).clone()
-    } else {
-        crate::salsa::ProjectGraph::default()
-    };
     let definition_index = if let Some(path) = doc_path.as_ref() {
         let db = salsa_db.lock().await;
         crate::salsa::definition_index(&*db, salsa_file, salsa_config, path.to_path_buf()).clone()
@@ -99,7 +93,6 @@ pub(crate) async fn did_open(
                 salsa_file,
                 salsa_config,
                 definition_index,
-                graph,
                 tree,
             },
         );
@@ -237,14 +230,12 @@ pub(crate) async fn did_change(
     } else {
         crate::salsa::DefinitionIndex::default()
     };
-    let new_graph = if let Some(path) = graph_path.as_ref() {
-        let db = salsa_db.lock().await;
-        crate::salsa::project_graph(&*db, salsa_file, config_input, path.to_path_buf()).clone()
-    } else {
-        crate::salsa::ProjectGraph::default()
-    };
     if let Some(path) = graph_path.as_ref() {
-        let dependents = new_graph.dependents(path, None);
+        let dependents = {
+            let db = salsa_db.lock().await;
+            crate::salsa::project_graph(&*db, salsa_file, config_input, path.to_path_buf())
+                .dependents(path, None)
+        };
         if !dependents.is_empty() {
             dependent_uris = Some(
                 dependents
@@ -283,7 +274,6 @@ pub(crate) async fn did_change(
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
             doc_state.metadata = metadata;
             doc_state.definition_index = new_definition_index.clone();
-            doc_state.graph = new_graph.clone();
         }
     }
 

@@ -25,20 +25,24 @@ pub(crate) async fn rename(
     let position = params.text_document_position.position;
     let new_name = params.new_name;
 
-    let (metadata, graph, content, root) = {
+    let (metadata, salsa_file, salsa_config, doc_path, content, green_tree) = {
         let map = document_map.lock().await;
         let Some(state) = map.get(&uri.to_string()) else {
             return Ok(None);
         };
+        let doc_path = uri.to_file_path().map(|p| p.into_owned());
         let db = salsa_db.lock().await;
         (
             state.metadata.clone(),
-            state.graph.clone(),
+            state.salsa_file,
+            state.salsa_config,
+            doc_path,
             state.salsa_file.text(&*db).clone(),
-            SyntaxNode::new_root(state.tree.clone()),
+            state.tree.clone(),
         )
     };
     let (old_key, old_norm) = {
+        let root = SyntaxNode::new_root(green_tree.clone());
         let Some(offset) = position_to_offset(&content, position) else {
             return Ok(None);
         };
@@ -96,9 +100,15 @@ pub(crate) async fn rename(
         }
     }
 
-    let doc_path = uri.to_file_path().map(|p| p.into_owned());
-    for bib_path in &bib_paths {
-        doc_paths.extend(graph.dependents(bib_path, Some(crate::salsa::EdgeKind::Bibliography)));
+    if let Some(root_path) = doc_path.as_ref() {
+        for bib_path in &bib_paths {
+            let dependents = {
+                let db = salsa_db.lock().await;
+                crate::salsa::project_graph(&*db, salsa_file, salsa_config, root_path.clone())
+                    .dependents(bib_path, Some(crate::salsa::EdgeKind::Bibliography))
+            };
+            doc_paths.extend(dependents);
+        }
     }
 
     let inline_refs = inline_reference_map(&metadata.inline_references);
@@ -144,6 +154,7 @@ pub(crate) async fn rename(
     doc_paths.sort();
     doc_paths.dedup();
 
+    let root = SyntaxNode::new_root(green_tree.clone());
     for path in doc_paths {
         let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
         let (text, tree) = if doc_uri == uri {

@@ -246,7 +246,6 @@ pub(crate) async fn lint_and_publish(
         doc_state.salsa_file.text(&*db).clone()
     };
     let metadata = doc_state.metadata.clone();
-    let _graph = doc_state.graph.clone();
     let mut all_diagnostics = Vec::new();
     // Check for YAML metadata errors
     if let Some(ref metadata) = doc_state.metadata {

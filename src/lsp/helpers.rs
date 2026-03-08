@@ -73,18 +73,24 @@ pub(crate) async fn get_definition_index_with_includes(
     salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
     uri: &Uri,
 ) -> crate::salsa::DefinitionIndex {
-    let (base_index, salsa_config, graph) = {
+    let (base_index, salsa_file, salsa_config, root_path) = {
         let doc_map = document_map.lock().await;
         let Some(state) = doc_map.get(&uri.to_string()) else {
             return crate::salsa::DefinitionIndex::default();
         };
+        let root_path = uri
+            .to_file_path()
+            .map(|p| p.into_owned())
+            .unwrap_or_else(|| PathBuf::from("<memory>"));
         (
             state.definition_index.clone(),
+            state.salsa_file,
             state.salsa_config,
-            state.graph.clone(),
+            root_path,
         )
     };
     let db = salsa_db.lock().await;
+    let graph = crate::salsa::project_graph(&*db, salsa_file, salsa_config, root_path).clone();
     let mut index = base_index.clone();
     for path in graph.documents().iter() {
         if let Some(include_file) = db.file_text(path.clone()) {
