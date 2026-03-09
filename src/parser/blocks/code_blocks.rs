@@ -951,20 +951,29 @@ pub(crate) fn parse_fenced_code_block(
         } else {
             closing_inner
         };
-        let closing_trimmed = strip_leading_spaces(closing_stripped);
-        let closing_count = closing_trimmed
+        let (closing_without_newline, newline_str) = strip_newline(closing_stripped);
+        let closing_trimmed_start = strip_leading_spaces(closing_without_newline);
+        let leading_ws_len = closing_without_newline.len() - closing_trimmed_start.len();
+        let closing_count = closing_trimmed_start
             .chars()
             .take_while(|&c| c == fence.fence_char)
             .count();
-
-        // Extract the actual newline from the closing line
-        let (_, newline_str) = strip_newline(closing_trimmed);
+        let trailing_after_marker = &closing_trimmed_start[closing_count..];
 
         builder.start_node(SyntaxKind::CODE_FENCE_CLOSE.into());
+        if leading_ws_len > 0 {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &closing_without_newline[..leading_ws_len],
+            );
+        }
         builder.token(
             SyntaxKind::CODE_FENCE_MARKER.into(),
-            &closing_trimmed[..closing_count],
+            &closing_trimmed_start[..closing_count],
         );
+        if !trailing_after_marker.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), trailing_after_marker);
+        }
         if !newline_str.is_empty() {
             builder.token(SyntaxKind::NEWLINE.into(), newline_str);
         }

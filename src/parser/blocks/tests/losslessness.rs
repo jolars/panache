@@ -67,3 +67,12 @@ fn test_losslessness_blockquote_list_continuation_lines() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_fenced_code_closing_fence_trailing_spaces() {
+    let input = "````{.python}\ncity = \"Corvallis\"\n````    \n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}
