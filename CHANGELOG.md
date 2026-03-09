@@ -1,5 +1,47 @@
 # Changelog
 
+## [2.14.0](https://github.com/jolars/panache/compare/v2.13.0...v2.14.0) (2026-03-09)
+
+### Features
+
+* **cli:** add `--quiet` flag ([47ee630](https://github.com/jolars/panache/commit/47ee630362745f742c8cbe9566257905d90fcad6))
+* **cli:** add `--verify` for format and parser ([f8fd6e6](https://github.com/jolars/panache/commit/f8fd6e6819e348393f92ce03a25a15d779be34e3))
+* **cli:** make `--verify` a pure smoke-test screen ([3619207](https://github.com/jolars/panache/commit/3619207469d5e2b579f370f2514c4118cd246e7e))
+* **formatter:** don't treat semicolons as sentence break ([ade76a9](https://github.com/jolars/panache/commit/ade76a93212ec7bfd93509a07581ba1cfac8996f)), closes [#48](https://github.com/jolars/panache/issues/48)
+
+### Bug Fixes
+
+* **formatter:** apply block code formatting inline ([5d76bea](https://github.com/jolars/panache/commit/5d76bea933011846baf8d4cd483e28927ddbb8dd))
+* **formatter:** don't line break after initials ([3030451](https://github.com/jolars/panache/commit/30304517cf3bf6525e74c40083b35ec6f26527f7))
+* **formatter:** fix idempotency in fancy list formatting ([f5c6509](https://github.com/jolars/panache/commit/f5c6509e0ba36c3fddc4b5f4940f0aaf5278c76d))
+* **formatter:** handle crossref in blockquote ([2b4e729](https://github.com/jolars/panache/commit/2b4e729b9519fa79e694751d3eda642acb521342))
+* **formatter:** handle empty cells in grid tables ([ecc7515](https://github.com/jolars/panache/commit/ecc7515154f9b68c7749039c28d3ecce8ddda52d))
+* **formatter:** harden external formatting ([2946761](https://github.com/jolars/panache/commit/2946761627fefb9b68e71947af4720a8f42a35d4))
+* **formatter:** require blankline before line block ([0589776](https://github.com/jolars/panache/commit/0589776a73192000839fd1dce687b9917ab74159))
+* **parser:** correctly parse trailing `#` ([942c1fa](https://github.com/jolars/panache/commit/942c1fad07fd907996f57b3e5fa99624b2ea9e8c))
+* **parser:** don't drop trailing whitespace in fenced div ([7bd2d31](https://github.com/jolars/panache/commit/7bd2d31c469d1e3c8dfea1deb9846a679de950cf))
+* **parser:** don't require blankline before fenced div ([f17c3aa](https://github.com/jolars/panache/commit/f17c3aa6fc7ae7e8e61a869f813236fea1fb1877))
+* **parser:** don't trim trailing space in definition ([edeae6f](https://github.com/jolars/panache/commit/edeae6f42a1d9e886c0f378e43f7985b518f1e3d))
+* **parser:** handle line block inside grid table ([100ebed](https://github.com/jolars/panache/commit/100ebed0b3e30506c6f36a8f92d4654c6e1d4aee))
+* **parser:** handle list inside blockquote ([e20e756](https://github.com/jolars/panache/commit/e20e75661aff09f738d703dac8fb446f2c26d8dd))
+* **parser:** handle rows exceeding separator width ([4a42c63](https://github.com/jolars/panache/commit/4a42c6383e47746c1606d83bf01e9256ca15c780))
+* **parser:** handle shortcode in heading ([200bfd8](https://github.com/jolars/panache/commit/200bfd829fe4af175286e53878bc86c4bfc283a2))
+* **parser:** handle spaces in indented code block ([cdbf952](https://github.com/jolars/panache/commit/cdbf952b105e0b8f485f40855a317f1b443ec59e))
+* **parser:** handle table after div close ([a4c2940](https://github.com/jolars/panache/commit/a4c2940f294b56aedc59f1cd3143bc4bf57be40c))
+* **parser:** handle trailing whitespace in grid table ([0677abb](https://github.com/jolars/panache/commit/0677abb8f2d7605760dcb5c3ae95e708eef456c4))
+* **parser:** handle unicode in shortcode ([7f603dc](https://github.com/jolars/panache/commit/7f603dc7b0cc7d24a3bcbaf204f18b73aa32d171))
+* **parser:** parse indented block in block quote losslessly ([bbd2f86](https://github.com/jolars/panache/commit/bbd2f869c2265813b539bc336b7f5c7d48e297a7))
+* **paser:** don't trim trailing whitespace after marker ([32e9734](https://github.com/jolars/panache/commit/32e97342a2de92bc2f375df60c8db95cbaa91775))
+
+### Performance Improvements
+
+* **lsp:** add lazy definition and hover handling ([69f7cce](https://github.com/jolars/panache/commit/69f7cceadc8ac27de6593462aafe760ddc5a5f03))
+* **lsp:** add LRU tuning ([7a5d439](https://github.com/jolars/panache/commit/7a5d43945cb885513f9117fc65481d77cac1e572))
+* **lsp:** derive lint and metadata diagnostics through salsa ([4ede8cb](https://github.com/jolars/panache/commit/4ede8cb872697d7de3b95b85cf9bca6a6b139b0b))
+* **lsp:** introduce durability macros into graph ([b74248e](https://github.com/jolars/panache/commit/b74248ea6c02dcd96d748e2c1b5773266932f112))
+* **lsp:** unify lint pipeline to avoid duplicate parse ([070e7f5](https://github.com/jolars/panache/commit/070e7f54fc1f86111cd6ef40b46d633549ac41b4))
+* **lsp:** use `salsa::interned` for project graph intternally ([996be36](https://github.com/jolars/panache/commit/996be360c5e6df449c31cb9c20d59260beb2a73e))
+
 ## [2.13.0](https://github.com/jolars/panache/compare/v2.12.0...v2.13.0) (2026-03-07)
 
 ### Features
