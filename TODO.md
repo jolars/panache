@@ -20,13 +20,16 @@ This document tracks implementation status for panache's features.
 - [x] [correctness] Model YAML frontmatter parsing as a salsa query (e.g.
       `yaml_metadata_parse_result(...) -> Result<...>`) so diagnostics/handlers
       don’t need a separate pre-check.
-- [ ] [optional] Move more LSP diagnostics/lint derivations behind salsa where
+- [x] [optional] Move more LSP diagnostics/lint derivations behind salsa where
       it makes sense (be careful with non-`Send` rowan/CST types; keep external
       linter execution at the async boundary, outside salsa queries).
       - [x] Built-in lint + YAML/metadata diagnostics now derived via salsa
             query (`built_in_lint_plan`); external linters remain async in LSP.
       - [x] Remove duplicate parse in diagnostics path by deriving external
             linter jobs from the same salsa lint-plan query.
+      - [x] Remove duplicate bibliography diagnostics by deriving bibliography
+            diagnostics from linter rules only (while keeping YAML parse
+            diagnostics query-derived).
 - [x] [performance] Apply salsa LRU tuning for long-running LSP sessions
       (see `salsa/book/src/tuning.md`): add `#[salsa::tracked(lru = N)]`
       to high-churn tracked queries where appropriate (`project_graph`,

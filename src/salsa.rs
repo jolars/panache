@@ -140,11 +140,7 @@ pub fn built_in_lint_plan(
         .map(|_| metadata(db, file, config, path).clone());
 
     let mut diagnostics = Vec::new();
-    if let Some(metadata) = metadata.as_ref() {
-        diagnostics.extend(crate::linter::metadata_diagnostics::metadata_diagnostics(
-            metadata, text,
-        ));
-    } else if let Err(yaml_error) = yaml
+    if let Err(yaml_error) = yaml
         && let Some(diag) =
             crate::linter::metadata_diagnostics::yaml_error_diagnostic(&yaml_error, text)
     {

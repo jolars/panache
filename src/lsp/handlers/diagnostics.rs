@@ -94,14 +94,6 @@ pub(crate) async fn lint_and_publish(
 
     let lsp_diagnostics: Vec<Diagnostic> = panache_diagnostics
         .iter()
-        .filter(|d| {
-            !matches!(
-                d.code.as_str(),
-                "bibliography-load-error"
-                    | "bibliography-parse-error"
-                    | "duplicate-bibliography-key"
-            )
-        })
         .map(|d| convert_diagnostic(d, &text))
         .collect();
 
