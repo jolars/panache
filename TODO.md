@@ -9,7 +9,7 @@ This document tracks implementation status for panache's features.
 
 ### Salsa/LSP refactor follow-ups
 
-- [ ] Remove `DocumentState.metadata` and replace it with
+- [x] Remove `DocumentState.metadata` and replace it with
       a minimal YAML-frontmatter status (`yaml_ok: bool` or
       `yaml_error: Option<YamlError>`). Salsa (`crate::salsa::metadata`) is now
       the single source of truth for metadata + bibliography parsing.

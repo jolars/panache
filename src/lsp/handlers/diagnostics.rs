@@ -245,7 +245,7 @@ pub(crate) async fn lint_and_publish(
         let db = salsa_db.lock().await;
         doc_state.salsa_file.text(&*db).clone()
     };
-    let metadata = if doc_state.metadata.is_some() {
+    let metadata = if doc_state.yaml_ok {
         if let Some(path) = doc_state.path.clone() {
             let db = salsa_db.lock().await;
             Some(

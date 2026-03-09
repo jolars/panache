@@ -34,21 +34,21 @@ pub(crate) async fn completion(
         return Ok(None);
     }
 
-    let (salsa_file, salsa_config, doc_path, had_metadata) = {
+    let (salsa_file, salsa_config, doc_path, yaml_ok) = {
         let map = document_map.lock().await;
         match map.get(&uri.to_string()) {
             Some(state) => (
                 state.salsa_file,
                 state.salsa_config,
                 state.path.clone(),
-                state.metadata.is_some(),
+                state.yaml_ok,
             ),
             None => return Ok(None),
         }
     };
 
     // If YAML metadata failed to parse on open/change, keep treating metadata as absent.
-    if !had_metadata {
+    if !yaml_ok {
         return Ok(None);
     }
 

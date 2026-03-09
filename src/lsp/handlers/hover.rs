@@ -27,20 +27,20 @@ pub(crate) async fn hover(
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
-    let (salsa_file, salsa_config, doc_path, had_metadata) = {
+    let (salsa_file, salsa_config, doc_path, yaml_ok) = {
         let map = document_map.lock().await;
         match map.get(&uri.to_string()) {
             Some(state) => (
                 state.salsa_file,
                 state.salsa_config,
                 state.path.clone(),
-                state.metadata.is_some(),
+                state.yaml_ok,
             ),
             None => return Ok(None),
         }
     };
 
-    if !had_metadata {
+    if !yaml_ok {
         return Ok(None);
     }
 

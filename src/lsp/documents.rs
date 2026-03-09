@@ -12,29 +12,12 @@ use crate::parser::parse_incremental;
 use crate::syntax::SyntaxNode;
 use rowan::GreenNode;
 use salsa::Setter;
-use std::path::PathBuf;
+use std::path::Path;
 use std::time::Instant;
 
-async fn compute_metadata(
-    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
-    salsa_file: crate::salsa::FileText,
-    salsa_config: crate::salsa::FileConfig,
-    tree: &GreenNode,
-    path: PathBuf,
-) -> Option<crate::metadata::DocumentMetadata> {
-    // Preserve the old LSP behavior: if YAML metadata fails to parse, treat metadata as absent
-    // so diagnostics can surface the YAML error.
-    let yaml_ok = {
-        let syntax = SyntaxNode::new_root(tree.clone());
-        crate::metadata::extract_project_metadata_without_bibliography_parse(&syntax, &path).is_ok()
-    };
-
-    if !yaml_ok {
-        return None;
-    }
-
-    let db = salsa_db.lock().await;
-    Some(crate::salsa::metadata(&*db, salsa_file, salsa_config, path).clone())
+fn compute_yaml_ok(tree: &GreenNode, path: &Path) -> bool {
+    let syntax = SyntaxNode::new_root(tree.clone());
+    crate::metadata::extract_project_metadata_without_bibliography_parse(&syntax, path).is_ok()
 }
 
 /// Handle textDocument/didOpen notification
@@ -70,19 +53,18 @@ pub(crate) async fn did_open(
         .to_file_path()
         .map(|p| p.into_owned());
 
-    let metadata = if let Some(path) = doc_path.clone() {
-        compute_metadata(&salsa_db, salsa_file, salsa_config, &tree, path).await
-    } else {
-        None
-    };
+    let yaml_ok = doc_path
+        .as_ref()
+        .map(|path| compute_yaml_ok(&tree, path))
+        .unwrap_or(false);
 
-    // Store document state with metadata
+    // Store document state
     {
         let mut map = document_map.lock().await;
         map.insert(
             uri.clone(),
             DocumentState {
-                metadata,
+                yaml_ok,
                 path: doc_path.clone(),
                 salsa_file,
                 salsa_config,
@@ -233,34 +215,20 @@ pub(crate) async fn did_change(
         }
     }
 
-    let metadata = {
+    let yaml_ok = {
         let state = {
             let map = document_map.lock().await;
             map.get(&uri_string).cloned()
         };
-        if let Some(state) = state {
-            if let Some(path) = state.path.clone() {
-                compute_metadata(
-                    &salsa_db,
-                    state.salsa_file,
-                    state.salsa_config,
-                    &state.tree,
-                    path,
-                )
-                .await
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+        state
+            .and_then(|state| state.path.as_ref().map(|p| compute_yaml_ok(&state.tree, p)))
+            .unwrap_or(false)
     };
 
-    // Update metadata in document state
     {
         let mut document_map = document_map.lock().await;
         if let Some(doc_state) = document_map.get_mut(&uri_string) {
-            doc_state.metadata = metadata;
+            doc_state.yaml_ok = yaml_ok;
         }
     }
 
