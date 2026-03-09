@@ -1,4 +1,4 @@
-DOCUMENT@0..187
+DOCUMENT@0..311
   PARAGRAPH@0..14
     TEXT@0..13 "Nested lists:"
     NEWLINE@13..14 "\n"
@@ -89,4 +89,42 @@ DOCUMENT@0..187
       PLAIN@167..187
         TEXT@167..186 "Back to first level"
         NEWLINE@186..187 "\n"
+  BLANK_LINE@187..188
+    BLANK_LINE@187..188 "\n"
+  PARAGRAPH@188..201
+    TEXT@188..200 "Nested case:"
+    NEWLINE@200..201 "\n"
+  BLANK_LINE@201..202
+    BLANK_LINE@201..202 "\n"
+  LIST@202..311
+    LIST_ITEM@202..311
+      LIST_MARKER@202..204 "A."
+      WHITESPACE@204..206 "  "
+      PLAIN@206..218
+        TEXT@206..217 "Upper Alpha"
+        NEWLINE@217..218 "\n"
+      LIST@218..311
+        LIST_ITEM@218..311
+          WHITESPACE@218..222 "    "
+          LIST_MARKER@222..224 "I."
+          WHITESPACE@224..226 "  "
+          PLAIN@226..239
+            TEXT@226..238 "Upper Roman."
+            NEWLINE@238..239 "\n"
+          LIST@239..311
+            LIST_ITEM@239..311
+              WHITESPACE@239..247 "        "
+              LIST_MARKER@247..250 "(6)"
+              WHITESPACE@250..251 " "
+              PLAIN@251..272
+                TEXT@251..271 "Decimal start with 6"
+                NEWLINE@271..272 "\n"
+              LIST@272..311
+                LIST_ITEM@272..311
+                  WHITESPACE@272..284 "            "
+                  LIST_MARKER@284..286 "c)"
+                  WHITESPACE@286..288 "  "
+                  PLAIN@288..311
+                    TEXT@288..310 "Lower alpha with paren"
+                    NEWLINE@310..311 "\n"
 

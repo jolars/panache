@@ -14,3 +14,10 @@ Mixed nesting:
    * Nested bullet
    * Another nested
 2. Back to first level
+
+Nested case:
+
+A.  Upper Alpha
+    I.  Upper Roman.
+        (6) Decimal start with 6
+            c)  Lower alpha with paren

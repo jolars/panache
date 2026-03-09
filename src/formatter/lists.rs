@@ -477,13 +477,7 @@ impl Formatter {
                         self.output.push('\n');
                     } else {
                         // Normal nested list: indent on next line
-                        self.format_node_sync(
-                            &child,
-                            total_indent
-                                + list_indent.marker_width
-                                + 1
-                                + list_indent.checkbox_width,
-                        );
+                        self.format_node_sync(&child, list_indent.hanging_indent(total_indent));
                     }
                 }
                 SyntaxKind::CODE_BLOCK => {

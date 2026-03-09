@@ -30,3 +30,11 @@ fn list_items_separate_properly() {
     // Should not merge the list items
     assert!(!output.contains("is created. - For instance"));
 }
+
+#[test]
+fn nested_ordered_list_after_upper_alpha_is_idempotent() {
+    let input = "A.  Upper Alpha\n    I.  Upper Roman.\n        (6) Decimal start with 6\n            c)  Lower alpha with paren\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}

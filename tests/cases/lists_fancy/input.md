@@ -85,3 +85,9 @@ ii. Second item with **bold** text
 iii. Third item with `code`
 
 More text after.
+
+Should not be a list item:
+
+M.A. 2007
+
+B. Williams
