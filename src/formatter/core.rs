@@ -1384,7 +1384,7 @@ impl Formatter {
                     )
                 });
 
-                // Use more colons for nested divs: 3 base + 2 per depth level
+                // Normalize fence lengths by nesting depth.
                 let colon_count = 3 + (self.fenced_div_depth * 2);
                 let colons = ":".repeat(colon_count);
 
@@ -1421,7 +1421,7 @@ impl Formatter {
                         }
 
                         SyntaxKind::DIV_FENCE_CLOSE => {
-                            // Will be handled after content
+                            // Handled after content.
                         }
 
                         // Process any other child nodes (paragraphs, nested divs, etc.)
@@ -1472,12 +1472,9 @@ impl Formatter {
                     .collect();
 
                 let mut start = 0usize;
-                let mut end = content_children.len();
+                let end = content_children.len();
                 while start < end && content_children[start].kind() == SyntaxKind::BLANK_LINE {
                     start += 1;
-                }
-                while end > start && content_children[end - 1].kind() == SyntaxKind::BLANK_LINE {
-                    end -= 1;
                 }
 
                 for child in &content_children[start..end] {

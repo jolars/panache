@@ -27,3 +27,8 @@ ENV["QUARTO_DOCUMENT_PATH"]
 
 For more information, see [Quarto engine execution
 information](./quarto-execute-info.qmd).
+
+#### No blank before div
+::: panel
+Inside panel
+:::

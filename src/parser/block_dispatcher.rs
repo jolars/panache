@@ -1458,10 +1458,6 @@ impl BlockParser for FencedDivOpenParser {
             return None;
         }
 
-        if !ctx.has_blank_before && !ctx.at_document_start {
-            return None;
-        }
-
         let div_fence = try_parse_div_fence_open(ctx.content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(div_fence))))
     }

@@ -1,4 +1,4 @@
-DOCUMENT@0..438
+DOCUMENT@0..493
   FENCED_DIV@0..204
     DIV_FENCE_OPEN@0..17
       TEXT@0..3 ":::"
@@ -138,4 +138,26 @@ DOCUMENT@0..438
       LINK_DEST_END@435..436 ")"
     TEXT@436..437 "."
     NEWLINE@437..438 "\n"
+  BLANK_LINE@438..439
+    BLANK_LINE@438..439 "\n"
+  HEADING@439..464
+    ATX_HEADING_MARKER@439..443
+      ATX_HEADING_MARKER@439..443 "####"
+    WHITESPACE@443..444 " "
+    HEADING_CONTENT@444..463
+      TEXT@444..463 "No blank before div"
+    NEWLINE@463..464 "\n"
+  FENCED_DIV@464..493
+    DIV_FENCE_OPEN@464..475
+      TEXT@464..468 "::::"
+      WHITESPACE@468..469 " "
+      DIV_INFO@469..474
+        TEXT@469..474 "panel"
+      NEWLINE@474..475 "\n"
+    PARAGRAPH@475..488
+      TEXT@475..487 "Inside panel"
+      NEWLINE@487..488 "\n"
+    DIV_FENCE_CLOSE@488..493
+      TEXT@488..492 "::::"
+      NEWLINE@492..493 "\n"
 
