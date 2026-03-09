@@ -853,6 +853,7 @@ dependencies = [
  "ignore",
  "log",
  "predicates",
+ "rayon",
  "regex",
  "rowan",
  "salsa",

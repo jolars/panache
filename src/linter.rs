@@ -30,7 +30,7 @@ pub fn lint_with_external_sync(tree: &SyntaxNode, input: &str, config: &Config) 
 }
 
 /// Lint a document with external linters (async version for LSP).
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "lsp"))]
 pub async fn lint_with_external(
     tree: &SyntaxNode,
     input: &str,
@@ -66,7 +66,7 @@ pub fn lint_with_external_sync_and_metadata(
     runner.run_with_external_linters_sync(tree, input, config, metadata)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "lsp"))]
 pub async fn lint_with_external_and_metadata(
     tree: &SyntaxNode,
     input: &str,

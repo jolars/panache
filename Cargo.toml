@@ -60,6 +60,9 @@ which = "8.0"
 assert_cmd = "2.0"
 predicates = "3.0"
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = "1.10.0"
+
 [features]
 default = ["cli", "lsp"]
 cli = ["dep:clap", "dep:ignore"]

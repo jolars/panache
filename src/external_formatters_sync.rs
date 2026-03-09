@@ -5,7 +5,7 @@
 
 use std::io::Write;
 use std::process::{Command, Stdio};
-use std::sync::{Arc, Mutex};
+
 use std::thread;
 use std::time::Duration;
 
@@ -226,81 +226,74 @@ pub fn run_formatters_parallel(
     blocks: Vec<ExternalCodeBlock>,
     formatters: &std::collections::HashMap<String, Vec<FormatterConfig>>,
     timeout: Duration,
+    max_parallel: usize,
 ) -> std::collections::HashMap<String, String> {
+    use rayon::prelude::*;
     use std::collections::HashMap;
 
-    let results = Arc::new(Mutex::new(HashMap::new()));
+    let max_parallel = max_parallel.max(1);
 
-    thread::scope(|s| {
-        let mut handles = Vec::new();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(max_parallel)
+        .build()
+        .expect("failed to build rayon thread pool");
 
-        for block in blocks {
-            let lang = block.language.clone();
-            if let Some(formatter_configs) = formatters.get(&lang) {
+    pool.install(|| {
+        blocks
+            .into_par_iter()
+            .filter_map(|block| {
+                let lang = block.language;
+                let formatter_configs = formatters.get(&lang)?;
                 if formatter_configs.is_empty() {
-                    continue; // Empty list means no formatting
+                    return None;
                 }
 
                 let formatter_configs = formatter_configs.clone();
-                let code = block.formatter_input.clone();
-                let original = block.original.clone();
-                let hashpipe_prefix = block.hashpipe_prefix.clone();
-                let results = Arc::clone(&results);
+                let mut current_code = block.formatter_input;
+                let original = block.original;
+                let hashpipe_prefix = block.hashpipe_prefix;
 
-                let handle = s.spawn(move || {
-                    // Format sequentially through the formatter chain
-                    let mut current_code = code.clone();
-
-                    for (idx, formatter_cfg) in formatter_configs.iter().enumerate() {
-                        if formatter_cfg.cmd.is_empty() {
-                            continue;
-                        }
-
-                        log::info!(
-                            "Formatting {} code with {} ({}/{} in chain)",
-                            lang,
-                            formatter_cfg.cmd,
-                            idx + 1,
-                            formatter_configs.len()
-                        );
-
-                        match format_code_sync(&current_code, formatter_cfg, timeout) {
-                            Ok(formatted) => {
-                                current_code = formatted;
-                            }
-                            Err(e) => {
-                                log::warn!(
-                                    "{} formatter '{}' failed: {}. Using original code.",
-                                    lang,
-                                    formatter_cfg.cmd,
-                                    e
-                                );
-                                // Stop chain on error, use original
-                                return;
-                            }
-                        }
+                for (idx, formatter_cfg) in formatter_configs.iter().enumerate() {
+                    if formatter_cfg.cmd.is_empty() {
+                        continue;
                     }
 
-                    // Only store if content changed
-                    if current_code != original {
-                        let output = if let Some(prefix) = hashpipe_prefix {
-                            format!("{}{}", prefix, current_code)
-                        } else {
-                            current_code
-                        };
-                        results.lock().unwrap().insert(original, output);
+                    log::info!(
+                        "Formatting {} code with {} ({}/{} in chain)",
+                        lang,
+                        formatter_cfg.cmd,
+                        idx + 1,
+                        formatter_configs.len()
+                    );
+
+                    match format_code_sync(&current_code, formatter_cfg, timeout) {
+                        Ok(formatted) => {
+                            current_code = formatted;
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "{} formatter '{}' failed: {}. Using original code.",
+                                lang,
+                                formatter_cfg.cmd,
+                                e
+                            );
+                            return None;
+                        }
                     }
-                });
+                }
 
-                handles.push(handle);
-            }
-        }
+                if current_code == original {
+                    return None;
+                }
 
-        // Wait for all threads to complete
-        for handle in handles {
-            let _ = handle.join();
-        }
-    });
+                let output = if let Some(prefix) = hashpipe_prefix {
+                    format!("{}{}", prefix, current_code)
+                } else {
+                    current_code
+                };
 
-    Arc::try_unwrap(results).unwrap().into_inner().unwrap()
+                Some((original, output))
+            })
+            .collect::<HashMap<_, _>>()
+    })
 }

@@ -20,8 +20,12 @@
 //! in the source markdown file.
 
 use std::collections::HashMap;
+
+#[cfg(feature = "lsp")]
 use std::io::Write;
+#[cfg(feature = "lsp")]
 use std::process::{Command, Stdio};
+#[cfg(feature = "lsp")]
 use std::time::Duration;
 
 use rowan::TextRange;
@@ -112,6 +116,7 @@ impl Default for ExternalLinterRegistry {
 }
 
 /// Run an external linter on code and parse its output.
+#[cfg(feature = "lsp")]
 pub async fn run_linter(
     linter_name: &str,
     code: &str,

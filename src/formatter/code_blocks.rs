@@ -685,66 +685,78 @@ pub async fn spawn_and_await_formatters(
     blocks: Vec<ExternalCodeBlock>,
     config: &Config,
 ) -> HashMap<String, String> {
-    let mut tasks = Vec::new();
-    let timeout = Duration::from_secs(30);
+    use std::sync::Arc;
+    use tokio::sync::Semaphore;
+    use tokio::task::JoinSet;
 
-    // Spawn all formatter tasks immediately (one task per language)
+    let timeout = Duration::from_secs(30);
+    let semaphore = Arc::new(Semaphore::new(config.external_max_parallel.max(1)));
+
+    let mut join_set = JoinSet::new();
+
+    // Spawn formatter tasks with bounded concurrency (one task per code block).
     for block in blocks {
         let lang = block.language.clone();
-        if let Some(formatter_configs) = config.formatters.get(&lang) {
-            if formatter_configs.is_empty() {
-                continue; // Empty formatter list means no formatting
-            }
+        let Some(formatter_configs) = config.formatters.get(&lang) else {
+            continue;
+        };
+        if formatter_configs.is_empty() {
+            continue; // Empty formatter list means no formatting
+        }
 
-            let formatter_configs = formatter_configs.clone();
-            let code = block.formatter_input.clone();
-            let original = block.original.clone();
-            let hashpipe_prefix = block.hashpipe_prefix.clone();
+        let permit = semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("semaphore closed");
 
-            let task = tokio::spawn(async move {
-                // Format sequentially through the formatter chain
-                let mut current_code = code.clone();
+        let formatter_configs = formatter_configs.clone();
+        let code = block.formatter_input.clone();
+        let original = block.original.clone();
+        let hashpipe_prefix = block.hashpipe_prefix.clone();
 
-                for (idx, formatter_cfg) in formatter_configs.iter().enumerate() {
-                    if formatter_cfg.cmd.is_empty() {
-                        continue;
-                    }
+        join_set.spawn(async move {
+            let _permit = permit;
 
-                    log::info!(
-                        "Formatting {} code with {} ({}/{} in chain)",
-                        lang,
-                        formatter_cfg.cmd,
-                        idx + 1,
-                        formatter_configs.len()
-                    );
+            // Format sequentially through the formatter chain
+            let mut current_code = code;
 
-                    match format_code_async(&current_code, formatter_cfg, timeout).await {
-                        Ok(formatted) => {
-                            current_code = formatted;
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "Warning: {} formatter '{}' failed: {}. Using original code.",
-                                lang, formatter_cfg.cmd, e
-                            );
-                            // Stop the chain on error and return original
-                            return (original, hashpipe_prefix, Err(e));
-                        }
-                    }
+            for (idx, formatter_cfg) in formatter_configs.iter().enumerate() {
+                if formatter_cfg.cmd.is_empty() {
+                    continue;
                 }
 
-                (original, hashpipe_prefix, Ok(current_code))
-            });
+                log::info!(
+                    "Formatting {} code with {} ({}/{} in chain)",
+                    lang,
+                    formatter_cfg.cmd,
+                    idx + 1,
+                    formatter_configs.len()
+                );
 
-            tasks.push(task);
-        }
+                match format_code_async(&current_code, formatter_cfg, timeout).await {
+                    Ok(formatted) => {
+                        current_code = formatted;
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Warning: {} formatter '{}' failed: {}. Using original code.",
+                            lang, formatter_cfg.cmd, e
+                        );
+                        // Stop the chain on error and return original
+                        return (original, hashpipe_prefix, Err(e));
+                    }
+                }
+            }
+
+            (original, hashpipe_prefix, Ok(current_code))
+        });
     }
 
     let mut formatted = HashMap::new();
 
-    // Await all results
-    for task in tasks {
-        if let Ok((original_code, hashpipe_prefix, result)) = task.await {
+    while let Some(res) = join_set.join_next().await {
+        if let Ok((original_code, hashpipe_prefix, result)) = res {
             match result {
                 Ok(formatted_code) => {
                     // Only store if content changed
@@ -778,7 +790,12 @@ pub fn spawn_and_await_formatters_sync(
     use std::time::Duration;
     let timeout = Duration::from_secs(30);
 
-    crate::external_formatters_sync::run_formatters_parallel(blocks, &config.formatters, timeout)
+    crate::external_formatters_sync::run_formatters_parallel(
+        blocks,
+        &config.formatters,
+        timeout,
+        config.external_max_parallel,
+    )
 }
 
 /// WASM version that returns empty HashMap (no external formatters in WASM)

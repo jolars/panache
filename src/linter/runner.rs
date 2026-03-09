@@ -4,7 +4,9 @@ use crate::directives::DirectiveTracker;
 use crate::linter::code_block_collector::concatenate_with_blanks_and_mapping;
 use crate::linter::diagnostics::Diagnostic;
 #[cfg(not(target_arch = "wasm32"))]
-use crate::linter::external_linters::{ExternalLinterRegistry, run_linter};
+use crate::linter::external_linters::ExternalLinterRegistry;
+#[cfg(all(not(target_arch = "wasm32"), feature = "lsp"))]
+use crate::linter::external_linters::run_linter;
 use crate::linter::rules::RuleRegistry;
 use crate::syntax::SyntaxNode;
 #[cfg(not(target_arch = "wasm32"))]
@@ -129,7 +131,7 @@ impl LintRunner {
     }
 
     /// Run external linters on code blocks (async version for LSP).
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "lsp"))]
     pub async fn run_with_external_linters(
         &self,
         tree: &SyntaxNode,

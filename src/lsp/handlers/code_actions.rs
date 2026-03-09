@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
 use tower_lsp_server::Client;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
@@ -38,54 +38,93 @@ pub(crate) async fn code_action(
         None => return Ok(None),
     };
 
-    // Run linter (with external linters if available)
+    #[derive(Debug)]
+    struct ExternalLintJob {
+        linter_name: String,
+        content: String,
+        mappings: Vec<crate::linter::code_block_collector::BlockMapping>,
+    }
+
+    // Phase A (blocking): parse + built-in lint + collect external jobs
     let text_clone = text.clone();
     let config_clone = config.clone();
     let doc_path = uri.to_file_path().map(|path| path.into_owned());
-    let has_external_linters = !config.linters.is_empty();
-
-    #[cfg(not(target_arch = "wasm32"))]
-    let diagnostics = if has_external_linters {
-        // Use external linters (async)
-        tokio::task::spawn_blocking(move || {
-            let tree = crate::parse(&text_clone, Some(config_clone.clone()));
-            let metadata = doc_path
-                .as_ref()
-                .and_then(|path| crate::metadata::extract_project_metadata(&tree, path).ok());
-            // Create a runtime for the async lint function
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(linter::lint_with_external_and_metadata(
-                &tree,
-                &text_clone,
-                &config_clone,
-                metadata.as_ref(),
-            ))
-        })
-        .await
-    } else {
-        // Regular sync lint for built-in rules only
-        tokio::task::spawn_blocking(move || {
-            let tree = crate::parse(&text_clone, Some(config_clone.clone()));
-            let metadata = doc_path
-                .as_ref()
-                .and_then(|path| crate::metadata::extract_project_metadata(&tree, path).ok());
-            linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref())
-        })
-        .await
-    };
-
-    #[cfg(target_arch = "wasm32")]
-    let diagnostics = tokio::task::spawn_blocking(move || {
+    let phase_a = tokio::task::spawn_blocking(move || {
         let tree = crate::parse(&text_clone, Some(config_clone.clone()));
         let metadata = doc_path
             .as_ref()
             .and_then(|path| crate::metadata::extract_project_metadata(&tree, path).ok());
-        linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref())
-    })
-    .await;
 
-    let diagnostics =
-        diagnostics.map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
+        let mut diagnostics =
+            linter::lint_with_metadata(&tree, &text_clone, &config_clone, metadata.as_ref());
+        let mut jobs = Vec::new();
+
+        if !config_clone.linters.is_empty() {
+            let code_blocks = crate::utils::collect_code_blocks(&tree, &text_clone);
+            for (language, linter_name) in &config_clone.linters {
+                let Some(blocks) = code_blocks.get(language) else {
+                    continue;
+                };
+                if blocks.is_empty() {
+                    continue;
+                }
+
+                let concatenated =
+                    crate::linter::code_block_collector::concatenate_with_blanks_and_mapping(
+                        blocks,
+                    );
+                jobs.push(ExternalLintJob {
+                    linter_name: linter_name.clone(),
+                    content: concatenated.content,
+                    mappings: concatenated.mappings,
+                });
+            }
+        }
+
+        diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
+        (diagnostics, jobs)
+    })
+    .await
+    .map_err(|_| tower_lsp_server::jsonrpc::Error::internal_error())?;
+
+    let (mut diagnostics, external_jobs) = phase_a;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    if !external_jobs.is_empty() {
+        let registry = Arc::new(crate::linter::external_linters::ExternalLinterRegistry::new());
+        let max_parallel = config.external_max_parallel.max(1);
+        let semaphore = Arc::new(Semaphore::new(max_parallel));
+        let mut join_set = tokio::task::JoinSet::new();
+
+        for job in external_jobs {
+            let Ok(permit) = semaphore.clone().acquire_owned().await else {
+                break;
+            };
+            let registry = registry.clone();
+            let input = text.clone();
+            join_set.spawn(async move {
+                let _permit = permit;
+                crate::linter::external_linters::run_linter(
+                    &job.linter_name,
+                    &job.content,
+                    &input,
+                    registry.as_ref(),
+                    Some(&job.mappings),
+                )
+                .await
+            });
+        }
+
+        while let Some(res) = join_set.join_next().await {
+            match res {
+                Ok(Ok(diags)) => diagnostics.extend(diags),
+                Ok(Err(e)) => log::warn!("External linter failed: {}", e),
+                Err(e) => log::warn!("External linter task join error: {}", e),
+            }
+        }
+
+        diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
+    }
 
     let mut actions = Vec::new();
 

@@ -915,12 +915,24 @@ struct RawConfig {
     #[serde(default)]
     formatters: Option<toml::Value>,
 
+    /// Max parallel external tool invocations (formatters/linters) per document.
+    #[serde(default)]
+    external_max_parallel: Option<usize>,
+
     #[serde(default)]
     linters: HashMap<String, String>,
 }
 
 fn default_line_width() -> usize {
     80
+}
+
+fn default_external_max_parallel() -> usize {
+    // Conservative cap: documents may have hundreds of code blocks.
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+        .clamp(1, 8)
 }
 
 fn default_blank_lines() -> BlankLines {
@@ -1139,6 +1151,9 @@ impl RawConfig {
             code_blocks: style.code_blocks.unwrap_or_default(),
             formatters: resolve_formatters(self.formatters),
             linters: self.linters,
+            external_max_parallel: self
+                .external_max_parallel
+                .unwrap_or_else(default_external_max_parallel),
             parser: self.parser.unwrap_or_default(),
         }
     }
@@ -1338,6 +1353,8 @@ pub struct Config {
     /// Language → Formatter(s) mapping (supports multiple formatters per language)
     pub formatters: HashMap<String, Vec<FormatterConfig>>,
     pub linters: HashMap<String, String>,
+    /// Max parallel external tool invocations (formatters/linters) per document.
+    pub external_max_parallel: usize,
     /// Parser configuration (experimental)
     pub parser: ParserConfig,
 }
@@ -1368,6 +1385,7 @@ impl Default for Config {
             code_blocks: CodeBlockConfig::default(),
             formatters: HashMap::new(), // Opt-in: empty by default
             linters: HashMap::new(),    // Opt-in: empty by default
+            external_max_parallel: default_external_max_parallel(),
             parser: ParserConfig::default(),
         }
     }
