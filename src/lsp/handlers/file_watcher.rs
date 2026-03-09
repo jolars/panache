@@ -69,10 +69,17 @@ pub(crate) async fn did_change_watched_files(
             states
                 .into_iter()
                 .filter_map(|(uri_str, state)| {
-                    if !state.yaml_ok {
+                    let doc_path = state.path?;
+                    if !crate::salsa::yaml_metadata_parse_result(
+                        &*db,
+                        state.salsa_file,
+                        state.salsa_config,
+                        doc_path.clone(),
+                    )
+                    .is_ok()
+                    {
                         return None;
                     }
-                    let doc_path = state.path?;
                     let metadata = crate::salsa::metadata(
                         &*db,
                         state.salsa_file,

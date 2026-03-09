@@ -245,35 +245,43 @@ pub(crate) async fn lint_and_publish(
         let db = salsa_db.lock().await;
         doc_state.salsa_file.text(&*db).clone()
     };
-    let metadata = if doc_state.yaml_ok {
-        if let Some(path) = doc_state.path.clone() {
-            let db = salsa_db.lock().await;
-            Some(
-                crate::salsa::metadata(&*db, doc_state.salsa_file, doc_state.salsa_config, path)
+    let (metadata, yaml_error) = if let Some(path) = doc_state.path.clone() {
+        let db = salsa_db.lock().await;
+        let parse_result = crate::salsa::yaml_metadata_parse_result(
+            &*db,
+            doc_state.salsa_file,
+            doc_state.salsa_config,
+            path.clone(),
+        )
+        .clone();
+        if parse_result.is_ok() {
+            (
+                Some(
+                    crate::salsa::metadata(
+                        &*db,
+                        doc_state.salsa_file,
+                        doc_state.salsa_config,
+                        path,
+                    )
                     .clone(),
+                ),
+                None,
             )
         } else {
-            None
+            (None, parse_result.err())
         }
     } else {
-        None
+        (None, None)
     };
     let mut all_diagnostics = Vec::new();
     // Check for YAML metadata errors
     if let Some(ref metadata) = metadata {
         all_diagnostics.extend(check_bibliography_parse(metadata, &text));
         all_diagnostics.extend(inline_reference_diagnostics(metadata, &text));
-    } else {
-        // Metadata parsing failed - try to get the error
-        // Re-parse to get the error (this is a bit wasteful, but errors are rare)
-        if let Some(file_path) = uri.to_file_path() {
-            let tree = crate::parse(&text, None);
-            if let Err(yaml_error) = crate::metadata::extract_project_metadata(&tree, &file_path)
-                && !matches!(yaml_error, YamlError::NotFound(_))
-            {
-                all_diagnostics.push(yaml_error_to_diagnostic(&yaml_error, &text));
-            }
-        }
+    } else if let Some(yaml_error) = yaml_error
+        && !matches!(yaml_error, YamlError::NotFound(_))
+    {
+        all_diagnostics.push(yaml_error_to_diagnostic(&yaml_error, &text));
     }
 
     // Use helper to load config

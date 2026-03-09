@@ -25,7 +25,7 @@ pub(crate) async fn rename(
     let position = params.text_document_position.position;
     let new_name = params.new_name;
 
-    let (salsa_file, salsa_config, doc_path, yaml_ok, content, green_tree) = {
+    let (salsa_file, salsa_config, doc_path, content, green_tree) = {
         let map = document_map.lock().await;
         let Some(state) = map.get(&uri.to_string()) else {
             return Ok(None);
@@ -35,19 +35,22 @@ pub(crate) async fn rename(
             state.salsa_file,
             state.salsa_config,
             state.path.clone(),
-            state.yaml_ok,
             state.salsa_file.text(&*db).clone(),
             state.tree.clone(),
         )
     };
 
-    if !yaml_ok {
-        return Ok(None);
-    }
-
     let Some(doc_path) = doc_path.clone() else {
         return Ok(None);
     };
+    let yaml_ok = {
+        let db = salsa_db.lock().await;
+        crate::salsa::yaml_metadata_parse_result(&*db, salsa_file, salsa_config, doc_path.clone())
+            .is_ok()
+    };
+    if !yaml_ok {
+        return Ok(None);
+    }
 
     let metadata = {
         let db = salsa_db.lock().await;

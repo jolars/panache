@@ -16,10 +16,6 @@ mod server;
 /// State for a single document in the LSP.
 #[derive(Clone)]
 pub struct DocumentState {
-    /// Whether YAML frontmatter metadata parsed successfully.
-    ///
-    /// If false, we treat metadata as absent so diagnostics can surface the YAML error.
-    pub yaml_ok: bool,
     /// Canonical file path for this document (if it exists on disk).
     pub path: Option<PathBuf>,
     /// Salsa input for this document's text.

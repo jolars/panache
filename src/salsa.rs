@@ -79,6 +79,17 @@ pub fn metadata(
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+pub fn yaml_metadata_parse_result(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+    path: PathBuf,
+) -> Result<(), crate::metadata::YamlError> {
+    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path).map(|_| ())
+}
+
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
 pub fn bibliography_index(db: &dyn Db, file: FileText, path: PathBuf) -> crate::bib::BibIndex {
     crate::bib::load_bibliography_from_text(file.text(db), &path)
 }

@@ -27,26 +27,25 @@ pub(crate) async fn hover(
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
-    let (salsa_file, salsa_config, doc_path, yaml_ok) = {
+    let (salsa_file, salsa_config, doc_path) = {
         let map = document_map.lock().await;
         match map.get(&uri.to_string()) {
-            Some(state) => (
-                state.salsa_file,
-                state.salsa_config,
-                state.path.clone(),
-                state.yaml_ok,
-            ),
+            Some(state) => (state.salsa_file, state.salsa_config, state.path.clone()),
             None => return Ok(None),
         }
     };
 
-    if !yaml_ok {
-        return Ok(None);
-    }
-
     let Some(doc_path) = doc_path else {
         return Ok(None);
     };
+    let yaml_ok = {
+        let db = salsa_db.lock().await;
+        crate::salsa::yaml_metadata_parse_result(&*db, salsa_file, salsa_config, doc_path.clone())
+            .is_ok()
+    };
+    if !yaml_ok {
+        return Ok(None);
+    }
 
     let metadata = {
         let db = salsa_db.lock().await;

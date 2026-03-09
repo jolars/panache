@@ -15,11 +15,6 @@ use salsa::Setter;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-fn compute_yaml_ok(tree: &GreenNode, path: &Path) -> bool {
-    let syntax = SyntaxNode::new_root(tree.clone());
-    crate::metadata::extract_project_metadata_without_bibliography_parse(&syntax, path).is_ok()
-}
-
 fn tracked_paths_for_graph(
     root_path: &Path,
     graph: &crate::salsa::ProjectGraph,
@@ -68,18 +63,12 @@ pub(crate) async fn did_open(
         .to_file_path()
         .map(|p| p.into_owned());
 
-    let yaml_ok = doc_path
-        .as_ref()
-        .map(|path| compute_yaml_ok(&tree, path))
-        .unwrap_or(false);
-
     // Store document state
     {
         let mut map = document_map.lock().await;
         map.insert(
             uri.clone(),
             DocumentState {
-                yaml_ok,
                 path: doc_path.clone(),
                 salsa_file,
                 salsa_config,
@@ -244,23 +233,6 @@ pub(crate) async fn did_change(
                     .filter_map(Uri::from_file_path)
                     .collect(),
             );
-        }
-    }
-
-    let yaml_ok = {
-        let state = {
-            let map = document_map.lock().await;
-            map.get(&uri_string).cloned()
-        };
-        state
-            .and_then(|state| state.path.as_ref().map(|p| compute_yaml_ok(&state.tree, p)))
-            .unwrap_or(false)
-    };
-
-    {
-        let mut document_map = document_map.lock().await;
-        if let Some(doc_state) = document_map.get_mut(&uri_string) {
-            doc_state.yaml_ok = yaml_ok;
         }
     }
 
