@@ -232,8 +232,10 @@ correct before committing!
 ### Architecture
 
 - Implements `tower_lsp_server::LanguageServer` trait
-- Uses `spawn_blocking` wrapper for non-Send rowan types
-- Document state in `Arc<RwLock<HashMap<String, Document>>>`
+- Uses `tokio::sync::Mutex`-guarded shared state (`Arc<Mutex<...>>`) for
+  `document_map`, `workspace_root`, and `salsa_db`
+- Per-document state is represented by `DocumentState` (path, salsa inputs,
+  CST `GreenNode`)
 - Incremental sync mode with UTF-16/UTF-8 position conversion
 
 Uses typed AST wrappers for cleaner code:
@@ -298,6 +300,13 @@ Instead of listing every file, understand the patterns:
 - `cases/*/`: Golden test scenarios (use `view` to explore)
 - `cli/`: CLI integration tests
 - `format/`: Feature-specific unit tests
+
+**Path-specific Copilot instructions** (`.github/instructions/`):
+
+- `parser.instructions.md`: parser + syntax guidance
+- `formatter.instructions.md`: formatter + golden expected guidance
+- `lsp.instructions.md`: LSP + LSP test guidance
+- `integration-tests.instructions.md`: integration test guidance
 
 ## Important Development Rules
 
