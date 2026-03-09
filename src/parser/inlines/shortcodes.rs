@@ -38,15 +38,16 @@ pub(crate) fn try_parse_shortcode(text: &str) -> Option<(usize, String, bool)> {
 
     // Find the closing marker (>}} or >}}})
     let close_marker = if is_escaped { ">}}}" } else { ">}}" };
-    let close_marker_len = close_marker.len();
+    let close_marker_bytes = close_marker.as_bytes();
+    let close_marker_len = close_marker_bytes.len();
 
     // Search for the closing marker
     let mut pos = marker_len;
     let mut brace_depth: i32 = 0; // Track nested braces in content
 
     while pos < text.len() {
-        if pos + close_marker_len <= text.len()
-            && &text[pos..pos + close_marker_len] == close_marker
+        if pos + close_marker_len <= bytes.len()
+            && &bytes[pos..pos + close_marker_len] == close_marker_bytes
             && brace_depth == 0
         {
             // Found matching close marker with correct brace depth
@@ -134,6 +135,19 @@ mod tests {
         let (len, content, _) = result.unwrap();
         assert_eq!(len, 23);
         assert_eq!(content, " video src=\"url\" ");
+    }
+
+    #[test]
+    fn parses_shortcode_with_unicode_quotes() {
+        let result = try_parse_shortcode("{{< video “https://www.youtube.com/watch?v=test” >}}");
+        assert!(result.is_some());
+        let (len, content, is_escaped) = result.unwrap();
+        assert_eq!(
+            len,
+            "{{< video “https://www.youtube.com/watch?v=test” >}}".len()
+        );
+        assert_eq!(content, " video “https://www.youtube.com/watch?v=test” ");
+        assert!(!is_escaped);
     }
 
     #[test]
