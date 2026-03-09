@@ -123,12 +123,12 @@ pub fn yaml_metadata_parse_result(
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 64)]
-pub fn built_in_diagnostics(
+pub fn built_in_lint_plan(
     db: &dyn Db,
     file: FileText,
     config: FileConfig,
     path: PathBuf,
-) -> Vec<crate::linter::Diagnostic> {
+) -> BuiltInLintPlan {
     let text = file.text(db);
     let cfg = config.config(db).clone();
     let tree = crate::parse(text, Some(cfg.clone()));
@@ -158,7 +158,44 @@ pub fn built_in_diagnostics(
         metadata.as_ref(),
     ));
     diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
-    diagnostics
+
+    let mut external_jobs = Vec::new();
+    if !cfg.linters.is_empty() {
+        let code_blocks = crate::utils::collect_code_blocks(&tree, text);
+        for (language, linter_name) in &cfg.linters {
+            let Some(blocks) = code_blocks.get(language) else {
+                continue;
+            };
+            if blocks.is_empty() {
+                continue;
+            }
+            let concatenated =
+                crate::linter::code_block_collector::concatenate_with_blanks_and_mapping(blocks);
+            external_jobs.push(ExternalLintJob {
+                linter_name: linter_name.clone(),
+                content: concatenated.content,
+                mappings: concatenated.mappings,
+            });
+        }
+    }
+
+    BuiltInLintPlan {
+        diagnostics,
+        external_jobs,
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ExternalLintJob {
+    pub linter_name: String,
+    pub content: String,
+    pub mappings: Vec<crate::linter::code_block_collector::BlockMapping>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct BuiltInLintPlan {
+    pub diagnostics: Vec<crate::linter::Diagnostic>,
+    pub external_jobs: Vec<ExternalLintJob>,
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
