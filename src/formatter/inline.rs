@@ -369,6 +369,31 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             // Format Quarto shortcodes with normalized spacing
             format_shortcode(node)
         }
+        SyntaxKind::CROSSREF => {
+            let mut result = String::new();
+            let mut skip_marker_whitespace = false;
+            for child in node.children_with_tokens() {
+                match child {
+                    NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BLOCKQUOTE_MARKER => {
+                        skip_marker_whitespace = true;
+                    }
+                    NodeOrToken::Token(tok)
+                        if tok.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace =>
+                    {
+                        skip_marker_whitespace = false;
+                    }
+                    NodeOrToken::Token(tok) => {
+                        skip_marker_whitespace = false;
+                        result.push_str(tok.text());
+                    }
+                    NodeOrToken::Node(n) => {
+                        skip_marker_whitespace = false;
+                        result.push_str(&n.text().to_string());
+                    }
+                }
+            }
+            result
+        }
         _ => {
             // For other inline nodes, just return their text
             node.text().to_string()

@@ -148,3 +148,18 @@ fn quote_idempotency_with_code() {
 
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn quote_display_math_attribute_idempotency() {
+    let input = r#"> Let $x$ be modeled
+> by a Poisson distribution $$
+> p(x) = \frac{e^{-\lambda} \lambda^{x}}{x !}
+> $$ {#eq-poisson}
+> where $\lambda$ is the rate. Using @eq-poisson, the probability can be
+> calculated.
+"#;
+
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}

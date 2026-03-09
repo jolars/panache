@@ -41,6 +41,7 @@ pub(super) fn format_paragraph_with_display_math(
 
     let children: Vec<_> = node.children_with_tokens().collect();
     let mut i = 0;
+    let mut skip_marker_whitespace = false;
     while i < children.len() {
         match &children[i] {
             NodeOrToken::Node(n) => {
@@ -109,9 +110,15 @@ pub(super) fn format_paragraph_with_display_math(
                 }
             }
             NodeOrToken::Token(t) => {
-                if t.kind() == SyntaxKind::NEWLINE {
+                if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
+                    skip_marker_whitespace = true;
+                } else if t.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace {
+                    skip_marker_whitespace = false;
+                } else if t.kind() == SyntaxKind::NEWLINE {
+                    skip_marker_whitespace = false;
                     current_text.push(' '); // Replace newlines with spaces for wrapping
                 } else if t.kind() != SyntaxKind::DISPLAY_MATH_MARKER {
+                    skip_marker_whitespace = false;
                     current_text.push_str(t.text());
                 }
             }
