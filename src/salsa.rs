@@ -122,6 +122,45 @@ pub fn yaml_metadata_parse_result(
     crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path).map(|_| ())
 }
 
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 64)]
+pub fn built_in_diagnostics(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+    path: PathBuf,
+) -> Vec<crate::linter::Diagnostic> {
+    let text = file.text(db);
+    let cfg = config.config(db).clone();
+    let tree = crate::parse(text, Some(cfg.clone()));
+
+    let yaml = yaml_metadata_parse_result(db, file, config, path.clone()).clone();
+    let metadata = yaml
+        .as_ref()
+        .ok()
+        .map(|_| metadata(db, file, config, path).clone());
+
+    let mut diagnostics = Vec::new();
+    if let Some(metadata) = metadata.as_ref() {
+        diagnostics.extend(crate::linter::metadata_diagnostics::metadata_diagnostics(
+            metadata, text,
+        ));
+    } else if let Err(yaml_error) = yaml
+        && let Some(diag) =
+            crate::linter::metadata_diagnostics::yaml_error_diagnostic(&yaml_error, text)
+    {
+        diagnostics.push(diag);
+    }
+
+    diagnostics.extend(crate::linter::lint_with_metadata(
+        &tree,
+        text,
+        &cfg,
+        metadata.as_ref(),
+    ));
+    diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
+    diagnostics
+}
+
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
 pub fn bibliography_index(db: &dyn Db, file: FileText, path: PathBuf) -> crate::bib::BibIndex {
     crate::bib::load_bibliography_from_text(file.text(db), &path)

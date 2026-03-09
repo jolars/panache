@@ -4,6 +4,7 @@ pub mod diagnostics;
 pub mod external_linters;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod external_linters_sync;
+pub mod metadata_diagnostics;
 pub mod rules;
 pub mod runner;
 
