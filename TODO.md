@@ -34,6 +34,8 @@ This document tracks implementation status for panache's features.
       MEDIUM/HIGH), and only roll out with a clear update/invalidation policy.
       - [x] Wire conservative defaults: open buffers LOW, config MEDIUM,
             dependency/disk-loaded files HIGH, watcher refreshes MEDIUM.
+      - [x] Add ignored durability measurement harness
+            (`tests/durability_bench.rs`) for HIGH vs LOW revalidation cost.
 - [x] [performance] Audit long-running query loops and add cancellation checks
       (`db.unwind_if_revision_cancelled()` in current salsa) where appropriate
       to improve cancellation responsiveness.
