@@ -637,14 +637,14 @@ impl<'a> Parser<'a> {
                         self.pos = new_pos - 1;
                     } else {
                         let (_, newline_str) = strip_newline(current_line);
-                        let trimmed_content = after_marker_and_spaces.trim_end();
-                        if trimmed_content.is_empty() {
+                        let (content_without_newline, _) = strip_newline(after_marker_and_spaces);
+                        if content_without_newline.is_empty() {
                             plain_buffer.push_line(newline_str);
                         } else {
                             let line_with_newline = if !newline_str.is_empty() {
-                                format!("{}{}", trimmed_content, newline_str)
+                                format!("{}{}", content_without_newline, newline_str)
                             } else {
-                                trimmed_content.to_string()
+                                content_without_newline.to_string()
                             };
                             plain_buffer.push_line(line_with_newline);
                         }
