@@ -169,6 +169,19 @@ fn test_grid_table_idempotency() {
 }
 
 #[test]
+fn test_grid_table_multiline_cell_idempotency() {
+    let input = "+-------+----------------------+\n| Var   | Desc                 |\n+=======+======================+\n| `A`   | First line           |\n|       |                      |\n|       | ```                  |\n|       | CODE=1               |\n|       | ```                  |\n+-------+----------------------+\n";
+
+    let first_format = format(input, None, None);
+    let second_format = format(&first_format, None, None);
+
+    assert_eq!(
+        first_format, second_format,
+        "Grid table with multiline cell content must be idempotent"
+    );
+}
+
+#[test]
 fn test_grid_table_with_caption_after() {
     let input = "+-----+-----+\n| A   | B   |\n+=====+=====+\n| C   | D   |\n+-----+-----+\n\nTable: Caption text";
     let expected = "+---+---+\n| A | B |\n+===+===+\n| C | D |\n+---+---+\n\nTable: Caption text\n";

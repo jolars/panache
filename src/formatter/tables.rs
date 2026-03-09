@@ -445,8 +445,13 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                 }
             }
             SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW => {
-                let row_content = format_cell_content(&child, config);
-                let cells = split_grid_row(&row_content);
+                let cells = extract_row_cells(&child, config);
+                let cells = if cells.is_empty() {
+                    let row_content = format_cell_content(&child, config);
+                    split_grid_row(&row_content)
+                } else {
+                    cells
+                };
                 rows.push(cells);
             }
             _ => {}
