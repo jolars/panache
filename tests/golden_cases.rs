@@ -176,6 +176,7 @@ golden_test_cases!(
     fenced_code,
     fenced_code_quarto,
     fenced_divs,
+    fenced_div_close_grid_table,
     footnote_def_paragraph,
     footnote_definition_list,
     headings,

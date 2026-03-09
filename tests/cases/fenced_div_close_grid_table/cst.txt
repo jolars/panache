@@ -1,0 +1,141 @@
+DOCUMENT@0..438
+  FENCED_DIV@0..204
+    DIV_FENCE_OPEN@0..17
+      TEXT@0..3 ":::"
+      WHITESPACE@3..4 " "
+      DIV_INFO@4..16
+        TEXT@4..16 "panel-tabset"
+      NEWLINE@16..17 "\n"
+    HEADING@17..22
+      ATX_HEADING_MARKER@17..19
+        ATX_HEADING_MARKER@17..19 "##"
+      WHITESPACE@19..20 " "
+      HEADING_CONTENT@20..21
+        TEXT@20..21 "R"
+      NEWLINE@21..22 "\n"
+    BLANK_LINE@22..23
+      BLANK_LINE@22..23 "\n"
+    CODE_BLOCK@23..68
+      CODE_FENCE_OPEN@23..29
+        CODE_FENCE_MARKER@23..26 "```"
+        WHITESPACE@26..27 " "
+        CODE_INFO@27..28
+          CODE_LANGUAGE@27..28 "r"
+        NEWLINE@28..29 "\n"
+      CODE_CONTENT@29..64
+        TEXT@29..63 "Sys.getenv(\"QUARTO_DO ..."
+        NEWLINE@63..64 "\n"
+      CODE_FENCE_CLOSE@64..68
+        CODE_FENCE_MARKER@64..67 "```"
+        NEWLINE@67..68 "\n"
+    BLANK_LINE@68..69
+      BLANK_LINE@68..69 "\n"
+    HEADING@69..79
+      ATX_HEADING_MARKER@69..71
+        ATX_HEADING_MARKER@69..71 "##"
+      WHITESPACE@71..72 " "
+      HEADING_CONTENT@72..78
+        TEXT@72..78 "Python"
+      NEWLINE@78..79 "\n"
+    BLANK_LINE@79..80
+      BLANK_LINE@79..80 "\n"
+    CODE_BLOCK@80..147
+      CODE_FENCE_OPEN@80..91
+        CODE_FENCE_MARKER@80..83 "```"
+        WHITESPACE@83..84 " "
+        CODE_INFO@84..90
+          CODE_LANGUAGE@84..90 "python"
+        NEWLINE@90..91 "\n"
+      CODE_CONTENT@91..143
+        TEXT@91..100 "import os"
+        NEWLINE@100..101 "\n"
+        TEXT@101..142 "print(os.environ[\"QUA ..."
+        NEWLINE@142..143 "\n"
+      CODE_FENCE_CLOSE@143..147
+        CODE_FENCE_MARKER@143..146 "```"
+        NEWLINE@146..147 "\n"
+    BLANK_LINE@147..148
+      BLANK_LINE@147..148 "\n"
+    HEADING@148..157
+      ATX_HEADING_MARKER@148..150
+        ATX_HEADING_MARKER@148..150 "##"
+      WHITESPACE@150..151 " "
+      HEADING_CONTENT@151..156
+        TEXT@151..156 "Julia"
+      NEWLINE@156..157 "\n"
+    BLANK_LINE@157..158
+      BLANK_LINE@157..158 "\n"
+    CODE_BLOCK@158..200
+      CODE_FENCE_OPEN@158..168
+        CODE_FENCE_MARKER@158..161 "```"
+        WHITESPACE@161..162 " "
+        CODE_INFO@162..167
+          CODE_LANGUAGE@162..167 "julia"
+        NEWLINE@167..168 "\n"
+      CODE_CONTENT@168..196
+        TEXT@168..195 "ENV[\"QUARTO_DOCUMENT_ ..."
+        NEWLINE@195..196 "\n"
+      CODE_FENCE_CLOSE@196..200
+        CODE_FENCE_MARKER@196..199 "```"
+        NEWLINE@199..200 "\n"
+    DIV_FENCE_CLOSE@200..204
+      TEXT@200..203 ":::"
+      NEWLINE@203..204 "\n"
+  BLANK_LINE@204..205
+    BLANK_LINE@204..205 "\n"
+  GRID_TABLE@205..345
+    TABLE_SEPARATOR@205..233
+      TEXT@205..232 "+--------+----------- ..."
+      NEWLINE@232..233 "\n"
+    TABLE_HEADER@233..261
+      TEXT@233..234 "|"
+      WHITESPACE@234..235 " "
+      TABLE_CELL@235..238
+        TEXT@235..238 "Var"
+      WHITESPACE@238..242 "    "
+      TEXT@242..243 "|"
+      WHITESPACE@243..244 " "
+      TABLE_CELL@244..255
+        TEXT@244..255 "Description"
+      WHITESPACE@255..259 "    "
+      TEXT@259..260 "|"
+      NEWLINE@260..261 "\n"
+    TABLE_SEPARATOR@261..289
+      TEXT@261..288 "+========+=========== ..."
+      NEWLINE@288..289 "\n"
+    TABLE_ROW@289..317
+      TEXT@289..290 "|"
+      WHITESPACE@290..291 " "
+      TABLE_CELL@291..294
+        CODE_SPAN@291..294
+          CODE_SPAN_MARKER@291..292 "`"
+          TEXT@292..293 "A"
+          CODE_SPAN_MARKER@293..294 "`"
+      WHITESPACE@294..298 "    "
+      TEXT@298..299 "|"
+      WHITESPACE@299..300 " "
+      TABLE_CELL@300..314
+        TEXT@300..314 "Example value."
+      WHITESPACE@314..315 " "
+      TEXT@315..316 "|"
+      NEWLINE@316..317 "\n"
+    TABLE_SEPARATOR@317..345
+      TEXT@317..344 "+--------+----------- ..."
+      NEWLINE@344..345 "\n"
+  BLANK_LINE@345..346
+    BLANK_LINE@345..346 "\n"
+  PARAGRAPH@346..438
+    TEXT@346..372 "For more information, ..."
+    LINK@372..436
+      LINK_START@372..373
+        LINK_START@372..373 "["
+      LINK_TEXT@373..408
+        TEXT@373..408 "Quarto engine executi ..."
+      LINK_TEXT_END@408..409 "]"
+      LINK_DEST_START@409..410 "("
+      LINK_DEST@410..435
+        TEXT@410..435 "./quarto-execute-info ..."
+      LINK_DEST_END@435..436 ")"
+    TEXT@436..437 "."
+    NEWLINE@437..438 "\n"
+

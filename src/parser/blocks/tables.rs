@@ -127,9 +127,9 @@ fn try_parse_caption_prefix(line: &str) -> Option<(usize, &str)> {
     } else if let Some(rest) = trimmed.strip_prefix("table:") {
         Some((leading_spaces + 6, rest))
     } else if let Some(rest) = trimmed.strip_prefix(':') {
-        // Just ":" - but need to be careful not to match definition list markers.
-        // A caption with just ":" should have content or be followed by content.
-        if !rest.trim().is_empty() || rest.starts_with(' ') {
+        // Just ":" caption markers must be followed by whitespace (Pandoc-style).
+        // This avoids accidentally treating constructs like fenced div fences ":::" as captions.
+        if rest.starts_with(|c: char| c.is_whitespace()) {
             Some((leading_spaces + 1, rest))
         } else {
             None
