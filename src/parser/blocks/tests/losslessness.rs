@@ -49,3 +49,12 @@ fn test_losslessness_indented_code_blank_line_with_spaces() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_fenced_div_open_with_trailing_space() {
+    let input = "::: {.panel-tabset group=\"language\"} \n\n## R\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

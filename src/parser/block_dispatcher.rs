@@ -1524,38 +1524,26 @@ impl BlockParser for FencedDivOpenParser {
             builder.token(SyntaxKind::TEXT.into(), &div_fence.attributes);
             builder.finish_node();
 
-            // Trailing colons (symmetric fences)
-            let (trailing_space, trailing_colons) = if div_fence.attributes.starts_with('{') {
+            // Preserve any suffix after attributes (e.g., trailing spaces, optional symmetric colons).
+            let after_attrs = if div_fence.attributes.starts_with('{') {
                 if let Some(close_idx) = content_after_space.find('}') {
-                    let after_attrs = &content_after_space[close_idx + 1..];
-                    let trailing = after_attrs.trim_start();
-                    let space_count = after_attrs.len() - trailing.len();
-                    if !trailing.is_empty() && trailing.chars().all(|c| c == ':') {
-                        (space_count > 0, trailing)
-                    } else {
-                        (false, "")
-                    }
+                    &content_after_space[close_idx + 1..]
                 } else {
-                    (false, "")
+                    ""
                 }
             } else {
-                let after_attrs = &content_after_space[div_fence.attributes.len()..];
-                if let Some(after_space) = after_attrs.strip_prefix(' ') {
-                    if !after_space.is_empty() && after_space.chars().all(|c| c == ':') {
-                        (true, after_space)
-                    } else {
-                        (false, "")
-                    }
-                } else {
-                    (false, "")
-                }
+                &content_after_space[div_fence.attributes.len()..]
             };
 
-            if trailing_space {
-                builder.token(SyntaxKind::WHITESPACE.into(), " ");
-            }
-            if !trailing_colons.is_empty() {
-                builder.token(SyntaxKind::TEXT.into(), trailing_colons);
+            if !after_attrs.is_empty() {
+                let suffix_trimmed = after_attrs.trim_start();
+                let ws_len = after_attrs.len() - suffix_trimmed.len();
+                if ws_len > 0 {
+                    builder.token(SyntaxKind::WHITESPACE.into(), &after_attrs[..ws_len]);
+                }
+                if !suffix_trimmed.is_empty() {
+                    builder.token(SyntaxKind::TEXT.into(), suffix_trimmed);
+                }
             }
         }
 
