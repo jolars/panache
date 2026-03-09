@@ -29,7 +29,10 @@ fn format_cell_content(node: &SyntaxNode, config: &Config) -> String {
     for child in node.children_with_tokens() {
         match child {
             NodeOrToken::Token(token) => {
-                if token.kind() == SyntaxKind::TEXT || token.kind() == SyntaxKind::NEWLINE {
+                if token.kind() == SyntaxKind::TEXT
+                    || token.kind() == SyntaxKind::NEWLINE
+                    || token.kind() == SyntaxKind::ESCAPED_CHAR
+                {
                     result.push_str(token.text());
                 }
             }
