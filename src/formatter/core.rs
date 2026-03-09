@@ -2,9 +2,9 @@ use crate::config::{Config, WrapMode};
 use crate::directives::{DirectiveTracker, extract_directive_from_node};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
-use std::collections::HashMap;
 
 use super::code_blocks;
+use super::code_blocks::FormattedCodeMap;
 use super::headings;
 use super::inline;
 use super::paragraphs;
@@ -17,7 +17,7 @@ pub struct Formatter {
     pub(super) config: Config,
     pub(super) consecutive_blank_lines: usize,
     pub(super) fenced_div_depth: usize,
-    pub(super) formatted_code: HashMap<String, String>,
+    pub(super) formatted_code: FormattedCodeMap,
     /// Stack of max marker widths for nested lists (for right-aligning markers)
     pub(super) max_marker_widths: Vec<usize>,
     /// Optional byte range to format (start, end). If None, format entire document.
@@ -31,7 +31,7 @@ pub struct Formatter {
 impl Formatter {
     pub fn new(
         config: Config,
-        formatted_code: HashMap<String, String>,
+        formatted_code: FormattedCodeMap,
         range: Option<(usize, usize)>,
     ) -> Self {
         Self {

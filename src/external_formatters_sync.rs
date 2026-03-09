@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use crate::config::FormatterConfig;
 pub use crate::external_formatters_common::FormatterError;
-use crate::formatter::code_blocks::ExternalCodeBlock;
+use crate::formatter::code_blocks::{ExternalCodeBlock, FormattedCodeMap};
 
 /// Format a code block using an external formatter (synchronous).
 ///
@@ -227,10 +227,8 @@ pub fn run_formatters_parallel(
     formatters: &std::collections::HashMap<String, Vec<FormatterConfig>>,
     timeout: Duration,
     max_parallel: usize,
-) -> std::collections::HashMap<String, String> {
+) -> FormattedCodeMap {
     use rayon::prelude::*;
-    use std::collections::HashMap;
-
     let max_parallel = max_parallel.max(1);
 
     let pool = rayon::ThreadPoolBuilder::new()
@@ -292,8 +290,8 @@ pub fn run_formatters_parallel(
                     current_code
                 };
 
-                Some((original, output))
+                Some(((lang, original), output))
             })
-            .collect::<HashMap<_, _>>()
+            .collect::<FormattedCodeMap>()
     })
 }

@@ -10,6 +10,8 @@ use std::time::Duration;
 
 use super::hashpipe;
 
+pub type FormattedCodeMap = HashMap<(String, String), String>;
+
 #[derive(Debug, Clone)]
 pub struct ExternalCodeBlock {
     pub language: String,
@@ -22,16 +24,17 @@ pub struct ExternalCodeBlock {
 pub(super) fn format_code_block(
     node: &SyntaxNode,
     config: &Config,
-    formatted_code: &HashMap<String, String>,
+    formatted_code: &FormattedCodeMap,
     output: &mut String,
 ) {
-    let (info_node, _language, extracted_content) = extract_code_block_parts(node);
+    let (info_node, language, extracted_content) = extract_code_block_parts(node);
     let mut content = extracted_content;
+    let language_key = language.unwrap_or_default();
 
-    if let Some(formatted) = formatted_code.get(&content) {
+    if let Some(formatted) = formatted_code.get(&(language_key.clone(), content.clone())) {
         content = expand_tabs_with_width(formatted, config.tab_width);
     } else if let Some(raw_content) = extract_raw_code_block_content(node)
-        && let Some(formatted) = formatted_code.get(&raw_content)
+        && let Some(formatted) = formatted_code.get(&(language_key, raw_content))
     {
         content = expand_tabs_with_width(formatted, config.tab_width);
     }
@@ -731,12 +734,12 @@ pub fn collect_code_blocks(
 }
 
 /// Spawn external formatters for code blocks and await results.
-/// Returns a HashMap of original code -> formatted code (only successful formats).
+/// Returns a map of (language, original code) -> formatted code (only successful formats).
 #[cfg(feature = "lsp")]
 pub async fn spawn_and_await_formatters(
     blocks: Vec<ExternalCodeBlock>,
     config: &Config,
-) -> HashMap<String, String> {
+) -> FormattedCodeMap {
     use std::sync::Arc;
     use tokio::sync::Semaphore;
     use tokio::task::JoinSet;
@@ -796,19 +799,19 @@ pub async fn spawn_and_await_formatters(
                             lang, formatter_cfg.cmd, e
                         );
                         // Stop the chain on error and return original
-                        return (original, hashpipe_prefix, Err(e));
+                        return (lang, original, hashpipe_prefix, Err(e));
                     }
                 }
             }
 
-            (original, hashpipe_prefix, Ok(current_code))
+            (lang, original, hashpipe_prefix, Ok(current_code))
         });
     }
 
-    let mut formatted = HashMap::new();
+    let mut formatted: FormattedCodeMap = HashMap::new();
 
     while let Some(res) = join_set.join_next().await {
-        if let Ok((original_code, hashpipe_prefix, result)) = res {
+        if let Ok((lang, original_code, hashpipe_prefix, result)) = res {
             match result {
                 Ok(formatted_code) => {
                     // Only store if content changed
@@ -818,7 +821,7 @@ pub async fn spawn_and_await_formatters(
                         } else {
                             formatted_code
                         };
-                        formatted.insert(original_code, combined);
+                        formatted.insert((lang, original_code), combined);
                     }
                 }
                 Err(e) => {
@@ -833,12 +836,12 @@ pub async fn spawn_and_await_formatters(
 }
 
 /// Run external formatters for code blocks synchronously using threads.
-/// Returns a HashMap of original code -> formatted code (only successful formats).
+/// Returns a map of (language, original code) -> formatted code (only successful formats).
 #[cfg(not(target_arch = "wasm32"))]
 pub fn spawn_and_await_formatters_sync(
     blocks: Vec<ExternalCodeBlock>,
     config: &Config,
-) -> HashMap<String, String> {
+) -> FormattedCodeMap {
     use std::time::Duration;
     let timeout = Duration::from_secs(30);
 
@@ -855,6 +858,6 @@ pub fn spawn_and_await_formatters_sync(
 pub fn spawn_and_await_formatters_sync(
     _blocks: Vec<ExternalCodeBlock>,
     _config: &Config,
-) -> HashMap<String, String> {
+) -> FormattedCodeMap {
     HashMap::new()
 }
