@@ -217,14 +217,32 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
                     let mut line_content = String::new();
                     let mut line_indent = String::new();
                     let mut at_line_start = true;
+                    let mut saw_blockquote_marker = false;
 
                     for token in n.children_with_tokens() {
                         if let NodeOrToken::Token(t) = token {
                             match t.kind() {
+                                SyntaxKind::BLOCKQUOTE_MARKER if at_line_start && !has_fence => {
+                                    // Parser may preserve blockquote continuation markers inside
+                                    // indented code content for losslessness. These are container
+                                    // syntax, not code bytes, so ignore them for formatter output.
+                                    saw_blockquote_marker = true;
+                                }
                                 SyntaxKind::WHITESPACE if at_line_start => {
-                                    line_indent.push_str(t.text());
+                                    if saw_blockquote_marker && !has_fence {
+                                        let ws = t.text();
+                                        if let Some(stripped) = ws.strip_prefix(' ') {
+                                            line_indent.push_str(stripped);
+                                        } else {
+                                            line_indent.push_str(ws);
+                                        }
+                                        saw_blockquote_marker = false;
+                                    } else {
+                                        line_indent.push_str(t.text());
+                                    }
                                 }
                                 SyntaxKind::TEXT => {
+                                    saw_blockquote_marker = false;
                                     if at_line_start && t.text().is_empty() {
                                         continue;
                                     }
@@ -239,6 +257,7 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
                                     line_content.push_str(t.text());
                                 }
                                 SyntaxKind::NEWLINE => {
+                                    saw_blockquote_marker = false;
                                     if !at_line_start {
                                         content.push_str(&line_content);
                                     }

@@ -256,6 +256,17 @@ fn spec_blockquote_with_indented_code() {
 }
 
 #[test]
+fn blockquote_indented_code_preserves_markers_on_all_lines() {
+    let input =
+        "> Code in a block quote:\n>\n>     sub status {\n>         print \"working\";\n>     }\n";
+    let tree = parse_blocks(input);
+
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::CODE_BLOCK), 1);
+    assert_eq!(tree.text().to_string(), input);
+}
+
+#[test]
 fn spec_blockquote_optional_space_after_marker() {
     // Test both "> " and ">" forms
     let input1 = "> With space";

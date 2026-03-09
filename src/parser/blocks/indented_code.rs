@@ -51,7 +51,10 @@ pub(crate) fn parse_indented_code_block(
     bq_depth: usize,
     base_indent: usize,
 ) -> usize {
-    use super::blockquotes::count_blockquote_markers;
+    use super::blockquotes::{
+        count_blockquote_markers, emit_one_blockquote_marker, strip_n_blockquote_markers,
+    };
+    use crate::parser::utils::marker_utils::parse_blockquote_marker_info;
 
     builder.start_node(SyntaxKind::CODE_BLOCK.into());
     builder.start_node(SyntaxKind::CODE_CONTENT.into());
@@ -63,8 +66,13 @@ pub(crate) fn parse_indented_code_block(
     while current_pos < lines.len() {
         let line = lines[current_pos];
 
-        // Strip blockquote markers to get inner content
-        let (line_bq_depth, inner) = count_blockquote_markers(line);
+        // Strip exactly the enclosing blockquote depth; deeper markers remain as content.
+        let (line_bq_depth, _) = count_blockquote_markers(line);
+        let inner = if bq_depth > 0 {
+            strip_n_blockquote_markers(line, bq_depth)
+        } else {
+            line
+        };
 
         // If blockquote depth decreases, code block ends (we've left the blockquote)
         if line_bq_depth < bq_depth {
@@ -94,8 +102,28 @@ pub(crate) fn parse_indented_code_block(
             if !continues {
                 break;
             }
+            if bq_depth > 0 && current_pos > start_pos {
+                let marker_info = parse_blockquote_marker_info(line);
+                for i in 0..bq_depth {
+                    if let Some(info) = marker_info.get(i) {
+                        emit_one_blockquote_marker(
+                            builder,
+                            info.leading_spaces,
+                            info.has_trailing_space,
+                        );
+                    }
+                }
+            }
+            let (_, newline_str) = strip_newline(inner);
             builder.token(SyntaxKind::TEXT.into(), "");
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
+            builder.token(
+                SyntaxKind::NEWLINE.into(),
+                if newline_str.is_empty() {
+                    "\n"
+                } else {
+                    newline_str
+                },
+            );
             current_pos += 1;
             continue;
         }
@@ -104,6 +132,19 @@ pub(crate) fn parse_indented_code_block(
         let (indent_cols, indent_bytes) = leading_indent(inner);
         if indent_cols < code_indent {
             break;
+        }
+
+        if bq_depth > 0 && current_pos > start_pos {
+            let marker_info = parse_blockquote_marker_info(line);
+            for i in 0..bq_depth {
+                if let Some(info) = marker_info.get(i) {
+                    emit_one_blockquote_marker(
+                        builder,
+                        info.leading_spaces,
+                        info.has_trailing_space,
+                    );
+                }
+            }
         }
 
         // For losslessness: emit ALL indentation as WHITESPACE, then emit remaining content
