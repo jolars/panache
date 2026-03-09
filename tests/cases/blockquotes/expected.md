@@ -40,3 +40,11 @@ block quote in pandoc:
 
 > This is a block quote. > Not nested, since `blank_before_blockquote` is
 > enabled by default
+
+> practical skills in:
+>
+> - Developing and integrating custom formats to support diverse outputs while
+>   reducing repetition across projects.
+> - Substituting Quarto’s templates with your own to customize formats beyond
+>   the built-in options.
+> - Implementing filters to automate and streamline content transformation.

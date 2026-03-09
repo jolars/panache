@@ -1185,6 +1185,7 @@ impl<'a> Parser<'a> {
             }
         } else if bq_depth > 0 {
             // Same blockquote depth - emit markers and continue parsing inner content
+            let mut list_item_continuation = false;
 
             // Check if we should close the ListItem
             // ListItem should continue if the line is properly indented for continuation
@@ -1225,20 +1226,29 @@ impl<'a> Parser<'a> {
                         effective_indent,
                         content_col
                     );
+                    list_item_continuation = true;
                 }
             }
 
-            let marker_info = parse_blockquote_marker_info(line);
-            for i in 0..bq_depth {
-                if let Some(info) = marker_info.get(i) {
-                    self.emit_or_buffer_blockquote_marker(
-                        info.leading_spaces,
-                        info.has_trailing_space,
-                    );
+            if !list_item_continuation {
+                let marker_info = parse_blockquote_marker_info(line);
+                for i in 0..bq_depth {
+                    if let Some(info) = marker_info.get(i) {
+                        self.emit_or_buffer_blockquote_marker(
+                            info.leading_spaces,
+                            info.has_trailing_space,
+                        );
+                    }
                 }
             }
-            // Same blockquote depth - markers stripped, use inner_content for appending
-            return self.parse_inner_content(inner_content, Some(inner_content));
+            // When continuing a list item inside a blockquote, keep original line bytes in the
+            // list-item buffer and avoid emitting separate marker tokens here.
+            let line_to_append = if list_item_continuation {
+                Some(line)
+            } else {
+                Some(inner_content)
+            };
+            return self.parse_inner_content(inner_content, line_to_append);
         }
 
         // No blockquote markers - parse as regular content

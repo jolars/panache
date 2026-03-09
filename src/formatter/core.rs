@@ -763,14 +763,21 @@ impl Formatter {
                             // Format list with blockquote prefix
                             // Save current output, format list to temp, then prefix each line
                             let saved_output = self.output.clone();
+                            let saved_line_width = self.config.line_width;
                             self.output.clear();
+                            self.config.line_width =
+                                self.config.line_width.saturating_sub(content_prefix.len());
                             self.format_node_sync(&child, indent);
                             let list_output = self.output.clone();
+                            self.config.line_width = saved_line_width;
                             self.output = saved_output;
 
                             for line in list_output.lines() {
                                 if line.is_empty() {
                                     self.output.push_str(&blank_prefix);
+                                } else if line.starts_with("> ") {
+                                    self.output.push_str(&base_indent);
+                                    self.output.push_str(line);
                                 } else {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(line);

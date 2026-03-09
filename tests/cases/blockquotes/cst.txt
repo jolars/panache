@@ -1,4 +1,4 @@
-DOCUMENT@0..1418
+DOCUMENT@0..1749
   PARAGRAPH@0..60
     TEXT@0..59 "Markdown uses email c ..."
     NEWLINE@59..60 "\n"
@@ -185,4 +185,44 @@ DOCUMENT@0..1418
       NEWLINE@1416..1417 "\n"
   BLANK_LINE@1417..1418
     BLANK_LINE@1417..1418 "\n"
+  BLOCKQUOTE@1418..1749
+    BLOCKQUOTE_MARKER@1418..1419 ">"
+    WHITESPACE@1419..1420 " "
+    PARAGRAPH@1420..1441
+      TEXT@1420..1440 "practical skills in:"
+      NEWLINE@1440..1441 "\n"
+    BLOCKQUOTE_MARKER@1441..1442 ">"
+    BLANK_LINE@1442..1443
+      BLANK_LINE@1442..1443 "\n"
+    BLOCKQUOTE_MARKER@1443..1444 ">"
+    WHITESPACE@1444..1445 " "
+    LIST@1445..1749
+      LIST_ITEM@1445..1563
+        LIST_MARKER@1445..1446 "-"
+        WHITESPACE@1446..1447 " "
+        PLAIN@1447..1563
+          TEXT@1447..1515 "Developing and integr ..."
+          NEWLINE@1515..1516 "\n"
+          TEXT@1516..1562 ">   while reducing re ..."
+          NEWLINE@1562..1563 "\n"
+      BLOCKQUOTE_MARKER@1563..1564 ">"
+      WHITESPACE@1564..1565 " "
+      LIST_ITEM@1565..1669
+        LIST_MARKER@1565..1566 "-"
+        WHITESPACE@1566..1567 " "
+        PLAIN@1567..1669
+          TEXT@1567..1635 "Substituting Quarto’ ..."
+          NEWLINE@1635..1636 "\n"
+          TEXT@1636..1668 ">   beyond the built- ..."
+          NEWLINE@1668..1669 "\n"
+      BLOCKQUOTE_MARKER@1669..1670 ">"
+      WHITESPACE@1670..1671 " "
+      LIST_ITEM@1671..1749
+        LIST_MARKER@1671..1672 "-"
+        WHITESPACE@1672..1673 " "
+        PLAIN@1673..1749
+          TEXT@1673..1728 "Implementing filters  ..."
+          NEWLINE@1728..1729 "\n"
+          TEXT@1729..1748 ">   transformation."
+          NEWLINE@1748..1749 "\n"
 

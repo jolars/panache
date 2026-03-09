@@ -312,7 +312,7 @@ impl Formatter {
         let mut arena: Vec<Box<str>> = Vec::new();
         let content_node = Self::find_content_node(node);
 
-        let words = if let Some(content) = content_node {
+        let mut words = if let Some(content) = content_node {
             // Extract words from Plain/PARAGRAPH child (postprocessor wraps all content in one node)
             wrapping::build_words(&self.config, &content, &mut arena, &|n| {
                 self.format_inline_node(n)
@@ -343,6 +343,11 @@ impl Formatter {
 
             node_words
         };
+
+        let in_blockquote = node.ancestors().any(|a| a.kind() == SyntaxKind::BLOCKQUOTE);
+        if in_blockquote {
+            words.retain(|w| w.word != ">");
+        }
 
         // Check if this item contains only an empty nested list (special case formatting)
         let has_only_empty_nested_list = node
