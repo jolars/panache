@@ -109,7 +109,7 @@ pub struct DefinitionIndex {
     crossrefs: HashMap<String, DefinitionLocation>,
 }
 
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked(returns(ref), lru = 64)]
 pub fn definition_index(
     db: &dyn Db,
     file: FileText,
@@ -352,7 +352,7 @@ pub struct GraphDiagnosticEntry {
 #[salsa::accumulator]
 pub struct GraphDiagnostic(pub GraphDiagnosticEntry);
 
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked(returns(ref), lru = 32)]
 pub fn project_graph(
     db: &dyn Db,
     root_file: FileText,

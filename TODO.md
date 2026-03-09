@@ -23,9 +23,10 @@ This document tracks implementation status for panache's features.
 - [ ] [optional] Move more LSP diagnostics/lint derivations behind salsa where
       it makes sense (be careful with non-`Send` rowan/CST types; keep external
       linter execution at the async boundary, outside salsa queries).
-- [ ] [performance] Apply salsa LRU tuning for long-running LSP sessions
-      (see `salsa/book/src/tuning.md`): add `#[salsa::tracked(lru = N)]` to
-      high-churn tracked queries where appropriate.
+- [x] [performance] Apply salsa LRU tuning for long-running LSP sessions
+      (see `salsa/book/src/tuning.md`): add `#[salsa::tracked(lru = N)]`
+      to high-churn tracked queries where appropriate (`project_graph`,
+      `definition_index`).
 - [ ] [performance] Evaluate `#[salsa::interned]` for common keys (paths/labels)
       if it reduces memory/cost.
 - [ ] [performance] Audit long-running query loops and add
