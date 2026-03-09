@@ -1410,12 +1410,14 @@ impl BlockParser for LineBlockParser {
 
         try_parse_line_block_start(ctx.content)?;
 
-        // Line blocks can interrupt paragraphs.
-        let detection = if ctx.has_blank_before || ctx.at_document_start {
-            BlockDetectionResult::Yes
-        } else {
-            BlockDetectionResult::YesCanInterrupt
-        };
+        // Require a blank line (or document start) before a line block.
+        // This prevents accidental line-block parsing for wrapped paragraph lines
+        // that happen to start with "| ".
+        if !ctx.has_blank_before && !ctx.at_document_start {
+            return None;
+        }
+
+        let detection = BlockDetectionResult::Yes;
 
         Some((detection, None))
     }

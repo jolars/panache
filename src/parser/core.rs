@@ -1717,7 +1717,10 @@ impl<'a> Parser<'a> {
         }
 
         // Check for line block (if line_blocks extension is enabled)
-        if self.config.extensions.line_blocks && try_parse_line_block_start(content).is_some() {
+        if self.config.extensions.line_blocks
+            && (has_blank_before || self.pos == 0)
+            && try_parse_line_block_start(content).is_some()
+        {
             log::debug!("Parsed line block at line {}", self.pos);
             // Close paragraph before opening line block
             self.close_paragraph_if_open();

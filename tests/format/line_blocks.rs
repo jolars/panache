@@ -117,3 +117,11 @@ fn test_line_block_idempotency() {
 
     assert_eq!(result1, result2, "Formatting should be idempotent");
 }
+
+#[test]
+fn test_pipe_line_inside_paragraph_is_not_line_block() {
+    let input = "Materials: [YouTube\nplaylist](https://example.com)\n| [Slides](https://example.com/slides) | [Starter\ncode](https://example.com/code)\n";
+    let result1 = format(input, None, None);
+    let result2 = format(&result1, None, None);
+    assert_eq!(result1, result2, "Formatting should be idempotent");
+}
