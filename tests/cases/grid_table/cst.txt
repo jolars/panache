@@ -1,4 +1,4 @@
-DOCUMENT@0..599
+DOCUMENT@0..1852
   GRID_TABLE@0..231
     TABLE_SEPARATOR@0..33
       TEXT@0..32 "+--------+----------+ ..."
@@ -199,4 +199,94 @@ DOCUMENT@0..599
     TABLE_SEPARATOR@577..599
       TEXT@577..598 "+--------+----------+"
       NEWLINE@598..599 "\n"
+  BLANK_LINE@599..600
+    BLANK_LINE@599..600 "\n"
+  PARAGRAPH@600..630
+    TEXT@600..629 "With trailing spaces  ..."
+    NEWLINE@629..630 "\n"
+  BLANK_LINE@630..631
+    BLANK_LINE@630..631 "\n"
+  GRID_TABLE@631..1852
+    TABLE_SEPARATOR@631..805
+      TEXT@631..804 "+-------------------- ..."
+      NEWLINE@804..805 "\n"
+    TABLE_HEADER@805..979
+      TEXT@805..806 "|"
+      WHITESPACE@806..807 " "
+      TABLE_CELL@807..813
+        TEXT@807..813 "Option"
+      WHITESPACE@813..832 "                   "
+      TEXT@832..833 "|"
+      WHITESPACE@833..834 " "
+      TABLE_CELL@834..845
+        TEXT@834..845 "Description"
+      WHITESPACE@845..977 "                      ..."
+      TEXT@977..978 "|"
+      NEWLINE@978..979 "\n"
+    TABLE_SEPARATOR@979..1153
+      TEXT@979..1152 "+==================== ..."
+      NEWLINE@1152..1153 "\n"
+    TABLE_ROW@1153..1329
+      TEXT@1153..1154 "|"
+      WHITESPACE@1154..1155 " "
+      TABLE_CELL@1155..1162
+        CODE_SPAN@1155..1162
+          CODE_SPAN_MARKER@1155..1156 "`"
+          TEXT@1156..1161 "width"
+          CODE_SPAN_MARKER@1161..1162 "`"
+      WHITESPACE@1162..1180 "                  "
+      TEXT@1180..1181 "|"
+      WHITESPACE@1181..1182 " "
+      TABLE_CELL@1182..1218
+        TEXT@1182..1210 "Width in CSS units. D ..."
+        CODE_SPAN@1210..1217
+          CODE_SPAN_MARKER@1210..1211 "`"
+          TEXT@1211..1216 "1.5in"
+          CODE_SPAN_MARKER@1216..1217 "`"
+        TEXT@1217..1218 "."
+      WHITESPACE@1218..1325 "                      ..."
+      TEXT@1325..1326 "|"
+      WHITESPACE@1326..1328 "  "
+      NEWLINE@1328..1329 "\n"
+    TABLE_SEPARATOR@1329..1503
+      TEXT@1329..1502 "+-------------------- ..."
+      NEWLINE@1502..1503 "\n"
+    TABLE_ROW@1503..1678
+      TEXT@1503..1504 "|"
+      WHITESPACE@1504..1505 " "
+      TABLE_CELL@1505..1530
+        CODE_SPAN@1505..1514
+          CODE_SPAN_MARKER@1505..1506 "`"
+          TEXT@1506..1513 "padding"
+          CODE_SPAN_MARKER@1513..1514 "`"
+        TEXT@1514..1516 ", "
+        CODE_SPAN@1516..1529
+          CODE_SPAN_MARKER@1516..1517 "`"
+          TEXT@1517..1528 "padding-top"
+          CODE_SPAN_MARKER@1528..1529 "`"
+        TEXT@1529..1530 ","
+      TEXT@1530..1531 "|"
+      WHITESPACE@1531..1532 " "
+      TABLE_CELL@1532..1675
+        TEXT@1532..1593 "Amount of padding to  ..."
+        LINK@1593..1662
+          LINK_START@1593..1594
+            LINK_START@1593..1594 "["
+          LINK_TEXT@1594..1603
+            CODE_SPAN@1594..1603
+              CODE_SPAN_MARKER@1594..1595 "`"
+              TEXT@1595..1602 "padding"
+              CODE_SPAN_MARKER@1602..1603 "`"
+          LINK_TEXT_END@1603..1604 "]"
+          LINK_DEST_START@1604..1605 "("
+          LINK_DEST@1605..1661
+            TEXT@1605..1661 "https://developer.moz ..."
+          LINK_DEST_END@1661..1662 ")"
+        TEXT@1662..1675 " conventions."
+      TEXT@1675..1676 "|"
+      WHITESPACE@1676..1677 " "
+      NEWLINE@1677..1678 "\n"
+    TABLE_SEPARATOR@1678..1852
+      TEXT@1678..1851 "+-------------------- ..."
+      NEWLINE@1851..1852 "\n"
 

@@ -610,7 +610,7 @@ fn emit_table_row(
 
     // Emit leading whitespace if present
     let trimmed = line_without_newline.trim_start();
-    let leading_ws_len = line_without_newline.len() - trimmed.len();
+    let leading_ws_len = line_without_newline.len() - line_without_newline.trim_start().len();
     if leading_ws_len > 0 {
         builder.token(
             SyntaxKind::WHITESPACE.into(),
@@ -1446,7 +1446,7 @@ fn emit_grid_table_row(
     let trimmed = line_without_newline.trim();
 
     // Emit leading whitespace
-    let leading_ws_len = line_without_newline.len() - trimmed.len();
+    let leading_ws_len = line_without_newline.len() - line_without_newline.trim_start().len();
     if leading_ws_len > 0 {
         builder.token(
             SyntaxKind::WHITESPACE.into(),
