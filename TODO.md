@@ -29,9 +29,12 @@ This document tracks implementation status for panache's features.
       `definition_index`).
 - [ ] [performance] Evaluate `#[salsa::interned]` for common keys (paths/labels)
       if it reduces memory/cost.
-- [ ] [performance] Audit long-running query loops and add
-      `db.unwind_if_cancelled()` where appropriate to improve cancellation
-      responsiveness.
+- [ ] [performance] Evaluate salsa durability policy (`set_with_durability`)
+      with measurements (e.g., open buffers LOW, stable dependency files
+      MEDIUM/HIGH), and only roll out with a clear update/invalidation policy.
+- [x] [performance] Audit long-running query loops and add cancellation checks
+      (`db.unwind_if_revision_cancelled()` in current salsa) where appropriate
+      to improve cancellation responsiveness.
 
 ### Core LSP Capabilities
 

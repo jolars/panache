@@ -54,6 +54,7 @@ pub fn metadata(
         let mut seen_paths = HashSet::new();
 
         for bib_path in &info.paths {
+            db.unwind_if_revision_cancelled();
             if !seen_paths.insert(bib_path.clone()) {
                 continue;
             }
@@ -120,6 +121,7 @@ pub fn definition_index(
     let mut index = DefinitionIndex::default();
 
     for def in tree.descendants().filter_map(ReferenceDefinition::cast) {
+        db.unwind_if_revision_cancelled();
         let label = def.label();
         if label.is_empty() {
             continue;
@@ -132,6 +134,7 @@ pub fn definition_index(
     }
 
     for def in tree.descendants().filter_map(FootnoteDefinition::cast) {
+        db.unwind_if_revision_cancelled();
         let id = def.id();
         if id.is_empty() {
             continue;
@@ -144,6 +147,7 @@ pub fn definition_index(
     }
 
     for node in tree.descendants() {
+        db.unwind_if_revision_cancelled();
         if node.kind() != SyntaxKind::ATTRIBUTE {
             continue;
         }
@@ -160,7 +164,7 @@ pub fn definition_index(
     }
 
     if config.config(db).extensions.bookdown_references {
-        collect_bookdown_definitions(&mut index, &tree, &path);
+        collect_bookdown_definitions(db, &mut index, &tree, &path);
     }
 
     index
@@ -230,12 +234,18 @@ impl DefinitionLocation {
     }
 }
 
-fn collect_bookdown_definitions(index: &mut DefinitionIndex, tree: &SyntaxNode, path: &Path) {
+fn collect_bookdown_definitions(
+    db: &dyn Db,
+    index: &mut DefinitionIndex,
+    tree: &SyntaxNode,
+    path: &Path,
+) {
     use crate::parser::inlines::bookdown::{
         try_parse_bookdown_definition, try_parse_bookdown_text_reference,
     };
 
     for element in tree.descendants_with_tokens() {
+        db.unwind_if_revision_cancelled();
         let Some(token) = element.into_token() else {
             continue;
         };
@@ -246,6 +256,7 @@ fn collect_bookdown_definitions(index: &mut DefinitionIndex, tree: &SyntaxNode, 
         let mut offset = 0usize;
         let bytes = text.as_bytes();
         while offset < bytes.len() {
+            db.unwind_if_revision_cancelled();
             if bytes[offset] != b'(' {
                 offset += 1;
                 continue;
@@ -380,6 +391,7 @@ pub fn project_graph(
         for path in
             crate::includes::find_project_documents(&project_root, config.config(db), is_bookdown)
         {
+            db.unwind_if_revision_cancelled();
             if visited.contains(&path) {
                 continue;
             }
@@ -425,6 +437,7 @@ fn visit_document(
         config.config(db),
     );
     for include in resolution.includes.iter() {
+        db.unwind_if_revision_cancelled();
         graph.add_edge(path, &include.path, EdgeKind::Include);
         if include.path == *path {
             continue;
@@ -460,6 +473,7 @@ fn visit_document(
     );
     if !duplicate_diagnostics.is_empty() {
         for diagnostic in duplicate_diagnostics {
+            db.unwind_if_revision_cancelled();
             GraphDiagnostic(GraphDiagnosticEntry {
                 path: path.to_path_buf(),
                 diagnostic,
