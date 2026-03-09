@@ -1352,6 +1352,7 @@ fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
 
         columns.push(GridColumn {
             is_header_separator: is_header_sep,
+            width: seg_trimmed.len(),
         });
     }
 
@@ -1366,6 +1367,7 @@ fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
 #[derive(Debug, Clone)]
 struct GridColumn {
     is_header_separator: bool,
+    width: usize,
 }
 
 /// Check if a line is a grid table content row (starts with |, contains |, ends with |).
@@ -1388,22 +1390,25 @@ fn extract_grid_cells_from_line(line: &str, _columns: &[GridColumn]) -> Vec<Stri
     let (line_content, _) = strip_newline(line);
     let line_trimmed = line_content.trim();
 
-    // Remove leading and trailing pipes
-    let content = if line_trimmed.starts_with('|') && line_trimmed.ends_with('|') {
-        &line_trimmed[1..line_trimmed.len() - 1]
-    } else {
-        line_trimmed
-    };
+    if !line_trimmed.starts_with('|') || !line_trimmed.ends_with('|') {
+        return vec![String::new(); _columns.len()];
+    }
 
-    // Split by | to get cells
-    let cell_segments: Vec<&str> = content.split('|').collect();
+    let mut cells = Vec::with_capacity(_columns.len());
+    let mut pos = 1; // Skip leading pipe
 
-    let mut cells = Vec::new();
-    for (i, _col) in _columns.iter().enumerate() {
-        if i < cell_segments.len() {
-            cells.push(cell_segments[i].trim().to_string());
-        } else {
+    for col in _columns {
+        if pos >= line_trimmed.len() {
             cells.push(String::new());
+            continue;
+        }
+
+        let end = (pos + col.width).min(line_trimmed.len());
+        cells.push(line_trimmed[pos..end].trim().to_string());
+        pos = end;
+
+        if pos < line_trimmed.len() && line_trimmed.as_bytes()[pos] == b'|' {
+            pos += 1;
         }
     }
 
@@ -1454,42 +1459,40 @@ fn emit_grid_table_row(
         );
     }
 
-    // Split by | to find cells (similar to pipe table parsing)
-    let mut parts: Vec<&str> = trimmed.split('|').collect();
-
-    // Remove empty first and last parts if line starts/ends with |
-    if !parts.is_empty() && parts[0].is_empty() {
-        parts.remove(0);
-    }
-    if !parts.is_empty() && parts[parts.len() - 1].is_empty() {
-        parts.pop();
-    }
-
     // Emit leading pipe
     if trimmed.starts_with('|') {
         builder.token(SyntaxKind::TEXT.into(), "|");
     }
 
-    // Emit each cell
+    // Emit each cell based on fixed column widths from separators
+    let mut pos = 1usize; // after leading pipe
     for (idx, cell_content) in cell_contents.iter().enumerate() {
-        if idx < parts.len() {
-            let part = parts[idx];
-
-            // Emit leading whitespace in cell
-            let cell_trimmed = part.trim();
-            let ws_start_len = part.len() - part.trim_start().len();
-            if ws_start_len > 0 {
-                builder.token(SyntaxKind::WHITESPACE.into(), &part[..ws_start_len]);
+        let part = if idx < columns.len() && pos <= trimmed.len() {
+            let end = (pos + columns[idx].width).min(trimmed.len());
+            let slice = &trimmed[pos..end];
+            pos = end;
+            if pos < trimmed.len() && trimmed.as_bytes()[pos] == b'|' {
+                pos += 1;
             }
+            slice
+        } else {
+            ""
+        };
 
-            // Emit TABLE_CELL with inline parsing
-            emit_table_cell(builder, cell_content, config);
+        // Emit leading whitespace in cell
+        let cell_trimmed = part.trim();
+        let ws_start_len = part.len() - part.trim_start().len();
+        if ws_start_len > 0 {
+            builder.token(SyntaxKind::WHITESPACE.into(), &part[..ws_start_len]);
+        }
 
-            // Emit trailing whitespace in cell
-            let ws_end_start = ws_start_len + cell_trimmed.len();
-            if ws_end_start < part.len() {
-                builder.token(SyntaxKind::WHITESPACE.into(), &part[ws_end_start..]);
-            }
+        // Emit TABLE_CELL with inline parsing
+        emit_table_cell(builder, cell_content, config);
+
+        // Emit trailing whitespace in cell
+        let ws_end_start = ws_start_len + cell_trimmed.len();
+        if ws_end_start < part.len() {
+            builder.token(SyntaxKind::WHITESPACE.into(), &part[ws_end_start..]);
         }
 
         // Emit pipe separator (unless this is the last cell and line doesn't end with |)
