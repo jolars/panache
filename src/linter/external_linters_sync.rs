@@ -81,7 +81,7 @@ mod tests {
             return;
         }
 
-        let code = "x = 1\n";
+        let code = "any(is.na(x))\n";
         let registry = ExternalLinterRegistry::new();
 
         let result = run_linter_sync("jarl", code, code, &registry, None);
@@ -90,12 +90,11 @@ mod tests {
         let diagnostics = result.unwrap();
         assert!(!diagnostics.is_empty());
 
-        // Should find assignment issue
-        let assignment_diags: Vec<_> = diagnostics
+        let any_is_na_diags: Vec<_> = diagnostics
             .iter()
-            .filter(|d| d.code == "assignment")
+            .filter(|d| d.code == "any_is_na")
             .collect();
-        assert_eq!(assignment_diags.len(), 1);
+        assert_eq!(any_is_na_diags.len(), 1);
     }
 
     #[test]

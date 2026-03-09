@@ -16,8 +16,8 @@ mod tests {
         let input = r#"# Test
 
 ```r
-x = 1
-result <- T
+any(is.na(x))
+result <- TRUE
 ```
 "#;
 
@@ -30,33 +30,24 @@ result <- T
         let tree = parse(input, Some(config.clone()));
         let diagnostics = linter::lint_with_external(&tree, input, &config).await;
 
-        // Should find at least the assignment violation (x = 1)
         assert!(!diagnostics.is_empty(), "Expected diagnostics from jarl");
 
-        // Check that we found the assignment issue
-        let assignment_diags: Vec<_> = diagnostics
+        let any_is_na_diags: Vec<_> = diagnostics
             .iter()
-            .filter(|d| d.code == "assignment")
+            .filter(|d| d.code == "any_is_na")
             .collect();
-        assert_eq!(
-            assignment_diags.len(),
-            1,
-            "Expected 1 assignment diagnostic (x = 1)"
-        );
+        assert_eq!(any_is_na_diags.len(), 1, "Expected 1 any_is_na diagnostic");
 
-        // Check line numbers are correct
-        assert_eq!(assignment_diags[0].location.line, 4); // x = 1 is on line 4
+        assert_eq!(any_is_na_diags[0].location.line, 4); // any(is.na(x)) is on line 4
 
-        // Auto-fixes should now be enabled!
         assert!(
-            assignment_diags[0].fix.is_some(),
+            any_is_na_diags[0].fix.is_some(),
             "Auto-fixes should be enabled with byte offset mapping"
         );
 
-        // Verify the fix is correct
-        let fix = assignment_diags[0].fix.as_ref().unwrap();
+        let fix = any_is_na_diags[0].fix.as_ref().unwrap();
         assert_eq!(fix.edits.len(), 1);
-        assert_eq!(fix.edits[0].replacement, "x <- 1");
+        assert_eq!(fix.edits[0].replacement, "anyNA(x)");
     }
 
     #[tokio::test]
@@ -67,13 +58,13 @@ result <- T
         }
 
         let input = r#"```r
-x = 1
+any(is.na(x))
 ```
 
 Some text in between.
 
 ```r
-y = 2
+any(is.na(y))
 ```
 "#;
 
@@ -85,20 +76,20 @@ y = 2
         let tree = parse(input, Some(config.clone()));
         let diagnostics = linter::lint_with_external(&tree, input, &config).await;
 
-        // Should find 2 assignment violations
-        let assignment_diags: Vec<_> = diagnostics
+        // Should find 2 any_is_na violations
+        let any_is_na_diags: Vec<_> = diagnostics
             .iter()
-            .filter(|d| d.code == "assignment")
+            .filter(|d| d.code == "any_is_na")
             .collect();
-        assert_eq!(assignment_diags.len(), 2);
+        assert_eq!(any_is_na_diags.len(), 2);
 
         // Check both line numbers are correct
-        assert_eq!(assignment_diags[0].location.line, 2); // First block content, line 2
-        assert_eq!(assignment_diags[1].location.line, 8); // Second block content, line 8
+        assert_eq!(any_is_na_diags[0].location.line, 2); // First block content, line 2
+        assert_eq!(any_is_na_diags[1].location.line, 8); // Second block content, line 8
 
         // Both should have fixes
-        assert!(assignment_diags[0].fix.is_some());
-        assert!(assignment_diags[1].fix.is_some());
+        assert!(any_is_na_diags[0].fix.is_some());
+        assert!(any_is_na_diags[1].fix.is_some());
     }
 
     #[tokio::test]
@@ -117,7 +108,7 @@ x = 1
         // No jarl diagnostics
         let external_diags: Vec<_> = diagnostics
             .iter()
-            .filter(|d| d.code == "assignment")
+            .filter(|d| d.code == "any_is_na")
             .collect();
         assert_eq!(external_diags.len(), 0);
     }
@@ -159,8 +150,8 @@ x <- 1
 Some text here.
 
 ```r
-x = 1
-y = 2
+any(is.na(x))
+any(is.na(y))
 ```
 
 More text.
@@ -204,14 +195,13 @@ More text.
         output.push_str(&input[last_end..]);
 
         // Verify the fixes were applied correctly
-        // The R code should now use <- instead of =
         assert!(
-            output.contains("x <- 1"),
-            "Fix should replace x = 1 with x <- 1"
+            output.contains("anyNA(x)"),
+            "Fix should replace any(is.na(x)) with anyNA(x)"
         );
         assert!(
-            output.contains("y <- 2"),
-            "Fix should replace y = 2 with y <- 2"
+            output.contains("anyNA(y)"),
+            "Fix should replace any(is.na(y)) with anyNA(y)"
         );
 
         // Verify surrounding markdown is unchanged
