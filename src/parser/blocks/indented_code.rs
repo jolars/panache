@@ -114,7 +114,10 @@ pub(crate) fn parse_indented_code_block(
                     }
                 }
             }
-            let (_, newline_str) = strip_newline(inner);
+            let (blank_content, newline_str) = strip_newline(inner);
+            if !blank_content.is_empty() {
+                builder.token(SyntaxKind::WHITESPACE.into(), blank_content);
+            }
             builder.token(SyntaxKind::TEXT.into(), "");
             builder.token(
                 SyntaxKind::NEWLINE.into(),
