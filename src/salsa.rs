@@ -532,6 +532,27 @@ impl SalsaDb {
         true
     }
 
+    pub fn ensure_file_text_cached(&mut self, path: PathBuf) -> bool {
+        {
+            let cache = self.file_cache.lock().expect("file cache lock poisoned");
+            if cache.contains_key(&path) {
+                return true;
+            }
+        }
+        let Ok(contents) = std::fs::read_to_string(&path) else {
+            return false;
+        };
+        let file = FileText::new(self, contents);
+        let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
+        cache.insert(path, file);
+        true
+    }
+
+    pub fn cached_file_paths(&self) -> Vec<PathBuf> {
+        let cache = self.file_cache.lock().expect("file cache lock poisoned");
+        cache.keys().cloned().collect()
+    }
+
     pub fn evict_file_text(&mut self, path: &Path) -> bool {
         let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
         cache.remove(path).is_some()

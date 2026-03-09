@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_lsp_server::Client;
@@ -12,12 +12,27 @@ use crate::parser::parse_incremental;
 use crate::syntax::SyntaxNode;
 use rowan::GreenNode;
 use salsa::Setter;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 fn compute_yaml_ok(tree: &GreenNode, path: &Path) -> bool {
     let syntax = SyntaxNode::new_root(tree.clone());
     crate::metadata::extract_project_metadata_without_bibliography_parse(&syntax, path).is_ok()
+}
+
+fn tracked_paths_for_graph(
+    root_path: &Path,
+    graph: &crate::salsa::ProjectGraph,
+) -> HashSet<PathBuf> {
+    let mut tracked = HashSet::new();
+    tracked.insert(root_path.to_path_buf());
+    for document in graph.documents() {
+        tracked.insert(document.clone());
+        for dependency in graph.dependencies(document, None) {
+            tracked.insert(dependency);
+        }
+    }
+    tracked
 }
 
 /// Handle textDocument/didOpen notification
@@ -72,6 +87,14 @@ pub(crate) async fn did_open(
             },
         );
     }
+    if let Some(path) = doc_path.as_ref() {
+        let mut db = salsa_db.lock().await;
+        let graph =
+            crate::salsa::project_graph(&*db, salsa_file, salsa_config, path.clone()).clone();
+        for tracked in tracked_paths_for_graph(path, &graph) {
+            let _ = db.ensure_file_text_cached(tracked);
+        }
+    }
 
     client
         .log_message(MessageType::INFO, format!("Opened document: {}", uri))
@@ -105,14 +128,15 @@ pub(crate) async fn did_change(
 
     // Apply incremental changes sequentially
     let mut dependent_uris: Option<Vec<Uri>> = None;
-    let (graph_text, graph_path, _rebuild_full_graph, salsa_file) = {
-        let (salsa_file, original_tree, has_multiple_docs) = {
+    let (graph_text, graph_path, _rebuild_full_graph, salsa_file, salsa_config) = {
+        let (salsa_file, salsa_config, original_tree, has_multiple_docs) = {
             let document_map = document_map.lock().await;
             let Some(doc_state) = document_map.get(&uri_string) else {
                 return;
             };
             (
                 doc_state.salsa_file,
+                doc_state.salsa_config,
                 doc_state.tree.clone(),
                 document_map.len() > 1,
             )
@@ -180,9 +204,10 @@ pub(crate) async fn did_change(
                 .map(|p| p.into_owned()),
             has_multiple_docs,
             salsa_file,
+            salsa_config,
         )
     };
-    let config_input = {
+    {
         let mut db = salsa_db.lock().await;
         if let Some(text) = graph_text.as_ref() {
             if let Some(path) = graph_path.clone() {
@@ -191,20 +216,27 @@ pub(crate) async fn did_change(
                 salsa_file.set_text(&mut *db).to(text.clone());
             }
         }
-        let config_input = crate::salsa::FileConfig::new(&*db, config.clone());
-        drop(db);
-        if let Some(state) = document_map.lock().await.get_mut(&uri_string) {
-            state.salsa_config = config_input;
-            state.path = graph_path.clone();
-        }
-        config_input
-    };
+        salsa_config.set_config(&mut *db).to(config.clone());
+    }
+    if let Some(state) = document_map.lock().await.get_mut(&uri_string) {
+        state.path = graph_path.clone();
+    }
     if let Some(path) = graph_path.as_ref() {
-        let dependents = {
+        let (dependents, tracked_paths) = {
             let db = salsa_db.lock().await;
-            crate::salsa::project_graph(&*db, salsa_file, config_input, path.to_path_buf())
-                .dependents(path, None)
+            let graph =
+                crate::salsa::project_graph(&*db, salsa_file, salsa_config, path.to_path_buf())
+                    .clone();
+            let dependents = graph.dependents(path, None);
+            let tracked_paths = tracked_paths_for_graph(path, &graph);
+            (dependents, tracked_paths)
         };
+        {
+            let mut db = salsa_db.lock().await;
+            for tracked in tracked_paths {
+                let _ = db.ensure_file_text_cached(tracked);
+            }
+        }
         if !dependents.is_empty() {
             dependent_uris = Some(
                 dependents
@@ -259,9 +291,30 @@ pub(crate) async fn did_close(
 ) {
     let uri = params.text_document.uri.to_string();
     document_map.lock().await.remove(&uri);
-    if let Some(path) = params.text_document.uri.to_file_path() {
-        let mut db = salsa_db.lock().await;
-        db.evict_file_text(&path);
+
+    let states: Vec<DocumentState> = {
+        let map = document_map.lock().await;
+        map.values().cloned().collect()
+    };
+    let mut retained = HashSet::new();
+    let mut db = salsa_db.lock().await;
+    for state in states {
+        let Some(path) = state.path.clone() else {
+            continue;
+        };
+        let graph =
+            crate::salsa::project_graph(&*db, state.salsa_file, state.salsa_config, path.clone())
+                .clone();
+        for tracked in tracked_paths_for_graph(&path, &graph) {
+            retained.insert(tracked.clone());
+            let _ = db.ensure_file_text_cached(tracked);
+        }
+    }
+    for cached in db.cached_file_paths() {
+        if retained.contains(&cached) || cached.as_os_str() == "<memory>" {
+            continue;
+        }
+        let _ = db.evict_file_text(&cached);
     }
 
     // Clear diagnostics
