@@ -126,6 +126,23 @@ fn normalize_link_dest(dest: &str) -> String {
     format!("{} {}", url, normalized_title)
 }
 
+fn is_initialism_with_periods(word: &str) -> bool {
+    if !word.ends_with('.') {
+        return false;
+    }
+    let parts: Vec<&str> = word.split('.').collect();
+    if parts.len() < 3 || !parts.last().is_some_and(|part| part.is_empty()) {
+        return false;
+    }
+    parts[..parts.len() - 1]
+        .iter()
+        .all(|part| part.len() == 1 && part.chars().all(|c| c.is_ascii_uppercase()))
+}
+
+fn is_year_like(word: &str) -> bool {
+    word.len() == 4 && word.chars().all(|c| c.is_ascii_digit())
+}
+
 fn is_sentence_boundary(word: &textwrap::core::Word<'_>, is_last: bool) -> bool {
     let mut trimmed = word.word;
     trimmed = trimmed.trim_end_matches(['"', '\'', ')', ']', '}']);
@@ -620,11 +637,41 @@ fn build_words_with_mode<'a>(
         atomic_links,
     ); // Start outside emphasis
 
-    let mut words: Vec<textwrap::core::Word<'a>> = Vec::with_capacity(b.piece_idx.len());
-    for (i, &idx) in b.piece_idx.iter().enumerate() {
+    let mut merged_piece_idx: Vec<usize> = Vec::with_capacity(b.piece_idx.len());
+    let mut merged_whitespace_after: Vec<bool> = Vec::with_capacity(b.piece_idx.len());
+    let mut i = 0;
+    while i < b.piece_idx.len() {
+        let idx = b.piece_idx[i];
+        let s_owned = b.arena[idx].to_string();
+
+        if i + 1 < b.piece_idx.len()
+            && b.whitespace_after.get(i).copied().unwrap_or(false)
+            && is_initialism_with_periods(&s_owned)
+        {
+            let next_idx = b.piece_idx[i + 1];
+            let next_owned = b.arena[next_idx].to_string();
+            if is_year_like(&next_owned) {
+                let combined = format!("{s_owned} {next_owned}");
+                b.arena.push(combined.into_boxed_str());
+                let combined_idx = b.arena.len() - 1;
+                merged_piece_idx.push(combined_idx);
+                merged_whitespace_after
+                    .push(b.whitespace_after.get(i + 1).copied().unwrap_or(false));
+                i += 2;
+                continue;
+            }
+        }
+
+        merged_piece_idx.push(idx);
+        merged_whitespace_after.push(b.whitespace_after.get(i).copied().unwrap_or(false));
+        i += 1;
+    }
+
+    let mut words: Vec<textwrap::core::Word<'a>> = Vec::with_capacity(merged_piece_idx.len());
+    for (i, &idx) in merged_piece_idx.iter().enumerate() {
         let s: &'a str = &b.arena[idx];
         let mut w = textwrap::core::Word::from(s);
-        if b.whitespace_after.get(i).copied().unwrap_or(false) {
+        if merged_whitespace_after.get(i).copied().unwrap_or(false) {
             w.whitespace = " ";
         }
         words.push(w);

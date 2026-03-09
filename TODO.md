@@ -557,6 +557,12 @@ links.
 **Decision**: Accept current behavior until a real-world use case requires
 matching Pandoc's AST structure exactly.
 
+#### Smart Abbreviation Non-Breaking Spaces
+
+- [ ] Follow Pandoc `Ext_smart` abbreviation behavior: convert the space after
+      recognized abbreviations (for example `M.A. 2007`) to a non-breaking space
+      so wrapping does not split them.
+
 ## Architecture
 
 - [ ] Separate out some functionality into separate crates (long-term)
