@@ -38,3 +38,19 @@ fn nested_ordered_list_after_upper_alpha_is_idempotent() {
     let output2 = format(&output1, None, None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn list_item_with_fenced_div_is_idempotent() {
+    let input = "- Item intro\n\n  ::: {layout-ncol=2}\n  content\n  :::\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
+fn list_item_with_fenced_div_containing_code_block_is_idempotent() {
+    let input = "- Item intro\n\n  ::: {layout-ncol=2}\n  ```{.markdown}\n  text\n  ```\n  :::\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}

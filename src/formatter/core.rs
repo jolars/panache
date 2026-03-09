@@ -1439,6 +1439,7 @@ impl Formatter {
 
                 // Emit normalized opening fence
                 if !has_close && !has_content {
+                    self.output.push_str(&" ".repeat(indent));
                     if let Some(attrs) = &attributes
                         && !attrs.is_empty()
                     {
@@ -1453,6 +1454,7 @@ impl Formatter {
                         return;
                     }
                 } else {
+                    self.output.push_str(&" ".repeat(indent));
                     self.output.push_str(&colons);
                     if let Some(attrs) = &attributes
                         && !attrs.is_empty()
@@ -1486,7 +1488,11 @@ impl Formatter {
                 }
 
                 for child in &content_children[start..end] {
-                    self.format_node_sync(child, indent);
+                    if child.kind() == SyntaxKind::CODE_BLOCK && indent > 0 {
+                        self.format_indented_code_block(child, indent);
+                    } else {
+                        self.format_node_sync(child, indent);
+                    }
                 }
 
                 // Decrement depth after processing content
@@ -1496,6 +1502,7 @@ impl Formatter {
                 if !self.output.ends_with('\n') {
                     self.output.push('\n');
                 }
+                self.output.push_str(&" ".repeat(indent));
                 self.output.push_str(&colons);
                 self.output.push('\n');
 
