@@ -3,7 +3,6 @@ use crate::config::{AttributeStyle, Config, FenceStyle, Flavor};
 use crate::external_formatters::format_code_async;
 use crate::parser::blocks::code_blocks::{CodeBlockType, InfoString};
 use crate::syntax::{AstNode, SyntaxKind, SyntaxNode};
-use crate::utils;
 use rowan::NodeOrToken;
 use std::collections::HashMap;
 #[cfg(feature = "lsp")]
@@ -26,11 +25,15 @@ pub(super) fn format_code_block(
     formatted_code: &HashMap<String, String>,
     output: &mut String,
 ) {
-    let (info_node, _language, content) = extract_code_block_parts(node);
+    let (info_node, _language, extracted_content) = extract_code_block_parts(node);
+    let mut content = extracted_content;
 
     if let Some(formatted) = formatted_code.get(&content) {
-        output.push_str(formatted);
-        return;
+        content = expand_tabs_with_width(formatted, config.tab_width);
+    } else if let Some(raw_content) = extract_raw_code_block_content(node)
+        && let Some(formatted) = formatted_code.get(&raw_content)
+    {
+        content = expand_tabs_with_width(formatted, config.tab_width);
     }
 
     let info_node = match info_node {
@@ -119,6 +122,12 @@ pub(super) fn format_code_block(
         output.push(fence_char);
     }
     output.push('\n');
+}
+
+fn extract_raw_code_block_content(node: &SyntaxNode) -> Option<String> {
+    node.children()
+        .find(|child| child.kind() == SyntaxKind::CODE_CONTENT)
+        .map(|child| child.text().to_string())
 }
 
 fn expand_tabs_with_width(text: &str, tab_width: usize) -> String {
@@ -625,20 +634,44 @@ fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool
 /// Returns a flat list of (language, content) pairs.
 pub fn collect_code_blocks(
     tree: &SyntaxNode,
-    input: &str,
+    _input: &str,
     config: &Config,
 ) -> Vec<ExternalCodeBlock> {
-    let blocks_by_language = utils::collect_code_blocks(tree, input);
     let mut result = Vec::new();
-    for (_language, blocks) in blocks_by_language {
-        for block in blocks {
-            result.push(ExternalCodeBlock {
-                language: block.language,
-                original: block.content.clone(),
-                formatter_input: block.content,
-                hashpipe_prefix: None,
-            });
+    for node in tree.descendants() {
+        if node.kind() != SyntaxKind::CODE_BLOCK {
+            continue;
         }
+
+        let (info_node, language, content) = extract_code_block_parts(&node);
+        if content.is_empty() {
+            continue;
+        }
+
+        let info = info_node
+            .as_ref()
+            .map(|n| InfoString::parse(&n.text().to_string()))
+            .unwrap_or_else(|| InfoString::parse(""));
+
+        let language = language.unwrap_or_else(|| match info.block_type {
+            CodeBlockType::DisplayShortcut { language }
+            | CodeBlockType::Executable { language } => language,
+            CodeBlockType::DisplayExplicit { classes } => {
+                classes.first().cloned().unwrap_or_default()
+            }
+            _ => String::new(),
+        });
+
+        if language.is_empty() {
+            continue;
+        }
+
+        result.push(ExternalCodeBlock {
+            language,
+            original: content.clone(),
+            formatter_input: content,
+            hashpipe_prefix: None,
+        });
     }
 
     if !matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown) {

@@ -300,6 +300,22 @@ x <- 1
     }
 
     #[test]
+    fn test_quarto_display_class_language_normalized() {
+        let input = "```{.bash filename=\"Terminal\"}\necho hi\n```\n";
+        let config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
+        let tree = parse(input, Some(config));
+        let blocks = collect_code_blocks(&tree, input);
+
+        assert!(blocks.contains_key("bash"));
+        let bash_blocks = &blocks["bash"];
+        assert_eq!(bash_blocks.len(), 1);
+        assert_eq!(bash_blocks[0].language, "bash");
+    }
+
+    #[test]
     fn test_quarto_various_syntaxes() {
         let input = r#"```{r}
 a <- 1

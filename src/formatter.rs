@@ -234,18 +234,10 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     #[cfg(target_arch = "wasm32")]
     let formatted_yaml: Option<(String, String)> = None;
 
-    // Step 2: Format markdown with formatted code blocks
-    let mut output = Formatter::new(config.clone(), HashMap::new(), range).format(tree);
+    // Step 2: Format markdown, applying externally formatted code blocks inline
+    let mut output = Formatter::new(config.clone(), formatted_code, range).format(tree);
 
-    // Step 3: Apply formatted code blocks if any
-    if !formatted_code.is_empty() {
-        log::debug!("Applying {} formatted code blocks", formatted_code.len());
-        for (original, formatted) in &formatted_code {
-            output = output.replace(original, formatted);
-        }
-    }
-
-    // Step 4: Apply formatted YAML if available
+    // Step 3: Apply formatted YAML if available
     if let Some((original_yaml, formatted_yaml)) = formatted_yaml {
         log::debug!(
             "Applying formatted YAML: {} bytes -> {} bytes",

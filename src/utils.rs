@@ -101,7 +101,12 @@ fn extract_code_block(node: &SyntaxNode, input: &str) -> Option<CodeBlock> {
                                 if let NodeOrToken::Token(t) = info_token
                                     && t.kind() == SyntaxKind::CODE_LANGUAGE
                                 {
-                                    language = Some(t.text().to_string());
+                                    let raw_language = t.text();
+                                    let normalized = raw_language
+                                        .strip_prefix('.')
+                                        .unwrap_or(raw_language)
+                                        .to_string();
+                                    language = Some(normalized);
                                     break;
                                 }
                             }
