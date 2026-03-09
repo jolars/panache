@@ -13,24 +13,24 @@ This document tracks implementation status for panache's features.
       a minimal YAML-frontmatter status (`yaml_ok: bool` or
       `yaml_error: Option<YamlError>`). Salsa (`crate::salsa::metadata`) is now
       the single source of truth for metadata + bibliography parsing.
-- [ ] Model YAML frontmatter parsing as a salsa query (e.g.
-      `yaml_metadata_parse_result(...) -> Result<...>`) so diagnostics/handlers
-      don’t need a separate pre-check.
-- [ ] Decide watcher policy for uncached dependency files: keep
-      `update_file_text_if_cached(...)` (bounded memory) or selectively
+- [ ] [correctness] Decide watcher policy for uncached dependency files:
+      keep `update_file_text_if_cached(...)` (bounded memory) or selectively
       insert (`update_file_text(...)`) for workspace dependency types
       (bibs/includes/metadata).
-- [ ] Apply salsa tuning for long-running LSP sessions (see
-      `salsa/book/src/tuning.md`):
-      - add LRU eviction (`#[salsa::tracked(lru = N)]`) to high-churn tracked
-        queries where appropriate
-      - consider `#[salsa::interned]` for common keys (paths/labels) if it
-        reduces memory/cost
-      - audit long loops in queries and add `db.unwind_if_cancelled()` to
-        improve cancellation responsiveness
-- [ ] Optional: move more LSP diagnostics/lint derivations behind salsa where
-      it makes sense (be careful with non-`Send` rowan/CST types and external
-      linters).
+- [ ] [correctness] Model YAML frontmatter parsing as a salsa query (e.g.
+      `yaml_metadata_parse_result(...) -> Result<...>`) so diagnostics/handlers
+      don’t need a separate pre-check.
+- [ ] [optional] Move more LSP diagnostics/lint derivations behind salsa where
+      it makes sense (be careful with non-`Send` rowan/CST types; keep external
+      linter execution at the async boundary, outside salsa queries).
+- [ ] [performance] Apply salsa LRU tuning for long-running LSP sessions
+      (see `salsa/book/src/tuning.md`): add `#[salsa::tracked(lru = N)]` to
+      high-churn tracked queries where appropriate.
+- [ ] [performance] Evaluate `#[salsa::interned]` for common keys (paths/labels)
+      if it reduces memory/cost.
+- [ ] [performance] Audit long-running query loops and add
+      `db.unwind_if_cancelled()` where appropriate to improve cancellation
+      responsiveness.
 
 ### Core LSP Capabilities
 
