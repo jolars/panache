@@ -67,8 +67,7 @@ fn block_quote_sentence_wraps_per_sentence() {
 ";
     let expected = "\
 > First sentence.
-> Second sentence;
-> third sentence.
+> Second sentence; third sentence.
 ";
 
     let out = format(input, Some(cfg_sentence()), None);

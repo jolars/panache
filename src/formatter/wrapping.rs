@@ -138,7 +138,7 @@ fn is_sentence_boundary(word: &textwrap::core::Word<'_>, is_last: bool) -> bool 
         return false;
     };
 
-    matches!(last_char, '.' | '!' | '?' | ';') && (!word.whitespace.is_empty() || is_last)
+    matches!(last_char, '.' | '!' | '?') && (!word.whitespace.is_empty() || is_last)
 }
 
 fn normalize_inline_for_sentence(text: &str) -> String {
