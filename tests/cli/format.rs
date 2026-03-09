@@ -206,3 +206,20 @@ fn test_format_verify_check_unformatted() {
         .failure()
         .stdout(predicate::str::contains("Diff in"));
 }
+
+#[test]
+fn test_format_verify_does_not_write_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let input = "# Heading\n\nThis is a very long line that exceeds the default line width of 80 characters and should be wrapped when formatted.";
+    fs::write(&test_file, input).unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", "--verify", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let content_after = fs::read_to_string(&test_file).unwrap();
+    assert_eq!(content_after, input);
+}

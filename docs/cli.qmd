@@ -66,7 +66,7 @@ For more information, visit: https://github.com/jolars/panache
 
 ## `panache format`
 
-Format a Quarto, Pandoc, or Markdown document according to panache's formatting rules. By default, formats files in place. Use --check to verify formatting without making changes. Stdin input always outputs to stdout.
+Format a Quarto, Pandoc, or Markdown document according to panache's formatting rules. By default, formats files in place. Use --check to verify formatting without making changes. With --verify, panache runs parser/formatter invariants without writing changes to disk. Stdin input always outputs to stdout.
 
 **Usage:** `panache format [OPTIONS] [FILES]...`
 
@@ -91,7 +91,7 @@ EXAMPLES:
     # Check formatting (exit code 1 if not formatted)
     panache format --check document.qmd
 
-    # Format and verify parser/formatter invariants
+    # Verify parser/formatter invariants (does not write changes)
     panache format --verify document.qmd
 
 ###### **Arguments:**
@@ -104,7 +104,7 @@ EXAMPLES:
 * `--range <START:END>` — Format only the specified line range. Lines are 1-indexed and inclusive. The range will be expanded to complete block boundaries to ensure well-formed output. For example, if you select part of a list, the entire list will be formatted. Format: --range START:END (e.g., --range 5:10 formats lines 5 through 10). 
 
    Note: This feature is experimental. Range filtering may not work correctly in all cases.
-* `--verify` — Run smoke-check invariants after formatting: (1) parser losslessness (input == parsed CST text) and (2) formatter idempotency (format(format(x)) == format(x)). Exits with code 1 when verification fails.
+* `--verify` — Run smoke-check invariants: (1) parser losslessness (input == parsed CST text) and (2) formatter idempotency (format(format(x)) == format(x)). When formatting files by path (including directories), --verify does not write any changes to disk. Exits with code 1 when verification fails.
 
 
 

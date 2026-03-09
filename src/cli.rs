@@ -71,7 +71,8 @@ pub enum Commands {
     #[command(
         long_about = "Format a Quarto, Pandoc, or Markdown document according to panache's \
         formatting rules. By default, formats files in place. Use --check to verify formatting \
-        without making changes. Stdin input always outputs to stdout."
+        without making changes. With --verify, panache runs parser/formatter invariants without \
+        writing changes to disk. Stdin input always outputs to stdout."
     )]
     #[command(after_help = "\
 EXAMPLES:
@@ -95,7 +96,7 @@ EXAMPLES:
     # Check formatting (exit code 1 if not formatted)
     panache format --check document.qmd
 
-    # Format and verify parser/formatter invariants
+    # Verify parser/formatter invariants (does not write changes)
     panache format --verify document.qmd")]
     Format {
         /// Input file(s) (stdin if not provided)
@@ -134,10 +135,11 @@ EXAMPLES:
         /// Verify parser losslessness and formatter idempotency
         #[arg(long)]
         #[arg(help = "Verify losslessness and idempotency invariants")]
-        #[arg(long_help = "Run smoke-check invariants after formatting: \
+        #[arg(long_help = "Run smoke-check invariants: \
             (1) parser losslessness (input == parsed CST text) and \
             (2) formatter idempotency (format(format(x)) == format(x)). \
-            Exits with code 1 when verification fails.")]
+            When formatting files by path (including directories), --verify does not write any changes \
+            to disk. Exits with code 1 when verification fails.")]
         verify: bool,
     },
     /// Parse and display the CST tree for debugging

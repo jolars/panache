@@ -350,7 +350,7 @@ fn main() -> io::Result<()> {
                         // Only print success for single file
                         println!("{} is correctly formatted", file_path.display());
                     }
-                } else {
+                } else if !verify {
                     // Format in place (default for file paths)
                     fs::write(file_path, &output)?;
                     println!("Formatted {}", file_path.display());
