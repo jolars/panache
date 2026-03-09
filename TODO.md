@@ -13,11 +13,11 @@ This document tracks implementation status for panache's features.
       a minimal YAML-frontmatter status (`yaml_ok: bool` or
       `yaml_error: Option<YamlError>`). Salsa (`crate::salsa::metadata`) is now
       the single source of truth for metadata + bibliography parsing.
-- [ ] [correctness] Decide watcher policy for uncached dependency files:
+- [x] [correctness] Decide watcher policy for uncached dependency files:
       keep `update_file_text_if_cached(...)` (bounded memory) or selectively
       insert (`update_file_text(...)`) for workspace dependency types
       (bibs/includes/metadata).
-- [ ] [correctness] Model YAML frontmatter parsing as a salsa query (e.g.
+- [x] [correctness] Model YAML frontmatter parsing as a salsa query (e.g.
       `yaml_metadata_parse_result(...) -> Result<...>`) so diagnostics/handlers
       don’t need a separate pre-check.
 - [ ] [optional] Move more LSP diagnostics/lint derivations behind salsa where
