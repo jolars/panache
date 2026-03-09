@@ -109,3 +109,13 @@ fn test_parse_json_output() {
     assert!(json_output.contains("\"DOCUMENT\""));
     assert!(json_output.contains("\"text\""));
 }
+
+#[test]
+fn test_parse_verify_stdin() {
+    cargo_bin_cmd!("panache")
+        .args(["parse", "--verify"])
+        .write_stdin("# Heading\n\nParagraph.")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DOCUMENT"));
+}

@@ -182,7 +182,7 @@ fn main() -> io::Result<()> {
     init_logger(debug_log.as_deref());
 
     match cli.command {
-        Commands::Parse { file, json } => {
+        Commands::Parse { file, json, verify } => {
             let start_dir = start_dir_for(&file)?;
             let (cfg, cfg_path) =
                 panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
@@ -195,6 +195,17 @@ fn main() -> io::Result<()> {
 
             let input = read_all(file.as_ref())?;
             let tree = parse(&input, Some(cfg));
+            if verify {
+                let tree_text = tree.text().to_string();
+                if input != tree_text {
+                    let file_label = file.as_ref().and_then(|p| p.to_str()).unwrap_or("<stdin>");
+                    eprintln!(
+                        "Verification failed (losslessness): parser output differs from input"
+                    );
+                    print_diff(file_label, &input, &tree_text);
+                    std::process::exit(1);
+                }
+            }
             if let Some(json_path) = json {
                 let json_value = panache::syntax::cst_to_json(&tree);
                 let json_output =
@@ -209,6 +220,7 @@ fn main() -> io::Result<()> {
             files,
             check,
             range,
+            verify,
         } => {
             // Parse range if provided (only valid for single file or stdin)
             let parsed_range = if let Some(range_str) = range {
@@ -240,7 +252,28 @@ fn main() -> io::Result<()> {
                 }
 
                 let input = read_all(None)?;
-                let output = format(&input, Some(cfg), parsed_range);
+                if verify {
+                    let tree = parse(&input, Some(cfg.clone()));
+                    let tree_text = tree.text().to_string();
+                    if input != tree_text {
+                        eprintln!(
+                            "Verification failed (losslessness): parser output differs from input"
+                        );
+                        print_diff("<stdin>", &input, &tree_text);
+                        std::process::exit(1);
+                    }
+                }
+                let output = format(&input, Some(cfg.clone()), parsed_range);
+                if verify {
+                    let output_twice = format(&output, Some(cfg), parsed_range);
+                    if output != output_twice {
+                        eprintln!(
+                            "Verification failed (idempotency): format(format(x)) != format(x)"
+                        );
+                        print_diff("<stdin>", &output, &output_twice);
+                        std::process::exit(1);
+                    }
+                }
 
                 if check {
                     if input != output {
@@ -278,7 +311,30 @@ fn main() -> io::Result<()> {
                 }
 
                 let input = fs::read_to_string(file_path)?;
-                let output = format(&input, Some(cfg), parsed_range);
+                if verify {
+                    let tree = parse(&input, Some(cfg.clone()));
+                    let tree_text = tree.text().to_string();
+                    if input != tree_text {
+                        let file_name = file_path.to_str().unwrap_or("<unknown>");
+                        eprintln!(
+                            "Verification failed (losslessness): parser output differs from input"
+                        );
+                        print_diff(file_name, &input, &tree_text);
+                        std::process::exit(1);
+                    }
+                }
+                let output = format(&input, Some(cfg.clone()), parsed_range);
+                if verify {
+                    let output_twice = format(&output, Some(cfg), parsed_range);
+                    if output != output_twice {
+                        let file_name = file_path.to_str().unwrap_or("<unknown>");
+                        eprintln!(
+                            "Verification failed (idempotency): format(format(x)) != format(x)"
+                        );
+                        print_diff(file_name, &output, &output_twice);
+                        std::process::exit(1);
+                    }
+                }
 
                 if check {
                     if input != output {

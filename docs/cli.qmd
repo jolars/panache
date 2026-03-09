@@ -29,6 +29,9 @@ EXAMPLES:
     # Parse and inspect CST
     panache parse document.qmd
 
+    # Parse and verify losslessness (input == CST text)
+    panache parse --verify document.qmd
+
 CONFIGURATION:
 
 Panache looks for configuration files in this order:
@@ -88,6 +91,9 @@ EXAMPLES:
     # Check formatting (exit code 1 if not formatted)
     panache format --check document.qmd
 
+    # Format and verify parser/formatter invariants
+    panache format --verify document.qmd
+
 ###### **Arguments:**
 
 * `<FILES>` — Path(s) to the input file(s) or directories to format. If not provided, reads from stdin. Supports .qmd, .md, .Rmd, and other Markdown-based formats. When file paths are provided, the files are formatted in place by default. Stdin input always outputs to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
@@ -98,6 +104,7 @@ EXAMPLES:
 * `--range <START:END>` — Format only the specified line range. Lines are 1-indexed and inclusive. The range will be expanded to complete block boundaries to ensure well-formed output. For example, if you select part of a list, the entire list will be formatted. Format: --range START:END (e.g., --range 5:10 formats lines 5 through 10). 
 
    Note: This feature is experimental. Range filtering may not work correctly in all cases.
+* `--verify` — Run smoke-check invariants after formatting: (1) parser losslessness (input == parsed CST text) and (2) formatter idempotency (format(format(x)) == format(x)). Exits with code 1 when verification fails.
 
 
 
@@ -121,6 +128,9 @@ EXAMPLES:
     # Parse with custom config (affects extension parsing)
     panache parse --config .panache.toml document.qmd
 
+    # Verify parser losslessness while parsing
+    panache parse --verify document.qmd
+
 ###### **Arguments:**
 
 * `<FILE>` — Path to the input file to parse. If not provided, reads from stdin. The parser respects extension flags from the configuration file.
@@ -128,6 +138,7 @@ EXAMPLES:
 ###### **Options:**
 
 * `--json <PATH>` — Write the parsed CST to the given JSON file instead of printing the debug tree. The output includes node kinds, text ranges, and token text.
+* `--verify` — Run parser losslessness verification (input == parsed CST text). Exits with code 1 when verification fails.
 
 
 

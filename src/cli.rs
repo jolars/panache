@@ -28,6 +28,9 @@ EXAMPLES:
     # Parse and inspect CST
     panache parse document.qmd
 
+    # Parse and verify losslessness (input == CST text)
+    panache parse --verify document.qmd
+
 CONFIGURATION:
 
 Panache looks for configuration files in this order:
@@ -90,7 +93,10 @@ EXAMPLES:
     echo '# Heading' | panache format
 
     # Check formatting (exit code 1 if not formatted)
-    panache format --check document.qmd")]
+    panache format --check document.qmd
+
+    # Format and verify parser/formatter invariants
+    panache format --verify document.qmd")]
     Format {
         /// Input file(s) (stdin if not provided)
         #[arg(help = "Input file path(s) or directories")]
@@ -124,6 +130,15 @@ EXAMPLES:
             \n\nNote: This feature is experimental. Range filtering may not work correctly in all cases."
         )]
         range: Option<String>,
+
+        /// Verify parser losslessness and formatter idempotency
+        #[arg(long)]
+        #[arg(help = "Verify losslessness and idempotency invariants")]
+        #[arg(long_help = "Run smoke-check invariants after formatting: \
+            (1) parser losslessness (input == parsed CST text) and \
+            (2) formatter idempotency (format(format(x)) == format(x)). \
+            Exits with code 1 when verification fails.")]
+        verify: bool,
     },
     /// Parse and display the CST tree for debugging
     #[command(
@@ -144,7 +159,10 @@ EXAMPLES:
     echo '# Heading' | panache parse
 
     # Parse with custom config (affects extension parsing)
-    panache parse --config .panache.toml document.qmd")]
+    panache parse --config .panache.toml document.qmd
+
+    # Verify parser losslessness while parsing
+    panache parse --verify document.qmd")]
     Parse {
         /// Input file (stdin if not provided)
         #[arg(help = "Input file path")]
@@ -162,6 +180,15 @@ EXAMPLES:
             The output includes node kinds, text ranges, and token text."
         )]
         json: Option<PathBuf>,
+
+        /// Verify parser losslessness (input must equal CST text)
+        #[arg(long)]
+        #[arg(help = "Verify parser losslessness invariant")]
+        #[arg(
+            long_help = "Run parser losslessness verification (input == parsed CST text). \
+            Exits with code 1 when verification fails."
+        )]
+        verify: bool,
     },
     /// Start the Language Server Protocol server
     #[command(
