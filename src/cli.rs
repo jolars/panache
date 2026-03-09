@@ -158,6 +158,9 @@ EXAMPLES:
     # Parse from stdin
     echo '# Heading' | panache parse
 
+    # Parse without printing CST output
+    panache parse --quiet document.qmd
+
     # Parse with custom config (affects extension parsing)
     panache parse --config .panache.toml document.qmd
 
@@ -180,6 +183,15 @@ EXAMPLES:
             The output includes node kinds, text ranges, and token text."
         )]
         json: Option<PathBuf>,
+
+        /// Suppress CST output to stdout
+        #[arg(long)]
+        #[arg(help = "Do not print CST output")]
+        #[arg(
+            long_help = "Suppress CST output to stdout. Useful with --verify for smoke-testing \
+            large files without terminal spam. Verification failures still print diagnostics and exit non-zero."
+        )]
+        quiet: bool,
 
         /// Verify parser losslessness (input must equal CST text)
         #[arg(long)]

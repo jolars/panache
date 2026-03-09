@@ -182,7 +182,12 @@ fn main() -> io::Result<()> {
     init_logger(debug_log.as_deref());
 
     match cli.command {
-        Commands::Parse { file, json, verify } => {
+        Commands::Parse {
+            file,
+            json,
+            quiet,
+            verify,
+        } => {
             let start_dir = start_dir_for(&file)?;
             let (cfg, cfg_path) =
                 panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
@@ -211,7 +216,7 @@ fn main() -> io::Result<()> {
                 let json_output =
                     serde_json::to_string_pretty(&json_value).map_err(io::Error::other)?;
                 fs::write(json_path, json_output)?;
-            } else {
+            } else if !quiet {
                 println!("{:#?}", tree);
             }
             Ok(())

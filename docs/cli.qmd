@@ -125,6 +125,9 @@ EXAMPLES:
     # Parse from stdin
     echo '# Heading' | panache parse
 
+    # Parse without printing CST output
+    panache parse --quiet document.qmd
+
     # Parse with custom config (affects extension parsing)
     panache parse --config .panache.toml document.qmd
 
@@ -138,6 +141,7 @@ EXAMPLES:
 ###### **Options:**
 
 * `--json <PATH>` — Write the parsed CST to the given JSON file instead of printing the debug tree. The output includes node kinds, text ranges, and token text.
+* `--quiet` — Suppress CST output to stdout. Useful with --verify for smoke-testing large files without terminal spam. Verification failures still print diagnostics and exit non-zero.
 * `--verify` — Run parser losslessness verification (input == parsed CST text). Exits with code 1 when verification fails.
 
 

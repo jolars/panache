@@ -119,3 +119,23 @@ fn test_parse_verify_stdin() {
         .success()
         .stdout(predicate::str::contains("DOCUMENT"));
 }
+
+#[test]
+fn test_parse_quiet_stdin() {
+    cargo_bin_cmd!("panache")
+        .args(["parse", "--quiet"])
+        .write_stdin("# Heading\n\nParagraph.")
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+}
+
+#[test]
+fn test_parse_verify_quiet_stdin() {
+    cargo_bin_cmd!("panache")
+        .args(["parse", "--verify", "--quiet"])
+        .write_stdin("# Heading\n\nParagraph.")
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+}
