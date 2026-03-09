@@ -1352,7 +1352,7 @@ fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
 
         columns.push(GridColumn {
             is_header_separator: is_header_sep,
-            width: seg_trimmed.len(),
+            width: seg_trimmed.chars().count(),
         });
     }
 
@@ -1368,6 +1368,16 @@ fn try_parse_grid_separator(line: &str) -> Option<Vec<GridColumn>> {
 struct GridColumn {
     is_header_separator: bool,
     width: usize,
+}
+
+fn byte_index_at_char_offset(text: &str, char_offset: usize) -> usize {
+    if char_offset == 0 {
+        return 0;
+    }
+    text.char_indices()
+        .nth(char_offset)
+        .map(|(idx, _)| idx)
+        .unwrap_or(text.len())
 }
 
 /// Check if a line is a grid table content row (starts with |, contains |, ends with |).
@@ -1395,20 +1405,29 @@ fn extract_grid_cells_from_line(line: &str, _columns: &[GridColumn]) -> Vec<Stri
     }
 
     let mut cells = Vec::with_capacity(_columns.len());
-    let mut pos = 1; // Skip leading pipe
+    let mut pos_chars = 1; // Skip leading pipe
+    let total_chars = line_trimmed.chars().count();
 
     for col in _columns {
-        if pos >= line_trimmed.len() {
+        let col_idx = cells.len();
+        if pos_chars >= total_chars {
             cells.push(String::new());
             continue;
         }
 
-        let end = (pos + col.width).min(line_trimmed.len());
-        cells.push(line_trimmed[pos..end].trim().to_string());
-        pos = end;
+        let end_chars = if col_idx + 1 == _columns.len() && total_chars > 0 {
+            total_chars.saturating_sub(1) // consume to trailing pipe for last column
+        } else {
+            (pos_chars + col.width).min(total_chars)
+        };
+        let start_byte = byte_index_at_char_offset(line_trimmed, pos_chars);
+        let end_byte = byte_index_at_char_offset(line_trimmed, end_chars);
+        cells.push(line_trimmed[start_byte..end_byte].trim().to_string());
+        pos_chars = end_chars;
 
-        if pos < line_trimmed.len() && line_trimmed.as_bytes()[pos] == b'|' {
-            pos += 1;
+        let sep_byte = byte_index_at_char_offset(line_trimmed, pos_chars);
+        if sep_byte < line_trimmed.len() && line_trimmed[sep_byte..].starts_with('|') {
+            pos_chars += 1;
         }
     }
 
@@ -1465,14 +1484,22 @@ fn emit_grid_table_row(
     }
 
     // Emit each cell based on fixed column widths from separators
-    let mut pos = 1usize; // after leading pipe
+    let mut pos_chars = 1usize; // after leading pipe
+    let total_chars = trimmed.chars().count();
     for (idx, cell_content) in cell_contents.iter().enumerate() {
-        let part = if idx < columns.len() && pos <= trimmed.len() {
-            let end = (pos + columns[idx].width).min(trimmed.len());
-            let slice = &trimmed[pos..end];
-            pos = end;
-            if pos < trimmed.len() && trimmed.as_bytes()[pos] == b'|' {
-                pos += 1;
+        let part = if idx < columns.len() && pos_chars <= total_chars {
+            let end_chars = if idx + 1 == columns.len() && total_chars > 0 {
+                total_chars.saturating_sub(1) // consume to trailing pipe for last column
+            } else {
+                (pos_chars + columns[idx].width).min(total_chars)
+            };
+            let start_byte = byte_index_at_char_offset(trimmed, pos_chars);
+            let end_byte = byte_index_at_char_offset(trimmed, end_chars);
+            let slice = &trimmed[start_byte..end_byte];
+            pos_chars = end_chars;
+            let sep_byte = byte_index_at_char_offset(trimmed, pos_chars);
+            if sep_byte < trimmed.len() && trimmed[sep_byte..].starts_with('|') {
+                pos_chars += 1;
             }
             slice
         } else {

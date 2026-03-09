@@ -94,3 +94,12 @@ fn test_losslessness_grid_table_cell_with_leading_pipe_text() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_grid_table_cell_with_nbsp() {
+    let input = "+--------------------------------------------+----------------+\n| `QUARTO_FIG_WIDTH` and `QUARTO_FIG_HEIGHT` | Value          |\n+--------------------------------------------+----------------+\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}
