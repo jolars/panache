@@ -8,7 +8,7 @@ use crate::metadata::DocumentMetadata;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{AstNode, FootnoteDefinition, ReferenceDefinition, SyntaxKind, SyntaxNode};
 use crate::utils::normalize_label;
-use salsa::{Accumulator, Setter};
+use salsa::{Accumulator, Durability, Setter};
 
 #[salsa::input]
 pub struct FileText {
@@ -653,21 +653,40 @@ impl SalsaDb {
     }
 
     pub fn update_file_text(&mut self, path: PathBuf, text: String) -> FileText {
+        self.update_file_text_with_durability(path, text, Durability::LOW)
+    }
+
+    pub fn update_file_text_with_durability(
+        &mut self,
+        path: PathBuf,
+        text: String,
+        durability: Durability,
+    ) -> FileText {
         let existing = {
             let cache = self.file_cache.lock().expect("file cache lock poisoned");
             cache.get(&path).copied()
         };
         if let Some(file) = existing {
-            file.set_text(self).to(text);
+            file.set_text(self).with_durability(durability).to(text);
             return file;
         }
-        let file = FileText::new(self, text);
+        let file = FileText::new(self, text.clone());
+        file.set_text(self).with_durability(durability).to(text);
         let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
         cache.insert(path, file);
         file
     }
 
     pub fn update_file_text_if_cached(&mut self, path: &Path, text: String) -> bool {
+        self.update_file_text_if_cached_with_durability(path, text, Durability::LOW)
+    }
+
+    pub fn update_file_text_if_cached_with_durability(
+        &mut self,
+        path: &Path,
+        text: String,
+        durability: Durability,
+    ) -> bool {
         let file = {
             let cache = self.file_cache.lock().expect("file cache lock poisoned");
             cache.get(path).copied()
@@ -675,11 +694,19 @@ impl SalsaDb {
         let Some(file) = file else {
             return false;
         };
-        file.set_text(self).to(text);
+        file.set_text(self).with_durability(durability).to(text);
         true
     }
 
     pub fn ensure_file_text_cached(&mut self, path: PathBuf) -> bool {
+        self.ensure_file_text_cached_with_durability(path, Durability::HIGH)
+    }
+
+    pub fn ensure_file_text_cached_with_durability(
+        &mut self,
+        path: PathBuf,
+        durability: Durability,
+    ) -> bool {
         {
             let cache = self.file_cache.lock().expect("file cache lock poisoned");
             if cache.contains_key(&path) {
@@ -689,7 +716,8 @@ impl SalsaDb {
         let Ok(contents) = std::fs::read_to_string(&path) else {
             return false;
         };
-        let file = FileText::new(self, contents);
+        let file = FileText::new(self, contents.clone());
+        file.set_text(self).with_durability(durability).to(contents);
         let mut cache = self.file_cache.lock().expect("file cache lock poisoned");
         cache.insert(path, file);
         true

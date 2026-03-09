@@ -32,6 +32,8 @@ This document tracks implementation status for panache's features.
 - [ ] [performance] Evaluate salsa durability policy (`set_with_durability`)
       with measurements (e.g., open buffers LOW, stable dependency files
       MEDIUM/HIGH), and only roll out with a clear update/invalidation policy.
+      - [x] Wire conservative defaults: open buffers LOW, config MEDIUM,
+            dependency/disk-loaded files HIGH, watcher refreshes MEDIUM.
 - [x] [performance] Audit long-running query loops and add cancellation checks
       (`db.unwind_if_revision_cancelled()` in current salsa) where appropriate
       to improve cancellation responsiveness.

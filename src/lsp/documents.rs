@@ -11,7 +11,7 @@ use crate::lsp::DocumentState;
 use crate::parser::parse_incremental;
 use crate::syntax::SyntaxNode;
 use rowan::GreenNode;
-use salsa::Setter;
+use salsa::{Durability, Setter};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -53,8 +53,14 @@ pub(crate) async fn did_open(
             .map(|p| p.into_owned())
             .unwrap_or_else(|| std::path::PathBuf::from("<memory>"));
         (
-            db.update_file_text(path, text.clone()),
-            crate::salsa::FileConfig::new(&*db, config.clone()),
+            db.update_file_text_with_durability(path, text.clone(), Durability::LOW),
+            {
+                let cfg = crate::salsa::FileConfig::new(&*db, config.clone());
+                cfg.set_config(&mut *db)
+                    .with_durability(Durability::MEDIUM)
+                    .to(config.clone());
+                cfg
+            },
         )
     };
     let doc_path = params
@@ -202,10 +208,16 @@ pub(crate) async fn did_change(
             if let Some(path) = graph_path.clone() {
                 db.update_file_text(path, text.clone());
             } else {
-                salsa_file.set_text(&mut *db).to(text.clone());
+                salsa_file
+                    .set_text(&mut *db)
+                    .with_durability(Durability::LOW)
+                    .to(text.clone());
             }
         }
-        salsa_config.set_config(&mut *db).to(config.clone());
+        salsa_config
+            .set_config(&mut *db)
+            .with_durability(Durability::MEDIUM)
+            .to(config.clone());
     }
     if let Some(state) = document_map.lock().await.get_mut(&uri_string) {
         state.path = graph_path.clone();

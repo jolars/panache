@@ -1,5 +1,6 @@
 //! File watcher handler for bibliography files.
 
+use salsa::Durability;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -33,7 +34,7 @@ pub(crate) async fn did_change_watched_files(
         // Always keep salsa's cached file text in sync when possible.
         if let Ok(contents) = std::fs::read_to_string(&path) {
             let mut db = salsa_db.lock().await;
-            if db.update_file_text_if_cached(&path, contents) {
+            if db.update_file_text_if_cached_with_durability(&path, contents, Durability::MEDIUM) {
                 client
                     .log_message(
                         MessageType::INFO,
