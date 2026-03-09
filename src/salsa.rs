@@ -22,6 +22,38 @@ pub struct FileConfig {
     pub config: Config,
 }
 
+#[salsa::interned]
+pub struct InternedPath<'db> {
+    #[returns(ref)]
+    pub path: PathBuf,
+}
+
+#[salsa::interned]
+pub struct InternedLabel<'db> {
+    #[returns(ref)]
+    pub label: String,
+}
+
+pub fn intern_path<'db>(db: &'db dyn Db, path: &Path) -> InternedPath<'db> {
+    InternedPath::new(db, path.to_path_buf())
+}
+
+pub fn intern_label<'db>(db: &'db dyn Db, label: &str) -> InternedLabel<'db> {
+    InternedLabel::new(db, label.to_owned())
+}
+
+pub fn intern_normalized_label<'db>(db: &'db dyn Db, label: &str) -> InternedLabel<'db> {
+    InternedLabel::new(db, normalize_label(label))
+}
+
+pub fn resolve_path(db: &dyn Db, path: InternedPath<'_>) -> PathBuf {
+    path.path(db).clone()
+}
+
+pub fn resolve_label(db: &dyn Db, label: InternedLabel<'_>) -> String {
+    label.label(db).clone()
+}
+
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
 pub fn metadata(
     db: &dyn Db,
@@ -110,6 +142,13 @@ pub struct DefinitionIndex {
     crossrefs: HashMap<String, DefinitionLocation>,
 }
 
+#[derive(Default)]
+struct InternedDefinitionIndex<'db> {
+    references: HashMap<InternedLabel<'db>, DefinitionLocation>,
+    footnotes: HashMap<InternedLabel<'db>, DefinitionLocation>,
+    crossrefs: HashMap<InternedLabel<'db>, DefinitionLocation>,
+}
+
 #[salsa::tracked(returns(ref), lru = 64)]
 pub fn definition_index(
     db: &dyn Db,
@@ -118,7 +157,7 @@ pub fn definition_index(
     path: PathBuf,
 ) -> DefinitionIndex {
     let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
-    let mut index = DefinitionIndex::default();
+    let mut index = InternedDefinitionIndex::default();
 
     for def in tree.descendants().filter_map(ReferenceDefinition::cast) {
         db.unwind_if_revision_cancelled();
@@ -130,7 +169,7 @@ pub fn definition_index(
             path: path.clone(),
             range: def.syntax().text_range(),
         };
-        insert_reference(&mut index, &label, location);
+        insert_reference(db, &mut index, &label, location);
     }
 
     for def in tree.descendants().filter_map(FootnoteDefinition::cast) {
@@ -143,7 +182,7 @@ pub fn definition_index(
             path: path.clone(),
             range: def.syntax().text_range(),
         };
-        insert_footnote(&mut index, &id, location);
+        insert_footnote(db, &mut index, &id, location);
     }
 
     for node in tree.descendants() {
@@ -159,7 +198,7 @@ pub fn definition_index(
                 path: path.clone(),
                 range: node.text_range(),
             };
-            insert_crossref(&mut index, &id, location);
+            insert_crossref(db, &mut index, &id, location);
         }
     }
 
@@ -167,22 +206,59 @@ pub fn definition_index(
         collect_bookdown_definitions(db, &mut index, &tree, &path);
     }
 
-    index
+    index.into_owned(db)
 }
 
-fn insert_reference(index: &mut DefinitionIndex, label: &str, location: DefinitionLocation) {
-    let key = normalize_label(label);
+fn insert_reference<'db>(
+    db: &'db dyn Db,
+    index: &mut InternedDefinitionIndex<'db>,
+    label: &str,
+    location: DefinitionLocation,
+) {
+    let key = intern_normalized_label(db, label);
     index.references.entry(key).or_insert(location);
 }
 
-fn insert_footnote(index: &mut DefinitionIndex, id: &str, location: DefinitionLocation) {
-    let key = normalize_label(id);
+fn insert_footnote<'db>(
+    db: &'db dyn Db,
+    index: &mut InternedDefinitionIndex<'db>,
+    id: &str,
+    location: DefinitionLocation,
+) {
+    let key = intern_normalized_label(db, id);
     index.footnotes.entry(key).or_insert(location);
 }
 
-fn insert_crossref(index: &mut DefinitionIndex, id: &str, location: DefinitionLocation) {
-    let key = normalize_label(id);
+fn insert_crossref<'db>(
+    db: &'db dyn Db,
+    index: &mut InternedDefinitionIndex<'db>,
+    id: &str,
+    location: DefinitionLocation,
+) {
+    let key = intern_normalized_label(db, id);
     index.crossrefs.entry(key).or_insert(location);
+}
+
+impl InternedDefinitionIndex<'_> {
+    fn into_owned(self, db: &dyn Db) -> DefinitionIndex {
+        DefinitionIndex {
+            references: self
+                .references
+                .into_iter()
+                .map(|(label, location)| (resolve_label(db, label), location))
+                .collect(),
+            footnotes: self
+                .footnotes
+                .into_iter()
+                .map(|(label, location)| (resolve_label(db, label), location))
+                .collect(),
+            crossrefs: self
+                .crossrefs
+                .into_iter()
+                .map(|(label, location)| (resolve_label(db, label), location))
+                .collect(),
+        }
+    }
 }
 
 impl DefinitionIndex {
@@ -234,9 +310,9 @@ impl DefinitionLocation {
     }
 }
 
-fn collect_bookdown_definitions(
-    db: &dyn Db,
-    index: &mut DefinitionIndex,
+fn collect_bookdown_definitions<'db>(
+    db: &'db dyn Db,
+    index: &mut InternedDefinitionIndex<'db>,
     tree: &SyntaxNode,
     path: &Path,
 ) {
@@ -272,7 +348,7 @@ fn collect_bookdown_definitions(
                     path: path.to_path_buf(),
                     range,
                 };
-                insert_crossref(index, label, location);
+                insert_crossref(db, index, label, location);
                 offset += len;
                 continue;
             }
@@ -286,7 +362,7 @@ fn collect_bookdown_definitions(
                     path: path.to_path_buf(),
                     range,
                 };
-                insert_crossref(index, label, location);
+                insert_crossref(db, index, label, location);
                 offset += len;
                 continue;
             }
@@ -307,6 +383,13 @@ pub struct ProjectGraph {
     documents: HashSet<PathBuf>,
     edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
     reverse_edges: HashMap<PathBuf, HashSet<(PathBuf, EdgeKind)>>,
+}
+
+#[derive(Default)]
+struct InternedProjectGraph<'db> {
+    documents: HashSet<InternedPath<'db>>,
+    edges: HashMap<InternedPath<'db>, HashSet<(InternedPath<'db>, EdgeKind)>>,
+    reverse_edges: HashMap<InternedPath<'db>, HashSet<(InternedPath<'db>, EdgeKind)>>,
 }
 
 impl ProjectGraph {
@@ -339,18 +422,57 @@ impl ProjectGraph {
             })
             .unwrap_or_default()
     }
+}
 
-    fn add_edge(&mut self, from: &Path, to: &Path, kind: EdgeKind) {
-        let from = from.to_path_buf();
-        let to = to.to_path_buf();
-        self.edges
-            .entry(from.clone())
-            .or_default()
-            .insert((to.clone(), kind));
+impl<'db> InternedProjectGraph<'db> {
+    fn add_document(&mut self, db: &'db dyn Db, path: &Path) {
+        self.documents.insert(intern_path(db, path));
+    }
+
+    fn add_edge(&mut self, db: &'db dyn Db, from: &Path, to: &Path, kind: EdgeKind) {
+        let from = intern_path(db, from);
+        let to = intern_path(db, to);
+        self.edges.entry(from).or_default().insert((to, kind));
         self.reverse_edges
             .entry(to)
             .or_default()
             .insert((from, kind));
+    }
+
+    fn into_owned(self, db: &dyn Db) -> ProjectGraph {
+        ProjectGraph {
+            documents: self
+                .documents
+                .into_iter()
+                .map(|path| resolve_path(db, path))
+                .collect(),
+            edges: self
+                .edges
+                .into_iter()
+                .map(|(from, targets)| {
+                    (
+                        resolve_path(db, from),
+                        targets
+                            .into_iter()
+                            .map(|(to, kind)| (resolve_path(db, to), kind))
+                            .collect(),
+                    )
+                })
+                .collect(),
+            reverse_edges: self
+                .reverse_edges
+                .into_iter()
+                .map(|(to, sources)| {
+                    (
+                        resolve_path(db, to),
+                        sources
+                            .into_iter()
+                            .map(|(from, kind)| (resolve_path(db, from), kind))
+                            .collect(),
+                    )
+                })
+                .collect(),
+        }
     }
 }
 
@@ -370,7 +492,7 @@ pub fn project_graph(
     config: FileConfig,
     root_path: PathBuf,
 ) -> ProjectGraph {
-    let mut graph = ProjectGraph::default();
+    let mut graph = InternedProjectGraph::default();
     let mut visited = HashSet::new();
     let mut definitions = crate::includes::DefinitionIndex::default();
     let _project_root = crate::includes::find_quarto_root(&root_path)
@@ -408,22 +530,22 @@ pub fn project_graph(
             }
         }
     }
-    graph
+    graph.into_owned(db)
 }
 
-fn visit_document(
-    db: &dyn Db,
+fn visit_document<'db>(
+    db: &'db dyn Db,
     file: &FileText,
     config: FileConfig,
     path: &Path,
-    graph: &mut ProjectGraph,
+    graph: &mut InternedProjectGraph<'db>,
     visited: &mut HashSet<PathBuf>,
     definitions: &mut crate::includes::DefinitionIndex,
 ) {
     if !visited.insert(path.to_path_buf()) {
         return;
     }
-    graph.documents.insert(path.to_path_buf());
+    graph.add_document(db, path);
     let text = file.text(db);
     let tree = crate::parse(text, Some(config.config(db).clone()));
     let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
@@ -438,7 +560,7 @@ fn visit_document(
     );
     for include in resolution.includes.iter() {
         db.unwind_if_revision_cancelled();
-        graph.add_edge(path, &include.path, EdgeKind::Include);
+        graph.add_edge(db, path, &include.path, EdgeKind::Include);
         if include.path == *path {
             continue;
         }
@@ -483,11 +605,11 @@ fn visit_document(
     }
     if let Ok(metadata) = crate::metadata::extract_project_metadata(&tree, path) {
         for metadata_file in &metadata.metadata_files {
-            graph.add_edge(path, metadata_file, EdgeKind::MetadataFile);
+            graph.add_edge(db, path, metadata_file, EdgeKind::MetadataFile);
         }
         if let Some(bibliography) = metadata.bibliography {
             for bib in bibliography.paths {
-                graph.add_edge(path, &bib, EdgeKind::Bibliography);
+                graph.add_edge(db, path, &bib, EdgeKind::Bibliography);
             }
         }
     }
@@ -591,5 +713,26 @@ impl salsa::Database for SalsaDb {}
 impl Db for SalsaDb {
     fn file_text(&self, path: PathBuf) -> Option<FileText> {
         self.get_or_load_file_text(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn intern_normalized_label_collapses_and_lowercases() {
+        let db = SalsaDb::default();
+        let a = intern_normalized_label(&db, "Foo  Bar");
+        let b = intern_normalized_label(&db, "foo bar");
+        assert!(a == b);
+    }
+
+    #[test]
+    fn intern_path_roundtrips_to_owned_path() {
+        let db = SalsaDb::default();
+        let path = PathBuf::from("/tmp/example.qmd");
+        let interned = intern_path(&db, &path);
+        assert_eq!(resolve_path(&db, interned), path);
     }
 }
