@@ -257,8 +257,32 @@ pub(crate) fn emit_atx_heading(
     // Get actual heading text
     let heading_text = &after_marker[spaces_after_marker_count..];
 
-    // Strip trailing hashes
-    let heading_content = heading_text.trim_end_matches(|c: char| c == '#' || c.is_whitespace());
+    // Parse optional closing ATX marker (` ###`) while preserving bytes.
+    let (heading_content, closing_suffix) = {
+        let without_trailing_ws = heading_text.trim_end_matches([' ', '\t']);
+        let trailing_hashes = without_trailing_ws
+            .chars()
+            .rev()
+            .take_while(|&c| c == '#')
+            .count();
+
+        if trailing_hashes > 0 {
+            let hashes_start = without_trailing_ws.len() - trailing_hashes;
+            let before_hashes = &without_trailing_ws[..hashes_start];
+            if before_hashes
+                .chars()
+                .last()
+                .is_some_and(|c| c == ' ' || c == '\t')
+            {
+                let content_end = before_hashes.trim_end_matches([' ', '\t']).len();
+                (&heading_text[..content_end], &heading_text[content_end..])
+            } else {
+                (heading_text, "")
+            }
+        } else {
+            (heading_text, "")
+        }
+    };
 
     // Try to parse trailing attributes
     let (text_content, attributes, space_before_attrs) =
@@ -286,6 +310,30 @@ pub(crate) fn emit_atx_heading(
     // Emit attributes if present
     if let Some(attrs) = attributes {
         emit_attributes(builder, &attrs);
+    }
+
+    if !closing_suffix.is_empty() {
+        let closing_trimmed = closing_suffix.trim_matches(|c| c == ' ' || c == '\t');
+        let leading_ws_len = closing_suffix
+            .find(|c: char| c != ' ' && c != '\t')
+            .unwrap_or(closing_suffix.len());
+        let trailing_ws_len = closing_suffix.len() - leading_ws_len - closing_trimmed.len();
+
+        if leading_ws_len > 0 {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &closing_suffix[..leading_ws_len],
+            );
+        }
+        if !closing_trimmed.is_empty() {
+            builder.token(SyntaxKind::ATX_HEADING_MARKER.into(), closing_trimmed);
+        }
+        if trailing_ws_len > 0 {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &closing_suffix[closing_suffix.len() - trailing_ws_len..],
+            );
+        }
     }
 
     // Emit trailing newline if present
@@ -352,6 +400,13 @@ mod tests {
             found_whitespace,
             "Whitespace token between heading content and attributes must be present"
         );
+    }
+
+    #[test]
+    fn test_atx_heading_closing_hashes_are_lossless() {
+        let input = "### Extension: `smart` ###\n";
+        let tree = crate::parse(input, Some(crate::Config::default()));
+        assert_eq!(tree.text().to_string(), input);
     }
 
     #[test]

@@ -312,6 +312,11 @@ impl<'a> Parser<'a> {
                     first_line_content,
                     self.config,
                 );
+            } else {
+                let (_, newline_str) = strip_newline(content);
+                if !newline_str.is_empty() {
+                    self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                }
             }
         }
     }
@@ -1377,8 +1382,10 @@ impl<'a> Parser<'a> {
                     content_indent,
                     &BlockContext {
                         content: stripped_content,
-                        has_blank_before: true,
-                        has_blank_before_strict: true,
+                        has_blank_before: self.pos == 0
+                            || self.lines[self.pos - 1].trim().is_empty(),
+                        has_blank_before_strict: self.pos == 0
+                            || self.lines[self.pos - 1].trim().is_empty(),
                         at_document_start: self.pos == 0 && self.current_blockquote_depth() == 0,
                         in_fenced_div: self.in_fenced_div(),
                         blockquote_depth: self.current_blockquote_depth(),

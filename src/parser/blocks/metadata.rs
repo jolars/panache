@@ -54,7 +54,7 @@ pub(crate) fn try_parse_yaml_block(
 
     // Opening delimiter - strip newline before emitting
     let (text, newline_str) = strip_newline(line);
-    builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), text.trim());
+    builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), text);
     if !newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
@@ -70,7 +70,7 @@ pub(crate) fn try_parse_yaml_block(
         if content_line.trim() == "---" || content_line.trim() == "..." {
             found_closing = true;
             let (text, newline_str) = strip_newline(content_line);
-            builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), text.trim());
+            builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), text);
             if !newline_str.is_empty() {
                 builder.token(SyntaxKind::NEWLINE.into(), newline_str);
             }
@@ -241,5 +241,12 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
         let result = try_parse_pandoc_title_block(&lines, 1, &mut builder);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_indented_yaml_delimiters_are_lossless() {
+        let input = "    ---\n    title: Test\n    ...\n";
+        let tree = crate::parse(input, Some(crate::Config::default()));
+        assert_eq!(tree.text().to_string(), input);
     }
 }

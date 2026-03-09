@@ -249,3 +249,13 @@ pub fn try_parse_footnote_marker(line: &str) -> Option<(String, usize)> {
 
     Some((id.to_string(), pos))
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_footnote_definition_body_layout_is_lossless() {
+        let input = "[^note-on-refs]:\n    Note that if `--file-scope` is used,\n";
+        let tree = crate::parse(input, Some(crate::Config::default()));
+        assert_eq!(tree.text().to_string(), input);
+    }
+}

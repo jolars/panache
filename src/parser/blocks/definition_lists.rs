@@ -150,4 +150,11 @@ mod tests {
     fn test_parse_definition_marker_at_eol() {
         assert_eq!(try_parse_definition_marker(":"), Some((':', 0, 0, 0)));
     }
+
+    #[test]
+    fn test_definition_list_preserves_first_content_line_losslessly() {
+        let input = "[`--reference-doc=`*FILE*]{#option--reference-doc}\n\n:   Use the specified file as a style reference in producing a\n    docx or ODT file.\n\n    Docx\n\n    :   For best results, the reference docx should be a modified\n        version of a docx file produced using pandoc.\n";
+        let tree = crate::parse(input, Some(crate::Config::default()));
+        assert_eq!(tree.text().to_string(), input);
+    }
 }
