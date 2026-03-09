@@ -1,5 +1,6 @@
 use crate::config::{Config, WrapMode};
 use crate::directives::{DirectiveTracker, extract_directive_from_node};
+use crate::parser::utils::attributes::parse_attribute_content;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -289,7 +290,7 @@ impl Formatter {
                             }
                         }
                         SyntaxKind::ATTRIBUTE => {
-                            attributes = child.text().to_string();
+                            attributes = normalize_attribute_text(&child.text().to_string());
                         }
                         _ => {}
                     }
@@ -1707,4 +1708,45 @@ impl Formatter {
             }
         }
     }
+}
+
+fn normalize_attribute_text(attr_text: &str) -> String {
+    let Some(inner) = attr_text
+        .strip_prefix('{')
+        .and_then(|s| s.strip_suffix('}'))
+    else {
+        return attr_text.to_string();
+    };
+    let Some(attrs) = parse_attribute_content(inner) else {
+        return attr_text.to_string();
+    };
+
+    let mut out = String::from("{");
+    if let Some(id) = attrs.identifier {
+        out.push('#');
+        out.push_str(&id);
+    }
+    for class in attrs.classes {
+        if out.len() > 1 {
+            out.push(' ');
+        }
+        if class.starts_with('=') {
+            out.push_str(&class);
+        } else {
+            out.push('.');
+            out.push_str(&class);
+        }
+    }
+    for (key, value) in attrs.key_values {
+        if out.len() > 1 {
+            out.push(' ');
+        }
+        out.push_str(&key);
+        out.push('=');
+        out.push('"');
+        out.push_str(&value.replace('"', "\\\""));
+        out.push('"');
+    }
+    out.push('}');
+    out
 }

@@ -23,6 +23,13 @@ pub struct AttributeBlock {
 /// Try to parse an attribute block from the end of a string
 /// Returns: (attribute_block, text_before_attributes)
 pub fn try_parse_trailing_attributes(text: &str) -> Option<(AttributeBlock, &str)> {
+    let (attrs, before, _) = try_parse_trailing_attributes_with_pos(text)?;
+    Some((attrs, before))
+}
+
+/// Try to parse an attribute block from the end of a string.
+/// Returns: (attribute_block, text_before_attributes, open_brace_position_in_trimmed_text)
+pub fn try_parse_trailing_attributes_with_pos(text: &str) -> Option<(AttributeBlock, &str, usize)> {
     let trimmed = text.trim_end();
 
     // Must end with }
@@ -30,8 +37,9 @@ pub fn try_parse_trailing_attributes(text: &str) -> Option<(AttributeBlock, &str
         return None;
     }
 
-    // Find matching {
-    let open_brace = trimmed.rfind('{')?;
+    // Find matching opening brace for the trailing attribute block, accounting
+    // for braces inside quoted attribute values.
+    let open_brace = find_matching_open_brace_for_trailing_block(trimmed)?;
 
     // Check if this is a bracketed span like [text]{.class} rather than a heading attribute
     // If the { is immediately after ] (with optional whitespace), this should be parsed as a span
@@ -48,7 +56,53 @@ pub fn try_parse_trailing_attributes(text: &str) -> Option<(AttributeBlock, &str
     // Get text before attributes (trim trailing whitespace)
     let before_attrs = trimmed[..open_brace].trim_end();
 
-    Some((attr_block, before_attrs))
+    Some((attr_block, before_attrs, open_brace))
+}
+
+fn find_matching_open_brace_for_trailing_block(text: &str) -> Option<usize> {
+    if !text.ends_with('}') {
+        return None;
+    }
+
+    let mut stack: Vec<usize> = Vec::new();
+    let mut in_quote: Option<char> = None;
+    let mut escaped = false;
+    let mut end_brace_open = None;
+
+    for (idx, ch) in text.char_indices() {
+        if let Some(q) = in_quote {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == q {
+                in_quote = None;
+            }
+            continue;
+        }
+
+        match ch {
+            '\'' | '"' => in_quote = Some(ch),
+            '{' => stack.push(idx),
+            '}' => {
+                let open = stack.pop()?;
+                if idx == text.len() - 1 {
+                    end_brace_open = Some(open);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if in_quote.is_some() || !stack.is_empty() {
+        return None;
+    }
+
+    end_brace_open
 }
 
 /// Parse the content inside the attribute braces
@@ -289,6 +343,27 @@ mod tests {
         assert_eq!(
             attrs.key_values[1],
             ("key2".to_string(), "val 2".to_string())
+        );
+    }
+
+    #[test]
+    fn test_trailing_attributes_with_shortcode_in_quoted_value() {
+        let text = "Slide Title {background-image='{{< placeholder 100 100 >}}' background-size=\"100px\"}";
+        let result = try_parse_trailing_attributes(text);
+        assert!(result.is_some());
+        let (attrs, before) = result.unwrap();
+        assert_eq!(before, "Slide Title");
+        assert_eq!(attrs.key_values.len(), 2);
+        assert_eq!(
+            attrs.key_values[0],
+            (
+                "background-image".to_string(),
+                "{{< placeholder 100 100 >}}".to_string()
+            )
+        );
+        assert_eq!(
+            attrs.key_values[1],
+            ("background-size".to_string(), "100px".to_string())
         );
     }
 

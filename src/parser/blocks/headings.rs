@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-use crate::parser::utils::attributes::{emit_attributes, try_parse_trailing_attributes};
+use crate::parser::utils::attributes::try_parse_trailing_attributes_with_pos;
 use crate::parser::utils::inline_emission;
 
 /// Try to parse an ATX heading from content, returns heading level (1-6) if found.
@@ -136,12 +136,13 @@ pub(crate) fn emit_setext_heading(
     }
 
     // Try to parse trailing attributes from heading text
-    let (text_content, attributes, space_before_attrs) =
-        if let Some((attrs, text_before)) = try_parse_trailing_attributes(text_trimmed) {
-            // Find where { starts in text_trimmed to get the space between text and attributes
-            let start_brace_pos = text_trimmed.rfind('{').unwrap();
+    let (text_content, attr_text, space_before_attrs) =
+        if let Some((_attrs, text_before, start_brace_pos)) =
+            try_parse_trailing_attributes_with_pos(text_trimmed)
+        {
             let space = &text_trimmed[text_before.len()..start_brace_pos];
-            (text_before, Some(attrs), space)
+            let raw_attrs = &text_trimmed[start_brace_pos..];
+            (text_before, Some(raw_attrs), space)
         } else {
             (text_trimmed, None, "")
         };
@@ -159,8 +160,10 @@ pub(crate) fn emit_setext_heading(
     }
 
     // Emit attributes if present
-    if let Some(attrs) = attributes {
-        emit_attributes(builder, &attrs);
+    if let Some(attr_text) = attr_text {
+        builder.start_node(SyntaxKind::ATTRIBUTE.into());
+        builder.token(SyntaxKind::ATTRIBUTE.into(), attr_text);
+        builder.finish_node();
     }
 
     // Emit newline after text line
@@ -285,12 +288,13 @@ pub(crate) fn emit_atx_heading(
     };
 
     // Try to parse trailing attributes
-    let (text_content, attributes, space_before_attrs) =
-        if let Some((attrs, text_before)) = try_parse_trailing_attributes(heading_content) {
-            // Find where { starts in heading_content to get the space between text and attributes
-            let start_brace_pos = heading_content.rfind('{').unwrap();
+    let (text_content, attr_text, space_before_attrs) =
+        if let Some((_attrs, text_before, start_brace_pos)) =
+            try_parse_trailing_attributes_with_pos(heading_content)
+        {
             let space = &heading_content[text_before.len()..start_brace_pos];
-            (text_before, Some(attrs), space)
+            let raw_attrs = &heading_content[start_brace_pos..];
+            (text_before, Some(raw_attrs), space)
         } else {
             (heading_content, None, "")
         };
@@ -308,8 +312,10 @@ pub(crate) fn emit_atx_heading(
     }
 
     // Emit attributes if present
-    if let Some(attrs) = attributes {
-        emit_attributes(builder, &attrs);
+    if let Some(attr_text) = attr_text {
+        builder.start_node(SyntaxKind::ATTRIBUTE.into());
+        builder.token(SyntaxKind::ATTRIBUTE.into(), attr_text);
+        builder.finish_node();
     }
 
     if !closing_suffix.is_empty() {
