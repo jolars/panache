@@ -270,3 +270,11 @@ fn test_multiline_table_idempotency() {
         "Multiline table formatting must be idempotent"
     );
 }
+
+#[test]
+fn test_multiline_table_with_wide_chars_stays_idempotent() {
+    let input = "---- ----\n魚    fish\n---- ----\n";
+    let first = format(input, None, None);
+    let second = format(&first, None, None);
+    assert_eq!(first, second);
+}

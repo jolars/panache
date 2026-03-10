@@ -893,6 +893,10 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
 
 /// Format a simple table with consistent alignment and padding
 pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
+    if !node.text().to_string().is_ascii() {
+        return node.text().to_string();
+    }
+
     let table_data = extract_simple_table_data(node, config);
     let mut output = String::new();
 
@@ -1413,6 +1417,10 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
 
 /// Format a multiline table preserving column widths and structure
 pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
+    if !node.text().to_string().is_ascii() {
+        return node.text().to_string();
+    }
+
     let table_data = extract_multiline_table_data(node, config);
     let mut output = String::new();
 
