@@ -306,6 +306,30 @@ fn build_words_with_mode<'a>(
         false
     }
 
+    fn emphasis_delimiter(node: &SyntaxNode) -> &'static str {
+        for child in node.children_with_tokens() {
+            if let NodeOrToken::Token(t) = child
+                && t.kind() == SyntaxKind::EMPHASIS_MARKER
+                && t.text() == "_"
+            {
+                return "_";
+            }
+        }
+        "*"
+    }
+
+    fn strong_delimiter(node: &SyntaxNode) -> &'static str {
+        for child in node.children_with_tokens() {
+            if let NodeOrToken::Token(t) = child
+                && t.kind() == SyntaxKind::STRONG_MARKER
+                && t.text() == "__"
+            {
+                return "__";
+            }
+        }
+        "**"
+    }
+
     fn process_node_recursive<'cfg>(
         _config: &'cfg Config,
         node: &SyntaxNode,
@@ -437,12 +461,13 @@ fn build_words_with_mode<'a>(
                         );
                     }
                     SyntaxKind::EMPHASIS => {
+                        let delimiter = emphasis_delimiter(n);
                         // Check if content starts with whitespace - if so, preserve it before opening marker
                         if node_starts_with_whitespace(n) {
                             b.pending_space = true;
                             b.skip_next_leading_whitespace = true;
                         }
-                        b.push_piece("*");
+                        b.push_piece(delimiter);
                         process_node_recursive(
                             _config,
                             n,
@@ -457,17 +482,18 @@ fn build_words_with_mode<'a>(
                         let had_pending_space = b.pending_space;
                         // Clear pending space before closing marker (trim trailing whitespace)
                         b.pending_space = false;
-                        b.push_piece("*");
+                        b.push_piece(delimiter);
                         // Restore pending space state for next sibling
                         b.pending_space = had_pending_space;
                     }
                     SyntaxKind::STRONG => {
+                        let delimiter = strong_delimiter(n);
                         // Check if content starts with whitespace - if so, preserve it before opening marker
                         if node_starts_with_whitespace(n) {
                             b.pending_space = true;
                             b.skip_next_leading_whitespace = true;
                         }
-                        b.push_piece("**");
+                        b.push_piece(delimiter);
                         process_node_recursive(
                             _config,
                             n,
@@ -482,7 +508,7 @@ fn build_words_with_mode<'a>(
                         let had_pending_space = b.pending_space;
                         // Clear pending space before closing marker (trim trailing whitespace)
                         b.pending_space = false;
-                        b.push_piece("**");
+                        b.push_piece(delimiter);
                         // Restore pending space state for next sibling
                         b.pending_space = had_pending_space;
                     }

@@ -136,11 +136,16 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
         }
         SyntaxKind::EMPHASIS => {
             let mut content = String::new();
+            let mut delimiter = "*";
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Node(n) => content.push_str(&format_inline_node(&n, config)),
                     NodeOrToken::Token(t) => {
-                        if t.kind() != SyntaxKind::EMPHASIS_MARKER {
+                        if t.kind() == SyntaxKind::EMPHASIS_MARKER {
+                            if t.text() == "_" {
+                                delimiter = "_";
+                            }
+                        } else {
                             content.push_str(t.text());
                         }
                     }
@@ -148,15 +153,20 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             }
             // Trim leading and trailing whitespace from emphasis content
             let content = content.trim();
-            format!("*{}*", content)
+            format!("{delimiter}{content}{delimiter}")
         }
         SyntaxKind::STRONG => {
             let mut content = String::new();
+            let mut delimiter = "**";
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Node(n) => content.push_str(&format_inline_node(&n, config)),
                     NodeOrToken::Token(t) => {
-                        if t.kind() != SyntaxKind::STRONG_MARKER {
+                        if t.kind() == SyntaxKind::STRONG_MARKER {
+                            if t.text() == "__" {
+                                delimiter = "__";
+                            }
+                        } else {
                             content.push_str(t.text());
                         }
                     }
@@ -164,7 +174,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             }
             // Trim leading and trailing whitespace from strong emphasis content
             let content = content.trim();
-            format!("**{}**", content)
+            format!("{delimiter}{content}{delimiter}")
         }
         SyntaxKind::BRACKETED_SPAN => {
             // Format bracketed span: [content]{.attributes}
