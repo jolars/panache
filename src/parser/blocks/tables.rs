@@ -1990,6 +1990,35 @@ fn is_column_separator(line: &str) -> bool {
     try_parse_table_separator(line).is_some() && !line.contains('*') && !line.contains('_')
 }
 
+fn is_headerless_single_row_without_blank(
+    lines: &[&str],
+    row_start: usize,
+    row_end: usize,
+    columns: &[Column],
+) -> bool {
+    if row_start >= row_end {
+        return false;
+    }
+
+    if row_end - row_start == 1 {
+        return false;
+    }
+
+    let Some(last_col) = columns.last() else {
+        return false;
+    };
+
+    for line in lines.iter().take(row_end).skip(row_start + 1) {
+        let (content, _) = strip_newline(line);
+        let prefix_end = last_col.start.min(content.len());
+        if !content[..prefix_end].trim().is_empty() {
+            return false;
+        }
+    }
+
+    true
+}
+
 /// Try to parse a multiline table starting at the given position.
 /// Returns the number of lines consumed if successful.
 pub(crate) fn try_parse_multiline_table(
@@ -2009,6 +2038,11 @@ pub(crate) fn try_parse_multiline_table(
     // 2. A column separator (for headerless tables)
     let is_full_width_start = try_parse_multiline_separator(first_line).is_some();
     let is_column_sep_start = !is_full_width_start && is_column_separator(first_line);
+    let headerless_columns = if is_column_sep_start {
+        try_parse_table_separator(first_line)
+    } else {
+        None
+    };
 
     if !is_full_width_start && !is_column_sep_start {
         return None;
@@ -2021,6 +2055,7 @@ pub(crate) fn try_parse_multiline_table(
     let mut has_header = false;
     let mut found_blank_line = false;
     let mut found_closing_sep = false;
+    let mut content_line_count = 0usize;
 
     // Scan for header section and column separator
     while pos < lines.len() {
@@ -2061,13 +2096,14 @@ pub(crate) fn try_parse_multiline_table(
         }
 
         // Check for closing column separator (for headerless tables)
-        if is_column_sep_start && is_column_separator(line) && found_blank_line {
+        if is_column_sep_start && is_column_separator(line) && content_line_count > 0 {
             found_closing_sep = true;
             pos += 1;
             break;
         }
 
         // Content row
+        content_line_count += 1;
         pos += 1;
     }
 
@@ -2078,7 +2114,13 @@ pub(crate) fn try_parse_multiline_table(
 
     // Must have had at least one blank line between rows (distinguishes from simple tables)
     if !found_blank_line {
-        return None;
+        if !is_column_sep_start {
+            return None;
+        }
+        let columns = headerless_columns.as_deref()?;
+        if !is_headerless_single_row_without_blank(lines, start_pos + 1, pos - 1, columns) {
+            return None;
+        }
     }
 
     // Must have a closing separator
@@ -2368,6 +2410,40 @@ mod multiline_table_tests {
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 6);
+    }
+
+    #[test]
+    fn test_multiline_table_headerless_single_line_is_not_multiline() {
+        let input = vec![
+            "-------     ------ ----------   -------",
+            "     12     12        12             12",
+            "-------     ------ ----------   -------",
+            "",
+            "Not part of table.",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_multiline_table_headerless_single_row_continuation_without_blank_line() {
+        let input = vec![
+            "----------  ---------  -----------  ---------------------------",
+            "   First    row               12.0  Example of a row that spans",
+            "                                    multiple lines.",
+            "----------  ---------  -----------  ---------------------------",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 4);
     }
 
     #[test]

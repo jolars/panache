@@ -1574,7 +1574,7 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
     // For single-row tables, emit blank line before closing separator
     // (required by Pandoc spec to distinguish from simple tables)
     let num_body_rows = table_data.rows.len() - if table_data.has_header { 1 } else { 0 };
-    if num_body_rows == 1 {
+    if num_body_rows == 1 && table_data.has_header {
         output.push('\n');
     }
 

@@ -64,13 +64,13 @@ Table: Simple table caption"#;
 
 #[test]
 fn multiline_table_caption_and_rows() {
-    let input = r#"--------  --------
+    let input = r#"-------------------
 Header1   Header2
 --------  --------
 Cell1     Cell2
 
 Cell3     Cell4
---------  --------
+-------------------
 
 Table: Multiline table caption"#;
     let tree = parse(input, None);
