@@ -139,3 +139,12 @@ fn test_losslessness_blockquote_fenced_code_lines() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_line_block_empty_marker_line() {
+    let input = "| Hello\n|\n| Goodbye\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

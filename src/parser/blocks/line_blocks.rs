@@ -39,7 +39,7 @@ pub fn parse_line_block(
             builder.start_node(SyntaxKind::LINE_BLOCK_LINE.into());
 
             // Emit the marker
-            builder.token(SyntaxKind::LINE_BLOCK_MARKER.into(), "| ");
+            builder.token(SyntaxKind::LINE_BLOCK_MARKER.into(), &line[..content_start]);
 
             // Emit the content (preserving leading spaces)
             let content = &line[content_start..];
