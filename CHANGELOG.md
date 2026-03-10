@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.14.1](https://github.com/jolars/panache/compare/v2.14.0...v2.14.1) (2026-03-10)
+
+### Bug Fixes
+
+* **formatter:** correct list idempotency ([3b0db0e](https://github.com/jolars/panache/commit/3b0db0e8936cef252bd2fb72563f6e1e1699fc9d))
+* **formatter:** fix idempotency failure in atx headings ([6a61caf](https://github.com/jolars/panache/commit/6a61caf614803060d268aaaf48bc9076aa3f87e8))
+* **formatter:** handle div in loose list ([6514e58](https://github.com/jolars/panache/commit/6514e58404417659baa654619f661cd517c5baad))
+* **formatter:** handle escaped char inside table ([130df6f](https://github.com/jolars/panache/commit/130df6fc594fa2347b1c719e067018c74e23b1a5))
+* **formatter:** handle horizontal before setext heading ([225d7b2](https://github.com/jolars/panache/commit/225d7b28b51a6e78d6fe0add77bcba5b96c35b10))
+* **formatter:** handle non-ASCI able content ([4ea70f4](https://github.com/jolars/panache/commit/4ea70f4fdacb39e444d6dc10ce0803c992deca49))
+* **formatter:** handle underscore emphasis with nested asterisks ([71f41b0](https://github.com/jolars/panache/commit/71f41b0b86c6d4c295ac563247d7bf0dfa63c245))
+* **formatter:** subdue blockquote marker after hard break ([e3b53c9](https://github.com/jolars/panache/commit/e3b53c90060e25411c302ee8e37ecaff75908ce7))
+* **parser,formatter:** tighten code fence logic ([9c1ffcc](https://github.com/jolars/panache/commit/9c1ffccca3c7ad3fffd8fa17f72598e9b1ee3824))
+* **parser:** allow fenced blocks to interrupt paragraphs ([0e521b5](https://github.com/jolars/panache/commit/0e521b5b500e861f4664cd4e359400271cb49fcd))
+* **parser:** allow references with leading spaces ([9051331](https://github.com/jolars/panache/commit/9051331e6338b4f8be248149468b49de1f9336d6))
+* **parser:** avoid stealing captions as definition items ([22855d0](https://github.com/jolars/panache/commit/22855d0399fa4c7d80700c65d75aeacf18c2c391))
+* **parser:** cater to spanning-style rows ([57e3ab3](https://github.com/jolars/panache/commit/57e3ab33f00c6cbeaec696946903b00500fcee89))
+* **parser:** don't interpret continuation line as list ([af73bd4](https://github.com/jolars/panache/commit/af73bd446464106f39ebc917e56540af07f54cb6))
+* **parser:** emit leading spaces before rule ([8d58381](https://github.com/jolars/panache/commit/8d58381ae7f07d24d59673b56601052461f379ac))
+* **parser:** emit original line block marker ([0866449](https://github.com/jolars/panache/commit/0866449f0c47702f3c68f95f067554452611dbf6))
+* **parser:** fix backtick-parsing in attributes ([5f82e22](https://github.com/jolars/panache/commit/5f82e22f08353a5e7cdad40606cb451c0633dc28))
+* **parser:** handle table with complex layout ([47fd1a3](https://github.com/jolars/panache/commit/47fd1a3b67f75ad8790621e2255cbf67b4800526))
+* **parser:** honor `blank-before-header` extension ([c1f3571](https://github.com/jolars/panache/commit/c1f3571f026ddb44a2562b8b0e2d06261a67f226))
+* **parser:** preserve leading whitespace before fences ([7f12c62](https://github.com/jolars/panache/commit/7f12c628e3719a69082c88617d750660483c7af3))
+* **parser:** relax fence block detection ([6cc356d](https://github.com/jolars/panache/commit/6cc356d4bfb7ba98bfbc658bd746a3415c872393))
+
 ## [2.14.0](https://github.com/jolars/panache/compare/v2.13.0...v2.14.0) (2026-03-09)
 
 ### Features
