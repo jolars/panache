@@ -88,12 +88,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 backtick_runs.insert(current_run);
             }
 
-            // Keep original in ambiguous cases where short-marked code spans
-            // contain very long internal backtick runs (can reparse unstably).
             let max_run = backtick_runs.iter().copied().max().unwrap_or(0);
-            if marker_len <= 2 && max_run >= 4 {
-                return node.text().to_string();
-            }
 
             let needs_padding =
                 normalized_content.starts_with('`') || normalized_content.ends_with('`');

@@ -469,8 +469,8 @@ pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
         info_string_trimmed.to_string()
     };
 
-    // Pandoc forbids backticks in fenced code language identifiers.
-    if fence_char == '`' && info_string.starts_with('`') {
+    // Backtick-fenced blocks cannot have backticks in the info string.
+    if fence_char == '`' && info_string.contains('`') {
         return None;
     }
 
@@ -1048,6 +1048,11 @@ mod tests {
     #[test]
     fn test_two_backticks_invalid() {
         assert!(try_parse_fence_open("``").is_none());
+    }
+
+    #[test]
+    fn test_backtick_fence_with_backtick_in_info_is_invalid() {
+        assert!(try_parse_fence_open("`````hi````there`````").is_none());
     }
 
     #[test]
