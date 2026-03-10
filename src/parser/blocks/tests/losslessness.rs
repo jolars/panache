@@ -148,3 +148,12 @@ fn test_losslessness_line_block_empty_marker_line() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_horizontal_rule_with_leading_spaces() {
+    let input = "before\n\n  ----\n\nafter\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

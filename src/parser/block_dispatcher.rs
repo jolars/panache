@@ -210,20 +210,11 @@ impl BlockParser for HorizontalRuleParser {
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
+        _lines: &[&str],
+        _line_pos: usize,
         _payload: Option<&dyn Any>,
     ) -> usize {
-        // Use ctx.content (blockquote markers already stripped)
-        // But preserve newline from original line
-        let (_, newline_str) = strip_newline(lines[line_pos]);
-        let content_with_newline = if !newline_str.is_empty() {
-            format!("{}{}", ctx.content.trim_end(), newline_str)
-        } else {
-            ctx.content.to_string()
-        };
-
-        emit_horizontal_rule(builder, &content_with_newline);
+        emit_horizontal_rule(builder, ctx.content);
         1 // Consumed 1 line
     }
 
