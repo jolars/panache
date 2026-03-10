@@ -1,4 +1,6 @@
 use super::helpers::{find_first, parse_blocks};
+use crate::config::Config;
+use crate::parser::Parser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 fn get_heading_content(node: &SyntaxNode) -> Option<String> {
@@ -50,6 +52,18 @@ fn does_not_parse_with_four_leading_spaces() {
 fn requires_blank_line_before_heading() {
     let node = parse_blocks("text\n# Heading\n");
     assert!(find_first(&node, SyntaxKind::HEADING).is_none());
+}
+
+#[test]
+fn parses_heading_without_blank_line_when_extension_disabled() {
+    let mut config = Config::default();
+    config.extensions.blank_before_header = false;
+    let node = Parser::new("text\n# Heading\n", &config).parse();
+    let headings: Vec<_> = node
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::HEADING)
+        .collect();
+    assert_eq!(headings.len(), 1);
 }
 
 #[test]

@@ -241,7 +241,7 @@ impl BlockParser for AtxHeadingParser {
         _lines: &[&str],
         _line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        if !ctx.has_blank_before {
+        if ctx.config.extensions.blank_before_header && !ctx.has_blank_before {
             return None;
         }
 
