@@ -698,13 +698,20 @@ pub(super) fn wrapped_lines_for_paragraph(
         log::debug!("Paragraph contains hard line breaks - preserving them");
 
         let mut result = String::new();
+        let mut skip_next_whitespace = false;
         for child in node.children_with_tokens() {
             match child {
                 NodeOrToken::Node(n) => {
+                    skip_next_whitespace = false;
                     result.push_str(&format_inline_fn(&n));
                 }
                 NodeOrToken::Token(t) => {
-                    if t.kind() == SyntaxKind::HARD_LINE_BREAK {
+                    if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
+                        skip_next_whitespace = true;
+                    } else if t.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace {
+                        skip_next_whitespace = false;
+                    } else if t.kind() == SyntaxKind::HARD_LINE_BREAK {
+                        skip_next_whitespace = false;
                         // Normalize to backslash-newline if extension enabled
                         if _config.extensions.escaped_line_breaks {
                             result.push_str("\\\n");
@@ -712,6 +719,7 @@ pub(super) fn wrapped_lines_for_paragraph(
                             result.push_str(t.text());
                         }
                     } else {
+                        skip_next_whitespace = false;
                         result.push_str(t.text());
                     }
                 }
@@ -771,13 +779,20 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
         log::debug!("Paragraph contains hard line breaks - preserving them");
 
         let mut result = String::new();
+        let mut skip_next_whitespace = false;
         for child in node.children_with_tokens() {
             match child {
                 NodeOrToken::Node(n) => {
+                    skip_next_whitespace = false;
                     result.push_str(&format_inline_fn(&n));
                 }
                 NodeOrToken::Token(t) => {
-                    if t.kind() == SyntaxKind::HARD_LINE_BREAK {
+                    if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
+                        skip_next_whitespace = true;
+                    } else if t.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace {
+                        skip_next_whitespace = false;
+                    } else if t.kind() == SyntaxKind::HARD_LINE_BREAK {
+                        skip_next_whitespace = false;
                         // Normalize to backslash-newline if extension enabled
                         if _config.extensions.escaped_line_breaks {
                             result.push_str("\\\n");
@@ -785,6 +800,7 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
                             result.push_str(t.text());
                         }
                     } else {
+                        skip_next_whitespace = false;
                         result.push_str(t.text());
                     }
                 }
@@ -835,19 +851,27 @@ pub(super) fn sentence_lines_for_paragraph(
         log::debug!("Paragraph contains hard line breaks - preserving them");
 
         let mut result = String::new();
+        let mut skip_next_whitespace = false;
         for child in node.children_with_tokens() {
             match child {
                 NodeOrToken::Node(n) => {
+                    skip_next_whitespace = false;
                     result.push_str(&format_inline_fn(&n));
                 }
                 NodeOrToken::Token(t) => {
-                    if t.kind() == SyntaxKind::HARD_LINE_BREAK {
+                    if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
+                        skip_next_whitespace = true;
+                    } else if t.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace {
+                        skip_next_whitespace = false;
+                    } else if t.kind() == SyntaxKind::HARD_LINE_BREAK {
+                        skip_next_whitespace = false;
                         if _config.extensions.escaped_line_breaks {
                             result.push_str("\\\n");
                         } else {
                             result.push_str(t.text());
                         }
                     } else {
+                        skip_next_whitespace = false;
                         result.push_str(t.text());
                     }
                 }
