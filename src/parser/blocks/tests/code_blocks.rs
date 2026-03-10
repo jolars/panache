@@ -151,6 +151,17 @@ fn code_block_with_language_can_interrupt_paragraph() {
 }
 
 #[test]
+fn bare_fence_after_colon_with_closing_fence_can_interrupt_paragraph() {
+    let input = "Some text:\n```\ncode\n```\n";
+    let node = parse_blocks(input);
+    assert_block_kinds_for_node(
+        &node,
+        &[SyntaxKind::PARAGRAPH, SyntaxKind::CODE_BLOCK],
+        input,
+    );
+}
+
+#[test]
 fn parses_code_block_at_start_of_document() {
     let input = "```\ncode\n```\n";
 

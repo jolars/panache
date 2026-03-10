@@ -18,7 +18,8 @@ use super::blocks::blockquotes::{
     strip_n_blockquote_markers,
 };
 use super::blocks::code_blocks::{
-    CodeBlockType, FenceInfo, InfoString, parse_fenced_code_block, try_parse_fence_open,
+    CodeBlockType, FenceInfo, InfoString, is_closing_fence, parse_fenced_code_block,
+    try_parse_fence_open,
 };
 use super::blocks::definition_lists::{
     next_line_is_definition_marker, try_parse_definition_marker,
@@ -1139,8 +1140,8 @@ impl BlockParser for FencedCodeBlockParser {
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
+        lines: &[&str],
+        line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         // Calculate content to check - may need to strip list indentation
         let content_to_check = if let Some(list_info) = ctx.list_indent_info {
@@ -1170,9 +1171,42 @@ impl BlockParser for FencedCodeBlockParser {
             return None;
         }
 
-        // Fenced code blocks can interrupt paragraphs only if they have an info string.
+        // Fenced code blocks can interrupt paragraphs if they have an info string.
+        // For bare fences (```), allow interruption after a colon-introducer when the
+        // fence is actually closed later; this matches common command transcript layout.
         let has_info = !fence.info_string.trim().is_empty();
-        let detection = if has_info {
+        let bare_fence_after_colon_with_closer =
+            !has_info && !ctx.has_blank_before && line_pos > 0 && {
+                let prev_nonblank_ends_with_colon = lines[line_pos - 1].trim_end().ends_with(':');
+                if !prev_nonblank_ends_with_colon {
+                    false
+                } else {
+                    let mut found = false;
+                    for raw_line in lines.iter().skip(line_pos + 1) {
+                        let (line_bq_depth, inner) = count_blockquote_markers(raw_line);
+                        if line_bq_depth < ctx.blockquote_depth {
+                            break;
+                        }
+                        let candidate = if let Some(list_info) = ctx.list_indent_info {
+                            if list_info.content_col > 0 && !inner.is_empty() {
+                                let idx = byte_index_at_column(inner, list_info.content_col);
+                                &inner[idx..]
+                            } else {
+                                inner
+                            }
+                        } else {
+                            inner
+                        };
+                        if is_closing_fence(candidate, &fence) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    found
+                }
+            };
+
+        let detection = if has_info || bare_fence_after_colon_with_closer {
             BlockDetectionResult::YesCanInterrupt
         } else if ctx.has_blank_before {
             BlockDetectionResult::Yes
