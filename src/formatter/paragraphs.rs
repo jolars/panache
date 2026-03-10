@@ -3,6 +3,45 @@ use crate::formatter::inline;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
+const INLINE_MATH_SPACE_SENTINEL: char = '\u{E000}';
+
+fn protect_inline_math_spaces(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut in_inline_math = false;
+    let mut backslash_run = 0usize;
+    let mut chars = text.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        let escaped_dollar = ch == '$' && backslash_run % 2 == 1;
+        if ch == '$' && !escaped_dollar {
+            if matches!(chars.peek(), Some('$')) {
+                out.push('$');
+                out.push(chars.next().unwrap_or('$'));
+                backslash_run = 0;
+                continue;
+            }
+            in_inline_math = !in_inline_math;
+            out.push(ch);
+            backslash_run = 0;
+            continue;
+        }
+
+        if in_inline_math && ch.is_whitespace() {
+            out.push(INLINE_MATH_SPACE_SENTINEL);
+        } else {
+            out.push(ch);
+        }
+
+        if ch == '\\' {
+            backslash_run += 1;
+        } else {
+            backslash_run = 0;
+        }
+    }
+
+    out
+}
+
 /// Check if a paragraph contains inline display math ($$...$$ within paragraph)
 pub(super) fn contains_inline_display_math(node: &SyntaxNode) -> bool {
     for child in node.descendants() {
@@ -162,12 +201,13 @@ pub(super) fn format_paragraph_with_display_math(
             // Normalize internal whitespace to keep wrapping stable across passes.
             let text = content.split_whitespace().collect::<Vec<_>>().join(" ");
             if !text.is_empty() {
-                let lines = textwrap::wrap(&text, line_width);
+                let protected = protect_inline_math_spaces(&text);
+                let lines = textwrap::wrap(&protected, line_width);
                 for (j, line) in lines.iter().enumerate() {
                     if j > 0 {
                         output.push('\n');
                     }
-                    output.push_str(line);
+                    output.push_str(&line.replace(INLINE_MATH_SPACE_SENTINEL, " "));
                 }
             }
         }
