@@ -111,9 +111,9 @@ fn code_block_can_interrupt_paragraph() {
 }
 
 #[test]
-fn bare_fence_requires_blank_line() {
-    // Bare ``` without info string requires blank line to avoid confusion with inline code
-    let input = "text\n```\ncode\n```\n";
+fn bare_fence_without_closing_fence_does_not_interrupt_paragraph() {
+    // Unclosed bare fences should not interrupt paragraphs.
+    let input = "text\n```\ncode\n";
     // Use full parse to get inline parsing too
     let tree = crate::parse(input, None);
 
@@ -124,11 +124,10 @@ fn bare_fence_requires_blank_line() {
         .collect();
     assert_eq!(paragraphs.len(), 1, "Should have one paragraph");
 
-    // Pandoc treats this as an inline code span spanning lines.
-    let code_span = tree
+    let code_block = tree
         .descendants()
-        .find(|n| n.kind() == SyntaxKind::CODE_SPAN);
-    assert!(code_span.is_some(), "Should contain inline code span");
+        .find(|n| n.kind() == SyntaxKind::CODE_BLOCK);
+    assert!(code_block.is_none(), "Should not contain fenced code block");
 }
 
 #[test]
@@ -172,6 +171,17 @@ fn bare_fence_in_list_item_with_closing_fence_can_interrupt_paragraph() {
         has_code_block,
         "Expected fenced code block inside list item"
     );
+}
+
+#[test]
+fn adjacent_bare_fences_without_blank_line_parse_as_two_code_blocks() {
+    let input = "```\na\n```\n```\nb\n```\n";
+    let node = parse_blocks(input);
+    let code_blocks = node
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::CODE_BLOCK)
+        .count();
+    assert_eq!(code_blocks, 2);
 }
 
 #[test]

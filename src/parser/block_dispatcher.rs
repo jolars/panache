@@ -1172,8 +1172,8 @@ impl BlockParser for FencedCodeBlockParser {
         }
 
         // Fenced code blocks can interrupt paragraphs if they have an info string.
-        // For bare fences (```), allow interruption after a colon-introducer when the
-        // fence is actually closed later; this matches common command transcript layout.
+        // For bare fences (```), only allow interruption when a matching closer exists
+        // later, to avoid accidentally swallowing unmatched inline-like constructs.
         let has_info = !fence.info_string.trim().is_empty();
         let has_matching_closer = !has_info && !ctx.has_blank_before && {
             let mut found = false;
@@ -1199,18 +1199,13 @@ impl BlockParser for FencedCodeBlockParser {
             }
             found
         };
-        let bare_fence_after_colon_with_closer =
-            has_matching_closer && line_pos > 0 && lines[line_pos - 1].trim_end().ends_with(':');
-        let bare_fence_in_list_with_closer = has_matching_closer && ctx.list_indent_info.is_some();
-
-        let detection =
-            if has_info || bare_fence_after_colon_with_closer || bare_fence_in_list_with_closer {
-                BlockDetectionResult::YesCanInterrupt
-            } else if ctx.has_blank_before {
-                BlockDetectionResult::Yes
-            } else {
-                BlockDetectionResult::No
-            };
+        let detection = if has_info || has_matching_closer {
+            BlockDetectionResult::YesCanInterrupt
+        } else if ctx.has_blank_before {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::No
+        };
 
         match detection {
             BlockDetectionResult::No => None,
