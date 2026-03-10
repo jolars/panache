@@ -202,3 +202,12 @@ fn test_losslessness_adjacent_tables_with_caption_between_and_following_heading(
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_triple_underscore_emphasis_preserves_delimiters() {
+    let input = "a. ___License grant.___\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

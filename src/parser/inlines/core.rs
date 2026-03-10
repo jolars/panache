@@ -285,6 +285,8 @@ fn try_parse_three(
     builder: &mut GreenNodeBuilder,
 ) -> Option<usize> {
     let content_start = pos + 3;
+    let one = delim_char.to_string();
+    let two = one.repeat(2);
 
     log::debug!("try_parse_three: '{}' x 3 at pos {}", delim_char, pos);
 
@@ -328,15 +330,15 @@ fn try_parse_three(
             log::debug!("Matched *** closer, emitting Strong[Emph[content]]");
 
             builder.start_node(SyntaxKind::STRONG.into());
-            builder.token(SyntaxKind::STRONG_MARKER.into(), "**");
+            builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
 
             builder.start_node(SyntaxKind::EMPHASIS.into());
-            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), "*");
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
             parse_inline_range_nested(text, content_start, closer_start, config, builder);
-            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), "*");
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
             builder.finish_node(); // EMPHASIS
 
-            builder.token(SyntaxKind::STRONG_MARKER.into(), "**");
+            builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
             builder.finish_node(); // STRONG
 
             return Some(closer_start + 3 - pos);
@@ -357,18 +359,18 @@ fn try_parse_three(
                 );
 
                 builder.start_node(SyntaxKind::EMPHASIS.into());
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), "*");
+                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
 
                 builder.start_node(SyntaxKind::STRONG.into());
-                builder.token(SyntaxKind::STRONG_MARKER.into(), "**");
+                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
                 parse_inline_range_nested(text, content_start, closer_start, config, builder);
-                builder.token(SyntaxKind::STRONG_MARKER.into(), "**");
+                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
                 builder.finish_node(); // STRONG
 
                 // Parse additional content between ** and * (up to but not including the closer)
                 parse_inline_range_nested(text, continue_pos, final_closer_pos, config, builder);
 
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), "*");
+                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
                 builder.finish_node(); // EMPHASIS
 
                 return Some(final_closer_pos + 1 - pos);
@@ -376,12 +378,12 @@ fn try_parse_three(
 
             // Fallback: emit * + STRONG
             log::debug!("No * closer found after **, emitting * + STRONG");
-            builder.token(SyntaxKind::TEXT.into(), "*");
+            builder.token(SyntaxKind::TEXT.into(), &one);
 
             builder.start_node(SyntaxKind::STRONG.into());
-            builder.token(SyntaxKind::STRONG_MARKER.into(), "**");
+            builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
             parse_inline_range_nested(text, content_start, closer_start, config, builder);
-            builder.token(SyntaxKind::STRONG_MARKER.into(), "**");
+            builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
             builder.finish_node(); // STRONG
 
             return Some(closer_start + 2 - pos);
@@ -402,17 +404,17 @@ fn try_parse_three(
                 );
 
                 builder.start_node(SyntaxKind::STRONG.into());
-                builder.token(SyntaxKind::STRONG_MARKER.into(), "**");
+                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
 
                 builder.start_node(SyntaxKind::EMPHASIS.into());
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), "*");
+                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
                 parse_inline_range_nested(text, content_start, closer_start, config, builder);
-                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), "*");
+                builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
                 builder.finish_node(); // EMPHASIS
 
                 parse_inline_range_nested(text, continue_pos, final_closer_pos, config, builder);
 
-                builder.token(SyntaxKind::STRONG_MARKER.into(), "**");
+                builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
                 builder.finish_node(); // STRONG
 
                 return Some(final_closer_pos + 2 - pos);
@@ -420,12 +422,12 @@ fn try_parse_three(
 
             // Fallback: emit ** + EMPH
             log::debug!("No ** closer found after *, emitting ** + EMPH");
-            builder.token(SyntaxKind::TEXT.into(), "**");
+            builder.token(SyntaxKind::TEXT.into(), &two);
 
             builder.start_node(SyntaxKind::EMPHASIS.into());
-            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), "*");
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
             parse_inline_range_nested(text, content_start, closer_start, config, builder);
-            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), "*");
+            builder.token(SyntaxKind::EMPHASIS_MARKER.into(), &one);
             builder.finish_node(); // EMPHASIS
 
             return Some(closer_start + 1 - pos);
