@@ -64,6 +64,7 @@ impl LanguageServer for PanacheLsp {
                 name: "panache-lsp".to_string(),
                 version: Some(env!("CARGO_PKG_VERSION").to_string()),
             }),
+            offset_encoding: None,
         })
     }
 
