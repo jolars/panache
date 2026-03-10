@@ -109,24 +109,3 @@ $$t(\mathbf{y}) = \sum_{i=1}^N x_i y_i = \mathbf{X}^T \mathbf{y} \quad \text{and
     let output2 = format(&output1, Some(config), None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
-
-#[test]
-fn examples_file_poisson_section_is_idempotent_in_rmarkdown() {
-    let flavor = Flavor::RMarkdown;
-    let config = Config {
-        flavor,
-        extensions: Extensions::for_flavor(flavor),
-        ..Default::default()
-    };
-    let source = std::fs::read_to_string("CSwR/21-Examples.Rmd").expect("read examples file");
-    let snippet = source
-        .lines()
-        .skip(1022)
-        .take(17)
-        .collect::<Vec<_>>()
-        .join("\n")
-        + "\n";
-    let output1 = format(&snippet, Some(config.clone()), None);
-    let output2 = format(&output1, Some(config), None);
-    assert_eq!(output1, output2, "Formatting should be idempotent");
-}
