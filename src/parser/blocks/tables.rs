@@ -275,15 +275,55 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usiz
 
             // If we find a caption start, this is the beginning of the multiline caption
             if is_valid_caption_start_before_table(lines, scan_pos) {
+                if scan_pos > 0 && !lines[scan_pos - 1].trim().is_empty() {
+                    return None;
+                }
+                if previous_nonblank_looks_like_table(lines, scan_pos) {
+                    return None;
+                }
                 return Some((scan_pos, caption_end));
             }
         }
         // Scanned to beginning without finding caption start
         None
     } else {
+        if pos > 0 && !lines[pos - 1].trim().is_empty() {
+            return None;
+        }
+        if previous_nonblank_looks_like_table(lines, pos) {
+            return None;
+        }
         // This line is a caption start - return the range
         Some((pos, caption_end))
     }
+}
+
+fn previous_nonblank_looks_like_table(lines: &[&str], pos: usize) -> bool {
+    if pos == 0 {
+        return false;
+    }
+    let mut i = pos;
+    while i > 0 {
+        i -= 1;
+        let line = lines[i].trim();
+        if line.is_empty() {
+            continue;
+        }
+        return line_looks_like_table_syntax(line);
+    }
+    false
+}
+
+fn line_looks_like_table_syntax(line: &str) -> bool {
+    if line.starts_with('|') && line.matches('|').count() >= 2 {
+        return true;
+    }
+    if line.starts_with('+') && line.ends_with('+') && (line.contains('-') || line.contains('=')) {
+        return true;
+    }
+    try_parse_table_separator(line).is_some()
+        || try_parse_pipe_separator(line).is_some()
+        || try_parse_grid_separator(line).is_some()
 }
 
 /// Find caption after table (if any).

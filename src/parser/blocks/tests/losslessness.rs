@@ -193,3 +193,12 @@ fn test_losslessness_grid_table_wide_and_zero_width_chars() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_adjacent_tables_with_caption_between_and_following_heading() {
+    let input = "| H1 | H2 |\n|----|----|\n| a  | b  |\nTable: first\n\n| J1 | J2 |\n|----|----|\n| c  | d  |\nTable: second\n\n### Exercises\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}
