@@ -166,6 +166,21 @@ fn quote_display_math_attribute_idempotency() {
 }
 
 #[test]
+fn quote_tex_command_lines_idempotency() {
+    let input = r#"> ... the problem with object-oriented languages is they’ve got all this
+> implicit environment that they carry around with them. You wanted a banana
+> but what you got was a gorilla holding the banana and the entire jungle.
+>
+> \medskip
+> \hfill---Joe Armstrong
+"#;
+
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
 fn display_math_followup_paragraph_idempotency() {
     let input = r#"::: {.exercise #NW}
 Show that the kernel density estimator

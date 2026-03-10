@@ -189,6 +189,12 @@ fn parse_tex_command_lines(
             break;
         }
 
+        // Inside blockquotes, consume one command line at a time so outer parsing
+        // can preserve each line's blockquote markers losslessly.
+        if blockquote_depth > 0 && !first_line {
+            break;
+        }
+
         log::trace!("  Raw block line: {:?}", inner);
 
         if !first_line {
@@ -367,6 +373,15 @@ mod tests {
     #[test]
     fn test_blockquote_line_parses_tex_command() {
         let lines = vec!["> \\medskip\n"];
+        let mut builder = GreenNodeBuilder::new();
+
+        let consumed = parse_raw_tex_block(&mut builder, &lines, 0, 1);
+        assert_eq!(consumed, 1);
+    }
+
+    #[test]
+    fn test_blockquote_multiple_tex_commands_consumes_one_line() {
+        let lines = vec!["> \\medskip\n", "> \\hfill---Joe Armstrong\n"];
         let mut builder = GreenNodeBuilder::new();
 
         let consumed = parse_raw_tex_block(&mut builder, &lines, 0, 1);

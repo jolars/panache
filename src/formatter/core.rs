@@ -896,6 +896,24 @@ impl Formatter {
                                 self.output.push('\n');
                             }
                         }
+                        SyntaxKind::TEX_BLOCK => {
+                            // Keep raw TeX content verbatim, but preserve blockquote prefixes.
+                            let saved_output = self.output.clone();
+                            self.output.clear();
+                            self.format_node_sync(&child, indent);
+                            let tex_output = self.output.clone();
+                            self.output = saved_output;
+
+                            for line in tex_output.lines() {
+                                if line.is_empty() {
+                                    self.output.push_str(&blank_prefix);
+                                } else {
+                                    self.output.push_str(&content_prefix);
+                                    self.output.push_str(line);
+                                }
+                                self.output.push('\n');
+                            }
+                        }
                         _ => {
                             // Handle other content within block quotes
                             self.format_node_sync(&child, indent);

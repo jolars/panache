@@ -168,6 +168,15 @@ fn test_losslessness_blockquote_atx_heading_with_attributes() {
 }
 
 #[test]
+fn test_losslessness_blockquote_tex_command_attribution_line() {
+    let input = "> quote line\n>\n> \\medskip\n> \\hfill---Joe Armstrong\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}
+
+#[test]
 fn test_losslessness_grid_table_wide_and_zero_width_chars() {
     let input = "+--+----+\n|魚|fish|\n+--+----+\n\n+-------+-------+\n|German |English|\n+-------+-------+\n|Auf‌lage|edition|\n+-------+-------+\n\n+-------+---------+\n|می‌خواهم|I want to|\n+-------+---------+\n";
     let config = Config::default();
