@@ -36,6 +36,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             let mut content = String::new();
             let mut attributes = String::new();
             let mut marker_len = 1usize;
+            let mut skip_marker_whitespace = false;
 
             for child in node.children_with_tokens() {
                 match child {
@@ -43,9 +44,15 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         attributes = n.text().to_string();
                     }
                     NodeOrToken::Token(t) => {
-                        if t.kind() == SyntaxKind::CODE_SPAN_MARKER {
+                        if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
+                            skip_marker_whitespace = true;
+                        } else if t.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace {
+                            skip_marker_whitespace = false;
+                        } else if t.kind() == SyntaxKind::CODE_SPAN_MARKER {
+                            skip_marker_whitespace = false;
                             marker_len = marker_len.max(t.text().len());
                         } else if t.kind() != SyntaxKind::ATTRIBUTE {
+                            skip_marker_whitespace = false;
                             content.push_str(t.text());
                         }
                     }

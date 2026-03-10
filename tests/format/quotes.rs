@@ -205,3 +205,11 @@ $x$ under $\hat{f}$.
     let output2 = format(&output1, Some(config), None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn blockquote_codespan_continuation_line_stays_idempotent() {
+    let input = "> If list `x` is a train carrying objects, then `x[[5]]` is the object in car 5;\n> `x[4:6]` is a train of cars 4-6.\n>\n> --- \\@RLangTip, <https://twitter.com/RLangTip/status/268375867468681216>\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
