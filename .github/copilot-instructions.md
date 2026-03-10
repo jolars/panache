@@ -46,6 +46,12 @@ cargo run -- format < document.qmd
 # Format from stdin to stdout
 cat document.qmd | cargo run -- format 
 
+# Run parsing checks on a file (checking losslessness)
+cargo run -- parse --verify document.qmd
+
+# Run formatting (idempotency) and parsing checks (losslessness) together
+cargo run -- format --verify document.qmd
+
 # Parse (show CST for debugging)
 printf "# Test" | cargo run -- parse
 
