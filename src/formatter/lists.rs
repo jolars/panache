@@ -171,7 +171,7 @@ impl Formatter {
         // Parser may emit PLAIN for most list item text; we treat lists as loose
         // if there are explicit blank lines between items in the CST.
         let list_children: Vec<_> = node.children().collect();
-        let is_loose = list_children.iter().enumerate().any(|(idx, child)| {
+        let has_blank_between_items = list_children.iter().enumerate().any(|(idx, child)| {
             if child.kind() != SyntaxKind::BLANK_LINE {
                 return false;
             }
@@ -180,6 +180,13 @@ impl Formatter {
                 && list_children[idx + 1].kind() == SyntaxKind::LIST_ITEM;
             prev_is_item && next_is_item
         });
+        let has_nested_lists = list_children.iter().any(|child| {
+            child.kind() == SyntaxKind::LIST_ITEM
+                && child
+                    .children()
+                    .any(|item_child| item_child.kind() == SyntaxKind::LIST)
+        });
+        let is_loose = has_blank_between_items && !has_nested_lists;
 
         log::debug!("Formatting list: is_loose={}", is_loose);
 
@@ -206,7 +213,18 @@ impl Formatter {
                     self.output.push('\n');
                 }
             } else if child.kind() == SyntaxKind::BLANK_LINE {
-                // Skip BlankLine nodes - we're normalizing spacing based on loose/tight
+                // Preserve explicit separators when not treating this list as globally loose.
+                let prev_is_item = child
+                    .prev_sibling()
+                    .map(|n| n.kind() == SyntaxKind::LIST_ITEM)
+                    .unwrap_or(false);
+                let next_is_item = child
+                    .next_sibling()
+                    .map(|n| n.kind() == SyntaxKind::LIST_ITEM)
+                    .unwrap_or(false);
+                if !is_loose && prev_is_item && next_is_item && !self.output.ends_with("\n\n") {
+                    self.output.push('\n');
+                }
                 continue;
             } else if child.kind() == SyntaxKind::PARAGRAPH {
                 // Paragraphs that are siblings of ListItems are continuation content

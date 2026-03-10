@@ -33,7 +33,10 @@ use super::blocks::html_blocks::{HtmlBlockType, parse_html_block, try_parse_html
 use super::blocks::indented_code::{is_indented_code_line, parse_indented_code_block};
 use super::blocks::latex_envs::LatexEnvInfo;
 use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
-use super::blocks::lists::{ListMarker, is_content_nested_bullet_marker, try_parse_list_marker};
+use super::blocks::lists::{
+    ListDelimiter, ListMarker, OrderedMarker, is_content_nested_bullet_marker,
+    try_parse_list_marker,
+};
 use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
 use super::blocks::raw_blocks;
 use super::blocks::raw_blocks::extract_environment_name;
@@ -500,6 +503,37 @@ impl BlockParser for ListParser {
         }
         let (indent_cols, indent_bytes) =
             super::utils::container_stack::leading_indent(ctx.content);
+        if !ctx.has_blank_before
+            && ctx.in_list
+            && let Some(list_indent) = ctx.list_indent_info
+            && list_indent.content_col >= 4
+            && indent_cols == list_indent.content_col
+            && indent_cols <= 4
+            && matches!(
+                marker_match.marker,
+                ListMarker::Ordered(OrderedMarker::Decimal {
+                    style: ListDelimiter::Parens,
+                    ..
+                }) | ListMarker::Ordered(OrderedMarker::Decimal {
+                    style: ListDelimiter::Period,
+                    ..
+                }) | ListMarker::Ordered(OrderedMarker::LowerAlpha {
+                    style: ListDelimiter::Parens,
+                    ..
+                }) | ListMarker::Ordered(OrderedMarker::UpperAlpha {
+                    style: ListDelimiter::Parens,
+                    ..
+                }) | ListMarker::Ordered(OrderedMarker::LowerRoman {
+                    style: ListDelimiter::Parens,
+                    ..
+                }) | ListMarker::Ordered(OrderedMarker::UpperRoman {
+                    style: ListDelimiter::Parens,
+                    ..
+                })
+            )
+        {
+            return None;
+        }
 
         if indent_cols >= 4 && !ctx.in_list {
             return None;

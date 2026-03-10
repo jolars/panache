@@ -78,3 +78,11 @@ fn nested_tight_list_with_followup_paragraph_is_idempotent() {
     let output2 = format(&output1, None, None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn parenthesized_marker_in_list_continuation_stays_paragraph_text() {
+    let input = "- Parent item\n\n  - First paragraph line that introduces context and\n    (b) continues as regular text, not a nested list marker.\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}

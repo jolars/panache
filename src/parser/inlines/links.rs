@@ -542,9 +542,9 @@ pub fn try_parse_reference_link(
         // Total length includes both bracket pairs
         let total_len = label_end + 1;
 
-        // Implicit reference: empty label means use text as label
+        // Implicit reference: empty label means emit [text][]
         if label.is_empty() {
-            return Some((total_len, link_text, link_text.to_string(), false));
+            return Some((total_len, link_text, String::new(), false));
         }
 
         // Explicit reference: use the provided label
@@ -587,9 +587,9 @@ pub fn emit_reference_link(
         // Explicit or implicit reference: [text][label] or [text][]
         builder.token(SyntaxKind::TEXT.into(), "[");
         builder.start_node(SyntaxKind::LINK_REF.into());
-        // For implicit references (label == text), emit empty label to get [text][]
+        // For implicit references, label is empty and we emit [text][]
         // For explicit references, emit the label to get [text][label]
-        if label != link_text {
+        if !label.is_empty() {
             builder.token(SyntaxKind::TEXT.into(), label);
         }
         builder.finish_node();
@@ -963,10 +963,14 @@ mod tests {
     fn test_parse_reference_link_implicit() {
         let input = "[link text][]";
         let result = try_parse_reference_link(input, false);
-        assert_eq!(
-            result,
-            Some((13, "link text", "link text".to_string(), false))
-        );
+        assert_eq!(result, Some((13, "link text", String::new(), false)));
+    }
+
+    #[test]
+    fn test_parse_reference_link_explicit_same_label_as_text() {
+        let input = "[stack][stack]";
+        let result = try_parse_reference_link(input, false);
+        assert_eq!(result, Some((14, "stack", "stack".to_string(), false)));
     }
 
     #[test]
