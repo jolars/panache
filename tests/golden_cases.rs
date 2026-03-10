@@ -191,6 +191,7 @@ golden_test_cases!(
     inline_footnotes,
     inline_math,
     grid_table,
+    grid_table_nordics,
     latex_environment,
     lazy_continuation_deep,
     line_blocks,

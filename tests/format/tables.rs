@@ -209,6 +209,15 @@ fn test_grid_table_with_caption_after() {
 }
 
 #[test]
+fn test_grid_table_multiline_header_and_footer_sections() {
+    let input = "+---------+--------+\n| Name    | Value  |\n|         | (2020) |\n+:=======:+:======:+\n| Denmark | 5.8    |\n+---------+--------+\n+=========+========+\n| Total   | 5.8    |\n+=========+========+";
+    let expected = "+---------+--------+\n|  Name   | Value  |\n|         | (2020) |\n+:=======:+:======:+\n| Denmark |  5.8   |\n+=========+========+\n|  Total  |  5.8   |\n+=========+========+\n";
+
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_grid_table_empty_cells() {
     let input = "+-----+-----+\n| A   |     |\n+=====+=====+\n|     | D   |\n+-----+-----+";
     let expected = "+---+---+\n| A |   |\n+===+===+\n|   | D |\n+---+---+\n";

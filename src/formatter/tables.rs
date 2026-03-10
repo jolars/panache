@@ -393,13 +393,32 @@ fn split_grid_row(row_text: &str) -> Vec<String> {
         .collect()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GridRowSection {
+    Header,
+    Body,
+    Footer,
+}
+
+struct GridTableData {
+    rows: Vec<Vec<String>>,
+    row_sections: Vec<GridRowSection>,
+    row_groups: Vec<usize>,
+    alignments: Vec<Alignment>,
+    caption: Option<String>,
+    caption_after: bool,
+}
+
 /// Extract structured data from grid table AST node
-fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> TableData {
+fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData {
     let mut rows = Vec::new();
+    let mut row_sections = Vec::new();
+    let mut row_groups = Vec::new();
     let mut alignments = Vec::new();
     let mut caption = None;
     let mut caption_after = false;
     let mut seen_header = false;
+    let mut row_group_index = 0usize;
 
     for child in node.children() {
         match child.kind() {
@@ -445,28 +464,63 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                     seen_header = true;
                 }
             }
-            SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW => {
-                let cells = extract_row_cells(&child, config);
-                let cells = if cells.is_empty() {
-                    let row_content = format_cell_content(&child, config);
-                    split_grid_row(&row_content)
-                } else {
-                    cells
+            SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW | SyntaxKind::TABLE_FOOTER => {
+                let section = match child.kind() {
+                    SyntaxKind::TABLE_HEADER => GridRowSection::Header,
+                    SyntaxKind::TABLE_FOOTER => GridRowSection::Footer,
+                    _ => GridRowSection::Body,
                 };
-                rows.push(cells);
+
+                let cells = extract_row_cells(&child, config);
+                let has_parsed_cells = !cells.is_empty();
+                if !has_parsed_cells {
+                    let row_content = format_cell_content(&child, config);
+                    let parsed = split_grid_row(&row_content);
+                    if !parsed.is_empty() {
+                        rows.push(parsed);
+                        row_sections.push(section);
+                        row_groups.push(row_group_index);
+                    }
+                } else {
+                    rows.push(cells);
+                    row_sections.push(section);
+                    row_groups.push(row_group_index);
+                }
+
+                // Continuation lines are emitted as raw text in CST rows; include
+                // them for width calculation and output structure.
+                let mut seen_first_content_line = false;
+                let row_text = child.text().to_string();
+                for line in row_text.lines() {
+                    if !(line.trim_start().starts_with('|') && line.trim_end().ends_with('|')) {
+                        continue;
+                    }
+                    if !seen_first_content_line {
+                        seen_first_content_line = true;
+                        if has_parsed_cells {
+                            continue;
+                        }
+                    }
+                    let parsed = split_grid_row(line);
+                    if !parsed.is_empty() {
+                        rows.push(parsed);
+                        row_sections.push(section);
+                        row_groups.push(row_group_index);
+                    }
+                }
+                row_group_index += 1;
             }
             _ => {}
         }
     }
 
-    TableData {
+    GridTableData {
         rows,
+        row_sections,
+        row_groups,
         alignments,
         caption,
         caption_after,
-        column_widths: None,
-        column_positions: None,
-        has_header: true, // Grid tables always have headers
     }
 }
 
@@ -499,7 +553,7 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
     }
 
     // Helper to create separator line
-    let make_separator = |is_header: bool| -> String {
+    let make_separator = |fill_char: char, with_alignment_markers: bool| -> String {
         let mut line = String::from("+");
 
         for (col_idx, width) in widths.iter().enumerate() {
@@ -509,11 +563,9 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
                 .copied()
                 .unwrap_or(Alignment::Default);
 
-            let fill_char = if is_header { '=' } else { '-' };
-
-            // Create separator with alignment markers
+            // Create separator with optional alignment markers
             // Per Pandoc spec: alignment colons go in header separator ONLY, not row separators
-            let segment = if is_header {
+            let segment = if with_alignment_markers {
                 // Header separator: include alignment colons if specified
                 match alignment {
                     Alignment::Left => {
@@ -549,13 +601,19 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
     };
 
     // Top border
-    output.push_str(&make_separator(false));
+    output.push_str(&make_separator('-', false));
 
     // Format rows
     for (row_idx, row) in table_data.rows.iter().enumerate() {
+        let current_section = table_data
+            .row_sections
+            .get(row_idx)
+            .copied()
+            .unwrap_or(GridRowSection::Body);
         output.push('|');
 
-        for (col_idx, cell) in row.iter().enumerate() {
+        for (col_idx, _) in widths.iter().enumerate() {
+            let cell = row.get(col_idx).map_or("", String::as_str);
             let width = widths.get(col_idx).copied().unwrap_or(3);
             let alignment = table_data
                 .alignments
@@ -568,29 +626,31 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
             // Apply alignment using unicode display width
             let cell_width = cell.width();
             let total_padding = width.saturating_sub(cell_width);
-
-            let padded_cell = if row_idx == 0 {
-                // Header row: always left-align
-                format!("{}{}", cell, " ".repeat(total_padding))
-            } else {
-                // Data rows: respect alignment
+            let effective_alignment = if current_section == GridRowSection::Header {
                 match alignment {
-                    Alignment::Left | Alignment::Default => {
-                        format!("{}{}", cell, " ".repeat(total_padding))
-                    }
-                    Alignment::Right => {
-                        format!("{}{}", " ".repeat(total_padding), cell)
-                    }
-                    Alignment::Center => {
-                        let left_padding = total_padding / 2;
-                        let right_padding = total_padding - left_padding;
-                        format!(
-                            "{}{}{}",
-                            " ".repeat(left_padding),
-                            cell,
-                            " ".repeat(right_padding)
-                        )
-                    }
+                    Alignment::Center => Alignment::Center,
+                    _ => Alignment::Left,
+                }
+            } else {
+                alignment
+            };
+
+            let padded_cell = match effective_alignment {
+                Alignment::Left | Alignment::Default => {
+                    format!("{}{}", cell, " ".repeat(total_padding))
+                }
+                Alignment::Right => {
+                    format!("{}{}", " ".repeat(total_padding), cell)
+                }
+                Alignment::Center => {
+                    let left_padding = total_padding / 2;
+                    let right_padding = total_padding - left_padding;
+                    format!(
+                        "{}{}{}",
+                        " ".repeat(left_padding),
+                        cell,
+                        " ".repeat(right_padding)
+                    )
                 }
             };
 
@@ -600,14 +660,23 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
 
         output.push('\n');
 
-        // Insert separator after first row (header) or after each row
-        if row_idx == 0 {
-            // Header separator with =
-            output.push_str(&make_separator(true));
-        } else {
-            // Row separator with -
-            output.push_str(&make_separator(false));
+        // Insert section-aware separator.
+        let next_section = table_data.row_sections.get(row_idx + 1).copied();
+        let current_group = table_data.row_groups.get(row_idx).copied();
+        let next_group = table_data.row_groups.get(row_idx + 1).copied();
+
+        if current_group.is_some() && current_group == next_group {
+            continue;
         }
+
+        let separator = match (current_section, next_section) {
+            (GridRowSection::Header, Some(GridRowSection::Header)) => make_separator('-', false),
+            (GridRowSection::Header, _) => make_separator('=', true),
+            (GridRowSection::Body, Some(GridRowSection::Footer)) => make_separator('=', false),
+            (GridRowSection::Footer, _) => make_separator('=', false),
+            (_, _) => make_separator('-', false),
+        };
+        output.push_str(&separator);
     }
 
     // Emit caption after if present
