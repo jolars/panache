@@ -515,6 +515,13 @@ fn prepare_fence_open_line<'a>(
     };
 
     let first_trimmed = strip_leading_spaces(first_stripped);
+    let leading_ws_len = first_stripped.len().saturating_sub(first_trimmed.len());
+    if leading_ws_len > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &first_stripped[..leading_ws_len],
+        );
+    }
     (first_trimmed, first_inner)
 }
 

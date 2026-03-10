@@ -1175,44 +1175,42 @@ impl BlockParser for FencedCodeBlockParser {
         // For bare fences (```), allow interruption after a colon-introducer when the
         // fence is actually closed later; this matches common command transcript layout.
         let has_info = !fence.info_string.trim().is_empty();
-        let bare_fence_after_colon_with_closer =
-            !has_info && !ctx.has_blank_before && line_pos > 0 && {
-                let prev_nonblank_ends_with_colon = lines[line_pos - 1].trim_end().ends_with(':');
-                if !prev_nonblank_ends_with_colon {
-                    false
-                } else {
-                    let mut found = false;
-                    for raw_line in lines.iter().skip(line_pos + 1) {
-                        let (line_bq_depth, inner) = count_blockquote_markers(raw_line);
-                        if line_bq_depth < ctx.blockquote_depth {
-                            break;
-                        }
-                        let candidate = if let Some(list_info) = ctx.list_indent_info {
-                            if list_info.content_col > 0 && !inner.is_empty() {
-                                let idx = byte_index_at_column(inner, list_info.content_col);
-                                &inner[idx..]
-                            } else {
-                                inner
-                            }
-                        } else {
-                            inner
-                        };
-                        if is_closing_fence(candidate, &fence) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    found
+        let has_matching_closer = !has_info && !ctx.has_blank_before && {
+            let mut found = false;
+            for raw_line in lines.iter().skip(line_pos + 1) {
+                let (line_bq_depth, inner) = count_blockquote_markers(raw_line);
+                if line_bq_depth < ctx.blockquote_depth {
+                    break;
                 }
-            };
-
-        let detection = if has_info || bare_fence_after_colon_with_closer {
-            BlockDetectionResult::YesCanInterrupt
-        } else if ctx.has_blank_before {
-            BlockDetectionResult::Yes
-        } else {
-            BlockDetectionResult::No
+                let candidate = if let Some(list_info) = ctx.list_indent_info {
+                    if list_info.content_col > 0 && !inner.is_empty() {
+                        let idx = byte_index_at_column(inner, list_info.content_col);
+                        &inner[idx..]
+                    } else {
+                        inner
+                    }
+                } else {
+                    inner
+                };
+                if is_closing_fence(candidate, &fence) {
+                    found = true;
+                    break;
+                }
+            }
+            found
         };
+        let bare_fence_after_colon_with_closer =
+            has_matching_closer && line_pos > 0 && lines[line_pos - 1].trim_end().ends_with(':');
+        let bare_fence_in_list_with_closer = has_matching_closer && ctx.list_indent_info.is_some();
+
+        let detection =
+            if has_info || bare_fence_after_colon_with_closer || bare_fence_in_list_with_closer {
+                BlockDetectionResult::YesCanInterrupt
+            } else if ctx.has_blank_before {
+                BlockDetectionResult::Yes
+            } else {
+                BlockDetectionResult::No
+            };
 
         match detection {
             BlockDetectionResult::No => None,

@@ -112,3 +112,12 @@ fn test_losslessness_colon_definition_before_grid_table() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_fenced_code_open_leading_space() {
+    let input = " ```\n x\n ```\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

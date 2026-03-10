@@ -162,6 +162,19 @@ fn bare_fence_after_colon_with_closing_fence_can_interrupt_paragraph() {
 }
 
 #[test]
+fn bare_fence_in_list_item_with_closing_fence_can_interrupt_paragraph() {
+    let input = "- one\n  ```\n  code\n  ```\n- two\n";
+    let node = parse_blocks(input);
+    let has_code_block = node
+        .descendants()
+        .any(|n| n.kind() == SyntaxKind::CODE_BLOCK);
+    assert!(
+        has_code_block,
+        "Expected fenced code block inside list item"
+    );
+}
+
+#[test]
 fn parses_code_block_at_start_of_document() {
     let input = "```\ncode\n```\n";
 

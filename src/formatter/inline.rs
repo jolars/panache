@@ -35,6 +35,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
         SyntaxKind::CODE_SPAN => {
             let mut content = String::new();
             let mut attributes = String::new();
+            let mut marker_len = 1usize;
 
             for child in node.children_with_tokens() {
                 match child {
@@ -42,14 +43,20 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         attributes = n.text().to_string();
                     }
                     NodeOrToken::Token(t) => {
-                        if t.kind() != SyntaxKind::CODE_SPAN_MARKER
-                            && t.kind() != SyntaxKind::ATTRIBUTE
-                        {
+                        if t.kind() == SyntaxKind::CODE_SPAN_MARKER {
+                            marker_len = marker_len.max(t.text().len());
+                        } else if t.kind() != SyntaxKind::ATTRIBUTE {
                             content.push_str(t.text());
                         }
                     }
                     _ => {}
                 }
+            }
+
+            // Preserve malformed multi-line triple-backtick code spans as-is so they
+            // don't collapse into one line and then reparse differently on pass 2.
+            if marker_len >= 3 && content.contains('\n') {
+                return node.text().to_string();
             }
 
             // Normalize content: replace newlines with spaces and trim

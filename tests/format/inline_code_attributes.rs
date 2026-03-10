@@ -93,3 +93,11 @@ fn inline_code_attributes_quoted_values() {
     let output = format(input, None, None);
     assert!(output.contains("`func()`{key=\"value with spaces\"}"));
 }
+
+#[test]
+fn multiline_triple_backtick_codespan_stays_idempotent() {
+    let input = "Add thin space between single and double quotes.\n```\n% pandoc -t latex+smart\n---\nlang: en-GB\n---\n'[\"On the Outside\"]{}: Constructing Cycling Citizenship.'\n^D\n`\\,{``On the Outside''}: Constructing Cycling Citizenship.'\n```\n";
+    let first = format(input, None, None);
+    let second = format(&first, None, None);
+    assert_eq!(first, second);
+}
