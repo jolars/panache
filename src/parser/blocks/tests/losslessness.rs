@@ -121,3 +121,12 @@ fn test_losslessness_fenced_code_open_leading_space() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_grid_table_spanning_style_row() {
+    let input = "+-----------------------------------------+-----------------------------------------+\n| Student ID                              | Name                                    |\n+:========================================+:========================================+\n| Computer Science                                                                  |\n+-----------------------------------------+-----------------------------------------+\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

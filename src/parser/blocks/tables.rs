@@ -1484,6 +1484,19 @@ fn emit_grid_table_row(
     let first_line = lines[0];
     let (line_without_newline, newline_str) = strip_newline(first_line);
     let trimmed = line_without_newline.trim();
+    let expected_pipe_count = columns.len().saturating_add(1);
+    let actual_pipe_count = trimmed.chars().filter(|&c| c == '|').count();
+
+    // Rows that don't contain all expected column separators (spanning-style rows)
+    // must be emitted verbatim for losslessness.
+    if actual_pipe_count != expected_pipe_count {
+        emit_line_tokens(builder, first_line);
+        for line in lines.iter().skip(1) {
+            emit_line_tokens(builder, line);
+        }
+        builder.finish_node();
+        return;
+    }
 
     // Emit leading whitespace
     let leading_ws_len = line_without_newline.len() - line_without_newline.trim_start().len();
