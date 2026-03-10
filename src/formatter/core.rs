@@ -166,6 +166,21 @@ impl Formatter {
         Some(format!("::: {} :::", middle))
     }
 
+    fn paragraph_starts_with_atx_heading_candidate(&self, node: &SyntaxNode) -> bool {
+        if node.kind() != SyntaxKind::PARAGRAPH {
+            return false;
+        }
+        let text = node.text().to_string();
+        let first_line = text.lines().next().unwrap_or_default();
+        let trimmed = first_line.trim_start_matches([' ', '\t']);
+        let leading_hashes = trimmed.chars().take_while(|&c| c == '#').count();
+        (1..=6).contains(&leading_hashes)
+            && trimmed[leading_hashes..]
+                .chars()
+                .next()
+                .is_some_and(char::is_whitespace)
+    }
+
     // Delegate to paragraphs module
     fn format_paragraph_with_display_math(
         &mut self,
@@ -360,6 +375,8 @@ impl Formatter {
 
                 if let Some(next) = node.next_sibling()
                     && is_block_element(next.kind())
+                    && !(self.config.extensions.blank_before_header
+                        && self.paragraph_starts_with_atx_heading_candidate(&next))
                     && !self.output.ends_with("\n\n")
                 {
                     self.output.push('\n');

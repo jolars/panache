@@ -19,3 +19,10 @@ fn atx_leading_spaces_are_normalized() {
     assert_eq!(out, expected);
     assert_eq!(format(&out, None, None), expected);
 }
+
+#[test]
+fn consecutive_atx_headings_without_blank_lines_stay_separate() {
+    let input = "# unremarkable header 1\n## unremarkable header 2\n### unremarkable header 3\n### unremarkable header 3 ##\n";
+    let out = format(input, None, None);
+    assert_eq!(format(&out, None, None), out);
+}
