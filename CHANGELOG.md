@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.15.0](https://github.com/jolars/panache/compare/v2.14.1...v2.15.0) (2026-03-10)
+
+### Features
+
+* **formatter:** normalize indented tables ([c4b394f](https://github.com/jolars/panache/commit/c4b394f27cfb4a4b86db08db40c6374f8dfe72f0))
+
+### Bug Fixes
+
+* **formatter:** fix idempotency around table caption ([aad08f6](https://github.com/jolars/panache/commit/aad08f6d9d654fc47de5aab6e6610fd571724467))
+* **formatter:** fix idempotency failure with display math ([d7e2b47](https://github.com/jolars/panache/commit/d7e2b47f5c21c9d6faed76f0fefbd34386fee2a1))
+* **formatter:** fix idempotency issue in hard break in list ([1b46852](https://github.com/jolars/panache/commit/1b4685250a5345d42347d492b1939742f9240f86))
+* **formatter:** fix idempotency issue with display math ([f47edc9](https://github.com/jolars/panache/commit/f47edc9a8336a49a2867cbaca7a38a5d99e0394e))
+* **formatter:** handle footer and multirow grid tables ([821e54f](https://github.com/jolars/panache/commit/821e54f4e230439fc5fe521e414f03df2b2ad533))
+* **formatter:** handle idempotency in code span formatting ([188d10f](https://github.com/jolars/panache/commit/188d10f7e14167493600be3aa68277a8249e28f1))
+* **formatter:** handle idempotency with blockquote marker ([854b5fe](https://github.com/jolars/panache/commit/854b5feda5ceff37c2bbe1842137940cab36c744))
+* **formatter:** handle tex blocks properly in formatter ([04ad902](https://github.com/jolars/panache/commit/04ad90267d914239c00fedb66b924d85b1dd07f7))
+* **formatter:** preserve malformed display math with dollars ([78e2907](https://github.com/jolars/panache/commit/78e290790664053a7874ae0d4f5408f73fc03762))
+* **formatter:** protect inline math spaces ([d6470b6](https://github.com/jolars/panache/commit/d6470b60ee64a52b815eb4b1acce34208c32e279))
+* **parser,formatter:** handle consecutive tables ([f1a4c08](https://github.com/jolars/panache/commit/f1a4c08b056f5c28d0dafc36c967e85b86f17a8b))
+* **parser,formatter:** harden grid table parsing ([05bdab9](https://github.com/jolars/panache/commit/05bdab946578e3d6061ec2dfa7ae55d0bf9f7c9a))
+* **parser:** don't hardcode emphasis markers ([ce7125e](https://github.com/jolars/panache/commit/ce7125edafe3b56f7cce6cbbd700fcb3e01f8bf2))
+* **parser:** parse whitespace after code block starter ([3d28e74](https://github.com/jolars/panache/commit/3d28e7430f45982d58b2dbb7da276d82bd8a7608))
+
 ## [2.14.1](https://github.com/jolars/panache/compare/v2.14.0...v2.14.1) (2026-03-10)
 
 ### Bug Fixes
