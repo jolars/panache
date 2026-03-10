@@ -26,3 +26,11 @@ fn consecutive_atx_headings_without_blank_lines_stay_separate() {
     let out = format(input, None, None);
     assert_eq!(format(&out, None, None), out);
 }
+
+#[test]
+fn horizontal_rule_before_setext_like_paragraph_stays_idempotent() {
+    let input = "---\nSIL OPEN FONT LICENSE Version 1.1 - 26 February 2007\n-----------------------------------------------------------\n";
+    let first = format(input, None, None);
+    let second = format(&first, None, None);
+    assert_eq!(first, second);
+}
