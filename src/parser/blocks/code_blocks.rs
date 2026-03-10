@@ -525,6 +525,17 @@ fn prepare_fence_open_line<'a>(
     (first_trimmed, first_inner)
 }
 
+fn emit_blockquote_prefix_tokens(builder: &mut GreenNodeBuilder<'static>, prefix: &str) {
+    for ch in prefix.chars() {
+        if ch == '>' {
+            builder.token(SyntaxKind::BLOCKQUOTE_MARKER.into(), ">");
+        } else {
+            let mut buf = [0u8; 4];
+            builder.token(SyntaxKind::WHITESPACE.into(), ch.encode_utf8(&mut buf));
+        }
+    }
+}
+
 /// Check if a line is a valid closing fence for the given fence info.
 pub(crate) fn is_closing_fence(content: &str, fence: &FenceInfo) -> bool {
     let trimmed = strip_leading_spaces(content);
@@ -897,8 +908,8 @@ pub(crate) fn parse_fenced_code_block(
             break;
         }
 
-        // Store the ORIGINAL inner line (after blockquote strip only) for lossless parsing
-        content_lines.push(inner);
+        // Store the original line for lossless parsing.
+        content_lines.push(line);
         current_pos += 1;
     }
 
@@ -906,19 +917,30 @@ pub(crate) fn parse_fenced_code_block(
     if !content_lines.is_empty() {
         builder.start_node(SyntaxKind::CODE_CONTENT.into());
         for content_line in content_lines.iter() {
+            let after_blockquote = if bq_depth > 0 {
+                let stripped = strip_n_blockquote_markers(content_line, bq_depth);
+                let prefix_len = content_line.len().saturating_sub(stripped.len());
+                if prefix_len > 0 {
+                    emit_blockquote_prefix_tokens(builder, &content_line[..prefix_len]);
+                }
+                stripped
+            } else {
+                content_line
+            };
+
             // Emit base indent for lossless parsing (if present in original line)
-            if base_indent > 0 && content_line.len() >= base_indent {
-                let indent_str = &content_line[..base_indent];
+            if base_indent > 0 && after_blockquote.len() >= base_indent {
+                let indent_str = &after_blockquote[..base_indent];
                 if !indent_str.is_empty() {
                     builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
                 }
             }
 
             // Get the content after base indent
-            let after_indent = if base_indent > 0 && content_line.len() >= base_indent {
-                &content_line[base_indent..]
+            let after_indent = if base_indent > 0 && after_blockquote.len() >= base_indent {
+                &after_blockquote[base_indent..]
             } else {
-                content_line
+                after_blockquote
             };
 
             // Split off trailing newline if present (from split_inclusive)
@@ -938,25 +960,30 @@ pub(crate) fn parse_fenced_code_block(
     // Closing fence (if found)
     if found_closing {
         let closing_line = lines[current_pos - 1];
-        let closing_inner = if bq_depth > 0 {
-            strip_n_blockquote_markers(closing_line, bq_depth)
+        let closing_after_blockquote = if bq_depth > 0 {
+            let stripped = strip_n_blockquote_markers(closing_line, bq_depth);
+            let prefix_len = closing_line.len().saturating_sub(stripped.len());
+            if prefix_len > 0 {
+                emit_blockquote_prefix_tokens(builder, &closing_line[..prefix_len]);
+            }
+            stripped
         } else {
             closing_line
         };
 
         // Emit base indent for lossless parsing
-        if base_indent > 0 && closing_inner.len() >= base_indent {
-            let indent_str = &closing_inner[..base_indent];
+        if base_indent > 0 && closing_after_blockquote.len() >= base_indent {
+            let indent_str = &closing_after_blockquote[..base_indent];
             if !indent_str.is_empty() {
                 builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
             }
         }
 
         // Strip base indent to get fence
-        let closing_stripped = if base_indent > 0 && closing_inner.len() >= base_indent {
-            &closing_inner[base_indent..]
+        let closing_stripped = if base_indent > 0 && closing_after_blockquote.len() >= base_indent {
+            &closing_after_blockquote[base_indent..]
         } else {
-            closing_inner
+            closing_after_blockquote
         };
         let (closing_without_newline, newline_str) = strip_newline(closing_stripped);
         let closing_trimmed_start = strip_leading_spaces(closing_without_newline);

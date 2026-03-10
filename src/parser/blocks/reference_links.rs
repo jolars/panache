@@ -28,6 +28,11 @@
 pub fn try_parse_reference_definition(
     text: &str,
 ) -> Option<(usize, String, String, Option<String>)> {
+    let leading_spaces = text.chars().take_while(|&c| c == ' ').count();
+    if leading_spaces > 3 {
+        return None;
+    }
+    let text = &text[leading_spaces..];
     let bytes = text.as_bytes();
 
     // Must start at beginning of line with [
@@ -252,10 +257,18 @@ pub fn try_parse_footnote_marker(line: &str) -> Option<(String, usize)> {
 
 #[cfg(test)]
 mod tests {
+    use super::try_parse_reference_definition;
+
     #[test]
     fn test_footnote_definition_body_layout_is_lossless() {
         let input = "[^note-on-refs]:\n    Note that if `--file-scope` is used,\n";
         let tree = crate::parse(input, Some(crate::Config::default()));
         assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn test_reference_definition_with_up_to_three_leading_spaces() {
+        assert!(try_parse_reference_definition("   [foo]: #bar").is_some());
+        assert!(try_parse_reference_definition("    [foo]: #bar").is_none());
     }
 }

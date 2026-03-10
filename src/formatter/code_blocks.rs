@@ -234,14 +234,14 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
                     for token in n.children_with_tokens() {
                         if let NodeOrToken::Token(t) = token {
                             match t.kind() {
-                                SyntaxKind::BLOCKQUOTE_MARKER if at_line_start && !has_fence => {
+                                SyntaxKind::BLOCKQUOTE_MARKER if at_line_start => {
                                     // Parser may preserve blockquote continuation markers inside
                                     // indented code content for losslessness. These are container
                                     // syntax, not code bytes, so ignore them for formatter output.
                                     saw_blockquote_marker = true;
                                 }
                                 SyntaxKind::WHITESPACE if at_line_start => {
-                                    if saw_blockquote_marker && !has_fence {
+                                    if saw_blockquote_marker {
                                         let ws = t.text();
                                         if let Some(stripped) = ws.strip_prefix(' ') {
                                             line_indent.push_str(stripped);
