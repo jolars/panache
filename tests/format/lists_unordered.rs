@@ -86,3 +86,11 @@ fn parenthesized_marker_in_list_continuation_stays_paragraph_text() {
     let output2 = format(&output1, None, None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn list_item_with_hard_breaks_stays_idempotent() {
+    let input = "- `some(.x, .p)` returns `TRUE` if *any* element matches;  \n  `every(.x, .p)` returns `TRUE` if *all* elements match;  \n  `none(.x, .p)` returns `TRUE` if *no* element matches.\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}

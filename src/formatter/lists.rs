@@ -331,6 +331,15 @@ impl Formatter {
         let mut arena: Vec<Box<str>> = Vec::new();
         let content_node = Self::find_content_node(node);
 
+        let content_has_hard_breaks = content_node
+            .as_ref()
+            .map(|content| {
+                content
+                    .descendants_with_tokens()
+                    .any(|el| el.kind() == SyntaxKind::HARD_LINE_BREAK)
+            })
+            .unwrap_or(false);
+
         let mut words = if let Some(content) = content_node {
             // Extract words from Plain/PARAGRAPH child (postprocessor wraps all content in one node)
             wrapping::build_words(&self.config, &content, &mut arena, &|n| {
@@ -459,7 +468,11 @@ impl Formatter {
                     .replace("<summary>\n  ", "<summary>\n    ");
                 if rendered_line.contains('\n') {
                     for (idx, segment) in rendered_line.split('\n').enumerate() {
-                        let segment = segment.trim_end();
+                        let segment = if content_has_hard_breaks {
+                            segment
+                        } else {
+                            segment.trim_end()
+                        };
                         if idx == 0 {
                             self.output.push_str(segment);
                         } else {
