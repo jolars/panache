@@ -687,6 +687,19 @@ pub(super) fn wrapped_lines_for_paragraph(
 ) -> Vec<String> {
     log::debug!("wrapped_lines_for_paragraph called with width={}", width);
 
+    let paragraph_text = node.text().to_string();
+    let normalized = paragraph_text.replace("\r\n", "\n");
+    let standalone_fences = normalized
+        .lines()
+        .filter(|line| line.trim() == "$$")
+        .count();
+    if standalone_fences >= 2 && standalone_fences % 2 == 0 {
+        return paragraph_text
+            .lines()
+            .map(|line| line.trim_end().to_string())
+            .collect();
+    }
+
     // Check if paragraph contains hard line breaks
     let has_hard_breaks = node
         .descendants_with_tokens()
@@ -768,6 +781,19 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
 ) -> Vec<String> {
     log::debug!("wrapped_lines_for_paragraph_with_widths called");
 
+    let paragraph_text = node.text().to_string();
+    let normalized = paragraph_text.replace("\r\n", "\n");
+    let standalone_fences = normalized
+        .lines()
+        .filter(|line| line.trim() == "$$")
+        .count();
+    if standalone_fences >= 2 && standalone_fences % 2 == 0 {
+        return paragraph_text
+            .lines()
+            .map(|line| line.trim_end().to_string())
+            .collect();
+    }
+
     // Check if paragraph contains hard line breaks
     let has_hard_breaks = node
         .descendants_with_tokens()
@@ -842,6 +868,19 @@ pub(super) fn sentence_lines_for_paragraph(
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
     log::debug!("sentence_lines_for_paragraph called");
+
+    let paragraph_text = node.text().to_string();
+    let normalized = paragraph_text.replace("\r\n", "\n");
+    let standalone_fences = normalized
+        .lines()
+        .filter(|line| line.trim() == "$$")
+        .count();
+    if standalone_fences >= 2 && standalone_fences % 2 == 0 {
+        return paragraph_text
+            .lines()
+            .map(|line| line.trim_end().to_string())
+            .collect();
+    }
 
     let has_hard_breaks = node
         .descendants_with_tokens()
