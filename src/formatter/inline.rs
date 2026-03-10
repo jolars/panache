@@ -312,6 +312,35 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 }
             }
 
+            // Preserve malformed display math that contains unescaped single-dollar
+            // delimiters inside content; normalizing it can cause cross-pass drift.
+            let mut backslashes = 0usize;
+            let mut contains_unescaped_single_dollar = false;
+            let chars: Vec<char> = content.chars().collect();
+            let mut idx = 0usize;
+            while idx < chars.len() {
+                let ch = chars[idx];
+                if ch == '\\' {
+                    backslashes += 1;
+                    idx += 1;
+                    continue;
+                }
+                let escaped = backslashes % 2 == 1;
+                backslashes = 0;
+                if ch == '$' && !escaped {
+                    if idx + 1 < chars.len() && chars[idx + 1] == '$' {
+                        idx += 2;
+                        continue;
+                    }
+                    contains_unescaped_single_dollar = true;
+                    break;
+                }
+                idx += 1;
+            }
+            if contains_unescaped_single_dollar {
+                return node.text().to_string();
+            }
+
             let opening = opening_marker.as_deref().unwrap_or("$$");
             let closing = closing_marker.as_deref().unwrap_or("$$");
             let is_environment = opening.starts_with("\\begin{") && closing.starts_with("\\end{");

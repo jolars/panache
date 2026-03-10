@@ -10,6 +10,7 @@ mod headings;
 mod indent_utils;
 mod inline;
 mod lists;
+mod math_delimiters;
 mod metadata;
 mod paragraphs;
 mod shortcodes;

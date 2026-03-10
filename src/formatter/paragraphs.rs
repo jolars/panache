@@ -1,5 +1,8 @@
 use crate::config::Config;
 use crate::formatter::inline;
+use crate::formatter::math_delimiters::{
+    count_unescaped_single_dollars, has_ambiguous_dollar_delimiters,
+};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -42,14 +45,49 @@ fn protect_inline_math_spaces(text: &str) -> String {
     out
 }
 
+fn normalize_inline_math_line_breaks(lines: &mut [String]) {
+    if lines.len() < 2 {
+        return;
+    }
+    for i in 0..(lines.len() - 1) {
+        let current = lines[i].trim_end().to_string();
+        if !current.ends_with('$') || current.ends_with("$$") {
+            continue;
+        }
+        if count_unescaped_single_dollars(&current).is_multiple_of(2) {
+            continue;
+        }
+        let without_marker = current[..current.len() - 1].trim_end().to_string();
+        let next = lines[i + 1].trim_start().to_string();
+        lines[i] = without_marker;
+        lines[i + 1] = if next.starts_with('$') {
+            next
+        } else if next.is_empty() {
+            "$".to_string()
+        } else {
+            format!("$ {next}")
+        };
+    }
+}
+
 /// Check if a paragraph contains inline display math ($$...$$ within paragraph)
 pub(super) fn contains_inline_display_math(node: &SyntaxNode) -> bool {
-    for child in node.descendants() {
-        if child.kind() == SyntaxKind::DISPLAY_MATH {
-            return true;
-        }
+    if has_ambiguous_dollar_delimiters(&node.text().to_string()) {
+        return false;
     }
-    false
+    node.descendants().any(|child| {
+        if child.kind() != SyntaxKind::DISPLAY_MATH {
+            return false;
+        }
+        let content = child
+            .children_with_tokens()
+            .filter_map(|el| match el {
+                NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => Some(t.text().to_string()),
+                _ => None,
+            })
+            .collect::<String>();
+        count_unescaped_single_dollars(&content) == 0
+    })
 }
 
 /// Check if a paragraph contains raw LaTeX commands.
@@ -202,7 +240,11 @@ pub(super) fn format_paragraph_with_display_math(
             let text = content.split_whitespace().collect::<Vec<_>>().join(" ");
             if !text.is_empty() {
                 let protected = protect_inline_math_spaces(&text);
-                let lines = textwrap::wrap(&protected, line_width);
+                let mut lines = textwrap::wrap(&protected, line_width)
+                    .iter()
+                    .map(|line| line.to_string())
+                    .collect::<Vec<_>>();
+                normalize_inline_math_line_breaks(&mut lines);
                 for (j, line) in lines.iter().enumerate() {
                     if j > 0 {
                         output.push('\n');

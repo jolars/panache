@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::formatter::math_delimiters::has_ambiguous_dollar_delimiters;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use textwrap::wrap_algorithms::WrapAlgorithm;
@@ -689,6 +690,15 @@ pub(super) fn wrapped_lines_for_paragraph(
 
     let paragraph_text = node.text().to_string();
     let normalized = paragraph_text.replace("\r\n", "\n");
+    let has_blockquote_markers = node
+        .children_with_tokens()
+        .any(|el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER));
+    if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
+        return paragraph_text
+            .lines()
+            .map(|line| line.to_string())
+            .collect();
+    }
     let standalone_fences = normalized
         .lines()
         .filter(|line| line.trim() == "$$")
@@ -783,6 +793,15 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
 
     let paragraph_text = node.text().to_string();
     let normalized = paragraph_text.replace("\r\n", "\n");
+    let has_blockquote_markers = node
+        .children_with_tokens()
+        .any(|el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER));
+    if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
+        return paragraph_text
+            .lines()
+            .map(|line| line.to_string())
+            .collect();
+    }
     let standalone_fences = normalized
         .lines()
         .filter(|line| line.trim() == "$$")
@@ -871,6 +890,15 @@ pub(super) fn sentence_lines_for_paragraph(
 
     let paragraph_text = node.text().to_string();
     let normalized = paragraph_text.replace("\r\n", "\n");
+    let has_blockquote_markers = node
+        .children_with_tokens()
+        .any(|el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER));
+    if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
+        return paragraph_text
+            .lines()
+            .map(|line| line.to_string())
+            .collect();
+    }
     let standalone_fences = normalized
         .lines()
         .filter(|line| line.trim() == "$$")
