@@ -192,6 +192,7 @@ golden_test_cases!(
     inline_math,
     grid_table,
     grid_table_nordics,
+    grid_table_planets,
     latex_environment,
     lazy_continuation_deep,
     line_blocks,

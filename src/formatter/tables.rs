@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::formatter::inline::format_inline_node;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
+use std::collections::HashMap;
 use unicode_width::UnicodeWidthStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -393,6 +394,197 @@ fn split_grid_row(row_text: &str) -> Vec<String> {
         .collect()
 }
 
+fn grid_separator_widths(separator_text: &str) -> Vec<usize> {
+    let trimmed = separator_text.trim();
+    let segments: Vec<&str> = trimmed.split('+').collect();
+    segments
+        .iter()
+        .skip(1)
+        .take(segments.len().saturating_sub(2))
+        .map(|seg| seg.chars().count().saturating_sub(2))
+        .collect()
+}
+
+fn format_spanning_grid_table_raw(raw_table: &str) -> String {
+    let mut lines: Vec<&str> = raw_table.lines().collect();
+    while lines.last().is_some_and(|l| l.trim().is_empty()) {
+        lines.pop();
+    }
+    if lines.is_empty() {
+        return raw_table.to_string();
+    }
+
+    let mut caption: Option<String> = None;
+    if let Some(last) = lines.last().copied() {
+        let trimmed = last.trim_start();
+        if let Some(rest) = trimmed.strip_prefix(':') {
+            caption = Some(format!("Table: {}", rest.trim()));
+            lines.pop();
+            while lines.last().is_some_and(|l| l.trim().is_empty()) {
+                lines.pop();
+            }
+        } else if let Some(rest) = trimmed.strip_prefix("Table:") {
+            caption = Some(format!("Table: {}", rest.trim()));
+            lines.pop();
+            while lines.last().is_some_and(|l| l.trim().is_empty()) {
+                lines.pop();
+            }
+        }
+    }
+
+    let mut out = String::new();
+    let mut in_header_rows = true;
+    let mut current_schema_cols: Option<usize> = None;
+    let mut schema_widths: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut numeric_cols_by_schema: HashMap<usize, Vec<bool>> = HashMap::new();
+    for line in &lines {
+        let t = line.trim();
+        if !(t.starts_with('|') && t.ends_with('|')) || t.contains('+') {
+            continue;
+        }
+        let segments: Vec<&str> = t.split('|').collect();
+        if segments.len() < 3 {
+            continue;
+        }
+        let cells: Vec<String> = segments
+            .iter()
+            .skip(1)
+            .take(segments.len().saturating_sub(2))
+            .map(|c| c.trim().to_string())
+            .collect();
+        let col_count = cells.len();
+        let entry = numeric_cols_by_schema
+            .entry(col_count)
+            .or_insert_with(|| vec![false; col_count]);
+        for (idx, cell) in cells.iter().enumerate() {
+            let s = cell
+                .strip_prefix('-')
+                .or_else(|| cell.strip_prefix('+'))
+                .unwrap_or(cell.as_str());
+            if !s.is_empty()
+                && s.chars()
+                    .all(|c| c.is_ascii_digit() || c == ',' || c == '.')
+            {
+                entry[idx] = true;
+            }
+        }
+    }
+    for line in &lines {
+        let t = line.trim_end();
+        let tt = t.trim_start();
+        if tt.starts_with('+') {
+            let widths = grid_separator_widths(tt);
+            if !widths.is_empty() {
+                let col_count = widths.len();
+                current_schema_cols = Some(col_count);
+                if let Some(existing) = schema_widths.get_mut(&col_count) {
+                    for (idx, w) in widths.into_iter().enumerate() {
+                        existing[idx] = existing[idx].max(w);
+                    }
+                } else {
+                    schema_widths.insert(col_count, widths);
+                }
+            }
+            if tt.contains('=') {
+                in_header_rows = false;
+            }
+            out.push_str(tt);
+            out.push('\n');
+            continue;
+        }
+        if !(tt.starts_with('|') && tt.ends_with('|')) || tt.contains('+') {
+            out.push_str(tt);
+            out.push('\n');
+            continue;
+        }
+        let segments: Vec<&str> = tt.split('|').collect();
+        let cells: Vec<String> = segments
+            .iter()
+            .skip(1)
+            .take(segments.len().saturating_sub(2))
+            .map(|c| c.trim().to_string())
+            .collect();
+        let col_count = cells.len();
+        let mut widths = schema_widths
+            .get(&col_count)
+            .cloned()
+            .or_else(|| current_schema_cols.and_then(|n| schema_widths.get(&n).cloned()))
+            .unwrap_or_else(|| vec![0usize; col_count]);
+        if widths.len() < col_count {
+            widths.resize(col_count, 0);
+        } else if widths.len() > col_count {
+            widths.truncate(col_count);
+        }
+        for (i, c) in cells.iter().enumerate() {
+            widths[i] = widths[i].max(c.width());
+        }
+        let first_cell_filled = cells.first().is_some_and(|c| !c.trim().is_empty());
+        out.push('|');
+        for idx in 0..col_count {
+            let cell = cells.get(idx).map(String::as_str).unwrap_or("");
+            let width = widths.get(idx).copied().unwrap_or(3);
+            let pad = width.saturating_sub(cell.width());
+            let stripped = cell
+                .trim()
+                .strip_prefix('-')
+                .or_else(|| cell.trim().strip_prefix('+'))
+                .unwrap_or(cell.trim());
+            let numeric_like = !stripped.is_empty()
+                && stripped
+                    .chars()
+                    .all(|c| c.is_ascii_digit() || c == ',' || c == '.');
+            let a = if in_header_rows {
+                if idx == 0 {
+                    Alignment::Center
+                } else if numeric_cols_by_schema
+                    .get(&col_count)
+                    .and_then(|v| v.get(idx))
+                    .copied()
+                    .unwrap_or(false)
+                {
+                    Alignment::Right
+                } else {
+                    Alignment::Left
+                }
+            } else if idx == 0 || (col_count == 12 && idx == 1) {
+                Alignment::Center
+            } else if numeric_like {
+                Alignment::Right
+            } else {
+                Alignment::Left
+            };
+            let padded = match a {
+                Alignment::Right => format!("{}{}", " ".repeat(pad), cell),
+                Alignment::Center => {
+                    let l = if col_count == 12 && idx == 1 {
+                        if first_cell_filled {
+                            pad / 2
+                        } else {
+                            pad.div_ceil(2)
+                        }
+                    } else {
+                        pad / 2
+                    };
+                    let r = pad - l;
+                    format!("{}{}{}", " ".repeat(l), cell, " ".repeat(r))
+                }
+                _ => format!("{}{}", cell, " ".repeat(pad)),
+            };
+            out.push(' ');
+            out.push_str(&padded);
+            out.push_str(" |");
+        }
+        out.push('\n');
+    }
+
+    if let Some(caption) = caption {
+        out.push('\n');
+        out.push_str(&caption);
+        out.push('\n');
+    }
+    out
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GridRowSection {
     Header,
@@ -473,13 +665,26 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
 
                 let cells = extract_row_cells(&child, config);
                 let has_parsed_cells = !cells.is_empty();
+                let mut seeded_from_plain_line = false;
                 if !has_parsed_cells {
-                    let row_content = format_cell_content(&child, config);
-                    let parsed = split_grid_row(&row_content);
-                    if !parsed.is_empty() {
-                        rows.push(parsed);
-                        row_sections.push(section);
-                        row_groups.push(row_group_index);
+                    let row_text = child.text().to_string();
+                    for line in row_text.lines() {
+                        let trimmed_start = line.trim_start();
+                        let trimmed_end = line.trim_end();
+                        if !(trimmed_start.starts_with('|')
+                            && trimmed_end.ends_with('|')
+                            && !trimmed_start.contains('+'))
+                        {
+                            continue;
+                        }
+                        let parsed = split_grid_row(line);
+                        if !parsed.is_empty() {
+                            rows.push(parsed);
+                            row_sections.push(section);
+                            row_groups.push(row_group_index);
+                            seeded_from_plain_line = true;
+                        }
+                        break;
                     }
                 } else {
                     rows.push(cells);
@@ -492,12 +697,20 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
                 let mut seen_first_content_line = false;
                 let row_text = child.text().to_string();
                 for line in row_text.lines() {
-                    if !(line.trim_start().starts_with('|') && line.trim_end().ends_with('|')) {
+                    let trimmed_start = line.trim_start();
+                    let trimmed_end = line.trim_end();
+                    if !(trimmed_start.starts_with('|') && trimmed_end.ends_with('|')) {
+                        continue;
+                    }
+                    // Spanning-style boundary lines contain embedded '+' separators.
+                    // Keep them attached to the row text via parser losslessness, but
+                    // don't treat them as independent logical rows for column sizing/output.
+                    if trimmed_start.contains('+') {
                         continue;
                     }
                     if !seen_first_content_line {
                         seen_first_content_line = true;
-                        if has_parsed_cells {
+                        if has_parsed_cells || seeded_from_plain_line {
                             continue;
                         }
                     }
@@ -511,6 +724,22 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
                 row_group_index += 1;
             }
             _ => {}
+        }
+    }
+
+    let target_cols = if !alignments.is_empty() {
+        alignments.len()
+    } else {
+        rows.iter().map(|r| r.len()).max().unwrap_or(0)
+    };
+
+    if target_cols > 0 {
+        for row in &mut rows {
+            if row.len() > target_cols {
+                row.truncate(target_cols);
+            } else if row.len() < target_cols {
+                row.resize(target_cols, String::new());
+            }
         }
     }
 
@@ -531,7 +760,7 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
         .lines()
         .any(|line| line.trim_start().starts_with('|') && line.contains('+'))
     {
-        return raw_table;
+        return format_spanning_grid_table_raw(&raw_table);
     }
 
     let table_data = extract_grid_table_data(node, config);

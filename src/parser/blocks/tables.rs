@@ -1407,7 +1407,8 @@ fn slice_cell_by_display_width(line: &str, start_byte: usize, width: usize) -> (
     (end_byte, next_start)
 }
 
-/// Check if a line is a grid table content row (starts with |, contains |, ends with |).
+/// Check if a line is a grid table content row.
+/// Accepts normal rows ending with `|` and spanning-style continuation lines ending with `+`.
 fn is_grid_content_row(line: &str) -> bool {
     let trimmed = line.trim_start();
     let leading_spaces = line.len() - trimmed.len();
@@ -1417,7 +1418,7 @@ fn is_grid_content_row(line: &str) -> bool {
     }
 
     let trimmed = trimmed.trim_end();
-    trimmed.starts_with('|') && trimmed.ends_with('|')
+    trimmed.starts_with('|') && (trimmed.ends_with('|') || trimmed.ends_with('+'))
 }
 
 /// Extract cell contents from a single grid table row line.
@@ -1821,6 +1822,7 @@ mod grid_table_tests {
     fn test_grid_content_row_detection() {
         assert!(is_grid_content_row("| content | content |"));
         assert!(is_grid_content_row("|  |  |"));
+        assert!(is_grid_content_row("| content +------+"));
         assert!(!is_grid_content_row("+---+---+")); // separator, not content
         assert!(!is_grid_content_row("no pipes here"));
     }

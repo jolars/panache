@@ -209,6 +209,14 @@ fn test_grid_table_with_caption_after() {
 }
 
 #[test]
+fn test_grid_table_planets_regression_case() {
+    let input = include_str!("../cases/grid_table_planets/input.md");
+    let expected = include_str!("../cases/grid_table_planets/expected.md");
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_grid_table_multiline_header_and_footer_sections() {
     let input = "+---------+--------+\n| Name    | Value  |\n|         | (2020) |\n+:=======:+:======:+\n| Denmark | 5.8    |\n+---------+--------+\n+=========+========+\n| Total   | 5.8    |\n+=========+========+";
     let expected = "+---------+--------+\n|  Name   | Value  |\n|         | (2020) |\n+:=======:+:======:+\n| Denmark |  5.8   |\n+=========+========+\n|  Total  |  5.8   |\n+=========+========+\n";

@@ -133,6 +133,45 @@ impl Formatter {
         paragraphs::contains_latex_command(node)
     }
 
+    fn is_grid_table_continuation_paragraph(&self, node: &SyntaxNode) -> bool {
+        if node.kind() != SyntaxKind::PARAGRAPH {
+            return false;
+        }
+        let text = node.text().to_string();
+        let lines: Vec<&str> = text
+            .lines()
+            .map(str::trim_end)
+            .filter(|l| !l.trim().is_empty())
+            .collect();
+        if lines.len() < 2 {
+            return false;
+        }
+        lines.iter().all(|line| {
+            let trimmed = line.trim_start();
+            trimmed.starts_with('|') || trimmed.starts_with('+')
+        }) && lines.iter().any(|line| line.contains("+-"))
+            && lines.iter().any(|line| line.trim_start().starts_with('|'))
+    }
+
+    fn is_grid_table_caption_definition_list(&self, node: &SyntaxNode) -> bool {
+        if node.kind() != SyntaxKind::DEFINITION_LIST {
+            return false;
+        }
+        if !node
+            .text()
+            .to_string()
+            .lines()
+            .any(|line| line.trim_start().starts_with(':'))
+        {
+            return false;
+        }
+        if let Some(prev) = node.prev_sibling() {
+            return prev.kind() == SyntaxKind::GRID_TABLE
+                || self.is_grid_table_continuation_paragraph(&prev);
+        }
+        false
+    }
+
     fn bare_fence_paragraph_line(&self, node: &SyntaxNode) -> Option<String> {
         let mut atoms = Vec::new();
 
@@ -869,6 +908,14 @@ impl Formatter {
                 let text = node.text().to_string();
                 log::debug!("Formatting paragraph, text length: {}", text.len());
 
+                if self.is_grid_table_continuation_paragraph(node) {
+                    self.output.push_str(&text);
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
+                    }
+                    return;
+                }
+
                 // Pandoc formats bare fenced div paragraphs on a single line ("::: A :::").
                 if let Some(line) = self.bare_fence_paragraph_line(node) {
                     self.output.push_str(&line);
@@ -1035,6 +1082,13 @@ impl Formatter {
             }
 
             SyntaxKind::DEFINITION_LIST => {
+                if self.is_grid_table_caption_definition_list(node) {
+                    self.output.push_str(&node.text().to_string());
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
+                    }
+                    return;
+                }
                 // Add blank line before top-level definition lists
                 if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") {
                     self.output.push('\n');
@@ -1346,6 +1400,15 @@ impl Formatter {
             }
 
             SyntaxKind::GRID_TABLE => {
+                if let Some(next) = node.next_sibling()
+                    && self.is_grid_table_continuation_paragraph(&next)
+                {
+                    self.output.push_str(&node.text().to_string());
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
+                    }
+                    return;
+                }
                 // Format grid table with proper alignment and borders
                 let formatted = tables::format_grid_table(node, &self.config);
                 self.output.push_str(&formatted);
