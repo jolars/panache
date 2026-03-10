@@ -90,12 +90,17 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
 
             let max_run = backtick_runs.iter().copied().max().unwrap_or(0);
 
-            let needs_padding =
-                normalized_content.starts_with('`') || normalized_content.ends_with('`');
+            let needs_padding = normalized_content.starts_with('`')
+                || normalized_content.ends_with('`')
+                || (normalized_content.is_empty() && marker_len > 1);
             let padding = if needs_padding { " " } else { "" };
 
             let min_needed = (max_run + 1).max(1);
-            let final_backtick_count = min_needed;
+            let final_backtick_count = if normalized_content.is_empty() {
+                min_needed.max(marker_len)
+            } else {
+                min_needed
+            };
 
             format!(
                 "{}{}{}{}",
