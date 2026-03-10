@@ -78,6 +78,15 @@ fn test_losslessness_fenced_code_closing_fence_trailing_spaces() {
 }
 
 #[test]
+fn test_losslessness_fenced_code_opening_fence_trailing_spaces() {
+    let input = "```{r em-alg} \nem <- 1\n```\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}
+
+#[test]
 fn test_losslessness_definition_first_line_trailing_spaces() {
     let input = "`repo`\n\n:   Add a link to repo:  \n";
     let config = Config::default();

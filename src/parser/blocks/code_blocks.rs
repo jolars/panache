@@ -591,6 +591,10 @@ fn emit_chunk_options(builder: &mut GreenNodeBuilder<'static>, content: &str) {
         // Check if this is a closing brace
         if bytes[pos] as char == '}' {
             builder.token(SyntaxKind::TEXT.into(), &content[pos..pos + 1]);
+            pos += 1;
+            if pos < bytes.len() {
+                builder.token(SyntaxKind::TEXT.into(), &content[pos..]);
+            }
             break;
         }
 
