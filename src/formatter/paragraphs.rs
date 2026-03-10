@@ -158,10 +158,11 @@ pub(super) fn format_paragraph_with_display_math(
                 output.push('\n');
             }
 
-            // Format as paragraph text with wrapping
-            let text = content.trim();
+            // Format as paragraph text with wrapping.
+            // Normalize internal whitespace to keep wrapping stable across passes.
+            let text = content.split_whitespace().collect::<Vec<_>>().join(" ");
             if !text.is_empty() {
-                let lines = textwrap::wrap(text, line_width);
+                let lines = textwrap::wrap(&text, line_width);
                 for (j, line) in lines.iter().enumerate() {
                     if j > 0 {
                         output.push('\n');
