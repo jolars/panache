@@ -150,8 +150,8 @@ fn code_block_with_language_can_interrupt_paragraph() {
 }
 
 #[test]
-fn bare_fence_after_colon_with_closing_fence_can_interrupt_paragraph() {
-    let input = "Some text:\n```\ncode\n```\n";
+fn bare_fence_after_colon_with_command_transcript_can_interrupt_paragraph() {
+    let input = "Some text:\n```\n% pandoc -t plain\n```\n";
     let node = parse_blocks(input);
     assert_block_kinds_for_node(
         &node,
@@ -174,8 +174,8 @@ fn bare_fence_in_list_item_with_closing_fence_can_interrupt_paragraph() {
 }
 
 #[test]
-fn adjacent_bare_fences_without_blank_line_parse_as_two_code_blocks() {
-    let input = "```\na\n```\n```\nb\n```\n";
+fn adjacent_bare_fences_with_command_transcripts_parse_as_two_code_blocks() {
+    let input = "```\n% one\n```\n```\n% two\n```\n";
     let node = parse_blocks(input);
     let code_blocks = node
         .descendants()

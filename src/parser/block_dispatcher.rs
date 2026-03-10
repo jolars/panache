@@ -1172,8 +1172,8 @@ impl BlockParser for FencedCodeBlockParser {
         }
 
         // Fenced code blocks can interrupt paragraphs if they have an info string.
-        // For bare fences (```), only allow interruption when a matching closer exists
-        // later, to avoid accidentally swallowing unmatched inline-like constructs.
+        // For bare fences (```), allow interruption only in explicit transcript-like
+        // contexts and only when a matching closer exists later.
         let has_info = !fence.info_string.trim().is_empty();
         let has_matching_closer = !has_info && !ctx.has_blank_before && {
             let mut found = false;
@@ -1199,7 +1199,28 @@ impl BlockParser for FencedCodeBlockParser {
             }
             found
         };
-        let detection = if has_info || has_matching_closer {
+        let next_nonblank_is_command = lines
+            .iter()
+            .skip(line_pos + 1)
+            .find(|l| !l.trim().is_empty())
+            .is_some_and(|l| l.trim_start().starts_with('%'));
+        let bare_fence_before_command_with_closer = has_matching_closer && next_nonblank_is_command;
+        let bare_fence_after_colon_with_closer = has_matching_closer
+            && next_nonblank_is_command
+            && line_pos > 0
+            && lines[line_pos - 1].trim_end().ends_with(':');
+        let bare_fence_in_list_with_closer = has_matching_closer && ctx.list_indent_info.is_some();
+        let bare_fence_after_matching_closer = has_matching_closer
+            && next_nonblank_is_command
+            && line_pos > 0
+            && is_closing_fence(lines[line_pos - 1], &fence);
+
+        let detection = if has_info
+            || bare_fence_before_command_with_closer
+            || bare_fence_after_colon_with_closer
+            || bare_fence_in_list_with_closer
+            || bare_fence_after_matching_closer
+        {
             BlockDetectionResult::YesCanInterrupt
         } else if ctx.has_blank_before {
             BlockDetectionResult::Yes

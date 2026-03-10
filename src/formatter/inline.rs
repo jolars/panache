@@ -56,7 +56,13 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             // Preserve malformed multi-line triple-backtick code spans as-is so they
             // don't collapse into one line and then reparse differently on pass 2.
             if marker_len >= 3 && content.contains('\n') {
-                return node.text().to_string();
+                let trimmed_start = content.trim_start();
+                let first_line = trimmed_start.lines().next().unwrap_or_default();
+                let looks_quarto_chunk_header =
+                    trimmed_start.starts_with('{') && first_line.contains('}');
+                if !looks_quarto_chunk_header {
+                    return node.text().to_string();
+                }
             }
 
             // Normalize content: replace newlines with spaces and trim
