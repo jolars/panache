@@ -414,11 +414,9 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                         {
                             // Skip the original prefix
                         }
-                        rowan::NodeOrToken::Token(token) => {
-                            caption_text.push_str(token.text());
-                        }
+                        rowan::NodeOrToken::Token(token) => caption_text.push_str(token.text()),
                         rowan::NodeOrToken::Node(node) => {
-                            caption_text.push_str(&node.text().to_string());
+                            caption_text.push_str(&node.text().to_string())
                         }
                     }
                 }
@@ -785,8 +783,8 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                // Build normalized caption: "Table: " + caption text (without prefix)
-                let mut caption_text = String::from("Table: ");
+                // Build normalized caption: "Table: " + trimmed caption text (without prefix)
+                let mut caption_body = String::new();
 
                 for caption_child in child.children_with_tokens() {
                     match caption_child {
@@ -796,15 +794,15 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                             // Skip the original prefix
                         }
                         rowan::NodeOrToken::Token(token) => {
-                            caption_text.push_str(token.text());
+                            caption_body.push_str(token.text());
                         }
                         rowan::NodeOrToken::Node(node) => {
-                            caption_text.push_str(&node.text().to_string());
+                            caption_body.push_str(&node.text().to_string());
                         }
                     }
                 }
 
-                caption = Some(caption_text.trim().to_string());
+                caption = Some(format!("Table: {}", caption_body.trim()));
                 caption_after = seen_separator;
             }
             SyntaxKind::TABLE_SEPARATOR => {
@@ -886,7 +884,11 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
 
     // For simple tables, preserve both separator dash lengths AND column positions
     let column_widths: Vec<usize> = columns.iter().map(|c| c.end - c.start).collect();
-    let column_positions: Vec<(usize, usize)> = columns.iter().map(|c| (c.start, c.end)).collect();
+    let base_offset = columns.first().map(|c| c.start).unwrap_or(0);
+    let column_positions: Vec<(usize, usize)> = columns
+        .iter()
+        .map(|c| (c.start - base_offset, c.end - base_offset))
+        .collect();
 
     TableData {
         rows,

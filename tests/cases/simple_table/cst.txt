@@ -1,4 +1,4 @@
-DOCUMENT@0..243
+DOCUMENT@0..518
   SIMPLE_TABLE@0..243
     TABLE_HEADER@0..40
       WHITESPACE@0..2 "  "
@@ -65,4 +65,78 @@ DOCUMENT@0..243
       TABLE_CAPTION_PREFIX@198..205 "Table: "
       TEXT@205..242 "Demonstration of simp ..."
       NEWLINE@242..243 "\n"
+  BLANK_LINE@243..244
+    BLANK_LINE@243..244 "\n"
+  PARAGRAPH@244..278
+    TEXT@244..277 "Simple table indented ..."
+    NEWLINE@277..278 "\n"
+  BLANK_LINE@278..279
+    BLANK_LINE@278..279 "\n"
+  SIMPLE_TABLE@279..518
+    TABLE_HEADER@279..321
+      WHITESPACE@279..283 "    "
+      TABLE_CELL@283..288
+        TEXT@283..288 "Right"
+      WHITESPACE@288..293 "     "
+      TABLE_CELL@293..297
+        TEXT@293..297 "Left"
+      WHITESPACE@297..302 "     "
+      TABLE_CELL@302..308
+        TEXT@302..308 "Center"
+      WHITESPACE@308..313 "     "
+      TABLE_CELL@313..320
+        TEXT@313..320 "Default"
+      NEWLINE@320..321 "\n"
+    TABLE_SEPARATOR@321..363
+      TEXT@321..362 "  -------     ------  ..."
+      NEWLINE@362..363 "\n"
+    TABLE_ROW@363..400
+      WHITESPACE@363..370 "       "
+      TABLE_CELL@370..372
+        TEXT@370..372 "12"
+      WHITESPACE@372..377 "     "
+      TABLE_CELL@377..379
+        TEXT@377..379 "12"
+      WHITESPACE@379..388 "         "
+      TABLE_CELL@388..390
+        TEXT@388..390 "12"
+      WHITESPACE@390..397 "       "
+      TABLE_CELL@397..399
+        TEXT@397..399 "12"
+      NEWLINE@399..400 "\n"
+    TABLE_ROW@400..438
+      WHITESPACE@400..406 "      "
+      TABLE_CELL@406..409
+        TEXT@406..409 "123"
+      WHITESPACE@409..414 "     "
+      TABLE_CELL@414..417
+        TEXT@414..417 "123"
+      WHITESPACE@417..424 "       "
+      TABLE_CELL@424..427
+        TEXT@424..427 "123"
+      WHITESPACE@427..434 "       "
+      TABLE_CELL@434..437
+        TEXT@434..437 "123"
+      NEWLINE@437..438 "\n"
+    TABLE_ROW@438..474
+      WHITESPACE@438..446 "        "
+      TABLE_CELL@446..447
+        TEXT@446..447 "1"
+      WHITESPACE@447..452 "     "
+      TABLE_CELL@452..453
+        TEXT@452..453 "1"
+      WHITESPACE@453..463 "          "
+      TABLE_CELL@463..464
+        TEXT@463..464 "1"
+      WHITESPACE@464..472 "        "
+      TABLE_CELL@472..473
+        TEXT@472..473 "1"
+      NEWLINE@473..474 "\n"
+    BLANK_LINE@474..475
+      BLANK_LINE@474..475 "\n"
+    TABLE_CAPTION@475..518
+      WHITESPACE@475..477 "  "
+      TABLE_CAPTION_PREFIX@477..479 ": "
+      TEXT@479..517 " Demonstration of sim ..."
+      NEWLINE@517..518 "\n"
 
