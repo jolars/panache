@@ -189,6 +189,26 @@ impl Formatter {
     /// Format a code block that is a continuation of a definition or list item.
     /// Adds indentation prefix to each line of the fenced code block.
     pub(super) fn format_indented_code_block(&mut self, node: &SyntaxNode, indent: usize) {
+        let is_fenced = node
+            .children()
+            .any(|child| child.kind() == SyntaxKind::CODE_FENCE_OPEN);
+        let in_list_item = node
+            .ancestors()
+            .any(|ancestor| ancestor.kind() == SyntaxKind::LIST_ITEM);
+        let code_text = node.text().to_string();
+        let should_preserve_raw_indented = !is_fenced
+            && in_list_item
+            && (code_text.contains("```")
+                || code_text.contains("<details")
+                || code_text.contains("</details>"));
+        if should_preserve_raw_indented {
+            self.output.push_str(&code_text);
+            if !self.output.ends_with('\n') {
+                self.output.push('\n');
+            }
+            return;
+        }
+
         let indent_str = " ".repeat(indent);
 
         // Save current output and format code block to temp buffer

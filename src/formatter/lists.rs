@@ -170,7 +170,16 @@ impl Formatter {
         // Decide loose/tight at the *list* level.
         // Parser may emit PLAIN for most list item text; we treat lists as loose
         // if there are explicit blank lines between items in the CST.
-        let is_loose = node.children().any(|c| c.kind() == SyntaxKind::BLANK_LINE);
+        let list_children: Vec<_> = node.children().collect();
+        let is_loose = list_children.iter().enumerate().any(|(idx, child)| {
+            if child.kind() != SyntaxKind::BLANK_LINE {
+                return false;
+            }
+            let prev_is_item = idx > 0 && list_children[idx - 1].kind() == SyntaxKind::LIST_ITEM;
+            let next_is_item = idx + 1 < list_children.len()
+                && list_children[idx + 1].kind() == SyntaxKind::LIST_ITEM;
+            prev_is_item && next_is_item
+        });
 
         log::debug!("Formatting list: is_loose={}", is_loose);
 
@@ -185,14 +194,6 @@ impl Formatter {
         for child in node.children() {
             if child.kind() == SyntaxKind::LIST_ITEM {
                 item_count += 1;
-
-                // Strip double newlines ONLY between items within a tight list
-                // Don't strip if we're at the first item (preserves spacing before the list)
-                if !is_loose && item_count > 1 {
-                    while self.output.ends_with("\n\n") {
-                        self.output.pop();
-                    }
-                }
 
                 // Calculate content indent for this list item (marker + space)
                 last_item_content_indent =
@@ -390,7 +391,14 @@ impl Formatter {
                     // Hanging indent includes all leading whitespace
                     self.output.push_str(&" ".repeat(hanging));
                 }
-                self.output.push_str(text);
+                if i > 0 {
+                    self.output.push_str(text.trim_start());
+                } else {
+                    let normalized = text
+                        .replace("<summary>\n\t", "<summary>\n    ")
+                        .replace("<summary>\n  ", "<summary>\n    ");
+                    self.output.push_str(&normalized);
+                }
                 if !has_only_empty_nested_list {
                     self.output.push('\n');
                 }
@@ -415,13 +423,38 @@ impl Formatter {
                     // Hanging indent includes all leading whitespace
                     self.output.push_str(&" ".repeat(hanging));
                 }
+                let mut rendered_line = String::new();
                 for (j, w) in line.iter().enumerate() {
-                    self.output.push_str(w.word);
-                    if j + 1 < line.len() {
-                        self.output.push_str(w.whitespace);
+                    if i > 0 && j == 0 {
+                        rendered_line.push_str(w.word.trim_start());
                     } else {
-                        self.output.push_str(w.penalty);
+                        rendered_line.push_str(w.word);
                     }
+                    if j + 1 < line.len() {
+                        rendered_line.push_str(w.whitespace);
+                    } else {
+                        rendered_line.push_str(w.penalty);
+                    }
+                }
+                rendered_line = rendered_line
+                    .replace("<summary>\n\t", "<summary>\n    ")
+                    .replace("<summary>\n  ", "<summary>\n    ");
+                if rendered_line.contains('\n') {
+                    for (idx, segment) in rendered_line.split('\n').enumerate() {
+                        let segment = segment.trim_end();
+                        if idx == 0 {
+                            self.output.push_str(segment);
+                        } else {
+                            let trimmed = segment.trim_start();
+                            if !trimmed.is_empty() {
+                                self.output.push('\n');
+                                self.output.push_str(&" ".repeat(hanging));
+                                self.output.push_str(trimmed);
+                            }
+                        }
+                    }
+                } else {
+                    self.output.push_str(&rendered_line);
                 }
                 // Only output newline if this item doesn't have an inline empty nested list
                 if !has_only_empty_nested_list {

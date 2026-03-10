@@ -77,6 +77,12 @@ fn expand_paths(paths: &[PathBuf]) -> io::Result<Vec<PathBuf>> {
             for entry in walker {
                 let entry = entry.map_err(io::Error::other)?;
                 let entry_path = entry.path();
+                if entry_path
+                    .components()
+                    .any(|component| component.as_os_str() == "node_modules")
+                {
+                    continue;
+                }
 
                 if entry_path.is_file()
                     && let Some(ext) = entry_path.extension().and_then(|e| e.to_str())

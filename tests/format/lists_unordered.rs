@@ -54,3 +54,27 @@ fn list_item_with_fenced_div_containing_code_block_is_idempotent() {
     let output2 = format(&output1, None, None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn list_item_details_with_indented_markdown_fence_content_is_idempotent() {
+    let input = "- Item\n\t<details>\n\t<summary>\n\t\tExample\n\t</summary>\n\n\t[Playground](https://example.test)\n\n\t```ts\n\tconst x = 1;\n\t```\n\t</details>\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
+fn nested_list_summary_continuation_indent_is_idempotent() {
+    let input = "- Parent\n  - Child <details> <summary>\n    Example </summary>\n\n\t[Playground](https://example.test)\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
+fn nested_tight_list_with_followup_paragraph_is_idempotent() {
+    let input = "- Parent\n\n  - A\n  - B\n\n    Continuation paragraph.\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
