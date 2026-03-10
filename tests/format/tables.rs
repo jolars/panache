@@ -192,6 +192,14 @@ fn test_grid_table_adjacent_code_spans_with_escaped_separators_idempotency() {
 }
 
 #[test]
+fn test_grid_table_with_spanning_style_rows_stays_idempotent() {
+    let input = "+---------------------+----------+\n| Property            | Earth    |\n+=============+=======+==========+\n|             | min   | -89.2 °C |\n| Temperature +-------+----------+\n| 1961-1990   | mean  | 14 °C    |\n|             +-------+----------+\n|             | min   | 56.7 °C  |\n+-------------+-------+----------+\n";
+    let first = format(input, None, None);
+    let second = format(&first, None, None);
+    assert_eq!(first, second);
+}
+
+#[test]
 fn test_grid_table_with_caption_after() {
     let input = "+-----+-----+\n| A   | B   |\n+=====+=====+\n| C   | D   |\n+-----+-----+\n\nTable: Caption text";
     let expected = "+---+---+\n| A | B |\n+===+===+\n| C | D |\n+---+---+\n\nTable: Caption text\n";

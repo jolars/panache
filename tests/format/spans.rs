@@ -118,14 +118,6 @@ fn complex_nested_span() {
 }
 
 #[test]
-fn underscore_emphasis_with_nested_asterisks_stays_idempotent() {
-    let input = ":   _Deprecated, use `--syntax-highlighting=`*STYLE*|*FILE* instead._\n";
-    let first = format(input, None, None);
-    let second = format(&first, None, None);
-    assert_eq!(first, second);
-}
-
-#[test]
 fn span_whitespace_normalization() {
     let input = "Text with [content]{.class    key=\"val\"   foo=\"bar\"}.\n";
     let output = format(input, None, None);

@@ -245,16 +245,15 @@ impl BlockParser for AtxHeadingParser {
         &self,
         ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
-        lines: &[&str],
-        line_pos: usize,
+        _lines: &[&str],
+        _line_pos: usize,
         payload: Option<&dyn Any>,
     ) -> usize {
-        let line = lines[line_pos];
         let heading_level = payload
             .and_then(|p| p.downcast_ref::<usize>().copied())
             .or_else(|| try_parse_atx_heading(ctx.content))
             .unwrap_or(1);
-        emit_atx_heading(builder, line, heading_level, ctx.config);
+        emit_atx_heading(builder, ctx.content, heading_level, ctx.config);
         1
     }
 

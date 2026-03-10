@@ -1062,6 +1062,11 @@ impl Formatter {
                     if child.kind() == SyntaxKind::LINE_BLOCK_LINE {
                         // Get the text content, preserving leading spaces
                         let text = child.text().to_string();
+                        if text.trim_end() == "|" {
+                            self.output.push('|');
+                            self.output.push('\n');
+                            continue;
+                        }
                         // The text might start with "| " from the marker, or be continuation
                         // We need to skip the marker if present and output the rest
                         let content = if let Some(stripped) = text.strip_prefix("| ") {

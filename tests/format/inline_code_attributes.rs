@@ -101,3 +101,11 @@ fn multiline_triple_backtick_codespan_stays_idempotent() {
     let second = format(&first, None, None);
     assert_eq!(first, second);
 }
+
+#[test]
+fn backticks_inside_codespan_stays_idempotent() {
+    let input = "`` hi````there ``\n";
+    let first = format(input, None, None);
+    let second = format(&first, None, None);
+    assert_eq!(first, second);
+}

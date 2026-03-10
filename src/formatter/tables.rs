@@ -474,6 +474,14 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> TableData {
 
 /// Format a grid table with consistent alignment and padding
 pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
+    let raw_table = node.text().to_string();
+    if raw_table
+        .lines()
+        .any(|line| line.trim_start().starts_with('|') && line.contains('+'))
+    {
+        return raw_table;
+    }
+
     let table_data = extract_grid_table_data(node, config);
     let mut output = String::new();
 

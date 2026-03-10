@@ -157,3 +157,21 @@ fn test_losslessness_horizontal_rule_with_leading_spaces() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_blockquote_atx_heading_with_attributes() {
+    let input = "> ## Header attributes inside block quote {#foobar .baz key=\"val\"}\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}
+
+#[test]
+fn test_losslessness_grid_table_wide_and_zero_width_chars() {
+    let input = "+--+----+\n|魚|fish|\n+--+----+\n\n+-------+-------+\n|German |English|\n+-------+-------+\n|Auf‌lage|edition|\n+-------+-------+\n\n+-------+---------+\n|می‌خواهم|I want to|\n+-------+---------+\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

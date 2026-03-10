@@ -88,11 +88,17 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 backtick_runs.insert(current_run);
             }
 
+            // Keep original in ambiguous cases where short-marked code spans
+            // contain very long internal backtick runs (can reparse unstably).
+            let max_run = backtick_runs.iter().copied().max().unwrap_or(0);
+            if marker_len <= 2 && max_run >= 4 {
+                return node.text().to_string();
+            }
+
             let needs_padding =
                 normalized_content.starts_with('`') || normalized_content.ends_with('`');
             let padding = if needs_padding { " " } else { "" };
 
-            let max_run = backtick_runs.iter().copied().max().unwrap_or(0);
             let min_needed = (max_run + 1).max(1);
             let final_backtick_count = min_needed;
 
@@ -136,16 +142,11 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
         }
         SyntaxKind::EMPHASIS => {
             let mut content = String::new();
-            let mut delimiter = "*";
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Node(n) => content.push_str(&format_inline_node(&n, config)),
                     NodeOrToken::Token(t) => {
-                        if t.kind() == SyntaxKind::EMPHASIS_MARKER {
-                            if t.text() == "_" {
-                                delimiter = "_";
-                            }
-                        } else {
+                        if t.kind() != SyntaxKind::EMPHASIS_MARKER {
                             content.push_str(t.text());
                         }
                     }
@@ -153,20 +154,15 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             }
             // Trim leading and trailing whitespace from emphasis content
             let content = content.trim();
-            format!("{delimiter}{content}{delimiter}")
+            format!("*{}*", content)
         }
         SyntaxKind::STRONG => {
             let mut content = String::new();
-            let mut delimiter = "**";
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Node(n) => content.push_str(&format_inline_node(&n, config)),
                     NodeOrToken::Token(t) => {
-                        if t.kind() == SyntaxKind::STRONG_MARKER {
-                            if t.text() == "__" {
-                                delimiter = "__";
-                            }
-                        } else {
+                        if t.kind() != SyntaxKind::STRONG_MARKER {
                             content.push_str(t.text());
                         }
                     }
@@ -174,7 +170,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             }
             // Trim leading and trailing whitespace from strong emphasis content
             let content = content.trim();
-            format!("{delimiter}{content}{delimiter}")
+            format!("**{}**", content)
         }
         SyntaxKind::BRACKETED_SPAN => {
             // Format bracketed span: [content]{.attributes}
