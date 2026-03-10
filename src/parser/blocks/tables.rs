@@ -144,6 +144,22 @@ fn is_table_caption_start(line: &str) -> bool {
     try_parse_caption_prefix(line).is_some()
 }
 
+fn is_bare_colon_caption_start(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.starts_with(':') && !trimmed.starts_with("::") && !trimmed.starts_with(":::")
+}
+
+fn is_valid_caption_start_before_table(lines: &[&str], pos: usize) -> bool {
+    if !is_table_caption_start(lines[pos]) {
+        return false;
+    }
+    // Avoid stealing definition-list definitions (":   ...") as table captions.
+    if is_bare_colon_caption_start(lines[pos]) && pos > 0 && !lines[pos - 1].trim().is_empty() {
+        return false;
+    }
+    true
+}
+
 /// Check if a line could be the start of a grid table.
 /// Grid tables start with a separator line like +---+---+ or +===+===+
 fn is_grid_table_start(line: &str) -> bool {
@@ -166,7 +182,7 @@ pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -
     }
 
     // Caption must start with a caption prefix
-    if !is_table_caption_start(lines[caption_pos]) {
+    if !is_valid_caption_start_before_table(lines, caption_pos) {
         return false;
     }
 
@@ -244,7 +260,7 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usiz
 
     // If this line is NOT a caption start, it might be a continuation line
     // Scan backward through non-blank lines to find the caption start
-    if !is_table_caption_start(lines[pos]) {
+    if !is_valid_caption_start_before_table(lines, pos) {
         // Not a caption start - check if there's a caption start above
         let mut scan_pos = pos;
         while scan_pos > 0 {
@@ -257,7 +273,7 @@ fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usiz
             }
 
             // If we find a caption start, this is the beginning of the multiline caption
-            if is_table_caption_start(line) {
+            if is_valid_caption_start_before_table(lines, scan_pos) {
                 return Some((scan_pos, caption_end));
             }
         }

@@ -103,3 +103,12 @@ fn test_losslessness_grid_table_cell_with_nbsp() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_colon_definition_before_grid_table() {
+    let input = "Misaligned separators in grid table \\`\\`\\`\n\n% pandoc -f markdown -t html\n:   Grid Table\n\n+-----------+---------------------------------+\n| Some text | [text]{.class1 .class2 .class3} |\n+===========+:===============================:+\n| Some text | [text]{.class1 .class2 .class3} |\n+-----------+---------------------------------+\n| Some text | [text]{.class1 .class2 .class3} |\n+-----------+---------------------------------+\n^D\n<table style=\"width:69%;\">\n<caption>Grid Table</caption>\n<colgroup>\n<col style=\"width: 25%\" />\n<col style=\"width: 44%\" />\n</colgroup>\n<tbody>\n<tr>\n<td>Some text</td>\n<td><span class=\"class1 class2 class3\">text</span></td>\n</tr>\n</tbody>\n</table> \\`\\`\\`\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}
