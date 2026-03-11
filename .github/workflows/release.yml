@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Semantic Release
+      - name: Semantic Release (core)
         uses: cycjimmy/semantic-release-action@v6
         with:
           extra_plugins: |
@@ -42,9 +42,20 @@ jobs:
             conventional-changelog-conventionalcommits
             semantic-release-cargo
             semantic-release-replace-plugin
-            semantic-release-vsce
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Semantic Release (VS Code extension)
+        uses: cycjimmy/semantic-release-action@v6
+        with:
+          working_directory: editors/code
+          extra_plugins: |
+            @semantic-release/commit-analyzer
+            @semantic-release/release-notes-generator
+            conventional-changelog-conventionalcommits
+            semantic-release-vsce
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
           OVSX_PAT: ${{ secrets.OVSX_PAT }}

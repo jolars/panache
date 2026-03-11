@@ -1,0 +1,26 @@
+{
+  "branches": [
+    "main"
+  ],
+  "tagFormat": "vscode-v${version}",
+  "plugins": [
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits"
+      }
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits"
+      }
+    ],
+    [
+      "semantic-release-vsce",
+      {
+        "packageVsix": true
+      }
+    ]
+  ]
+}
