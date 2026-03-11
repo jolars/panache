@@ -1067,7 +1067,12 @@ impl Formatter {
                             } else if needs_indent {
                                 self.output.push_str(&" ".repeat(indent));
                             }
-                            self.output.push_str(line);
+                            let rendered = if i > 0 && indent > 0 {
+                                line.trim_start()
+                            } else {
+                                line.as_str()
+                            };
+                            self.output.push_str(rendered);
                         }
 
                         if !self.output.ends_with('\n') {
@@ -1085,7 +1090,12 @@ impl Formatter {
                             } else if needs_indent {
                                 self.output.push_str(&" ".repeat(indent));
                             }
-                            self.output.push_str(line);
+                            let rendered = if i > 0 && indent > 0 {
+                                line.trim_start()
+                            } else {
+                                line.as_str()
+                            };
+                            self.output.push_str(rendered);
                         }
 
                         if !self.output.ends_with('\n') {
@@ -1356,7 +1366,7 @@ impl Formatter {
                                             self.output.push('\n');
                                             for line in lines.iter().skip(1) {
                                                 self.output.push_str(&" ".repeat(def_indent));
-                                                self.output.push_str(line);
+                                                self.output.push_str(line.trim_start());
                                                 self.output.push('\n');
                                             }
                                         }

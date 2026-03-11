@@ -2,6 +2,7 @@ mod bare_uris;
 mod bullet_standardization;
 mod code_chunks;
 mod comments;
+mod definition_lists;
 mod external_formatters;
 mod frontmatter;
 mod header_attributes;
