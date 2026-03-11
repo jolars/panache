@@ -5,7 +5,7 @@ Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/bad
 [![Crates.io](https://img.shields.io/crates/v/panache.svg)](https://crates.io/crates/panache)
 [![codecov](https://codecov.io/gh/jolars/panache/graph/badge.svg?token=uaBVOBfILv)](https://codecov.io/gh/jolars/panache)
 
-A formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and Markdown files.
+A language server, formatter, and linter for Pandoc, Quarto, and R Markdown.
 
 ## Work in Progress
 
@@ -14,7 +14,10 @@ breaking changes.
 
 ## Installation
 
-### From crates.io (Recommended)
+### From crates.io
+
+If you have Rust installed, the easiest way is likely to install from
+[crates.io](https://crates.io/crates/panache):
 
 ```bash
 cargo install panache
@@ -22,36 +25,10 @@ cargo install panache
 
 ### Pre-built Binaries
 
-Download pre-built binaries from the [releases
-page](https://github.com/jolars/panache/releases). Available for:
-
-- Linux (x86_64, ARM64)
-- macOS (Intel, Apple Silicon)
-- Windows (x86_64)
-
-Each archive includes the binary, man pages, and shell completions.
-
-### Linux Packages
-
-For Debian/Ubuntu systems:
-
-```bash
-# Download the .deb from releases
-sudo dpkg -i panache_*.deb
-```
-
-For Fedora/RHEL/openSUSE systems:
-
-```bash
-# Download the .rpm from releases
-sudo rpm -i panache-*.rpm
-```
-
-Packages include:
-
-- Binary at `/usr/bin/panache`
-- Man pages for all subcommands
-- Shell completions (bash, fish, zsh)
+Alternatively, you can install pre-built binary packages from the [releases
+page](https://github.com/jolars/panache/releases) for Linux, macOS, and Windows.
+For Linux, packages are available for generic distributions (tarballs) as well
+as Debian/Ubuntu (`.deb`) and Fedora/RHEL/openSUSE (`.rpm`).
 
 ## Usage
 
