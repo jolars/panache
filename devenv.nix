@@ -22,6 +22,7 @@
     pkgs.shfmt
     pkgs.wasm-pack
     pkgs.yamlfmt
+    pkgs.vsce
     (pkgs.rWrapper.override {
       packages = with pkgs.rPackages; [
         knitr
@@ -31,8 +32,28 @@
     })
   ];
 
-  languages.rust = {
-    enable = true;
+  languages = {
+    rust = {
+      enable = true;
+    };
+
+    javascript = {
+      enable = true;
+
+      # corepack.enable = true;
+
+      pnpm = {
+        enable = true;
+
+        install = {
+          enable = true;
+        };
+      };
+    };
+
+    typescript = {
+      enable = true;
+    };
   };
 
   git-hooks = {
@@ -63,6 +84,10 @@
           "^(pandoc|assets|tests)"
           "docs/cli.qmd"
         ];
+      };
+
+      eslint = {
+        enable = true;
       };
     };
   };
