@@ -176,20 +176,9 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 <details>
 <summary>VS Code</summary>
 
-Install a generic LSP client extension like [vscode-languageserver-node](https://marketplace.visualstudio.com/items?itemName=Microsoft.vscode-languageserver-node), then configure in `settings.json`:
-
-```json
-{
-  "languageServerExample.server": {
-    "command": "panache",
-    "args": ["lsp"],
-    "filetypes": ["quarto", "markdown", "rmarkdown"]
-  },
-  "editor.formatOnSave": true
-}
-```
-
-Or use the [Custom LSP](https://marketplace.visualstudio.com/items?itemName=josa.custom-lsp) extension.
+VS Code does not support generic LSP servers directly; a dedicated extension is
+needed. See the [LSP documentation](https://jolars.github.io/panache/lsp.html#vs-code)
+for options and setup instructions.
 
 </details>
 

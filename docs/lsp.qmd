@@ -137,45 +137,72 @@ vim.keymap.set('n', '<leader>f', vim.lsp.buf.format, { desc = 'Format buffer' })
 
 ### VS Code
 
-#### Option 1: Custom LSP Extension
+VS Code does not support connecting to arbitrary LSP servers natively; a
+dedicated extension is required. The options below range from simple
+(formatting-only) to full LSP support.
 
-Install the [Custom
-LSP](https://marketplace.visualstudio.com/items?itemName=josa.custom-lsp)
-extension, then configure in `settings.json`:
+#### Option 1: Format on Save via Task
+
+The simplest approach uses a VS Code task to run `panache format` whenever you
+save a file. Create `.vscode/tasks.json` in your project:
 
 ```json
 {
-  "customLsp.servers": {
-    "panache": {
-      "command": "panache",
-      "args": ["lsp"],
-      "filetypes": ["quarto", "markdown", "rmarkdown"]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Format with panache",
+      "type": "shell",
+      "command": "panache format ${file}",
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared"
+      }
     }
-  },
-  "editor.formatOnSave": true
+  ]
 }
 ```
 
-#### Option 2: Generic LSP Client
+Then bind it to a keyboard shortcut in `keybindings.json` or run it with
+`Ctrl+Shift+P` → **Tasks: Run Task** → **Format with panache**.
 
-Install a generic LSP client extension, then configure:
+#### Option 2: Minimal LSP Extension
 
-```json
-{
-  "languageServerExample.server": {
-    "command": "panache",
-    "args": ["lsp"],
-    "filetypes": ["quarto", "markdown", "rmarkdown"]
-  },
-  "editor.formatOnSave": true,
-  "[quarto]": {
-    "editor.defaultFormatter": "languageServerExample"
-  },
-  "[markdown]": {
-    "editor.defaultFormatter": "languageServerExample"
-  }
+For full LSP support (live diagnostics, code actions, document symbols), you
+need a VS Code extension that acts as an LSP client for panache. You can create
+a minimal one using the [VS Code Language Server Extension
+Guide](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide)
+and the
+[`vscode-languageclient`](https://www.npmjs.com/package/vscode-languageclient)
+package:
+
+```typescript
+// extension.ts (minimal example)
+import * as vscode from "vscode";
+import { LanguageClient, ServerOptions, TransportKind } from "vscode-languageclient/node";
+
+export function activate(context: vscode.ExtensionContext) {
+  const serverOptions: ServerOptions = {
+    command: "panache",
+    args: ["lsp"],
+    transport: TransportKind.stdio,
+  };
+
+  const clientOptions = {
+    documentSelector: [
+      { scheme: "file", language: "quarto" },
+      { scheme: "file", language: "markdown" },
+    ],
+  };
+
+  const client = new LanguageClient("panache", "Panache", serverOptions, clientOptions);
+  context.subscriptions.push(client.start());
 }
 ```
+
+See the [VS Code extension
+documentation](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide)
+for full packaging and publishing instructions.
 
 ### Helix
 
@@ -455,7 +482,8 @@ vim.lsp.set_log_level("debug")
 
 **VS Code:**
 
-Set `"customLsp.trace.server": "verbose"` in settings.
+When using a custom extension, enable server tracing in your extension's client
+options or check the **Output** panel and select your extension's output channel.
 
 ### Configuration Not Loading
 
