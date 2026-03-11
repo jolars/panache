@@ -46,6 +46,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
+      - name: Setup Node for VS Code extension release
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install VS Code extension dependencies
+        working-directory: editors/code
+        run: npm ci
+
       - name: Semantic Release (VS Code extension)
         uses: cycjimmy/semantic-release-action@v6
         with:
