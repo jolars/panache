@@ -760,7 +760,7 @@ pub(super) fn wrapped_lines_for_paragraph(
         words.iter().map(|w| w.word).collect::<Vec<_>>()
     );
 
-    let algo = WrapAlgorithm::new();
+    let algo = WrapAlgorithm::FirstFit;
     let line_widths = [width];
     let lines = algo.wrap(&words, &line_widths);
     log::debug!("Wrapped into {} lines", lines.len());
@@ -859,7 +859,7 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
     let words = build_words(_config, node, &mut arena, format_inline_fn);
     log::debug!("Built {} words for paragraph", words.len());
 
-    let algo = WrapAlgorithm::new();
+    let algo = WrapAlgorithm::FirstFit;
     let line_widths = if widths.is_empty() { &[1] } else { widths };
     let lines = algo.wrap(&words, line_widths);
     log::debug!("Wrapped into {} lines", lines.len());

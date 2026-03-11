@@ -34,8 +34,8 @@ Instead of giving the identifier explicitly:
 - [Heading identifiers in HTML](#heading-identifiers-in-html)
 
 Explicit link reference definitions always take priority over implicit heading
-references. So, in the following example, the link will point to `bar`, not
-to `#foo`:
+references. So, in the following example, the link will point to `bar`, not to
+`#foo`:
 
 ## Foo
 

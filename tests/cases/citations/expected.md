@@ -1,12 +1,12 @@
 # Citations
 
-Introductory text to ensure wrapping
-and keep these sentences long enough to
+Introductory text to ensure wrapping and
+keep these sentences long enough to
 reflow around citations.
 
 Blah blah
-[@doe99; @smith2000; @smith2004]
-with extra words to exercise wrapping
+[@doe99; @smith2000; @smith2004] with
+extra words to exercise wrapping
 behavior.
 
 Blah blah [see @doe99, pp. 33-35 and
@@ -16,8 +16,8 @@ sentence for reflow.
 Smith says blah [-@smith04] when the
 author appears in the prose already.
 
-@smith04 says blah in a sentence
-that should reflow nicely with the
+@smith04 says blah in a sentence that
+should reflow nicely with the
 author-in-text citation.
 
 @smith04 [p. 33] says blah with a
