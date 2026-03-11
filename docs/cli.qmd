@@ -57,6 +57,7 @@ For more information, visit: https://github.com/jolars/panache
 * `parse` — Parse and display the CST tree for debugging
 * `lsp` — Start the Language Server Protocol server
 * `lint` — Lint a Quarto, Pandoc, or Markdown document
+* `debug` — Debug utilities for parser/formatter diagnostics
 
 ###### **Options:**
 
@@ -104,7 +105,9 @@ EXAMPLES:
 * `--range <START:END>` — Format only the specified line range. Lines are 1-indexed and inclusive. The range will be expanded to complete block boundaries to ensure well-formed output. For example, if you select part of a list, the entire list will be formatted. Format: --range START:END (e.g., --range 5:10 formats lines 5 through 10). 
 
    Note: This feature is experimental. Range filtering may not work correctly in all cases.
-* `--verify` — Run smoke-check invariants: (1) parser losslessness (input == parsed CST text) and (2) formatter idempotency (format(format(x)) == format(x)). When formatting files by path (including directories), --verify does not write any changes to disk. Exits with code 1 when verification fails.
+* `--verify` — Run smoke-check invariants: (1) parser losslessness (input == parsed CST text) and (2) formatter idempotency (format(format(x)) == format(x)). When formatting files by path (including directories), --verify does not write any changes to disk. Exits with code 1 when verification fails. 
+
+   Deprecated: prefer `panache debug format --checks all`.
 
 
 
@@ -142,7 +145,9 @@ EXAMPLES:
 
 * `--json <PATH>` — Write the parsed CST to the given JSON file instead of printing the debug tree. The output includes node kinds, text ranges, and token text.
 * `--quiet` — Suppress CST output to stdout. Useful with --verify for smoke-testing large files without terminal spam. Verification failures still print diagnostics and exit non-zero.
-* `--verify` — Run parser losslessness verification (input == parsed CST text). Exits with code 1 when verification fails.
+* `--verify` — Run parser losslessness verification (input == parsed CST text). Exits with code 1 when verification fails. 
+
+   Deprecated: prefer `panache debug format --checks losslessness`.
 
 
 
@@ -197,12 +202,47 @@ Configure rules in .panache.toml with [lint] section.
 
 ###### **Arguments:**
 
-* `<FILES>` — Input file path(s) or directories
+* `<FILES>` — Path(s) to the input file(s) or directories to check. If not provided, reads from stdin. Supports .qmd, .md, .Rmd, and other Markdown-based formats. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
 
 ###### **Options:**
 
 * `--check` — Exit with code 1 if violations found (CI mode)
 * `--fix` — Automatically fix violations where possible
+
+
+
+## `panache debug`
+
+Debugging utilities for parse/format workflows. These commands are intended for diagnosing parser losslessness and formatter idempotency failures in repositories.
+
+**Usage:** `panache debug <COMMAND>`
+
+###### **Subcommands:**
+
+* `format` — Run parser+formatter checks and emit diagnostics
+
+
+
+## `panache debug format`
+
+Run parser+formatter checks and emit diagnostics
+
+**Usage:** `panache debug format [OPTIONS] [FILES]...`
+
+###### **Arguments:**
+
+* `<FILES>` — Input file path(s) or directories
+
+###### **Options:**
+
+* `--checks <CHECKS>` — Which checks to run
+
+  Default value: `all`
+
+  Possible values: `idempotency`, `losslessness`, `all`
+
+* `--json` — Emit JSON output for machine-readable tooling
+* `--dump-dir <DIR>` — Directory where failing artifacts are written
 
 
 

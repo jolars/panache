@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -134,12 +134,13 @@ EXAMPLES:
 
         /// Verify parser losslessness and formatter idempotency
         #[arg(long)]
-        #[arg(help = "Verify losslessness and idempotency invariants")]
+        #[arg(help = "[Deprecated] Verify losslessness and idempotency invariants")]
         #[arg(long_help = "Run smoke-check invariants: \
             (1) parser losslessness (input == parsed CST text) and \
             (2) formatter idempotency (format(format(x)) == format(x)). \
             When formatting files by path (including directories), --verify does not write any changes \
-            to disk. Exits with code 1 when verification fails.")]
+            to disk. Exits with code 1 when verification fails. \
+            \n\nDeprecated: prefer `panache debug format --checks all`.")]
         verify: bool,
     },
     /// Parse and display the CST tree for debugging
@@ -197,10 +198,11 @@ EXAMPLES:
 
         /// Verify parser losslessness (input must equal CST text)
         #[arg(long)]
-        #[arg(help = "Verify parser losslessness invariant")]
+        #[arg(help = "[Deprecated] Verify parser losslessness invariant")]
         #[arg(
             long_help = "Run parser losslessness verification (input == parsed CST text). \
-            Exits with code 1 when verification fails."
+            Exits with code 1 when verification fails. \
+            \n\nDeprecated: prefer `panache debug format --checks losslessness`."
         )]
         verify: bool,
     },
@@ -262,6 +264,12 @@ Configure rules in .panache.toml with [lint] section.")]
     Lint {
         /// Input file(s) or directories (stdin if not provided)
         #[arg(help = "Input file path(s) or directories")]
+        #[arg(
+            long_help = "Path(s) to the input file(s) or directories to check. If not provided, reads from stdin. \
+            Supports .qmd, .md, .Rmd, and other Markdown-based formats. Supports glob patterns \
+            (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, \
+            respecting .gitignore files."
+        )]
         files: Vec<PathBuf>,
 
         /// Check mode: exit with code 1 if violations found
@@ -274,4 +282,43 @@ Configure rules in .panache.toml with [lint] section.")]
         #[arg(help = "Automatically fix violations where possible")]
         fix: bool,
     },
+    /// Debug utilities for parser/formatter diagnostics
+    #[command(
+        long_about = "Debugging utilities for parse/format workflows. These commands are intended \
+        for diagnosing parser losslessness and formatter idempotency failures in repositories."
+    )]
+    Debug {
+        #[command(subcommand)]
+        command: DebugCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DebugCommands {
+    /// Run parser+formatter checks and emit diagnostics
+    #[command(name = "format")]
+    Format {
+        /// Input file(s) or directories (stdin if not provided)
+        #[arg(help = "Input file path(s) or directories")]
+        files: Vec<PathBuf>,
+
+        /// Which checks to run
+        #[arg(long, value_enum, default_value = "all")]
+        checks: DebugChecks,
+
+        /// Emit JSON output for machine-readable tooling
+        #[arg(long)]
+        json: bool,
+
+        /// Directory where failing artifacts are written
+        #[arg(long, value_name = "DIR")]
+        dump_dir: Option<PathBuf>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum DebugChecks {
+    Idempotency,
+    Losslessness,
+    All,
 }

@@ -6,9 +6,10 @@ use clap::Parser;
 use similar::{ChangeTag, TextDiff};
 
 use panache::{format, parse};
+use serde_json::json;
 
 mod cli;
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, DebugChecks, DebugCommands};
 
 /// Supported file extensions for formatting
 const SUPPORTED_EXTENSIONS: &[&str] = &["md", "qmd", "Rmd", "markdown", "mdown", "mkd"];
@@ -179,6 +180,58 @@ fn print_diff(file_path: &str, original: &str, formatted: &str) {
     }
 }
 
+#[derive(Clone, Copy)]
+enum CheckKind {
+    Losslessness,
+    Idempotency,
+}
+
+impl CheckKind {
+    fn label(self) -> &'static str {
+        match self {
+            CheckKind::Losslessness => "losslessness",
+            CheckKind::Idempotency => "idempotency",
+        }
+    }
+}
+
+fn sanitize_path_for_filename(path: &str) -> String {
+    path.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+fn run_debug_checks_for_content(
+    input: &str,
+    cfg: &panache::Config,
+    checks: DebugChecks,
+) -> Vec<(CheckKind, String, String)> {
+    let mut failures = Vec::new();
+
+    if matches!(checks, DebugChecks::Losslessness | DebugChecks::All) {
+        let tree_text = parse(input, Some(cfg.clone())).text().to_string();
+        if input != tree_text {
+            failures.push((CheckKind::Losslessness, input.to_string(), tree_text));
+        }
+    }
+
+    if matches!(checks, DebugChecks::Idempotency | DebugChecks::All) {
+        let once = format(input, Some(cfg.clone()), None);
+        let twice = format(&once, Some(cfg.clone()), None);
+        if once != twice {
+            failures.push((CheckKind::Idempotency, once, twice));
+        }
+    }
+
+    failures
+}
+
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
     let debug_log = match &cli.command {
@@ -194,6 +247,11 @@ fn main() -> io::Result<()> {
             quiet,
             verify,
         } => {
+            if verify {
+                eprintln!(
+                    "Warning: `panache parse --verify` is deprecated; use `panache debug format --checks losslessness`."
+                );
+            }
             let start_dir = start_dir_for(&file)?;
             let (cfg, cfg_path) =
                 panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
@@ -233,6 +291,11 @@ fn main() -> io::Result<()> {
             range,
             verify,
         } => {
+            if verify {
+                eprintln!(
+                    "Warning: `panache format --verify` is deprecated; use `panache debug format --checks all`."
+                );
+            }
             // Parse range if provided (only valid for single file or stdin)
             let parsed_range = if let Some(range_str) = range {
                 if files.len() > 1 {
@@ -375,6 +438,116 @@ fn main() -> io::Result<()> {
 
             Ok(())
         }
+        Commands::Debug { command } => match command {
+            DebugCommands::Format {
+                files,
+                checks,
+                json,
+                dump_dir,
+            } => {
+                let use_stdin = files.is_empty();
+                let targets = if use_stdin {
+                    vec![]
+                } else {
+                    expand_paths(&files)?
+                };
+
+                if !use_stdin && targets.is_empty() {
+                    eprintln!("Error: No supported files found");
+                    std::process::exit(1);
+                }
+
+                let mut files_checked = 0usize;
+                let mut failure_count = 0usize;
+                let mut json_failures = Vec::new();
+
+                if use_stdin {
+                    let start_dir = std::env::current_dir()?;
+                    let (cfg, _) = panache::config::load(cli.config.as_deref(), &start_dir, None)?;
+                    let input = read_all(None)?;
+                    files_checked += 1;
+
+                    let failures = run_debug_checks_for_content(&input, &cfg, checks);
+                    for (kind, left, right) in failures {
+                        failure_count += 1;
+                        if !json {
+                            eprintln!("Debug check failed ({}) in <stdin>", kind.label());
+                            print_diff("<stdin>", &left, &right);
+                        }
+                        if let Some(dir) = dump_dir.as_ref() {
+                            fs::create_dir_all(dir)?;
+                            let stem = format!("stdin.{}", kind.label());
+                            fs::write(dir.join(format!("{stem}.left.txt")), &left)?;
+                            fs::write(dir.join(format!("{stem}.right.txt")), &right)?;
+                        }
+                        json_failures.push(json!({
+                            "file": "<stdin>",
+                            "kind": kind.label(),
+                        }));
+                    }
+                } else {
+                    for file_path in &targets {
+                        let start_dir = file_path.parent().unwrap_or(Path::new(".")).to_path_buf();
+                        let (cfg, _) = panache::config::load(
+                            cli.config.as_deref(),
+                            &start_dir,
+                            Some(file_path),
+                        )?;
+                        let input = fs::read_to_string(file_path)?;
+                        files_checked += 1;
+                        let file_label = file_path.to_str().unwrap_or("<unknown>");
+
+                        let failures = run_debug_checks_for_content(&input, &cfg, checks);
+                        for (kind, left, right) in failures {
+                            failure_count += 1;
+                            if !json {
+                                eprintln!(
+                                    "Debug check failed ({}) in {}",
+                                    kind.label(),
+                                    file_label
+                                );
+                                print_diff(file_label, &left, &right);
+                            }
+                            if let Some(dir) = dump_dir.as_ref() {
+                                fs::create_dir_all(dir)?;
+                                let safe = sanitize_path_for_filename(file_label);
+                                let stem = format!("{}.{}", safe, kind.label());
+                                fs::write(dir.join(format!("{stem}.left.txt")), &left)?;
+                                fs::write(dir.join(format!("{stem}.right.txt")), &right)?;
+                            }
+                            json_failures.push(json!({
+                                "file": file_label,
+                                "kind": kind.label(),
+                            }));
+                        }
+                    }
+                }
+
+                if json {
+                    let output = json!({
+                        "checks": format!("{:?}", checks).to_lowercase(),
+                        "files_checked": files_checked,
+                        "failure_count": failure_count,
+                        "failures": json_failures,
+                    });
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&output).map_err(io::Error::other)?
+                    );
+                } else if failure_count == 0 {
+                    println!(
+                        "All checks passed (checks: {}, files: {})",
+                        format!("{:?}", checks).to_lowercase(),
+                        files_checked
+                    );
+                }
+
+                if failure_count > 0 {
+                    std::process::exit(1);
+                }
+                Ok(())
+            }
+        },
         #[cfg(feature = "lsp")]
         Commands::Lsp { .. } => {
             // LSP needs tokio runtime

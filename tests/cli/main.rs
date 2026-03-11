@@ -8,6 +8,7 @@
 //! - Error handling
 
 mod common;
+mod debug;
 mod format;
 mod lint;
 mod parse;
