@@ -5,6 +5,7 @@ toml = "taplo"
 bash = "shfmt"
 sh = "shfmt"
 python = "ruff"
+lua = "stylua"
 
 [formatters.taplo]
 cmd = "taplo"
@@ -14,9 +15,9 @@ args = ["format", "-"]
 cmd = "shfmt"
 args = ["-"]
 
-[formatters.ruff]
-cmd = "ruff"
-args = ["format", "--stdin-filename", "{}", "-"]
+[formatters.stylua]
+cmd = "stylua"
+args = ["--indent-type", "Spaces", "--indent-width", "2", "-"]
 
 [linters]
 r = "jarl"

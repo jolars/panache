@@ -21,6 +21,7 @@
     pkgs.ruff
     pkgs.shfmt
     pkgs.wasm-pack
+    pkgs.stylua
     pkgs.yamlfmt
     pkgs.vsce
     (pkgs.rWrapper.override {
