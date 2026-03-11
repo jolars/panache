@@ -3,168 +3,96 @@ title: "Performance Benchmarks"
 description: "panache performance metrics on real-world documents"
 ---
 
-::: {.callout-note}
-Last updated: 2026-03-01 21:14 UTC\
-Commit: `c3a47b2`
-:::
-
 ## Benchmark Suite
 
 Benchmarks are run on real Quarto documents to measure realistic performance.
 
-### Test Documents
-
-- **Small**: Synthetic document (747 bytes) with mixed content
-- **Medium**: Quarto tutorial from quarto-dev/quarto-web (\~9KB)
-- **Tables**: Table-heavy document from Quarto docs (\~19KB)
-- **Math**: Computation-heavy document with equations (\~29KB)
-- **Large**: Comprehensive authoring guide (\~30KB)
-
 ### Methodology
 
-- Each benchmark runs multiple iterations (1000 for small, 20-100 for larger)
 - Measures three phases: full pipeline (parse+format), parse only, format only
 - Reports average time per iteration and throughput (KB/s)
+- Source of truth: `benches/benchmark_results.json` (schema version 1)
 
 ## Results
 
-```
-warning: function `init_logger` is never used
-  --> src/lib.rs:27:4
-   |
-27 | fn init_logger() {
-   |    ^^^^^^^^^^^
-   |
-   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+### Small (synthetic)
 
-warning: function `init_logger` is never used
-  --> src/parser/core.rs:30:4
-   |
-30 | fn init_logger() {
-   |    ^^^^^^^^^^^
+Document: `small.qmd` (748 bytes, 48 lines)\
+Iterations: 1000
 
-warning: `panache` (lib) generated 2 warnings
-    Finished `bench` profile [optimized] target(s) in 0.05s
-     Running benches/formatting.rs (target/release/deps/formatting-a28c4abd661b6546)
-Panache Benchmarks
-==================
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |       0.07 ms |
+| Parse only    |       0.03 ms |
+| Format only   |       0.03 ms |
+| Throughput    | 10273.39 KB/s |
 
+### Medium (Quarto tutorial)
 
-============================================================
-Benchmark: Small (synthetic)
-============================================================
-Document size: 747 bytes, 47 lines
+Document: `medium_quarto.qmd` (8893 bytes, 146 lines)\
+Iterations: 100
 
-Full pipeline (parse + format):
-  Total: 54.632375ms for 1000 iterations
-  Average: 54.63µs per iteration (0.05ms)
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |       0.47 ms |
+| Parse only    |       0.12 ms |
+| Format only   |       0.29 ms |
+| Throughput    | 18363.33 KB/s |
 
-Parse only:
-  Total: 23.311061ms for 1000 iterations
-  Average: 23.31µs per iteration (0.02ms)
+### Tables (table-heavy)
 
-Format only (CST pre-built):
-  Total: 27.359959ms for 1000 iterations
-  Average: 27.36µs per iteration (0.03ms)
+Document: `tables.qmd` (18833 bytes, 636 lines)\
+Iterations: 50
 
-Throughput: 13352.84 KB/s
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |       1.18 ms |
+| Parse only    |       0.42 ms |
+| Format only   |       0.64 ms |
+| Throughput    | 15611.24 KB/s |
 
-============================================================
-Benchmark: Medium (Quarto tutorial)
-============================================================
-Document size: 8893 bytes, 146 lines
+### Math (computation-heavy)
 
-Full pipeline (parse + format):
-  Total: 45.821879ms for 100 iterations
-  Average: 458.21µs per iteration (0.46ms)
+Document: `math.qmd` (28562 bytes, 664 lines)\
+Iterations: 50
 
-Parse only:
-  Total: 9.5417ms for 100 iterations
-  Average: 95.41µs per iteration (0.10ms)
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |       1.41 ms |
+| Parse only    |       0.36 ms |
+| Format only   |       0.81 ms |
+| Throughput    | 19758.15 KB/s |
 
-Format only (CST pre-built):
-  Total: 32.366624ms for 100 iterations
-  Average: 323.66µs per iteration (0.32ms)
+### Large (comprehensive)
 
-Throughput: 18953.25 KB/s
+Document: `large_authoring.qmd` (29858 bytes, 592 lines)\
+Iterations: 20
 
-============================================================
-Benchmark: Tables (table-heavy)
-============================================================
-Document size: 18833 bytes, 636 lines
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |       1.08 ms |
+| Parse only    |       0.41 ms |
+| Format only   |       0.58 ms |
+| Throughput    | 26908.64 KB/s |
 
-Full pipeline (parse + format):
-  Total: 51.128424ms for 50 iterations
-  Average: 1022.56µs per iteration (1.02ms)
+### Pandoc MANUAL (stress)
 
-Parse only:
-  Total: 16.605064ms for 50 iterations
-  Average: 332.10µs per iteration (0.33ms)
+Document: `pandoc_manual.md` (299536 bytes, 8036 lines)\
+Iterations: 3
 
-Format only (CST pre-built):
-  Total: 30.002231ms for 50 iterations
-  Average: 600.04µs per iteration (0.60ms)
-
-Throughput: 17985.84 KB/s
-
-============================================================
-Benchmark: Math (computation-heavy)
-============================================================
-Document size: 28562 bytes, 664 lines
-
-Full pipeline (parse + format):
-  Total: 73.653438ms for 50 iterations
-  Average: 1473.06µs per iteration (1.47ms)
-
-Parse only:
-  Total: 17.290033ms for 50 iterations
-  Average: 345.80µs per iteration (0.35ms)
-
-Format only (CST pre-built):
-  Total: 50.777622ms for 50 iterations
-  Average: 1015.54µs per iteration (1.02ms)
-
-Throughput: 18935.13 KB/s
-
-============================================================
-Benchmark: Large (comprehensive)
-============================================================
-Document size: 29858 bytes, 592 lines
-
-Full pipeline (parse + format):
-  Total: 21.671041ms for 20 iterations
-  Average: 1083.55µs per iteration (1.08ms)
-
-Parse only:
-  Total: 7.868618ms for 20 iterations
-  Average: 393.40µs per iteration (0.39ms)
-
-Format only (CST pre-built):
-  Total: 12.18237ms for 20 iterations
-  Average: 609.10µs per iteration (0.61ms)
-
-Throughput: 26909.88 KB/s
-
-============================================================
-Benchmarks complete!
-============================================================
-```
-
-## Interpretation
-
-- **Full pipeline**: What users experience when running `panache format`
-- **Parse only**: Time to build the CST (concrete syntax tree)
-- **Format only**: Time to traverse CST and generate output
-- **Throughput**: Processing speed in KB/second
+| Metric        | Avg time      |
+| ------------- | ------------: |
+| Full pipeline |      16.43 ms |
+| Parse only    |       5.55 ms |
+| Format only   |      10.31 ms |
+| Throughput    | 17799.78 KB/s |
 
 ## Reproducing
-
-To reproduce these benchmarks:
 
 ```bash
 # Download test documents
 cd benches/documents && ./download.sh
 
-# Run benchmarks
-cargo bench --bench formatting
+# Generate JSON + docs page
+./benches/generate_docs.sh
 ```

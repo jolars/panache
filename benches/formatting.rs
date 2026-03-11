@@ -1,4 +1,5 @@
 use panache::{format, parse};
+use serde::Serialize;
 use std::env;
 use std::fs;
 use std::hint::black_box;
@@ -35,12 +36,39 @@ fn bench_parse_only(input: &str, config: &panache::Config, iterations: usize) ->
     start.elapsed()
 }
 
-fn run_benchmark(name: &str, input: &str, iterations: usize) {
-    let config = panache::Config::default();
-    run_benchmark_with_config(name, input, &config, iterations);
+#[derive(Debug, Serialize)]
+struct BenchmarkResult {
+    id: String,
+    name: String,
+    document: String,
+    size_bytes: usize,
+    line_count: usize,
+    iterations: usize,
+    built_in_greedy_wrap: bool,
+    full_avg_us: f64,
+    parse_avg_us: f64,
+    format_avg_us: f64,
+    throughput_kb_s: f64,
 }
 
-fn run_benchmark_with_config(name: &str, input: &str, config: &panache::Config, iterations: usize) {
+#[derive(Debug, Serialize)]
+struct BenchmarkReport {
+    schema_version: u32,
+    results: Vec<BenchmarkResult>,
+}
+
+fn run_benchmark(name: &str, doc_id: &str, input: &str, iterations: usize) -> BenchmarkResult {
+    let config = panache::Config::default();
+    run_benchmark_with_config(name, doc_id, input, &config, iterations)
+}
+
+fn run_benchmark_with_config(
+    name: &str,
+    doc_id: &str,
+    input: &str,
+    config: &panache::Config,
+    iterations: usize,
+) -> BenchmarkResult {
     println!("\n{}", "=".repeat(60));
     println!("Benchmark: {}", name);
     println!("{}", "=".repeat(60));
@@ -91,6 +119,24 @@ fn run_benchmark_with_config(name: &str, input: &str, config: &panache::Config, 
     // Throughput
     let throughput = (input.len() as f64 / 1024.0) / (full_avg / 1_000_000.0);
     println!("\nThroughput: {:.2} KB/s", throughput);
+
+    BenchmarkResult {
+        id: if config.built_in_greedy_wrap {
+            doc_id.to_owned()
+        } else {
+            format!("{doc_id}-built-in-greedy-wrap-false")
+        },
+        name: name.to_owned(),
+        document: doc_id.to_owned(),
+        size_bytes: input.len(),
+        line_count: input.lines().count(),
+        iterations,
+        built_in_greedy_wrap: config.built_in_greedy_wrap,
+        full_avg_us: full_avg,
+        parse_avg_us: parse_avg,
+        format_avg_us: format_avg,
+        throughput_kb_s: throughput,
+    }
 }
 
 fn load_document(name: &str) -> Option<String> {
@@ -101,6 +147,8 @@ fn load_document(name: &str) -> Option<String> {
 fn main() {
     println!("Panache Benchmarks");
     println!("==================\n");
+
+    let mut results = Vec::new();
 
     if let Ok(doc_name) = env::var("PANACHE_BENCH_DOC") {
         let iterations = env::var("PANACHE_BENCH_ITERATIONS")
@@ -113,11 +161,12 @@ fn main() {
                 doc_name
             )
         });
-        run_benchmark(
+        results.push(run_benchmark(
             &format!("Selected profile doc ({doc_name})"),
+            &doc_name,
             &doc,
             iterations,
-        );
+        ));
         if env::var("PANACHE_BENCH_COMPARE_BUILT_IN_WRAP")
             .ok()
             .as_deref()
@@ -127,13 +176,15 @@ fn main() {
                 built_in_greedy_wrap: false,
                 ..panache::Config::default()
             };
-            run_benchmark_with_config(
+            results.push(run_benchmark_with_config(
                 &format!("Selected profile doc ({doc_name}) [built-in-greedy-wrap=false]"),
+                &doc_name,
                 &doc,
                 &built_in,
                 iterations,
-            );
+            ));
         }
+        maybe_write_json_report(results);
         return;
     }
 
@@ -146,34 +197,64 @@ fn main() {
     let pandoc_manual = load_document("pandoc_manual.md");
 
     // Run benchmarks
-    run_benchmark("Small (synthetic)", &small, 1000);
+    results.push(run_benchmark(
+        "Small (synthetic)",
+        "small.qmd",
+        &small,
+        1000,
+    ));
 
     if let Some(doc) = medium {
-        run_benchmark("Medium (Quarto tutorial)", &doc, 100);
+        results.push(run_benchmark(
+            "Medium (Quarto tutorial)",
+            "medium_quarto.qmd",
+            &doc,
+            100,
+        ));
     } else {
         println!("\n⚠️  Skipping medium benchmark - run benches/documents/download.sh");
     }
 
     if let Some(doc) = tables {
-        run_benchmark("Tables (table-heavy)", &doc, 50);
+        results.push(run_benchmark(
+            "Tables (table-heavy)",
+            "tables.qmd",
+            &doc,
+            50,
+        ));
     } else {
         println!("\n⚠️  Skipping tables benchmark - run benches/documents/download.sh");
     }
 
     if let Some(doc) = math {
-        run_benchmark("Math (computation-heavy)", &doc, 50);
+        results.push(run_benchmark(
+            "Math (computation-heavy)",
+            "math.qmd",
+            &doc,
+            50,
+        ));
     } else {
         println!("\n⚠️  Skipping math benchmark - run benches/documents/download.sh");
     }
 
     if let Some(doc) = large {
-        run_benchmark("Large (comprehensive)", &doc, 20);
+        results.push(run_benchmark(
+            "Large (comprehensive)",
+            "large_authoring.qmd",
+            &doc,
+            20,
+        ));
     } else {
         println!("\n⚠️  Skipping large benchmark - run benches/documents/download.sh");
     }
 
     if let Some(doc) = pandoc_manual {
-        run_benchmark("Pandoc MANUAL (stress)", &doc, 3);
+        results.push(run_benchmark(
+            "Pandoc MANUAL (stress)",
+            "pandoc_manual.md",
+            &doc,
+            3,
+        ));
     } else {
         println!("\n⚠️  Skipping Pandoc MANUAL benchmark - run benches/documents/download.sh");
     }
@@ -181,4 +262,21 @@ fn main() {
     println!("\n{}", "=".repeat(60));
     println!("Benchmarks complete!");
     println!("{}", "=".repeat(60));
+
+    maybe_write_json_report(results);
+}
+
+fn maybe_write_json_report(results: Vec<BenchmarkResult>) {
+    let Some(path) = env::var("PANACHE_BENCH_OUTPUT_JSON").ok() else {
+        return;
+    };
+
+    let report = BenchmarkReport {
+        schema_version: 1,
+        results,
+    };
+    let json =
+        serde_json::to_string_pretty(&report).expect("failed to serialize benchmark JSON report");
+    fs::write(&path, json)
+        .unwrap_or_else(|e| panic!("failed to write benchmark JSON report to '{path}': {e}"));
 }

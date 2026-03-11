@@ -1,74 +1,83 @@
 #!/usr/bin/env bash
 
-# Script to generate benchmark results for documentation
-# Output is saved to docs/benchmarks.qmd
+# Script to generate benchmark docs from deterministic JSON benchmark output.
 
-set -e
+set -euo pipefail
 
 OUTPUT_FILE="docs/benchmarks.qmd"
-TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
-COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+JSON_FILE="benches/benchmark_results.json"
 
 echo "Running benchmarks..."
-BENCH_OUTPUT=$(cargo bench --bench formatting 2>&1)
+PANACHE_BENCH_OUTPUT_JSON="$JSON_FILE" cargo bench --bench formatting --quiet
 
-cat > "$OUTPUT_FILE" << EOF
----
-title: "Performance Benchmarks"
-description: "panache performance metrics on real-world documents"
----
+python3 - "$JSON_FILE" "$OUTPUT_FILE" <<'PY'
+import json
+import sys
+from pathlib import Path
 
-::: {.callout-note}
-Last updated: $TIMESTAMP
-Commit: \`$COMMIT\`
-:::
+json_path = Path(sys.argv[1])
+output_path = Path(sys.argv[2])
+data = json.loads(json_path.read_text(encoding="utf-8"))
+results = [r for r in data.get("results", []) if r.get("built_in_greedy_wrap", True)]
 
-## Benchmark Suite
+lines = [
+    "---",
+    'title: "Performance Benchmarks"',
+    'description: "panache performance metrics on real-world documents"',
+    "---",
+    "",
+    "## Benchmark Suite",
+    "",
+    "Benchmarks are run on real Quarto documents to measure realistic performance.",
+    "",
+    "### Methodology",
+    "",
+    "- Measures three phases: full pipeline (parse+format), parse only, format only",
+    "- Reports average time per iteration and throughput (KB/s)",
+    "- Source of truth: `benches/benchmark_results.json` (schema version "
+    + str(data.get("schema_version", "unknown"))
+    + ")",
+    "",
+    "## Results",
+    "",
+]
 
-Benchmarks are run on real Quarto documents to measure realistic performance.
+for r in results:
+    lines.extend(
+        [
+            f"### {r['name']}",
+            "",
+            f"Document: `{r['document']}` ({r['size_bytes']} bytes, {r['line_count']} lines)  ",
+            f"Iterations: {r['iterations']}",
+            "",
+            "| Metric | Avg time |",
+            "| --- | ---: |",
+            f"| Full pipeline | {r['full_avg_us'] / 1000.0:.2f} ms |",
+            f"| Parse only | {r['parse_avg_us'] / 1000.0:.2f} ms |",
+            f"| Format only | {r['format_avg_us'] / 1000.0:.2f} ms |",
+            f"| Throughput | {r['throughput_kb_s']:.2f} KB/s |",
+            "",
+        ]
+    )
 
-### Test Documents
+lines.extend(
+    [
+        "## Reproducing",
+        "",
+        "```bash",
+        "# Download test documents",
+        "cd benches/documents && ./download.sh",
+        "",
+        "# Generate JSON + docs page",
+        "./benches/generate_docs.sh",
+        "```",
+        "",
+    ]
+)
 
-- **Small**: Synthetic document (747 bytes) with mixed content
-- **Medium**: Quarto tutorial from quarto-dev/quarto-web (~9KB)
-- **Tables**: Table-heavy document from Quarto docs (~19KB)
-- **Math**: Computation-heavy document with equations (~29KB)
-- **Large**: Comprehensive authoring guide (~30KB)
+output_path.write_text("\n".join(lines), encoding="utf-8")
+PY
 
-### Methodology
-
-- Each benchmark runs multiple iterations (1000 for small, 20-100 for larger)
-- Measures three phases: full pipeline (parse+format), parse only, format only
-- Reports average time per iteration and throughput (KB/s)
-
-## Results
-
-\`\`\`
-$BENCH_OUTPUT
-\`\`\`
-
-## Interpretation
-
-- **Full pipeline**: What users experience when running \`panache format\`
-- **Parse only**: Time to build the CST (concrete syntax tree)
-- **Format only**: Time to traverse CST and generate output
-- **Throughput**: Processing speed in KB/second
-
-## Reproducing
-
-To reproduce these benchmarks:
-
-\`\`\`bash
-# Download test documents
-cd benches/documents && ./download.sh
-
-# Run benchmarks
-cargo bench --bench formatting
-\`\`\`
-EOF
-
-echo "✅ Benchmark results saved to $OUTPUT_FILE"
-echo
-echo "Add to your docs with:"
-echo "  git add $OUTPUT_FILE"
-echo "  git commit -m 'docs: update benchmark results'"
+echo "✅ Benchmark artifacts saved:"
+echo "  - $JSON_FILE"
+echo "  - $OUTPUT_FILE"

@@ -11,7 +11,7 @@ cd benches/documents && ./download.sh && cd ../..
 # Run benchmarks
 cargo bench --bench formatting
 
-# Generate docs (creates docs/benchmarks.qmd)
+# Generate docs + machine-readable JSON
 ./benches/generate_docs.sh
 ```
 
@@ -88,9 +88,9 @@ valgrind --tool=cachegrind cargo bench --bench formatting
 
   - Use to update `docs/performance.qmd`
 - **`benches/generate_docs.sh`**: Captures results for documentation
-  - Generates `docs/benchmarks.qmd`
-  - Includes timestamp and commit SHA
-  - Ready for Quarto docs site
+  - Generates `benches/benchmark_results.json` (machine-readable)
+  - Renders `docs/benchmarks.qmd` from JSON
+  - Deterministic output for CI checks
 
 ## What to Benchmark
 
@@ -121,10 +121,13 @@ After running benchmarks:
 # Generate fresh benchmark page
 ./benches/generate_docs.sh
 
+# Verify tracked artifacts are up to date (CI-friendly)
+./benches/check_docs.sh
+
 # Preview in Quarto
 cd docs && quarto preview
 
 # Commit to repo
-git add docs/benchmarks.qmd
+git add benches/benchmark_results.json docs/benchmarks.qmd
 git commit -m "docs: update benchmark results"
 ```
