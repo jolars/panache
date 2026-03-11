@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.16.0](https://github.com/jolars/panache/compare/v2.15.0...v2.16.0) (2026-03-11)
+
+### Features
+
+* **cli:** add `panache debug format` for debugging ([1319489](https://github.com/jolars/panache/commit/13194899f7c338e99924e272055510c9dd975080))
+* **formatter:** use first-fit word wrapping ([66957be](https://github.com/jolars/panache/commit/66957be8fc08052b18f05edc079f1352180b32bf))
+
+### Bug Fixes
+
+* **build:** gate warnings behind `debug_assertions` ([71c1b24](https://github.com/jolars/panache/commit/71c1b24f1196a9f619ac7e51b73a8265f897a91d))
+* **build:** use `InitializeResult` defaults, update lockfile ([e1b045e](https://github.com/jolars/panache/commit/e1b045ee12f30c56b1cf8358be68b34547b07ca2)), closes [#53](https://github.com/jolars/panache/issues/53)
+* **formatter:** fix idempotency in emphasis formatting ([5e492a5](https://github.com/jolars/panache/commit/5e492a5535a908999f4cff64634afe60fa7ca189))
+* **formatter:** fix idempotency issue in definition list ([04b2b7f](https://github.com/jolars/panache/commit/04b2b7fe73dab8c83d2e5ca4bca64f509ddad63c))
+
 ## [2.15.0](https://github.com/jolars/panache/compare/v2.14.1...v2.15.0) (2026-03-10)
 
 ### Features
