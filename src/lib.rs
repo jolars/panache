@@ -37,6 +37,7 @@ pub fn all_document_extensions() -> &'static [&'static str] {
     ]
 }
 
+#[cfg(debug_assertions)]
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
 }

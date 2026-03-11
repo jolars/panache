@@ -28,6 +28,7 @@ use lists::{is_content_nested_bullet_marker, start_nested_list, try_parse_list_m
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use text_buffer::TextBuffer;
 
+#[cfg(debug_assertions)]
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
 }
