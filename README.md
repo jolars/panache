@@ -36,200 +36,125 @@ as Debian/Ubuntu (`.deb`) and Fedora/RHEL/openSUSE (`.rpm`).
 
 ## Usage
 
+Panache provides a single CLI interface for formatting, linting, and running the
+LSP server.
+
 ### Formatting
 
+To format a file in place, simply run:
+
 ```bash
-# Format a file in place
 panache format document.qmd
+```
 
-# Check if a file is formatted
-panache format --check document.qmd
+You can also format from stdin by piping content into `panache format`:
 
-# Format from stdin
-cat document.qmd | panache format
+```bash
+cat <file> | panache format
+```
 
-# Format all .qmd and .md files in directory, recursively
+`panache format` supports glob patterns and recursive directory formatting:
+
+```bash
 panache format **/*.{qmd,md}
+```
+
+You can use Panache as a linter via the `--check` flag to check if files are
+already formatted without making changes:
+
+```bash
+panache format --check document.qmd
+```
+
+#### External Code Formatters
+
+Panache supports external formatters for code blocks. For example, you can
+configure it to run `air` on R code blocks and `ruff` on Python code blocks:
+
+```toml
+[formatters]
+r = "air"
+python = "ruff"
+javascript = "prettier"
+typescript = "prettier" # Reuse same formatter
+```
+
+You can setup custom formatters or modify built-in presets with additional
+arguments:
+
+```toml
+[formatters]
+python = ["isort", "black"]
+javascript = "foobar"
+
+[formatters.isort]
+args = ["--profile=black"]
+
+[formatters.myformatters]
+cmd = "foobar"
+args = ["--print-width=100"]
+stdin = true
 ```
 
 ### Linting
 
+Panache also features a linter that can report formatting issues and optionally
+auto-fix them. To run the linter, use:
+
 ```bash
-# Lint a file
 panache lint document.qmd
-
-# Lint entire working directory
-panache lint .
 ```
 
-### Pre-commit Hooks
-
-panache integrates with [pre-commit](https://pre-commit.com/) to automatically
-format and lint your files before committing.
-
-**Installation:**
-
-First, install pre-commit if you haven't already:
+As with `panache format`, you can use glob patterns and recursive formatting:
 
 ```bash
-pip install pre-commit
-# or
-brew install pre-commit
+panache lint **/*.{qmd,md}
 ```
 
-Then add Panache to your `.pre-commit-config.yaml`:
+#### External Linters
 
-```yaml
-repos:
-  - repo: https://github.com/jolars/panache
-    rev: v2.6.3 # Use the latest version
-    hooks:
-      - id: panache-format # Format files
-      - id: panache-lint # Lint and auto-fix issues
+As with formatting, Panache supports external linters for code blocks. These
+are configured in the `[linters]` section of the configuration, but due to the
+complexity of linting, including dealing with auto-fixing, external linters
+cannot be customized and only support presets and at the moment only support R
+via the `jarl` linter:
+
+```toml
+# Enable R linting
+[linters]
+r = "jarl" # R linter with JSON output
 ```
 
-Install the hooks:
+### Language Server
 
-```bash
-pre-commit install
-```
+Panache implements the language server protocol (LSP) to provide editor features
+like formatting, diagnostics, code actions, and more.
 
-Now Panache will automatically run on your staged `.qmd`, `.md`, and `.Rmd`
-files before each commit.
-
-See [examples/pre-commit-config.yaml](examples/pre-commit-config.yaml) for more
-configuration options.
-
-## Language Server
-
-Panache includes a built-in LSP implementation for editor integration.
-
-To start the LSP server, run:
+To start the language server, run:
 
 ```bash
 panache lsp
 ```
 
-But typically you will configure your editor to start the LSP server
-automatically when editing supported file types (`.qmd`, `.md`, `.Rmd`).
+Most users will want to configure their editor to start the
+language server automatically when editing. See [the language
+server documentation](https://jolars.github.io/panache/lsp)
+for guides on configuring your editor. For VS Code and related
+editors such as Positron, there is a [VS Code Marketplace
+extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
+and [Open VSX extension](https://open-vsx.org/extension/jolars/panache) that
+provides an LSP client and additional features.
 
-**Editor Configuration:**
-
-The LSP communicates over stdin/stdout and provides document formatting
+The server communicates over stdin/stdout and provides document formatting
 capabilities. For Quarto projects, the LSP also reads `_quarto.yml`,
 per-directory `_metadata.yml`, and `metadata-files` includes to supply
-project-level metadata to bibliography-aware features. For bookdown,
+project-level metadata to bibliography-aware features. For Bookdown,
 `_bookdown.yml`, `_output.yml`, and `index.Rmd` frontmatter are also considered.
 
-<details>
-<summary>Neovim </summary>
+The list of LSP features supported by Panache includes, among others:
 
-Native LSP configuration (0.11+)
-
-```lua
--- .config/nvim/lsp/panache.lua
-
-return {
-  cmd = { "panache", "lsp" },
-  filetypes = { "quarto", "markdown", "rmarkdown" },
-  root_markers = { ".panache.toml", "panache.toml", ".git" },
-  settings = {},
-}
-
-
--- Enable it
-vim.lsp.enable({"panache"})
-```
-
-Nvim-lspconfig
-
-```lua
--- Add to your LSP config
-local lspconfig = require("lspconfig")
-local configs = require("lspconfig.configs")
-
--- Define panache LSP
-if not configs.panache then
-	configs.panache = {
-		default_config = {
-			cmd = { "panache", "lsp" },
-			filetypes = { "quarto", "markdown", "rmarkdown" },
-			root_dir = lspconfig.util.root_pattern(".panache.toml", "panache.toml", ".git"),
-			settings = {},
-		},
-	}
-end
-
--- Enable it
-lspconfig.panache.setup({})
-```
-
-Format on save:
-
-```lua
-vim.api.nvim_create_autocmd("BufWritePre", {
-	pattern = { "*.qmd", "*.md", "*.rmd" },
-	callback = function()
-		vim.lsp.buf.format({ async = false })
-	end,
-})
-```
-
-</details>
-
-<details>
-<summary>VS Code</summary>
-
-VS Code requires an extension-based LSP client for `panache lsp`; it does not
-have built-in `settings.json` support for arbitrary stdio language servers.
-
-Install the published Panache extension:
-
-- VS Code Marketplace:
-  <https://marketplace.visualstudio.com/items?itemName=jolars.panache>
-- Open VSX:
-  <https://open-vsx.org/extension/jolars/panache>
-
-Useful settings:
-
-```json
-{
-  "panache.commandPath": "panache",
-  "panache.downloadBinary": true,
-  "panache.releaseTag": "latest",
-  "panache.serverArgs": [],
-  "panache.serverEnv": { "RUST_LOG": "info" },
-  "panache.trace.server": "off"
-}
-```
-
-</details>
-
-<details>
-<summary>Helix</summary>
-
-Add to `~/.config/helix/languages.toml`:
-
-```toml
-[[language]]
-name = "markdown"
-language-servers = ["panache-lsp"]
-auto-format = true
-
-[language-server.panache-lsp]
-command = "panache"
-args = ["lsp"]
-```
-
-</details>
-
-### Features
-
-The list of LSP features supported by Panache is still evolving, but currently
-includes:
-
-- Document formatting (full document and range)
-- Live diagnostics with quick fixes
+- Document formatting (full document, incremental and range)
+- Diagnostics with quick fixes
 - Code actions for refactoring
   - Convert between loose/compact lists
   - Convert between inline/reference footnotes
@@ -276,133 +201,43 @@ r = "jarl" # Enable R linting
 
 See `.panache.toml.example` for a complete configuration reference.
 
-### External Code Formatters
+### Pre-commit Hooks
 
-Panache supports external formatters for code blocks—**opt-in and easy to
-enable**:
+Panache integrates with [pre-commit](https://pre-commit.com/) to automatically
+format and lint your files before committing.
 
-```toml
-[formatters]
-r = "air"
-python = "ruff"
-javascript = "prettier"
-typescript = "prettier" # Reuse same formatter
+**Installation:**
+
+First, install pre-commit if you haven't already:
+
+```bash
+pip install pre-commit
+# or
+brew install pre-commit
 ```
 
-**Key features:**
+Then add Panache to your `.pre-commit-config.yaml`:
 
-- **Opt-in by design** - No surprises, explicit configuration
-- **Built-in presets** - Quick setup with sensible defaults
-- **Preset inheritance** - Override only specific fields, inherit the rest
-- **Incremental arg modification** - Add args with `append_args`/`prepend_args`
-- **Sequential formatting** - Run multiple formatters in order:
-  `python = ["isort", "black"]`
-- **Reusable definitions** - Define once, use for multiple languages
-- **Parallel execution** - Formatters run concurrently across languages
-- **Graceful fallback** - Missing tools preserve original code (no errors)
-- **Custom config** - Full control with `cmd`, `args`, `stdin` fields
-
-**Custom formatter definitions:**
-
-```toml
-[formatters]
-python = ["isort", "black"]
-javascript = "prettier"
-
-# Partial override - inherits cmd/stdin from built-in "air" preset
-[formatters.air]
-args = ["format", "--custom-flag", "{}"] # Only override args
-
-# Incremental modification - add args without full override
-[formatters.ruff]
-append_args = ["--line-length", "100"] # Adds to preset args
-
-# Full custom formatter
-[formatters.prettier]
-cmd = "prettier"
-args = ["--print-width=100"]
-stdin = true
+```yaml
+repos:
+  - repo: https://github.com/jolars/panache
+    rev: v2.16.0 # Use the latest version
+    hooks:
+      - id: panache-format # Format files
+      - id: panache-lint # Lint and auto-fix issues
 ```
 
-**Preset inheritance:**
+Install the hooks:
 
-When a `[formatters.NAME]` section matches a built-in preset name (like `air`,
-`black`, `ruff`), unspecified fields are inherited from the preset:
-
-```toml
-[formatters]
-r = "air"
-
-[formatters.air]
-args = ["format", "--preset=tidyverse"] # cmd and stdin inherited from built-in
+```bash
+pre-commit install
 ```
 
-**Incremental argument modification:**
+Panache will now automatically run on your staged `.qmd`, `.md`, and `.Rmd`
+files before each commit.
 
-Use `append_args` and `prepend_args` to add arguments without completely
-overriding the base args (from preset or explicit `args` field):
-
-```toml
-[formatters]
-r = "air"
-
-[formatters.air]
-# Base args from preset: ["format", "{}"]
-append_args = ["-i", "2"]
-# Final args: ["format", "{}", "-i", "2"]
-```
-
-Both modifiers work together and with explicit args:
-
-```toml
-[formatters.custom]
-cmd = "shfmt"
-args = ["-filename", "$FILENAME"]
-prepend_args = ["--verbose"]
-append_args = ["-i", "2"]
-# Final: ["--verbose", "-filename", "$FILENAME", "-i", "2"]
-```
-
-**Additional details:**
-
-- Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
-  etc.)
-- Support both stdin/stdout and file-based formatters
-- 30 second timeout per formatter
-
-### External Code Linters
-
-panache supports external linters for code blocks—**opt-in via configuration**:
-
-```toml
-# Enable R linting
-[linters]
-r = "jarl" # R linter with JSON output
-```
-
-**Key features:**
-
-- **Opt-in by design** - Only runs if configured
-- **Stateful code analysis** - Concatenates all code blocks of same language to
-  handle cross-block dependencies
-- **LSP integration** - Diagnostics appear inline in your editor
-- **CLI support** - `panache lint` shows external linter issues
-- **Line-accurate diagnostics** - Reports exact line/column locations
-
-**How it works:**
-
-1. Collects all code blocks of each configured language
-2. Concatenates blocks with blank-line preservation (keeps original line
-   numbers)
-3. Runs external linter on concatenated code
-4. Maps diagnostics back to original document positions
-
-**Supported linters:**
-
-- **jarl** - R linter with structured JSON output
-
-**Note:** Auto-fixes from external linters are currently disabled due to byte
-offset mapping complexity. Diagnostics work perfectly.
+See [examples/pre-commit-config.yaml](examples/pre-commit-config.yaml) for more
+configuration options.
 
 ## Motivation
 

@@ -4,24 +4,8 @@ title: Language Server Protocol
 
 ## Overview
 
-panache includes a built-in Language Server Protocol (LSP) implementation that
+Panache includes a built-in Language Server Protocol (LSP) implementation that
 provides document formatting capabilities for editors and IDEs.
-
-## Quick Start
-
-1. Install Panache:
-
-   ```bash
-   cargo install panache
-   ```
-
-2. Install the Panache editor extension:
-
-   - VS Code Marketplace:
-     <https://marketplace.visualstudio.com/items?itemName=jolars.panache>
-   - Open VSX: <https://open-vsx.org/extension/jolars/panache>
-
-3. Open a `.md`, `.qmd`, `.Rmd`, or `.rmd` file and run format in your editor.
 
 ## Features
 
@@ -104,43 +88,62 @@ protocol.
 
 ### Neovim
 
-Using `nvim-lspconfig`:
+In Neovim +0.11, you can use the built-in LSP client:
 
 ```lua
--- Add to your LSP configuration file
-local lspconfig = require('lspconfig')
-local configs = require('lspconfig.configs')
+-- .config/nvim/lsp/panache.lua
+
+return {
+  cmd = { "panache", "lsp" },
+  filetypes = { "quarto", "markdown", "rmarkdown" },
+    root_markers = { ".panache.toml", "panache.toml", ".git" },
+  settings = {},
+}
+
+-- Enable it
+vim.lsp.enable({"panache"})
+```
+
+For earlier Neovim releases, use `nvim-lspconfig`:
+
+```lua
+-- Add to your LSP config
+local lspconfig = require("lspconfig")
+local configs = require("lspconfig.configs")
 
 -- Define panache LSP
 if not configs.panache then
   configs.panache = {
     default_config = {
-      cmd = { 'panache', 'lsp' },
-      filetypes = { 'quarto', 'markdown', 'rmarkdown' },
-      root_dir = lspconfig.util.root_pattern('.panache.toml', 'panache.toml', '.git'),
+      cmd = { "panache", "lsp" },
+      filetypes = { "quarto", "markdown", "rmarkdown" },
+      root_dir = lspconfig.util.root_pattern(
+        ".panache.toml",
+        "panache.toml",
+        ".git"
+      ),
       settings = {},
     },
   }
 end
 
--- Enable the server
-lspconfig.panache.setup{}
+-- Enable it
+lspconfig.panache.setup({})
 ```
 
-#### Format on Save
+Note that you need to have `panache` in your PATH for the above configurations
+to work.
 
-Add this to enable automatic formatting when saving:
+To format on save, add an autocmd:
 
 ```lua
-vim.api.nvim_create_autocmd('BufWritePre', {
-  pattern = { '*.qmd', '*.md', '*.rmd' },
+vim.api.nvim_create_autocmd("BufWritePre", {
+  pattern = { "*.qmd", "*.md", "*.rmd" },
   callback = function()
     vim.lsp.buf.format({ async = false })
   end,
 })
 ```
-
-#### Manual Formatting
 
 Format the current buffer with:
 
@@ -151,7 +154,7 @@ Format the current buffer with:
 Or map it to a key:
 
 ```lua
-vim.keymap.set('n', '<leader>f', vim.lsp.buf.format, { desc = 'Format buffer' })
+vim.keymap.set("n", "<leader>f", vim.lsp.buf.format, { desc = "Format buffer" })
 ```
 
 ### VS Code
@@ -476,14 +479,14 @@ panache lsp
 
 Enable LSP logging in your editor to see error messages:
 
-**Neovim:**
+#### Neovim
 
 ```lua
 vim.lsp.set_log_level("debug")
 -- View logs: :lua vim.cmd('e'..vim.lsp.get_log_path())
 ```
 
-**VS Code:**
+#### VS Code
 
 Set `"panache.trace.server": "verbose"` in settings.
 
