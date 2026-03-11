@@ -17,6 +17,7 @@
     pkgs.pandoc
     pkgs.prettier
     pkgs.quartoMinimal
+    pkgs.air-formatter
     pkgs.ruff
     pkgs.shfmt
     pkgs.wasm-pack

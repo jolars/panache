@@ -5,31 +5,30 @@ use std::hint::black_box;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-fn bench_parse(input: &str, iterations: usize) -> Duration {
+fn bench_parse(input: &str, config: &panache::Config, iterations: usize) -> Duration {
     let start = Instant::now();
     for _ in 0..iterations {
-        black_box(parse(black_box(input), None));
+        black_box(parse(black_box(input), Some(config.clone())));
     }
     start.elapsed()
 }
 
-fn bench_format(input: &str, iterations: usize) -> Duration {
+fn bench_format(input: &str, config: &panache::Config, iterations: usize) -> Duration {
     let start = Instant::now();
     for _ in 0..iterations {
-        black_box(format(black_box(input), None, None));
+        black_box(format(black_box(input), Some(config.clone()), None));
     }
     start.elapsed()
 }
 
-fn bench_parse_only(input: &str, iterations: usize) -> Duration {
+fn bench_parse_only(input: &str, config: &panache::Config, iterations: usize) -> Duration {
     // Parse once to get the CST, then format repeatedly
-    let tree = parse(input, None);
-    let config = panache::Config::default();
+    let tree = parse(input, Some(config.clone()));
     let start = Instant::now();
     for _ in 0..iterations {
         black_box(panache::formatter::format_tree(
             black_box(&tree),
-            &config,
+            config,
             None,
         ));
     }
@@ -37,6 +36,11 @@ fn bench_parse_only(input: &str, iterations: usize) -> Duration {
 }
 
 fn run_benchmark(name: &str, input: &str, iterations: usize) {
+    let config = panache::Config::default();
+    run_benchmark_with_config(name, input, &config, iterations);
+}
+
+fn run_benchmark_with_config(name: &str, input: &str, config: &panache::Config, iterations: usize) {
     println!("\n{}", "=".repeat(60));
     println!("Benchmark: {}", name);
     println!("{}", "=".repeat(60));
@@ -48,11 +52,11 @@ fn run_benchmark(name: &str, input: &str, iterations: usize) {
 
     // Warmup
     for _ in 0..10 {
-        let _ = format(input, None, None);
+        let _ = format(input, Some(config.clone()), None);
     }
 
     // Full pipeline (parse + format)
-    let full_time = bench_format(input, iterations);
+    let full_time = bench_format(input, config, iterations);
     let full_avg = full_time.as_micros() as f64 / iterations as f64;
     println!("\nFull pipeline (parse + format):");
     println!("  Total: {:?} for {} iterations", full_time, iterations);
@@ -63,7 +67,7 @@ fn run_benchmark(name: &str, input: &str, iterations: usize) {
     );
 
     // Parse only
-    let parse_time = bench_parse(input, iterations);
+    let parse_time = bench_parse(input, config, iterations);
     let parse_avg = parse_time.as_micros() as f64 / iterations as f64;
     println!("\nParse only:");
     println!("  Total: {:?} for {} iterations", parse_time, iterations);
@@ -74,7 +78,7 @@ fn run_benchmark(name: &str, input: &str, iterations: usize) {
     );
 
     // Format only (CST already built)
-    let format_time = bench_parse_only(input, iterations);
+    let format_time = bench_parse_only(input, config, iterations);
     let format_avg = format_time.as_micros() as f64 / iterations as f64;
     println!("\nFormat only (CST pre-built):");
     println!("  Total: {:?} for {} iterations", format_time, iterations);
@@ -114,6 +118,22 @@ fn main() {
             &doc,
             iterations,
         );
+        if env::var("PANACHE_BENCH_COMPARE_BUILT_IN_WRAP")
+            .ok()
+            .as_deref()
+            .is_some_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        {
+            let built_in = panache::Config {
+                built_in_greedy_wrap: false,
+                ..panache::Config::default()
+            };
+            run_benchmark_with_config(
+                &format!("Selected profile doc ({doc_name}) [built-in-greedy-wrap=false]"),
+                &doc,
+                &built_in,
+                iterations,
+            );
+        }
         return;
     }
 

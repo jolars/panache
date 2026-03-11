@@ -3,7 +3,6 @@ use crate::formatter::indent_utils::{calculate_list_item_indent, is_alignable_ma
 use crate::formatter::wrapping;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
-use textwrap::wrap_algorithms::WrapAlgorithm;
 
 use super::Formatter;
 
@@ -328,7 +327,6 @@ impl Formatter {
         let available_width = self.config.line_width.saturating_sub(hanging);
 
         // Build words from Plain/PARAGRAPH content node if present, otherwise from entire ListItem
-        let mut arena: Vec<Box<str>> = Vec::new();
         let content_node = Self::find_content_node(node);
 
         let content_has_hard_breaks = content_node
@@ -342,14 +340,11 @@ impl Formatter {
 
         let mut words = if let Some(content) = content_node {
             // Extract words from Plain/PARAGRAPH child (postprocessor wraps all content in one node)
-            wrapping::build_words(&self.config, &content, &mut arena, &|n| {
-                self.format_inline_node(n)
-            })
+            wrapping::build_words(&self.config, &content, &|n| self.format_inline_node(n))
         } else {
             // Backwards compatibility: scan entire ListItem and remove marker/checkbox
-            let mut node_words = wrapping::build_words(&self.config, node, &mut arena, &|n| {
-                self.format_inline_node(n)
-            });
+            let mut node_words =
+                wrapping::build_words(&self.config, node, &|n| self.format_inline_node(n));
 
             // Remove the original marker from words (not the standardized one)
             if let Some(first) = node_words.first()
@@ -384,9 +379,8 @@ impl Formatter {
             && words.is_empty();
 
         let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
-        let algo = WrapAlgorithm::new();
         let line_widths = [available_width];
-        let lines = algo.wrap(&words, &line_widths);
+        let lines = wrapping::wrap_words_first_fit(&words, &line_widths);
         let sentence_lines = match wrap_mode {
             WrapMode::Sentence => Some(wrapping::sentence_lines_from_words(&words)),
             _ => None,
@@ -432,7 +426,7 @@ impl Formatter {
             }
         } else {
             for (i, line) in lines.iter().enumerate() {
-                log::trace!("  Line {}: {} words", i, line.len());
+                log::trace!("  Line {}: {} chars", i, line.len());
                 if i == 0 {
                     // First line: output indent + marker padding + marker + spaces + checkbox
                     self.output.push_str(&" ".repeat(total_indent));
@@ -450,19 +444,11 @@ impl Formatter {
                     // Hanging indent includes all leading whitespace
                     self.output.push_str(&" ".repeat(hanging));
                 }
-                let mut rendered_line = String::new();
-                for (j, w) in line.iter().enumerate() {
-                    if i > 0 && j == 0 {
-                        rendered_line.push_str(w.word.trim_start());
-                    } else {
-                        rendered_line.push_str(w.word);
-                    }
-                    if j + 1 < line.len() {
-                        rendered_line.push_str(w.whitespace);
-                    } else {
-                        rendered_line.push_str(w.penalty);
-                    }
-                }
+                let mut rendered_line = if i > 0 {
+                    line.trim_start().to_string()
+                } else {
+                    line.to_string()
+                };
                 rendered_line = rendered_line
                     .replace("<summary>\n\t", "<summary>\n    ")
                     .replace("<summary>\n  ", "<summary>\n    ");

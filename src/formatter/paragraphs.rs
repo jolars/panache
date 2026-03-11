@@ -240,10 +240,7 @@ pub(super) fn format_paragraph_with_display_math(
             let text = content.split_whitespace().collect::<Vec<_>>().join(" ");
             if !text.is_empty() {
                 let protected = protect_inline_math_spaces(&text);
-                let mut lines = textwrap::wrap(&protected, line_width)
-                    .iter()
-                    .map(|line| line.to_string())
-                    .collect::<Vec<_>>();
+                let mut lines = super::wrapping::wrap_text_first_fit(&protected, line_width);
                 normalize_inline_math_line_breaks(&mut lines);
                 for (j, line) in lines.iter().enumerate() {
                     if j > 0 {

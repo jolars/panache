@@ -843,6 +843,8 @@ pub struct StyleConfig {
     pub tab_width: usize,
     /// Code block formatting preferences
     pub code_blocks: Option<CodeBlockConfig>,
+    /// Use panache-native greedy wrapping instead of textwrap.
+    pub built_in_greedy_wrap: bool,
 }
 
 impl Default for StyleConfig {
@@ -855,6 +857,7 @@ impl Default for StyleConfig {
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             code_blocks: None,
+            built_in_greedy_wrap: true,
         }
     }
 }
@@ -1131,6 +1134,7 @@ impl RawConfig {
                 tab_stops: self.tab_stops,
                 tab_width: self.tab_width,
                 code_blocks: Some(code_blocks),
+                built_in_greedy_wrap: true,
             }
         };
 
@@ -1155,6 +1159,7 @@ impl RawConfig {
                 .external_max_parallel
                 .unwrap_or_else(default_external_max_parallel),
             parser: self.parser.unwrap_or_default(),
+            built_in_greedy_wrap: style.built_in_greedy_wrap,
         }
     }
 }
@@ -1357,6 +1362,7 @@ pub struct Config {
     pub external_max_parallel: usize,
     /// Parser configuration (experimental)
     pub parser: ParserConfig,
+    pub built_in_greedy_wrap: bool,
 }
 
 impl<'de> Deserialize<'de> for Config {
@@ -1387,6 +1393,7 @@ impl Default for Config {
             linters: HashMap::new(),    // Opt-in: empty by default
             external_max_parallel: default_external_max_parallel(),
             parser: ParserConfig::default(),
+            built_in_greedy_wrap: true,
         }
     }
 }
@@ -2050,6 +2057,7 @@ mod tests {
             
             [style]
             wrap = "sentence"
+            built-in-greedy-wrap = true
             blank-lines = "collapse"
             math-delimiter-style = "dollars"
             math-indent = 2
@@ -2064,6 +2072,7 @@ mod tests {
         assert_eq!(cfg.math_indent, 2);
         assert_eq!(cfg.tab_stops, TabStopMode::Preserve);
         assert_eq!(cfg.tab_width, 4);
+        assert!(cfg.built_in_greedy_wrap);
 
         // code-blocks should get flavor defaults
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
@@ -2087,6 +2096,7 @@ mod tests {
         assert_eq!(cfg.wrap, Some(WrapMode::Preserve));
         assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Tilde);
         assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
+        assert!(cfg.built_in_greedy_wrap);
     }
 
     #[test]

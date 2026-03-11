@@ -2,7 +2,9 @@ use crate::config::Config;
 use crate::formatter::math_delimiters::has_ambiguous_dollar_delimiters;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
-use textwrap::wrap_algorithms::WrapAlgorithm;
+use std::borrow::Cow;
+use std::fmt::Write;
+use unicode_width::UnicodeWidthStr;
 
 /// Escape special characters in text to prevent ambiguous parsing.
 ///
@@ -19,9 +21,10 @@ fn escape_special_chars(
     escape_underscores: bool,
 ) -> String {
     let mut result = String::with_capacity(text.len() * 2);
-    let chars: Vec<char> = text.chars().collect();
+    let is_single_underscore = text == "_";
+    let mut chars = text.char_indices().peekable();
 
-    for (i, &ch) in chars.iter().enumerate() {
+    while let Some((byte_idx, ch)) = chars.next() {
         match ch {
             '*' => {
                 // Only escape asterisks when NOT a direct child of EMPHASIS/STRONG
@@ -33,11 +36,11 @@ fn escape_special_chars(
             '_' => {
                 // For underscores, only escape at word boundaries
                 // Intraword underscores like foo_bar are left unescaped
-                let at_start = i == 0;
-                let at_end = i == chars.len() - 1;
+                let at_start = byte_idx == 0;
+                let at_end = chars.peek().is_none();
 
                 // If the entire text is just "_", always escape it (not intraword)
-                if text == "_" {
+                if is_single_underscore {
                     if !skip_emphasis_delim {
                         result.push('\\');
                     }
@@ -75,7 +78,14 @@ fn escape_special_chars(
     result
 }
 
-fn expand_tabs_with_width(text: &str, tab_width: usize) -> String {
+fn fast_display_width(text: &str) -> usize {
+    UnicodeWidthStr::width(text)
+}
+
+fn expand_tabs_with_width<'a>(text: &'a str, tab_width: usize) -> Cow<'a, str> {
+    if !text.contains('\t') {
+        return Cow::Borrowed(text);
+    }
     let mut out = String::with_capacity(text.len());
     let mut col = 0usize;
     for ch in text.chars() {
@@ -95,10 +105,10 @@ fn expand_tabs_with_width(text: &str, tab_width: usize) -> String {
             }
         }
     }
-    out
+    Cow::Owned(out)
 }
 
-fn normalize_link_dest(dest: &str) -> String {
+fn append_normalized_link_dest(dest: &str, out: &mut String) {
     let dest_trimmed = dest.trim();
     let mut split_at = None;
     for (i, ch) in dest_trimmed.char_indices() {
@@ -109,22 +119,26 @@ fn normalize_link_dest(dest: &str) -> String {
     }
 
     let Some(split_at) = split_at else {
-        return dest_trimmed.to_string();
+        out.push_str(dest_trimmed);
+        return;
     };
 
     let (url, rest) = dest_trimmed.split_at(split_at);
     let title = rest.trim();
     if title.is_empty() {
-        return url.to_string();
+        out.push_str(url);
+        return;
     }
 
-    let normalized_title = if title.starts_with('\'') && title.ends_with('\'') && title.len() >= 2 {
-        format!("\"{}\"", &title[1..title.len() - 1])
+    out.push_str(url);
+    out.push(' ');
+    if title.starts_with('\'') && title.ends_with('\'') && title.len() >= 2 {
+        out.push('"');
+        out.push_str(&title[1..title.len() - 1]);
+        out.push('"');
     } else {
-        title.to_string()
-    };
-
-    format!("{} {}", url, normalized_title)
+        out.push_str(title);
+    }
 }
 
 fn is_initialism_with_periods(word: &str) -> bool {
@@ -144,98 +158,182 @@ fn is_year_like(word: &str) -> bool {
     word.len() == 4 && word.chars().all(|c| c.is_ascii_digit())
 }
 
-fn is_sentence_boundary(word: &textwrap::core::Word<'_>, is_last: bool) -> bool {
-    let mut trimmed = word.word;
-    trimmed = trimmed.trim_end_matches(['"', '\'', ')', ']', '}']);
+fn normalize_inline_for_sentence<'a>(text: &'a str) -> Cow<'a, str> {
+    if text.contains('\n') {
+        Cow::Owned(text.replace('\n', " "))
+    } else {
+        Cow::Borrowed(text)
+    }
+}
 
+fn is_sentence_boundary_piece(word: &str, has_whitespace_after: bool, is_last: bool) -> bool {
+    let trimmed = word.trim_end_matches(['"', '\'', ')', ']', '}']);
     if trimmed.ends_with("...") || trimmed.ends_with("…") {
         return false;
     }
-
     let Some(last_char) = trimmed.chars().last() else {
         return false;
     };
+    matches!(last_char, '.' | '!' | '?') && (has_whitespace_after || is_last)
+}
 
+fn strip_blockquote_prefix(line: &str) -> &str {
+    if let Some(rest) = line.strip_prefix("> ") {
+        rest
+    } else if let Some(rest) = line.strip_prefix('>') {
+        rest
+    } else {
+        line
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Piece<'a> {
+    word: &'a str,
+    whitespace_after: bool,
+}
+
+#[derive(Clone)]
+pub(super) struct WrapWord {
+    pub word: String,
+    pub whitespace: String,
+    pub penalty: String,
+}
+
+fn is_sentence_boundary(word: &WrapWord, is_last: bool) -> bool {
+    let mut trimmed = word.word.as_str();
+    trimmed = trimmed.trim_end_matches(['"', '\'', ')', ']', '}']);
+    if trimmed.ends_with("...") || trimmed.ends_with("…") {
+        return false;
+    }
+    let Some(last_char) = trimmed.chars().last() else {
+        return false;
+    };
     matches!(last_char, '.' | '!' | '?') && (!word.whitespace.is_empty() || is_last)
 }
 
-fn normalize_inline_for_sentence(text: &str) -> String {
-    text.replace('\n', " ")
-}
-
-pub(super) fn sentence_lines_from_words(words: &[textwrap::core::Word<'_>]) -> Vec<String> {
+pub(super) fn sentence_lines_from_words(words: &[WrapWord]) -> Vec<String> {
     let mut out_lines = Vec::new();
     let mut current = String::new();
-
     for (idx, word) in words.iter().enumerate() {
         let is_last = idx + 1 == words.len();
-        current.push_str(word.word);
-
+        current.push_str(&word.word);
         if is_sentence_boundary(word, is_last) {
-            current.push_str(word.penalty);
+            current.push_str(&word.penalty);
             if !current.is_empty() {
                 out_lines.push(current);
                 current = String::new();
             }
         } else {
-            current.push_str(word.whitespace);
+            current.push_str(&word.whitespace);
         }
     }
-
     if !current.is_empty() {
         out_lines.push(current);
     }
-
     out_lines
 }
 
-fn build_words_for_sentence<'a>(
-    _config: &Config,
-    node: &SyntaxNode,
-    arena: &'a mut Vec<Box<str>>,
-    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-) -> Vec<textwrap::core::Word<'a>> {
-    build_words_with_mode(_config, node, arena, format_inline_fn, false, true)
+fn build_words_from_pieces<'a>(pieces: Vec<Piece<'a>>) -> Vec<WrapWord> {
+    pieces
+        .into_iter()
+        .map(|piece| WrapWord {
+            word: piece.word.to_string(),
+            whitespace: if piece.whitespace_after {
+                " ".to_string()
+            } else {
+                String::new()
+            },
+            penalty: String::new(),
+        })
+        .collect()
 }
 
-pub(super) fn build_words<'a>(
-    _config: &Config,
+pub(super) fn build_words(
+    config: &Config,
     node: &SyntaxNode,
-    arena: &'a mut Vec<Box<str>>,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-) -> Vec<textwrap::core::Word<'a>> {
-    build_words_with_mode(_config, node, arena, format_inline_fn, false, false)
+) -> Vec<WrapWord> {
+    let mut arena: Vec<Box<str>> = Vec::new();
+    build_words_from_pieces(build_pieces_with_mode(
+        config,
+        node,
+        &mut arena,
+        format_inline_fn,
+        false,
+        false,
+    ))
 }
 
-fn build_words_with_mode<'a>(
+pub(super) fn wrap_words_first_fit(words: &[WrapWord], line_widths: &[usize]) -> Vec<String> {
+    let default_line_width = line_widths.last().copied().unwrap_or(0);
+    let mut out = Vec::new();
+    let mut line = String::new();
+    let mut line_width = 0usize;
+    for w in words {
+        let ww = fast_display_width(&w.word);
+        let line_limit = line_widths
+            .get(out.len())
+            .copied()
+            .unwrap_or(default_line_width);
+        let spacer = usize::from(!line.is_empty() && !w.whitespace.is_empty());
+        if !line.is_empty() && line_width + spacer + ww > line_limit {
+            out.push(std::mem::take(&mut line));
+            line_width = 0;
+        }
+        if !line.is_empty() {
+            line.push(' ');
+            line_width += 1;
+        }
+        line.push_str(&w.word);
+        line_width += ww;
+    }
+    if !line.is_empty() {
+        out.push(line);
+    } else if out.is_empty() {
+        out.push(String::new());
+    }
+    out
+}
+
+pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
+    let words: Vec<WrapWord> = text
+        .split_whitespace()
+        .map(|w| WrapWord {
+            word: w.to_string(),
+            whitespace: " ".to_string(),
+            penalty: String::new(),
+        })
+        .collect();
+    wrap_words_first_fit(&words, &[line_width])
+}
+
+fn build_pieces_with_mode<'a>(
     _config: &Config,
     node: &SyntaxNode,
     arena: &'a mut Vec<Box<str>>,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
     in_link_text: bool,
     atomic_links: bool,
-) -> Vec<textwrap::core::Word<'a>> {
-    struct Builder<'a> {
-        arena: &'a mut Vec<Box<str>>,
-        piece_idx: Vec<usize>,
+) -> Vec<Piece<'a>> {
+    struct Builder {
+        pieces: Vec<String>,
         whitespace_after: Vec<bool>,
         last_piece_pos: Option<usize>,
         pending_space: bool,
         skip_next_leading_whitespace: bool,
     }
 
-    impl<'a> Builder<'a> {
-        fn new(arena: &'a mut Vec<Box<str>>) -> Self {
+    impl Builder {
+        fn new() -> Self {
             Self {
-                arena,
-                piece_idx: Vec::new(),
+                pieces: Vec::new(),
                 whitespace_after: Vec::new(),
                 last_piece_pos: None,
                 pending_space: false,
                 skip_next_leading_whitespace: false,
             }
         }
-
         fn flush_pending(&mut self) {
             if self.pending_space {
                 if let Some(prev) = self.last_piece_pos {
@@ -244,31 +342,18 @@ fn build_words_with_mode<'a>(
                 self.pending_space = false;
             }
         }
-
         fn attach_to_previous(&mut self, text: &str) {
             if let Some(pos) = self.last_piece_pos {
-                let prev_idx = self.piece_idx[pos];
-                let prev = &self.arena[prev_idx];
-                let mut combined = String::with_capacity(prev.len() + text.len());
-                combined.push_str(prev);
-                combined.push_str(text);
-                self.arena.push(combined.into_boxed_str());
-                let new_idx = self.arena.len() - 1;
-                self.piece_idx[pos] = new_idx;
+                self.pieces[pos].push_str(text);
             } else {
-                // No previous piece; start a new one.
                 self.start_new_piece(text);
             }
         }
-
         fn start_new_piece(&mut self, text: &str) {
-            self.arena.push(Box::<str>::from(text));
-            let idx = self.arena.len() - 1;
-            self.piece_idx.push(idx);
+            self.pieces.push(text.to_string());
             self.whitespace_after.push(false);
-            self.last_piece_pos = Some(self.piece_idx.len() - 1);
+            self.last_piece_pos = Some(self.pieces.len() - 1);
         }
-
         fn push_piece(&mut self, text: &str) {
             if self.pending_space {
                 self.flush_pending();
@@ -279,7 +364,6 @@ fn build_words_with_mode<'a>(
         }
     }
 
-    /// Check if a node's first TEXT content starts with whitespace
     fn node_starts_with_whitespace(node: &SyntaxNode) -> bool {
         for child in node.children_with_tokens() {
             match child {
@@ -292,11 +376,9 @@ fn build_words_with_mode<'a>(
                         SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER
                     ) =>
                 {
-                    // Skip markers, continue looking
                     continue;
                 }
                 NodeOrToken::Node(n) => {
-                    // Recurse into child nodes
                     if node_starts_with_whitespace(&n) {
                         return true;
                     }
@@ -307,75 +389,53 @@ fn build_words_with_mode<'a>(
         false
     }
 
-    fn process_node_recursive<'cfg>(
-        _config: &'cfg Config,
+    fn process_node_recursive(
+        _config: &Config,
         node: &SyntaxNode,
         b: &mut Builder,
         format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
         in_link_text: bool,
         atomic_links: bool,
     ) {
-        let children: Vec<_> = node.children_with_tokens().collect();
-
-        for (idx, el) in children.iter().enumerate() {
+        let mut children = node.children_with_tokens().peekable();
+        let mut prev_is_text = false;
+        while let Some(el) = children.next() {
+            let current_is_text =
+                matches!(&el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT);
+            let next_is_text = matches!(
+                children.peek(),
+                Some(NodeOrToken::Token(tok)) if tok.kind() == SyntaxKind::TEXT
+            );
             match el {
                 NodeOrToken::Token(t) => match t.kind() {
                     SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
                         b.pending_space = true;
                     }
-                    // Skip blockquote markers - they're in the tree for losslessness but
-                    // the formatter adds them dynamically when formatting BlockQuote nodes
                     SyntaxKind::BLOCKQUOTE_MARKER => {}
                     SyntaxKind::ESCAPED_CHAR => {
                         if in_link_text && t.text() == r"\_" {
                             b.push_piece("_");
                         } else {
-                            // Token already includes backslash (e.g., "\*")
                             b.push_piece(t.text());
                         }
                     }
-                    SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {
-                        // Skip original markers - we'll add normalized ones
-                    }
+                    SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {}
                     SyntaxKind::TEXT => {
                         let text = expand_tabs_with_width(t.text(), _config.tab_width);
-
-                        // Check if prev/next siblings are TEXT (for intraword underscore detection)
-                        let prev_is_text = idx > 0
-                            && matches!(
-                                &children[idx - 1],
-                                NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::TEXT
-                            );
-                        let next_is_text = idx + 1 < children.len()
-                            && matches!(
-                                &children[idx + 1],
-                                NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::TEXT
-                            );
-
-                        // Split TEXT tokens on whitespace to create separate words
-                        // Note: We don't preserve leading spaces here since list item continuations
-                        // will be re-indented by the formatter
-
-                        // Check if text starts with whitespace
-                        let mut text_to_process = text.as_str();
+                        let mut text_to_process = text.as_ref();
                         if !text.is_empty() && text.starts_with(char::is_whitespace) {
                             if b.skip_next_leading_whitespace {
-                                // Skip the leading whitespace - it's been moved outside the emphasis/strong
                                 text_to_process = text.trim_start();
                                 b.skip_next_leading_whitespace = false;
                             } else {
                                 b.pending_space = true;
                             }
                         }
-
-                        let words: Vec<&str> = text_to_process.split_whitespace().collect();
-
-                        for (i, word) in words.iter().enumerate() {
-                            if i > 0 {
+                        let mut saw_word = false;
+                        for word in text_to_process.split_whitespace() {
+                            if saw_word {
                                 b.pending_space = true;
                             }
-                            // Always escape special characters in TEXT tokens
-                            // ESCAPED_CHAR tokens are handled separately and preserve their backslashes
                             let processed_word = escape_special_chars(
                                 word,
                                 false,
@@ -384,41 +444,26 @@ fn build_words_with_mode<'a>(
                                 !in_link_text,
                             );
                             b.push_piece(&processed_word);
+                            saw_word = true;
                         }
-
-                        // If text ends with whitespace, mark pending space for next piece
-                        if !words.is_empty() && text.ends_with(char::is_whitespace) {
+                        if saw_word && text.ends_with(char::is_whitespace) {
                             b.pending_space = true;
                         }
                     }
-                    _ => {
-                        b.push_piece(t.text());
-                    }
+                    _ => b.push_piece(t.text()),
                 },
                 NodeOrToken::Node(n) => match n.kind() {
-                    SyntaxKind::LIST => {
-                        b.pending_space = true;
-                    }
-                    SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {
-                        // Skip code blocks and blank lines - they'll be handled separately
-                        // Don't recurse into them
-                    }
+                    SyntaxKind::LIST => b.pending_space = true,
+                    SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {}
                     SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
-                        // For PARAGRAPH children of ListItem, check if there's a BlankLine before it
-                        // If yes, it's a true continuation paragraph (skip in wrapping)
-                        // If no, it's a lazy continuation (include in wrapping)
                         let has_blank_before = n
                             .prev_sibling()
                             .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
                             .unwrap_or(false);
-
-                        if has_blank_before {
-                            // True continuation paragraph - skip in wrapping, format separately
-                        } else {
-                            // Lazy continuation - include in wrapping
+                        if !has_blank_before {
                             process_node_recursive(
                                 _config,
-                                n,
+                                &n,
                                 b,
                                 format_inline_fn,
                                 in_link_text,
@@ -426,71 +471,580 @@ fn build_words_with_mode<'a>(
                             );
                         }
                     }
-                    SyntaxKind::PARAGRAPH => {
-                        // Recursively process PARAGRAPH content instead of treating it as a unit
+                    SyntaxKind::PARAGRAPH => process_node_recursive(
+                        _config,
+                        &n,
+                        b,
+                        format_inline_fn,
+                        in_link_text,
+                        atomic_links,
+                    ),
+                    SyntaxKind::EMPHASIS => {
+                        if node_starts_with_whitespace(&n) {
+                            b.pending_space = true;
+                            b.skip_next_leading_whitespace = true;
+                        }
+                        b.push_piece("*");
                         process_node_recursive(
                             _config,
-                            n,
+                            &n,
                             b,
                             format_inline_fn,
                             in_link_text,
                             atomic_links,
                         );
-                    }
-                    SyntaxKind::EMPHASIS => {
-                        // Check if content starts with whitespace - if so, preserve it before opening marker
-                        if node_starts_with_whitespace(n) {
-                            b.pending_space = true;
-                            b.skip_next_leading_whitespace = true;
-                        }
-                        b.push_piece("*");
-                        process_node_recursive(
-                            _config,
-                            n,
-                            b,
-                            format_inline_fn,
-                            in_link_text,
-                            atomic_links,
-                        ); // Inside emphasis now
-                        // Reset the flag (it should have been consumed by first TEXT, but just in case)
                         b.skip_next_leading_whitespace = false;
-                        // Save pending space state (from trailing whitespace in content)
                         let had_pending_space = b.pending_space;
-                        // Clear pending space before closing marker (trim trailing whitespace)
                         b.pending_space = false;
                         b.push_piece("*");
-                        // Restore pending space state for next sibling
                         b.pending_space = had_pending_space;
                     }
                     SyntaxKind::STRONG => {
-                        // Check if content starts with whitespace - if so, preserve it before opening marker
-                        if node_starts_with_whitespace(n) {
+                        if node_starts_with_whitespace(&n) {
                             b.pending_space = true;
                             b.skip_next_leading_whitespace = true;
                         }
                         b.push_piece("**");
                         process_node_recursive(
                             _config,
-                            n,
+                            &n,
                             b,
                             format_inline_fn,
                             in_link_text,
                             atomic_links,
-                        ); // Inside emphasis now
-                        // Reset the flag (it should have been consumed by first TEXT, but just in case)
+                        );
                         b.skip_next_leading_whitespace = false;
-                        // Save pending space state (from trailing whitespace in content)
                         let had_pending_space = b.pending_space;
-                        // Clear pending space before closing marker (trim trailing whitespace)
                         b.pending_space = false;
                         b.push_piece("**");
-                        // Restore pending space state for next sibling
                         b.pending_space = had_pending_space;
                     }
                     SyntaxKind::LINK => {
                         if atomic_links {
-                            let text = normalize_inline_for_sentence(&format_inline_fn(n));
-                            b.push_piece(&text);
+                            let formatted = format_inline_fn(&n);
+                            let text = normalize_inline_for_sentence(&formatted);
+                            b.push_piece(text.as_ref());
+                        } else {
+                            b.push_piece("[");
+                            for child in n.children_with_tokens() {
+                                if let NodeOrToken::Node(link_child) = child
+                                    && link_child.kind() == SyntaxKind::LINK_TEXT
+                                {
+                                    process_node_recursive(
+                                        _config,
+                                        &link_child,
+                                        b,
+                                        format_inline_fn,
+                                        true,
+                                        atomic_links,
+                                    );
+                                }
+                            }
+                            let mut closing = String::new();
+                            let mut past_link_text = false;
+                            for child in n.children_with_tokens() {
+                                match child {
+                                    NodeOrToken::Node(link_child) => match link_child.kind() {
+                                        SyntaxKind::LINK_TEXT => past_link_text = true,
+                                        SyntaxKind::LINK_DEST
+                                        | SyntaxKind::LINK_REF
+                                        | SyntaxKind::ATTRIBUTE => {
+                                            if past_link_text {
+                                                if link_child.kind() == SyntaxKind::LINK_DEST {
+                                                    let raw = link_child.text().to_string();
+                                                    append_normalized_link_dest(&raw, &mut closing);
+                                                } else {
+                                                    let _ = write!(
+                                                        &mut closing,
+                                                        "{}",
+                                                        link_child.text()
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    },
+                                    NodeOrToken::Token(t) => {
+                                        if past_link_text {
+                                            match t.kind() {
+                                                SyntaxKind::LINK_TEXT_END
+                                                | SyntaxKind::LINK_DEST_START
+                                                | SyntaxKind::LINK_DEST_END
+                                                | SyntaxKind::TEXT => closing.push_str(t.text()),
+                                                _ => {}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            b.attach_to_previous(&closing);
+                        }
+                    }
+                    SyntaxKind::IMAGE_LINK => {
+                        if atomic_links {
+                            let formatted = format_inline_fn(&n);
+                            let text = normalize_inline_for_sentence(&formatted);
+                            b.push_piece(text.as_ref());
+                        } else {
+                            b.push_piece("![");
+                            for child in n.children_with_tokens() {
+                                if let NodeOrToken::Node(img_child) = child
+                                    && img_child.kind() == SyntaxKind::IMAGE_ALT
+                                {
+                                    process_node_recursive(
+                                        _config,
+                                        &img_child,
+                                        b,
+                                        format_inline_fn,
+                                        true,
+                                        atomic_links,
+                                    );
+                                }
+                            }
+                            let mut closing = String::new();
+                            let mut past_image_alt = false;
+                            for child in n.children_with_tokens() {
+                                match child {
+                                    NodeOrToken::Node(img_child) => match img_child.kind() {
+                                        SyntaxKind::IMAGE_ALT => past_image_alt = true,
+                                        SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE => {
+                                            if past_image_alt {
+                                                if img_child.kind() == SyntaxKind::LINK_DEST {
+                                                    let raw = img_child.text().to_string();
+                                                    append_normalized_link_dest(&raw, &mut closing);
+                                                } else {
+                                                    let _ = write!(
+                                                        &mut closing,
+                                                        "{}",
+                                                        img_child.text()
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    },
+                                    NodeOrToken::Token(t) => {
+                                        if past_image_alt {
+                                            match t.kind() {
+                                                SyntaxKind::IMAGE_ALT_END
+                                                | SyntaxKind::IMAGE_DEST_START
+                                                | SyntaxKind::IMAGE_DEST_END
+                                                | SyntaxKind::TEXT => closing.push_str(t.text()),
+                                                _ => {}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            b.attach_to_previous(&closing);
+                        }
+                    }
+                    _ => {
+                        let text = format_inline_fn(&n);
+                        b.push_piece(&text);
+                    }
+                },
+            }
+            prev_is_text = current_is_text;
+        }
+    }
+
+    let mut b = Builder::new();
+    process_node_recursive(
+        _config,
+        node,
+        &mut b,
+        format_inline_fn,
+        in_link_text,
+        atomic_links,
+    );
+    let mut merged_len = 0usize;
+    let mut i = 0;
+    while i < b.pieces.len() {
+        let current_idx = i;
+        if current_idx + 1 < b.pieces.len()
+            && b.whitespace_after[current_idx]
+            && is_initialism_with_periods(&b.pieces[current_idx])
+            && is_year_like(&b.pieces[current_idx + 1])
+        {
+            let right = std::mem::take(&mut b.pieces[current_idx + 1]);
+            b.pieces[current_idx].push(' ');
+            b.pieces[current_idx].push_str(&right);
+            b.whitespace_after[current_idx] = b.whitespace_after[current_idx + 1];
+            i += 2;
+        } else {
+            i += 1;
+        }
+        if merged_len != current_idx {
+            b.pieces.swap(merged_len, current_idx);
+            b.whitespace_after.swap(merged_len, current_idx);
+        }
+        merged_len += 1;
+    }
+    b.pieces.truncate(merged_len);
+    b.whitespace_after.truncate(merged_len);
+
+    let start_idx = arena.len();
+    for text in b.pieces {
+        arena.push(text.into_boxed_str());
+    }
+    b.whitespace_after
+        .into_iter()
+        .enumerate()
+        .map(|(offset, whitespace_after)| {
+            let s: &'a str = &arena[start_idx + offset];
+            Piece {
+                word: s,
+                whitespace_after,
+            }
+        })
+        .collect()
+}
+
+pub(super) fn wrapped_lines_for_paragraph(
+    _config: &Config,
+    node: &SyntaxNode,
+    width: usize,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+) -> Vec<String> {
+    log::debug!("wrapped_lines_for_paragraph called with width={}", width);
+    if let Some(lines) = special_case_lines(_config, node, format_inline_fn) {
+        return lines;
+    }
+
+    let out_lines =
+        wrap_node_greedy_streaming(_config, node, &[width], format_inline_fn, false, false);
+    log::debug!("Wrapped into {} lines", out_lines.len());
+    out_lines
+}
+
+pub(super) fn wrapped_lines_for_paragraph_with_widths(
+    _config: &Config,
+    node: &SyntaxNode,
+    widths: &[usize],
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+) -> Vec<String> {
+    log::debug!("wrapped_lines_for_paragraph_with_widths called");
+    if let Some(lines) = special_case_lines(_config, node, format_inline_fn) {
+        return lines;
+    }
+
+    let line_widths = if widths.is_empty() { &[1] } else { widths };
+    let out_lines =
+        wrap_node_greedy_streaming(_config, node, line_widths, format_inline_fn, false, false);
+    log::debug!("Wrapped into {} lines", out_lines.len());
+    out_lines
+}
+
+pub(super) fn sentence_lines_for_paragraph(
+    _config: &Config,
+    node: &SyntaxNode,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+) -> Vec<String> {
+    log::debug!("sentence_lines_for_paragraph called");
+    if let Some(lines) = special_case_lines(_config, node, format_inline_fn) {
+        return lines;
+    }
+    wrap_node_greedy_streaming(_config, node, &[], format_inline_fn, true, true)
+}
+
+fn wrap_node_greedy_streaming(
+    _config: &Config,
+    node: &SyntaxNode,
+    line_widths: &[usize],
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+    sentence_mode: bool,
+    atomic_links_root: bool,
+) -> Vec<String> {
+    struct GreedySink<'a> {
+        default_line_width: usize,
+        line_widths: &'a [usize],
+        sentence_mode: bool,
+        out: Vec<String>,
+        line: String,
+        line_width: usize,
+        line_has_piece: bool,
+        prev_ws_after: bool,
+        pending_piece: Option<(String, bool)>,
+    }
+
+    impl<'a> GreedySink<'a> {
+        fn new(line_widths: &'a [usize], sentence_mode: bool) -> Self {
+            Self {
+                default_line_width: line_widths.last().copied().unwrap_or(0),
+                line_widths,
+                sentence_mode,
+                out: Vec::new(),
+                line: String::new(),
+                line_width: 0,
+                line_has_piece: false,
+                prev_ws_after: false,
+                pending_piece: None,
+            }
+        }
+
+        fn consume(&mut self, piece: String, piece_ws_after: bool, is_last: bool) {
+            let piece_width = fast_display_width(&piece);
+            if !self.sentence_mode {
+                let width_limit = self
+                    .line_widths
+                    .get(self.out.len())
+                    .copied()
+                    .unwrap_or(self.default_line_width);
+                let spacer_width = usize::from(self.line_has_piece && self.prev_ws_after);
+                if self.line_has_piece && self.line_width + spacer_width + piece_width > width_limit
+                {
+                    self.out.push(std::mem::take(&mut self.line));
+                    self.line_width = 0;
+                    self.line_has_piece = false;
+                    self.prev_ws_after = false;
+                }
+            }
+            if self.line_has_piece && self.prev_ws_after {
+                self.line.push(' ');
+                self.line_width += 1;
+            }
+            self.line.push_str(&piece);
+            self.line_width += piece_width;
+            self.line_has_piece = true;
+            self.prev_ws_after = piece_ws_after;
+
+            if self.sentence_mode && is_sentence_boundary_piece(&piece, piece_ws_after, is_last) {
+                self.out.push(std::mem::take(&mut self.line));
+                self.line_width = 0;
+                self.line_has_piece = false;
+                self.prev_ws_after = false;
+            }
+        }
+
+        fn emit_piece(&mut self, piece: String, ws_after: bool) {
+            if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
+                if pending_ws_after && is_initialism_with_periods(&pending) && is_year_like(&piece)
+                {
+                    self.pending_piece = Some((format!("{pending} {piece}"), ws_after));
+                    return;
+                }
+                self.consume(pending, pending_ws_after, false);
+            }
+            self.pending_piece = Some((piece, ws_after));
+        }
+
+        fn finish(mut self) -> Vec<String> {
+            if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
+                self.consume(pending, pending_ws_after, true);
+            }
+            if self.line_has_piece {
+                self.out.push(self.line);
+            } else if self.out.is_empty() {
+                self.out.push(String::new());
+            }
+            self.out
+        }
+    }
+
+    struct StreamingBuilder<'a> {
+        sink: GreedySink<'a>,
+        current_piece: Option<String>,
+        pending_space: bool,
+        skip_next_leading_whitespace: bool,
+    }
+
+    impl<'a> StreamingBuilder<'a> {
+        fn new(line_widths: &'a [usize], sentence_mode: bool) -> Self {
+            Self {
+                sink: GreedySink::new(line_widths, sentence_mode),
+                current_piece: None,
+                pending_space: false,
+                skip_next_leading_whitespace: false,
+            }
+        }
+
+        fn flush_current(&mut self, ws_after: bool) {
+            if let Some(piece) = self.current_piece.take() {
+                self.sink.emit_piece(piece, ws_after);
+            }
+        }
+
+        fn push_piece(&mut self, text: &str) {
+            if self.pending_space {
+                self.flush_current(true);
+                self.current_piece = Some(text.to_string());
+                self.pending_space = false;
+            } else if let Some(current) = &mut self.current_piece {
+                current.push_str(text);
+            } else {
+                self.current_piece = Some(text.to_string());
+            }
+        }
+
+        fn finish(mut self) -> Vec<String> {
+            self.flush_current(false);
+            self.sink.finish()
+        }
+    }
+
+    fn node_starts_with_whitespace(node: &SyntaxNode) -> bool {
+        for child in node.children_with_tokens() {
+            match child {
+                NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
+                    return t.text().starts_with(char::is_whitespace);
+                }
+                NodeOrToken::Token(t)
+                    if matches!(
+                        t.kind(),
+                        SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER
+                    ) =>
+                {
+                    continue;
+                }
+                NodeOrToken::Node(n) => {
+                    if node_starts_with_whitespace(&n) {
+                        return true;
+                    }
+                }
+                _ => continue,
+            }
+        }
+        false
+    }
+
+    fn process_node_recursive(
+        _config: &Config,
+        node: &SyntaxNode,
+        b: &mut StreamingBuilder<'_>,
+        format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+        in_link_text: bool,
+        atomic_links: bool,
+    ) {
+        let mut children = node.children_with_tokens().peekable();
+        let mut prev_is_text = false;
+
+        while let Some(el) = children.next() {
+            let current_is_text =
+                matches!(&el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT);
+            let next_is_text = matches!(
+                children.peek(),
+                Some(NodeOrToken::Token(tok)) if tok.kind() == SyntaxKind::TEXT
+            );
+            match el {
+                NodeOrToken::Token(t) => match t.kind() {
+                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
+                        b.pending_space = true;
+                    }
+                    SyntaxKind::BLOCKQUOTE_MARKER => {}
+                    SyntaxKind::ESCAPED_CHAR => {
+                        if in_link_text && t.text() == r"\_" {
+                            b.push_piece("_");
+                        } else {
+                            b.push_piece(t.text());
+                        }
+                    }
+                    SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {}
+                    SyntaxKind::TEXT => {
+                        let text = expand_tabs_with_width(t.text(), _config.tab_width);
+                        let mut text_to_process = text.as_ref();
+                        if !text.is_empty() && text.starts_with(char::is_whitespace) {
+                            if b.skip_next_leading_whitespace {
+                                text_to_process = text.trim_start();
+                                b.skip_next_leading_whitespace = false;
+                            } else {
+                                b.pending_space = true;
+                            }
+                        }
+
+                        let mut saw_word = false;
+                        for word in text_to_process.split_whitespace() {
+                            if saw_word {
+                                b.pending_space = true;
+                            }
+                            let processed_word = escape_special_chars(
+                                word,
+                                false,
+                                prev_is_text,
+                                next_is_text,
+                                !in_link_text,
+                            );
+                            b.push_piece(&processed_word);
+                            saw_word = true;
+                        }
+                        if saw_word && text.ends_with(char::is_whitespace) {
+                            b.pending_space = true;
+                        }
+                    }
+                    _ => b.push_piece(t.text()),
+                },
+                NodeOrToken::Node(n) => match n.kind() {
+                    SyntaxKind::LIST => b.pending_space = true,
+                    SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {}
+                    SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
+                        let has_blank_before = n
+                            .prev_sibling()
+                            .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
+                            .unwrap_or(false);
+                        if !has_blank_before {
+                            process_node_recursive(
+                                _config,
+                                &n,
+                                b,
+                                format_inline_fn,
+                                in_link_text,
+                                atomic_links,
+                            );
+                        }
+                    }
+                    SyntaxKind::PARAGRAPH => process_node_recursive(
+                        _config,
+                        &n,
+                        b,
+                        format_inline_fn,
+                        in_link_text,
+                        atomic_links,
+                    ),
+                    SyntaxKind::EMPHASIS => {
+                        if node_starts_with_whitespace(&n) {
+                            b.pending_space = true;
+                            b.skip_next_leading_whitespace = true;
+                        }
+                        b.push_piece("*");
+                        process_node_recursive(
+                            _config,
+                            &n,
+                            b,
+                            format_inline_fn,
+                            in_link_text,
+                            atomic_links,
+                        );
+                        b.skip_next_leading_whitespace = false;
+                        let had_pending_space = b.pending_space;
+                        b.pending_space = false;
+                        b.push_piece("*");
+                        b.pending_space = had_pending_space;
+                    }
+                    SyntaxKind::STRONG => {
+                        if node_starts_with_whitespace(&n) {
+                            b.pending_space = true;
+                            b.skip_next_leading_whitespace = true;
+                        }
+                        b.push_piece("**");
+                        process_node_recursive(
+                            _config,
+                            &n,
+                            b,
+                            format_inline_fn,
+                            in_link_text,
+                            atomic_links,
+                        );
+                        b.skip_next_leading_whitespace = false;
+                        let had_pending_space = b.pending_space;
+                        b.pending_space = false;
+                        b.push_piece("**");
+                        b.pending_space = had_pending_space;
+                    }
+                    SyntaxKind::LINK => {
+                        if atomic_links {
+                            let formatted = format_inline_fn(&n);
+                            let text = normalize_inline_for_sentence(&formatted);
+                            b.push_piece(text.as_ref());
                         } else {
                             b.push_piece("[");
                             for child in n.children_with_tokens() {
@@ -510,24 +1064,23 @@ fn build_words_with_mode<'a>(
 
                             let mut closing = String::new();
                             let mut past_link_text = false;
-
                             for child in n.children_with_tokens() {
                                 match child {
                                     NodeOrToken::Node(link_child) => match link_child.kind() {
-                                        SyntaxKind::LINK_TEXT => {
-                                            past_link_text = true;
-                                        }
+                                        SyntaxKind::LINK_TEXT => past_link_text = true,
                                         SyntaxKind::LINK_DEST
                                         | SyntaxKind::LINK_REF
                                         | SyntaxKind::ATTRIBUTE => {
                                             if past_link_text {
                                                 if link_child.kind() == SyntaxKind::LINK_DEST {
-                                                    closing.push_str(&normalize_link_dest(
-                                                        &link_child.text().to_string(),
-                                                    ));
+                                                    let raw = link_child.text().to_string();
+                                                    append_normalized_link_dest(&raw, &mut closing);
                                                 } else {
-                                                    closing
-                                                        .push_str(&link_child.text().to_string());
+                                                    let _ = write!(
+                                                        &mut closing,
+                                                        "{}",
+                                                        link_child.text()
+                                                    );
                                                 }
                                             }
                                         }
@@ -538,26 +1091,22 @@ fn build_words_with_mode<'a>(
                                             match t.kind() {
                                                 SyntaxKind::LINK_TEXT_END
                                                 | SyntaxKind::LINK_DEST_START
-                                                | SyntaxKind::LINK_DEST_END => {
-                                                    closing.push_str(t.text());
-                                                }
-                                                SyntaxKind::TEXT => {
-                                                    closing.push_str(t.text());
-                                                }
+                                                | SyntaxKind::LINK_DEST_END
+                                                | SyntaxKind::TEXT => closing.push_str(t.text()),
                                                 _ => {}
                                             }
                                         }
                                     }
                                 }
                             }
-
-                            b.attach_to_previous(&closing);
+                            b.push_piece(&closing);
                         }
                     }
                     SyntaxKind::IMAGE_LINK => {
                         if atomic_links {
-                            let text = normalize_inline_for_sentence(&format_inline_fn(n));
-                            b.push_piece(&text);
+                            let formatted = format_inline_fn(&n);
+                            let text = normalize_inline_for_sentence(&formatted);
+                            b.push_piece(text.as_ref());
                         } else {
                             b.push_piece("![");
                             for child in n.children_with_tokens() {
@@ -577,21 +1126,21 @@ fn build_words_with_mode<'a>(
 
                             let mut closing = String::new();
                             let mut past_image_alt = false;
-
                             for child in n.children_with_tokens() {
                                 match child {
                                     NodeOrToken::Node(img_child) => match img_child.kind() {
-                                        SyntaxKind::IMAGE_ALT => {
-                                            past_image_alt = true;
-                                        }
+                                        SyntaxKind::IMAGE_ALT => past_image_alt = true,
                                         SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE => {
                                             if past_image_alt {
                                                 if img_child.kind() == SyntaxKind::LINK_DEST {
-                                                    closing.push_str(&normalize_link_dest(
-                                                        &img_child.text().to_string(),
-                                                    ));
+                                                    let raw = img_child.text().to_string();
+                                                    append_normalized_link_dest(&raw, &mut closing);
                                                 } else {
-                                                    closing.push_str(&img_child.text().to_string());
+                                                    let _ = write!(
+                                                        &mut closing,
+                                                        "{}",
+                                                        img_child.text()
+                                                    );
                                                 }
                                             }
                                         }
@@ -602,355 +1151,147 @@ fn build_words_with_mode<'a>(
                                             match t.kind() {
                                                 SyntaxKind::IMAGE_ALT_END
                                                 | SyntaxKind::IMAGE_DEST_START
-                                                | SyntaxKind::IMAGE_DEST_END => {
-                                                    closing.push_str(t.text());
-                                                }
-                                                SyntaxKind::TEXT => {
-                                                    closing.push_str(t.text());
-                                                }
+                                                | SyntaxKind::IMAGE_DEST_END
+                                                | SyntaxKind::TEXT => closing.push_str(t.text()),
                                                 _ => {}
                                             }
                                         }
                                     }
                                 }
                             }
-
-                            b.attach_to_previous(&closing);
+                            b.push_piece(&closing);
                         }
                     }
                     _ => {
-                        // For other inline nodes, format and push as single piece
-                        let text = format_inline_fn(n);
+                        let text = format_inline_fn(&n);
                         b.push_piece(&text);
                     }
                 },
             }
+            prev_is_text = current_is_text;
         }
     }
 
-    let mut b = Builder::new(arena);
+    let mut builder = StreamingBuilder::new(line_widths, sentence_mode);
     process_node_recursive(
         _config,
         node,
-        &mut b,
+        &mut builder,
         format_inline_fn,
-        in_link_text,
-        atomic_links,
-    ); // Start outside emphasis
-
-    let mut merged_piece_idx: Vec<usize> = Vec::with_capacity(b.piece_idx.len());
-    let mut merged_whitespace_after: Vec<bool> = Vec::with_capacity(b.piece_idx.len());
-    let mut i = 0;
-    while i < b.piece_idx.len() {
-        let idx = b.piece_idx[i];
-        let s_owned = b.arena[idx].to_string();
-
-        if i + 1 < b.piece_idx.len()
-            && b.whitespace_after.get(i).copied().unwrap_or(false)
-            && is_initialism_with_periods(&s_owned)
-        {
-            let next_idx = b.piece_idx[i + 1];
-            let next_owned = b.arena[next_idx].to_string();
-            if is_year_like(&next_owned) {
-                let combined = format!("{s_owned} {next_owned}");
-                b.arena.push(combined.into_boxed_str());
-                let combined_idx = b.arena.len() - 1;
-                merged_piece_idx.push(combined_idx);
-                merged_whitespace_after
-                    .push(b.whitespace_after.get(i + 1).copied().unwrap_or(false));
-                i += 2;
-                continue;
-            }
-        }
-
-        merged_piece_idx.push(idx);
-        merged_whitespace_after.push(b.whitespace_after.get(i).copied().unwrap_or(false));
-        i += 1;
-    }
-
-    let mut words: Vec<textwrap::core::Word<'a>> = Vec::with_capacity(merged_piece_idx.len());
-    for (i, &idx) in merged_piece_idx.iter().enumerate() {
-        let s: &'a str = &b.arena[idx];
-        let mut w = textwrap::core::Word::from(s);
-        if merged_whitespace_after.get(i).copied().unwrap_or(false) {
-            w.whitespace = " ";
-        }
-        words.push(w);
-    }
-    words
-}
-
-pub(super) fn wrapped_lines_for_paragraph(
-    _config: &Config,
-    node: &SyntaxNode,
-    width: usize,
-    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-) -> Vec<String> {
-    log::debug!("wrapped_lines_for_paragraph called with width={}", width);
-
-    let paragraph_text = node.text().to_string();
-    let normalized = paragraph_text.replace("\r\n", "\n");
-    let has_blockquote_markers = node
-        .children_with_tokens()
-        .any(|el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER));
-    if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
-        return paragraph_text
-            .lines()
-            .map(|line| line.to_string())
-            .collect();
-    }
-    let standalone_fences = normalized
-        .lines()
-        .filter(|line| line.trim() == "$$")
-        .count();
-    if standalone_fences >= 2 && standalone_fences % 2 == 0 {
-        return paragraph_text
-            .lines()
-            .map(|line| line.trim_end().to_string())
-            .collect();
-    }
-
-    // Check if paragraph contains hard line breaks
-    let has_hard_breaks = node
-        .descendants_with_tokens()
-        .any(|el| el.kind() == SyntaxKind::HARD_LINE_BREAK);
-
-    if has_hard_breaks {
-        // Don't wrap paragraphs with hard line breaks - preserve the breaks
-        // But normalize hard breaks and format inline elements
-        log::debug!("Paragraph contains hard line breaks - preserving them");
-
-        let mut result = String::new();
-        let mut skip_next_whitespace = false;
-        for child in node.children_with_tokens() {
-            match child {
-                NodeOrToken::Node(n) => {
-                    skip_next_whitespace = false;
-                    result.push_str(&format_inline_fn(&n));
-                }
-                NodeOrToken::Token(t) => {
-                    if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
-                        skip_next_whitespace = true;
-                    } else if t.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace {
-                        skip_next_whitespace = false;
-                    } else if t.kind() == SyntaxKind::HARD_LINE_BREAK {
-                        skip_next_whitespace = false;
-                        // Normalize to backslash-newline if extension enabled
-                        if _config.extensions.escaped_line_breaks {
-                            result.push_str("\\\n");
-                        } else {
-                            result.push_str(t.text());
-                        }
-                    } else {
-                        skip_next_whitespace = false;
-                        result.push_str(t.text());
-                    }
-                }
-            }
-        }
-
-        return result.lines().map(|s| s.to_string()).collect();
-    }
-
-    let mut arena: Vec<Box<str>> = Vec::new();
-    let words = build_words(_config, node, &mut arena, format_inline_fn);
-    log::debug!("Built {} words for paragraph", words.len());
-    log::trace!(
-        "Words: {:?}",
-        words.iter().map(|w| w.word).collect::<Vec<_>>()
+        false,
+        atomic_links_root,
     );
-
-    let algo = WrapAlgorithm::FirstFit;
-    let line_widths = [width];
-    let lines = algo.wrap(&words, &line_widths);
-    log::debug!("Wrapped into {} lines", lines.len());
-
-    let mut out_lines = Vec::with_capacity(lines.len());
-
-    for line in lines {
-        let mut acc = String::new();
-        for (i, w) in line.iter().enumerate() {
-            acc.push_str(w.word);
-            if i + 1 < line.len() {
-                acc.push_str(w.whitespace);
-            } else {
-                acc.push_str(w.penalty);
-            }
-        }
-        log::trace!("Line: '{}'", acc);
-        out_lines.push(acc);
-    }
-    out_lines
+    builder.finish()
 }
 
-pub(super) fn wrapped_lines_for_paragraph_with_widths(
-    _config: &Config,
+fn special_case_lines(
+    config: &Config,
     node: &SyntaxNode,
-    widths: &[usize],
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-) -> Vec<String> {
-    log::debug!("wrapped_lines_for_paragraph_with_widths called");
+) -> Option<Vec<String>> {
+    let mut has_hard_breaks = false;
+    let mut has_dollar_text = false;
+    for el in node.descendants_with_tokens() {
+        if el.kind() == SyntaxKind::HARD_LINE_BREAK {
+            has_hard_breaks = true;
+        }
+        if let NodeOrToken::Token(t) = el
+            && t.text().contains('$')
+        {
+            has_dollar_text = true;
+        }
+        if has_hard_breaks && has_dollar_text {
+            break;
+        }
+    }
 
-    let paragraph_text = node.text().to_string();
-    let normalized = paragraph_text.replace("\r\n", "\n");
     let has_blockquote_markers = node
         .children_with_tokens()
         .any(|el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER));
-    if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
-        return paragraph_text
+    let in_blockquote = node
+        .ancestors()
+        .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCKQUOTE);
+    if has_dollar_text {
+        let paragraph_text = node.text().to_string();
+        let normalized: Cow<'_, str> = if paragraph_text.contains("\r\n") {
+            Cow::Owned(paragraph_text.replace("\r\n", "\n"))
+        } else {
+            Cow::Borrowed(paragraph_text.as_str())
+        };
+        if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
+            return Some(paragraph_text.lines().map(ToString::to_string).collect());
+        }
+        let standalone_fences = normalized
             .lines()
-            .map(|line| line.to_string())
-            .collect();
-    }
-    let standalone_fences = normalized
-        .lines()
-        .filter(|line| line.trim() == "$$")
-        .count();
-    if standalone_fences >= 2 && standalone_fences % 2 == 0 {
-        return paragraph_text
-            .lines()
-            .map(|line| line.trim_end().to_string())
-            .collect();
-    }
-
-    // Check if paragraph contains hard line breaks
-    let has_hard_breaks = node
-        .descendants_with_tokens()
-        .any(|el| el.kind() == SyntaxKind::HARD_LINE_BREAK);
-
-    if has_hard_breaks {
-        // Don't wrap paragraphs with hard line breaks - preserve the breaks
-        // But normalize hard breaks and format inline elements
-        log::debug!("Paragraph contains hard line breaks - preserving them");
-
-        let mut result = String::new();
-        let mut skip_next_whitespace = false;
-        for child in node.children_with_tokens() {
-            match child {
-                NodeOrToken::Node(n) => {
-                    skip_next_whitespace = false;
-                    result.push_str(&format_inline_fn(&n));
+            .map(|line| {
+                if has_blockquote_markers {
+                    strip_blockquote_prefix(line)
+                } else {
+                    line
                 }
-                NodeOrToken::Token(t) => {
-                    if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
-                        skip_next_whitespace = true;
-                    } else if t.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace {
-                        skip_next_whitespace = false;
-                    } else if t.kind() == SyntaxKind::HARD_LINE_BREAK {
-                        skip_next_whitespace = false;
-                        // Normalize to backslash-newline if extension enabled
-                        if _config.extensions.escaped_line_breaks {
-                            result.push_str("\\\n");
-                        } else {
-                            result.push_str(t.text());
-                        }
+            })
+            .filter(|line| line.trim_start().starts_with("$$"))
+            .count();
+        if standalone_fences >= 2 && standalone_fences % 2 == 0 {
+            if has_blockquote_markers {
+                return Some(
+                    paragraph_text
+                        .lines()
+                        .map(strip_blockquote_prefix)
+                        .map(ToString::to_string)
+                        .collect(),
+                );
+            }
+            return Some(
+                paragraph_text
+                    .lines()
+                    .map(|line| line.trim_end().to_string())
+                    .collect(),
+            );
+        }
+        let fence_marker_count = normalized.match_indices("$$").count();
+        if fence_marker_count >= 2 && fence_marker_count.is_multiple_of(2) && in_blockquote {
+            return Some(
+                paragraph_text
+                    .lines()
+                    .map(strip_blockquote_prefix)
+                    .map(|line| line.trim_end().to_string())
+                    .collect(),
+            );
+        }
+    }
+
+    if !has_hard_breaks {
+        return None;
+    }
+
+    let mut result = String::new();
+    let mut skip_next_whitespace = false;
+    for child in node.children_with_tokens() {
+        match child {
+            NodeOrToken::Node(n) => {
+                skip_next_whitespace = false;
+                result.push_str(&format_inline_fn(&n));
+            }
+            NodeOrToken::Token(t) => {
+                if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
+                    skip_next_whitespace = true;
+                } else if t.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace {
+                    skip_next_whitespace = false;
+                } else if t.kind() == SyntaxKind::HARD_LINE_BREAK {
+                    skip_next_whitespace = false;
+                    if config.extensions.escaped_line_breaks {
+                        result.push_str("\\\n");
                     } else {
-                        skip_next_whitespace = false;
                         result.push_str(t.text());
                     }
-                }
-            }
-        }
-
-        return result.lines().map(|s| s.to_string()).collect();
-    }
-
-    let mut arena: Vec<Box<str>> = Vec::new();
-    let words = build_words(_config, node, &mut arena, format_inline_fn);
-    log::debug!("Built {} words for paragraph", words.len());
-
-    let algo = WrapAlgorithm::FirstFit;
-    let line_widths = if widths.is_empty() { &[1] } else { widths };
-    let lines = algo.wrap(&words, line_widths);
-    log::debug!("Wrapped into {} lines", lines.len());
-
-    let mut out_lines = Vec::with_capacity(lines.len());
-
-    for line in lines {
-        let mut acc = String::new();
-        for (i, w) in line.iter().enumerate() {
-            acc.push_str(w.word);
-            if i + 1 < line.len() {
-                acc.push_str(w.whitespace);
-            } else {
-                acc.push_str(w.penalty);
-            }
-        }
-        out_lines.push(acc);
-    }
-    out_lines
-}
-
-pub(super) fn sentence_lines_for_paragraph(
-    _config: &Config,
-    node: &SyntaxNode,
-    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-) -> Vec<String> {
-    log::debug!("sentence_lines_for_paragraph called");
-
-    let paragraph_text = node.text().to_string();
-    let normalized = paragraph_text.replace("\r\n", "\n");
-    let has_blockquote_markers = node
-        .children_with_tokens()
-        .any(|el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER));
-    if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
-        return paragraph_text
-            .lines()
-            .map(|line| line.to_string())
-            .collect();
-    }
-    let standalone_fences = normalized
-        .lines()
-        .filter(|line| line.trim() == "$$")
-        .count();
-    if standalone_fences >= 2 && standalone_fences % 2 == 0 {
-        return paragraph_text
-            .lines()
-            .map(|line| line.trim_end().to_string())
-            .collect();
-    }
-
-    let has_hard_breaks = node
-        .descendants_with_tokens()
-        .any(|el| el.kind() == SyntaxKind::HARD_LINE_BREAK);
-
-    if has_hard_breaks {
-        log::debug!("Paragraph contains hard line breaks - preserving them");
-
-        let mut result = String::new();
-        let mut skip_next_whitespace = false;
-        for child in node.children_with_tokens() {
-            match child {
-                NodeOrToken::Node(n) => {
+                } else {
                     skip_next_whitespace = false;
-                    result.push_str(&format_inline_fn(&n));
-                }
-                NodeOrToken::Token(t) => {
-                    if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
-                        skip_next_whitespace = true;
-                    } else if t.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace {
-                        skip_next_whitespace = false;
-                    } else if t.kind() == SyntaxKind::HARD_LINE_BREAK {
-                        skip_next_whitespace = false;
-                        if _config.extensions.escaped_line_breaks {
-                            result.push_str("\\\n");
-                        } else {
-                            result.push_str(t.text());
-                        }
-                    } else {
-                        skip_next_whitespace = false;
-                        result.push_str(t.text());
-                    }
+                    result.push_str(t.text());
                 }
             }
         }
-
-        return result.lines().map(|s| s.to_string()).collect();
     }
 
-    let mut arena: Vec<Box<str>> = Vec::new();
-    let words = build_words_for_sentence(_config, node, &mut arena, format_inline_fn);
-    log::debug!("Built {} words for paragraph", words.len());
-
-    sentence_lines_from_words(&words)
+    Some(result.lines().map(|s| s.to_string()).collect())
 }
