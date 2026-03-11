@@ -33,38 +33,38 @@ impl LanguageServer for PanacheLsp {
             }
         }
 
-        Ok(InitializeResult {
-            capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Options(
-                    TextDocumentSyncOptions {
-                        open_close: Some(true),
-                        change: Some(TextDocumentSyncKind::INCREMENTAL),
-                        ..Default::default()
-                    },
-                )),
-                document_formatting_provider: Some(OneOf::Left(true)),
-                document_range_formatting_provider: Some(OneOf::Left(true)),
-                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
-                document_symbol_provider: Some(OneOf::Left(true)),
-                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
-                definition_provider: Some(OneOf::Left(true)),
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
-                completion_provider: Some(CompletionOptions::default()),
-                rename_provider: Some(OneOf::Left(true)),
-                workspace: Some(WorkspaceServerCapabilities {
-                    workspace_folders: Some(WorkspaceFoldersServerCapabilities {
-                        supported: Some(true),
-                        change_notifications: Some(OneOf::Left(true)),
-                    }),
-                    file_operations: None,
+        let mut initialize_result = InitializeResult::default();
+        initialize_result.capabilities = ServerCapabilities {
+            text_document_sync: Some(TextDocumentSyncCapability::Options(
+                TextDocumentSyncOptions {
+                    open_close: Some(true),
+                    change: Some(TextDocumentSyncKind::INCREMENTAL),
+                    ..Default::default()
+                },
+            )),
+            document_formatting_provider: Some(OneOf::Left(true)),
+            document_range_formatting_provider: Some(OneOf::Left(true)),
+            code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+            document_symbol_provider: Some(OneOf::Left(true)),
+            folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
+            definition_provider: Some(OneOf::Left(true)),
+            hover_provider: Some(HoverProviderCapability::Simple(true)),
+            completion_provider: Some(CompletionOptions::default()),
+            rename_provider: Some(OneOf::Left(true)),
+            workspace: Some(WorkspaceServerCapabilities {
+                workspace_folders: Some(WorkspaceFoldersServerCapabilities {
+                    supported: Some(true),
+                    change_notifications: Some(OneOf::Left(true)),
                 }),
-                ..Default::default()
-            },
-            server_info: Some(ServerInfo {
-                name: "panache-lsp".to_string(),
-                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                file_operations: None,
             }),
-        })
+            ..Default::default()
+        };
+        initialize_result.server_info = Some(ServerInfo {
+            name: "panache-lsp".to_string(),
+            version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        });
+        Ok(initialize_result)
     }
 
     async fn initialized(&self, _: InitializedParams) {
