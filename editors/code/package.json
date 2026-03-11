@@ -1,0 +1,114 @@
+{
+  "name": "panache",
+  "displayName": "Panache",
+  "description": "Language server for Pandoc, Quarto, and R Markdown documents",
+  "version": "2.16.0",
+  "publisher": "jolars",
+  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jolars/panache.git"
+  },
+  "homepage": "https://github.com/jolars/panache/tree/main/editors/code",
+  "bugs": {
+    "url": "https://github.com/jolars/panache/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Formatters",
+    "Linters",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "markdown",
+    "quarto",
+    "pandoc",
+    "rmarkdown",
+    "r markdown",
+    "qmd",
+    "rmd"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown",
+    "onLanguage:rmarkdown",
+    "onLanguage:quarto",
+    "workspaceContains:**/*.qmd",
+    "workspaceContains:**/*.Rmd",
+    "workspaceContains:**/*.rmd"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Panache",
+      "properties": {
+        "panache.commandPath": {
+          "type": "string",
+          "default": "panache",
+          "description": "Path to the panache binary used to launch the language server (fallback if auto-download is enabled)."
+        },
+        "panache.downloadBinary": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically download a platform-specific Panache binary from GitHub releases."
+        },
+        "panache.releaseTag": {
+          "type": "string",
+          "default": "latest",
+          "description": "Panache release tag to install (for example: latest or v2.16.0)."
+        },
+        "panache.githubRepo": {
+          "type": "string",
+          "default": "jolars/panache",
+          "description": "GitHub repository used for Panache binary downloads (<owner>/<repo>)."
+        },
+        "panache.serverArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional command-line arguments passed after `panache lsp`."
+        },
+        "panache.serverEnv": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Environment variables merged into the Panache language server process."
+        },
+        "panache.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace communication between VS Code and the Panache language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "tar": "^7.5.2",
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/node": "^20.17.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.8.2"
+  }
+}

@@ -176,20 +176,28 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 <details>
 <summary>VS Code</summary>
 
-Install a generic LSP client extension like [vscode-languageserver-node](https://marketplace.visualstudio.com/items?itemName=Microsoft.vscode-languageserver-node), then configure in `settings.json`:
+VS Code requires an extension-based LSP client for `panache lsp`; it does not
+have built-in `settings.json` support for arbitrary stdio language servers.
+
+Install the published Panache extension:
+
+- VS Code Marketplace:
+  <https://marketplace.visualstudio.com/items?itemName=jolars.panache>
+- Open VSX:
+  <https://open-vsx.org/extension/jolars/panache>
+
+Useful settings:
 
 ```json
 {
-  "languageServerExample.server": {
-    "command": "panache",
-    "args": ["lsp"],
-    "filetypes": ["quarto", "markdown", "rmarkdown"]
-  },
-  "editor.formatOnSave": true
+  "panache.commandPath": "panache",
+  "panache.downloadBinary": true,
+  "panache.releaseTag": "latest",
+  "panache.serverArgs": [],
+  "panache.serverEnv": { "RUST_LOG": "info" },
+  "panache.trace.server": "off"
 }
 ```
-
-Or use the [Custom LSP](https://marketplace.visualstudio.com/items?itemName=josa.custom-lsp) extension.
 
 </details>
 

@@ -7,6 +7,22 @@ title: Language Server Protocol
 panache includes a built-in Language Server Protocol (LSP) implementation that
 provides document formatting capabilities for editors and IDEs.
 
+## Quick Start
+
+1. Install Panache:
+
+   ```bash
+   cargo install panache
+   ```
+
+2. Install the Panache editor extension:
+
+   - VS Code Marketplace:
+     <https://marketplace.visualstudio.com/items?itemName=jolars.panache>
+   - Open VSX: <https://open-vsx.org/extension/jolars/panache>
+
+3. Open a `.md`, `.qmd`, `.Rmd`, or `.rmd` file and run format in your editor.
+
 ## Features
 
 Document formatting
@@ -72,7 +88,10 @@ Format on save
 
 ## Starting the Server
 
-Start the LSP server:
+Most users should install an editor extension and let the editor start the
+server automatically.
+
+Manual start (for debugging):
 
 ```bash
 panache lsp
@@ -137,45 +156,51 @@ vim.keymap.set('n', '<leader>f', vim.lsp.buf.format, { desc = 'Format buffer' })
 
 ### VS Code
 
-#### Option 1: Custom LSP Extension
+Panache is available as a VS Code extension with built-in LSP support:
 
-Install the [Custom
-LSP](https://marketplace.visualstudio.com/items?itemName=josa.custom-lsp)
-extension, then configure in `settings.json`:
+- VS Code Marketplace:
+  <https://marketplace.visualstudio.com/items?itemName=jolars.panache>
+- Open VSX: <https://open-vsx.org/extension/jolars/panache>
+
+To install through the command line, run:
+
+```bash
+# VS Code
+code --install-extension jolars.panache
+```
+
+If you prefer to install from the VS Code UI, launch VS Code Quick Open
+(`Ctrl+P`), then run:
+
+```sh
+ext install jolars.panache
+```
+
+The extension launches `panache lsp` automatically.
+
+Optional extension settings:
 
 ```json
 {
-  "customLsp.servers": {
-    "panache": {
-      "command": "panache",
-      "args": ["lsp"],
-      "filetypes": ["quarto", "markdown", "rmarkdown"]
-    }
-  },
-  "editor.formatOnSave": true
+  "panache.commandPath": "panache",
+  "panache.downloadBinary": true,
+  "panache.releaseTag": "latest",
+  "panache.serverArgs": [],
+  "panache.serverEnv": { "RUST_LOG": "info" },
+  "panache.trace.server": "off"
 }
 ```
 
-#### Option 2: Generic LSP Client
+### Cursor
 
-Install a generic LSP client extension, then configure:
+Install the Panache extension from the marketplace:
 
-```json
-{
-  "languageServerExample.server": {
-    "command": "panache",
-    "args": ["lsp"],
-    "filetypes": ["quarto", "markdown", "rmarkdown"]
-  },
-  "editor.formatOnSave": true,
-  "[quarto]": {
-    "editor.defaultFormatter": "languageServerExample"
-  },
-  "[markdown]": {
-    "editor.defaultFormatter": "languageServerExample"
-  }
-}
+```shell
+ext install jolars.panache
 ```
+
+Open a Markdown or Quarto file and the extension will automatically start the
+LSP server.
 
 ### Helix
 
@@ -184,15 +209,20 @@ Add to `~/.config/helix/languages.toml`:
 ```toml
 [[language]]
 name = "markdown"
-language-servers = ["panache-lsp"]
+language-servers = ["panache"]
 auto-format = true
 
 [[language]]
 name = "quarto"
-language-servers = ["panache-lsp"]
+language-servers = ["panache"]
 auto-format = true
 
-[language-server.panache-lsp]
+[[language]]
+name = "rmarkdown"
+language-servers = ["panache"]
+auto-format = true
+
+[language-server.panache]
 command = "panache"
 args = ["lsp"]
 ```
@@ -455,7 +485,7 @@ vim.lsp.set_log_level("debug")
 
 **VS Code:**
 
-Set `"customLsp.trace.server": "verbose"` in settings.
+Set `"panache.trace.server": "verbose"` in settings.
 
 ### Configuration Not Loading
 
@@ -466,49 +496,3 @@ panache format --config .panache.toml test.qmd
 ```
 
 The LSP searches for config from the workspace root, not the file's directory.
-
-### Performance Issues
-
-For large documents:
-
-Reduce line width
-:   Lower `line-width` in config to reduce rewrapping work
-
-Disable external formatters
-:   Temporarily disable external formatters for faster feedback
-
-Use preserve mode
-:   Set `wrap = "preserve"` instead of `"reflow"`
-
-## Comparison with CLI
-
-| Feature             | LSP                      | CLI                    |
-| ------------------- | ------------------------ | ---------------------- |
-| Formatting          | ✅ Same engine           | ✅ Direct              |
-| Linting             | ✅ Live diagnostics      | ✅ On-demand           |
-| Config discovery    | ✅ From workspace root   | ✅ From file directory |
-| Format on save      | ✅ Automatic             | ❌ Manual              |
-| Multiple files      | ✅ Per-editor-tab        | ✅ Shell scripting     |
-| Error reporting     | ✅ In-editor diagnostics | ✅ stderr output       |
-| External formatters | ✅ Supported             | ✅ Supported           |
-| External linters    | ✅ Live integration      | ✅ On-demand           |
-| Go to definition    | ✅ LSP only              | ❌ Not applicable      |
-| Code actions        | ✅ LSP only              | ❌ Not applicable      |
-
-## Best Practices
-
-Place config at project root
-:   Put `.panache.toml` at your project root for consistent behavior across CLI
-    and LSP
-
-Use format on save
-:   Enable format-on-save for automatic formatting
-
-Test CLI first
-:   Verify formatting with CLI before relying on LSP
-
-Check logs
-:   Enable LSP logging when debugging issues
-
-Restart after config changes
-:   Restart LSP server after changing `.panache.toml`
