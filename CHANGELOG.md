@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.17.0](https://github.com/jolars/panache/compare/v2.16.0...v2.17.0) (2026-03-11)
+
+### Features
+
+* **editors:** add VS code and Open VSX extensions ([#57](https://github.com/jolars/panache/issues/57)) ([0570c84](https://github.com/jolars/panache/commit/0570c8496feda8531ae9f64f8cc663f1ee2d88f7)), closes [#55](https://github.com/jolars/panache/issues/55)
+
+### Performance Improvements
+
+* **formatter:** use built-in greedy wrapper ([ac73a3a](https://github.com/jolars/panache/commit/ac73a3acb769f9babff6ea5cdffbba0fbf03426d))
+
 ## [2.16.0](https://github.com/jolars/panache/compare/v2.15.0...v2.16.0) (2026-03-11)
 
 ### Features
