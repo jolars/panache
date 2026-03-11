@@ -1047,14 +1047,20 @@ impl Formatter {
                     WrapMode::Reflow => {
                         log::trace!("Reflowing Plain block to {} width", line_width);
                         let in_definition = self.output.ends_with(":   ");
+                        let preserve_ambiguous_definition_emphasis =
+                            in_definition && text.contains(r"\|*") && text.contains(".*");
                         let lines = if in_definition {
-                            let marker_len = ":   ".len();
-                            let marker_indent = indent.saturating_sub(4);
-                            let first_line_space =
-                                line_width.saturating_sub(marker_indent + marker_len);
-                            let continuation_width = line_width.saturating_sub(indent);
-                            let widths = [first_line_space, continuation_width];
-                            self.wrapped_lines_for_paragraph_with_widths(node, &widths)
+                            if preserve_ambiguous_definition_emphasis {
+                                text.lines().map(ToString::to_string).collect()
+                            } else {
+                                let marker_len = ":   ".len();
+                                let marker_indent = indent.saturating_sub(4);
+                                let first_line_space =
+                                    line_width.saturating_sub(marker_indent + marker_len);
+                                let continuation_width = line_width.saturating_sub(indent);
+                                let widths = [first_line_space, continuation_width];
+                                self.wrapped_lines_for_paragraph_with_widths(node, &widths)
+                            }
                         } else {
                             self.wrapped_lines_for_paragraph(node, line_width)
                         };
@@ -1081,7 +1087,14 @@ impl Formatter {
                     }
                     WrapMode::Sentence => {
                         log::trace!("Wrapping Plain block by sentence");
-                        let lines = self.sentence_lines_for_paragraph(node);
+                        let in_definition = self.output.ends_with(":   ");
+                        let preserve_ambiguous_definition_emphasis =
+                            in_definition && text.contains(r"\|*") && text.contains(".*");
+                        let lines = if preserve_ambiguous_definition_emphasis {
+                            text.lines().map(ToString::to_string).collect()
+                        } else {
+                            self.sentence_lines_for_paragraph(node)
+                        };
 
                         for (i, line) in lines.iter().enumerate() {
                             if i > 0 {
