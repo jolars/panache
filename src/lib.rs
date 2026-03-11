@@ -117,7 +117,7 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
     let expanded_range = range.and_then(|(start_line, end_line)| {
         let result = range_utils::expand_line_range_to_blocks(&tree, input, start_line, end_line);
         if let Some((start, end)) = result {
-            log::info!(
+            log::debug!(
                 "Range lines {}:{} expanded to byte range {}:{} (text: {:?}...{:?})",
                 start_line,
                 end_line,

@@ -781,7 +781,7 @@ pub async fn spawn_and_await_formatters(
                     continue;
                 }
 
-                log::info!(
+                log::debug!(
                     "Formatting {} code with {} ({}/{} in chain)",
                     lang,
                     formatter_cfg.cmd,

@@ -256,7 +256,7 @@ pub fn run_formatters_parallel(
                         continue;
                     }
 
-                    log::info!(
+                    log::debug!(
                         "Formatting {} code with {} ({}/{} in chain)",
                         lang,
                         formatter_cfg.cmd,

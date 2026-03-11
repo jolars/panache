@@ -135,7 +135,7 @@ pub async fn format_tree_async(
 }
 
 pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usize)>) -> String {
-    log::info!(
+    log::debug!(
         "Formatting document with config: line_width={}, wrap={:?}",
         config.line_width,
         config.wrap
@@ -178,7 +178,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
                         continue;
                     }
 
-                    log::info!(
+                    log::debug!(
                         "Formatting YAML metadata with {} ({}/{} in chain)",
                         yaml_config.cmd,
                         idx + 1,
@@ -237,7 +237,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
         output = output.replace(&format!("\n{}\n", original_yaml), &wrapped_formatted);
     }
 
-    log::info!("Formatting complete: {} bytes output", output.len());
+    log::debug!("Formatting complete: {} bytes output", output.len());
 
     // Ensure exactly one trailing newline
     output.trim_end().to_string() + "\n"

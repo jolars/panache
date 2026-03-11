@@ -1586,7 +1586,7 @@ fn read_config(path: &Path) -> io::Result<Config> {
     log::debug!("Reading config from: {}", path.display());
     let s = fs::read_to_string(path)?;
     let config = parse_config_str(&s, path)?;
-    log::info!("Loaded config from: {}", path.display());
+    log::debug!("Loaded config from: {}", path.display());
     Ok(config)
 }
 
