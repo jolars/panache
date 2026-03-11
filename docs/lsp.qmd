@@ -141,10 +141,10 @@ VS Code does not support connecting to arbitrary LSP servers natively; a
 dedicated extension is required. The options below range from simple
 (formatting-only) to full LSP support.
 
-#### Option 1: Format on Save via Task
+#### Option 1: Format via VS Code Task
 
-The simplest approach uses a VS Code task to run `panache format` whenever you
-save a file. Create `.vscode/tasks.json` in your project:
+The simplest approach uses a VS Code task to run `panache format` on demand.
+Create `.vscode/tasks.json` in your project:
 
 ```json
 {
@@ -192,6 +192,7 @@ export function activate(context: vscode.ExtensionContext) {
     documentSelector: [
       { scheme: "file", language: "quarto" },
       { scheme: "file", language: "markdown" },
+      { scheme: "file", language: "rmarkdown" },
     ],
   };
 
@@ -356,7 +357,7 @@ Figures
 
 The outline appears in:
 
-- **VSCode**: Outline view (sidebar) or breadcrumbs
+- **VS Code**: Outline view (sidebar) or breadcrumbs
 - **Neovim**: Telescope symbols (`:Telescope lsp_document_symbols`) or Aerial
   plugin
 - **Helix**: Symbol picker (`:symbol-picker`)
@@ -402,7 +403,7 @@ YAML frontmatter
 :   Fold `---` delimited metadata
 
 Most editors support folding with default key bindings (e.g., `za` in Neovim,
-`Ctrl+Shift+[` in VSCode).
+`Ctrl+Shift+[` in VS Code).
 
 ### Live Diagnostics
 
