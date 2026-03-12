@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.18.0](https://github.com/jolars/panache/compare/v2.17.0...v2.18.0) (2026-03-12)
+
+### Features
+
+* **cli:** add `--no-color` and `--isolated` ([f19b7f5](https://github.com/jolars/panache/commit/f19b7f5bdaf40eeb3e5e7d77a68a96a17fd9834b))
+* **cli:** add `--stdin-filename` ([a574782](https://github.com/jolars/panache/commit/a5747827ec50c7fb47edbc158bf344fe1cb0e03e))
+
+### Bug Fixes
+
+* **formatter:** maintain idempotency with `  ` and `\\n` ([b22e91e](https://github.com/jolars/panache/commit/b22e91e47a3dfb116fcf0706ef10cd74c0339052))
+* **formatter:** remove space in code block fences ([0a81b0f](https://github.com/jolars/panache/commit/0a81b0fd8e0d4675dcf447bc1b4dd60680294931))
+* **parser:** parse `\cmd{\n<content>\n}` as `TEX_BLOCK` ([8373ffb](https://github.com/jolars/panache/commit/8373ffb48792f702531425eaafec52aec58c91f5))
+
 ## [2.17.0](https://github.com/jolars/panache/compare/v2.16.0...v2.17.0) (2026-03-11)
 
 ### Features
