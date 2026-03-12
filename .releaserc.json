@@ -46,6 +46,13 @@
     ],
     "semantic-release-cargo",
     [
+      "semantic-release-vsce",
+      {
+        "packageVsix": true,
+        "packageRoot": "editors/code"
+      }
+    ],
+    [
       "@semantic-release/git",
       {
         "message": "chore(release): release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
@@ -53,11 +60,21 @@
           "CHANGELOG.md",
           "Cargo.toml",
           "Cargo.lock",
-          "flake.nix"
+          "flake.nix",
+          "editors/code/package.json"
         ]
       }
     ],
-    "@semantic-release/github"
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "editors/code/*.vsix"
+          }
+        ]
+      }
+    ]
   ],
   "repositoryUrl": "https://github.com/jolars/panache.git"
 }
