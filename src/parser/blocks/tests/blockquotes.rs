@@ -1,4 +1,4 @@
-use super::helpers::parse_blocks;
+use super::helpers::{parse_blocks, parse_blocks_gfm};
 use crate::syntax::SyntaxKind;
 
 fn count_nodes_of_type(root: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
@@ -606,4 +606,21 @@ How should the list structure be interpreted?
         count_nodes_of_type(&tree, SyntaxKind::LIST) >= 2,
         "Expected lists inside blockquotes"
     );
+}
+
+#[test]
+fn github_alerts_parse_as_alert_nodes_in_gfm() {
+    let input = "> [!TIP]\n> Helpful advice for doing things better or more easily.\n";
+    let tree = parse_blocks_gfm(input);
+
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::ALERT), 1);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::LINK), 0);
+}
+
+#[test]
+fn github_alerts_disabled_by_default_in_pandoc_parser() {
+    let input = "> [!TIP]\n> Helpful advice.\n";
+    let tree = parse_blocks(input);
+
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::ALERT), 0);
 }

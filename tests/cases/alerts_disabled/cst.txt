@@ -1,0 +1,17 @@
+DOCUMENT@0..66
+  BLOCKQUOTE@0..66
+    BLOCKQUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    PARAGRAPH@2..66
+      LINK@2..8
+        LINK_START@2..3
+          LINK_START@2..3 "["
+        LINK_TEXT@3..7
+          TEXT@3..7 "!TIP"
+        TEXT@7..8 "]"
+      NEWLINE@8..9 "\n"
+      BLOCKQUOTE_MARKER@9..10 ">"
+      WHITESPACE@10..11 " "
+      TEXT@11..65 "Helpful advice for do ..."
+      NEWLINE@65..66 "\n"
+

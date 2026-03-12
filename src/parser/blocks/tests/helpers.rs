@@ -1,4 +1,4 @@
-use crate::config::{Config, Flavor};
+use crate::config::{Config, Extensions, Flavor};
 use crate::parser::Parser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
@@ -18,6 +18,15 @@ pub fn parse_blocks_quarto(input: &str) -> SyntaxNode {
 pub fn parse_blocks_rmarkdown(input: &str) -> SyntaxNode {
     let config = Config {
         flavor: Flavor::RMarkdown,
+        ..Default::default()
+    };
+    Parser::new(input, &config).parse()
+}
+
+pub fn parse_blocks_gfm(input: &str) -> SyntaxNode {
+    let config = Config {
+        flavor: Flavor::Gfm,
+        extensions: Extensions::for_flavor(Flavor::Gfm),
         ..Default::default()
     };
     Parser::new(input, &config).parse()

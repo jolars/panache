@@ -28,6 +28,14 @@ use lists::{is_content_nested_bullet_marker, start_nested_list, try_parse_list_m
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use text_buffer::TextBuffer;
 
+const GITHUB_ALERT_MARKERS: [&str; 5] = [
+    "[!TIP]",
+    "[!WARNING]",
+    "[!IMPORTANT]",
+    "[!CAUTION]",
+    "[!NOTE]",
+];
+
 #[cfg(debug_assertions)]
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -246,6 +254,25 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
+    }
+
+    fn active_alert_blockquote_depth(&self) -> Option<usize> {
+        self.containers.stack.iter().rev().find_map(|c| match c {
+            Container::Alert { blockquote_depth } => Some(*blockquote_depth),
+            _ => None,
+        })
+    }
+
+    fn in_active_alert(&self) -> bool {
+        self.active_alert_blockquote_depth().is_some()
+    }
+
+    fn alert_marker_from_content(content: &str) -> Option<&'static str> {
+        let (without_newline, _) = strip_newline(content);
+        let trimmed = without_newline.trim();
+        GITHUB_ALERT_MARKERS
+            .into_iter()
+            .find(|marker| *marker == trimmed)
     }
 
     /// Emit buffered list item content if we're in a ListItem and it has content.
@@ -913,6 +940,7 @@ impl<'a> Parser<'a> {
                     }
                     Some(Container::List { .. })
                     | Some(Container::FootnoteDefinition { .. })
+                    | Some(Container::Alert { .. })
                     | Some(Container::Paragraph { .. })
                     | Some(Container::Definition { .. })
                     | Some(Container::DefinitionItem { .. })
@@ -1375,6 +1403,25 @@ impl<'a> Parser<'a> {
             (content, None)
         };
 
+        if self.config.extensions.alerts
+            && self.current_blockquote_depth() > 0
+            && !self.in_active_alert()
+            && !self.is_paragraph_open()
+            && let Some(marker) = Self::alert_marker_from_content(stripped_content)
+        {
+            let (_, newline_str) = strip_newline(stripped_content);
+            self.builder.start_node(SyntaxKind::ALERT.into());
+            self.builder.token(SyntaxKind::ALERT_MARKER.into(), marker);
+            if !newline_str.is_empty() {
+                self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+            }
+            self.containers.push(Container::Alert {
+                blockquote_depth: self.current_blockquote_depth(),
+            });
+            self.pos += 1;
+            return true;
+        }
+
         // Check if we're in a Definition container (with or without an open PLAIN)
         // Continuation lines should be added to PLAIN, not treated as new blocks
         // BUT: Don't treat lines with block element markers as continuations
@@ -1519,6 +1566,13 @@ impl<'a> Parser<'a> {
         };
 
         let current_bq_depth = self.current_blockquote_depth();
+        if let Some(alert_bq_depth) = self.active_alert_blockquote_depth()
+            && current_bq_depth < alert_bq_depth
+        {
+            while matches!(self.containers.last(), Some(Container::Alert { .. })) {
+                self.close_containers_to(self.containers.depth() - 1);
+            }
+        }
 
         let dispatcher_ctx = BlockContext {
             content,

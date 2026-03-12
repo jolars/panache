@@ -7,6 +7,9 @@ pub(crate) enum Container {
     BlockQuote {
         // No special tracking needed
     },
+    Alert {
+        blockquote_depth: usize,
+    },
     FencedDiv {
         // No special tracking needed - closed by fence marker
     },

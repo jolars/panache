@@ -213,6 +213,8 @@ pub struct Extensions {
     /// [NON-DEFAULT] Newline = <br>
     #[serde(alias = "hard_line_breaks")]
     pub hard_line_breaks: bool,
+    /// [NON-DEFAULT] GitHub/CommonMark alerts in blockquotes (`> [!NOTE]`)
+    pub alerts: bool,
     /// [NON-DEFAULT] :emoji: syntax
     pub emoji: bool,
     /// [NON-DEFAULT] Highlighted ==text==
@@ -336,6 +338,7 @@ impl Extensions {
             // Non-default (all OFF for Pandoc)
             autolink_bare_uris: false,
             hard_line_breaks: false,
+            alerts: false,
             emoji: false,
             mark: false,
 
@@ -388,6 +391,7 @@ impl Extensions {
         ext.task_lists = true;
         ext.strikeout = true;
         ext.autolink_bare_uris = true;
+        ext.alerts = true;
 
         // GFM doesn't support some Pandoc features
         ext.definition_lists = false;
@@ -464,6 +468,7 @@ impl Extensions {
 
             autolink_bare_uris: false,
             hard_line_breaks: false,
+            alerts: false,
             emoji: false,
             mark: false,
 
@@ -2108,6 +2113,18 @@ mod tests {
         // Other Quarto defaults should remain
         assert!(cfg.extensions.quarto_callouts);
         assert!(cfg.extensions.quarto_shortcodes);
+    }
+
+    #[test]
+    fn alerts_enabled_by_default_for_gfm() {
+        let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
+        assert!(cfg.extensions.alerts);
+    }
+
+    #[test]
+    fn alerts_disabled_by_default_for_pandoc() {
+        let cfg = toml::from_str::<Config>("flavor = \"pandoc\"").unwrap();
+        assert!(!cfg.extensions.alerts);
     }
 
     #[test]

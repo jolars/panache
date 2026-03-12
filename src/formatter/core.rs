@@ -833,6 +833,85 @@ impl Formatter {
                                 }
                             }
                         },
+                        SyntaxKind::ALERT => {
+                            let marker = child
+                                .children_with_tokens()
+                                .filter_map(|item| item.into_token())
+                                .find(|tok| tok.kind() == SyntaxKind::ALERT_MARKER)
+                                .map(|tok| tok.text().to_string())
+                                .unwrap_or_else(|| "[!NOTE]".to_string());
+
+                            self.output.push_str(&content_prefix);
+                            self.output.push_str(&marker);
+                            self.output.push('\n');
+
+                            for alert_child in child.children() {
+                                match alert_child.kind() {
+                                    SyntaxKind::PARAGRAPH => match wrap_mode {
+                                        WrapMode::Preserve => {
+                                            let text = alert_child.text().to_string();
+                                            for line in text.lines() {
+                                                self.output.push_str(&content_prefix);
+                                                self.output.push_str(line);
+                                                self.output.push('\n');
+                                            }
+                                        }
+                                        WrapMode::Reflow => {
+                                            let width = self
+                                                .config
+                                                .line_width
+                                                .saturating_sub(content_prefix.len());
+                                            for line in self
+                                                .wrapped_lines_for_paragraph(&alert_child, width)
+                                            {
+                                                self.output.push_str(&content_prefix);
+                                                self.output.push_str(&line);
+                                                self.output.push('\n');
+                                            }
+                                        }
+                                        WrapMode::Sentence => {
+                                            for line in
+                                                self.sentence_lines_for_paragraph(&alert_child)
+                                            {
+                                                self.output.push_str(&content_prefix);
+                                                self.output.push_str(&line);
+                                                self.output.push('\n');
+                                            }
+                                        }
+                                    },
+                                    SyntaxKind::BLANK_LINE => {
+                                        self.output.push_str(&blank_prefix);
+                                        self.output.push('\n');
+                                    }
+                                    _ => {
+                                        let saved_output = self.output.clone();
+                                        let saved_line_width = self.config.line_width;
+                                        self.output.clear();
+                                        self.config.line_width = self
+                                            .config
+                                            .line_width
+                                            .saturating_sub(content_prefix.len());
+                                        self.format_node_sync(&alert_child, indent);
+                                        let rendered = self.output.clone();
+                                        self.config.line_width = saved_line_width;
+                                        self.output = saved_output;
+
+                                        for line in rendered.lines() {
+                                            if line.is_empty() {
+                                                self.output.push_str(&blank_prefix);
+                                            } else if line.starts_with("> ") {
+                                                self.output.push_str(&base_indent);
+                                                self.output.push_str(line);
+                                            } else {
+                                                self.output.push_str(&content_prefix);
+                                                self.output.push_str(line);
+                                            }
+                                            self.output.push('\n');
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         SyntaxKind::BLANK_LINE => {
                             self.output.push_str(&blank_prefix);
                             self.output.push('\n');

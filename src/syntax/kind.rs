@@ -17,6 +17,7 @@ pub enum SyntaxKind {
     DIV_MARKER,          // :::
     YAML_METADATA_DELIM, // --- or ... (for YAML blocks)
     BLOCKQUOTE_MARKER,   // >
+    ALERT_MARKER,        // [!NOTE], [!TIP], etc.
     IMAGE_LINK_START,    // ![
     LIST_MARKER,         // - + *
     TASK_CHECKBOX,       // [ ] or [x] or [X]
@@ -116,6 +117,7 @@ pub enum SyntaxKind {
     PARAGRAPH,
     PLAIN, // Inline content without paragraph break (tight lists, definition lists, table cells)
     BLOCKQUOTE,
+    ALERT,
     LIST,
     LIST_ITEM,
     DEFINITION_LIST,
