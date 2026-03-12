@@ -34,6 +34,11 @@ page](https://github.com/jolars/panache/releases) for Linux, macOS, and Windows.
 For Linux, packages are available for generic distributions (tarballs) as well
 as Debian/Ubuntu (`.deb`) and Fedora/RHEL/openSUSE (`.rpm`).
 
+### Arch Linux
+
+There is also an Arch Linux package available in the AUR:
+[panache-bin](https://aur.archlinux.org/packages/panache-bin/).
+
 ## Usage
 
 Panache provides a single CLI interface for formatting, linting, and running the
