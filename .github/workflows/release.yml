@@ -33,18 +33,29 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
-          extra_plugins: |
-            @semantic-release/changelog
-            @semantic-release/git
-            conventional-changelog-conventionalcommits
-            semantic-release-cargo
-            semantic-release-replace-plugin
-            semantic-release-vsce
+          node-version: "lts/*"
+
+      - name: Install dependencies
+        run: npm clean-install
+
+      - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
+        run: npm audit signatures
+
+      - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          npx --yes \
+            --package @semantic-release/changelog \
+            --package @semantic-release/git \
+            --package conventional-changelog-conventionalcommits \
+            --package semantic-release-cargo \
+            --package semantic-release-replace-plugin \
+            --package semantic-release-vsce \
+            semantic-release --dry-run
