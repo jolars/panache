@@ -63,7 +63,7 @@ This document tracks implementation status for panache's features.
 - [x] Lint warnings - Configurable linting rules (e.g., heading levels, list
       consistency)
 - [X] Citation validation - Validate citation keys against bibliography
-- [ ] Footnote validation - Check for undefined footnotes (also in linter)
+- [X] Footnote validation - Check for undefined footnotes (also in linter)
 - [ ] Link validation - Check for broken internal links/references
 
 #### Code Actions
@@ -181,7 +181,7 @@ to support.
 
 ## Linter
 
-- [ ] Add support for comments to disable linting on specific lines or blocks
+- [x] Add support for comments to disable linting on specific lines or blocks
       (e.g., `<!-- something -->`)
 - [x] Auto-fixing for external code linters
 
@@ -220,7 +220,7 @@ to support.
 
 ## Formatter
 
-- [ ] Add support for comments to disable formatting on specific lines or blocks
+- [x] Add support for comments to disable formatting on specific lines or blocks
       (e.g., `<!-- something-->`)
 
 ### Tables
