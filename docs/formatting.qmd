@@ -52,34 +52,18 @@ First line\
 Second line (forced break)
 ```
 
-### Wrapping Mode
-
-Configure wrapping behavior:
-
-```toml
-[style]
-wrap = "reflow"
-```
-
-`reflow`
-:   Reformat paragraphs to fit within configured line width (default)
-
-`preserve`
-:   Keep existing line breaks
-
 ## Headings
 
 ### ATX Headings
 
 Headings are normalized with consistent spacing:
 
-**Input:**
-
-```markdown
-#Heading 1
-##  Heading 2
-###   Heading 3
-```
+Input
+:   ``` markdown
+    #Heading 1
+    ##  Heading 2
+    ###   Heading 3
+    ```
 
 **Output:**
 
@@ -98,6 +82,26 @@ Attributes are preserved and formatted:
 ```markdown
 ## Heading {#custom-id .my-class key="value"}
 ```
+
+### Setext Headings
+
+Setext-style headings are converted to ATX style for consistency:
+
+Input
+:   ``` markdown
+    Heading 1
+    =========
+    
+    Heading 2
+    ---------
+    ```
+
+Output
+:   ``` markdown
+    # Heading 1
+    
+    ## Heading 2
+    ```
 
 ## Emphasis and Strong
 
@@ -292,7 +296,8 @@ Nested quote
 
 ## Tables
 
-panache supports all Pandoc table types.
+Panache supports all Pandoc table types and normalizes alignment and spacing
+while preserving content and attributes.
 
 ### Pipe Tables
 
@@ -328,7 +333,7 @@ panache supports all Pandoc table types.
 
 ### Inline Math
 
-Inline math is formatted with proper spacing:
+Inline math is untouched:
 
 ```markdown
 The equation $E = mc^2$ is famous.
@@ -336,31 +341,20 @@ The equation $E = mc^2$ is famous.
 
 ### Display Math
 
-Display math is formatted on its own lines:
+Display math is formatted on its own lines with leading indentation depending on
+the `math-indent` configuration option (default 0):
 
-**Input:**
+Input
+:   ``` markdown
+    $$E = mc^2$$
+    ```
 
-```markdown
-$$E = mc^2$$
-```
-
-**Output:**
-
-```markdown
-$$
-E = mc^2
-$$
-```
-
-### Complex Math
-
-panache preserves math formatting:
-
-```markdown
-$$
-\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
-$$
-```
+Output
+:   ``` markdown
+    $$
+    E = mc^2
+    $$
+    ```
 
 ## Links
 
