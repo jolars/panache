@@ -11,7 +11,9 @@ fn test_help() {
         .success()
         .stdout(predicate::str::contains("Panache is a CLI formatter"))
         .stdout(predicate::str::contains("Global options:"))
-        .stdout(predicate::str::contains("--color <WHEN>"));
+        .stdout(predicate::str::contains("--color <WHEN>"))
+        .stdout(predicate::str::contains("--no-color"))
+        .stdout(predicate::str::contains("--isolated"));
 }
 
 #[test]

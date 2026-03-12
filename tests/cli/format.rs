@@ -244,3 +244,43 @@ fn test_format_color_always_shows_ansi_diff() {
         .stdout(predicate::str::contains("\u{1b}[31m"))
         .stdout(predicate::str::contains("\u{1b}[32m"));
 }
+
+#[test]
+fn test_format_no_color_disables_ansi_diff() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "--check", "--color", "always", "--no-color"])
+        .write_stdin("# Heading\n\nThis is a very long line that exceeds the default line width of 80 characters and should be wrapped.")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\u{1b}[").not());
+}
+
+#[test]
+fn test_format_stdin_uses_discovered_config_without_isolated() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_file = temp_dir.path().join(".panache.toml");
+    fs::write(&config_file, "flavor = \"quarto\"").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .arg("format")
+        .write_stdin("```{r, echo=FALSE}\n1 + 1\n```\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("#| echo: false"));
+}
+
+#[test]
+fn test_format_isolated_ignores_discovered_config_for_stdin() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_file = temp_dir.path().join(".panache.toml");
+    fs::write(&config_file, "flavor = \"quarto\"").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["format", "--isolated"])
+        .write_stdin("```{r, echo=FALSE}\n1 + 1\n```\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("#| echo: false").not());
+}

@@ -150,7 +150,39 @@ fn start_dir_for(input_path: Option<&Path>) -> io::Result<PathBuf> {
     }
 }
 
-fn color_enabled(mode: ColorMode) -> bool {
+fn load_config_for_cli(
+    config_path: Option<&Path>,
+    isolated: bool,
+    start_dir: &Path,
+    input_path: Option<&Path>,
+) -> io::Result<(panache::Config, Option<PathBuf>)> {
+    if !isolated {
+        return panache::config::load(config_path, start_dir, input_path);
+    }
+
+    let mut cfg = panache::Config::default();
+    if let Some(input_path) = input_path
+        && let Some(ext) = input_path.extension().and_then(|e| e.to_str())
+    {
+        let detected_flavor = match ext.to_lowercase().as_str() {
+            "qmd" => Some(panache::config::Flavor::Quarto),
+            "rmd" => Some(panache::config::Flavor::RMarkdown),
+            "md" => Some(cfg.flavor),
+            _ => None,
+        };
+
+        if let Some(flavor) = detected_flavor {
+            cfg.flavor = flavor;
+            cfg.extensions = panache::config::Extensions::for_flavor(flavor);
+        }
+    }
+    Ok((cfg, None))
+}
+
+fn color_enabled(mode: ColorMode, no_color: bool) -> bool {
+    if no_color {
+        return false;
+    }
     match mode {
         ColorMode::Always => true,
         ColorMode::Never => false,
@@ -251,7 +283,7 @@ fn run_debug_checks_for_content(
 
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
-    let use_color = color_enabled(cli.color);
+    let use_color = color_enabled(cli.color, cli.no_color);
     let debug_log = match &cli.command {
         Commands::Lsp { debug } if *debug => Some(init_lsp_debug_log()?),
         _ => None,
@@ -273,7 +305,7 @@ fn main() -> io::Result<()> {
             let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
             let start_dir = start_dir_for(input_path)?;
             let (cfg, cfg_path) =
-                panache::config::load(cli.config.as_deref(), &start_dir, input_path)?;
+                load_config_for_cli(cli.config.as_deref(), cli.isolated, &start_dir, input_path)?;
 
             if let Some(path) = &cfg_path {
                 log::debug!("Using config from: {}", path.display());
@@ -335,8 +367,9 @@ fn main() -> io::Result<()> {
             // Handle stdin case
             if files.is_empty() {
                 let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
-                let (cfg, cfg_path) = panache::config::load(
+                let (cfg, cfg_path) = load_config_for_cli(
                     cli.config.as_deref(),
+                    cli.isolated,
                     &start_dir,
                     cli.stdin_filename.as_deref(),
                 )?;
@@ -397,8 +430,12 @@ fn main() -> io::Result<()> {
 
             for file_path in &expanded_files {
                 let start_dir = file_path.parent().unwrap_or(Path::new(".")).to_path_buf();
-                let (cfg, cfg_path) =
-                    panache::config::load(cli.config.as_deref(), &start_dir, Some(file_path))?;
+                let (cfg, cfg_path) = load_config_for_cli(
+                    cli.config.as_deref(),
+                    cli.isolated,
+                    &start_dir,
+                    Some(file_path),
+                )?;
 
                 if let Some(path) = &cfg_path {
                     log::debug!("Using config from: {}", path.display());
@@ -485,8 +522,9 @@ fn main() -> io::Result<()> {
 
                 if use_stdin {
                     let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
-                    let (cfg, _) = panache::config::load(
+                    let (cfg, _) = load_config_for_cli(
                         cli.config.as_deref(),
+                        cli.isolated,
                         &start_dir,
                         cli.stdin_filename.as_deref(),
                     )?;
@@ -514,8 +552,9 @@ fn main() -> io::Result<()> {
                 } else {
                     for file_path in &targets {
                         let start_dir = file_path.parent().unwrap_or(Path::new(".")).to_path_buf();
-                        let (cfg, _) = panache::config::load(
+                        let (cfg, _) = load_config_for_cli(
                             cli.config.as_deref(),
+                            cli.isolated,
                             &start_dir,
                             Some(file_path),
                         )?;
@@ -585,8 +624,9 @@ fn main() -> io::Result<()> {
             // Handle stdin case
             if files.is_empty() {
                 let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
-                let (cfg, cfg_path) = panache::config::load(
+                let (cfg, cfg_path) = load_config_for_cli(
                     cli.config.as_deref(),
+                    cli.isolated,
                     &start_dir,
                     cli.stdin_filename.as_deref(),
                 )?;
@@ -646,8 +686,12 @@ fn main() -> io::Result<()> {
 
             for file_path in &expanded_files {
                 let start_dir = file_path.parent().unwrap_or(Path::new(".")).to_path_buf();
-                let (cfg, cfg_path) =
-                    panache::config::load(cli.config.as_deref(), &start_dir, Some(file_path))?;
+                let (cfg, cfg_path) = load_config_for_cli(
+                    cli.config.as_deref(),
+                    cli.isolated,
+                    &start_dir,
+                    Some(file_path),
+                )?;
 
                 if let Some(path) = &cfg_path {
                     log::debug!("Using config from: {}", path.display());

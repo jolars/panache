@@ -63,6 +63,16 @@ pub struct Cli {
     )]
     #[arg(help = "Control when colored output is used")]
     pub color: ColorMode,
+
+    /// Disable colored output
+    #[arg(long, global = true, help_heading = "Global options")]
+    #[arg(help = "Disable colored output (equivalent to --color never)")]
+    pub no_color: bool,
+
+    /// Ignore all discovered configuration files
+    #[arg(long, global = true, help_heading = "Global options")]
+    #[arg(help = "Ignore all discovered configuration files")]
+    pub isolated: bool,
 }
 
 #[derive(Subcommand)]
