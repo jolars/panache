@@ -45,6 +45,7 @@ jobs:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
+          ln -sf editors/code/package.json package.json
           npx --yes \
             --package @semantic-release/changelog \
             --package @semantic-release/git \
