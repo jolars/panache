@@ -111,6 +111,15 @@ fn backticks_inside_codespan_stays_idempotent() {
 }
 
 #[test]
+fn whitespace_only_codespan_stays_idempotent() {
+    let input = "Hard line breaks, which are created either by ending a line with two or more spaces (`  `) or by using a backslash (`\\\\n`), are preserved regardless of the wrapping mode:\n";
+    let first = format(input, None, None);
+    let second = format(&first, None, None);
+    assert_eq!(first, second);
+    assert!(first.contains("spaces (``  ``)"));
+}
+
+#[test]
 fn nested_backtick_rmarkdown_paragraph_stays_idempotent() {
     let cfg = panache::ConfigBuilder::default().line_width(72).build();
     let input = "There are two types of R code in R Markdown/**knitr** documents: R code chunks\\index{code chunk}, and inline R code\\index{inline R code}. The syntax for the latter is `` ``r ''`r R_CODE` ``, and it can be embedded inline with other document elements. R code chunks look like plain code blocks, but have `{r}` after the three backticks and (optionally) chunk options inside `{}`, e.g.,\n";

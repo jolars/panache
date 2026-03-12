@@ -1,4 +1,4 @@
-DOCUMENT@0..255
+DOCUMENT@0..427
   HEADING@0..13
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -70,4 +70,23 @@ DOCUMENT@0..255
     TEXT@244..252 "not code"
     ESCAPED_CHAR@252..254 "\\`"
     NEWLINE@254..255 "\n"
+  BLANK_LINE@255..256
+    BLANK_LINE@255..256 "\n"
+  PARAGRAPH@256..427
+    TEXT@256..332 "Hard line breaks, whi ..."
+    NEWLINE@332..333 "\n"
+    TEXT@333..341 "spaces ("
+    CODE_SPAN@341..345
+      CODE_SPAN_MARKER@341..342 "`"
+      TEXT@342..344 "  "
+      CODE_SPAN_MARKER@344..345 "`"
+    TEXT@345..372 ") or by using a backs ..."
+    CODE_SPAN@372..377
+      CODE_SPAN_MARKER@372..373 "`"
+      TEXT@373..376 "\\\\n"
+      CODE_SPAN_MARKER@376..377 "`"
+    TEXT@377..411 "), are preserved rega ..."
+    NEWLINE@411..412 "\n"
+    TEXT@412..426 "wrapping mode:"
+    NEWLINE@426..427 "\n"
 
