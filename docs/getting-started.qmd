@@ -2,11 +2,17 @@
 title: Getting Started
 ---
 
+To get started with Panache, follow the installation instructions below, then
+explore the basic usage examples for formatting, linting, and parsing your
+Markdown documents. You can also customize Panache's behavior with configuration
+files and use ignore directives to preserve specific formatting or suppress lint
+warnings in certain sections of your documents.
+
 ## Installation
 
-### From crates.io (Recommended)
+### From crates.io
 
-Install panache with Cargo:
+Install `panache` with Cargo:
 
 ```bash
 cargo install panache
@@ -35,6 +41,14 @@ wget https://github.com/jolars/panache/releases/latest/download/panache- <VERSIO
 sudo rpm -i panache-*.rpm
 ```
 
+### Arch Linux
+
+Panache is available in the Arch User Repository (AUR):
+
+```bash
+yay -S panache-bin
+```
+
 ### From Source
 
 Clone the repository and build:
@@ -59,19 +73,20 @@ panache --version
 
 #### Format files in place
 
-By default, panache formats files in place when given file paths:
+By default, Panache formats files in place when given file paths:
 
 ```bash
 panache format document.qmd
 ```
 
-Format multiple files:
+You can also format multiple files or use glob patterns:
 
 ```bash
 panache format file1.md file2.qmd file3.Rmd
+panache format ./*.{qmd,md}
 ```
 
-Format entire directories recursively:
+If you specify a directory, Panache will recursively format all supported files:
 
 ```bash
 panache format .
@@ -80,19 +95,19 @@ panache format docs/
 
 #### Format from stdin to stdout
 
-When reading from stdin, panache always writes to stdout:
+When reading from stdin, Panache always writes to stdout:
 
 ```bash
 cat document.qmd | panache format
 ```
 
-Using input redirection:
+You can also use input redirection:
 
 ```bash
 panache format <document.qmd
 ```
 
-Inline formatting with echo:
+Or pipe input directly:
 
 ```bash
 echo '# Heading' | panache format
@@ -100,8 +115,8 @@ echo '# Heading' | panache format
 
 #### Check formatting without changes
 
-Check if files are already formatted. Exits with code 1 if formatting is needed,
-0 if already formatted:
+`panache` includes a `--check` option to verify if files are already formatted
+correctly. It exits with code 1 if any formatting issues are found:
 
 ```bash
 panache format --check document.qmd
@@ -115,16 +130,19 @@ panache format --check .
 
 ### Linting
 
+Panache also includes a `lint` command to check for semantic issues in your
+Markdown documents, such as heading hierarchy problems, broken references, and
+syntax errors.
+
 #### Check for correctness issues
 
-Lint a file to check for semantic problems like heading hierarchy issues, broken
-references, and syntax errors:
+To lint a single file, run:
 
 ```bash
 panache lint document.qmd
 ```
 
-Lint multiple files or directories:
+As with `format`, you can lint multiple files or entire directories:
 
 ```bash
 panache lint file1.md file2.qmd
@@ -137,46 +155,41 @@ Lint from stdin:
 echo '# H1\n### H3' | panache lint
 ```
 
-#### Apply automatic fixes
-
-Fix issues automatically where possible:
+`panache lint` also support an auto-fix mode that attempts to correct certain
+issues:
 
 ```bash
 panache lint --fix document.qmd
 ```
 
-#### CI mode
-
-Exit with code 1 if violations are found (useful for continuous integration):
+To exit with an error code if any lint issues are found (without fixing), use
+`--check`:
 
 ```bash
 panache lint --check .
 ```
 
+This is typically used in CI/CD pipelines to enforce linting rules.
+
 ### Parsing
 
-Inspect the Concrete Syntax Tree (CST) for debugging:
+You can also selectively invoke the Panache parser to analyze the structure
+of your Markdown documents. This is typically mostly useful for debugging or
+understanding why your document is formatted in a certain way.
+
+To return a stdout representation of the parsed document tree, run:
 
 ```bash
 panache parse document.qmd
 ```
 
-Export CST to JSON:
+If you want to see the raw JSON output of the parser, use the `--json` flag:
 
 ```bash
 panache parse --json cst.json document.qmd
 ```
 
 ## Configuration
-
-panache looks for configuration files in this order:
-
-1. Explicit `--config` path
-2. `.panache.toml` or `panache.toml` in current/parent directories
-3. `~/.config/panache/config.toml` (XDG config directory)
-4. Built-in defaults
-
-### Create a Config File
 
 Create `.panache.toml` in your project root with your preferred settings:
 
@@ -193,32 +206,20 @@ hard-line-breaks = false
 citations = true
 ```
 
-Available flavor options:
+To see all the available configuration options, check the [Configuration
+guide](configuration.qmd).
 
-`pandoc`
-:   Standard Pandoc Markdown (default)
+Panache looks for configuration files in this order:
 
-`quarto`
-:   Quarto-flavored Markdown
+1. Explicit `--config` path
+2. `.panache.toml` or `panache.toml` in current/parent directories
+3. `~/.config/panache/config.toml` (XDG config directory)
 
-`rmarkdown`
-:   R Markdown
-
-`gfm`
-:   GitHub Flavored Markdown
-
-`commonmark`
-:   CommonMark (minimal extensions)
-
-### Use a Custom Config
-
-Specify a config file explicitly:
+If you like, you can also specify a custom configuration file directly:
 
 ```bash
 panache format --config custom.toml document.qmd
 ```
-
-See the [Configuration](configuration.qmd) guide for all options.
 
 ## Ignore Directives
 
