@@ -12,7 +12,9 @@ const STYLES: Styles = Styles::styled()
 #[derive(Parser)]
 #[command(name = "panache")]
 #[command(author, version)]
-#[command(about = "A formatter for Quarto, Pandoc, and Markdown documents")]
+#[command(
+    about = "Panache: A language server, formatter, and linter for Pandoc, Quarto and R Markdown"
+)]
 #[command(styles = STYLES)]
 #[command(
     long_about = "Panache is a CLI formatter and LSP for Quarto (.qmd), Pandoc, and Markdown files \
