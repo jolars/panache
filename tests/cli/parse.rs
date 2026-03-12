@@ -139,3 +139,13 @@ fn test_parse_verify_quiet_stdin() {
         .success()
         .stdout(predicate::str::is_empty());
 }
+
+#[test]
+fn test_parse_stdin_filename_infers_quarto_flavor() {
+    cargo_bin_cmd!("panache")
+        .args(["parse", "--stdin-filename", "doc.qmd"])
+        .write_stdin("{{< include _child.qmd >}}")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("SHORTCODE"));
+}

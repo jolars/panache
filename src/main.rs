@@ -142,7 +142,7 @@ fn read_all(path: Option<&PathBuf>) -> io::Result<String> {
     }
 }
 
-fn start_dir_for(input_path: &Option<PathBuf>) -> io::Result<PathBuf> {
+fn start_dir_for(input_path: Option<&Path>) -> io::Result<PathBuf> {
     if let Some(p) = input_path {
         Ok(p.parent().unwrap_or(Path::new(".")).to_path_buf())
     } else {
@@ -252,9 +252,10 @@ fn main() -> io::Result<()> {
                     "Warning: `panache parse --verify` is deprecated; use `panache debug format --checks losslessness`."
                 );
             }
-            let start_dir = start_dir_for(&file)?;
+            let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
+            let start_dir = start_dir_for(input_path)?;
             let (cfg, cfg_path) =
-                panache::config::load(cli.config.as_deref(), &start_dir, file.as_deref())?;
+                panache::config::load(cli.config.as_deref(), &start_dir, input_path)?;
 
             if let Some(path) = &cfg_path {
                 log::debug!("Using config from: {}", path.display());
@@ -315,9 +316,12 @@ fn main() -> io::Result<()> {
 
             // Handle stdin case
             if files.is_empty() {
-                let start_dir = std::env::current_dir()?;
-                let (cfg, cfg_path) =
-                    panache::config::load(cli.config.as_deref(), &start_dir, None)?;
+                let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
+                let (cfg, cfg_path) = panache::config::load(
+                    cli.config.as_deref(),
+                    &start_dir,
+                    cli.stdin_filename.as_deref(),
+                )?;
 
                 if let Some(path) = &cfg_path {
                     log::debug!("Using config from: {}", path.display());
@@ -462,8 +466,12 @@ fn main() -> io::Result<()> {
                 let mut json_failures = Vec::new();
 
                 if use_stdin {
-                    let start_dir = std::env::current_dir()?;
-                    let (cfg, _) = panache::config::load(cli.config.as_deref(), &start_dir, None)?;
+                    let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
+                    let (cfg, _) = panache::config::load(
+                        cli.config.as_deref(),
+                        &start_dir,
+                        cli.stdin_filename.as_deref(),
+                    )?;
                     let input = read_all(None)?;
                     files_checked += 1;
 
@@ -558,9 +566,12 @@ fn main() -> io::Result<()> {
         Commands::Lint { files, check, fix } => {
             // Handle stdin case
             if files.is_empty() {
-                let start_dir = std::env::current_dir()?;
-                let (cfg, cfg_path) =
-                    panache::config::load(cli.config.as_deref(), &start_dir, None)?;
+                let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
+                let (cfg, cfg_path) = panache::config::load(
+                    cli.config.as_deref(),
+                    &start_dir,
+                    cli.stdin_filename.as_deref(),
+                )?;
 
                 if let Some(path) = &cfg_path {
                     log::debug!("Using config from: {}", path.display());
@@ -570,8 +581,11 @@ fn main() -> io::Result<()> {
 
                 let input = read_all(None)?;
                 let tree = parse(&input, Some(cfg.clone()));
-                let metadata =
-                    panache::metadata::extract_project_metadata(&tree, Path::new("stdin.md")).ok();
+                let stdin_path = cli
+                    .stdin_filename
+                    .as_deref()
+                    .unwrap_or(Path::new("stdin.md"));
+                let metadata = panache::metadata::extract_project_metadata(&tree, stdin_path).ok();
                 let diagnostics = panache::linter::lint_with_external_sync_and_metadata(
                     &tree,
                     &input,

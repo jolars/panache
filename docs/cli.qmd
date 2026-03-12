@@ -62,6 +62,7 @@ For more information, visit: https://github.com/jolars/panache
 ###### **Options:**
 
 * `--config <CONFIG>` — Path to a custom configuration file. If not specified, panache will search for .panache.toml or panache.toml in the current directory and its parents, then fall back to ~/.config/panache/config.toml.
+* `--stdin-filename <PATH>` — Synthetic filename to associate with stdin input. This is useful for editor integrations that pipe content via stdin but still need panache to infer flavor/extensions from file extension (for example: --stdin-filename doc.qmd).
 
 
 

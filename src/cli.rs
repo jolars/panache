@@ -63,6 +63,16 @@ pub struct Cli {
         then fall back to ~/.config/panache/config.toml."
     )]
     pub config: Option<PathBuf>,
+
+    /// Synthetic filename to use when reading from stdin
+    #[arg(long, global = true, value_name = "PATH")]
+    #[arg(help = "Synthetic filename for stdin input (used for flavor detection)")]
+    #[arg(
+        long_help = "Synthetic filename to associate with stdin input. This is useful for editor \
+        integrations that pipe content via stdin but still need panache to infer flavor/extensions \
+        from file extension (for example: --stdin-filename doc.qmd)."
+    )]
+    pub stdin_filename: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]

@@ -223,3 +223,13 @@ fn test_format_verify_does_not_write_file() {
     let content_after = fs::read_to_string(&test_file).unwrap();
     assert_eq!(content_after, input);
 }
+
+#[test]
+fn test_format_stdin_filename_infers_quarto_flavor() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "--stdin-filename", "doc.qmd"])
+        .write_stdin("```{r, echo=FALSE}\n1 + 1\n```\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("#| echo: false"));
+}
