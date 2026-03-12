@@ -178,17 +178,6 @@ def hello():
 ```
 ````
 
-### External Formatters
-
-When configured, code blocks are formatted by external tools:
-
-```toml
-[formatters]
-python = "black"
-```
-
-Python code in code blocks is automatically formatted by Black.
-
 ## Lists
 
 ### Unordered Lists
