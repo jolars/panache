@@ -62,8 +62,11 @@ pub(crate) fn offset_to_position(text: &str, offset: usize) -> Position {
         if current_offset + text_line.len() >= offset {
             // Offset is in this line
             let line_offset = offset - current_offset;
-            let line_slice = &text_line[..line_offset];
-            character = line_slice.chars().map(|c| c.len_utf16()).sum::<usize>() as u32;
+            character = text_line
+                .char_indices()
+                .take_while(|(byte_idx, _)| *byte_idx < line_offset)
+                .map(|(_, c)| c.len_utf16())
+                .sum::<usize>() as u32;
             break;
         }
 
@@ -588,5 +591,30 @@ mod tests {
         let pos = offset_to_position(text, 10);
         assert_eq!(pos.line, 1);
         assert_eq!(pos.character, 3);
+    }
+
+    #[test]
+    fn test_offset_to_position_inside_multibyte_char() {
+        let text = "ä\n";
+        let pos = offset_to_position(text, 1);
+        assert_eq!(pos.line, 0);
+        assert_eq!(pos.character, 1);
+    }
+
+    #[test]
+    fn test_offset_to_position_inside_multibyte_char_crlf() {
+        let text = "åäö\r\nnext\r\n";
+
+        let pos = offset_to_position(text, 1);
+        assert_eq!(pos.line, 0);
+        assert_eq!(pos.character, 1);
+
+        let pos = offset_to_position(text, 5);
+        assert_eq!(pos.line, 0);
+        assert_eq!(pos.character, 3);
+
+        let pos = offset_to_position(text, 8);
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.character, 0);
     }
 }

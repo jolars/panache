@@ -243,6 +243,7 @@ golden_test_cases!(
     tab_handling,
     tab_preserve,
     trailing_blanklines,
+    umlauts,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

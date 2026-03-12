@@ -68,6 +68,24 @@ async fn test_format_after_edit() {
 }
 
 #[tokio::test]
+async fn test_format_document_with_umlauts_frontmatter() {
+    let server = TestLspServer::new();
+    let content = "---\nauthor: Test \ntitle: smörgås \n--- \n# introduction \n\nåäö\n";
+
+    server
+        .open_document("file:///umlauts.qmd", content, "quarto")
+        .await;
+
+    let edits = server.format_document("file:///umlauts.qmd").await;
+    if let Some(edits) = edits {
+        assert_eq!(edits.len(), 1);
+        let new_text = &edits[0].new_text;
+        assert!(new_text.contains("smörgås"));
+        assert!(new_text.contains("åäö"));
+    }
+}
+
+#[tokio::test]
 async fn test_range_formatting_fenced_code_case_file() {
     let server = TestLspServer::new();
 
