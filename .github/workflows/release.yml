@@ -53,4 +53,4 @@ jobs:
             --package semantic-release-cargo \
             --package semantic-release-replace-plugin \
             --package semantic-release-vsce \
-            semantic-release --dry-run
+            semantic-release
