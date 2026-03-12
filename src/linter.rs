@@ -17,7 +17,7 @@ use crate::syntax::SyntaxNode;
 
 /// Lint a document and return diagnostics (built-in rules only).
 pub fn lint(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> {
-    let registry = default_registry();
+    let registry = default_registry(config);
     let runner = LintRunner::new(registry);
     runner.run(tree, input, config)
 }
@@ -25,7 +25,7 @@ pub fn lint(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> 
 /// Lint a document with external linters (sync version for CLI).
 #[cfg(not(target_arch = "wasm32"))]
 pub fn lint_with_external_sync(tree: &SyntaxNode, input: &str, config: &Config) -> Vec<Diagnostic> {
-    let registry = default_registry();
+    let registry = default_registry(config);
     let runner = LintRunner::new(registry);
     runner.run_with_external_linters_sync(tree, input, config, None)
 }
@@ -37,7 +37,7 @@ pub async fn lint_with_external(
     input: &str,
     config: &Config,
 ) -> Vec<Diagnostic> {
-    let registry = default_registry();
+    let registry = default_registry(config);
     let runner = LintRunner::new(registry);
     runner
         .run_with_external_linters(tree, input, config, None)
@@ -50,7 +50,7 @@ pub fn lint_with_metadata(
     config: &Config,
     metadata: Option<&crate::metadata::DocumentMetadata>,
 ) -> Vec<Diagnostic> {
-    let registry = default_registry();
+    let registry = default_registry(config);
     let runner = LintRunner::new(registry);
     runner.run_with_metadata(tree, input, config, metadata)
 }
@@ -62,7 +62,7 @@ pub fn lint_with_external_sync_and_metadata(
     config: &Config,
     metadata: Option<&crate::metadata::DocumentMetadata>,
 ) -> Vec<Diagnostic> {
-    let registry = default_registry();
+    let registry = default_registry(config);
     let runner = LintRunner::new(registry);
     runner.run_with_external_linters_sync(tree, input, config, metadata)
 }
@@ -74,7 +74,7 @@ pub async fn lint_with_external_and_metadata(
     config: &Config,
     metadata: Option<&crate::metadata::DocumentMetadata>,
 ) -> Vec<Diagnostic> {
-    let registry = default_registry();
+    let registry = default_registry(config);
     let runner = LintRunner::new(registry);
     runner
         .run_with_external_linters(tree, input, config, metadata)
@@ -82,12 +82,23 @@ pub async fn lint_with_external_and_metadata(
 }
 
 /// Create the default rule registry with all built-in rules.
-fn default_registry() -> RuleRegistry {
+fn default_registry(config: &Config) -> RuleRegistry {
     let mut registry = RuleRegistry::new();
-    registry.register(Box::new(rules::heading_hierarchy::HeadingHierarchyRule));
-    registry.register(Box::new(
-        rules::duplicate_references::DuplicateReferencesRule,
-    ));
-    registry.register(Box::new(rules::citation_keys::CitationKeysRule));
+    if config.lint.is_rule_enabled("heading-hierarchy") {
+        registry.register(Box::new(rules::heading_hierarchy::HeadingHierarchyRule));
+    }
+    if config.lint.is_rule_enabled("duplicate-reference-labels") {
+        registry.register(Box::new(
+            rules::duplicate_references::DuplicateReferencesRule,
+        ));
+    }
+    if config.lint.is_rule_enabled("undefined-references") {
+        registry.register(Box::new(
+            rules::undefined_references::UndefinedReferencesRule,
+        ));
+    }
+    if config.lint.is_rule_enabled("citation-keys") {
+        registry.register(Box::new(rules::citation_keys::CitationKeysRule));
+    }
     registry
 }

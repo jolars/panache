@@ -5,6 +5,7 @@ use crate::syntax::SyntaxNode;
 pub mod citation_keys;
 pub mod duplicate_references;
 pub mod heading_hierarchy;
+pub mod undefined_references;
 
 pub trait Rule {
     fn name(&self) -> &str;

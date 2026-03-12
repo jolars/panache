@@ -19,6 +19,17 @@ fn lint_file(filename: &str) -> Vec<panache::linter::Diagnostic> {
     lint(&tree, &input, &config)
 }
 
+fn lint_file_with_config(filename: &str, config_toml: &str) -> Vec<panache::linter::Diagnostic> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("linting")
+        .join(filename);
+    let input = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read {}", filename));
+    let config = toml::from_str::<Config>(config_toml).expect("valid config");
+    let tree = panache::parse(&input, Some(config.clone()));
+    lint(&tree, &input, &config)
+}
+
 #[test]
 fn test_ignore_directives() {
     let diagnostics = lint_file("ignore_directives.md");
@@ -113,4 +124,49 @@ fn test_whitespace_normalization() {
     // All reference the first definition on line 5
     assert!(dup[0].message.contains("first defined at line 5"));
     assert!(dup[1].message.contains("first defined at line 5"));
+}
+
+#[test]
+fn test_missing_reference_targets() {
+    let diagnostics = lint_file("missing_references.md");
+    let missing_ref: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-reference-label")
+        .collect();
+    let missing_footnote: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-footnote-id")
+        .collect();
+
+    assert_eq!(
+        missing_ref.len(),
+        1,
+        "Should flag 1 missing reference label"
+    );
+    assert_eq!(missing_footnote.len(), 1, "Should flag 1 missing footnote");
+    assert!(missing_ref[0].message.contains("[missing]"));
+    assert!(missing_footnote[0].message.contains("[^missing-note]"));
+}
+
+#[test]
+fn test_missing_reference_targets_can_be_disabled() {
+    let diagnostics = lint_file_with_config(
+        "missing_references.md",
+        r#"
+[lint]
+undefined-references = false
+"#,
+    );
+
+    let missing_ref: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-reference-label")
+        .collect();
+    let missing_footnote: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-footnote-id")
+        .collect();
+
+    assert!(missing_ref.is_empty());
+    assert!(missing_footnote.is_empty());
 }

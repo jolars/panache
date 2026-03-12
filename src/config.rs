@@ -876,6 +876,35 @@ pub struct ParserConfig {
     // Reserved for future parser configuration options
 }
 
+/// Linter configuration.
+/// Rule keys map to enabled/disabled booleans under `[lint]`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct LintConfig {
+    #[serde(flatten)]
+    pub rules: HashMap<String, bool>,
+}
+
+impl LintConfig {
+    fn normalize_rule_name(name: &str) -> String {
+        name.trim().to_lowercase().replace('_', "-")
+    }
+
+    fn normalize(mut self) -> Self {
+        self.rules = self
+            .rules
+            .into_iter()
+            .map(|(name, enabled)| (Self::normalize_rule_name(&name), enabled))
+            .collect();
+        self
+    }
+
+    pub fn is_rule_enabled(&self, rule_name: &str) -> bool {
+        let normalized = Self::normalize_rule_name(rule_name);
+        self.rules.get(&normalized).copied().unwrap_or(true)
+    }
+}
+
 /// Internal deserialization struct that allows for optional fields
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -924,6 +953,8 @@ struct RawConfig {
 
     #[serde(default)]
     linters: HashMap<String, String>,
+    #[serde(default)]
+    lint: Option<LintConfig>,
 }
 
 fn default_line_width() -> usize {
@@ -1155,6 +1186,7 @@ impl RawConfig {
             code_blocks: style.code_blocks.unwrap_or_default(),
             formatters: resolve_formatters(self.formatters),
             linters: self.linters,
+            lint: self.lint.unwrap_or_default().normalize(),
             external_max_parallel: self
                 .external_max_parallel
                 .unwrap_or_else(default_external_max_parallel),
@@ -1362,6 +1394,8 @@ pub struct Config {
     pub external_max_parallel: usize,
     /// Parser configuration (experimental)
     pub parser: ParserConfig,
+    /// Linter rule toggles.
+    pub lint: LintConfig,
     pub built_in_greedy_wrap: bool,
 }
 
@@ -1393,6 +1427,7 @@ impl Default for Config {
             linters: HashMap::new(),    // Opt-in: empty by default
             external_max_parallel: default_external_max_parallel(),
             parser: ParserConfig::default(),
+            lint: LintConfig::default(),
             built_in_greedy_wrap: true,
         }
     }
@@ -1848,6 +1883,31 @@ mod tests {
         let cfg = Config::default();
         // Formatters are opt-in, so empty by default
         assert!(cfg.formatters.is_empty());
+        assert!(cfg.lint.is_rule_enabled("heading-hierarchy"));
+        assert!(cfg.lint.is_rule_enabled("undefined-references"));
+    }
+
+    #[test]
+    fn lint_config_allows_rule_toggles() {
+        let toml_str = r#"
+            [lint]
+            heading-hierarchy = false
+            undefined-references = false
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        assert!(!cfg.lint.is_rule_enabled("heading-hierarchy"));
+        assert!(!cfg.lint.is_rule_enabled("undefined-references"));
+        assert!(cfg.lint.is_rule_enabled("duplicate-reference-labels"));
+    }
+
+    #[test]
+    fn lint_config_normalizes_snake_case_rule_names() {
+        let toml_str = r#"
+            [lint]
+            undefined_references = false
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        assert!(!cfg.lint.is_rule_enabled("undefined-references"));
     }
 
     #[test]

@@ -145,9 +145,9 @@ Auto-fix
 :   No
 
 Description
-:   Each reference label and footnote ID must be unique within a document. Duplicate
-    definitions cause ambiguity—only the first definition is used, making the others
-    ineffective.
+:   Each reference label and footnote ID must be unique within a document.
+    Duplicate definitions cause ambiguity—only the first definition is used,
+    making the others ineffective.
 
 **Example violation**
 
@@ -178,7 +178,39 @@ Text with footnote[^1] and another[^2].
 
 **Resolution:** Rename or remove the duplicate definition.
 
-### citation-keys
+### `undefined-references`
+
+Detects reference links and footnotes that point to missing definitions.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Description
+:   Flags unresolved reference-style links (including shortcut/collapsed forms)
+    and unresolved footnote references. This helps catch broken cross-references
+    early in editing and CI.
+
+**Example violation:**
+
+```markdown
+See [missing][nope] and note[^missing].
+
+[ok]: https://example.com
+```
+
+**Diagnostic:**
+
+```
+warning[undefined-reference-label]: Reference label '[nope]' not found
+  --> document.qmd:1:15
+warning[undefined-footnote-id]: Footnote '[^missing]' not found
+  --> document.qmd:1:31
+```
+
+### `citation-keys`
 
 Validates citation keys against loaded bibliographies and detects conflicts in
 inline bibliography entries.
@@ -194,7 +226,8 @@ Requirements
 
 Description
 :   Checks that all cited keys (`[@key]`) exist in the configured bibliography
-    files. Also validates inline bibliography entries for duplicates and conflicts.
+    files. Also validates inline bibliography entries for duplicates and
+    conflicts.
 
 **Example violation (undefined key):**
 
@@ -243,9 +276,9 @@ Auto-fix
 :   No
 
 Description
-:   Parser errors indicate syntactically invalid Markdown that panache cannot parse
-    correctly. These should be fixed manually as they typically indicate incomplete
-    or malformed structures.
+:   Parser errors indicate syntactically invalid Markdown that panache cannot
+    parse correctly. These should be fixed manually as they typically indicate
+    incomplete or malformed structures.
 
 **Example violations:**
 
@@ -468,20 +501,23 @@ ignore directives.
 
 ## Configuration
 
-Lint rules can be configured in the `[lint]` section of your configuration file
-(planned feature):
+Lint rules can be configured in the `[lint]` section of your configuration file.
+Each key is a rule name and each value is a boolean (`true`/`false`).
 
 ```toml
 [lint]
-# Future: Enable/disable specific rules
-# heading-hierarchy = true
-# duplicate-references = true
+heading-hierarchy = true
+duplicate-reference-labels = true
+undefined-references = true
+citation-keys = true
 ```
 
-::: {.callout-note}
-Per-rule configuration is a planned feature. Currently, all rules are enabled
-by default.
-:::
+All rules are enabled by default when omitted. You can disable a specific rule:
+
+```toml
+[lint]
+undefined-references = false
+```
 
 ## LSP Integration
 

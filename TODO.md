@@ -62,9 +62,9 @@ This document tracks implementation status for panache's features.
 - [x] Syntax error diagnostics - Report parsing errors as diagnostics
 - [x] Lint warnings - Configurable linting rules (e.g., heading levels, list
       consistency)
-- [X] Citation validation - Validate citation keys against bibliography
-- [X] Footnote validation - Check for undefined footnotes (also in linter)
-- [ ] Link validation - Check for broken internal links/references
+- [x] Citation validation - Validate citation keys against bibliography
+- [x] Footnote validation - Check for undefined footnotes (also in linter)
+- [x] Link validation - Check for broken internal links/references
 
 #### Code Actions
 
@@ -158,7 +158,7 @@ to support.
 
 ## Configuration System
 
-- [ ] Enable turning on or off linting rules in `[lint]` section
+- [x] Enable turning on or off linting rules in `[lint]` section
 
 ### Per-Flavor Extension Configuration
 
