@@ -39,6 +39,10 @@ as Debian/Ubuntu (`.deb`) and Fedora/RHEL/openSUSE (`.rpm`).
 There is also an Arch Linux package available in the AUR:
 [panache-bin](https://aur.archlinux.org/packages/panache-bin/).
 
+```bash
+yay -S panache-bin # or your preferred AUR helper
+```
+
 ### VS Code Extension
 
 If you are running VS Code or an editor that supports VS

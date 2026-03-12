@@ -2,71 +2,91 @@
 title: Panache
 ---
 
-Panache is a formatter, LSP server, and linter for Pandoc Markdown, Quarto, and
-R Markdown documents. It is designed to be fast, configurable, and fully support
-the rich syntax of Pandoc Markdown, including features like fenced divs, grid
+Panache is a language server, formatter, and linter for Pandoc, Quarto, and R
+Markdown. It is designed to be fast, configurable, and fully support the rich
+syntax of Pandoc Markdown and Quarto, including features like fenced divs, grid
 tables, definition lists, inline footnotes, and more.
 
-## Key Features
+## Installation
 
-- **Full Pandoc syntax support**: Handles fenced divs, grid tables, definition
-  lists, inline footnotes, and more
-- **Math formatting**: Intelligent formatting for inline and display math
-- **External formatter integration**: Hook into language-specific formatters (R,
-  Python, Rust, etc.) for code blocks
-- **Ignore directives**: Selectively disable formatting and linting for specific
-  regions
-- **Built-in linter**: Check for heading hierarchy, duplicate references, and
-  citation issues
-- **Language Server Protocol**: Built-in LSP for editor integration with
-  format-on-save
-- **Fast and configurable**: Written in Rust with sensible defaults
+### From crates.io
 
-## Quick Start
-
-### Installation
-
-Install panache from crates.io:
+If you have Rust installed, the easiest way is likely to install from
+[crates.io](https://crates.io/crates/panache):
 
 ```bash
 cargo install panache
 ```
 
-Or download and install pre-built binaries from the [releases
-page](https://github.com/jolars/panache/releases). Available for:
+### Pre-built Binaries
 
-### Basic Usage
+Alternatively, you can install pre-built binary packages from the [releases
+page](https://github.com/jolars/panache/releases) for Linux, macOS, and Windows.
+For Linux, packages are available for generic distributions (tarballs) as well
+as Debian/Ubuntu (`.deb`) and Fedora/RHEL/openSUSE (`.rpm`).
 
-Format a document:
+### Arch Linux
+
+There is also an Arch Linux package available in the AUR:
+[panache-bin](https://aur.archlinux.org/packages/panache-bin/).
+
+```bash
+yay -S panache-bin # or your preferred AUR helper
+```
+
+### VS Code Extension
+
+If you are running VS Code or an editor that supports VS
+Code extensions (like Positron), you can install the [Panache
+extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
+from the VS Code Marketplace or the [Open VSX
+extension](https://open-vsx.org/extension/jolars/panache), which will
+automatically also install the `panache` CLI and start the language server when
+editing supported files.
+
+## Usage
+
+To get the most out of Panache, you should set up the language server in your
+editor to integrate diagnostics, formatting, code actions, and much more. See
+the [LSP documentation](lsp.qmd) for editor integration instructions.
+
+But if you just want to quickly format or lint a document from the command line,
+you can do so with the `panache` CLI.
+
+To format a document in place, run:
 
 ```bash
 panache format document.qmd
 ```
 
-## Why panache?
+To lint a document, run:
 
-Existing formatters like Prettier and mdformat don't fully support Pandoc's
-extended Markdown syntax used in Quarto and R Markdown documents. panache is
-built specifically to handle:
+```bash
+panache lint document.qmd
+```
 
-- Fenced divs (`::: {.class}`)
-- All table types (grid, pipe, simple, multiline)
-- Inline footnotes (`^[text]`)
-- Citations (`[@ref]`)
-- Raw blocks and attributes
-- And much more
+Both of these commands also support reading from standard input as well as
+globbing patterns for multiple files:
 
-## Status
+```bash
+# Format all .qmd files in the current directory
+panache format *.qmd
 
-::: {.callout-warning}
-This project is in **early development**. Expect bugs, missing features, and
-breaking changes.
-:::
+# Lint a directory
+panache lint docs/
+
+# Format from standard input and write to standard output
+panache format <document.qmd
+```
 
 ## Learn More
 
+To learn more about panache, check out the following documentation:
+
 - [Getting Started](getting-started.qmd) - Installation and first steps
 - [Configuration](configuration.qmd) - Customize panache behavior
+- [Language Server](lsp.qmd) - Editor integration guide
 - [Formatting](formatting.qmd) - Formatting rules and examples
+- [Linting](linting.qmd) - Formatting rules and examples
 - [LSP](lsp.qmd) - Editor integration guide
 - [CLI Reference](cli.qmd) - Command-line options

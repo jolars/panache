@@ -2,12 +2,12 @@
 title: Configuration
 ---
 
-Panache is designed to be opinionated with sensible defaults, but also
-configurable enough to accommodate *most* formatting preferences.
+Panache aims to provide sensible defaults, but also be configurable enough to
+accommodate common formatting preferences.
 
 The configuration system is built around a TOML configuration file, which allows
-you to customize a wide range of options, including formatting preferences,
-linting rules, external linter and formatter integrations, and more.
+you to customize a range of options, including formatting preferences, linting
+rules, external linter and formatter integrations>
 
 Panache searches for a configuration file in the following order:
 
@@ -57,8 +57,6 @@ Set the maximum line width for text wrapping:
 ```toml
 line-width = 80
 ```
-
-The default is 80 characters.
 
 ## Formatting Style
 
@@ -185,24 +183,10 @@ These defaults vary by flavor. Quarto uses `backtick` and `shortcut`, while
 Pandoc preserves original formatting.
 :::
 
-### Backwards Compatibility
-
-For backwards compatibility, style options can still be specified at the
-top-level, but this is deprecated:
-
-```toml
-[style]
-wrap = "reflow"
-blank-lines = "collapse"
-```
-
-The `[style]` section format shown above is preferred. If both formats are
-present, the `[style]` section takes precedence and a warning will be logged.
-
 ## Extensions
 
-panache supports 66 Pandoc extensions. Each flavor has sensible defaults, but
-you can override any extension:
+Panache supports most of the Pandoc extensions. Defaults vary by flavor, but you
+can override any extension:
 
 ```toml
 flavor = "quarto"
@@ -422,8 +406,8 @@ tex-math-double-backslash = false
 :   Dollar-delimited math `$x$` and `$$equation$$` (default: enabled)
 
 `tex-math-single-backslash`
-:   Single backslash math `\(...\)` and `\[...\]` (default: disabled, enabled for
-    RMarkdown)
+:   Single backslash math `\(...\)` and `\[...\]` (default: disabled, enabled
+    for RMarkdown)
 
 `tex-math-double-backslash`
 :   Double backslash math `\\(...\\)` and `\\[...\\]` (default: disabled)
@@ -526,7 +510,8 @@ mark = false
 :   Emoji syntax `:emoji:` (default: disabled, non-default extension)
 
 `mark`
-:   Highlighted text `==highlighted==` (default: disabled, non-default extension)
+:   Highlighted text `==highlighted==` (default: disabled, non-default
+    extension)
 
 ### Quarto-Specific Extensions
 
@@ -557,12 +542,12 @@ bookdown-references = true
 ```
 
 `bookdown-references`
-:   Bookdown references `\@ref(label)` and `(\#label)` (default: disabled, enabled
-    for RMarkdown flavor)
+:   Bookdown references `\@ref(label)` and `(\#label)` (default: disabled,
+    enabled for RMarkdown flavor)
 
 ## External Code Formatters
 
-panache can invoke external formatters for code blocks. Formatters are
+Panache can invoke external formatters for code blocks. Formatters are
 opt-in—you choose which languages to format.
 
 ### Basic Usage
@@ -659,14 +644,14 @@ How it works:
 
 Examples:
 
-Override only args (inherits `cmd="air"`, `stdin=false`):
+Override only `args` (inherits `cmd = "air"`, `stdin = false`):
 
 ```toml
 [formatters.air]
 args = ["format", "--custom-flag", "{}"]
 ```
 
-Override only cmd (inherits default args and `stdin`):
+Override only `cmd` (inherits default `args` and `stdin`):
 
 ```toml
 [formatters.ruff]
@@ -684,8 +669,8 @@ stdin = false
 
 ### Incremental Argument Modification
 
-Instead of completely overriding `args`, you can add arguments incrementally
-using `append-args` and `prepend-args`:
+Instead of completely overriding `args`, you can append and prepend arguments to
+the preset's base `args` using `append-args` and `prepend-args`:[^1]
 
 ```toml
 [formatters]
@@ -727,6 +712,9 @@ append-args = ["-i", "2", "-bn"]
 
 Final args: `["-filename", "$FILENAME", "-i", "2", "-bn"]`.
 
+[^1]: The idea of `append-args` and `prepend-args` is taken from the
+    [conform.nvim](https://github.com/stevearc/conform.nvim) Neovim plugin.
+
 ### File-Based Formatters
 
 For formatters that modify files in place:
@@ -747,8 +735,8 @@ appended at the end.
 ### Behavior
 
 Language matching
-:   Code block language (e.g., \`\`\`python) is matched to formatter key
-    (case-insensitive)
+:   Code block language (e.g., ```` ```python ````) is matched to formatter
+    key (case-insensitive)
 
 Parallel execution
 :   All formatters run concurrently for speed
@@ -768,7 +756,7 @@ Config files
 
 ## External Code Linters
 
-panache can invoke external linters for code blocks. Linters are opt-in—you
+Panache can invoke external linters for code blocks. Linters are opt-in—you
 choose which languages to lint.
 
 ### Quick Start
@@ -814,7 +802,8 @@ LSP
 ### Behavior
 
 Language matching
-:   Code block language (e.g., \`\`\`r) is matched to linter key (case-insensitive)
+:   Code block language (e.g., ```` ```{r} ````) is matched to linter key
+    (case-insensitive)
 
 Error handling
 :   Missing linters are gracefully ignored with a warning
@@ -843,14 +832,12 @@ r = "air"
 
 ## Example Configuration
 
-Complete example with all common options:
+Complete example with some common options:
 
 ```toml
-# Markdown flavor and basic settings
 flavor = "quarto"
 line-width = 80
 
-# Formatting style (NEW: organized under [style] section)
 [style]
 wrap = "reflow"
 blank-lines = "collapse"
@@ -861,38 +848,14 @@ math-indent = 0
 fence-style = "backtick"
 attribute-style = "shortcut"
 
-# Extension overrides
 [extensions]
 hard-line-breaks = false
 citations = true
 task-lists = true
 
 emoji = false
-```
 
-# External formatters (opt-in)
-
-```toml
 [formatters]
-python = ["isort", "black"] # Sequential: isort then black
-r = "air"                   # Built-in preset
-javascript = "prettier"     # Reusable definition
-typescript = "prettier"
-rust = "rustfmt"
-```
-
-# Customize formatters (optional)
-
-```toml
-[formatters.prettier]
-args = ["--print-width=100"]
-
-
-[formatters.isort]
-cmd = "isort"
-args = ["-"]
-
-# External linters (opt-in)
-[linters]
-r = "jarl" # Enable R linting
+r = "air"
+python = "ruff"
 ```

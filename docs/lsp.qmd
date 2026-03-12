@@ -1,5 +1,5 @@
 ---
-title: Language Server Protocol
+title: Language Server
 ---
 
 ## Overview
@@ -8,6 +8,9 @@ Panache includes a built-in Language Server Protocol (LSP) implementation that
 provides document formatting capabilities for editors and IDEs.
 
 ## Features
+
+The list of features is still evolving, but here is a (hopfully) comprehensive
+overview of the current capabilities:
 
 Document formatting
 :   Format entire documents or selected ranges (`textDocument/formatting`,
@@ -19,6 +22,7 @@ Go to definition
     - Reference links: `[text][ref]` → `[ref]: url`
     - Reference images: `![alt][ref]` → `[ref]: url`
     - Footnote references: `[^id]` → `[^id]: content`
+    - Citation references: `[@key]` → `[@key]: content`
 
 Document outline
 :   Hierarchical view of document structure (`textDocument/documentSymbol`)
@@ -35,7 +39,7 @@ Code folding
     - Fenced divs
     - YAML frontmatter
 
-Live diagnostics
+Diagnostics
 :   Real-time linting as you type (`textDocument/publishDiagnostics`)
 
     - Heading hierarchy violations
@@ -54,11 +58,20 @@ Code actions
 Hover information
 :   Contextual information on hover (`textDocument/hover`)
 
+    - Footnote definitions
+    - Citation previews
+
 Auto-completion
 :   Smart completions for Markdown syntax (`textDocument/completion`)
 
+    - Citation keys
+    - Reference labels
+
 Symbol renaming
 :   Rename references and their definitions together (`textDocument/rename`)
+
+    - Citation keys
+    - Reference labels
 
 Document tracking
 :   Incremental synchronization for efficiency (`textDocument/didOpen`,
@@ -67,24 +80,13 @@ Document tracking
 Configuration discovery
 :   Automatic detection from workspace root
 
-Format on save
-:   Automatic formatting when saving files
-
 ## Starting the Server
 
-Most users should install an editor extension and let the editor start the
-server automatically.
-
-Manual start (for debugging):
-
-```bash
-panache lsp
-```
-
-The server communicates over stdin/stdout using the standard LSP JSON-RPC
-protocol.
-
-## Editor Configuration
+If you want to start the language server manually (for debugging), then you
+can run `panache lsp` in your terminal. This will start the server and wait for
+JSON-RPC input. But most users will want to set up their editor to start the
+server automatically when editing supported files. See the editor integration
+instructions below.
 
 ### Neovim
 
@@ -194,16 +196,9 @@ Optional extension settings:
 }
 ```
 
-### Cursor
+### Positron
 
-Install the Panache extension from the marketplace:
-
-```shell
-ext install jolars.panache
-```
-
-Open a Markdown or Quarto file and the extension will automatically start the
-LSP server.
+See the [VS Code] section above.
 
 ### Helix
 

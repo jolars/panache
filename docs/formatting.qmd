@@ -2,36 +2,50 @@
 title: Formatting
 ---
 
-Panache follows these principles:
-
-1. **Preserve semantic meaning**: Never change what your document means
-2. **Consistent style**: Apply uniform formatting rules throughout
-3. **Readability first**: Optimize for human readers, not machines
-4. **Pandoc compatibility**: Respect Pandoc's parsing rules and extensions
+Panache's formatting rules are designed to produce clean, consistent Markdown
+output that adheres to common style guidelines while preserving the semantic
+meaning of the original document.
 
 ## Text Wrapping
 
 ### Paragraphs
 
-Panache wraps paragraphs to fit within the configured line width (default 80
-characters):
+Panache supports three modes of text wrapping for paragraphs, which are
+controlled via the [configuration](configuration.qmd) file:
 
-**Input:**
-
-```markdown
-This is a very long paragraph that exceeds the line width and needs to be wrapped across multiple lines for better readability.
+```toml
+[style]
+wrap = "reflow" # or "preserve" or "sentence"
 ```
 
-**Output:**
+If `wrap` is set to `reflow`, panache will reformat paragraphs to fit within the
+number of columns specified by the `line-width` configuration option (default
+80). If `wrap` is set to `preserve`, panache will keep existing line breaks and
+not reflow paragraphs. If `wrap` is set to `sentence`, panache will break lines
+at sentence boundaries, ensuring that each sentence starts on a new line.
 
-```markdown
-This is a very long paragraph that exceeds the line width and needs to be
-wrapped across multiple lines for better readability.
-```
+Input
+:   ``` markdown
+    First sentence with a [link text](https://example.com) and inline math $a + b = c$. Second sentence; third sentence!
+    ```
+
+Output (`"reflow"`)
+:   ``` markdown
+    First sentence with a [link text](https://example.com) and inline math
+    $a + b = c$. Second sentence; third sentence!
+    ```
+
+Output (`"sentence"`)
+:   ``` markdown
+    First sentence with a [link text](https://example.com) and inline math $a + b = c$.
+    Second sentence; third sentence!
+    ```
 
 ### Preserving Hard Breaks
 
-Hard line breaks are preserved:
+Hard line breaks, which are created either by ending a line with two or more
+spaces (\``) or by using a backslash (`\\n\`), are preserved regardless of the
+wrapping mode:
 
 ```markdown
 First line\
