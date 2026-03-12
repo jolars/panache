@@ -39,6 +39,16 @@ as Debian/Ubuntu (`.deb`) and Fedora/RHEL/openSUSE (`.rpm`).
 There is also an Arch Linux package available in the AUR:
 [panache-bin](https://aur.archlinux.org/packages/panache-bin/).
 
+### VS Code Extension
+
+If you are running VS Code or an editor that supports VS
+Code extensions (like Positron), you can install the [Panache
+extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
+from the VS Code Marketplace or the [Open VSX
+extension](https://open-vsx.org/extension/jolars/panache), which will
+automatically also install the `panache` CLI and start the language server when
+editing supported files.
+
 ## Usage
 
 Panache provides a single CLI interface for formatting, linting, and running the
