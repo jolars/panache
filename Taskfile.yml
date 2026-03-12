@@ -89,3 +89,22 @@ tasks:
       - npm run compile
       - npx @vscode/vsce package
       - code --install-extension *.vsix --force
+
+  release:
+    desc: Publish a new release
+    cmds:
+      - gh workflow run release.yml --ref main
+
+  release-dry-run:
+    desc: Run a semantic release dry run to preview changes
+    cmds:
+      - |
+        npx \
+          --yes \
+          --package @semantic-release/changelog \
+          --package @semantic-release/git \
+          --package conventional-changelog-conventionalcommits \
+          --package semantic-release-cargo \
+          --package semantic-release-replace-plugin \
+          --package semantic-release-vsce \
+          semantic-release --dry-run
