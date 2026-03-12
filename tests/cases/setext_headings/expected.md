@@ -21,3 +21,9 @@
 # Long underline that's longer than text
 
 # Short text
+
+## The following is in fact a heading, even though it looks like metadata:
+
+## subtitle: "A subtitle added later"
+
+And here is a bit of text.

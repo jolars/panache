@@ -6,7 +6,6 @@ keywords:
   - markdown
   - quarto
 ---
-
 # Introduction
 
 This is a test document with YAML frontmatter.

@@ -428,7 +428,7 @@ impl Formatter {
                 self.output.push('\n');
 
                 if let Some(next) = node.next_sibling()
-                    && is_block_element(next.kind())
+                    && (is_block_element(next.kind()) || next.kind() == SyntaxKind::HEADING)
                     && !(self.config.extensions.blank_before_header
                         && self.paragraph_starts_with_atx_heading_candidate(&next))
                     && !self.output.ends_with("\n\n")
@@ -1859,6 +1859,14 @@ impl Formatter {
                 // Ensure these blocks end with appropriate spacing
                 if !text.ends_with('\n') {
                     self.output.push('\n');
+                }
+                // Ensure blank line after if followed by block element.
+                if let Some(next) = node.next_sibling()
+                    && is_block_element(next.kind())
+                    && !self.output.ends_with("\n\n")
+                {
+                    self.output.push('\n');
+                    self.consecutive_blank_lines = 1;
                 }
             }
 

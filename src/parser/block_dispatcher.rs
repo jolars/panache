@@ -1764,11 +1764,20 @@ impl BlockParser for SetextHeadingParser {
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
+        lines: &[&str],
+        line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        // Setext headings require blank line before (unless at document start)
-        if !ctx.has_blank_before && !ctx.at_document_start {
+        // Setext headings usually require blank line before (unless at document start),
+        // but Pandoc also allows consecutive setext headings without an intervening blank line.
+        let follows_setext_heading = if line_pos >= 2 {
+            let prev_text = count_blockquote_markers(lines[line_pos - 2]).1;
+            let prev_underline = count_blockquote_markers(lines[line_pos - 1]).1;
+            try_parse_setext_heading(&[prev_text, prev_underline], 0).is_some()
+        } else {
+            false
+        };
+
+        if !ctx.has_blank_before && !ctx.at_document_start && !follows_setext_heading {
             return None;
         }
 
