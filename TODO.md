@@ -9,13 +9,13 @@ This document tracks implementation status for panache's features.
 
 ### Salsa/LSP refactor follow-ups
 
-- [x] Remove `DocumentState.metadata` and replace it with
-      a minimal YAML-frontmatter status (`yaml_ok: bool` or
+- [x] Remove `DocumentState.metadata` and replace it with a minimal
+      YAML-frontmatter status (`yaml_ok: bool` or
       `yaml_error: Option<YamlError>`). Salsa (`crate::salsa::metadata`) is now
       the single source of truth for metadata + bibliography parsing.
-- [x] [correctness] Decide watcher policy for uncached dependency files:
-      keep `update_file_text_if_cached(...)` (bounded memory) or selectively
-      insert (`update_file_text(...)`) for workspace dependency types
+- [x] [correctness] Decide watcher policy for uncached dependency files: keep
+      `update_file_text_if_cached(...)` (bounded memory) or selectively insert
+      (`update_file_text(...)`) for workspace dependency types
       (bibs/includes/metadata).
 - [x] [correctness] Model YAML frontmatter parsing as a salsa query (e.g.
       `yaml_metadata_parse_result(...) -> Result<...>`) so diagnostics/handlers
@@ -30,9 +30,9 @@ This document tracks implementation status for panache's features.
       - [x] Remove duplicate bibliography diagnostics by deriving bibliography
             diagnostics from linter rules only (while keeping YAML parse
             diagnostics query-derived).
-- [x] [performance] Apply salsa LRU tuning for long-running LSP sessions
-      (see `salsa/book/src/tuning.md`): add `#[salsa::tracked(lru = N)]`
-      to high-churn tracked queries where appropriate (`project_graph`,
+- [x] [performance] Apply salsa LRU tuning for long-running LSP sessions (see
+      `salsa/book/src/tuning.md`): add `#[salsa::tracked(lru = N)]` to
+      high-churn tracked queries where appropriate (`project_graph`,
       `definition_index`).
 - [ ] [performance] Evaluate `#[salsa::interned]` for common keys (paths/labels)
       if it reduces memory/cost.
@@ -107,8 +107,8 @@ This document tracks implementation status for panache's features.
 
 #### Inlay Hints (low priority)
 
-Personally I think inlay hints are distractive and I am not sure what we want
-to support.
+Personally I think inlay hints are distractive and I am not sure what we want to
+support.
 
 - [ ] Link target hints - Show link targets as inlay hints
 - [ ] Reference definition hints - Show reference definitions as inlay hints
@@ -137,8 +137,7 @@ to support.
       - [ ] General support for pandoc etc
       - [ ] Quarto - project-wide symbol search for figures, tables, sections
       - [ ] Rmarkdown (Bookdown)
-- [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload
-      config
+- [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload config
 
 ## Pandoc Test Adoption
 
@@ -243,9 +242,9 @@ to support.
 This section tracks implementation status of Pandoc Markdown features based on
 the spec files in `assets/pandoc-spec/`.
 
-**Focus**: Prioritize **default Pandoc extensions**. Non-default extensions
-are lower priority and may be deferred until after core formatting features
-are implemented.
+**Focus**: Prioritize **default Pandoc extensions**. Non-default extensions are
+lower priority and may be deferred until after core formatting features are
+implemented.
 
 ### Block-Level Elements
 
@@ -314,8 +313,7 @@ are implemented.
 
 - [x] Extension: `simple_tables` - Simple table syntax (parsing complete,
       formatting deferred)
-- [x] Extension: `table_captions` - Table captions (both before and after
-      tables)
+- [x] Extension: `table_captions` - Table captions (both before and after tables)
 - [x] Extension: `pipe_tables` - GitHub/PHP Markdown tables (all alignments,
       orgtbl variant)
 - [x] Extension: `multiline_tables` - Multiline cell content (parsing complete,
@@ -462,8 +460,7 @@ for initial implementation.
 
 #### Non-Default: Headings
 
-- [ ] Extension: `mmd_header_identifiers` - MultiMarkdown style IDs
-      (non-default)
+- [ ] Extension: `mmd_header_identifiers` - MultiMarkdown style IDs (non-default)
 
 #### Non-Default: Lists
 
@@ -480,7 +477,7 @@ for initial implementation.
 
 #### Non-Default: GitHub-specific
 
-- [ ] Extension: `alerts` - GitHub/Quarto alert/callout boxes (non-default)
+- [x] Extension: `alerts` - GitHub/Quarto alert/callout boxes (non-default)
 - [ ] Extension: `emoji` - `:emoji:` syntax (non-default)
 - [ ] Extension: `wikilinks_title_after_pipe` - `[[link|title]]` (non-default)
 
