@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.19.0](https://github.com/jolars/panache/compare/v2.18.0...v2.19.0) (2026-03-12)
+
+### Features
+
+* add support for github alerts ([31d8055](https://github.com/jolars/panache/commit/31d8055f092ca6daa55a9d12736075415d9217f9))
+* **linter:** add linting rule for spaces in labels ([d8e522e](https://github.com/jolars/panache/commit/d8e522e4d70dc6a21de836652d26c17bf889af02))
+* **linter:** add missing link references rule ([2232449](https://github.com/jolars/panache/commit/223244989f5b9c759b468b811af8bab3e6f6db66))
+
+### Bug Fixes
+
+* **formatter:** handle labels with spaces in them ([be100ae](https://github.com/jolars/panache/commit/be100ae46219a57e86fe73dcbd5eaabf9de6765e)), closes [#66](https://github.com/jolars/panache/issues/66)
+* **lsp:** handle umlauts properly ([a8227fb](https://github.com/jolars/panache/commit/a8227fb3f8eb51b32427c4a9516b3cadc669c753)), closes [#65](https://github.com/jolars/panache/issues/65)
+* **parser:** handle `---` without blankline before ([746d827](https://github.com/jolars/panache/commit/746d827c92f7f1234bab2b6aff063e6ba8d44681))
+
 ## [2.18.0](https://github.com/jolars/panache/compare/v2.17.0...v2.18.0) (2026-03-12)
 
 ### Features
