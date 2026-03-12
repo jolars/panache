@@ -1,61 +1,32 @@
+use clap::builder::Styles;
+use clap::builder::styling::{AnsiColor, Effects};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
+
+const STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .usage(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Cyan.on_default());
 
 #[derive(Parser)]
 #[command(name = "panache")]
 #[command(author, version)]
 #[command(about = "A formatter for Quarto, Pandoc, and Markdown documents")]
+#[command(styles = STYLES)]
 #[command(
     long_about = "Panache is a CLI formatter and LSP for Quarto (.qmd), Pandoc, and Markdown files \
     written in Rust. It understands Quarto/Pandoc-specific syntax that other formatters like \
     Prettier and mdformat struggle with, including fenced divs, tables, and math formatting."
 )]
-#[command(after_help = "\
-EXAMPLES:
-
-    # Format a file in place
-    panache format document.qmd
-
-    # Format from stdin to stdout
-    cat document.qmd | panache format
-
-    # Check if a file is formatted
-    panache format --check document.qmd
-
-    # Use custom config
-    panache format --config custom.toml document.qmd
-
-    # Parse and inspect CST
-    panache parse document.qmd
-
-    # Parse and verify losslessness (input == CST text)
-    panache parse --verify document.qmd
-
-CONFIGURATION:
-
-Panache looks for configuration files in this order:
-  1. Explicit --config path
-  2. panache.toml or .panache.toml in current/parent directories
-  3. ~/.config/panache/config.toml (XDG)
-  4. Built-in defaults
-
-Example .panache.toml:
-
-    flavor = \"quarto\"
-    line-width = 80
-
-    [extensions]
-    hard-line-breaks = false
-    citations = true
-
-For more information, visit: https://github.com/jolars/panache")]
+#[command(after_help = "For help with a specific command, see: `panache help <command>`.")]
 #[command(arg_required_else_help = true)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
 
     /// Path to config file
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "Global options")]
     #[arg(help = "Path to configuration file")]
     #[arg(
         long_help = "Path to a custom configuration file. If not specified, panache will \
@@ -65,7 +36,12 @@ pub struct Cli {
     pub config: Option<PathBuf>,
 
     /// Synthetic filename to use when reading from stdin
-    #[arg(long, global = true, value_name = "PATH")]
+    #[arg(
+        long,
+        global = true,
+        value_name = "PATH",
+        help_heading = "Global options"
+    )]
     #[arg(help = "Synthetic filename for stdin input (used for flavor detection)")]
     #[arg(
         long_help = "Synthetic filename to associate with stdin input. This is useful for editor \
@@ -73,41 +49,29 @@ pub struct Cli {
         from file extension (for example: --stdin-filename doc.qmd)."
     )]
     pub stdin_filename: Option<PathBuf>,
+
+    /// Control when colored output is used
+    #[arg(
+        long,
+        global = true,
+        value_enum,
+        default_value = "auto",
+        value_name = "WHEN",
+        help_heading = "Global options"
+    )]
+    #[arg(help = "Control when colored output is used")]
+    pub color: ColorMode,
 }
 
 #[derive(Subcommand)]
 pub enum Commands {
     /// Format a Quarto, Pandoc, or Markdown document
     #[command(
-        long_about = "Format a Quarto, Pandoc, or Markdown document according to panache's \
+        long_about = "Format a Quarto, Pandoc, or R Markdown document according to Panache's \
         formatting rules. By default, formats files in place. Use --check to verify formatting \
         without making changes. With --verify, panache runs parser/formatter invariants without \
         writing changes to disk. Stdin input always outputs to stdout."
     )]
-    #[command(after_help = "\
-EXAMPLES:
-
-    # Format file in place (default)
-    panache format document.qmd
-
-    # Format multiple files
-    panache format file1.md file2.md file3.qmd
-
-    # Use glob patterns (expanded by shell)
-    panache format **/*.{md,qmd}
-
-    # Format entire directory recursively, all supported files
-    panache format .
-    panache format docs/
-
-    # Format from stdin to stdout
-    echo '# Heading' | panache format
-
-    # Check formatting (exit code 1 if not formatted)
-    panache format --check document.qmd
-
-    # Verify parser/formatter invariants (does not write changes)
-    panache format --verify document.qmd")]
     Format {
         /// Input file(s) (stdin if not provided)
         #[arg(help = "Input file path(s) or directories")]
@@ -159,26 +123,6 @@ EXAMPLES:
         and understanding how panache interprets the document structure. The CST shows all block \
         and inline elements detected by the parser."
     )]
-    #[command(after_help = "\
-EXAMPLES:
-
-    # Parse a file and show CST
-    panache parse document.qmd
-
-    # Parse a file and write CST JSON to disk
-    panache parse --json cst.json document.qmd
-
-    # Parse from stdin
-    echo '# Heading' | panache parse
-
-    # Parse without printing CST output
-    panache parse --quiet document.qmd
-
-    # Parse with custom config (affects extension parsing)
-    panache parse --config .panache.toml document.qmd
-
-    # Verify parser losslessness while parsing
-    panache parse --verify document.qmd")]
     Parse {
         /// Input file (stdin if not provided)
         #[arg(help = "Input file path")]
@@ -244,33 +188,7 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         violations. Unlike the formatter which handles style, the linter catches semantic \
         problems like syntax errors, heading hierarchy issues, and broken references."
     )]
-    #[command(after_help = "\
-EXAMPLES:
-
-    # Lint a file and show diagnostics
-    panache lint document.qmd
-
-    # Lint multiple files
-    panache lint file1.md file2.qmd
-
-    # Lint entire directory
-    panache lint .
-
-    # Lint from stdin
-    echo '# H1\\n### H3' | panache lint
-
-    # Check mode for CI (exit code 1 if violations found)
-    panache lint --check document.qmd
-
-    # Apply auto-fixes
-    panache lint --fix document.qmd
-
-LINT RULES:
-
-  - Parser errors: Syntax errors detected during parsing
-  - Heading hierarchy: Warns on skipped heading levels (e.g., h1 → h3)
-  
-Configure rules in .panache.toml with [lint] section.")]
+    #[command(after_help = "Configure rules in panache.toml with [lint] section.")]
     Lint {
         /// Input file(s) or directories (stdin if not provided)
         #[arg(help = "Input file path(s) or directories")]
@@ -331,4 +249,11 @@ pub enum DebugChecks {
     Idempotency,
     Losslessness,
     All,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum ColorMode {
+    Auto,
+    Always,
+    Never,
 }

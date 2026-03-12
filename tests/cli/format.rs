@@ -233,3 +233,14 @@ fn test_format_stdin_filename_infers_quarto_flavor() {
         .success()
         .stdout(predicate::str::contains("#| echo: false"));
 }
+
+#[test]
+fn test_format_color_always_shows_ansi_diff() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "--check", "--color", "always"])
+        .write_stdin("# Heading\n\nThis is a very long line that exceeds the default line width of 80 characters and should be wrapped.")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\u{1b}[31m"))
+        .stdout(predicate::str::contains("\u{1b}[32m"));
+}

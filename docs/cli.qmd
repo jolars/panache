@@ -12,44 +12,7 @@ Panache is a CLI formatter and LSP for Quarto (.qmd), Pandoc, and Markdown files
 
 **Usage:** `panache [OPTIONS] <COMMAND>`
 
-EXAMPLES:
-
-    # Format a file in place
-    panache format document.qmd
-
-    # Format from stdin to stdout
-    cat document.qmd | panache format
-
-    # Check if a file is formatted
-    panache format --check document.qmd
-
-    # Use custom config
-    panache format --config custom.toml document.qmd
-
-    # Parse and inspect CST
-    panache parse document.qmd
-
-    # Parse and verify losslessness (input == CST text)
-    panache parse --verify document.qmd
-
-CONFIGURATION:
-
-Panache looks for configuration files in this order:
-  1. Explicit --config path
-  2. panache.toml or .panache.toml in current/parent directories
-  3. ~/.config/panache/config.toml (XDG)
-  4. Built-in defaults
-
-Example .panache.toml:
-
-    flavor = "quarto"
-    line-width = 80
-
-    [extensions]
-    hard-line-breaks = false
-    citations = true
-
-For more information, visit: https://github.com/jolars/panache
+For help with a specific command, see: `panache help <command>`.
 
 ###### **Subcommands:**
 
@@ -63,38 +26,20 @@ For more information, visit: https://github.com/jolars/panache
 
 * `--config <CONFIG>` — Path to a custom configuration file. If not specified, panache will search for .panache.toml or panache.toml in the current directory and its parents, then fall back to ~/.config/panache/config.toml.
 * `--stdin-filename <PATH>` — Synthetic filename to associate with stdin input. This is useful for editor integrations that pipe content via stdin but still need panache to infer flavor/extensions from file extension (for example: --stdin-filename doc.qmd).
+* `--color <WHEN>` — Control when colored output is used
+
+  Default value: `auto`
+
+  Possible values: `auto`, `always`, `never`
+
 
 
 
 ## `panache format`
 
-Format a Quarto, Pandoc, or Markdown document according to panache's formatting rules. By default, formats files in place. Use --check to verify formatting without making changes. With --verify, panache runs parser/formatter invariants without writing changes to disk. Stdin input always outputs to stdout.
+Format a Quarto, Pandoc, or R Markdown document according to Panache's formatting rules. By default, formats files in place. Use --check to verify formatting without making changes. With --verify, panache runs parser/formatter invariants without writing changes to disk. Stdin input always outputs to stdout.
 
 **Usage:** `panache format [OPTIONS] [FILES]...`
-
-EXAMPLES:
-
-    # Format file in place (default)
-    panache format document.qmd
-
-    # Format multiple files
-    panache format file1.md file2.md file3.qmd
-
-    # Use glob patterns (expanded by shell)
-    panache format **/*.{md,qmd}
-
-    # Format entire directory recursively, all supported files
-    panache format .
-    panache format docs/
-
-    # Format from stdin to stdout
-    echo '# Heading' | panache format
-
-    # Check formatting (exit code 1 if not formatted)
-    panache format --check document.qmd
-
-    # Verify parser/formatter invariants (does not write changes)
-    panache format --verify document.qmd
 
 ###### **Arguments:**
 
@@ -117,26 +62,6 @@ EXAMPLES:
 Parse a document and display its Concrete Syntax Tree (CST) for debugging and understanding how panache interprets the document structure. The CST shows all block and inline elements detected by the parser.
 
 **Usage:** `panache parse [OPTIONS] [FILE]`
-
-EXAMPLES:
-
-    # Parse a file and show CST
-    panache parse document.qmd
-
-    # Parse a file and write CST JSON to disk
-    panache parse --json cst.json document.qmd
-
-    # Parse from stdin
-    echo '# Heading' | panache parse
-
-    # Parse without printing CST output
-    panache parse --quiet document.qmd
-
-    # Parse with custom config (affects extension parsing)
-    panache parse --config .panache.toml document.qmd
-
-    # Verify parser losslessness while parsing
-    panache parse --verify document.qmd
 
 ###### **Arguments:**
 
@@ -174,32 +99,7 @@ Lint a document to check for correctness issues and best practice violations. Un
 
 **Usage:** `panache lint [OPTIONS] [FILES]...`
 
-EXAMPLES:
-
-    # Lint a file and show diagnostics
-    panache lint document.qmd
-
-    # Lint multiple files
-    panache lint file1.md file2.qmd
-
-    # Lint entire directory
-    panache lint .
-
-    # Lint from stdin
-    echo '# H1\n### H3' | panache lint
-
-    # Check mode for CI (exit code 1 if violations found)
-    panache lint --check document.qmd
-
-    # Apply auto-fixes
-    panache lint --fix document.qmd
-
-LINT RULES:
-
-  - Parser errors: Syntax errors detected during parsing
-  - Heading hierarchy: Warns on skipped heading levels (e.g., h1 → h3)
-  
-Configure rules in .panache.toml with [lint] section.
+Configure rules in panache.toml with [lint] section.
 
 ###### **Arguments:**
 

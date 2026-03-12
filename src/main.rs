@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, IsTerminal, Read};
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
@@ -9,7 +9,7 @@ use panache::{format, parse};
 use serde_json::json;
 
 mod cli;
-use cli::{Cli, Commands, DebugChecks, DebugCommands};
+use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands};
 
 /// Supported file extensions for formatting
 const SUPPORTED_EXTENSIONS: &[&str] = &["md", "qmd", "Rmd", "markdown", "mdown", "mkd"];
@@ -150,7 +150,20 @@ fn start_dir_for(input_path: Option<&Path>) -> io::Result<PathBuf> {
     }
 }
 
-fn print_diff(file_path: &str, original: &str, formatted: &str) {
+fn color_enabled(mode: ColorMode) -> bool {
+    match mode {
+        ColorMode::Always => true,
+        ColorMode::Never => false,
+        ColorMode::Auto => {
+            if std::env::var_os("NO_COLOR").is_some() {
+                return false;
+            }
+            io::stdout().is_terminal()
+        }
+    }
+}
+
+fn print_diff(file_path: &str, original: &str, formatted: &str, use_color: bool) {
     let diff = TextDiff::from_lines(original, formatted);
 
     for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
@@ -169,10 +182,14 @@ fn print_diff(file_path: &str, original: &str, formatted: &str) {
                     ChangeTag::Equal => (" ", "\x1b[0m"),   // normal
                 };
 
-                print!("{}{}{}", style, sign, change.value());
+                if use_color {
+                    print!("{}{}{}", style, sign, change.value());
+                } else {
+                    print!("{}{}", sign, change.value());
+                }
 
                 // Reset color at end of line if it was colored
-                if change.tag() != ChangeTag::Equal {
+                if use_color && change.tag() != ChangeTag::Equal {
                     print!("\x1b[0m");
                 }
             }
@@ -234,6 +251,7 @@ fn run_debug_checks_for_content(
 
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
+    let use_color = color_enabled(cli.color);
     let debug_log = match &cli.command {
         Commands::Lsp { debug } if *debug => Some(init_lsp_debug_log()?),
         _ => None,
@@ -272,7 +290,7 @@ fn main() -> io::Result<()> {
                     eprintln!(
                         "Verification failed (losslessness): parser output differs from input"
                     );
-                    print_diff(file_label, &input, &tree_text);
+                    print_diff(file_label, &input, &tree_text, use_color);
                     std::process::exit(1);
                 }
             }
@@ -337,7 +355,7 @@ fn main() -> io::Result<()> {
                         eprintln!(
                             "Verification failed (losslessness): parser output differs from input"
                         );
-                        print_diff("<stdin>", &input, &tree_text);
+                        print_diff("<stdin>", &input, &tree_text, use_color);
                         std::process::exit(1);
                     }
                 }
@@ -348,14 +366,14 @@ fn main() -> io::Result<()> {
                         eprintln!(
                             "Verification failed (idempotency): format(format(x)) != format(x)"
                         );
-                        print_diff("<stdin>", &output, &output_twice);
+                        print_diff("<stdin>", &output, &output_twice, use_color);
                         std::process::exit(1);
                     }
                 }
 
                 if check {
                     if input != output {
-                        print_diff("<stdin>", &input, &output);
+                        print_diff("<stdin>", &input, &output, use_color);
                         std::process::exit(1);
                     }
                 } else {
@@ -397,7 +415,7 @@ fn main() -> io::Result<()> {
                         eprintln!(
                             "Verification failed (losslessness): parser output differs from input"
                         );
-                        print_diff(file_name, &input, &tree_text);
+                        print_diff(file_name, &input, &tree_text, use_color);
                         std::process::exit(1);
                     }
                 }
@@ -409,7 +427,7 @@ fn main() -> io::Result<()> {
                         eprintln!(
                             "Verification failed (idempotency): format(format(x)) != format(x)"
                         );
-                        print_diff(file_name, &output, &output_twice);
+                        print_diff(file_name, &output, &output_twice, use_color);
                         std::process::exit(1);
                     }
                 }
@@ -417,7 +435,7 @@ fn main() -> io::Result<()> {
                 if check {
                     if input != output {
                         let file_name = file_path.to_str().unwrap_or("<unknown>");
-                        print_diff(file_name, &input, &output);
+                        print_diff(file_name, &input, &output, use_color);
                         all_formatted = false;
                     } else if expanded_files.len() == 1 {
                         // Only print success for single file
@@ -480,7 +498,7 @@ fn main() -> io::Result<()> {
                         failure_count += 1;
                         if !json {
                             eprintln!("Debug check failed ({}) in <stdin>", kind.label());
-                            print_diff("<stdin>", &left, &right);
+                            print_diff("<stdin>", &left, &right, use_color);
                         }
                         if let Some(dir) = dump_dir.as_ref() {
                             fs::create_dir_all(dir)?;
@@ -514,7 +532,7 @@ fn main() -> io::Result<()> {
                                     kind.label(),
                                     file_label
                                 );
-                                print_diff(file_label, &left, &right);
+                                print_diff(file_label, &left, &right, use_color);
                             }
                             if let Some(dir) = dump_dir.as_ref() {
                                 fs::create_dir_all(dir)?;
@@ -604,7 +622,7 @@ fn main() -> io::Result<()> {
                     let fixed_output = apply_fixes(&input, &diagnostics);
                     print!("{}", fixed_output);
                 } else {
-                    print_diagnostics(&diagnostics, None);
+                    print_diagnostics(&diagnostics, None, use_color);
                 }
 
                 if check {
@@ -662,7 +680,7 @@ fn main() -> io::Result<()> {
                             file_path.display()
                         );
                     } else {
-                        print_diagnostics(&root_doc.diagnostics, Some(file_path));
+                        print_diagnostics(&root_doc.diagnostics, Some(file_path), use_color);
                     }
                 }
 
@@ -673,7 +691,7 @@ fn main() -> io::Result<()> {
                         }
                         any_issues = true;
                         total_issues += doc.diagnostics.len();
-                        print_diagnostics(&doc.diagnostics, Some(&doc.path));
+                        print_diagnostics(&doc.diagnostics, Some(&doc.path), use_color);
                     }
                 }
             }
@@ -696,16 +714,23 @@ fn main() -> io::Result<()> {
     }
 }
 
-fn print_diagnostics(diagnostics: &[panache::linter::Diagnostic], file: Option<&PathBuf>) {
+fn print_diagnostics(
+    diagnostics: &[panache::linter::Diagnostic],
+    file: Option<&PathBuf>,
+    use_color: bool,
+) {
     use panache::linter::Severity;
 
     let file_name = file.and_then(|p| p.to_str()).unwrap_or("<stdin>");
 
     for diag in diagnostics {
-        let severity_str = match diag.severity {
-            Severity::Error => "\x1b[31merror\x1b[0m",     // red
-            Severity::Warning => "\x1b[33mwarning\x1b[0m", // yellow
-            Severity::Info => "\x1b[34minfo\x1b[0m",       // blue
+        let severity_str = match (&diag.severity, use_color) {
+            (Severity::Error, true) => "\x1b[31merror\x1b[0m", // red
+            (Severity::Warning, true) => "\x1b[33mwarning\x1b[0m", // yellow
+            (Severity::Info, true) => "\x1b[34minfo\x1b[0m",   // blue
+            (Severity::Error, false) => "error",
+            (Severity::Warning, false) => "warning",
+            (Severity::Info, false) => "info",
         };
 
         println!(
@@ -714,7 +739,11 @@ fn print_diagnostics(diagnostics: &[panache::linter::Diagnostic], file: Option<&
         );
 
         if let Some(fix) = &diag.fix {
-            println!("  \x1b[36mhelp\x1b[0m: {}", fix.message); // cyan
+            if use_color {
+                println!("  \x1b[36mhelp\x1b[0m: {}", fix.message); // cyan
+            } else {
+                println!("  help: {}", fix.message);
+            }
         }
     }
 

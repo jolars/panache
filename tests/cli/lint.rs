@@ -131,6 +131,27 @@ fn test_lint_stdin() {
 }
 
 #[test]
+fn test_lint_color_always_shows_ansi_diagnostics() {
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--color", "always"])
+        .write_stdin("# Heading\n\n### Subheading")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\u{1b}[33mwarning\u{1b}[0m"));
+}
+
+#[test]
+fn test_lint_color_never_disables_ansi_diagnostics() {
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--color", "never"])
+        .write_stdin("# Heading\n\n### Subheading")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning"))
+        .stdout(predicate::str::contains("\u{1b}[").not());
+}
+
+#[test]
 fn test_lint_bibliography_integration() {
     let temp_dir = TempDir::new().unwrap();
     let bib_path = temp_dir.path().join("refs.bib");

@@ -9,7 +9,19 @@ fn test_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Panache is a CLI formatter"));
+        .stdout(predicate::str::contains("Panache is a CLI formatter"))
+        .stdout(predicate::str::contains("Global options:"))
+        .stdout(predicate::str::contains("--color <WHEN>"));
+}
+
+#[test]
+fn test_help_forced_color_outputs_ansi() {
+    cargo_bin_cmd!("panache")
+        .env("CLICOLOR_FORCE", "1")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\u{1b}["));
 }
 
 #[test]
