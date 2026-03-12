@@ -349,6 +349,7 @@ fn extract_chunk_options_from_cst(
     use crate::syntax::{ChunkLabel, ChunkOption};
 
     let mut options = Vec::new();
+    let mut pending_label_parts = Vec::new();
 
     // Find CHUNK_OPTIONS node
     for child in info_node.children() {
@@ -356,14 +357,20 @@ fn extract_chunk_options_from_cst(
             // Iterate through options and labels
             for opt_or_label in child.children() {
                 if let Some(label) = ChunkLabel::cast(opt_or_label.clone()) {
-                    // Label (no key, just value)
-                    options.push((None, Some(label.text()), false));
+                    pending_label_parts.push(label.text());
                 } else if let Some(opt) = ChunkOption::cast(opt_or_label) {
+                    if !pending_label_parts.is_empty() {
+                        options.push((None, Some(pending_label_parts.join(" ")), false));
+                        pending_label_parts.clear();
+                    }
                     // Regular option with key=value
                     if let (Some(key), Some(value)) = (opt.key(), opt.value()) {
                         options.push((Some(key), Some(value), opt.is_quoted()));
                     }
                 }
+            }
+            if !pending_label_parts.is_empty() {
+                options.push((None, Some(pending_label_parts.join(" ")), false));
             }
             break;
         }

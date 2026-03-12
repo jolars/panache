@@ -105,3 +105,12 @@ fn preserve_mode_keeps_original() {
     // In preserve mode, should keep original format exactly
     assert!(output.contains("{r,echo=FALSE}"));
 }
+
+#[test]
+fn r_chunk_label_with_spaces_stays_single_label() {
+    let input = "```{r several words}\n#\n```\n";
+    let output = format(input, Some(quarto_config()), None);
+
+    assert!(output.contains("#| label: several words"));
+    assert_eq!(output.matches("#| label:").count(), 1);
+}

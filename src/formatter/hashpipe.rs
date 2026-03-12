@@ -174,6 +174,7 @@ pub fn normalize_value(value: &str) -> String {
 pub fn split_options_from_cst(info_node: &SyntaxNode) -> (Vec<ClassifiedOption>, Vec<CstOption>) {
     let mut simple = Vec::new();
     let mut complex = Vec::new();
+    let mut pending_label_parts = Vec::new();
 
     // Find CHUNK_OPTIONS node
     for child in info_node.children() {
@@ -181,9 +182,16 @@ pub fn split_options_from_cst(info_node: &SyntaxNode) -> (Vec<ClassifiedOption>,
             // Iterate through options and labels
             for opt_or_label in child.children() {
                 if let Some(label) = ChunkLabel::cast(opt_or_label.clone()) {
-                    // Label converts to #| label: value
-                    simple.push(("label".to_string(), ChunkOptionValue::Simple(label.text())));
+                    pending_label_parts.push(label.text());
                 } else if let Some(opt) = ChunkOption::cast(opt_or_label) {
+                    if !pending_label_parts.is_empty() {
+                        simple.push((
+                            "label".to_string(),
+                            ChunkOptionValue::Simple(pending_label_parts.join(" ")),
+                        ));
+                        pending_label_parts.clear();
+                    }
+
                     // Regular option with key=value
                     if let (Some(key), Some(value)) = (opt.key(), opt.value()) {
                         let is_quoted = opt.is_quoted();
@@ -200,6 +208,12 @@ pub fn split_options_from_cst(info_node: &SyntaxNode) -> (Vec<ClassifiedOption>,
                         }
                     }
                 }
+            }
+            if !pending_label_parts.is_empty() {
+                simple.push((
+                    "label".to_string(),
+                    ChunkOptionValue::Simple(pending_label_parts.join(" ")),
+                ));
             }
             break;
         }
