@@ -38,6 +38,10 @@ jobs:
         with:
           node-version: "lts/*"
 
+      - run: npm ci --prefix editors/code --no-audit --no-fund
+
+      - run: npm audit signatures
+
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
