@@ -264,6 +264,22 @@ error[bibliography-load-error]: Failed to load bibliography nonexistent.bib: Fil
 **When it runs:** Only when document metadata includes bibliography
 configuration and citation extension is enabled.
 
+### `chunk-label-spaces`
+
+Detects executable chunk labels containing whitespace (for example
+`{r several words}` or `label="several words"`).
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Description
+:   Labels with spaces are accepted by Quarto execution, but cross-references
+    often fail to resolve reliably. Use a stable identifier such as
+    `several-words` or `several_words` instead.
+
 ### Parser Errors
 
 The parser emits syntax errors as lint diagnostics when it encounters malformed
@@ -510,6 +526,7 @@ heading-hierarchy = true
 duplicate-reference-labels = true
 undefined-references = true
 citation-keys = true
+chunk-label-spaces = true
 ```
 
 All rules are enabled by default when omitted. You can disable a specific rule:

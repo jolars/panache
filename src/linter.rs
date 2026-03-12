@@ -100,5 +100,8 @@ fn default_registry(config: &Config) -> RuleRegistry {
     if config.lint.is_rule_enabled("citation-keys") {
         registry.register(Box::new(rules::citation_keys::CitationKeysRule));
     }
+    if config.lint.is_rule_enabled("chunk-label-spaces") {
+        registry.register(Box::new(rules::chunk_label_spaces::ChunkLabelSpacesRule));
+    }
     registry
 }

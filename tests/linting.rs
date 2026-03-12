@@ -170,3 +170,44 @@ undefined-references = false
     assert!(missing_ref.is_empty());
     assert!(missing_footnote.is_empty());
 }
+
+#[test]
+fn test_chunk_label_spaces() {
+    let diagnostics = lint_file_with_config(
+        "chunk_label_spaces.md",
+        r#"
+flavor = "quarto"
+"#,
+    );
+    let label_issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "chunk-label-spaces")
+        .collect();
+
+    assert_eq!(
+        label_issues.len(),
+        2,
+        "Should flag labels containing spaces"
+    );
+    assert!(label_issues[0].message.contains("several words"));
+    assert!(label_issues[1].message.contains("another label"));
+}
+
+#[test]
+fn test_chunk_label_spaces_can_be_disabled() {
+    let diagnostics = lint_file_with_config(
+        "chunk_label_spaces.md",
+        r#"
+flavor = "quarto"
+
+[lint]
+chunk-label-spaces = false
+"#,
+    );
+
+    let label_issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "chunk-label-spaces")
+        .collect();
+    assert!(label_issues.is_empty());
+}
