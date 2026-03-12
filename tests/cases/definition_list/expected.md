@@ -59,7 +59,7 @@ Term 3
 :   Definition with lazy continuation. Second paragraph of the definition.
 
 Example violation
-:   ``` r
+:   ```r
     a <- 1
     ```
 

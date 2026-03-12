@@ -1309,16 +1309,7 @@ impl Formatter {
                                         let mut lines = formatted.lines();
                                         if let Some(first_line) = lines.next() {
                                             let trimmed = first_line.trim_start();
-                                            let rest =
-                                                if let Some(info) = trimmed.strip_prefix("```") {
-                                                    if info.is_empty() || info.starts_with(' ') {
-                                                        trimmed.to_string()
-                                                    } else {
-                                                        format!("``` {}", info)
-                                                    }
-                                                } else {
-                                                    trimmed.to_string()
-                                                };
+                                            let rest = trimmed.to_string();
                                             self.output.push_str(&rest);
                                             self.output.push('\n');
                                         }
@@ -1327,6 +1318,10 @@ impl Formatter {
                                             // Remove trailing closing fence line to control its indent
                                             let closing = lines_vec.pop().unwrap();
                                             for line in &lines_vec {
+                                                if line.trim().is_empty() {
+                                                    self.output.push('\n');
+                                                    continue;
+                                                }
                                                 self.output.push_str(&" ".repeat(def_indent));
                                                 self.output.push_str(line.trim_start());
                                                 self.output.push('\n');

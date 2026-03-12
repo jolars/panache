@@ -41,3 +41,13 @@ fn definition_list_underscore_emphasis_with_asterisks_is_idempotent_in_sentence_
     );
     similar_asserts::assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn definition_list_fenced_code_info_has_no_space_after_fence() {
+    let input = "Input\n:   ``` markdown \n    # Heading 1\n    \n    # Heading 2\n    ``` \n";
+    let output = format(input, None, None);
+    assert!(output.contains(":   ```markdown"));
+    assert!(!output.contains(":   ``` markdown"));
+    assert!(output.contains("# Heading 1\n\n    # Heading 2"));
+    assert!(!output.contains("# Heading 1\n    \n    # Heading 2"));
+}

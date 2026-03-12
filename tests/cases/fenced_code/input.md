@@ -46,3 +46,12 @@ A fenced code block should be separated with a blankline after we have formatted
 a <- 1
 b <- 2
 ```
+
+A code block in a definition list:
+
+Input
+:   ``` markdown 
+    # Heading 1
+    
+    # Heading 2
+    ``` 

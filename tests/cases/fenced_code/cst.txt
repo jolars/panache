@@ -1,4 +1,4 @@
-DOCUMENT@0..702
+DOCUMENT@0..809
   CODE_BLOCK@0..32
     CODE_FENCE_OPEN@0..8
       CODE_FENCE_MARKER@0..3 "```"
@@ -156,4 +156,41 @@ DOCUMENT@0..702
     CODE_FENCE_CLOSE@698..702
       CODE_FENCE_MARKER@698..701 "```"
       NEWLINE@701..702 "\n"
+  BLANK_LINE@702..703
+    BLANK_LINE@702..703 "\n"
+  PARAGRAPH@703..738
+    TEXT@703..737 "A code block in a def ..."
+    NEWLINE@737..738 "\n"
+  BLANK_LINE@738..739
+    BLANK_LINE@738..739 "\n"
+  DEFINITION_LIST@739..809
+    DEFINITION_ITEM@739..809
+      TERM@739..745
+        TEXT@739..744 "Input"
+        NEWLINE@744..745 "\n"
+      DEFINITION@745..809
+        DEFINITION_MARKER@745..746 ":"
+        WHITESPACE@746..749 "   "
+        CODE_BLOCK@749..809
+          CODE_FENCE_OPEN@749..763
+            CODE_FENCE_MARKER@749..752 "```"
+            WHITESPACE@752..753 " "
+            CODE_INFO@753..762
+              CODE_LANGUAGE@753..761 "markdown"
+              TEXT@761..762 " "
+            NEWLINE@762..763 "\n"
+          CODE_CONTENT@763..800
+            WHITESPACE@763..767 "    "
+            TEXT@767..778 "# Heading 1"
+            NEWLINE@778..779 "\n"
+            WHITESPACE@779..783 "    "
+            NEWLINE@783..784 "\n"
+            WHITESPACE@784..788 "    "
+            TEXT@788..799 "# Heading 2"
+            NEWLINE@799..800 "\n"
+          WHITESPACE@800..804 "    "
+          CODE_FENCE_CLOSE@804..809
+            CODE_FENCE_MARKER@804..807 "```"
+            WHITESPACE@807..808 " "
+            NEWLINE@808..809 "\n"
 
