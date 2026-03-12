@@ -175,24 +175,28 @@ fn parse_tex_command_lines(
 ) -> usize {
     let mut lines_consumed = 0;
     let mut first_line = true;
+    let mut brace_depth: i32 = 0;
+    let mut started_braced_command = false;
 
     for line in &lines[start_pos..] {
         let inner =
             crate::parser::blocks::blockquotes::strip_n_blockquote_markers(line, blockquote_depth);
-        // Stop at blank lines
-        if inner.trim().is_empty() {
-            break;
-        }
+        if !first_line && brace_depth == 0 {
+            // Stop at blank lines
+            if inner.trim().is_empty() {
+                break;
+            }
 
-        // Stop if not a LaTeX command line
-        if !is_latex_command_line(inner) {
-            break;
-        }
+            // Stop if not a LaTeX command line
+            if !is_latex_command_line(inner) {
+                break;
+            }
 
-        // Inside blockquotes, consume one command line at a time so outer parsing
-        // can preserve each line's blockquote markers losslessly.
-        if blockquote_depth > 0 && !first_line {
-            break;
+            // Inside blockquotes, consume one command line at a time so outer parsing
+            // can preserve each line's blockquote markers losslessly.
+            if blockquote_depth > 0 {
+                break;
+            }
         }
 
         log::trace!("  Raw block line: {:?}", inner);
@@ -207,6 +211,17 @@ fn parse_tex_command_lines(
         builder.token(SyntaxKind::TEXT.into(), content);
 
         lines_consumed += 1;
+        brace_depth += brace_delta(content);
+        if brace_depth < 0 {
+            brace_depth = 0;
+        }
+        if first_line && brace_depth > 0 {
+            started_braced_command = true;
+        }
+        if started_braced_command && brace_depth == 0 {
+            break;
+        }
+        first_line = false;
     }
 
     // Emit final newline if there were any lines
@@ -215,6 +230,33 @@ fn parse_tex_command_lines(
     }
 
     lines_consumed
+}
+
+fn brace_delta(text: &str) -> i32 {
+    let mut delta = 0i32;
+    let mut backslashes = 0usize;
+
+    for ch in text.chars() {
+        if ch == '\\' {
+            backslashes += 1;
+            continue;
+        }
+
+        let escaped = backslashes % 2 == 1;
+        backslashes = 0;
+
+        if escaped {
+            continue;
+        }
+
+        match ch {
+            '{' => delta += 1,
+            '}' => delta -= 1,
+            _ => {}
+        }
+    }
+
+    delta
 }
 
 /// Parse a LaTeX environment from \begin{env} to \end{env}.
@@ -386,5 +428,18 @@ mod tests {
 
         let consumed = parse_raw_tex_block(&mut builder, &lines, 0, 1);
         assert_eq!(consumed, 1);
+    }
+
+    #[test]
+    fn test_parse_braced_command_block_until_closing_brace() {
+        let lines = vec!["\\pdfpcnote{\n", "  - blabla\n", "}\n"];
+        let mut builder = GreenNodeBuilder::new();
+
+        let consumed = parse_raw_tex_block(&mut builder, &lines, 0, 0);
+        assert_eq!(consumed, 3);
+
+        let green = builder.finish();
+        let node = SyntaxNode::new_root(green);
+        assert_eq!(node.text().to_string(), "\\pdfpcnote{\n  - blabla\n}\n");
     }
 }

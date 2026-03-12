@@ -38,3 +38,12 @@ fn mixed_latex_and_markdown() {
     assert!(output.contains("\\LaTeX{}"));
     assert!(output.contains("https://example.com"));
 }
+
+#[test]
+fn braced_tex_command_block_is_preserved() {
+    let input = "\\pdfpcnote{\n  - blabla\n}\n";
+    let first = format(input, None, None);
+    let second = format(&first, None, None);
+    similar_asserts::assert_eq!(first, second);
+    similar_asserts::assert_eq!(first, input);
+}
