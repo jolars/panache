@@ -246,13 +246,21 @@ use Prettier as well as mdformat, but both fail to handle some of the particular
 syntax used in Quarto documents, such as fenced divs and some of the table
 syntax.
 
-## Design Goals
+## Design Goals and Scope
 
-- Full LSP implementation for editor integration
-- Linting as part of LSP but also available as a standalone CLI command
-- Support Quarto, Pandoc, and Markdown syntax
-- Fast lossless parsing and formatting (no CST changes if already formatted)
-- Be configurable, but have sane defaults (that most people can agree on)
-- Format math
-- Hook into external formatters for code blocks (e.g. `air` for R, `ruff` for
-  Python)
+- Full LSP implementation with formatting, diagnostics, code actions, and more
+- Standalone CLI for both formatting and linting
+- Support for Quarto, Pandoc, and R Markdown syntax
+- Lossless CST-based parsing
+- Idempotent formatting
+- Semi-opinionated defaults with configurable style options for common
+  formatting decisions
+- Support for running external formatters and linters on code blocks, with
+  built-in presets for popular languages and tools
+
+## Acknowledgements
+
+The development of Panache has simplified considerably thanks to the extensive
+documentation, well-structured code, and testing infrastructure provided by
+Pandoc. We also owe significant debt to the rust-analyzer project, on which
+Panche is heavily inspired.
