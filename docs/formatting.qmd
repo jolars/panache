@@ -630,24 +630,6 @@ Ignore directives work inside lists, blockquotes, and other nested structures:
 See [Linting](linting.qmd) for information about linting-specific ignore
 directives.
 
-## Formatting Preservation
-
-panache preserves:
-
-- Semantic meaning of all elements
-
-- Math expressions exactly as written
-
-- Code block content (unless external formatter configured)
-
-- Link URLs and reference definitions
-
-- Attribute syntax and values
-
-- Raw HTML/LaTeX blocks
-
-- Content within ignore directive regions
-
 ## See Also
 
 - [Configuration](configuration.qmd) - Control formatting behavior
