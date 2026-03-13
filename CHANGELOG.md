@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.20.0](https://github.com/jolars/panache/compare/v2.19.0...v2.20.0) (2026-03-13)
+
+### Features
+
+* **linter:** add linting rule for missing code chunk labels ([a8f4709](https://github.com/jolars/panache/commit/a8f4709ab943297a9912761cb9a6acff6a9fb07d)), closes [#68](https://github.com/jolars/panache/issues/68)
+* **linter:** add rule for duplicate chunk labels ([50806ba](https://github.com/jolars/panache/commit/50806bad26cfd9a5d5262590f752380b2c973f6e))
+* **lsp:** add find-references support for crossrefs ([475bd94](https://github.com/jolars/panache/commit/475bd94cca5e5fba61c7e17c7cadad5e89e21478))
+* **lsp:** add go-to-def, rename for exec chunk labels ([5f4367d](https://github.com/jolars/panache/commit/5f4367db2c71557c49f5c040507f068094f72807))
+* **lsp:** extend find-references to citations ([ec2d328](https://github.com/jolars/panache/commit/ec2d328170d04406d91570e411a4660424adc8eb))
+* **parser:** parse in-comment execution options ([35c772d](https://github.com/jolars/panache/commit/35c772d0b469c88e12b3d272820fb53dcaa2bc9b))
+
+### Bug Fixes
+
+* **parser:** handle unicode properly ([5886d05](https://github.com/jolars/panache/commit/5886d05d5558271fa8daeb92c5b125cb4c68c265))
+
 ## [2.19.0](https://github.com/jolars/panache/compare/v2.18.0...v2.19.0) (2026-03-12)
 
 ### Features
