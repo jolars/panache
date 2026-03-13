@@ -65,6 +65,7 @@ pub(crate) async fn goto_definition(
     };
 
     enum PendingDefinition {
+        Citation(String),
         Crossref(String),
         Reference { label: String, is_footnote: bool },
     }
@@ -88,52 +89,8 @@ pub(crate) async fn goto_definition(
 
         // Walk up the tree to find a citation, reference, or footnote
         let pending = loop {
-            // First: citation definitions in bibliography
-            if let Some(key) = helpers::extract_citation_key(&node)
-                && let Some(metadata) = metadata.clone()
-            {
-                if let Some(parse) = metadata.bibliography_parse
-                    && let Some(entry) = parse.index.get(&key)
-                {
-                    let target_uri =
-                        Uri::from_file_path(&entry.source_file).unwrap_or_else(|| uri.clone());
-                    let (target_text, target_uri) =
-                        if let Ok(text) = std::fs::read_to_string(&entry.source_file) {
-                            (text, target_uri)
-                        } else {
-                            (content.clone(), uri.clone())
-                        };
-                    let start = conversions::offset_to_position(&target_text, entry.span.start);
-                    let end = conversions::offset_to_position(&target_text, entry.span.end);
-                    let location = Location {
-                        uri: target_uri,
-                        range: Range { start, end },
-                    };
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-                }
-
-                if let Some(inline) = metadata
-                    .inline_references
-                    .iter()
-                    .find(|entry| entry.id.eq_ignore_ascii_case(&key))
-                {
-                    let target_uri =
-                        Uri::from_file_path(&inline.path).unwrap_or_else(|| uri.clone());
-                    let target_text = if Some(inline.path.clone()) == this_path {
-                        content.clone()
-                    } else {
-                        std::fs::read_to_string(&inline.path).unwrap_or_default()
-                    };
-                    let start =
-                        conversions::offset_to_position(&target_text, inline.range.start().into());
-                    let end =
-                        conversions::offset_to_position(&target_text, inline.range.end().into());
-                    let location = Location {
-                        uri: target_uri,
-                        range: Range { start, end },
-                    };
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-                }
+            if let Some(key) = helpers::extract_citation_key(&node) {
+                break Some(PendingDefinition::Citation(key));
             }
 
             // Quarto crossref: jump to attribute definition
@@ -275,6 +232,24 @@ pub(crate) async fn goto_definition(
         helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
 
     let definition = match pending {
+        PendingDefinition::Citation(key) => {
+            let Some(metadata) = metadata.as_ref() else {
+                return Ok(None);
+            };
+            let db = salsa_db.lock().await;
+            let mut locations = helpers::citation_definition_locations(
+                metadata,
+                &key,
+                &crate::utils::normalize_label(&key),
+                uri,
+                &content,
+                &*db,
+            );
+            if locations.is_empty() {
+                return Ok(None);
+            }
+            return Ok(Some(GotoDefinitionResponse::Scalar(locations.remove(0))));
+        }
         PendingDefinition::Crossref(label) => definition_index.find_crossref(&label),
         PendingDefinition::Reference { label, is_footnote } => {
             if is_footnote {
@@ -294,9 +269,9 @@ pub(crate) async fn goto_definition(
         content
     } else {
         let db = salsa_db.lock().await;
-        db.file_text_if_cached(definition.path())
+        crate::salsa::Db::file_text(&*db, definition.path().to_path_buf())
             .map(|file| file.text(&*db).clone())
-            .unwrap_or_else(|| std::fs::read_to_string(definition.path()).unwrap_or_default())
+            .unwrap_or_default()
     };
     let start = conversions::offset_to_position(&target_text, definition.range().start().into());
     let end = conversions::offset_to_position(&target_text, definition.range().end().into());

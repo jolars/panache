@@ -7,7 +7,8 @@ use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{
-    AstNode, ChunkOption, FootnoteDefinition, ReferenceDefinition, SyntaxKind, SyntaxNode,
+    AstNode, ChunkOption, Citation, Crossref, FootnoteDefinition, ReferenceDefinition, SyntaxKind,
+    SyntaxNode,
 };
 use crate::utils::normalize_label;
 use salsa::{Accumulator, Durability, Setter};
@@ -194,6 +195,130 @@ pub struct ExternalLintJob {
 pub struct BuiltInLintPlan {
     pub diagnostics: Vec<crate::linter::Diagnostic>,
     pub external_jobs: Vec<ExternalLintJob>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SymbolUsageIndex {
+    citation_usages: HashMap<String, Vec<rowan::TextRange>>,
+    crossref_usages: HashMap<String, Vec<rowan::TextRange>>,
+    crossref_declarations: HashMap<String, Vec<rowan::TextRange>>,
+    chunk_label_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
+}
+
+impl SymbolUsageIndex {
+    pub fn citation_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.citation_usages.get(&normalize_label(key))
+    }
+
+    pub fn crossref_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.crossref_usages.get(&normalize_label(key))
+    }
+
+    pub fn crossref_declarations(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.crossref_declarations.get(&normalize_label(key))
+    }
+
+    pub fn chunk_label_value_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.chunk_label_value_ranges.get(&normalize_label(key))
+    }
+}
+
+#[salsa::tracked(returns(ref), lru = 64)]
+pub fn symbol_usage_index(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+    _path: PathBuf,
+) -> SymbolUsageIndex {
+    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    let mut index = SymbolUsageIndex::default();
+
+    for node in tree
+        .descendants()
+        .filter(|node| node.kind() == SyntaxKind::CITATION)
+    {
+        db.unwind_if_revision_cancelled();
+        let Some(citation) = Citation::cast(node) else {
+            continue;
+        };
+        for key in citation.keys() {
+            index
+                .citation_usages
+                .entry(normalize_label(&key.text()))
+                .or_default()
+                .push(key.text_range());
+        }
+    }
+
+    for node in tree
+        .descendants()
+        .filter(|node| node.kind() == SyntaxKind::CROSSREF)
+    {
+        db.unwind_if_revision_cancelled();
+        let Some(crossref) = Crossref::cast(node) else {
+            continue;
+        };
+        for key in crossref.keys() {
+            index
+                .crossref_usages
+                .entry(normalize_label(&key.text()))
+                .or_default()
+                .push(key.text_range());
+        }
+    }
+
+    for node in tree.descendants() {
+        db.unwind_if_revision_cancelled();
+        if node.kind() != SyntaxKind::ATTRIBUTE {
+            continue;
+        }
+        let text = node.text().to_string();
+        if let Some(attrs) = try_parse_trailing_attributes(&text).map(|(attrs, _)| attrs)
+            && let Some(id) = attrs.identifier
+        {
+            index
+                .crossref_declarations
+                .entry(normalize_label(&id))
+                .or_default()
+                .push(node.text_range());
+        }
+    }
+
+    for option in tree.descendants().filter_map(ChunkOption::cast) {
+        db.unwind_if_revision_cancelled();
+        let Some(key) = option.key() else {
+            continue;
+        };
+        if !key.eq_ignore_ascii_case("label") {
+            continue;
+        }
+        let Some(value) = option.value() else {
+            continue;
+        };
+        if value.is_empty() {
+            continue;
+        }
+        index
+            .crossref_declarations
+            .entry(normalize_label(&value))
+            .or_default()
+            .push(option.syntax().text_range());
+        if let Some(value_range) = option
+            .syntax()
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|t| t.kind() == SyntaxKind::CHUNK_OPTION_VALUE)
+            .map(|t| t.text_range())
+        {
+            index
+                .chunk_label_value_ranges
+                .entry(normalize_label(&value))
+                .or_default()
+                .push(value_range);
+        }
+    }
+
+    index
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
@@ -857,5 +982,33 @@ mod tests {
         let path = PathBuf::from("/tmp/example.qmd");
         let interned = intern_path(&db, &path);
         assert_eq!(resolve_path(&db, interned), path);
+    }
+
+    #[test]
+    fn symbol_usage_index_collects_citations_and_crossrefs() {
+        let mut db = SalsaDb::default();
+        let path = PathBuf::from("/tmp/symbols.qmd");
+        let file = db.update_file_text(
+            path.clone(),
+            "See @fig-plot and [@cite].\n\n```{r}\n#| label: fig-plot\n1 + 1\n```\n".to_string(),
+        );
+        let mut cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        cfg.extensions.quarto_crossrefs = true;
+        let config = FileConfig::new(&db, cfg);
+        let index = symbol_usage_index(&db, file, config, path);
+
+        assert_eq!(index.crossref_usages("fig-plot").map(|v| v.len()), Some(1));
+        assert_eq!(
+            index.crossref_declarations("fig-plot").map(|v| v.len()),
+            Some(1)
+        );
+        assert_eq!(
+            index.chunk_label_value_ranges("fig-plot").map(|v| v.len()),
+            Some(1)
+        );
+        assert_eq!(index.citation_usages("cite").map(|v| v.len()), Some(1));
     }
 }

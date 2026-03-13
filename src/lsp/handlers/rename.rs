@@ -8,7 +8,7 @@ use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
 use crate::metadata::{inline_bib_conflicts, inline_reference_map};
-use crate::syntax::{AstNode, ChunkOption, Citation, Crossref, SyntaxKind, SyntaxNode};
+use crate::syntax::SyntaxNode;
 
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
@@ -69,32 +69,47 @@ pub(crate) async fn rename(
         let old_norm = normalize_label(&old_key);
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
-        let mut doc_paths = {
+        let per_doc = {
             let db = salsa_db.lock().await;
-            crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
-                .documents()
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>()
+            let mut doc_paths =
+                crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
+                    .documents()
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>();
+            if !doc_paths.contains(&doc_path) {
+                doc_paths.push(doc_path.clone());
+            }
+            doc_paths.sort();
+            doc_paths.dedup();
+
+            let mut out = Vec::new();
+            for path in &doc_paths {
+                let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
+                let (file, text) = if doc_uri == uri {
+                    (salsa_file, content.clone())
+                } else {
+                    let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
+                        continue;
+                    };
+                    (file, file.text(&*db).clone())
+                };
+                let symbol_index =
+                    crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone())
+                        .clone();
+                out.push((doc_uri, text, symbol_index));
+            }
+            out
         };
-        if !doc_paths.contains(&doc_path) {
-            doc_paths.push(doc_path.clone());
-        }
-        doc_paths.sort();
-        doc_paths.dedup();
 
-        for path in doc_paths {
-            let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
-            let (text, tree) = if doc_uri == uri {
-                (content.clone(), SyntaxNode::new_root(green_tree.clone()))
-            } else {
-                let text = std::fs::read_to_string(&path).unwrap_or_default();
-                let tree = crate::parse(&text, None);
-                (text, tree)
-            };
-
-            let mut edits = crossref_key_edits(&tree, &text, &old_norm, &new_name);
-            edits.extend(chunk_label_edits(&tree, &text, &old_norm, &new_name));
+        for (doc_uri, text, symbol_index) in per_doc {
+            let mut edits = Vec::new();
+            if let Some(ranges) = symbol_index.crossref_usages(&old_norm) {
+                edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
+            }
+            if let Some(ranges) = symbol_index.chunk_label_value_ranges(&old_norm) {
+                edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
+            }
             if edits.is_empty() {
                 continue;
             }
@@ -164,7 +179,12 @@ pub(crate) async fn rename(
             .dedup_by(|a, b| a.source_file == b.source_file && a.key.eq_ignore_ascii_case(&b.key));
         for entry in bib_entries {
             let bib_path = entry.source_file.clone();
-            let bib_text = std::fs::read_to_string(&bib_path).unwrap_or_default();
+            let bib_text = {
+                let db = salsa_db.lock().await;
+                crate::salsa::Db::file_text(&*db, bib_path.clone())
+                    .map(|file| file.text(&*db).clone())
+                    .unwrap_or_default()
+            };
             let bib_start = offset_to_position(&bib_text, entry.span.start);
             let bib_end = offset_to_position(&bib_text, entry.span.end);
             let bib_uri = Uri::from_file_path(&bib_path).unwrap_or_else(|| uri.clone());
@@ -200,7 +220,10 @@ pub(crate) async fn rename(
             let text = if entry.path == doc_path {
                 content.clone()
             } else {
-                std::fs::read_to_string(&entry.path).unwrap_or_default()
+                let db = salsa_db.lock().await;
+                crate::salsa::Db::file_text(&*db, entry.path.clone())
+                    .map(|file| file.text(&*db).clone())
+                    .unwrap_or_default()
             };
             let start = offset_to_position(&text, entry.range.start().into());
             let end = offset_to_position(&text, entry.range.end().into());
@@ -229,22 +252,33 @@ pub(crate) async fn rename(
     doc_paths.sort();
     doc_paths.dedup();
 
-    let current_root = SyntaxNode::new_root(green_tree.clone());
-    for path in doc_paths {
-        let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
-        let (text, tree) = if doc_uri == uri {
-            (content.clone(), current_root.clone())
-        } else {
-            let text = std::fs::read_to_string(&path).unwrap_or_default();
-            let tree = crate::parse(&text, None);
-            (text, tree)
-        };
-
-        let edits = citation_key_edits(&tree, &text, &old_norm, &new_name);
-        if edits.is_empty() {
-            continue;
+    let citation_usage_docs = {
+        let db = salsa_db.lock().await;
+        let mut out = Vec::new();
+        for path in &doc_paths {
+            let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
+            let (file, text) = if doc_uri == uri {
+                (salsa_file, content.clone())
+            } else {
+                let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
+                    continue;
+                };
+                (file, file.text(&*db).clone())
+            };
+            let symbol_index =
+                crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
+            out.push((doc_uri, text, symbol_index));
         }
-        changes.entry(doc_uri).or_default().extend(edits);
+        out
+    };
+    for (doc_uri, text, symbol_index) in citation_usage_docs {
+        let Some(ranges) = symbol_index.citation_usages(&old_norm) else {
+            continue;
+        };
+        let edits = text_edits_from_ranges(ranges, &text, &new_name);
+        if !edits.is_empty() {
+            changes.entry(doc_uri).or_default().extend(edits);
+        }
     }
 
     if changes.is_empty() {
@@ -257,101 +291,19 @@ pub(crate) async fn rename(
     }))
 }
 
-fn crossref_key_edits(
-    root: &SyntaxNode,
+fn text_edits_from_ranges(
+    ranges: &[rowan::TextRange],
     text: &str,
-    old_norm: &str,
-    new_key: &str,
+    new_text: &str,
 ) -> Vec<TextEdit> {
     let mut edits = Vec::new();
-    for node in root
-        .descendants()
-        .filter(|node| node.kind() == SyntaxKind::CROSSREF)
-    {
-        let Some(crossref) = Crossref::cast(node) else {
-            continue;
-        };
-        for key in crossref.keys() {
-            if normalize_label(&key.text()) != old_norm {
-                continue;
-            }
-            let range = key.text_range();
-            let start = offset_to_position(text, range.start().into());
-            let end = offset_to_position(text, range.end().into());
-            edits.push(TextEdit {
-                range: Range { start, end },
-                new_text: new_key.to_string(),
-            });
-        }
-    }
-    edits
-}
-
-fn chunk_label_edits(
-    root: &SyntaxNode,
-    text: &str,
-    old_norm: &str,
-    new_key: &str,
-) -> Vec<TextEdit> {
-    let mut edits = Vec::new();
-    for option in root.descendants().filter_map(ChunkOption::cast) {
-        let Some(key) = option.key() else {
-            continue;
-        };
-        if !key.eq_ignore_ascii_case("label") {
-            continue;
-        }
-        let Some(value) = option.value() else {
-            continue;
-        };
-        if normalize_label(&value) != old_norm {
-            continue;
-        }
-        let Some(value_range) = option
-            .syntax()
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .find(|t| t.kind() == SyntaxKind::CHUNK_OPTION_VALUE)
-            .map(|t| t.text_range())
-        else {
-            continue;
-        };
-        let start = offset_to_position(text, value_range.start().into());
-        let end = offset_to_position(text, value_range.end().into());
+    for range in ranges {
+        let start = offset_to_position(text, range.start().into());
+        let end = offset_to_position(text, range.end().into());
         edits.push(TextEdit {
             range: Range { start, end },
-            new_text: new_key.to_string(),
+            new_text: new_text.to_string(),
         });
-    }
-    edits
-}
-
-fn citation_key_edits(
-    root: &SyntaxNode,
-    text: &str,
-    old_norm: &str,
-    new_key: &str,
-) -> Vec<TextEdit> {
-    let mut edits = Vec::new();
-    for node in root
-        .descendants()
-        .filter(|node| node.kind() == SyntaxKind::CITATION)
-    {
-        let Some(citation) = Citation::cast(node) else {
-            continue;
-        };
-        for key in citation.keys() {
-            if normalize_label(&key.text()) != old_norm {
-                continue;
-            }
-            let range = key.text_range();
-            let start = offset_to_position(text, range.start().into());
-            let end = offset_to_position(text, range.end().into());
-            edits.push(TextEdit {
-                range: Range { start, end },
-                new_text: new_key.to_string(),
-            });
-        }
     }
     edits
 }

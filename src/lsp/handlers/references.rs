@@ -7,13 +7,16 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
-use crate::metadata::DocumentMetadata;
-use crate::parser::utils::attributes::try_parse_trailing_attributes;
-use crate::syntax::{AstNode, ChunkOption, Citation, Crossref, SyntaxKind, SyntaxNode};
+use crate::syntax::SyntaxNode;
 use crate::utils::normalize_label;
 
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
+
+enum Target {
+    Crossref(String),
+    Citation { key: String, norm: String },
+}
 
 pub(crate) async fn references(
     _client: &tower_lsp_server::Client,
@@ -45,11 +48,6 @@ pub(crate) async fn references(
         return Ok(None);
     };
 
-    enum Target {
-        Crossref(String),
-        Citation { key: String, norm: String },
-    }
-
     let target = {
         let root = SyntaxNode::new_root(green_tree.clone());
         let Some(offset) = position_to_offset(&content, position) else {
@@ -78,85 +76,84 @@ pub(crate) async fn references(
             }
         }
     };
-
     let Some(target) = target else {
         return Ok(None);
     };
 
-    let metadata = if include_declaration {
-        let yaml_ok = {
-            let db = salsa_db.lock().await;
-            crate::salsa::yaml_metadata_parse_result(
+    let mut locations = Vec::new();
+    let metadata = {
+        let db = salsa_db.lock().await;
+        let mut doc_paths =
+            crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
+                .documents()
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>();
+        if !doc_paths.contains(&doc_path) {
+            doc_paths.push(doc_path.clone());
+        }
+        doc_paths.sort();
+        doc_paths.dedup();
+
+        for path in doc_paths {
+            let (file, text) = if path == doc_path {
+                (salsa_file, content.clone())
+            } else {
+                let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
+                    continue;
+                };
+                (file, file.text(&*db).clone())
+            };
+            let symbol_index =
+                crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
+            let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
+
+            match &target {
+                Target::Crossref(label) => {
+                    if let Some(ranges) = symbol_index.crossref_usages(label) {
+                        add_locations(&mut locations, &doc_uri, &text, ranges);
+                    }
+                    if include_declaration
+                        && let Some(ranges) = symbol_index.crossref_declarations(label)
+                    {
+                        add_locations(&mut locations, &doc_uri, &text, ranges);
+                    }
+                }
+                Target::Citation { norm, .. } => {
+                    if let Some(ranges) = symbol_index.citation_usages(norm) {
+                        add_locations(&mut locations, &doc_uri, &text, ranges);
+                    }
+                }
+            }
+        }
+
+        if include_declaration {
+            let yaml_ok = crate::salsa::yaml_metadata_parse_result(
                 &*db,
                 salsa_file,
                 salsa_config,
                 doc_path.clone(),
             )
-            .is_ok()
-        };
-        if yaml_ok {
-            let db = salsa_db.lock().await;
-            Some(crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone()).clone())
+            .is_ok();
+            if yaml_ok {
+                Some(
+                    crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone())
+                        .clone(),
+                )
+            } else {
+                None
+            }
         } else {
             None
         }
-    } else {
-        None
     };
-
-    let mut doc_paths = {
-        let db = salsa_db.lock().await;
-        crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
-            .documents()
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>()
-    };
-    if !doc_paths.contains(&doc_path) {
-        doc_paths.push(doc_path.clone());
-    }
-    doc_paths.sort();
-    doc_paths.dedup();
-
-    let mut locations = Vec::new();
-    for path in doc_paths {
-        let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
-        let (text, tree) = if path == doc_path {
-            (content.clone(), SyntaxNode::new_root(green_tree.clone()))
-        } else {
-            let text = std::fs::read_to_string(&path).unwrap_or_default();
-            let tree = crate::parse(&text, None);
-            (text, tree)
-        };
-
-        match &target {
-            Target::Crossref(target_norm) => {
-                locations.extend(crossref_usage_locations(
-                    &tree,
-                    &text,
-                    target_norm,
-                    &doc_uri,
-                ));
-                if include_declaration {
-                    locations.extend(crossref_definition_locations(
-                        &tree,
-                        &text,
-                        target_norm,
-                        &doc_uri,
-                    ));
-                }
-            }
-            Target::Citation { norm, .. } => {
-                locations.extend(citation_usage_locations(&tree, &text, norm, &doc_uri));
-            }
-        }
-    }
 
     if include_declaration
         && let (Target::Citation { key, norm }, Some(metadata)) = (&target, metadata.as_ref())
     {
-        locations.extend(citation_definition_locations(
-            metadata, key, norm, &uri, &content,
+        let db = salsa_db.lock().await;
+        locations.extend(helpers::citation_definition_locations(
+            metadata, key, norm, &uri, &content, &*db,
         ));
     }
 
@@ -174,163 +171,11 @@ pub(crate) async fn references(
     if locations.is_empty() {
         return Ok(None);
     }
-
     Ok(Some(locations))
 }
 
-fn citation_usage_locations(
-    root: &SyntaxNode,
-    text: &str,
-    target_norm: &str,
-    uri: &Uri,
-) -> Vec<Location> {
-    let mut out = Vec::new();
-    for node in root
-        .descendants()
-        .filter(|node| node.kind() == SyntaxKind::CITATION)
-    {
-        let Some(citation) = Citation::cast(node) else {
-            continue;
-        };
-        for key in citation.keys() {
-            if normalize_label(&key.text()) != target_norm {
-                continue;
-            }
-            let range = key.text_range();
-            out.push(Location {
-                uri: uri.clone(),
-                range: Range {
-                    start: offset_to_position(text, range.start().into()),
-                    end: offset_to_position(text, range.end().into()),
-                },
-            });
-        }
-    }
-    out
-}
-
-fn citation_definition_locations(
-    metadata: &DocumentMetadata,
-    key: &str,
-    norm: &str,
-    default_uri: &Uri,
-    default_content: &str,
-) -> Vec<Location> {
-    let mut out = Vec::new();
-
-    if let Some(parse) = metadata.bibliography_parse.as_ref() {
-        for entry in parse.index.entries.values().filter(|entry| {
-            entry.key.eq_ignore_ascii_case(key) || normalize_label(&entry.key) == norm
-        }) {
-            let entry_uri =
-                Uri::from_file_path(&entry.source_file).unwrap_or_else(|| default_uri.clone());
-            let bib_text = std::fs::read_to_string(&entry.source_file).unwrap_or_default();
-            out.push(Location {
-                uri: entry_uri,
-                range: Range {
-                    start: offset_to_position(&bib_text, entry.span.start),
-                    end: offset_to_position(&bib_text, entry.span.end),
-                },
-            });
-        }
-    }
-
-    for inline in metadata
-        .inline_references
-        .iter()
-        .filter(|entry| entry.id.eq_ignore_ascii_case(key) || normalize_label(&entry.id) == norm)
-    {
-        let entry_uri = Uri::from_file_path(&inline.path).unwrap_or_else(|| default_uri.clone());
-        let inline_text = if entry_uri == *default_uri {
-            default_content.to_string()
-        } else {
-            std::fs::read_to_string(&inline.path).unwrap_or_default()
-        };
-        out.push(Location {
-            uri: entry_uri,
-            range: Range {
-                start: offset_to_position(&inline_text, inline.range.start().into()),
-                end: offset_to_position(&inline_text, inline.range.end().into()),
-            },
-        });
-    }
-
-    out
-}
-
-fn crossref_usage_locations(
-    root: &SyntaxNode,
-    text: &str,
-    target_norm: &str,
-    uri: &Uri,
-) -> Vec<Location> {
-    let mut out = Vec::new();
-    for node in root
-        .descendants()
-        .filter(|node| node.kind() == SyntaxKind::CROSSREF)
-    {
-        let Some(crossref) = Crossref::cast(node) else {
-            continue;
-        };
-        for key in crossref.keys() {
-            if normalize_label(&key.text()) != target_norm {
-                continue;
-            }
-            let range = key.text_range();
-            out.push(Location {
-                uri: uri.clone(),
-                range: Range {
-                    start: offset_to_position(text, range.start().into()),
-                    end: offset_to_position(text, range.end().into()),
-                },
-            });
-        }
-    }
-    out
-}
-
-fn crossref_definition_locations(
-    root: &SyntaxNode,
-    text: &str,
-    target_norm: &str,
-    uri: &Uri,
-) -> Vec<Location> {
-    let mut out = Vec::new();
-
-    for node in root.descendants() {
-        if node.kind() != SyntaxKind::ATTRIBUTE {
-            continue;
-        }
-        let text_value = node.text().to_string();
-        if let Some(attrs) = try_parse_trailing_attributes(&text_value).map(|(attrs, _)| attrs)
-            && let Some(id) = attrs.identifier
-            && normalize_label(&id) == target_norm
-        {
-            let range = node.text_range();
-            out.push(Location {
-                uri: uri.clone(),
-                range: Range {
-                    start: offset_to_position(text, range.start().into()),
-                    end: offset_to_position(text, range.end().into()),
-                },
-            });
-        }
-    }
-
-    for option in root.descendants().filter_map(ChunkOption::cast) {
-        let Some(key) = option.key() else {
-            continue;
-        };
-        if !key.eq_ignore_ascii_case("label") {
-            continue;
-        }
-        let Some(value) = option.value() else {
-            continue;
-        };
-        if normalize_label(&value) != target_norm {
-            continue;
-        }
-        let range = option.syntax().text_range();
+fn add_locations(out: &mut Vec<Location>, uri: &Uri, text: &str, ranges: &[rowan::TextRange]) {
+    for range in ranges {
         out.push(Location {
             uri: uri.clone(),
             range: Range {
@@ -339,6 +184,4 @@ fn crossref_definition_locations(
             },
         });
     }
-
-    out
 }

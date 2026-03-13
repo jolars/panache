@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tower_lsp_server::ls_types::Uri;
+use tower_lsp_server::ls_types::{Location, Range, Uri};
 
 use crate::Config;
 use crate::lsp::DocumentState;
+use crate::metadata::DocumentMetadata;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::salsa::Db;
 use crate::syntax::{AstNode, ChunkOption, Citation, Crossref, SyntaxKind, SyntaxNode};
@@ -97,6 +98,77 @@ pub(crate) async fn get_definition_index_with_includes(
         }
     }
     index
+}
+
+pub(crate) fn citation_definition_locations(
+    metadata: &DocumentMetadata,
+    key: &str,
+    norm: &str,
+    default_uri: &Uri,
+    default_content: &str,
+    db: &dyn crate::salsa::Db,
+) -> Vec<Location> {
+    let mut out = Vec::new();
+
+    if let Some(parse) = metadata.bibliography_parse.as_ref() {
+        for entry in parse.index.entries.values().filter(|entry| {
+            entry.key.eq_ignore_ascii_case(key) || normalize_label(&entry.key) == norm
+        }) {
+            let entry_uri =
+                Uri::from_file_path(&entry.source_file).unwrap_or_else(|| default_uri.clone());
+            let bib_text = db
+                .file_text(entry.source_file.clone())
+                .map(|file| file.text(db).clone())
+                .unwrap_or_default();
+            out.push(Location {
+                uri: entry_uri,
+                range: Range {
+                    start: crate::lsp::conversions::offset_to_position(&bib_text, entry.span.start),
+                    end: crate::lsp::conversions::offset_to_position(&bib_text, entry.span.end),
+                },
+            });
+        }
+    }
+
+    for inline in metadata
+        .inline_references
+        .iter()
+        .filter(|entry| entry.id.eq_ignore_ascii_case(key) || normalize_label(&entry.id) == norm)
+    {
+        let entry_uri = Uri::from_file_path(&inline.path).unwrap_or_else(|| default_uri.clone());
+        let inline_text = if entry_uri == *default_uri {
+            default_content.to_string()
+        } else {
+            db.file_text(inline.path.clone())
+                .map(|file| file.text(db).clone())
+                .unwrap_or_default()
+        };
+        out.push(Location {
+            uri: entry_uri,
+            range: Range {
+                start: crate::lsp::conversions::offset_to_position(
+                    &inline_text,
+                    inline.range.start().into(),
+                ),
+                end: crate::lsp::conversions::offset_to_position(
+                    &inline_text,
+                    inline.range.end().into(),
+                ),
+            },
+        });
+    }
+
+    out.sort_by(|a, b| {
+        a.uri
+            .as_str()
+            .cmp(b.uri.as_str())
+            .then(a.range.start.line.cmp(&b.range.start.line))
+            .then(a.range.start.character.cmp(&b.range.start.character))
+            .then(a.range.end.line.cmp(&b.range.end.line))
+            .then(a.range.end.character.cmp(&b.range.end.character))
+    });
+    out.dedup_by(|a, b| a.uri == b.uri && a.range == b.range);
+    out
 }
 
 /// Find the syntax node at the given byte offset
