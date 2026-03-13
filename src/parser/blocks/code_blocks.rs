@@ -4,6 +4,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
+use crate::parser::utils::container_stack::byte_index_at_column;
 use crate::parser::utils::helpers::{strip_leading_spaces, strip_newline};
 
 /// Represents the type of code block based on its info string syntax.
@@ -504,12 +505,13 @@ fn prepare_fence_open_line<'a>(
     } else {
         base_indent
     };
-    let first_stripped = if first_base_indent > 0 && first_inner.len() >= first_base_indent {
-        let indent_str = &first_inner[..first_base_indent];
+    let first_base_indent_bytes = byte_index_at_column(first_inner, first_base_indent);
+    let first_stripped = if first_base_indent > 0 && first_inner.len() >= first_base_indent_bytes {
+        let indent_str = &first_inner[..first_base_indent_bytes];
         if !indent_str.is_empty() {
             builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
         }
-        &first_inner[first_base_indent..]
+        &first_inner[first_base_indent_bytes..]
     } else {
         first_inner
     };
@@ -899,8 +901,9 @@ pub(crate) fn parse_fenced_code_block(
         };
 
         // Strip base indent (footnote context) from content lines for fence detection
-        let inner_stripped = if base_indent > 0 && inner.len() >= base_indent {
-            &inner[base_indent..]
+        let base_indent_bytes = byte_index_at_column(inner, base_indent);
+        let inner_stripped = if base_indent > 0 && inner.len() >= base_indent_bytes {
+            &inner[base_indent_bytes..]
         } else {
             inner
         };
@@ -933,16 +936,17 @@ pub(crate) fn parse_fenced_code_block(
             };
 
             // Emit base indent for lossless parsing (if present in original line)
-            if base_indent > 0 && after_blockquote.len() >= base_indent {
-                let indent_str = &after_blockquote[..base_indent];
+            let base_indent_bytes = byte_index_at_column(after_blockquote, base_indent);
+            if base_indent > 0 && after_blockquote.len() >= base_indent_bytes {
+                let indent_str = &after_blockquote[..base_indent_bytes];
                 if !indent_str.is_empty() {
                     builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
                 }
             }
 
             // Get the content after base indent
-            let after_indent = if base_indent > 0 && after_blockquote.len() >= base_indent {
-                &after_blockquote[base_indent..]
+            let after_indent = if base_indent > 0 && after_blockquote.len() >= base_indent_bytes {
+                &after_blockquote[base_indent_bytes..]
             } else {
                 after_blockquote
             };
@@ -976,19 +980,21 @@ pub(crate) fn parse_fenced_code_block(
         };
 
         // Emit base indent for lossless parsing
-        if base_indent > 0 && closing_after_blockquote.len() >= base_indent {
-            let indent_str = &closing_after_blockquote[..base_indent];
+        let base_indent_bytes = byte_index_at_column(closing_after_blockquote, base_indent);
+        if base_indent > 0 && closing_after_blockquote.len() >= base_indent_bytes {
+            let indent_str = &closing_after_blockquote[..base_indent_bytes];
             if !indent_str.is_empty() {
                 builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
             }
         }
 
         // Strip base indent to get fence
-        let closing_stripped = if base_indent > 0 && closing_after_blockquote.len() >= base_indent {
-            &closing_after_blockquote[base_indent..]
-        } else {
-            closing_after_blockquote
-        };
+        let closing_stripped =
+            if base_indent > 0 && closing_after_blockquote.len() >= base_indent_bytes {
+                &closing_after_blockquote[base_indent_bytes..]
+            } else {
+                closing_after_blockquote
+            };
         let (closing_without_newline, newline_str) = strip_newline(closing_stripped);
         let closing_trimmed_start = strip_leading_spaces(closing_without_newline);
         let leading_ws_len = closing_without_newline.len() - closing_trimmed_start.len();
@@ -1075,6 +1081,13 @@ mod tests {
     #[test]
     fn test_fenced_code_preserves_leading_gt() {
         let input = "```\n> foo\n```\n";
+        let tree = crate::parse(input, None);
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn test_fenced_code_in_definition_list_with_unicode_content_does_not_panic() {
+        let input = "Term\n: ```\n├── pyproject.toml\n```\n";
         let tree = crate::parse(input, None);
         assert_eq!(tree.text().to_string(), input);
     }

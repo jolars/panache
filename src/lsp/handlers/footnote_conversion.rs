@@ -5,7 +5,9 @@
 use crate::syntax::{
     AstNode, FootnoteDefinition, FootnoteReference, InlineFootnote, SyntaxKind, SyntaxNode,
 };
-use tower_lsp_server::ls_types::{Position, Range, TextEdit};
+use tower_lsp_server::ls_types::{Range, TextEdit};
+
+use super::super::conversions::offset_to_position;
 
 /// Find the innermost FOOTNOTE_REFERENCE node at the given position.
 pub fn find_footnote_reference_at_position(tree: &SyntaxNode, offset: usize) -> Option<SyntaxNode> {
@@ -191,33 +193,6 @@ pub fn convert_to_reference(
     });
 
     edits
-}
-
-/// Convert UTF-8 byte offset to LSP Position.
-fn offset_to_position(text: &str, offset: usize) -> Position {
-    let mut line = 0;
-    let mut col = 0;
-    let mut current_offset = 0;
-
-    for ch in text.chars() {
-        if current_offset >= offset {
-            break;
-        }
-
-        if ch == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += ch.len_utf16() as u32;
-        }
-
-        current_offset += ch.len_utf8();
-    }
-
-    Position {
-        line: line as u32,
-        character: col,
-    }
 }
 
 #[cfg(test)]

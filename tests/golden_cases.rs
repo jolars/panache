@@ -246,6 +246,7 @@ golden_test_cases!(
     tab_preserve,
     trailing_blanklines,
     umlauts,
+    unicode,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

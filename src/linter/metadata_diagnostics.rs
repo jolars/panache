@@ -1,6 +1,7 @@
 use rowan::TextRange;
 
 use crate::linter::diagnostics::{Diagnostic, Location};
+use crate::linter::offsets::line_col_to_byte_offset_1based;
 use crate::metadata::{
     DocumentMetadata, InlineBibConflict, InlineReferenceDuplicate, YamlError,
     bibliography_range_map, format_bibliography_load_error, inline_bib_conflicts,
@@ -138,32 +139,7 @@ fn inline_reference_conflict_diagnostic(conflict: &InlineBibConflict, text: &str
 }
 
 fn line_col_to_offset(input: &str, line: usize, column: usize) -> usize {
-    let target_line = line.saturating_sub(1);
-    let target_col = column.saturating_sub(1);
-    let mut current_line = 0usize;
-    let mut line_start = 0usize;
-
-    for (idx, ch) in input.char_indices() {
-        if current_line == target_line {
-            return line_start
-                + target_col.min(
-                    input[line_start..]
-                        .chars()
-                        .take_while(|c| *c != '\n')
-                        .count(),
-                );
-        }
-        if ch == '\n' {
-            current_line += 1;
-            line_start = idx + ch.len_utf8();
-        }
-    }
-
-    if current_line == target_line {
-        return line_start + target_col.min(input[line_start..].chars().count());
-    }
-
-    input.len()
+    line_col_to_byte_offset_1based(input, line, column).unwrap_or(input.len())
 }
 
 #[cfg(test)]
@@ -214,5 +190,13 @@ mod tests {
             diag.message,
             "Failed to load bibliography /tmp/test.bib: File not found"
         );
+    }
+
+    #[test]
+    fn line_col_to_offset_handles_unicode_columns() {
+        let text = "éx\n";
+        assert_eq!(line_col_to_offset(text, 1, 1), 0);
+        assert_eq!(line_col_to_offset(text, 1, 2), 2);
+        assert_eq!(line_col_to_offset(text, 1, 3), 3);
     }
 }

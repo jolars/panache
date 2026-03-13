@@ -32,6 +32,7 @@ use rowan::TextRange;
 use serde::Deserialize;
 
 use crate::linter::diagnostics::{Diagnostic, Location};
+use crate::linter::offsets::line_col_to_byte_offset_1based;
 
 /// Errors that can occur when invoking external linters.
 #[derive(Debug)]
@@ -223,47 +224,7 @@ struct JarlFix {
 }
 
 fn line_col_to_offset(input: &str, line: usize, column: usize) -> Option<usize> {
-    if line == 0 || column == 0 {
-        return None;
-    }
-
-    let mut current_line = 1;
-    let mut offset = 0;
-    let bytes = input.as_bytes();
-
-    for text_line in input.lines() {
-        if current_line == line {
-            let mut current_column = 1;
-            for (byte_idx, _ch) in text_line.char_indices() {
-                if current_column == column {
-                    return Some(offset + byte_idx);
-                }
-                current_column += 1;
-            }
-            return Some(offset + text_line.len());
-        }
-
-        let line_end_offset = offset + text_line.len();
-        let line_ending_len = if line_end_offset + 1 < input.len()
-            && bytes[line_end_offset] == b'\r'
-            && bytes[line_end_offset + 1] == b'\n'
-        {
-            2
-        } else if line_end_offset < input.len() && bytes[line_end_offset] == b'\n' {
-            1
-        } else {
-            0
-        };
-
-        offset += text_line.len() + line_ending_len;
-        current_line += 1;
-    }
-
-    if current_line == line {
-        Some(offset)
-    } else {
-        None
-    }
+    line_col_to_byte_offset_1based(input, line, column)
 }
 
 /// Map a byte offset from the concatenated file to the original document.
@@ -404,6 +365,12 @@ mod tests {
         assert_eq!(line_col_to_offset(input, 1, 1), Some(0));
         assert_eq!(line_col_to_offset(input, 2, 1), Some(6));
         assert_eq!(line_col_to_offset(input, 3, 1), Some(7));
+    }
+
+    #[test]
+    fn test_line_col_to_offset_unicode_columns() {
+        let input = "éx\n";
+        assert_eq!(line_col_to_offset(input, 1, 2), Some(2));
     }
 
     #[test]
