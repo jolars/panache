@@ -221,6 +221,12 @@ impl SymbolUsageIndex {
     pub fn chunk_label_value_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.chunk_label_value_ranges.get(&normalize_label(key))
     }
+
+    pub fn crossref_declaration_entries(
+        &self,
+    ) -> impl Iterator<Item = (&String, &Vec<rowan::TextRange>)> {
+        self.crossref_declarations.iter()
+    }
 }
 
 #[salsa::tracked(returns(ref), lru = 64)]
@@ -231,6 +237,10 @@ pub fn symbol_usage_index(
     _path: PathBuf,
 ) -> SymbolUsageIndex {
     let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    symbol_usage_index_from_tree(db, &tree)
+}
+
+pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsageIndex {
     let mut index = SymbolUsageIndex::default();
 
     for node in tree

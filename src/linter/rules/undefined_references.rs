@@ -1,10 +1,9 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{
-    AstNode, ChunkOption, Crossref, FootnoteDefinition, FootnoteReference, Heading, Link,
-    ReferenceDefinition, SyntaxNode,
+    AstNode, Crossref, FootnoteDefinition, FootnoteReference, Heading, Link, ReferenceDefinition,
+    SyntaxNode,
 };
 use crate::utils::normalize_label;
 use std::collections::HashSet;
@@ -32,29 +31,14 @@ impl Rule for UndefinedReferencesRule {
             .filter(|label| !label.is_empty())
             .collect();
 
-        reference_labels.extend(tree.descendants().filter_map(|node| {
-            if node.kind() != crate::syntax::SyntaxKind::ATTRIBUTE {
-                return None;
-            }
-            let text = node.text().to_string();
-            try_parse_trailing_attributes(&text)
-                .map(|(attrs, _)| attrs)
-                .and_then(|attrs| attrs.identifier)
-                .map(|id| normalize_label(&id))
-                .filter(|label| !label.is_empty())
-        }));
-
-        reference_labels.extend(tree.descendants().filter_map(ChunkOption::cast).filter_map(
-            |opt| {
-                let key = opt.key()?;
-                if !key.eq_ignore_ascii_case("label") {
-                    return None;
-                }
-                opt.value()
-                    .map(|v| normalize_label(&v))
-                    .filter(|label| !label.is_empty())
-            },
-        ));
+        let db = crate::salsa::SalsaDb::default();
+        let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, tree);
+        reference_labels.extend(
+            symbol_index
+                .crossref_declaration_entries()
+                .map(|(label, _)| label.clone())
+                .filter(|label| !label.is_empty()),
+        );
 
         if config.extensions.implicit_header_references {
             reference_labels.extend(

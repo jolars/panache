@@ -1,10 +1,7 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::parser::utils::attributes::try_parse_trailing_attributes;
-use crate::syntax::{
-    AstNode, ChunkOption, FootnoteDefinition, ReferenceDefinition, SyntaxKind, SyntaxNode,
-};
+use crate::syntax::{AstNode, FootnoteDefinition, ReferenceDefinition, SyntaxNode};
 use crate::utils::normalize_label;
 use std::collections::HashMap;
 
@@ -105,53 +102,24 @@ fn check_duplicate_footnotes(tree: &SyntaxNode, input: &str) -> Vec<Diagnostic> 
 
 fn check_duplicate_crossref_labels(tree: &SyntaxNode, input: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
-    let mut seen_labels: HashMap<String, SyntaxNode> = HashMap::new();
+    let db = crate::salsa::SalsaDb::default();
+    let index = crate::salsa::symbol_usage_index_from_tree(&db, tree);
 
-    for node in tree.descendants() {
-        if node.kind() == SyntaxKind::ATTRIBUTE {
-            let text = node.text().to_string();
-            if let Some(attrs) = try_parse_trailing_attributes(&text).map(|(attrs, _)| attrs)
-                && let Some(id) = attrs.identifier
-            {
-                let normalized = normalize_label(&id);
-                if let Some(first_node) = seen_labels.get(&normalized) {
-                    let location = Location::from_node(&node, input);
-                    let first_location = Location::from_node(first_node, input);
-                    diagnostics.push(Diagnostic::warning(
-                        location,
-                        "duplicate-reference-labels",
-                        format!(
-                            "Duplicate cross-reference label '[{}]' (first defined at line {})",
-                            id, first_location.line
-                        ),
-                    ));
-                } else {
-                    seen_labels.insert(normalized, node.clone());
-                }
-            }
+    for (label, ranges) in index.crossref_declaration_entries() {
+        if ranges.len() < 2 {
+            continue;
         }
-    }
-
-    for node in tree.descendants() {
-        if let Some(opt) = ChunkOption::cast(node.clone())
-            && let (Some(key), Some(value)) = (opt.key(), opt.value())
-            && key.eq_ignore_ascii_case("label")
-        {
-            let normalized = normalize_label(&value);
-            if let Some(first_node) = seen_labels.get(&normalized) {
-                let location = Location::from_node(&node, input);
-                let first_location = Location::from_node(first_node, input);
-                diagnostics.push(Diagnostic::warning(
-                    location,
-                    "duplicate-reference-labels",
-                    format!(
-                        "Duplicate cross-reference label '[{}]' (first defined at line {})",
-                        value, first_location.line
-                    ),
-                ));
-            } else {
-                seen_labels.insert(normalized, node.clone());
-            }
+        let first_location = Location::from_range(ranges[0], input);
+        for range in ranges.iter().skip(1) {
+            let location = Location::from_range(*range, input);
+            diagnostics.push(Diagnostic::warning(
+                location,
+                "duplicate-reference-labels",
+                format!(
+                    "Duplicate cross-reference label '[{}]' (first defined at line {})",
+                    label, first_location.line
+                ),
+            ));
         }
     }
 
