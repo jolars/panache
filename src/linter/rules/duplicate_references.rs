@@ -1,9 +1,7 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, FootnoteDefinition, ReferenceDefinition, SyntaxNode};
-use crate::utils::normalize_label;
-use std::collections::HashMap;
+use crate::syntax::SyntaxNode;
 
 pub struct DuplicateReferencesRule;
 
@@ -34,32 +32,24 @@ impl Rule for DuplicateReferencesRule {
 
 fn check_duplicate_references(tree: &SyntaxNode, input: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
-    let mut seen_labels: HashMap<String, SyntaxNode> = HashMap::new();
+    let db = crate::salsa::SalsaDb::default();
+    let index = crate::salsa::symbol_usage_index_from_tree(&db, tree);
 
-    for node in tree.descendants() {
-        if let Some(ref_def) = ReferenceDefinition::cast(node.clone()) {
-            let label = ref_def.label();
-            let normalized = normalize_label(&label);
-
-            if let Some(first_node) = seen_labels.get(&normalized) {
-                // This is a duplicate - create diagnostic
-                let location = Location::from_node(&node, input);
-                let first_location = Location::from_node(first_node, input);
-
-                let diagnostic = Diagnostic::warning(
-                    location,
-                    "duplicate-reference-labels",
-                    format!(
-                        "Duplicate reference label '[{}]' (first defined at line {})",
-                        label, first_location.line
-                    ),
-                );
-
-                diagnostics.push(diagnostic);
-            } else {
-                // First occurrence - record it
-                seen_labels.insert(normalized, node);
-            }
+    for (label, ranges) in index.reference_definition_entries() {
+        if ranges.len() < 2 {
+            continue;
+        }
+        let first_location = Location::from_range(ranges[0], input);
+        for range in ranges.iter().skip(1) {
+            let display = extract_definition_label(input, *range).unwrap_or_else(|| label.clone());
+            diagnostics.push(Diagnostic::warning(
+                Location::from_range(*range, input),
+                "duplicate-reference-labels",
+                format!(
+                    "Duplicate reference label '[{}]' (first defined at line {})",
+                    display, first_location.line
+                ),
+            ));
         }
     }
 
@@ -68,36 +58,44 @@ fn check_duplicate_references(tree: &SyntaxNode, input: &str) -> Vec<Diagnostic>
 
 fn check_duplicate_footnotes(tree: &SyntaxNode, input: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
-    let mut seen_ids: HashMap<String, SyntaxNode> = HashMap::new();
+    let db = crate::salsa::SalsaDb::default();
+    let index = crate::salsa::symbol_usage_index_from_tree(&db, tree);
 
-    for node in tree.descendants() {
-        if let Some(fn_def) = FootnoteDefinition::cast(node.clone()) {
-            let id = fn_def.id();
-            let normalized = normalize_label(&id);
-
-            if let Some(first_node) = seen_ids.get(&normalized) {
-                // This is a duplicate - create diagnostic
-                let location = Location::from_node(&node, input);
-                let first_location = Location::from_node(first_node, input);
-
-                let diagnostic = Diagnostic::warning(
-                    location,
-                    "duplicate-reference-labels",
-                    format!(
-                        "Duplicate footnote ID '[^{}]' (first defined at line {})",
-                        id, first_location.line
-                    ),
-                );
-
-                diagnostics.push(diagnostic);
-            } else {
-                // First occurrence - record it
-                seen_ids.insert(normalized, node);
-            }
+    for (id, ranges) in index.footnote_definition_entries() {
+        if ranges.len() < 2 {
+            continue;
+        }
+        let first_location = Location::from_range(ranges[0], input);
+        for range in ranges.iter().skip(1) {
+            let display =
+                extract_definition_label(input, *range).unwrap_or_else(|| format!("^{}", id));
+            diagnostics.push(Diagnostic::warning(
+                Location::from_range(*range, input),
+                "duplicate-reference-labels",
+                format!(
+                    "Duplicate footnote ID '[^{}]' (first defined at line {})",
+                    display.trim_start_matches('^'),
+                    first_location.line
+                ),
+            ));
         }
     }
 
     diagnostics
+}
+
+fn extract_definition_label(input: &str, range: rowan::TextRange) -> Option<String> {
+    let start: usize = range.start().into();
+    let end: usize = range.end().into();
+    let text = input.get(start..end)?;
+    let open = text.find('[')?;
+    let close = text[open + 1..].find(']')?;
+    let label = &text[open + 1..open + 1 + close];
+    if label.is_empty() {
+        None
+    } else {
+        Some(label.to_string())
+    }
 }
 
 fn check_duplicate_crossref_labels(tree: &SyntaxNode, input: &str) -> Vec<Diagnostic> {
@@ -187,8 +185,13 @@ mod tests {
 "#;
         let diagnostics = parse_and_lint(input);
         assert_eq!(diagnostics.len(), 2); // Second and third are duplicates of first
-        assert!(diagnostics[0].message.contains("[myref]"));
-        assert!(diagnostics[1].message.contains("[MYREF]"));
+        let joined = diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(joined.contains("[myref]"));
+        assert!(joined.contains("[MYREF]"));
     }
 
     #[test]
@@ -220,8 +223,13 @@ mod tests {
 "#;
         let diagnostics = parse_and_lint(input);
         assert_eq!(diagnostics.len(), 2);
-        assert!(diagnostics[0].message.contains("[^note]"));
-        assert!(diagnostics[1].message.contains("[^NOTE]"));
+        let joined = diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(joined.contains("[^note]"));
+        assert!(joined.contains("[^NOTE]"));
     }
 
     #[test]

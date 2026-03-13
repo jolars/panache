@@ -203,6 +203,9 @@ pub struct SymbolUsageIndex {
     crossref_usages: HashMap<String, Vec<rowan::TextRange>>,
     crossref_declarations: HashMap<String, Vec<rowan::TextRange>>,
     chunk_label_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
+    reference_definitions: HashMap<String, Vec<rowan::TextRange>>,
+    footnote_definitions: HashMap<String, Vec<rowan::TextRange>>,
+    heading_labels: HashMap<String, Vec<rowan::TextRange>>,
 }
 
 impl SymbolUsageIndex {
@@ -227,6 +230,22 @@ impl SymbolUsageIndex {
     ) -> impl Iterator<Item = (&String, &Vec<rowan::TextRange>)> {
         self.crossref_declarations.iter()
     }
+
+    pub fn reference_definition_entries(
+        &self,
+    ) -> impl Iterator<Item = (&String, &Vec<rowan::TextRange>)> {
+        self.reference_definitions.iter()
+    }
+
+    pub fn footnote_definition_entries(
+        &self,
+    ) -> impl Iterator<Item = (&String, &Vec<rowan::TextRange>)> {
+        self.footnote_definitions.iter()
+    }
+
+    pub fn heading_label_entries(&self) -> impl Iterator<Item = (&String, &Vec<rowan::TextRange>)> {
+        self.heading_labels.iter()
+    }
 }
 
 #[salsa::tracked(returns(ref), lru = 64)]
@@ -242,6 +261,45 @@ pub fn symbol_usage_index(
 
 pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsageIndex {
     let mut index = SymbolUsageIndex::default();
+
+    for def in tree.descendants().filter_map(ReferenceDefinition::cast) {
+        db.unwind_if_revision_cancelled();
+        let label = normalize_label(&def.label());
+        if label.is_empty() {
+            continue;
+        }
+        index
+            .reference_definitions
+            .entry(label)
+            .or_default()
+            .push(def.syntax().text_range());
+    }
+
+    for def in tree.descendants().filter_map(FootnoteDefinition::cast) {
+        db.unwind_if_revision_cancelled();
+        let id = normalize_label(&def.id());
+        if id.is_empty() {
+            continue;
+        }
+        index
+            .footnote_definitions
+            .entry(id)
+            .or_default()
+            .push(def.syntax().text_range());
+    }
+
+    for heading in tree.descendants().filter_map(crate::syntax::Heading::cast) {
+        db.unwind_if_revision_cancelled();
+        let label = normalize_label(&heading.text());
+        if label.is_empty() {
+            continue;
+        }
+        index
+            .heading_labels
+            .entry(label)
+            .or_default()
+            .push(heading.syntax().text_range());
+    }
 
     for node in tree
         .descendants()
@@ -1000,7 +1058,7 @@ mod tests {
         let path = PathBuf::from("/tmp/symbols.qmd");
         let file = db.update_file_text(
             path.clone(),
-            "See @fig-plot and [@cite].\n\n```{r}\n#| label: fig-plot\n1 + 1\n```\n".to_string(),
+            "See @fig-plot and [@cite] and [ref].\n\n# Heading\n\n[ref]: https://example.com\n[^a]: footnote\n\n```{r}\n#| label: fig-plot\n1 + 1\n```\n".to_string(),
         );
         let mut cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
@@ -1018,6 +1076,21 @@ mod tests {
         assert_eq!(
             index.chunk_label_value_ranges("fig-plot").map(|v| v.len()),
             Some(1)
+        );
+        assert_eq!(
+            index.reference_definition_entries().count(),
+            1,
+            "expected one reference definition label"
+        );
+        assert_eq!(
+            index.footnote_definition_entries().count(),
+            1,
+            "expected one footnote definition id"
+        );
+        assert_eq!(
+            index.heading_label_entries().count(),
+            1,
+            "expected one heading label"
         );
         assert_eq!(index.citation_usages("cite").map(|v| v.len()), Some(1));
     }

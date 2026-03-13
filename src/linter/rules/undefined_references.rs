@@ -1,10 +1,7 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{
-    AstNode, Crossref, FootnoteDefinition, FootnoteReference, Heading, Link, ReferenceDefinition,
-    SyntaxNode,
-};
+use crate::syntax::{AstNode, Crossref, FootnoteReference, Link, SyntaxNode};
 use crate::utils::normalize_label;
 use std::collections::HashSet;
 
@@ -24,15 +21,13 @@ impl Rule for UndefinedReferencesRule {
     ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
 
-        let mut reference_labels: HashSet<String> = tree
-            .descendants()
-            .filter_map(ReferenceDefinition::cast)
-            .map(|def| normalize_label(&def.label()))
-            .filter(|label| !label.is_empty())
-            .collect();
-
         let db = crate::salsa::SalsaDb::default();
         let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, tree);
+        let mut reference_labels: HashSet<String> = symbol_index
+            .reference_definition_entries()
+            .map(|(label, _)| label.clone())
+            .filter(|label| !label.is_empty())
+            .collect();
         reference_labels.extend(
             symbol_index
                 .crossref_declaration_entries()
@@ -42,17 +37,16 @@ impl Rule for UndefinedReferencesRule {
 
         if config.extensions.implicit_header_references {
             reference_labels.extend(
-                tree.descendants()
-                    .filter_map(Heading::cast)
-                    .map(|heading| normalize_label(&heading.text()))
+                symbol_index
+                    .heading_label_entries()
+                    .map(|(label, _)| label.clone())
                     .filter(|label| !label.is_empty()),
             );
         }
 
-        let footnote_ids: HashSet<String> = tree
-            .descendants()
-            .filter_map(FootnoteDefinition::cast)
-            .map(|def| normalize_label(&def.id()))
+        let footnote_ids: HashSet<String> = symbol_index
+            .footnote_definition_entries()
+            .map(|(id, _)| id.clone())
             .filter(|id| !id.is_empty())
             .collect();
 
