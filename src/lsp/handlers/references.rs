@@ -81,7 +81,7 @@ pub(crate) async fn references(
     };
 
     let mut locations = Vec::new();
-    let metadata = {
+    let citation_def_index = {
         let db = salsa_db.lock().await;
         let mut doc_paths =
             crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
@@ -137,8 +137,13 @@ pub(crate) async fn references(
             .is_ok();
             if yaml_ok {
                 Some(
-                    crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone())
-                        .clone(),
+                    crate::salsa::citation_definition_index(
+                        &*db,
+                        salsa_file,
+                        salsa_config,
+                        doc_path.clone(),
+                    )
+                    .clone(),
                 )
             } else {
                 None
@@ -149,11 +154,11 @@ pub(crate) async fn references(
     };
 
     if include_declaration
-        && let (Target::Citation { key, norm }, Some(metadata)) = (&target, metadata.as_ref())
+        && let (Target::Citation { key, .. }, Some(index)) = (&target, citation_def_index.as_ref())
     {
         let db = salsa_db.lock().await;
         locations.extend(helpers::citation_definition_locations(
-            metadata, key, norm, &uri, &content, &*db,
+            index, key, &uri, &content, &*db,
         ));
     }
 

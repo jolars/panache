@@ -5,7 +5,7 @@ use crate::metadata::{
     bibliography_range_map, format_bibliography_load_error, inline_bib_conflicts,
     inline_reference_contains, inline_reference_duplicates,
 };
-use crate::syntax::{AstNode, Citation, Crossref, SyntaxNode};
+use crate::syntax::SyntaxNode;
 
 pub struct CitationKeysRule;
 
@@ -26,6 +26,8 @@ impl Rule for CitationKeysRule {
         }
 
         let mut diagnostics = Vec::new();
+        let db = crate::salsa::SalsaDb::default();
+        let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, tree);
 
         let Some(metadata) = metadata else {
             return diagnostics;
@@ -110,12 +112,7 @@ impl Rule for CitationKeysRule {
         }
 
         for key_text in &metadata.citations.keys {
-            if tree
-                .descendants()
-                .filter_map(Crossref::cast)
-                .flat_map(|crossref| crossref.keys())
-                .any(|crossref_key| crossref_key.text() == *key_text)
-            {
+            if symbol_index.crossref_usages(key_text).is_some() {
                 continue;
             }
             if config.extensions.quarto_crossrefs
@@ -125,21 +122,15 @@ impl Rule for CitationKeysRule {
             }
             if parse.and_then(|parse| parse.index.get(key_text)).is_none()
                 && !inline_reference_contains(&metadata.inline_references, key_text)
+                && let Some(ranges) = symbol_index.citation_references(key_text)
             {
-                // Find all citation nodes that reference this missing key
-                for citation in tree.descendants().filter_map(Citation::cast) {
-                    for citation_key in citation.keys() {
-                        if citation_key.text() == *key_text {
-                            // Use the citation node range (includes @) instead of just the key
-                            let location =
-                                Location::from_range(citation.syntax().text_range(), input);
-                            diagnostics.push(Diagnostic::warning(
-                                location,
-                                "missing-bibliography-key",
-                                format!("Citation key '{}' not found in bibliography", key_text),
-                            ));
-                        }
-                    }
+                for range in ranges {
+                    let location = Location::from_range(*range, input);
+                    diagnostics.push(Diagnostic::warning(
+                        location,
+                        "missing-bibliography-key",
+                        format!("Citation key '{}' not found in bibliography", key_text),
+                    ));
                 }
             }
         }

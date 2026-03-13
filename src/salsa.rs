@@ -200,6 +200,7 @@ pub struct BuiltInLintPlan {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SymbolUsageIndex {
     citation_usages: HashMap<String, Vec<rowan::TextRange>>,
+    citation_references: HashMap<String, Vec<rowan::TextRange>>,
     crossref_usages: HashMap<String, Vec<rowan::TextRange>>,
     crossref_declarations: HashMap<String, Vec<rowan::TextRange>>,
     chunk_label_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
@@ -212,6 +213,10 @@ pub struct SymbolUsageIndex {
 impl SymbolUsageIndex {
     pub fn citation_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.citation_usages.get(&normalize_label(key))
+    }
+
+    pub fn citation_references(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.citation_references.get(&normalize_label(key))
     }
 
     pub fn crossref_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
@@ -326,6 +331,11 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
                 .entry(normalize_label(&key.text()))
                 .or_default()
                 .push(key.text_range());
+            index
+                .citation_references
+                .entry(normalize_label(&key.text()))
+                .or_default()
+                .push(citation.syntax().text_range());
         }
     }
 
@@ -398,6 +408,70 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
     }
 
     index
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CitationDefinitionLocation {
+    pub path: PathBuf,
+    pub range: rowan::TextRange,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CitationDefinitionIndex {
+    by_key: HashMap<String, Vec<CitationDefinitionLocation>>,
+}
+
+impl CitationDefinitionIndex {
+    pub fn by_key(&self, key: &str) -> Option<&Vec<CitationDefinitionLocation>> {
+        self.by_key.get(&normalize_label(key))
+    }
+}
+
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 64)]
+pub fn citation_definition_index(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+    path: PathBuf,
+) -> CitationDefinitionIndex {
+    let metadata = metadata(db, file, config, path).clone();
+    let mut out = CitationDefinitionIndex::default();
+
+    if let Some(parse) = metadata.bibliography_parse.as_ref() {
+        for entry in parse.index.entries.values() {
+            out.by_key
+                .entry(normalize_label(&entry.key))
+                .or_default()
+                .push(CitationDefinitionLocation {
+                    path: entry.source_file.clone(),
+                    range: rowan::TextRange::new(
+                        rowan::TextSize::from(entry.span.start as u32),
+                        rowan::TextSize::from(entry.span.end as u32),
+                    ),
+                });
+        }
+    }
+
+    for inline in &metadata.inline_references {
+        out.by_key
+            .entry(normalize_label(&inline.id))
+            .or_default()
+            .push(CitationDefinitionLocation {
+                path: inline.path.clone(),
+                range: inline.range,
+            });
+    }
+
+    for values in out.by_key.values_mut() {
+        values.sort_by(|a, b| {
+            a.path
+                .cmp(&b.path)
+                .then(a.range.start().cmp(&b.range.start()))
+        });
+        values.dedup_by(|a, b| a.path == b.path && a.range == b.range);
+    }
+
+    out
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]

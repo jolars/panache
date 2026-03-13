@@ -6,7 +6,6 @@ use tower_lsp_server::ls_types::{Location, Range, Uri};
 
 use crate::Config;
 use crate::lsp::DocumentState;
-use crate::metadata::DocumentMetadata;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::salsa::Db;
 use crate::syntax::{AstNode, ChunkOption, Citation, Crossref, SyntaxKind, SyntaxNode};
@@ -101,61 +100,38 @@ pub(crate) async fn get_definition_index_with_includes(
 }
 
 pub(crate) fn citation_definition_locations(
-    metadata: &DocumentMetadata,
+    index: &crate::salsa::CitationDefinitionIndex,
     key: &str,
-    norm: &str,
     default_uri: &Uri,
     default_content: &str,
     db: &dyn crate::salsa::Db,
 ) -> Vec<Location> {
     let mut out = Vec::new();
-
-    if let Some(parse) = metadata.bibliography_parse.as_ref() {
-        for entry in parse.index.entries.values().filter(|entry| {
-            entry.key.eq_ignore_ascii_case(key) || normalize_label(&entry.key) == norm
-        }) {
-            let entry_uri =
-                Uri::from_file_path(&entry.source_file).unwrap_or_else(|| default_uri.clone());
-            let bib_text = db
-                .file_text(entry.source_file.clone())
-                .map(|file| file.text(db).clone())
-                .unwrap_or_default();
+    let norm = normalize_label(key);
+    if let Some(entries) = index.by_key(&norm) {
+        for entry in entries {
+            let entry_uri = Uri::from_file_path(&entry.path).unwrap_or_else(|| default_uri.clone());
+            let text = if entry_uri == *default_uri {
+                default_content.to_string()
+            } else {
+                db.file_text(entry.path.clone())
+                    .map(|file| file.text(db).clone())
+                    .unwrap_or_default()
+            };
             out.push(Location {
                 uri: entry_uri,
                 range: Range {
-                    start: crate::lsp::conversions::offset_to_position(&bib_text, entry.span.start),
-                    end: crate::lsp::conversions::offset_to_position(&bib_text, entry.span.end),
+                    start: crate::lsp::conversions::offset_to_position(
+                        &text,
+                        entry.range.start().into(),
+                    ),
+                    end: crate::lsp::conversions::offset_to_position(
+                        &text,
+                        entry.range.end().into(),
+                    ),
                 },
             });
         }
-    }
-
-    for inline in metadata
-        .inline_references
-        .iter()
-        .filter(|entry| entry.id.eq_ignore_ascii_case(key) || normalize_label(&entry.id) == norm)
-    {
-        let entry_uri = Uri::from_file_path(&inline.path).unwrap_or_else(|| default_uri.clone());
-        let inline_text = if entry_uri == *default_uri {
-            default_content.to_string()
-        } else {
-            db.file_text(inline.path.clone())
-                .map(|file| file.text(db).clone())
-                .unwrap_or_default()
-        };
-        out.push(Location {
-            uri: entry_uri,
-            range: Range {
-                start: crate::lsp::conversions::offset_to_position(
-                    &inline_text,
-                    inline.range.start().into(),
-                ),
-                end: crate::lsp::conversions::offset_to_position(
-                    &inline_text,
-                    inline.range.end().into(),
-                ),
-            },
-        });
     }
 
     out.sort_by(|a, b| {

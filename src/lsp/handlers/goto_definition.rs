@@ -37,7 +37,7 @@ pub(crate) async fn goto_definition(
         }
     };
 
-    let metadata = if let Some(doc_path) = doc_path.clone() {
+    let citation_def_index = if let Some(doc_path) = doc_path.clone() {
         let yaml_ok = {
             let db = salsa_db.lock().await;
             crate::salsa::yaml_metadata_parse_result(
@@ -50,7 +50,10 @@ pub(crate) async fn goto_definition(
         };
         if yaml_ok {
             let db = salsa_db.lock().await;
-            Some(crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path).clone())
+            Some(
+                crate::salsa::citation_definition_index(&*db, salsa_file, salsa_config, doc_path)
+                    .clone(),
+            )
         } else {
             None
         }
@@ -233,18 +236,12 @@ pub(crate) async fn goto_definition(
 
     let definition = match pending {
         PendingDefinition::Citation(key) => {
-            let Some(metadata) = metadata.as_ref() else {
+            let Some(index) = citation_def_index.as_ref() else {
                 return Ok(None);
             };
             let db = salsa_db.lock().await;
-            let mut locations = helpers::citation_definition_locations(
-                metadata,
-                &key,
-                &crate::utils::normalize_label(&key),
-                uri,
-                &content,
-                &*db,
-            );
+            let mut locations =
+                helpers::citation_definition_locations(index, &key, uri, &content, &*db);
             if locations.is_empty() {
                 return Ok(None);
             }
