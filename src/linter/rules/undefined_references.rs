@@ -1,8 +1,10 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
+use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{
-    AstNode, FootnoteDefinition, FootnoteReference, Heading, Link, ReferenceDefinition, SyntaxNode,
+    AstNode, ChunkOption, Crossref, FootnoteDefinition, FootnoteReference, Heading, Link,
+    ReferenceDefinition, SyntaxNode,
 };
 use crate::utils::normalize_label;
 use std::collections::HashSet;
@@ -29,6 +31,30 @@ impl Rule for UndefinedReferencesRule {
             .map(|def| normalize_label(&def.label()))
             .filter(|label| !label.is_empty())
             .collect();
+
+        reference_labels.extend(tree.descendants().filter_map(|node| {
+            if node.kind() != crate::syntax::SyntaxKind::ATTRIBUTE {
+                return None;
+            }
+            let text = node.text().to_string();
+            try_parse_trailing_attributes(&text)
+                .map(|(attrs, _)| attrs)
+                .and_then(|attrs| attrs.identifier)
+                .map(|id| normalize_label(&id))
+                .filter(|label| !label.is_empty())
+        }));
+
+        reference_labels.extend(tree.descendants().filter_map(ChunkOption::cast).filter_map(
+            |opt| {
+                let key = opt.key()?;
+                if !key.eq_ignore_ascii_case("label") {
+                    return None;
+                }
+                opt.value()
+                    .map(|v| normalize_label(&v))
+                    .filter(|label| !label.is_empty())
+            },
+        ));
 
         if config.extensions.implicit_header_references {
             reference_labels.extend(
@@ -80,6 +106,21 @@ impl Rule for UndefinedReferencesRule {
             ));
         }
 
+        for crossref in tree.descendants().filter_map(Crossref::cast) {
+            for key in crossref.keys() {
+                let label = key.text();
+                let normalized = normalize_label(&label);
+                if normalized.is_empty() || reference_labels.contains(&normalized) {
+                    continue;
+                }
+                diagnostics.push(Diagnostic::warning(
+                    Location::from_range(key.text_range(), input),
+                    "undefined-reference-label",
+                    format!("Cross-reference label '@{}' not found", label),
+                ));
+            }
+        }
+
         diagnostics
     }
 }
@@ -99,6 +140,7 @@ fn extract_reference_label_and_node(link: &Link) -> Option<(String, SyntaxNode)>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Flavor;
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
@@ -137,5 +179,35 @@ mod tests {
         let input = "# Heading Name\n\nSee [Heading Name].\n";
         let diagnostics = parse_and_lint(input);
         assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn accepts_quarto_crossref_to_chunk_label() {
+        let input = "See @fig-plot.\n\n```{r}\n#| label: fig-plot\nplot(1:10)\n```\n";
+        let mut config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
+        config.extensions.quarto_crossrefs = true;
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = UndefinedReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn reports_missing_quarto_crossref_label() {
+        let input = "See @fig-missing.\n";
+        let mut config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
+        config.extensions.quarto_crossrefs = true;
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = UndefinedReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "undefined-reference-label");
+        assert!(diagnostics[0].message.contains("@fig-missing"));
     }
 }
