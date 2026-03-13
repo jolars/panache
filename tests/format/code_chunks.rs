@@ -114,3 +114,14 @@ fn r_chunk_label_with_spaces_stays_single_label() {
     assert!(output.contains("#| label: several words"));
     assert_eq!(output.matches("#| label:").count(), 1);
 }
+
+#[test]
+fn inline_options_override_existing_hashpipe_options() {
+    let input = "```{r, echo=TRUE}\n#| echo: false\n#| label: \"from-content\"\nx <- 1\n```\n";
+    let output = format(input, Some(quarto_config()), None);
+
+    assert_eq!(output.matches("#| echo:").count(), 1);
+    assert!(output.contains("#| echo: true"));
+    assert_eq!(output.matches("#| label:").count(), 1);
+    assert!(output.contains("#| label: \"from-content\""));
+}

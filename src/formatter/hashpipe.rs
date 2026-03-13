@@ -4,6 +4,7 @@
 //! line wrapping and language-specific comment prefixes.
 
 use crate::parser::utils::chunk_options::ChunkOptionValue;
+use crate::parser::utils::chunk_options::hashpipe_comment_prefix;
 use crate::syntax::{AstNode, ChunkLabel, ChunkOption, SyntaxKind, SyntaxNode};
 
 /// A chunk option with a classified value (simple or expression).
@@ -123,21 +124,7 @@ const OPTION_NAME_OVERRIDES: &[(&str, &str)] = &[
 /// - C, C++, Java, JavaScript, Rust, Go, etc.: `//|`
 /// - SQL dialects: `--|`
 pub fn get_comment_prefix(language: &str) -> Option<&'static str> {
-    match language.to_lowercase().as_str() {
-        "r" | "python" | "julia" | "bash" | "shell" | "sh" | "ruby" | "perl" => Some("#|"),
-
-        "c" | "cpp" | "c++" | "java" | "javascript" | "js" | "typescript" | "ts" | "rust"
-        | "go" | "swift" | "kotlin" | "scala" | "csharp" | "c#" | "php" | "ojs" | "dot" => {
-            Some("//|")
-        }
-
-        "sql" | "mysql" | "postgres" | "postgresql" | "sqlite" => Some("--|"),
-
-        "mermaid" => Some("%%|"),
-
-        // Unknown language - don't convert to hashpipe
-        _ => None,
-    }
+    hashpipe_comment_prefix(language)
 }
 
 /// Normalize a chunk option name from R dot-notation to YAML dash-notation.
@@ -167,59 +154,140 @@ pub fn normalize_value(value: &str) -> String {
     }
 }
 
-/// Extract chunk options from CST and classify into hashpipe-safe vs inline-only.
+/// Extract chunk options from inline info-string and optional parsed leading hashpipe lines.
 ///
-/// Returns (simple_options, complex_options) where simple_options can be converted
-/// to hashpipe format and complex_options must stay inline.
-pub fn split_options_from_cst(info_node: &SyntaxNode) -> (Vec<ClassifiedOption>, Vec<CstOption>) {
-    let mut simple = Vec::new();
-    let mut complex = Vec::new();
-    let mut pending_label_parts = Vec::new();
+/// Returns ((simple_options, complex_options), had_leading_hashpipe_options).
+/// When both sources provide the same normalized key, inline info-string options win.
+pub fn split_options_from_cst_with_content(
+    info_node: &SyntaxNode,
+    code_content_node: Option<&SyntaxNode>,
+) -> ((Vec<ClassifiedOption>, Vec<CstOption>), bool) {
+    #[derive(Clone)]
+    enum Entry {
+        Simple(ClassifiedOption),
+        Complex(CstOption),
+    }
 
-    // Find CHUNK_OPTIONS node
-    for child in info_node.children() {
-        if child.kind() == SyntaxKind::CHUNK_OPTIONS {
-            // Iterate through options and labels
-            for opt_or_label in child.children() {
-                if let Some(label) = ChunkLabel::cast(opt_or_label.clone()) {
-                    pending_label_parts.push(label.text());
-                } else if let Some(opt) = ChunkOption::cast(opt_or_label) {
-                    if !pending_label_parts.is_empty() {
-                        simple.push((
-                            "label".to_string(),
-                            ChunkOptionValue::Simple(pending_label_parts.join(" ")),
-                        ));
-                        pending_label_parts.clear();
-                    }
-
-                    // Regular option with key=value
-                    if let (Some(key), Some(value)) = (opt.key(), opt.value()) {
-                        let is_quoted = opt.is_quoted();
-                        let normalized_key = normalize_option_name(&key);
-
-                        // Classify the option
-                        if let Some(classified_value) =
-                            classify_option_for_hashpipe(&normalized_key, &value, is_quoted)
-                        {
-                            simple.push((normalized_key, classified_value));
-                        } else {
-                            // Keep inline with original key
-                            complex.push((Some(key), Some(value), is_quoted));
-                        }
-                    }
-                }
-            }
-            if !pending_label_parts.is_empty() {
-                simple.push((
-                    "label".to_string(),
-                    ChunkOptionValue::Simple(pending_label_parts.join(" ")),
-                ));
-            }
-            break;
+    fn upsert(entries: &mut Vec<(String, Entry)>, normalized_key: String, entry: Entry) {
+        if let Some(pos) = entries.iter().position(|(k, _)| *k == normalized_key) {
+            entries[pos] = (normalized_key, entry);
+        } else {
+            entries.push((normalized_key, entry));
         }
     }
 
-    (simple, complex)
+    fn insert_if_absent(entries: &mut Vec<(String, Entry)>, normalized_key: String, entry: Entry) {
+        if entries.iter().any(|(k, _)| *k == normalized_key) {
+            return;
+        }
+        entries.push((normalized_key, entry));
+    }
+
+    fn push_inline_option(
+        entries: &mut Vec<(String, Entry)>,
+        key: String,
+        value: String,
+        is_quoted: bool,
+    ) {
+        let normalized_key = normalize_option_name(&key);
+        if let Some(classified_value) =
+            classify_option_for_hashpipe(&normalized_key, &value, is_quoted)
+        {
+            upsert(
+                entries,
+                normalized_key.clone(),
+                Entry::Simple((normalized_key, classified_value)),
+            );
+        } else {
+            upsert(
+                entries,
+                normalized_key,
+                Entry::Complex((Some(key), Some(value), is_quoted)),
+            );
+        }
+    }
+
+    fn push_content_option(
+        entries: &mut Vec<(String, Entry)>,
+        key: String,
+        value: String,
+        is_quoted: bool,
+    ) {
+        let normalized_key = normalize_option_name(&key);
+        let rendered = if is_quoted {
+            format!("\"{}\"", value)
+        } else {
+            value
+        };
+        insert_if_absent(
+            entries,
+            normalized_key.clone(),
+            Entry::Simple((normalized_key, ChunkOptionValue::Simple(rendered))),
+        );
+    }
+
+    let mut entries: Vec<(String, Entry)> = Vec::new();
+    let mut had_content_hashpipe = false;
+
+    // 1) Inline options from CODE_INFO CHUNK_OPTIONS (highest precedence)
+    let mut pending_label_parts = Vec::new();
+    for child in info_node.children() {
+        if child.kind() != SyntaxKind::CHUNK_OPTIONS {
+            continue;
+        }
+
+        for opt_or_label in child.children() {
+            if let Some(label) = ChunkLabel::cast(opt_or_label.clone()) {
+                pending_label_parts.push(label.text());
+            } else if let Some(opt) = ChunkOption::cast(opt_or_label) {
+                if !pending_label_parts.is_empty() {
+                    let label_value = pending_label_parts.join(" ");
+                    upsert(
+                        &mut entries,
+                        "label".to_string(),
+                        Entry::Simple(("label".to_string(), ChunkOptionValue::Simple(label_value))),
+                    );
+                    pending_label_parts.clear();
+                }
+                if let (Some(key), Some(value)) = (opt.key(), opt.value()) {
+                    push_inline_option(&mut entries, key, value, opt.is_quoted());
+                }
+            }
+        }
+
+        if !pending_label_parts.is_empty() {
+            let label_value = pending_label_parts.join(" ");
+            upsert(
+                &mut entries,
+                "label".to_string(),
+                Entry::Simple(("label".to_string(), ChunkOptionValue::Simple(label_value))),
+            );
+        }
+        break;
+    }
+
+    // 2) Existing leading hashpipe options parsed under CODE_CONTENT (lower precedence)
+    if let Some(content_node) = code_content_node {
+        for child in content_node.children() {
+            if let Some(opt) = ChunkOption::cast(child)
+                && let (Some(key), Some(value)) = (opt.key(), opt.value())
+            {
+                had_content_hashpipe = true;
+                push_content_option(&mut entries, key, value, opt.is_quoted());
+            }
+        }
+    }
+
+    let mut simple = Vec::new();
+    let mut complex = Vec::new();
+    for (_, entry) in entries {
+        match entry {
+            Entry::Simple(s) => simple.push(s),
+            Entry::Complex(c) => complex.push(c),
+        }
+    }
+
+    ((simple, complex), had_content_hashpipe)
 }
 
 /// Classify an option value for hashpipe conversion.
@@ -248,8 +316,10 @@ fn classify_option_for_hashpipe(
         }
     } else {
         // Unquoted - check boolean, numeric, or simple bareword
-        if is_boolean_literal(value) && allowed_types.contains(&ValueType::Boolean) {
-            return Some(ChunkOptionValue::Simple(value.to_lowercase()));
+        if allowed_types.contains(&ValueType::Boolean)
+            && (is_boolean_literal(value) || matches!(value, "true" | "false"))
+        {
+            return Some(ChunkOptionValue::Simple(value.to_ascii_lowercase()));
         }
         if is_numeric_literal(value) && allowed_types.contains(&ValueType::Numeric) {
             return Some(ChunkOptionValue::Simple(value.to_string()));

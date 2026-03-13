@@ -1,5 +1,6 @@
 //! Fenced code block parsing utilities.
 
+use crate::parser::utils::chunk_options::hashpipe_comment_prefix;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -538,6 +539,147 @@ fn emit_blockquote_prefix_tokens(builder: &mut GreenNodeBuilder<'static>, prefix
     }
 }
 
+fn emit_content_line_prefixes<'a>(
+    builder: &mut GreenNodeBuilder<'static>,
+    content_line: &'a str,
+    bq_depth: usize,
+    base_indent: usize,
+) -> &'a str {
+    let after_blockquote = if bq_depth > 0 {
+        let stripped = strip_n_blockquote_markers(content_line, bq_depth);
+        let prefix_len = content_line.len().saturating_sub(stripped.len());
+        if prefix_len > 0 {
+            emit_blockquote_prefix_tokens(builder, &content_line[..prefix_len]);
+        }
+        stripped
+    } else {
+        content_line
+    };
+
+    let base_indent_bytes = byte_index_at_column(after_blockquote, base_indent);
+    if base_indent > 0 && after_blockquote.len() >= base_indent_bytes {
+        let indent_str = &after_blockquote[..base_indent_bytes];
+        if !indent_str.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+        }
+        &after_blockquote[base_indent_bytes..]
+    } else {
+        after_blockquote
+    }
+}
+
+fn emit_hashpipe_option_line(
+    builder: &mut GreenNodeBuilder<'static>,
+    line_without_newline: &str,
+    prefix: &str,
+) -> bool {
+    if !is_hashpipe_option_line(line_without_newline, prefix) {
+        return false;
+    }
+
+    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
+    let leading_ws_len = line_without_newline
+        .len()
+        .saturating_sub(trimmed_start.len());
+    let after_prefix = &trimmed_start[prefix.len()..];
+    let ws_after_prefix_len = after_prefix
+        .len()
+        .saturating_sub(after_prefix.trim_start_matches([' ', '\t']).len());
+    let rest = &after_prefix[ws_after_prefix_len..];
+    let Some(colon_idx) = rest.find(':') else {
+        return false;
+    };
+
+    let key_with_ws = &rest[..colon_idx];
+    let key = key_with_ws.trim_end_matches([' ', '\t']);
+    if key.is_empty() {
+        return false;
+    }
+    let key_ws_suffix = &key_with_ws[key.len()..];
+
+    let after_colon = &rest[colon_idx + 1..];
+    let value_ws_prefix_len = after_colon
+        .len()
+        .saturating_sub(after_colon.trim_start_matches([' ', '\t']).len());
+    let value_with_trailing = &after_colon[value_ws_prefix_len..];
+    let value = value_with_trailing.trim_end_matches([' ', '\t']);
+    if value.is_empty() {
+        return false;
+    }
+    let value_ws_suffix = &value_with_trailing[value.len()..];
+
+    builder.start_node(SyntaxKind::CHUNK_OPTION.into());
+    if leading_ws_len > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &line_without_newline[..leading_ws_len],
+        );
+    }
+    builder.token(SyntaxKind::TEXT.into(), prefix);
+    if ws_after_prefix_len > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &after_prefix[..ws_after_prefix_len],
+        );
+    }
+
+    builder.token(SyntaxKind::CHUNK_OPTION_KEY.into(), key);
+    if !key_ws_suffix.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), key_ws_suffix);
+    }
+    builder.token(SyntaxKind::TEXT.into(), ":");
+    if value_ws_prefix_len > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &after_colon[..value_ws_prefix_len],
+        );
+    }
+
+    if let Some(quote) = value.chars().next()
+        && (quote == '"' || quote == '\'')
+        && value.ends_with(quote)
+        && value.len() >= 2
+    {
+        builder.token(SyntaxKind::CHUNK_OPTION_QUOTE.into(), &value[..1]);
+        builder.token(
+            SyntaxKind::CHUNK_OPTION_VALUE.into(),
+            &value[1..value.len() - 1],
+        );
+        builder.token(
+            SyntaxKind::CHUNK_OPTION_QUOTE.into(),
+            &value[value.len() - 1..],
+        );
+    } else {
+        builder.token(SyntaxKind::CHUNK_OPTION_VALUE.into(), value);
+    }
+
+    if !value_ws_suffix.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), value_ws_suffix);
+    }
+    builder.finish_node();
+    true
+}
+
+fn is_hashpipe_option_line(line_without_newline: &str, prefix: &str) -> bool {
+    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
+    if !trimmed_start.starts_with(prefix) {
+        return false;
+    }
+    let after_prefix = &trimmed_start[prefix.len()..];
+    let rest = after_prefix.trim_start_matches([' ', '\t']);
+    let Some(colon_idx) = rest.find(':') else {
+        return false;
+    };
+    let key = rest[..colon_idx].trim_end_matches([' ', '\t']);
+    if key.is_empty() {
+        return false;
+    }
+    let value = rest[colon_idx + 1..]
+        .trim_start_matches([' ', '\t'])
+        .trim_end_matches([' ', '\t']);
+    !value.is_empty()
+}
+
 /// Check if a line is a valid closing fence for the given fence info.
 pub(crate) fn is_closing_fence(content: &str, fence: &FenceInfo) -> bool {
     let trimmed = strip_leading_spaces(content);
@@ -923,35 +1065,48 @@ pub(crate) fn parse_fenced_code_block(
     // Add content
     if !content_lines.is_empty() {
         builder.start_node(SyntaxKind::CODE_CONTENT.into());
-        for content_line in content_lines.iter() {
-            let after_blockquote = if bq_depth > 0 {
-                let stripped = strip_n_blockquote_markers(content_line, bq_depth);
-                let prefix_len = content_line.len().saturating_sub(stripped.len());
-                if prefix_len > 0 {
-                    emit_blockquote_prefix_tokens(builder, &content_line[..prefix_len]);
-                }
-                stripped
-            } else {
-                content_line
-            };
+        let hashpipe_prefix = match InfoString::parse(&fence.info_string).block_type {
+            CodeBlockType::Executable { language } => hashpipe_comment_prefix(&language),
+            _ => None,
+        };
 
-            // Emit base indent for lossless parsing (if present in original line)
-            let base_indent_bytes = byte_index_at_column(after_blockquote, base_indent);
-            if base_indent > 0 && after_blockquote.len() >= base_indent_bytes {
-                let indent_str = &after_blockquote[..base_indent_bytes];
-                if !indent_str.is_empty() {
-                    builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+        let mut line_idx = 0usize;
+        if let Some(prefix) = hashpipe_prefix {
+            while line_idx < content_lines.len() {
+                let content_line = content_lines[line_idx];
+                let preview_after_blockquote = if bq_depth > 0 {
+                    strip_n_blockquote_markers(content_line, bq_depth)
+                } else {
+                    content_line
+                };
+                let preview_base_indent_bytes =
+                    byte_index_at_column(preview_after_blockquote, base_indent);
+                let preview_after_indent = if base_indent > 0
+                    && preview_after_blockquote.len() >= preview_base_indent_bytes
+                {
+                    &preview_after_blockquote[preview_base_indent_bytes..]
+                } else {
+                    preview_after_blockquote
+                };
+                let (preview_without_newline, _) = strip_newline(preview_after_indent);
+                if !is_hashpipe_option_line(preview_without_newline, prefix) {
+                    break;
                 }
+
+                let after_indent =
+                    emit_content_line_prefixes(builder, content_line, bq_depth, base_indent);
+                let (line_without_newline, newline_str) = strip_newline(after_indent);
+                let _ = emit_hashpipe_option_line(builder, line_without_newline, prefix);
+                if !newline_str.is_empty() {
+                    builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                }
+                line_idx += 1;
             }
+        }
 
-            // Get the content after base indent
-            let after_indent = if base_indent > 0 && after_blockquote.len() >= base_indent_bytes {
-                &after_blockquote[base_indent_bytes..]
-            } else {
-                after_blockquote
-            };
-
-            // Split off trailing newline if present (from split_inclusive)
+        for content_line in content_lines.iter().skip(line_idx) {
+            let after_indent =
+                emit_content_line_prefixes(builder, content_line, bq_depth, base_indent);
             let (line_without_newline, newline_str) = strip_newline(after_indent);
 
             if !line_without_newline.is_empty() {

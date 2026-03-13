@@ -94,8 +94,8 @@ pub(super) fn format_code_block(
         // Try to format as hashpipe with YAML-style options
         // Falls back to inline format if language comment syntax is unknown
         if format_code_block_hashpipe(
+            node,
             &info_node,
-            &info,
             &final_content,
             fence_char,
             fence_length,
@@ -232,8 +232,8 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
                     let mut saw_blockquote_marker = false;
 
                     for token in n.children_with_tokens() {
-                        if let NodeOrToken::Token(t) = token {
-                            match t.kind() {
+                        match token {
+                            NodeOrToken::Token(t) => match t.kind() {
                                 SyntaxKind::BLOCKQUOTE_MARKER if at_line_start => {
                                     // Parser may preserve blockquote continuation markers inside
                                     // indented code content for losslessness. These are container
@@ -279,6 +279,21 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
                                     at_line_start = true;
                                 }
                                 _ => {}
+                            },
+                            NodeOrToken::Node(inner_node) => {
+                                let node_text = inner_node.text().to_string();
+                                if node_text.is_empty() {
+                                    continue;
+                                }
+                                if at_line_start {
+                                    line_content.push_str(&strip_indent_columns(
+                                        &line_indent,
+                                        base_indent_cols,
+                                    ));
+                                    line_indent.clear();
+                                    at_line_start = false;
+                                }
+                                line_content.push_str(&node_text);
                             }
                         }
                     }
@@ -539,14 +554,15 @@ fn format_info_string(info_node: &SyntaxNode, info: &InfoString, config: &Config
 /// while keeping complex expressions in the inline position.
 /// If the language's comment syntax is unknown, returns false to fall back to inline format.
 fn format_code_block_hashpipe(
+    code_block_node: &SyntaxNode,
     info_node: &SyntaxNode,
-    info: &InfoString,
     content: &str,
     fence_char: char,
     fence_length: usize,
     config: &Config,
     output: &mut String,
 ) -> bool {
+    let info = InfoString::parse(&info_node.text().to_string());
     let language = match &info.block_type {
         CodeBlockType::Executable { language } => language,
         _ => unreachable!("hashpipe only for executable chunks"),
@@ -554,7 +570,11 @@ fn format_code_block_hashpipe(
 
     // Classify options into simple (hashpipe) vs complex (inline)
     // Extract from CST nodes
-    let (simple, complex) = hashpipe::split_options_from_cst(info_node);
+    let code_content_node = code_block_node
+        .children()
+        .find(|child| child.kind() == SyntaxKind::CODE_CONTENT);
+    let ((simple, complex), had_content_hashpipe) =
+        hashpipe::split_options_from_cst_with_content(info_node, code_content_node.as_ref());
 
     // Try to get hashpipe lines - returns None for unknown languages
     let hashpipe_lines = match hashpipe::format_as_hashpipe(language, &simple, config.line_width) {
@@ -581,8 +601,20 @@ fn format_code_block_hashpipe(
         output.push('\n');
     }
 
-    // Add content
-    output.push_str(content);
+    // Add content, dropping already-parsed leading hashpipe header lines to avoid duplication.
+    if had_content_hashpipe {
+        if let Some(prefix) = hashpipe::get_comment_prefix(language) {
+            if let Some((_header, body)) = split_hashpipe_header(content, prefix) {
+                output.push_str(&body);
+            } else {
+                output.push_str(content);
+            }
+        } else {
+            output.push_str(content);
+        }
+    } else {
+        output.push_str(content);
+    }
 
     // Close fence
     for _ in 0..fence_length {

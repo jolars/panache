@@ -16,6 +16,20 @@ pub enum ChunkOptionValue {
     Expression(String),
 }
 
+/// Get hashpipe comment prefix for a code chunk language.
+pub fn hashpipe_comment_prefix(language: &str) -> Option<&'static str> {
+    match language.to_ascii_lowercase().as_str() {
+        "r" | "python" | "julia" | "bash" | "shell" | "sh" | "ruby" | "perl" => Some("#|"),
+        "c" | "cpp" | "c++" | "java" | "javascript" | "js" | "typescript" | "ts" | "rust"
+        | "go" | "swift" | "kotlin" | "scala" | "csharp" | "c#" | "php" | "ojs" | "dot" => {
+            Some("//|")
+        }
+        "sql" | "mysql" | "postgres" | "postgresql" | "sqlite" => Some("--|"),
+        "mermaid" => Some("%%|"),
+        _ => None,
+    }
+}
+
 /// Classify a chunk option value as either simple (convertible) or expression (skip).
 ///
 /// Conservative approach: only classify as Simple if we're certain it's a literal.
@@ -227,5 +241,14 @@ mod tests {
 
         let result = classify_value(&Some("vec[1]".to_string()));
         assert_eq!(result, ChunkOptionValue::Expression("vec[1]".to_string()));
+    }
+
+    #[test]
+    fn test_hashpipe_comment_prefix() {
+        assert_eq!(hashpipe_comment_prefix("r"), Some("#|"));
+        assert_eq!(hashpipe_comment_prefix("cpp"), Some("//|"));
+        assert_eq!(hashpipe_comment_prefix("sql"), Some("--|"));
+        assert_eq!(hashpipe_comment_prefix("mermaid"), Some("%%|"));
+        assert_eq!(hashpipe_comment_prefix("fortran"), None);
     }
 }

@@ -290,6 +290,68 @@ fn definition_list_inline_fence_parses_as_code_block() {
     assert_eq!(info, "r");
 }
 
+#[test]
+fn executable_chunk_parses_hashpipe_label_as_chunk_option() {
+    let input = "```{r}\n#| label: foobar\na <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
+    let info = get_code_info(&code_block).expect("expected code info");
+    assert_eq!(info, "{r}");
+
+    let has_label_option = code_block.descendants().any(|n| {
+        if n.kind() != SyntaxKind::CHUNK_OPTION {
+            return false;
+        }
+        let key = n
+            .children_with_tokens()
+            .find_map(|el| match el {
+                rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::CHUNK_OPTION_KEY => {
+                    Some(t.text().to_string())
+                }
+                _ => None,
+            })
+            .unwrap_or_default();
+        let value = n
+            .children_with_tokens()
+            .find_map(|el| match el {
+                rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::CHUNK_OPTION_VALUE => {
+                    Some(t.text().to_string())
+                }
+                _ => None,
+            })
+            .unwrap_or_default();
+        key == "label" && value == "foobar"
+    });
+    assert!(
+        has_label_option,
+        "expected hashpipe label to be parsed as CHUNK_OPTION"
+    );
+}
+
+#[test]
+fn executable_chunk_keeps_non_hashpipe_lines_in_code_content() {
+    let input = "```{r}\n#| label: foobar\na <- 1\n# comment\n```\n";
+    let node = parse_blocks_quarto(input);
+
+    let content = get_code_content(&node).unwrap();
+    assert_eq!(content, "#| label: foobar\na <- 1\n# comment\n");
+}
+
+#[test]
+fn display_code_block_keeps_hashpipe_line_as_plain_text() {
+    let input = "```r\n#| label: foobar\na <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+
+    let has_chunk_option = node
+        .descendants()
+        .any(|n| n.kind() == SyntaxKind::CHUNK_OPTION);
+    assert!(
+        !has_chunk_option,
+        "display-only code blocks should not parse hashpipe as chunk options"
+    );
+}
+
 // Indented code block tests
 
 #[test]
