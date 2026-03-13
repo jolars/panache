@@ -49,6 +49,10 @@ pub async fn document_symbol(
 fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbol> {
     let mut symbols = Vec::new();
     let mut heading_stack: Vec<(usize, DocumentSymbol)> = Vec::new();
+    let db = crate::salsa::SalsaDb::default();
+    let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, root);
+    let heading_levels: std::collections::HashMap<rowan::TextRange, usize> =
+        symbol_index.heading_sequence().iter().copied().collect();
 
     log::debug!("build_document_symbols: root kind = {:?}", root.kind());
 
@@ -62,7 +66,7 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
         match node.kind() {
             SyntaxKind::HEADING => {
                 if let Some(symbol) = extract_heading_symbol(&node, content) {
-                    let level = get_heading_level(&node);
+                    let level = heading_levels.get(&node.text_range()).copied().unwrap_or(1);
 
                     // Pop stack until we find a parent with lower level
                     while let Some((stack_level, _)) = heading_stack.last() {
@@ -141,11 +145,6 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
     }
 
     symbols
-}
-
-fn get_heading_level(node: &SyntaxNode) -> usize {
-    // Use typed wrapper for cleaner access
-    Heading::cast(node.clone()).map(|h| h.level()).unwrap_or(1)
 }
 
 fn extract_heading_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {

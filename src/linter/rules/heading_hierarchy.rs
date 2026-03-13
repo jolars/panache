@@ -22,11 +22,11 @@ impl Rule for HeadingHierarchyRule {
 
         let mut prev_level: Option<usize> = None;
 
-        for (node, level) in headings {
+        for (range, level) in headings {
             if let Some(prev) = prev_level
                 && level > prev + 1
             {
-                let location = Location::from_node(&node, input);
+                let location = Location::from_range(range, input);
                 let expected_level = prev + 1;
 
                 let diagnostic = Diagnostic::warning(
@@ -37,7 +37,16 @@ impl Rule for HeadingHierarchyRule {
                         prev, level, expected_level
                     ),
                 )
-                .with_fix(create_fix(&node, level, expected_level));
+                .with_fix({
+                    if let Some(node) = heading_node_at_range(tree, range) {
+                        create_fix(&node, level, expected_level)
+                    } else {
+                        Fix {
+                            message: "Could not create fix".to_string(),
+                            edits: vec![],
+                        }
+                    }
+                });
 
                 diagnostics.push(diagnostic);
             }
@@ -49,33 +58,16 @@ impl Rule for HeadingHierarchyRule {
     }
 }
 
-fn collect_headings(tree: &SyntaxNode) -> Vec<(SyntaxNode, usize)> {
-    let mut headings = Vec::new();
-
-    fn walk(node: &SyntaxNode, headings: &mut Vec<(SyntaxNode, usize)>) {
-        if node.kind() == SyntaxKind::HEADING
-            && let Some(level) = extract_heading_level(node)
-        {
-            headings.push((node.clone(), level));
-        }
-
-        for child in node.children() {
-            walk(&child, headings);
-        }
-    }
-
-    walk(tree, &mut headings);
-    headings
+fn collect_headings(tree: &SyntaxNode) -> Vec<(rowan::TextRange, usize)> {
+    let db = crate::salsa::SalsaDb::default();
+    crate::salsa::symbol_usage_index_from_tree(&db, tree)
+        .heading_sequence()
+        .to_vec()
 }
 
-fn extract_heading_level(heading: &SyntaxNode) -> Option<usize> {
-    for child in heading.children() {
-        if child.kind() == SyntaxKind::ATX_HEADING_MARKER {
-            let marker_text = child.text().to_string();
-            return Some(marker_text.trim().chars().filter(|&c| c == '#').count());
-        }
-    }
-    None
+fn heading_node_at_range(tree: &SyntaxNode, range: rowan::TextRange) -> Option<SyntaxNode> {
+    tree.descendants()
+        .find(|node| node.kind() == SyntaxKind::HEADING && node.text_range() == range)
 }
 
 fn create_fix(heading: &SyntaxNode, current_level: usize, expected_level: usize) -> Fix {

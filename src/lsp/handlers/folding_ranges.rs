@@ -39,6 +39,10 @@ pub async fn folding_range(
 
 fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
     let mut ranges = Vec::new();
+    let db = crate::salsa::SalsaDb::default();
+    let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, root);
+    let heading_levels: std::collections::HashMap<rowan::TextRange, usize> =
+        symbol_index.heading_sequence().iter().copied().collect();
 
     // Root is now DOCUMENT node directly
     if root.kind() != SyntaxKind::DOCUMENT {
@@ -51,7 +55,7 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
     for node in root.children() {
         match node.kind() {
             SyntaxKind::HEADING => {
-                let level = get_heading_level(&node);
+                let level = heading_levels.get(&node.text_range()).copied().unwrap_or(1);
                 let start_offset = node.text_range().start().into();
                 heading_positions.push((level, start_offset));
             }
@@ -108,21 +112,6 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
     }
 
     ranges
-}
-
-fn get_heading_level(heading: &SyntaxNode) -> usize {
-    // Count # markers or determine from setext underline
-    for child in heading.children() {
-        if child.kind() == SyntaxKind::ATX_HEADING_MARKER {
-            let text = child.text().to_string();
-            return text.chars().filter(|&c| c == '#').count();
-        }
-        if child.kind() == SyntaxKind::SETEXT_HEADING_UNDERLINE {
-            let text = child.text().to_string();
-            return if text.contains('=') { 1 } else { 2 };
-        }
-    }
-    1 // Default to level 1 if no marker found
 }
 
 fn extract_code_block_range(node: &SyntaxNode, content: &str) -> Option<FoldingRange> {

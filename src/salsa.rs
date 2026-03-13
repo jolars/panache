@@ -206,6 +206,7 @@ pub struct SymbolUsageIndex {
     reference_definitions: HashMap<String, Vec<rowan::TextRange>>,
     footnote_definitions: HashMap<String, Vec<rowan::TextRange>>,
     heading_labels: HashMap<String, Vec<rowan::TextRange>>,
+    heading_sequence: Vec<(rowan::TextRange, usize)>,
 }
 
 impl SymbolUsageIndex {
@@ -245,6 +246,10 @@ impl SymbolUsageIndex {
 
     pub fn heading_label_entries(&self) -> impl Iterator<Item = (&String, &Vec<rowan::TextRange>)> {
         self.heading_labels.iter()
+    }
+
+    pub fn heading_sequence(&self) -> &[(rowan::TextRange, usize)] {
+        &self.heading_sequence
     }
 }
 
@@ -299,6 +304,12 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
             .entry(label)
             .or_default()
             .push(heading.syntax().text_range());
+        let level = heading.level();
+        if level > 0 {
+            index
+                .heading_sequence
+                .push((heading.syntax().text_range(), level));
+        }
     }
 
     for node in tree
