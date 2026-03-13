@@ -104,5 +104,10 @@ fn default_registry(config: &Config) -> RuleRegistry {
     if config.lint.is_rule_enabled("chunk-label-spaces") {
         registry.register(Box::new(rules::chunk_label_spaces::ChunkLabelSpacesRule));
     }
+    if config.lint.is_rule_enabled("missing-chunk-labels") {
+        registry.register(Box::new(
+            rules::missing_chunk_labels::MissingChunkLabelsRule,
+        ));
+    }
     registry
 }

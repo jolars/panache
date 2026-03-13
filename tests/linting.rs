@@ -211,3 +211,40 @@ chunk-label-spaces = false
         .collect();
     assert!(label_issues.is_empty());
 }
+
+#[test]
+fn test_missing_chunk_labels() {
+    let diagnostics = lint_file_with_config(
+        "missing_chunk_labels.md",
+        r#"
+flavor = "quarto"
+"#,
+    );
+    let missing: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "missing-chunk-labels")
+        .collect();
+    assert_eq!(
+        missing.len(),
+        1,
+        "Should flag only unlabeled executable chunks"
+    );
+}
+
+#[test]
+fn test_missing_chunk_labels_can_be_disabled() {
+    let diagnostics = lint_file_with_config(
+        "missing_chunk_labels.md",
+        r#"
+flavor = "quarto"
+
+[lint]
+missing-chunk-labels = false
+"#,
+    );
+    let missing: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "missing-chunk-labels")
+        .collect();
+    assert!(missing.is_empty());
+}

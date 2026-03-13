@@ -89,8 +89,8 @@ panache lint --check . || exit 1
 
 ## Lint Rules
 
-Panache includes several built-in lint rules that analyze document structure
-and content.
+Panache includes several built-in lint rules that analyze document structure and
+content.
 
 ### `heading-hierarchy`
 
@@ -280,41 +280,20 @@ Description
     often fail to resolve reliably. Use a stable identifier such as
     `several-words` or `several_words` instead.
 
-### Parser Errors
+### `missing-chunk-labels`
 
-The parser emits syntax errors as lint diagnostics when it encounters malformed
-input.
+Detects executable chunks that do not define a `label` (either inline or
+hashpipe style).
 
 Severity
-:   Error
+:   Warning
 
 Auto-fix
 :   No
 
 Description
-:   Parser errors indicate syntactically invalid Markdown that panache cannot
-    parse correctly. These should be fixed manually as they typically indicate
-    incomplete or malformed structures.
-
-**Example violations:**
-
-Unclosed code block:
-
-````markdown
-```python
-def hello():
-    print("Hello")
-````
-
-Malformed table:
-
-```markdown
-| Header |
-|-----
-| Cell |
-```
-
-**Resolution:** Fix the syntax to match valid Markdown/Pandoc specifications.
+:   Labels facilitates debugging. Add a label with either `#| label: my-chunk`
+    or inline `label=my-chunk`.
 
 ## Diagnostic Format
 
@@ -352,7 +331,7 @@ note: First defined here:
 
 ## Severity Levels
 
-panache uses three severity levels:
+Panache uses three severity levels:
 
 `error`
 :   Critical issues that prevent correct parsing or rendering
@@ -527,6 +506,7 @@ duplicate-reference-labels = true
 undefined-references = true
 citation-keys = true
 chunk-label-spaces = true
+missing-chunk-labels = true
 ```
 
 All rules are enabled by default when omitted. You can disable a specific rule:
