@@ -25,6 +25,11 @@ Go to definition
     - Citation references: `[@key]` → `[@key]: content`
     - Quarto crossrefs: `@fig-label` → chunk/equation/figure label definition
 
+Find references
+:   Find all usages of a symbol (`textDocument/references`)
+
+    - Quarto crossrefs and chunk labels
+
 Document outline
 :   Hierarchical view of document structure (`textDocument/documentSymbol`)
 
@@ -441,6 +446,11 @@ Smart completions for Markdown syntax (implementation varies by context).
 
 Rename references and their definitions together. Place cursor on a reference
 label or definition and trigger rename (F2 in many editors).
+
+### Find References
+
+Find all references to the symbol under cursor (`textDocument/references`),
+including Quarto crossrefs and executable chunk labels.
 
 ### Document Synchronization
 

@@ -50,6 +50,7 @@ impl LanguageServer for PanacheLsp {
                 definition_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions::default()),
+                references_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Left(true)),
                 workspace: Some(WorkspaceServerCapabilities {
                     workspace_folders: Some(WorkspaceFoldersServerCapabilities {
@@ -255,6 +256,17 @@ impl LanguageServer for PanacheLsp {
 
     async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
         handlers::rename::rename(
+            &self.client,
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await
+    }
+
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+        handlers::references::references(
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.salsa_db),

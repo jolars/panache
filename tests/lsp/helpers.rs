@@ -287,6 +287,31 @@ impl TestLspServer {
         self.lsp.goto_definition(params).await.unwrap()
     }
 
+    /// Find references at a specific position.
+    pub async fn references(
+        &self,
+        uri: &str,
+        line: u32,
+        character: u32,
+        include_declaration: bool,
+    ) -> Option<Vec<Location>> {
+        let params = ReferenceParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: uri.parse().unwrap(),
+                },
+                position: Position { line, character },
+            },
+            context: ReferenceContext {
+                include_declaration,
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+
+        self.lsp.references(params).await.unwrap()
+    }
+
     /// Get hover information at a specific position.
     ///
     /// Simulates the `textDocument/hover` request.
@@ -428,6 +453,13 @@ impl LanguageServer for LspWrapper {
         params: GotoDefinitionParams,
     ) -> tower_lsp_server::jsonrpc::Result<Option<GotoDefinitionResponse>> {
         self.inner.goto_definition(params).await
+    }
+
+    async fn references(
+        &self,
+        params: ReferenceParams,
+    ) -> tower_lsp_server::jsonrpc::Result<Option<Vec<Location>>> {
+        self.inner.references(params).await
     }
 
     async fn hover(&self, params: HoverParams) -> tower_lsp_server::jsonrpc::Result<Option<Hover>> {
