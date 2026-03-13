@@ -211,3 +211,39 @@ async fn test_rename_citation_updates_ris() {
     assert!(changes.contains_key(&doc_uri));
     assert!(changes.contains_key(&bib_uri));
 }
+
+#[tokio::test]
+async fn test_rename_chunk_label_updates_crossref_and_definition() {
+    let server = TestLspServer::new();
+    let content = r#"See @fig-plot.
+
+```{r}
+#| label: fig-plot
+plot(1:10)
+```
+"#;
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let edit = server
+        .rename("file:///test.qmd", 0, 7, "fig-renamed")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.qmd".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert!(
+        edits.iter().any(|e| e.new_text == "fig-renamed"),
+        "expected rename edits to use new key"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 0),
+        "expected crossref reference edit"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 3),
+        "expected chunk label definition edit"
+    );
+}

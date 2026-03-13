@@ -6,7 +6,9 @@ use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
-use crate::syntax::{AstNode, FootnoteDefinition, ReferenceDefinition, SyntaxKind, SyntaxNode};
+use crate::syntax::{
+    AstNode, ChunkOption, FootnoteDefinition, ReferenceDefinition, SyntaxKind, SyntaxNode,
+};
 use crate::utils::normalize_label;
 use salsa::{Accumulator, Durability, Setter};
 
@@ -272,6 +274,27 @@ pub fn definition_index(
             };
             insert_crossref(db, &mut index, &id, location);
         }
+    }
+
+    for option in tree.descendants().filter_map(ChunkOption::cast) {
+        db.unwind_if_revision_cancelled();
+        let Some(key) = option.key() else {
+            continue;
+        };
+        if !key.eq_ignore_ascii_case("label") {
+            continue;
+        }
+        let Some(value) = option.value() else {
+            continue;
+        };
+        if value.is_empty() {
+            continue;
+        }
+        let location = DefinitionLocation {
+            path: path.clone(),
+            range: option.syntax().text_range(),
+        };
+        insert_crossref(db, &mut index, &value, location);
     }
 
     if config.config(db).extensions.bookdown_references {

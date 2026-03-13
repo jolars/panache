@@ -8,7 +8,7 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::salsa::Db;
-use crate::syntax::{AstNode, Citation, Crossref, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, ChunkOption, Citation, Crossref, SyntaxKind, SyntaxNode};
 use crate::utils::pandoc_slugify;
 use rowan::{NodeOrToken, TextRange, TextSize};
 
@@ -198,9 +198,31 @@ pub(crate) fn extract_crossref_key(node: &SyntaxNode) -> Option<String> {
     None
 }
 
+pub(crate) fn extract_chunk_label_key(node: &SyntaxNode) -> Option<String> {
+    if let Some(option) = ChunkOption::cast(node.clone())
+        && let (Some(key), Some(value)) = (option.key(), option.value())
+        && key.eq_ignore_ascii_case("label")
+    {
+        return Some(value);
+    }
+
+    let mut current = node.clone();
+    while let Some(parent) = current.parent() {
+        if let Some(option) = ChunkOption::cast(parent.clone())
+            && let (Some(key), Some(value)) = (option.key(), option.value())
+            && key.eq_ignore_ascii_case("label")
+        {
+            return Some(value);
+        }
+        current = parent;
+    }
+
+    None
+}
+
 pub(crate) fn find_crossref_definition_node(root: &SyntaxNode, label: &str) -> Option<SyntaxNode> {
     let target = normalize_label(label);
-    root.descendants().find(|node| {
+    if let Some(node) = root.descendants().find(|node| {
         if node.kind() != SyntaxKind::ATTRIBUTE {
             return false;
         }
@@ -209,6 +231,18 @@ pub(crate) fn find_crossref_definition_node(root: &SyntaxNode, label: &str) -> O
             && let Some(id) = attrs.identifier
         {
             return normalize_label(&id) == target;
+        }
+        false
+    }) {
+        return Some(node);
+    }
+
+    root.descendants().find(|node| {
+        if let Some(option) = ChunkOption::cast(node.clone())
+            && let (Some(key), Some(value)) = (option.key(), option.value())
+            && key.eq_ignore_ascii_case("label")
+        {
+            return normalize_label(&value) == target;
         }
         false
     })
@@ -482,6 +516,19 @@ mod tests {
         let def = find_crossref_definition_node(&root, "eq-test");
         assert!(def.is_some());
         assert_eq!(def.unwrap().kind(), SyntaxKind::ATTRIBUTE);
+    }
+
+    #[test]
+    fn test_find_crossref_definition_node_chunk_label() {
+        let input = "See @fig-plot.\n\n```{r}\n#| label: fig-plot\nx <- 1\n```\n";
+        let mut config = Config::default();
+        config.flavor = crate::config::Flavor::Quarto;
+        config.extensions.quarto_crossrefs = true;
+        let root = crate::parser::parse(input, Some(config));
+
+        let def = find_crossref_definition_node(&root, "fig-plot");
+        assert!(def.is_some());
+        assert_eq!(def.unwrap().kind(), SyntaxKind::CHUNK_OPTION);
     }
 
     #[test]

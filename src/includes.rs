@@ -7,7 +7,9 @@ use rowan::{NodeOrToken, TextRange};
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
-use crate::syntax::{AstNode, FootnoteDefinition, ReferenceDefinition, SyntaxKind, SyntaxNode};
+use crate::syntax::{
+    AstNode, ChunkOption, FootnoteDefinition, ReferenceDefinition, SyntaxKind, SyntaxNode,
+};
 use crate::utils::normalize_label;
 
 #[derive(Debug, Clone)]
@@ -168,6 +170,23 @@ pub fn collect_cross_doc_duplicates(
             let location = DefinitionLocation::new(doc_path, node.text_range(), input);
             index.insert_crossref(&id, location);
         }
+    }
+
+    for option in tree.descendants().filter_map(ChunkOption::cast) {
+        let Some(key) = option.key() else {
+            continue;
+        };
+        if !key.eq_ignore_ascii_case("label") {
+            continue;
+        }
+        let Some(value) = option.value() else {
+            continue;
+        };
+        if value.is_empty() {
+            continue;
+        }
+        let location = DefinitionLocation::new(doc_path, option.syntax().text_range(), input);
+        index.insert_crossref(&value, location);
     }
 
     if config.extensions.bookdown_references {

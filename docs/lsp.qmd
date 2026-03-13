@@ -23,6 +23,7 @@ Go to definition
     - Reference images: `![alt][ref]` → `[ref]: url`
     - Footnote references: `[^id]` → `[^id]: content`
     - Citation references: `[@key]` → `[@key]: content`
+    - Quarto crossrefs: `@fig-label` → chunk/equation/figure label definition
 
 Document outline
 :   Hierarchical view of document structure (`textDocument/documentSymbol`)
@@ -72,6 +73,7 @@ Symbol renaming
 
     - Citation keys
     - Reference labels
+    - Quarto crossref labels (including executable chunk `label` options)
 
 Document tracking
 :   Incremental synchronization for efficiency (`textDocument/didOpen`,
@@ -82,8 +84,8 @@ Configuration discovery
 
 ## Starting the Server
 
-If you want to start the language server manually (for debugging), then you
-can run `panache lsp` in your terminal. This will start the server and wait for
+If you want to start the language server manually (for debugging), then you can
+run `panache lsp` in your terminal. This will start the server and wait for
 JSON-RPC input. But most users will want to set up their editor to start the
 server automatically when editing supported files. See the editor integration
 instructions below.
@@ -339,6 +341,9 @@ Reference images
 Footnote references
 :   `[^id]` → `[^id]: content`
 
+Quarto crossrefs
+:   `@fig-label` → `#| label: fig-label` (or other crossref label definitions)
+
 Place your cursor on a reference and trigger "go to definition" (F12 in many
 editors).
 
@@ -450,8 +455,8 @@ The LSP tracks document changes using **incremental synchronization**:
 `textDocument/didClose`
 :   Document closed
 
-This ensures the LSP always has the current document state while minimizing
-data transfer.
+This ensures the LSP always has the current document state while minimizing data
+transfer.
 
 ## Troubleshooting
 

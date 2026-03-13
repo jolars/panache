@@ -313,3 +313,25 @@ async fn test_goto_definition_ris_bibliography() {
         Uri::from_file_path(&bib_path).expect("bib uri")
     );
 }
+
+#[tokio::test]
+async fn test_goto_definition_chunk_label_hashpipe() {
+    let server = TestLspServer::new();
+
+    let content = r#"See @fig-plot.
+
+```{r}
+#| label: fig-plot
+plot(1:10)
+```
+"#;
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let result = server.goto_definition("file:///test.qmd", 0, 7).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 3);
+}

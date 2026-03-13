@@ -8,7 +8,7 @@ use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
 use crate::metadata::{inline_bib_conflicts, inline_reference_map};
-use crate::syntax::{AstNode, Citation, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, ChunkOption, Citation, Crossref, SyntaxKind, SyntaxNode};
 
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
@@ -43,6 +43,73 @@ pub(crate) async fn rename(
     let Some(doc_path) = doc_path.clone() else {
         return Ok(None);
     };
+    // First handle crossref/chunk-label rename without requiring bibliography metadata.
+    let maybe_crossref_key = {
+        let root = SyntaxNode::new_root(green_tree.clone());
+        let Some(offset) = position_to_offset(&content, position) else {
+            return Ok(None);
+        };
+        let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
+            return Ok(None);
+        };
+        loop {
+            if let Some(key) = helpers::extract_crossref_key(&node) {
+                break Some(key);
+            }
+            if let Some(key) = helpers::extract_chunk_label_key(&node) {
+                break Some(key);
+            }
+            match node.parent() {
+                Some(parent) => node = parent,
+                None => break None,
+            }
+        }
+    };
+    if let Some(old_key) = maybe_crossref_key {
+        let old_norm = normalize_label(&old_key);
+        let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+
+        let mut doc_paths = {
+            let db = salsa_db.lock().await;
+            crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
+                .documents()
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        if !doc_paths.contains(&doc_path) {
+            doc_paths.push(doc_path.clone());
+        }
+        doc_paths.sort();
+        doc_paths.dedup();
+
+        for path in doc_paths {
+            let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
+            let (text, tree) = if doc_uri == uri {
+                (content.clone(), SyntaxNode::new_root(green_tree.clone()))
+            } else {
+                let text = std::fs::read_to_string(&path).unwrap_or_default();
+                let tree = crate::parse(&text, None);
+                (text, tree)
+            };
+
+            let mut edits = crossref_key_edits(&tree, &text, &old_norm, &new_name);
+            edits.extend(chunk_label_edits(&tree, &text, &old_norm, &new_name));
+            if edits.is_empty() {
+                continue;
+            }
+            changes.entry(doc_uri).or_default().extend(edits);
+        }
+
+        if changes.is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(WorkspaceEdit {
+            changes: Some(changes),
+            ..Default::default()
+        }));
+    }
+
     let yaml_ok = {
         let db = salsa_db.lock().await;
         crate::salsa::yaml_metadata_parse_result(&*db, salsa_file, salsa_config, doc_path.clone())
@@ -162,11 +229,11 @@ pub(crate) async fn rename(
     doc_paths.sort();
     doc_paths.dedup();
 
-    let root = SyntaxNode::new_root(green_tree.clone());
+    let current_root = SyntaxNode::new_root(green_tree.clone());
     for path in doc_paths {
         let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
         let (text, tree) = if doc_uri == uri {
-            (content.clone(), root.clone())
+            (content.clone(), current_root.clone())
         } else {
             let text = std::fs::read_to_string(&path).unwrap_or_default();
             let tree = crate::parse(&text, None);
@@ -188,6 +255,75 @@ pub(crate) async fn rename(
         changes: Some(changes),
         ..Default::default()
     }))
+}
+
+fn crossref_key_edits(
+    root: &SyntaxNode,
+    text: &str,
+    old_norm: &str,
+    new_key: &str,
+) -> Vec<TextEdit> {
+    let mut edits = Vec::new();
+    for node in root
+        .descendants()
+        .filter(|node| node.kind() == SyntaxKind::CROSSREF)
+    {
+        let Some(crossref) = Crossref::cast(node) else {
+            continue;
+        };
+        for key in crossref.keys() {
+            if normalize_label(&key.text()) != old_norm {
+                continue;
+            }
+            let range = key.text_range();
+            let start = offset_to_position(text, range.start().into());
+            let end = offset_to_position(text, range.end().into());
+            edits.push(TextEdit {
+                range: Range { start, end },
+                new_text: new_key.to_string(),
+            });
+        }
+    }
+    edits
+}
+
+fn chunk_label_edits(
+    root: &SyntaxNode,
+    text: &str,
+    old_norm: &str,
+    new_key: &str,
+) -> Vec<TextEdit> {
+    let mut edits = Vec::new();
+    for option in root.descendants().filter_map(ChunkOption::cast) {
+        let Some(key) = option.key() else {
+            continue;
+        };
+        if !key.eq_ignore_ascii_case("label") {
+            continue;
+        }
+        let Some(value) = option.value() else {
+            continue;
+        };
+        if normalize_label(&value) != old_norm {
+            continue;
+        }
+        let Some(value_range) = option
+            .syntax()
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|t| t.kind() == SyntaxKind::CHUNK_OPTION_VALUE)
+            .map(|t| t.text_range())
+        else {
+            continue;
+        };
+        let start = offset_to_position(text, value_range.start().into());
+        let end = offset_to_position(text, value_range.end().into());
+        edits.push(TextEdit {
+            range: Range { start, end },
+            new_text: new_key.to_string(),
+        });
+    }
+    edits
 }
 
 fn citation_key_edits(
