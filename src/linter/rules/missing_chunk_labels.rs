@@ -74,7 +74,7 @@ impl Rule for MissingChunkLabelsRule {
             diagnostics.push(Diagnostic::warning(
                 Location::from_node(&info_node, input),
                 "missing-chunk-labels",
-                "Executable chunk has no label; add `#| label: ...` (or inline `label=`) for stable cross-references".to_string(),
+                "Executable code chunk has no label; add `#| label: ...`".to_string(),
             ));
         }
 
