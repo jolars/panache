@@ -29,6 +29,7 @@ Find references
 :   Find all usages of a symbol (`textDocument/references`)
 
     - Quarto crossrefs and chunk labels
+    - Citation keys (with optional bibliography/inline-reference declarations)
 
 Document outline
 :   Hierarchical view of document structure (`textDocument/documentSymbol`)
@@ -450,7 +451,7 @@ label or definition and trigger rename (F2 in many editors).
 ### Find References
 
 Find all references to the symbol under cursor (`textDocument/references`),
-including Quarto crossrefs and executable chunk labels.
+including Quarto crossrefs, executable chunk labels, and citation keys.
 
 ### Document Synchronization
 
