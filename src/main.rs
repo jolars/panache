@@ -112,11 +112,22 @@ fn expand_paths(
         let filters = build_path_filters(matcher_root, cfg)?;
 
         if path.is_file() {
-            let rel_path = path.strip_prefix(matcher_root).unwrap_or(path.as_path());
+            let rel_path = path
+                .strip_prefix(matcher_root)
+                .map(Path::to_path_buf)
+                .or_else(|_| {
+                    let canonical_path = path.canonicalize().map_err(io::Error::other)?;
+                    let canonical_root = matcher_root.canonicalize().map_err(io::Error::other)?;
+                    canonical_path
+                        .strip_prefix(&canonical_root)
+                        .map(Path::to_path_buf)
+                        .map_err(io::Error::other)
+                })
+                .unwrap_or_else(|_| path.to_path_buf());
             if force_exclude
                 && filters
                     .exclude
-                    .matched_path_or_any_parents(rel_path, false)
+                    .matched_path_or_any_parents(&rel_path, false)
                     .is_ignore()
             {
                 continue;
