@@ -197,6 +197,7 @@ golden_test_cases!(
     grid_table_planets,
     latex_environment,
     lazy_continuation_deep,
+    leading_blanklines,
     line_blocks,
     line_ending_crlf,
     line_ending_lf,

@@ -340,7 +340,9 @@ impl Formatter {
                             SyntaxKind::WHITESPACE => {}
                             SyntaxKind::NEWLINE => {}
                             SyntaxKind::BLANK_LINE => {
-                                self.output.push('\n');
+                                if !self.output.is_empty() {
+                                    self.output.push('\n');
+                                }
                             }
                             SyntaxKind::ESCAPED_CHAR => {
                                 // Token already includes backslash (e.g., "\*")
@@ -1873,6 +1875,10 @@ impl Formatter {
             SyntaxKind::BLANK_LINE => {
                 // BlankLine nodes preserve exact whitespace in the CST for losslessness
                 // But when formatting, we normalize to just newlines (no trailing spaces)
+                // Drop blank lines at beginning of document output.
+                if self.output.is_empty() {
+                    return;
+                }
                 // Limit consecutive blank lines to 1
                 if self.consecutive_blank_lines < 1 {
                     self.output.push('\n');
