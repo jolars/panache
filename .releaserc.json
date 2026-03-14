@@ -61,7 +61,8 @@
           "Cargo.toml",
           "Cargo.lock",
           "flake.nix",
-          "editors/code/package.json"
+          "editors/code/package.json",
+          "editors/code/package-lock.json"
         ]
       }
     ],
