@@ -58,6 +58,32 @@ Set the maximum line width for text wrapping:
 line-width = 80
 ```
 
+### File Selection (Directory Traversal)
+
+When you run commands on directories (`panache format .`, `panache lint .`,
+`panache debug format .`), Panache supports include/exclude selectors:
+
+```toml
+exclude = [".git/", "build/"]
+extend-exclude = ["tests/testthat/_snaps/"]
+include = ["*.qmd", "*.md"]
+extend-include = ["*.Rmd"]
+```
+
+`exclude`
+:   Base exclude patterns. If set, replaces Panache's default exclude base.
+
+`extend-exclude`
+:   Additional exclude patterns appended to the base set.
+
+`include`
+:   Base include patterns. If set, replaces Panache's default include base.
+
+`extend-include`
+:   Additional include patterns appended to the base set.
+
+If a path matches both include and exclude, exclude wins.
+
 ## Formatting Style
 
 Formatting style preferences are organized under the `[style]` section:
@@ -735,8 +761,8 @@ appended at the end.
 ### Behavior
 
 Language matching
-:   Code block language (e.g., ```` ```python ````) is matched to formatter
-    key (case-insensitive)
+:   Code block language (e.g., ```` ```python ````) is matched to formatter key
+    (case-insensitive)
 
 Parallel execution
 :   All formatters run concurrently for speed

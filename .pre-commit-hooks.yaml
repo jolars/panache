@@ -1,15 +1,15 @@
 - id: panache-format
   name: panache format
   description: "Format Quarto, Pandoc, and Markdown files with panache"
-  entry: panache format
+  entry: panache format --force-exclude
   language: rust
-  files: '\.(qmd|Rmd|md|markdown)$'
+  files: '\.(qmd|Rmd|md|markdown|mdown|mkd)$'
   require_serial: true
 
 - id: panache-lint
   name: panache lint
   description: "Lint Quarto, Pandoc, and Markdown files with panache"
-  entry: panache lint --fix
+  entry: panache lint --force-exclude
   language: rust
-  files: '\.(qmd|Rmd|md|markdown)$'
+  files: '\.(qmd|Rmd|md|markdown|mdown|mkd)$'
   require_serial: true

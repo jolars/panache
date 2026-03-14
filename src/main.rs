@@ -43,14 +43,84 @@ fn init_lsp_debug_log() -> io::Result<PathBuf> {
     Ok(base)
 }
 
+struct PathFilters {
+    exclude: ignore::gitignore::Gitignore,
+    include: ignore::gitignore::Gitignore,
+}
+
+fn effective_exclude_patterns(cfg: &panache::Config) -> Vec<String> {
+    let mut patterns = cfg.exclude.clone().unwrap_or_else(|| {
+        panache::config::DEFAULT_EXCLUDE_PATTERNS
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
+    });
+    patterns.extend(cfg.extend_exclude.iter().cloned());
+    patterns
+}
+
+fn effective_include_patterns(cfg: &panache::Config) -> Vec<String> {
+    let mut patterns = cfg.include.clone().unwrap_or_else(|| {
+        panache::config::DEFAULT_INCLUDE_PATTERNS
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
+    });
+    patterns.extend(cfg.extend_include.iter().cloned());
+    patterns
+}
+
+fn build_path_filters(root: &Path, cfg: &panache::Config) -> io::Result<PathFilters> {
+    let mut exclude_builder = ignore::gitignore::GitignoreBuilder::new(root);
+    for pattern in effective_exclude_patterns(cfg) {
+        exclude_builder
+            .add_line(None, &pattern)
+            .map_err(io::Error::other)?;
+    }
+    let exclude = exclude_builder.build().map_err(io::Error::other)?;
+
+    let mut include_builder = ignore::gitignore::GitignoreBuilder::new(root);
+    for pattern in effective_include_patterns(cfg) {
+        include_builder
+            .add_line(None, &pattern)
+            .map_err(io::Error::other)?;
+    }
+    let include = include_builder.build().map_err(io::Error::other)?;
+
+    Ok(PathFilters { exclude, include })
+}
+
 /// Expand paths to include all supported files, recursively handling directories
-fn expand_paths(paths: &[PathBuf]) -> io::Result<Vec<PathBuf>> {
+fn expand_paths(
+    paths: &[PathBuf],
+    cfg: &panache::Config,
+    filter_root: &Path,
+    force_exclude: bool,
+) -> io::Result<Vec<PathBuf>> {
     use ignore::WalkBuilder;
 
     let mut files = Vec::new();
 
     for path in paths {
+        let matcher_root = if path.starts_with(filter_root) {
+            filter_root
+        } else if path.is_dir() {
+            path.as_path()
+        } else {
+            path.parent().unwrap_or(filter_root)
+        };
+        let filters = build_path_filters(matcher_root, cfg)?;
+
         if path.is_file() {
+            let rel_path = path.strip_prefix(matcher_root).unwrap_or(path.as_path());
+            if force_exclude
+                && filters
+                    .exclude
+                    .matched_path_or_any_parents(rel_path, false)
+                    .is_ignore()
+            {
+                continue;
+            }
             // Check if file has a supported extension
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if SUPPORTED_EXTENSIONS.contains(&ext) {
@@ -78,17 +148,21 @@ fn expand_paths(paths: &[PathBuf]) -> io::Result<Vec<PathBuf>> {
             for entry in walker {
                 let entry = entry.map_err(io::Error::other)?;
                 let entry_path = entry.path();
-                if entry_path
-                    .components()
-                    .any(|component| component.as_os_str() == "node_modules")
+                let rel_path = entry_path.strip_prefix(matcher_root).unwrap_or(entry_path);
+                if entry_path.is_dir() {
+                    continue;
+                }
+                if filters
+                    .exclude
+                    .matched_path_or_any_parents(rel_path, false)
+                    .is_ignore()
                 {
                     continue;
                 }
-
-                if entry_path.is_file()
-                    && let Some(ext) = entry_path.extension().and_then(|e| e.to_str())
-                    && SUPPORTED_EXTENSIONS.contains(&ext)
-                {
+                if !filters.include.matched(rel_path, false).is_ignore() {
+                    continue;
+                }
+                if entry_path.is_file() {
                     files.push(entry_path.to_path_buf());
                 }
             }
@@ -341,6 +415,7 @@ fn main() -> io::Result<()> {
             check,
             range,
             verify,
+            force_exclude,
         } => {
             if verify {
                 eprintln!(
@@ -418,7 +493,15 @@ fn main() -> io::Result<()> {
             }
 
             // Expand paths (handle directories)
-            let expanded_files = expand_paths(&files)?;
+            let traversal_start_dir = start_dir_for(None)?;
+            let (traversal_cfg, _) = load_config_for_cli(
+                cli.config.as_deref(),
+                cli.isolated,
+                &traversal_start_dir,
+                None,
+            )?;
+            let expanded_files =
+                expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?;
 
             if expanded_files.is_empty() {
                 eprintln!("Error: No supported files found");
@@ -503,12 +586,20 @@ fn main() -> io::Result<()> {
                 checks,
                 json,
                 dump_dir,
+                force_exclude,
             } => {
                 let use_stdin = files.is_empty();
                 let targets = if use_stdin {
                     vec![]
                 } else {
-                    expand_paths(&files)?
+                    let traversal_start_dir = start_dir_for(None)?;
+                    let (traversal_cfg, _) = load_config_for_cli(
+                        cli.config.as_deref(),
+                        cli.isolated,
+                        &traversal_start_dir,
+                        None,
+                    )?;
+                    expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?
                 };
 
                 if !use_stdin && targets.is_empty() {
@@ -620,7 +711,12 @@ fn main() -> io::Result<()> {
             rt.block_on(async { panache::lsp::run().await })?;
             Ok(())
         }
-        Commands::Lint { files, check, fix } => {
+        Commands::Lint {
+            files,
+            check,
+            fix,
+            force_exclude,
+        } => {
             // Handle stdin case
             if files.is_empty() {
                 let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
@@ -673,7 +769,15 @@ fn main() -> io::Result<()> {
             }
 
             // Expand paths (handle directories)
-            let expanded_files = expand_paths(&files)?;
+            let traversal_start_dir = start_dir_for(None)?;
+            let (traversal_cfg, _) = load_config_for_cli(
+                cli.config.as_deref(),
+                cli.isolated,
+                &traversal_start_dir,
+                None,
+            )?;
+            let expanded_files =
+                expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?;
 
             if expanded_files.is_empty() {
                 eprintln!("Error: No supported files found");

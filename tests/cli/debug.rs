@@ -41,3 +41,27 @@ fn test_debug_format_directory_uses_supported_extensions() {
         .success()
         .stdout(predicate::str::contains("files: 1"));
 }
+
+#[test]
+fn test_debug_format_directory_respects_include_override() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = temp_dir.path().join(".panache.toml");
+    let file_qmd = temp_dir.path().join("doc.qmd");
+    let file_md = temp_dir.path().join("doc.md");
+    fs::write(
+        &config,
+        r#"
+include = ["*.qmd"]
+"#,
+    )
+    .unwrap();
+    fs::write(&file_qmd, "# Heading\n\nParagraph.\n").unwrap();
+    fs::write(&file_md, "# Heading\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["debug", "format", temp_dir.path().to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("files: 1"));
+}

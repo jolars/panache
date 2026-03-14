@@ -960,6 +960,14 @@ struct RawConfig {
     linters: HashMap<String, String>,
     #[serde(default)]
     lint: Option<LintConfig>,
+    #[serde(default)]
+    exclude: Option<Vec<String>>,
+    #[serde(default)]
+    extend_exclude: Vec<String>,
+    #[serde(default)]
+    include: Option<Vec<String>>,
+    #[serde(default)]
+    extend_include: Vec<String>,
 }
 
 fn default_line_width() -> usize {
@@ -981,6 +989,39 @@ fn default_blank_lines() -> BlankLines {
 fn default_tab_width() -> usize {
     4
 }
+
+pub const DEFAULT_EXCLUDE_PATTERNS: &[&str] = &[
+    ".Rproj.user/",
+    ".bzr/",
+    ".cache/",
+    ".devevn/",
+    ".direnv/",
+    ".git/",
+    ".hg/",
+    ".julia/",
+    ".mypy_cache/",
+    ".nox/",
+    ".pytest_cache/",
+    ".ruff_cache/",
+    ".svn/",
+    ".tmp/",
+    ".tox/",
+    ".venv/",
+    ".vscode/",
+    "_book/",
+    "_build/",
+    "_freeze/",
+    "_site/",
+    "build/",
+    "dist/",
+    "node_modules/",
+    "renv/",
+    "target/",
+    "tests/testthat/_snaps",
+];
+
+pub const DEFAULT_INCLUDE_PATTERNS: &[&str] =
+    &["*.md", "*.qmd", "*.Rmd", "*.markdown", "*.mdown", "*.mkd"];
 
 /// Resolve a single formatter name to a FormatterConfig.
 ///
@@ -1197,6 +1238,10 @@ impl RawConfig {
                 .unwrap_or_else(default_external_max_parallel),
             parser: self.parser.unwrap_or_default(),
             built_in_greedy_wrap: style.built_in_greedy_wrap,
+            exclude: self.exclude,
+            extend_exclude: self.extend_exclude,
+            include: self.include,
+            extend_include: self.extend_include,
         }
     }
 }
@@ -1402,6 +1447,10 @@ pub struct Config {
     /// Linter rule toggles.
     pub lint: LintConfig,
     pub built_in_greedy_wrap: bool,
+    pub exclude: Option<Vec<String>>,
+    pub extend_exclude: Vec<String>,
+    pub include: Option<Vec<String>>,
+    pub extend_include: Vec<String>,
 }
 
 impl<'de> Deserialize<'de> for Config {
@@ -1434,6 +1483,10 @@ impl Default for Config {
             parser: ParserConfig::default(),
             lint: LintConfig::default(),
             built_in_greedy_wrap: true,
+            exclude: None,
+            extend_exclude: Vec::new(),
+            include: None,
+            extend_include: Vec::new(),
         }
     }
 }
@@ -1913,6 +1966,33 @@ mod tests {
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
         assert!(!cfg.lint.is_rule_enabled("undefined-references"));
+    }
+
+    #[test]
+    fn path_selector_fields_parse() {
+        let toml_str = r#"
+            exclude = ["tests/", "build/"]
+            extend-exclude = ["snapshots/"]
+            include = ["*.qmd"]
+            extend-include = ["*.md"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        assert_eq!(
+            cfg.exclude,
+            Some(vec!["tests/".to_string(), "build/".to_string()])
+        );
+        assert_eq!(cfg.extend_exclude, vec!["snapshots/".to_string()]);
+        assert_eq!(cfg.include, Some(vec!["*.qmd".to_string()]));
+        assert_eq!(cfg.extend_include, vec!["*.md".to_string()]);
+    }
+
+    #[test]
+    fn path_selector_fields_default_to_unset_or_empty() {
+        let cfg = toml::from_str::<Config>("line-width = 100").unwrap();
+        assert!(cfg.exclude.is_none());
+        assert!(cfg.extend_exclude.is_empty());
+        assert!(cfg.include.is_none());
+        assert!(cfg.extend_include.is_empty());
     }
 
     #[test]

@@ -136,6 +136,57 @@ fn test_format_directory() {
 }
 
 #[test]
+fn test_format_directory_respects_exclude_config() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = temp_dir.path().join(".panache.toml");
+    let included = temp_dir.path().join("doc.qmd");
+    let excluded_dir = temp_dir.path().join("tests");
+    let excluded = excluded_dir.join("snapshot.md");
+    fs::create_dir_all(&excluded_dir).unwrap();
+    fs::write(
+        &config,
+        r#"
+exclude = ["tests/"]
+"#,
+    )
+    .unwrap();
+    fs::write(&included, "# Included\n\nParagraph.\n").unwrap();
+    fs::write(&excluded, "# Excluded\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["format", temp_dir.path().to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("doc.qmd"))
+        .stdout(predicate::str::contains("snapshot.md").not());
+}
+
+#[test]
+fn test_format_explicit_file_respects_force_exclude() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = temp_dir.path().join(".panache.toml");
+    let excluded_dir = temp_dir.path().join("tests");
+    let excluded = excluded_dir.join("snapshot.md");
+    fs::create_dir_all(&excluded_dir).unwrap();
+    fs::write(
+        &config,
+        r#"
+exclude = ["tests/"]
+"#,
+    )
+    .unwrap();
+    fs::write(&excluded, "# Excluded\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["format", "--force-exclude", excluded.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No supported files found"));
+}
+
+#[test]
 fn test_format_unsupported_extension() {
     let temp_dir = TempDir::new().unwrap();
     let test_file = temp_dir.path().join("test.txt");

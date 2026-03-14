@@ -56,6 +56,7 @@ Format a Quarto, Pandoc, or R Markdown document according to Panache's formattin
 * `--verify` — Run smoke-check invariants: (1) parser losslessness (input == parsed CST text) and (2) formatter idempotency (format(format(x)) == format(x)). When formatting files by path (including directories), --verify does not write any changes to disk. Exits with code 1 when verification fails. 
 
    Deprecated: prefer `panache debug format --checks all`.
+* `--force-exclude` — Apply exclude patterns to explicitly provided files
 
 
 
@@ -111,6 +112,7 @@ Configure rules in panache.toml with [lint] section.
 
 * `--check` — Exit with code 1 if violations found (CI mode)
 * `--fix` — Automatically fix violations where possible
+* `--force-exclude` — Apply exclude patterns to explicitly provided files
 
 
 
@@ -146,6 +148,7 @@ Run parser+formatter checks and emit diagnostics
 
 * `--json` — Emit JSON output for machine-readable tooling
 * `--dump-dir <DIR>` — Directory where failing artifacts are written
+* `--force-exclude` — Apply exclude patterns to explicitly provided files
 
 
 

@@ -128,6 +128,11 @@ pub enum Commands {
             to disk. Exits with code 1 when verification fails. \
             \n\nDeprecated: prefer `panache debug format --checks all`.")]
         verify: bool,
+
+        /// Enforce exclude patterns even for explicitly provided files
+        #[arg(long)]
+        #[arg(help = "Apply exclude patterns to explicitly provided files")]
+        force_exclude: bool,
     },
     /// Parse and display the CST tree for debugging
     #[command(
@@ -221,6 +226,11 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         #[arg(long)]
         #[arg(help = "Automatically fix violations where possible")]
         fix: bool,
+
+        /// Enforce exclude patterns even for explicitly provided files
+        #[arg(long)]
+        #[arg(help = "Apply exclude patterns to explicitly provided files")]
+        force_exclude: bool,
     },
     /// Debug utilities for parser/formatter diagnostics
     #[command(
@@ -253,6 +263,11 @@ pub enum DebugCommands {
         /// Directory where failing artifacts are written
         #[arg(long, value_name = "DIR")]
         dump_dir: Option<PathBuf>,
+
+        /// Enforce exclude patterns even for explicitly provided files
+        #[arg(long)]
+        #[arg(help = "Apply exclude patterns to explicitly provided files")]
+        force_exclude: bool,
     },
 }
 

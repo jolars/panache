@@ -121,6 +121,56 @@ fn test_lint_directory() {
 }
 
 #[test]
+fn test_lint_directory_respects_exclude_config() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = temp_dir.path().join(".panache.toml");
+    let included = temp_dir.path().join("doc.qmd");
+    let excluded_dir = temp_dir.path().join("tests");
+    let excluded = excluded_dir.join("snapshot.md");
+    fs::create_dir_all(&excluded_dir).unwrap();
+    fs::write(
+        &config,
+        r#"
+exclude = ["tests/"]
+"#,
+    )
+    .unwrap();
+    fs::write(&included, "# Heading\n\n## Subheading\n").unwrap();
+    fs::write(&excluded, "# Heading\n\n### Skipped\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["lint", temp_dir.path().to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found in 1 file(s)"));
+}
+
+#[test]
+fn test_lint_explicit_file_respects_force_exclude() {
+    let temp_dir = TempDir::new().unwrap();
+    let config = temp_dir.path().join(".panache.toml");
+    let excluded_dir = temp_dir.path().join("tests");
+    let excluded = excluded_dir.join("snapshot.md");
+    fs::create_dir_all(&excluded_dir).unwrap();
+    fs::write(
+        &config,
+        r#"
+exclude = ["tests/"]
+"#,
+    )
+    .unwrap();
+    fs::write(&excluded, "# Heading\n\n### Skipped\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["lint", "--force-exclude", excluded.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No supported files found"));
+}
+
+#[test]
 fn test_lint_stdin() {
     cargo_bin_cmd!("panache")
         .arg("lint")
