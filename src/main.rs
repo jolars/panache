@@ -90,6 +90,18 @@ fn build_path_filters(root: &Path, cfg: &panache::Config) -> io::Result<PathFilt
     Ok(PathFilters { exclude, include })
 }
 
+fn relative_path_from_root(path: &Path, root: &Path) -> Option<PathBuf> {
+    if let Ok(rel) = path.strip_prefix(root) {
+        return Some(rel.to_path_buf());
+    }
+    let canonical_path = path.canonicalize().ok()?;
+    let canonical_root = root.canonicalize().ok()?;
+    canonical_path
+        .strip_prefix(&canonical_root)
+        .ok()
+        .map(Path::to_path_buf)
+}
+
 /// Expand paths to include all supported files, recursively handling directories
 fn expand_paths(
     paths: &[PathBuf],
@@ -102,7 +114,7 @@ fn expand_paths(
     let mut files = Vec::new();
 
     for path in paths {
-        let matcher_root = if path.starts_with(filter_root) {
+        let matcher_root = if relative_path_from_root(path, filter_root).is_some() {
             filter_root
         } else if path.is_dir() {
             path.as_path()
@@ -112,18 +124,9 @@ fn expand_paths(
         let filters = build_path_filters(matcher_root, cfg)?;
 
         if path.is_file() {
-            let rel_path = path
-                .strip_prefix(matcher_root)
-                .map(Path::to_path_buf)
-                .or_else(|_| {
-                    let canonical_path = path.canonicalize().map_err(io::Error::other)?;
-                    let canonical_root = matcher_root.canonicalize().map_err(io::Error::other)?;
-                    canonical_path
-                        .strip_prefix(&canonical_root)
-                        .map(Path::to_path_buf)
-                        .map_err(io::Error::other)
-                })
-                .unwrap_or_else(|_| path.to_path_buf());
+            let rel_path = relative_path_from_root(path, matcher_root)
+                .or_else(|| path.file_name().map(PathBuf::from))
+                .unwrap_or_else(|| path.to_path_buf());
             if force_exclude
                 && filters
                     .exclude
@@ -159,18 +162,19 @@ fn expand_paths(
             for entry in walker {
                 let entry = entry.map_err(io::Error::other)?;
                 let entry_path = entry.path();
-                let rel_path = entry_path.strip_prefix(matcher_root).unwrap_or(entry_path);
+                let rel_path = relative_path_from_root(entry_path, matcher_root)
+                    .unwrap_or_else(|| entry_path.to_path_buf());
                 if entry_path.is_dir() {
                     continue;
                 }
                 if filters
                     .exclude
-                    .matched_path_or_any_parents(rel_path, false)
+                    .matched_path_or_any_parents(&rel_path, false)
                     .is_ignore()
                 {
                     continue;
                 }
-                if !filters.include.matched(rel_path, false).is_ignore() {
+                if !filters.include.matched(&rel_path, false).is_ignore() {
                     continue;
                 }
                 if entry_path.is_file() {
