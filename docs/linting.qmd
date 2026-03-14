@@ -496,11 +496,11 @@ ignore directives.
 
 ## Configuration
 
-Lint rules can be configured in the `[lint]` section of your configuration file.
-Each key is a rule name and each value is a boolean (`true`/`false`).
+Lint rules can be configured in the `[lint.rules]` section of your configuration
+file. Each key is a rule name and each value is a boolean (`true`/`false`).
 
 ```toml
-[lint]
+[lint.rules]
 heading-hierarchy = true
 duplicate-reference-labels = true
 undefined-references = true
@@ -512,9 +512,14 @@ missing-chunk-labels = true
 All rules are enabled by default when omitted. You can disable a specific rule:
 
 ```toml
-[lint]
+[lint.rules]
 undefined-references = false
 ```
+
+::: {.callout-note}
+Legacy `[lint] rule = true/false` is still supported for backward compatibility,
+but deprecated.
+:::
 
 ## LSP Integration
 

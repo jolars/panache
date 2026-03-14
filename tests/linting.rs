@@ -153,7 +153,7 @@ fn test_missing_reference_targets_can_be_disabled() {
     let diagnostics = lint_file_with_config(
         "missing_references.md",
         r#"
-[lint]
+[lint.rules]
 undefined-references = false
 "#,
     );
@@ -200,7 +200,7 @@ fn test_chunk_label_spaces_can_be_disabled() {
         r#"
 flavor = "quarto"
 
-[lint]
+[lint.rules]
 chunk-label-spaces = false
 "#,
     );
@@ -238,7 +238,7 @@ fn test_missing_chunk_labels_can_be_disabled() {
         r#"
 flavor = "quarto"
 
-[lint]
+[lint.rules]
 missing-chunk-labels = false
 "#,
     );

@@ -882,11 +882,10 @@ pub struct ParserConfig {
 }
 
 /// Linter configuration.
-/// Rule keys map to enabled/disabled booleans under `[lint]`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(default, rename_all = "kebab-case")]
+/// Preferred shape is `[lint.rules] rule-name = true/false`.
+/// Legacy `[lint] rule-name = true/false` is still supported (deprecated).
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
 pub struct LintConfig {
-    #[serde(flatten)]
     pub rules: HashMap<String, bool>,
 }
 
@@ -907,6 +906,58 @@ impl LintConfig {
     pub fn is_rule_enabled(&self, rule_name: &str) -> bool {
         let normalized = Self::normalize_rule_name(rule_name);
         self.rules.get(&normalized).copied().unwrap_or(true)
+    }
+}
+
+impl<'de> Deserialize<'de> for LintConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = toml::Value::deserialize(deserializer)?;
+        let mut rules = HashMap::new();
+        let mut used_legacy_shape = false;
+
+        let mut table = value
+            .as_table()
+            .cloned()
+            .ok_or_else(|| serde::de::Error::custom("expected [lint] table"))?;
+
+        // New shape: [lint.rules]
+        if let Some(rules_value) = table.remove("rules") {
+            let rules_table = rules_value
+                .as_table()
+                .ok_or_else(|| serde::de::Error::custom("[lint.rules] must be a table"))?;
+            for (name, enabled) in rules_table {
+                let enabled = enabled.as_bool().ok_or_else(|| {
+                    serde::de::Error::custom(format!(
+                        "[lint.rules] entry '{}' must be true or false",
+                        name
+                    ))
+                })?;
+                rules.insert(name.clone(), enabled);
+            }
+        }
+
+        // Legacy shape: [lint] rule-name = true/false
+        for (name, enabled) in table {
+            let enabled = enabled.as_bool().ok_or_else(|| {
+                serde::de::Error::custom(format!(
+                    "Unsupported [lint] key '{}'; use [lint.rules] for rule toggles",
+                    name
+                ))
+            })?;
+            used_legacy_shape = true;
+            rules.insert(name, enabled);
+        }
+
+        if used_legacy_shape {
+            eprintln!(
+                "Warning: [lint] rule = true/false is deprecated; use [lint.rules] rule = true/false."
+            );
+        }
+
+        Ok(Self { rules }.normalize())
     }
 }
 
@@ -1948,7 +1999,7 @@ mod tests {
     #[test]
     fn lint_config_allows_rule_toggles() {
         let toml_str = r#"
-            [lint]
+            [lint.rules]
             heading-hierarchy = false
             undefined-references = false
         "#;
@@ -1961,8 +2012,18 @@ mod tests {
     #[test]
     fn lint_config_normalizes_snake_case_rule_names() {
         let toml_str = r#"
-            [lint]
+            [lint.rules]
             undefined_references = false
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        assert!(!cfg.lint.is_rule_enabled("undefined-references"));
+    }
+
+    #[test]
+    fn lint_config_legacy_top_level_rules_still_supported() {
+        let toml_str = r#"
+            [lint]
+            undefined-references = false
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
         assert!(!cfg.lint.is_rule_enabled("undefined-references"));
