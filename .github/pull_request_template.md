@@ -10,13 +10,6 @@
 
 <!-- Describe what you ran and the result -->
 
-## Documentation impact
-
-<!-- If docs are needed, list what was updated -->
-
-- [ ] No docs update needed
-- [ ] Updated docs/README/CONTRIBUTING
-
 ## Checklist
 
 - [ ] PR is focused and avoids unrelated changes
@@ -26,4 +19,5 @@
 - [ ] Ran `cargo test`
 - [ ] Ran `cargo clippy --all-targets --all-features -- -D warnings`
 - [ ] Ran `cargo fmt -- --check`
+- [ ] Updated docs or README if needed
 - [ ] Did not manually edit `CHANGELOG.md`
