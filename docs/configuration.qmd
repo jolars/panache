@@ -86,10 +86,10 @@ If a path matches both include and exclude, exclude wins.
 
 ## Formatting Style
 
-Formatting style preferences are organized under the `[style]` section:
+Formatting style preferences are organized under the `[format]` section:
 
 ```toml
-[style]
+[format]
 wrap = "reflow"
 blank-lines = "collapse"
 math-delimiter-style = "preserve"
@@ -103,7 +103,7 @@ tab-width = 4
 Control how text is wrapped:
 
 ```toml
-[style]
+[format]
 wrap = "reflow"
 ```
 
@@ -118,7 +118,7 @@ wrap = "reflow"
 Control blank line handling:
 
 ```toml
-[style]
+[format]
 blank-lines = "collapse"
 ```
 
@@ -133,7 +133,7 @@ blank-lines = "collapse"
 Configure how math delimiters are formatted:
 
 ```toml
-[style]
+[format]
 math-delimiter-style = "preserve"
 math-indent = 0
 ```
@@ -157,7 +157,7 @@ blocks. Default is 0.
 Control how tabs are handled during formatting:
 
 ```toml
-[style]
+[format]
 tab-stops = "normalize"
 tab-width = 4
 ```
@@ -177,7 +177,7 @@ tab-width = 4
 Configure code block formatting preferences:
 
 ```toml
-[style.code-blocks]
+[format.code-blocks]
 fence-style = "backtick"
 attribute-style = "shortcut"
 ```
@@ -864,13 +864,13 @@ Complete example with some common options:
 flavor = "quarto"
 line-width = 80
 
-[style]
+[format]
 wrap = "reflow"
 blank-lines = "collapse"
 math-delimiter-style = "preserve"
 math-indent = 0
 
-[style.code-blocks]
+[format.code-blocks]
 fence-style = "backtick"
 attribute-style = "shortcut"
 

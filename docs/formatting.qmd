@@ -14,7 +14,7 @@ Panache supports three modes of text wrapping for paragraphs, which are
 controlled via the [configuration](configuration.qmd) file:
 
 ```toml
-[style]
+[format]
 wrap = "reflow" # or "preserve" or "sentence"
 ```
 
@@ -25,18 +25,18 @@ not reflow paragraphs. If `wrap` is set to `sentence`, panache will break lines
 at sentence boundaries, ensuring that each sentence starts on a new line.
 
 Input
-:   ``` markdown
+:   ```markdown
     First sentence with a [link text](https://example.com) and inline math $a + b = c$. Second sentence; third sentence!
     ```
 
 Output (`"reflow"`)
-:   ``` markdown
+:   ```markdown
     First sentence with a [link text](https://example.com) and inline math
     $a + b = c$. Second sentence; third sentence!
     ```
 
 Output (`"sentence"`)
-:   ``` markdown
+:   ```markdown
     First sentence with a [link text](https://example.com) and inline math $a + b = c$.
     Second sentence; third sentence!
     ```
@@ -59,7 +59,7 @@ Second line (forced break)
 Headings are normalized with consistent spacing:
 
 Input
-:   ``` markdown
+:   ```markdown
     #Heading 1
     ##  Heading 2
     ###   Heading 3
@@ -88,18 +88,18 @@ Attributes are preserved and formatted:
 Setext-style headings are converted to ATX style for consistency:
 
 Input
-:   ``` markdown
+:   ```markdown
     Heading 1
     =========
-    
+
     Heading 2
     ---------
     ```
 
 Output
-:   ``` markdown
+:   ```markdown
     # Heading 1
-    
+
     ## Heading 2
     ```
 
@@ -151,7 +151,7 @@ Tabs in regular text are always normalized to spaces. To preserve tabs in
 literal code spans and code blocks, set:
 
 ```toml
-[style]
+[format]
 tab-stops = "preserve"
 tab-width = 4
 ```
@@ -334,12 +334,12 @@ Display math is formatted on its own lines with leading indentation depending on
 the `math-indent` configuration option (default 0):
 
 Input
-:   ``` markdown
+:   ```markdown
     $$E = mc^2$$
     ```
 
 Output
-:   ``` markdown
+:   ```markdown
     $$
     E = mc^2
     $$
@@ -510,7 +510,7 @@ Paragraph 2
 Configure to preserve blank lines:
 
 ```toml
-[style]
+[format]
 blank-lines = "preserve"
 ```
 

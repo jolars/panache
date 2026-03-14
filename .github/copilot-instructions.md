@@ -103,8 +103,7 @@ RUST_LOG=info ./target/release/panache format document.qmd
 
 - Typed wrappers (`Heading`, `Link`, `Table`) hide syntactic details
 - Pattern borrowed from rust-analyzer
-- Example: `Heading::cast(node).level()` returns `1` without exposing `#`
-  markers
+- Example: `Heading::cast(node).level()` returns `1` without exposing `#` markers
 - Located in `src/syntax/{headings,links,tables,references}.rs`
 
 ### Single-Pass Parsing Architecture
@@ -177,7 +176,7 @@ Hierarchical lookup:
   extensions)
 - `line-width`: Default 80 - `wrap`: reflow (default), preserve, or sentence.
 - `extensions`: many bool flags for Pandoc extensions
-- `[style]` section for formatting preferences
+- `[format]` section for formatting preferences
 - `[lint]` section for linter rule configuration
 - `[formatters]` section for external formatter integration (e.g., black for
   python code blocks)
@@ -240,8 +239,8 @@ correct before committing!
 - Implements `tower_lsp_server::LanguageServer` trait
 - Uses `tokio::sync::Mutex`-guarded shared state (`Arc<Mutex<...>>`) for
   `document_map`, `workspace_root`, and `salsa_db`
-- Per-document state is represented by `DocumentState` (path, salsa inputs,
-  CST `GreenNode`)
+- Per-document state is represented by `DocumentState` (path, salsa inputs, CST
+  `GreenNode`)
 - Incremental sync mode with UTF-16/UTF-8 position conversion
 
 Uses typed AST wrappers for cleaner code:

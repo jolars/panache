@@ -173,8 +173,8 @@ This is typically used in CI/CD pipelines to enforce linting rules.
 
 ### Parsing
 
-You can also selectively invoke the Panache parser to analyze the structure
-of your Markdown documents. This is typically mostly useful for debugging or
+You can also selectively invoke the Panache parser to analyze the structure of
+your Markdown documents. This is typically mostly useful for debugging or
 understanding why your document is formatted in a certain way.
 
 To return a stdout representation of the parsed document tree, run:
@@ -197,7 +197,7 @@ Create `.panache.toml` in your project root with your preferred settings:
 flavor = "quarto"
 line-width = 80
 
-[style]
+[format]
 wrap = "reflow"
 blank-lines = "collapse"
 

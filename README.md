@@ -45,8 +45,8 @@ yay -S panache-bin # or your preferred AUR helper
 
 ### VS Code Extension
 
-If you are running VS Code or an editor that supports VS
-Code extensions (like Positron), you can install the [Panache
+If you are running VS Code or an editor that supports VS Code extensions (like
+Positron), you can install the [Panache
 extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
 from the VS Code Marketplace or the [Open VSX
 extension](https://open-vsx.org/extension/jolars/panache), which will
@@ -132,8 +132,8 @@ panache lint **/*.{qmd,md}
 
 #### External Linters
 
-As with formatting, Panache supports external linters for code blocks. These
-are configured in the `[linters]` section of the configuration, but due to the
+As with formatting, Panache supports external linters for code blocks. These are
+configured in the `[linters]` section of the configuration, but due to the
 complexity of linting, including dealing with auto-fixing, external linters
 cannot be customized and only support presets and at the moment only support R
 via the `jarl` linter:
@@ -155,11 +155,11 @@ To start the language server, run:
 panache lsp
 ```
 
-Most users will want to configure their editor to start the
-language server automatically when editing. See [the language
-server documentation](https://jolars.github.io/panache/lsp)
-for guides on configuring your editor. For VS Code and related
-editors such as Positron, there is a [VS Code Marketplace
+Most users will want to configure their editor to start the language server
+automatically when editing. See [the language server
+documentation](https://jolars.github.io/panache/lsp) for guides on configuring
+your editor. For VS Code and related editors such as Positron, there is a [VS
+Code Marketplace
 extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
 and [Open VSX extension](https://open-vsx.org/extension/jolars/panache) that
 provides an LSP client and additional features.
@@ -198,7 +198,7 @@ line-width = 80
 line-ending = "auto"
 
 # Formatting style
-[style]
+[format]
 wrap = "reflow"
 
 # External code formatters (opt-in)

@@ -974,7 +974,12 @@ struct RawConfig {
     #[serde(default = "default_line_width")]
     line_width: usize,
 
-    // New preferred style section
+    // New preferred formatting section
+    #[serde(default)]
+    #[serde(rename = "format")]
+    format_section: Option<StyleConfig>,
+
+    // DEPRECATED: [style] section (kept for backwards compatibility)
     #[serde(default)]
     style: Option<StyleConfig>,
 
@@ -1226,29 +1231,46 @@ impl RawConfig {
             || self.tab_stops != TabStopMode::Normalize
             || self.tab_width != default_tab_width();
 
-        if has_deprecated_fields && self.style.is_none() {
+        if has_deprecated_fields && self.format_section.is_none() && self.style.is_none() {
             eprintln!(
                 "Warning: top-level style fields (wrap, code-blocks, math-indent, etc.) \
-                 are deprecated. Please move them under [style] section. \
+                 are deprecated. Please move them under [format] section. \
                  See documentation for the new format."
             );
         }
 
-        // Merge style config: prefer new [style] section, fall back to old fields
-        let style = if let Some(mut style_config) = self.style {
-            // New [style] section exists - use it, but warn if both formats present
+        // Merge formatting config: prefer [format], then deprecated [style], then old top-level fields.
+        let style = if let Some(mut format_config) = self.format_section {
+            if self.style.is_some() {
+                eprintln!(
+                    "Warning: Both [format] and deprecated [style] sections found. \
+                     Using [format] section."
+                );
+            }
             if has_deprecated_fields {
                 eprintln!(
-                    "Warning: Both [style] section and top-level style fields found. \
-                     Using [style] section and ignoring top-level fields."
+                    "Warning: Both [format] section and top-level style fields found. \
+                     Using [format] section and ignoring top-level fields."
                 );
             }
 
             // Fill in missing fields with defaults
+            if format_config.code_blocks.is_none() {
+                format_config.code_blocks = Some(CodeBlockConfig::default());
+            }
+
+            format_config
+        } else if let Some(mut style_config) = self.style {
+            eprintln!("Warning: [style] section is deprecated. Please use [format] instead.");
+            if has_deprecated_fields {
+                eprintln!(
+                    "Warning: Both deprecated [style] section and top-level style fields found. \
+                     Using [style] section and ignoring top-level fields."
+                );
+            }
             if style_config.code_blocks.is_none() {
                 style_config.code_blocks = Some(CodeBlockConfig::default());
             }
-
             style_config
         } else {
             // Old format - construct StyleConfig from top-level fields
@@ -2269,11 +2291,11 @@ mod tests {
     }
 
     #[test]
-    fn style_section_new_format() {
+    fn format_section_new_format() {
         let toml_str = r#"
             flavor = "quarto"
             
-            [style]
+            [format]
             wrap = "sentence"
             built-in-greedy-wrap = true
             blank-lines = "collapse"
@@ -2298,14 +2320,14 @@ mod tests {
     }
 
     #[test]
-    fn style_section_with_code_blocks() {
+    fn format_section_with_code_blocks() {
         let toml_str = r#"
             flavor = "pandoc"
             
-            [style]
+            [format]
             wrap = "preserve"
             
-            [style.code-blocks]
+            [format.code-blocks]
             fence-style = "tilde"
             attribute-style = "explicit"
         "#;
@@ -2336,7 +2358,7 @@ mod tests {
     }
 
     #[test]
-    fn style_section_takes_precedence() {
+    fn format_section_takes_precedence() {
         let toml_str = r#"
             flavor = "quarto"
             
@@ -2345,15 +2367,25 @@ mod tests {
             math-indent = 10
             
             # New format (should take precedence)
-            [style]
+            [format]
             wrap = "sentence"
             math-indent = 2
         "#;
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
-        // New [style] section should win
+        // New [format] section should win
         assert_eq!(cfg.wrap, Some(WrapMode::Sentence));
         assert_eq!(cfg.math_indent, 2);
+    }
+
+    #[test]
+    fn deprecated_style_section_still_supported() {
+        let toml_str = r#"
+            [style]
+            wrap = "preserve"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        assert_eq!(cfg.wrap, Some(WrapMode::Preserve));
     }
 }
 
