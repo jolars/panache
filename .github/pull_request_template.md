@@ -6,14 +6,11 @@
 
 <!-- Link issue(s), e.g. Closes #123 -->
 
-## Testing
-
-<!-- Describe what you ran and the result -->
-
 ## Checklist
 
 - [ ] PR is focused and avoids unrelated changes
-- [ ] Commit messages follow Conventional Commits
+- [ ] Commit messages follow [Conventional
+      Commits](https://www.conventionalcommits.org)
 - [ ] Added or updated tests for behavior changes
 - [ ] Ran `cargo check`
 - [ ] Ran `cargo test`
