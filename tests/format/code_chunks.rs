@@ -1,5 +1,5 @@
 use panache::{
-    config::{AttributeStyle, Config, Extensions, Flavor},
+    config::{Config, Extensions, Flavor},
     format,
 };
 
@@ -94,16 +94,22 @@ fn display_block_vs_executable_chunk() {
 }
 
 #[test]
-fn preserve_mode_keeps_original() {
-    // Create config with Preserve mode
-    let mut config = Config::default();
-    config.code_blocks.attribute_style = AttributeStyle::Preserve;
+fn deprecated_code_block_style_config_is_noop() {
+    let config: Config = toml::from_str(
+        r#"
+        flavor = "quarto"
 
+        [format.code-blocks]
+        attribute-style = "preserve"
+    "#,
+    )
+    .unwrap();
     let input = "```{r,echo=FALSE}\n1 + 1\n```\n";
     let output = format(input, Some(config), None);
 
-    // In preserve mode, should keep original format exactly
-    assert!(output.contains("{r,echo=FALSE}"));
+    // Deprecated option is ignored; executable chunks still use normalized output.
+    assert!(output.contains("```{r}"));
+    assert!(output.contains("#| echo: false"));
 }
 
 #[test]

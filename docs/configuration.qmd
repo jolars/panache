@@ -172,42 +172,10 @@ tab-width = 4
 `tab-width`
 :   Number of spaces per tab when normalizing (default 4).
 
-### Code Block Style
+### Code Block Style (Deprecated)
 
-Configure code block formatting preferences:
-
-```toml
-[format.code-blocks]
-fence-style = "backtick"
-attribute-style = "shortcut"
-```
-
-Fence style options:
-
-`backtick`
-:   Use \`\`\` fences (default for Quarto/RMarkdown)
-
-`tilde`
-:   Use `~~~` fences
-
-`preserve`
-:   Keep original fence style (default for Pandoc)
-
-Attribute style options:
-
-`shortcut`
-:   Use shortcut form like \`\`\`python (default for Quarto/RMarkdown)
-
-`explicit`
-:   Use explicit form like \`\`\`{.python}
-
-`preserve`
-:   Keep original style (default for Pandoc)
-
-::: {.callout-note}
-These defaults vary by flavor. Quarto uses `backtick` and `shortcut`, while
-Pandoc preserves original formatting.
-:::
+`[format.code-blocks]` and top-level `[code-blocks]` are deprecated and now
+no-ops. If explicitly set, panache prints a warning during config loading.
 
 ## Extensions
 
@@ -869,10 +837,6 @@ wrap = "reflow"
 blank-lines = "collapse"
 math-delimiter-style = "preserve"
 math-indent = 0
-
-[format.code-blocks]
-fence-style = "backtick"
-attribute-style = "shortcut"
 
 [extensions]
 hard-line-breaks = false

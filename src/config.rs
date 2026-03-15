@@ -519,50 +519,6 @@ impl Extensions {
     }
 }
 
-/// Configuration for code block formatting.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
-#[serde(rename_all = "kebab-case")]
-pub struct CodeBlockConfig {
-    /// Fence style: "backtick", "tilde", or "preserve"
-    pub fence_style: FenceStyle,
-    /// Attribute style: "shortcut", "explicit", or "preserve"
-    pub attribute_style: AttributeStyle,
-}
-
-/// Fence character preference for code blocks.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum FenceStyle {
-    /// Use backticks (```)
-    Backtick,
-    /// Use tildes (~~~)
-    Tilde,
-    /// Keep original fence character
-    Preserve,
-}
-
-/// Attribute syntax preference for code blocks.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum AttributeStyle {
-    /// Use shortcut form: ```python or ```python {.numberLines}
-    Shortcut,
-    /// Use explicit form: ```{.python} or ```{.python .numberLines}
-    Explicit,
-    /// Keep original attribute syntax
-    Preserve,
-}
-
-impl Default for CodeBlockConfig {
-    fn default() -> Self {
-        Self {
-            fence_style: FenceStyle::Backtick,
-            attribute_style: AttributeStyle::Shortcut,
-        }
-    }
-}
-
 /// Configuration for an external code formatter.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FormatterConfig {
@@ -846,8 +802,6 @@ pub struct StyleConfig {
     pub tab_stops: TabStopMode,
     /// Tab width for expanding tabs when normalizing
     pub tab_width: usize,
-    /// Code block formatting preferences
-    pub code_blocks: Option<CodeBlockConfig>,
     /// Use panache-native greedy wrapping instead of textwrap.
     pub built_in_greedy_wrap: bool,
 }
@@ -861,7 +815,6 @@ impl Default for StyleConfig {
             math_indent: 0,
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
-            code_blocks: None,
             built_in_greedy_wrap: true,
         }
     }
@@ -996,9 +949,6 @@ struct RawConfig {
     tab_stops: TabStopMode,
     #[serde(default = "default_tab_width")]
     tab_width: usize,
-    #[serde(default)]
-    code_blocks: Option<CodeBlockConfig>,
-
     // Parser configuration
     #[serde(default)]
     parser: Option<ParserConfig>,
@@ -1224,7 +1174,6 @@ impl RawConfig {
     fn finalize(self) -> Config {
         // Check for deprecated top-level style fields
         let has_deprecated_fields = self.wrap.is_some()
-            || self.code_blocks.is_some()
             || self.math_indent != 0
             || self.math_delimiter_style != MathDelimiterStyle::default()
             || self.blank_lines != default_blank_lines()
@@ -1233,14 +1182,14 @@ impl RawConfig {
 
         if has_deprecated_fields && self.format_section.is_none() && self.style.is_none() {
             eprintln!(
-                "Warning: top-level style fields (wrap, code-blocks, math-indent, etc.) \
+                "Warning: top-level style fields (wrap, math-indent, etc.) \
                  are deprecated. Please move them under [format] section. \
                  See documentation for the new format."
             );
         }
 
         // Merge formatting config: prefer [format], then deprecated [style], then old top-level fields.
-        let style = if let Some(mut format_config) = self.format_section {
+        let style = if let Some(format_config) = self.format_section {
             if self.style.is_some() {
                 eprintln!(
                     "Warning: Both [format] and deprecated [style] sections found. \
@@ -1254,13 +1203,8 @@ impl RawConfig {
                 );
             }
 
-            // Fill in missing fields with defaults
-            if format_config.code_blocks.is_none() {
-                format_config.code_blocks = Some(CodeBlockConfig::default());
-            }
-
             format_config
-        } else if let Some(mut style_config) = self.style {
+        } else if let Some(style_config) = self.style {
             eprintln!("Warning: [style] section is deprecated. Please use [format] instead.");
             if has_deprecated_fields {
                 eprintln!(
@@ -1268,14 +1212,9 @@ impl RawConfig {
                      Using [style] section and ignoring top-level fields."
                 );
             }
-            if style_config.code_blocks.is_none() {
-                style_config.code_blocks = Some(CodeBlockConfig::default());
-            }
             style_config
         } else {
             // Old format - construct StyleConfig from top-level fields
-            let code_blocks = self.code_blocks.unwrap_or_default();
-
             StyleConfig {
                 wrap: self.wrap.or(Some(WrapMode::Reflow)),
                 blank_lines: self.blank_lines,
@@ -1283,7 +1222,6 @@ impl RawConfig {
                 math_indent: self.math_indent,
                 tab_stops: self.tab_stops,
                 tab_width: self.tab_width,
-                code_blocks: Some(code_blocks),
                 built_in_greedy_wrap: true,
             }
         };
@@ -1302,7 +1240,6 @@ impl RawConfig {
             math_indent: style.math_indent,
             tab_stops: style.tab_stops,
             tab_width: style.tab_width,
-            code_blocks: style.code_blocks.unwrap_or_default(),
             formatters: resolve_formatters(self.formatters),
             linters: self.linters,
             lint: self.lint.unwrap_or_default().normalize(),
@@ -1509,7 +1446,6 @@ pub struct Config {
     pub tab_width: usize,
     pub wrap: Option<WrapMode>,
     pub blank_lines: BlankLines,
-    pub code_blocks: CodeBlockConfig,
     /// Language → Formatter(s) mapping (supports multiple formatters per language)
     pub formatters: HashMap<String, Vec<FormatterConfig>>,
     pub linters: HashMap<String, String>,
@@ -1549,7 +1485,6 @@ impl Default for Config {
             tab_width: 4,
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
-            code_blocks: CodeBlockConfig::default(),
             formatters: HashMap::new(), // Opt-in: empty by default
             linters: HashMap::new(),    // Opt-in: empty by default
             external_max_parallel: default_external_max_parallel(),
@@ -1723,10 +1658,48 @@ fn check_deprecated_formatter_names(s: &str, path: &Path) {
     }
 }
 
+/// Check for deprecated code-block style configuration and warn users.
+fn check_deprecated_code_block_style_options(s: &str, path: &Path) {
+    let Ok(toml_value) = toml::from_str::<toml::Value>(s) else {
+        return;
+    };
+    let Some(root) = toml_value.as_table() else {
+        return;
+    };
+
+    let top_level = root.contains_key("code-blocks");
+    let format_nested = root
+        .get("format")
+        .and_then(|v| v.as_table())
+        .is_some_and(|format| format.contains_key("code-blocks"));
+    let style_nested = root
+        .get("style")
+        .and_then(|v| v.as_table())
+        .is_some_and(|style| style.contains_key("code-blocks"));
+
+    if top_level || format_nested || style_nested {
+        eprintln!(
+            "Warning: Deprecated code block style options found in {}:",
+            path.display()
+        );
+        if format_nested {
+            eprintln!("  - [format.code-blocks]");
+        }
+        if top_level {
+            eprintln!("  - [code-blocks]");
+        }
+        if style_nested {
+            eprintln!("  - [style.code-blocks]");
+        }
+        eprintln!("  These options are now no-ops and will be removed in a future release.");
+    }
+}
+
 fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
     // Check for deprecated names before parsing
     check_deprecated_extension_names(s, path);
     check_deprecated_formatter_names(s, path);
+    check_deprecated_code_block_style_options(s, path);
 
     let mut config: Config = toml::from_str(s).map_err(|e| {
         io::Error::new(
@@ -2118,64 +2091,9 @@ mod tests {
     }
 
     #[test]
-    fn code_blocks_flavor_defaults() {
-        // CodeBlockConfig no longer varies by flavor - it has simple defaults
+    fn default_flavor_is_pandoc() {
         let default_cfg = Config::default();
         assert_eq!(default_cfg.flavor, Flavor::Pandoc);
-        assert_eq!(default_cfg.code_blocks.fence_style, FenceStyle::Backtick);
-        assert_eq!(
-            default_cfg.code_blocks.attribute_style,
-            AttributeStyle::Shortcut
-        );
-
-        // All flavors get the same code block defaults
-        let toml_str = r#"
-            flavor = "quarto"
-        "#;
-        let quarto_cfg = toml::from_str::<Config>(toml_str).unwrap();
-        assert_eq!(quarto_cfg.flavor, Flavor::Quarto);
-        assert_eq!(
-            quarto_cfg.code_blocks.attribute_style,
-            AttributeStyle::Shortcut
-        );
-    }
-
-    #[test]
-    fn code_blocks_config_default() {
-        // Test the Default impl
-        let cb = CodeBlockConfig::default();
-        assert_eq!(cb.fence_style, FenceStyle::Backtick);
-        assert_eq!(cb.attribute_style, AttributeStyle::Shortcut);
-    }
-
-    #[test]
-    fn code_blocks_from_toml() {
-        let toml_str = r#"
-            flavor = "quarto"
-            
-            [code-blocks]
-            fence-style = "tilde"
-            attribute-style = "explicit"
-        "#;
-        let cfg = toml::from_str::<Config>(toml_str).unwrap();
-
-        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Tilde);
-        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
-    }
-
-    #[test]
-    fn code_blocks_partial_override() {
-        let toml_str = r#"
-            flavor = "quarto"
-            
-            [code-blocks]
-            fence-style = "preserve"
-        "#;
-        let cfg = toml::from_str::<Config>(toml_str).unwrap();
-
-        // Partial override uses Default impl for unspecified fields
-        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Preserve);
-        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Shortcut);
     }
 
     #[test]
@@ -2313,14 +2231,10 @@ mod tests {
         assert_eq!(cfg.tab_stops, TabStopMode::Preserve);
         assert_eq!(cfg.tab_width, 4);
         assert!(cfg.built_in_greedy_wrap);
-
-        // code-blocks should get flavor defaults
-        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
-        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Shortcut);
     }
 
     #[test]
-    fn format_section_with_code_blocks() {
+    fn format_section_with_deprecated_code_blocks_is_accepted() {
         let toml_str = r#"
             flavor = "pandoc"
             
@@ -2334,8 +2248,6 @@ mod tests {
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
         assert_eq!(cfg.wrap, Some(WrapMode::Preserve));
-        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Tilde);
-        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
         assert!(cfg.built_in_greedy_wrap);
     }
 
@@ -2354,7 +2266,6 @@ mod tests {
         // Old format should still work
         assert_eq!(cfg.wrap, Some(WrapMode::Reflow));
         assert_eq!(cfg.math_indent, 4);
-        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
     }
 
     #[test]
@@ -2456,8 +2367,7 @@ mod code_blocks_config_test {
     use super::*;
 
     #[test]
-    fn test_partial_code_blocks_override() {
-        // User overrides only attribute_style, other fields should use flavor defaults
+    fn deprecated_top_level_code_blocks_is_accepted_as_noop() {
         let toml_str = r#"
             flavor = "pandoc"
             
@@ -2465,41 +2375,30 @@ mod code_blocks_config_test {
             attribute-style = "explicit"
         "#;
         let cfg: Config = toml::from_str(toml_str).unwrap();
-
-        // User override should apply
-        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
-
-        // Defaults should fill in other fields
-        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
+        assert_eq!(cfg.flavor, Flavor::Pandoc);
     }
 
     #[test]
-    fn test_multiple_code_blocks_overrides() {
+    fn deprecated_format_code_blocks_is_accepted_as_noop() {
         let toml_str = r#"
             flavor = "quarto"
+            [format]
+            wrap = "reflow"
             
-            [code-blocks]
+            [format.code-blocks]
             attribute-style = "explicit"
         "#;
         let cfg: Config = toml::from_str(toml_str).unwrap();
-
-        // User overrides
-        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Explicit);
-
-        // Defaults
-        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
+        assert_eq!(cfg.wrap, Some(WrapMode::Reflow));
     }
 
     #[test]
-    fn test_no_code_blocks_override_uses_defaults() {
+    fn no_code_blocks_config_still_parses() {
         let toml_str = r#"
             flavor = "quarto"
         "#;
         let cfg: Config = toml::from_str(toml_str).unwrap();
-
-        // Should use defaults
-        assert_eq!(cfg.code_blocks.attribute_style, AttributeStyle::Shortcut);
-        assert_eq!(cfg.code_blocks.fence_style, FenceStyle::Backtick);
+        assert_eq!(cfg.flavor, Flavor::Quarto);
     }
 
     // ===== New Formatter Format Tests =====
