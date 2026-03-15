@@ -7,6 +7,10 @@ pub fn parse_blocks(input: &str) -> SyntaxNode {
     Parser::new(input, &config).parse()
 }
 
+pub fn parse_blocks_with_config(input: &str, config: &Config) -> SyntaxNode {
+    Parser::new(input, config).parse()
+}
+
 pub fn parse_blocks_quarto(input: &str) -> SyntaxNode {
     let config = Config {
         flavor: Flavor::Quarto,

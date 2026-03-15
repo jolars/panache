@@ -272,6 +272,10 @@ impl BlockParser for PandocTitleBlockParser {
         _lines: &[&str],
         line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.pandoc_title_block {
+            return None;
+        }
+
         // Must be at document start.
         if !ctx.at_document_start || line_pos != 0 {
             return None;
@@ -313,6 +317,10 @@ impl BlockParser for YamlMetadataParser {
         lines: &[&str],
         line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.yaml_metadata_block {
+            return None;
+        }
+
         // Must be at top level (not inside blockquotes)
         if ctx.blockquote_depth > 0 {
             return None;
@@ -599,15 +607,19 @@ impl BlockParser for BlockQuoteParser {
 
         let marker_info = parse_blockquote_marker_info(line);
         let at_document_start = ctx.at_document_start;
-        let can_start = can_start_blockquote(line_pos, lines);
+        let require_blank_before = ctx.config.extensions.blank_before_blockquote;
+        let can_start = !require_blank_before || can_start_blockquote(line_pos, lines);
 
         let prev_line = lines.get(line_pos.wrapping_sub(1)).unwrap_or(&"");
         let prev_line_blank = prev_line.trim().is_empty();
         let (prev_depth, prev_inner) = count_blockquote_markers(prev_line);
         let prev_line_is_quoted_blank = prev_depth > 0 && prev_inner.trim().is_empty();
 
-        let can_nest =
-            depth <= 1 || at_document_start || prev_line_blank || prev_line_is_quoted_blank;
+        let can_nest = if require_blank_before {
+            depth <= 1 || at_document_start || prev_line_blank || prev_line_is_quoted_blank
+        } else {
+            true
+        };
 
         let has_blank_before = ctx.has_blank_before;
         let detection = if has_blank_before || at_document_start {
@@ -671,6 +683,10 @@ impl BlockParser for DefinitionListParser {
         lines: &[&str],
         line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.definition_lists {
+            return None;
+        }
+
         if let Some((marker_char, indent, spaces_after_cols, spaces_after_bytes)) =
             try_parse_definition_marker(ctx.content)
         {
@@ -797,6 +813,10 @@ impl BlockParser for ReferenceDefinitionParser {
         _lines: &[&str],
         _line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.reference_links {
+            return None;
+        }
+
         // Parse once and cache for emission.
         let parsed = try_parse_reference_definition(ctx.content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(parsed))))
@@ -1146,6 +1166,22 @@ impl BlockParser for FencedCodeBlockParser {
         };
 
         let fence = try_parse_fence_open(content_to_check)?;
+        if (fence.fence_char == '`' && !ctx.config.extensions.backtick_code_blocks)
+            || (fence.fence_char == '~' && !ctx.config.extensions.fenced_code_blocks)
+        {
+            return None;
+        }
+
+        let trimmed_info = fence.info_string.trim();
+        if trimmed_info.starts_with('{') && trimmed_info.ends_with('}') {
+            if trimmed_info.starts_with("{=") {
+                if !ctx.config.extensions.raw_attribute {
+                    return None;
+                }
+            } else if !ctx.config.extensions.fenced_code_attributes {
+                return None;
+            }
+        }
 
         // Parse info string to determine block type (expensive, but now cached via fence)
         let info = InfoString::parse(&fence.info_string);
@@ -1777,7 +1813,11 @@ impl BlockParser for SetextHeadingParser {
             false
         };
 
-        if !ctx.has_blank_before && !ctx.at_document_start && !follows_setext_heading {
+        if ctx.config.extensions.blank_before_header
+            && !ctx.has_blank_before
+            && !ctx.at_document_start
+            && !follows_setext_heading
+        {
             return None;
         }
 

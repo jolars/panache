@@ -182,7 +182,8 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &Config) -> Option<ListM
     }
 
     // Try ordered markers
-    if let Some(after_marker) = trimmed.strip_prefix("#.")
+    if config.extensions.fancy_lists
+        && let Some(after_marker) = trimmed.strip_prefix("#.")
         && (after_marker.starts_with(' ')
             || after_marker.starts_with('\t')
             || after_marker.is_empty())
@@ -233,27 +234,31 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &Config) -> Option<ListM
 
     // Try parenthesized markers: (2), (a), (ii)
     if let Some(rest) = trimmed.strip_prefix('(') {
-        // Try decimal: (2)
-        let digit_count = rest.chars().take_while(|c| c.is_ascii_digit()).count();
-        if digit_count > 0 && rest.len() > digit_count && rest.chars().nth(digit_count) == Some(')')
-        {
-            let number = &rest[..digit_count];
-            let after_marker = &rest[digit_count + 1..];
-            if after_marker.starts_with(' ')
-                || after_marker.starts_with('\t')
-                || after_marker.is_empty()
+        if config.extensions.fancy_lists {
+            // Try decimal: (2)
+            let digit_count = rest.chars().take_while(|c| c.is_ascii_digit()).count();
+            if digit_count > 0
+                && rest.len() > digit_count
+                && rest.chars().nth(digit_count) == Some(')')
             {
-                let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
-                let marker_len = 2 + digit_count;
-                return Some(ListMarkerMatch {
-                    marker: ListMarker::Ordered(OrderedMarker::Decimal {
-                        number: number.to_string(),
-                        style: ListDelimiter::Parens,
-                    }),
-                    marker_len,
-                    spaces_after_cols,
-                    spaces_after_bytes,
-                });
+                let number = &rest[..digit_count];
+                let after_marker = &rest[digit_count + 1..];
+                if after_marker.starts_with(' ')
+                    || after_marker.starts_with('\t')
+                    || after_marker.is_empty()
+                {
+                    let (spaces_after_cols, spaces_after_bytes) = leading_indent(after_marker);
+                    let marker_len = 2 + digit_count;
+                    return Some(ListMarkerMatch {
+                        marker: ListMarker::Ordered(OrderedMarker::Decimal {
+                            number: number.to_string(),
+                            style: ListDelimiter::Parens,
+                        }),
+                        marker_len,
+                        spaces_after_cols,
+                        spaces_after_bytes,
+                    });
+                }
             }
         }
 
@@ -368,6 +373,9 @@ pub(crate) fn try_parse_list_marker(line: &str, config: &Config) -> Option<ListM
             Some(')') => (ListDelimiter::RightParen, digit_count + 1),
             _ => return None,
         };
+        if style == ListDelimiter::RightParen && !config.extensions.fancy_lists {
+            return None;
+        }
 
         let after_marker = &trimmed[marker_len..];
         if after_marker.starts_with(' ')

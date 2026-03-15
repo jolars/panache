@@ -1160,10 +1160,15 @@ fn parse_inline_range_impl(
 
             // Try escapes (after bookdown refs and backslash math)
             if let Some((len, ch, escape_type)) = try_parse_escape(&text[pos..]) {
-                // Check if this is a hard line break and if the extension is disabled
-                if matches!(escape_type, EscapeType::HardLineBreak)
-                    && !config.extensions.escaped_line_breaks
-                {
+                let escape_enabled = match escape_type {
+                    EscapeType::HardLineBreak => config.extensions.escaped_line_breaks,
+                    EscapeType::NonbreakingSpace => config.extensions.all_symbols_escapable,
+                    EscapeType::Literal => {
+                        const BASE_ESCAPABLE: &str = "\\`*_{}[]()>#+-.!";
+                        BASE_ESCAPABLE.contains(ch) || config.extensions.all_symbols_escapable
+                    }
+                };
+                if !escape_enabled {
                     // Don't treat as hard line break - skip the escape and continue
                     // The backslash will be included in the next TEXT token
                     pos += 1;
@@ -1183,8 +1188,9 @@ fn parse_inline_range_impl(
             }
 
             // Try LaTeX commands (after escapes, before shortcodes)
-            // Note: No config flag needed - always try to parse LaTeX commands
-            if let Some(len) = try_parse_latex_command(&text[pos..]) {
+            if config.extensions.raw_tex
+                && let Some(len) = try_parse_latex_command(&text[pos..])
+            {
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
@@ -1236,6 +1242,12 @@ fn parse_inline_range_impl(
                 use super::raw_inline::emit_raw_inline;
                 log::debug!("Matched raw inline span at pos {}: format={}", pos, format);
                 emit_raw_inline(builder, content, backtick_count, format);
+            } else if !config.extensions.inline_code_attributes && attributes.is_some() {
+                let code_span_len = backtick_count * 2 + content.len();
+                emit_code_span(builder, content, backtick_count, None);
+                pos += code_span_len;
+                text_start = pos;
+                continue;
             } else {
                 emit_code_span(builder, content, backtick_count, attributes);
             }
@@ -1249,6 +1261,7 @@ fn parse_inline_range_impl(
         if byte == b'^'
             && pos + 1 < text.len()
             && text.as_bytes()[pos + 1] == b'['
+            && config.extensions.inline_footnotes
             && let Some((len, content)) = try_parse_inline_footnote(&text[pos..])
         {
             if pos > text_start {
@@ -1331,7 +1344,7 @@ fn parse_inline_range_impl(
         }
 
         // Try math ($...$, $$...$$)
-        if byte == b'$' {
+        if byte == b'$' && config.extensions.tex_math_dollars {
             // Try display math first ($$...$$)
             if let Some((len, content)) = try_parse_display_math(&text[pos..]) {
                 // Emit accumulated text
@@ -1422,6 +1435,7 @@ fn parse_inline_range_impl(
 
         // Try autolinks: <url> or <email>
         if byte == b'<'
+            && config.extensions.autolinks
             && let Some((len, url)) = try_parse_autolink(&text[pos..])
         {
             if pos > text_start {
@@ -1504,7 +1518,9 @@ fn parse_inline_range_impl(
         // Process bracket-starting elements
         if byte == b'[' {
             // Try footnote reference: [^id]
-            if let Some((len, id)) = try_parse_footnote_reference(&text[pos..]) {
+            if config.extensions.footnotes
+                && let Some((len, id)) = try_parse_footnote_reference(&text[pos..])
+            {
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
@@ -1516,7 +1532,10 @@ fn parse_inline_range_impl(
             }
 
             // Try inline link: [text](url)
-            if let Some((len, link_text, dest, attributes)) = try_parse_inline_link(&text[pos..]) {
+            if config.extensions.inline_links
+                && let Some((len, link_text, dest, attributes)) =
+                    try_parse_inline_link(&text[pos..])
+            {
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
@@ -1569,6 +1588,7 @@ fn parse_inline_range_impl(
         // Try bracketed spans: [text]{.class}
         // Must come after links/citations
         if byte == b'['
+            && config.extensions.bracketed_spans
             && let Some((len, text_content, attrs)) = try_parse_bracketed_span(&text[pos..])
         {
             if pos > text_start {
@@ -1583,44 +1603,52 @@ fn parse_inline_range_impl(
 
         // Try bare citation: @cite (must come after bracketed elements)
         if byte == b'@'
-            && config.extensions.citations
+            && (config.extensions.citations || config.extensions.quarto_crossrefs)
             && let Some((len, key, has_suppress)) = try_parse_bare_citation(&text[pos..])
         {
-            if pos > text_start {
-                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            let is_crossref =
+                config.extensions.quarto_crossrefs && super::citations::is_quarto_crossref_key(key);
+            if is_crossref || config.extensions.citations {
+                if pos > text_start {
+                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                }
+                if is_crossref {
+                    log::debug!("Matched Quarto crossref at pos {}: {}", pos, &key);
+                    super::citations::emit_crossref(builder, key, has_suppress);
+                } else {
+                    log::debug!("Matched bare citation at pos {}: {}", pos, &key);
+                    emit_bare_citation(builder, key, has_suppress);
+                }
+                pos += len;
+                text_start = pos;
+                continue;
             }
-            if config.extensions.quarto_crossrefs && super::citations::is_quarto_crossref_key(key) {
-                log::debug!("Matched Quarto crossref at pos {}: {}", pos, &key);
-                super::citations::emit_crossref(builder, key, has_suppress);
-            } else {
-                log::debug!("Matched bare citation at pos {}: {}", pos, &key);
-                emit_bare_citation(builder, key, has_suppress);
-            }
-            pos += len;
-            text_start = pos;
-            continue;
         }
 
         // Try suppress-author citation: -@cite
         if byte == b'-'
             && pos + 1 < text.len()
             && text.as_bytes()[pos + 1] == b'@'
-            && config.extensions.citations
+            && (config.extensions.citations || config.extensions.quarto_crossrefs)
             && let Some((len, key, has_suppress)) = try_parse_bare_citation(&text[pos..])
         {
-            if pos > text_start {
-                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            let is_crossref =
+                config.extensions.quarto_crossrefs && super::citations::is_quarto_crossref_key(key);
+            if is_crossref || config.extensions.citations {
+                if pos > text_start {
+                    builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+                }
+                if is_crossref {
+                    log::debug!("Matched Quarto crossref at pos {}: {}", pos, &key);
+                    super::citations::emit_crossref(builder, key, has_suppress);
+                } else {
+                    log::debug!("Matched suppress-author citation at pos {}: {}", pos, &key);
+                    emit_bare_citation(builder, key, has_suppress);
+                }
+                pos += len;
+                text_start = pos;
+                continue;
             }
-            if config.extensions.quarto_crossrefs && super::citations::is_quarto_crossref_key(key) {
-                log::debug!("Matched Quarto crossref at pos {}: {}", pos, &key);
-                super::citations::emit_crossref(builder, key, has_suppress);
-            } else {
-                log::debug!("Matched suppress-author citation at pos {}: {}", pos, &key);
-                emit_bare_citation(builder, key, has_suppress);
-            }
-            pos += len;
-            text_start = pos;
-            continue;
         }
 
         // Try to parse emphasis at this position

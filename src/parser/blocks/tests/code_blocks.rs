@@ -1,7 +1,8 @@
 use super::helpers::{
     assert_block_kinds, assert_block_kinds_for_node, find_all, find_first, parse_blocks,
-    parse_blocks_quarto,
+    parse_blocks_quarto, parse_blocks_with_config,
 };
+use crate::config::{Config, Flavor};
 use crate::syntax::SyntaxKind;
 
 fn get_code_content(node: &crate::syntax::SyntaxNode) -> Option<String> {
@@ -349,6 +350,90 @@ fn display_code_block_keeps_hashpipe_line_as_plain_text() {
     assert!(
         !has_chunk_option,
         "display-only code blocks should not parse hashpipe as chunk options"
+    );
+}
+
+#[test]
+fn backtick_fenced_code_blocks_respect_extension_guard() {
+    let input = "```r\na <- 1\n```\n";
+    let mut config = Config::default();
+    config.extensions.backtick_code_blocks = false;
+
+    let disabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&disabled, SyntaxKind::CODE_BLOCK).is_none(),
+        "backtick_code_blocks disabled should prevent backtick fenced code parsing"
+    );
+
+    config.extensions.backtick_code_blocks = true;
+    let enabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&enabled, SyntaxKind::CODE_BLOCK).is_some(),
+        "backtick_code_blocks enabled should allow backtick fenced code parsing"
+    );
+}
+
+#[test]
+fn tilde_fenced_code_blocks_respect_extension_guard() {
+    let input = "~~~r\na <- 1\n~~~\n";
+    let mut config = Config::default();
+    config.extensions.fenced_code_blocks = false;
+
+    let disabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&disabled, SyntaxKind::CODE_BLOCK).is_none(),
+        "fenced_code_blocks disabled should prevent tilde fenced code parsing"
+    );
+
+    config.extensions.fenced_code_blocks = true;
+    let enabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&enabled, SyntaxKind::CODE_BLOCK).is_some(),
+        "fenced_code_blocks enabled should allow tilde fenced code parsing"
+    );
+}
+
+#[test]
+fn fenced_code_attributes_respect_extension_guard() {
+    let input = "```{python}\na <- 1\n```\n";
+    let mut config = Config {
+        flavor: Flavor::Quarto,
+        ..Default::default()
+    };
+    config.extensions.fenced_code_attributes = false;
+
+    let disabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&disabled, SyntaxKind::CODE_BLOCK).is_none(),
+        "fenced_code_attributes disabled should prevent brace-info fenced code parsing"
+    );
+
+    config.extensions.fenced_code_attributes = true;
+    let enabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&enabled, SyntaxKind::CODE_BLOCK).is_some(),
+        "fenced_code_attributes enabled should allow brace-info fenced code parsing"
+    );
+}
+
+#[test]
+fn raw_attribute_respects_extension_guard_for_fenced_code() {
+    let input = "```{=html}\n<div>raw</div>\n```\n";
+    let mut config = Config::default();
+    config.extensions.raw_attribute = false;
+    config.extensions.fenced_code_attributes = false;
+
+    let disabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&disabled, SyntaxKind::CODE_BLOCK).is_none(),
+        "raw_attribute disabled should prevent raw-attribute fenced code parsing"
+    );
+
+    config.extensions.raw_attribute = true;
+    let enabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&enabled, SyntaxKind::CODE_BLOCK).is_some(),
+        "raw_attribute enabled should allow raw-attribute fenced code parsing"
     );
 }
 

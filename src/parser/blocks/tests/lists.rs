@@ -353,6 +353,51 @@ fn fancy_list_disabled_when_extension_off() {
 }
 
 #[test]
+fn fancy_list_hash_marker_disabled_when_extension_off() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: false,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "#. first\n#. second\n";
+    let tree = crate::parser::Parser::new(input, &config).parse();
+    assert!(find_first(&tree, SyntaxKind::LIST).is_none());
+}
+
+#[test]
+fn fancy_list_right_paren_decimal_disabled_when_extension_off() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: false,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "1) first\n2) second\n";
+    let tree = crate::parser::Parser::new(input, &config).parse();
+    assert!(find_first(&tree, SyntaxKind::LIST).is_none());
+}
+
+#[test]
+fn fancy_list_parens_decimal_disabled_when_extension_off() {
+    use crate::config::{Config, Extensions};
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: false,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "(1) first\n(2) second\n";
+    let tree = crate::parser::Parser::new(input, &config).parse();
+    assert!(find_first(&tree, SyntaxKind::LIST).is_none());
+}
+
+#[test]
 fn fancy_list_complex_roman() {
     use crate::config::{Config, Extensions};
     let config = Config {

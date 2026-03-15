@@ -1,4 +1,5 @@
-use super::helpers::{parse_blocks, parse_blocks_gfm};
+use super::helpers::{parse_blocks, parse_blocks_gfm, parse_blocks_with_config};
+use crate::config::Config;
 use crate::syntax::SyntaxKind;
 
 fn count_nodes_of_type(root: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
@@ -235,6 +236,24 @@ fn spec_blank_before_blockquote_required() {
 
     // Should have 1 paragraph containing both lines
     assert_eq!(count_nodes_of_type(&tree, SyntaxKind::PARAGRAPH), 1);
+}
+
+#[test]
+fn blockquote_can_interrupt_when_blank_before_blockquote_disabled() {
+    let mut config = Config::default();
+    config.extensions.blank_before_blockquote = false;
+    let input = "Paragraph\n> quote\n";
+    let tree = parse_blocks_with_config(input, &config);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 1);
+}
+
+#[test]
+fn nested_blockquote_without_blank_when_extension_disabled() {
+    let mut config = Config::default();
+    config.extensions.blank_before_blockquote = false;
+    let input = "> outer\n>> inner\n";
+    let tree = parse_blocks_with_config(input, &config);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCKQUOTE), 2);
 }
 
 #[test]

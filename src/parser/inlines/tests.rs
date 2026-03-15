@@ -898,6 +898,169 @@ mod raw_inline_tests {
 }
 
 #[cfg(test)]
+mod extension_guard_tests {
+    use crate::config::Config;
+    use crate::syntax::SyntaxKind;
+
+    fn parse_with_config(input: &str, config: Config) -> crate::syntax::SyntaxNode {
+        crate::parser::parse(input, Some(config))
+    }
+
+    fn count_kind(tree: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
+        tree.descendants_with_tokens()
+            .filter(|element| element.kind() == kind)
+            .count()
+    }
+
+    #[test]
+    fn strikeout_disabled_treats_text_literal() {
+        let mut config = Config::default();
+        config.extensions.strikeout = false;
+        let tree = parse_with_config("~~strike~~", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::STRIKEOUT), 0);
+    }
+
+    #[test]
+    fn superscript_disabled_treats_text_literal() {
+        let mut config = Config::default();
+        config.extensions.superscript = false;
+        let tree = parse_with_config("^sup^", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::SUPERSCRIPT), 0);
+    }
+
+    #[test]
+    fn subscript_disabled_treats_text_literal() {
+        let mut config = Config::default();
+        config.extensions.subscript = false;
+        let tree = parse_with_config("~sub~", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::SUBSCRIPT), 0);
+    }
+
+    #[test]
+    fn bracketed_spans_disabled_do_not_parse_span() {
+        let mut config = Config::default();
+        config.extensions.bracketed_spans = false;
+        let tree = parse_with_config("[text]{.class}", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::BRACKETED_SPAN), 0);
+    }
+
+    #[test]
+    fn inline_code_attributes_disabled_leaves_attrs_outside_code_span() {
+        let mut config = Config::default();
+        config.extensions.inline_code_attributes = false;
+        let tree = parse_with_config("`code`{.lang}", config);
+        let code_span = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::CODE_SPAN)
+            .expect("code span");
+        assert_eq!(code_span.to_string(), "`code`");
+        assert!(tree.to_string().contains("{.lang}"));
+    }
+
+    #[test]
+    fn tex_math_dollars_disabled_keeps_dollars_literal() {
+        let mut config = Config::default();
+        config.extensions.tex_math_dollars = false;
+        let tree = parse_with_config("$x$", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_MATH), 0);
+        assert_eq!(count_kind(&tree, SyntaxKind::DISPLAY_MATH), 0);
+    }
+
+    #[test]
+    fn all_symbols_escapable_disabled_stops_symbol_escapes() {
+        let mut config = Config::default();
+        config.extensions.all_symbols_escapable = false;
+        let tree = parse_with_config(r"\?", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::ESCAPED_CHAR), 0);
+    }
+
+    #[test]
+    fn escaped_line_breaks_still_work_when_symbol_escapes_disabled() {
+        let mut config = Config::default();
+        config.extensions.all_symbols_escapable = false;
+        config.extensions.escaped_line_breaks = true;
+        let tree = parse_with_config("a\\\nb", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::HARD_LINE_BREAK), 1);
+    }
+
+    #[test]
+    fn raw_tex_disabled_blocks_latex_command_node() {
+        let mut config = Config::default();
+        config.extensions.raw_tex = false;
+        let tree = parse_with_config(r"\alpha", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::LATEX_COMMAND), 0);
+    }
+
+    #[test]
+    fn inline_footnotes_disabled_keeps_note_literal() {
+        let mut config = Config::default();
+        config.extensions.inline_footnotes = false;
+        let tree = parse_with_config("A^[note]", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_FOOTNOTE), 0);
+    }
+
+    #[test]
+    fn footnotes_disabled_keeps_reference_literal() {
+        let mut config = Config::default();
+        config.extensions.footnotes = false;
+        let tree = parse_with_config("[^id]", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::FOOTNOTE_REFERENCE), 0);
+    }
+
+    #[test]
+    fn autolinks_disabled_keeps_angle_link_literal() {
+        let mut config = Config::default();
+        config.extensions.autolinks = false;
+        let tree = parse_with_config("<https://example.com>", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::AUTO_LINK), 0);
+    }
+
+    #[test]
+    fn inline_links_disabled_keeps_inline_link_literal() {
+        let mut config = Config::default();
+        config.extensions.inline_links = false;
+        let tree = parse_with_config("[text](url)", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::LINK), 0);
+    }
+
+    #[test]
+    fn reference_links_disabled_keeps_reference_link_literal() {
+        let mut config = Config::default();
+        config.extensions.reference_links = false;
+        let tree = parse_with_config("[text][ref]", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::LINK), 0);
+    }
+
+    #[test]
+    fn citations_disabled_keeps_bare_citation_literal() {
+        let mut config = Config::default();
+        config.extensions.citations = false;
+        let tree = parse_with_config("@doe99", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::CITATION), 0);
+    }
+
+    #[test]
+    fn crossrefs_enabled_without_citations_still_parse_crossref() {
+        let mut config = Config::default();
+        config.extensions.citations = false;
+        config.extensions.quarto_crossrefs = true;
+        let tree = parse_with_config("@fig-plot", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::CROSSREF), 1);
+        assert_eq!(count_kind(&tree, SyntaxKind::CITATION), 0);
+    }
+
+    #[test]
+    fn crossrefs_disabled_parse_quarto_key_as_citation() {
+        let mut config = Config::default();
+        config.extensions.citations = true;
+        config.extensions.quarto_crossrefs = false;
+        let tree = parse_with_config("@fig-plot", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::CROSSREF), 0);
+        assert_eq!(count_kind(&tree, SyntaxKind::CITATION), 1);
+    }
+}
+
+#[cfg(test)]
 mod complex_emphasis_tests {
 
     use crate::syntax::SyntaxKind;

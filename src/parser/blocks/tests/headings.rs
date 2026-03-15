@@ -67,6 +67,18 @@ fn parses_heading_without_blank_line_when_extension_disabled() {
 }
 
 #[test]
+fn parses_setext_heading_without_blank_line_when_extension_disabled() {
+    let mut config = Config::default();
+    config.extensions.blank_before_header = false;
+    let node = Parser::new("text\nHeading\n---\n", &config).parse();
+    let headings: Vec<_> = node
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::HEADING)
+        .collect();
+    assert_eq!(headings.len(), 1);
+}
+
+#[test]
 fn parses_heading_at_start_of_document() {
     let node = parse_blocks("# Start\n");
     let content = get_heading_content(&node).unwrap();

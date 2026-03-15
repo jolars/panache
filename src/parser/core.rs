@@ -984,7 +984,8 @@ impl<'a> Parser<'a> {
         if bq_depth > current_bq_depth {
             // Need to open new blockquote(s)
             // But first check blank_before_blockquote requirement
-            if current_bq_depth == 0
+            if self.config.extensions.blank_before_blockquote
+                && current_bq_depth == 0
                 && !blockquote_payload
                     .as_ref()
                     .map(|payload| payload.can_start)
@@ -1005,13 +1006,17 @@ impl<'a> Parser<'a> {
             // For nested blockquotes, also need blank line before (blank_before_blockquote)
             // Check if previous line inside the blockquote was blank
             let can_nest = if current_bq_depth > 0 {
-                // Check if we're right after a blank line or at start of blockquote
-                matches!(self.containers.last(), Some(Container::BlockQuote { .. }))
-                    || (self.pos > 0 && {
-                        let prev_line = self.lines[self.pos - 1];
-                        let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
-                        prev_bq_depth >= current_bq_depth && prev_inner.trim().is_empty()
-                    })
+                if self.config.extensions.blank_before_blockquote {
+                    // Check if we're right after a blank line or at start of blockquote
+                    matches!(self.containers.last(), Some(Container::BlockQuote { .. }))
+                        || (self.pos > 0 && {
+                            let prev_line = self.lines[self.pos - 1];
+                            let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
+                            prev_bq_depth >= current_bq_depth && prev_inner.trim().is_empty()
+                        })
+                } else {
+                    true
+                }
             } else {
                 blockquote_payload
                     .as_ref()
@@ -1609,10 +1614,11 @@ impl<'a> Parser<'a> {
             let prev_line = self.lines[self.pos - 1];
             let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);
             let (prev_inner_no_nl, _) = strip_newline(prev_inner);
-            let prev_is_fenced_div_open = fenced_divs::try_parse_div_fence_open(
-                strip_n_blockquote_markers(prev_inner_no_nl, prev_bq_depth).trim_start(),
-            )
-            .is_some();
+            let prev_is_fenced_div_open = self.config.extensions.fenced_divs
+                && fenced_divs::try_parse_div_fence_open(
+                    strip_n_blockquote_markers(prev_inner_no_nl, prev_bq_depth).trim_start(),
+                )
+                .is_some();
 
             prev_line.trim().is_empty()
                 || prev_is_fenced_div_open
