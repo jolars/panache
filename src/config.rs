@@ -41,6 +41,8 @@ pub struct Extensions {
     /// Full attribute syntax on headers {#id .class key=value}
     #[serde(alias = "header_attributes")]
     pub header_attributes: bool,
+    /// Auto-generate identifiers from headings
+    pub auto_identifiers: bool,
     /// Implicit header references ([Heading] links to header)
     pub implicit_header_references: bool,
 
@@ -247,6 +249,7 @@ impl Extensions {
             blank_before_header: false,
             blank_before_blockquote: false,
             header_attributes: false,
+            auto_identifiers: false,
             implicit_header_references: false,
             fancy_lists: false,
             startnum: false,
@@ -322,6 +325,7 @@ impl Extensions {
             blank_before_header: true,
             blank_before_blockquote: true,
             header_attributes: true,
+            auto_identifiers: true,
             implicit_header_references: true,
 
             // Lists
@@ -441,6 +445,7 @@ impl Extensions {
 
         ext.pipe_tables = true;
         ext.raw_html = true;
+        ext.auto_identifiers = true;
         ext.task_lists = true;
         ext.emoji = true;
         ext.strikeout = true;
@@ -2184,6 +2189,14 @@ mod tests {
     }
 
     #[test]
+    fn auto_identifiers_enabled_by_default_for_pandoc_and_gfm() {
+        let pandoc = toml::from_str::<Config>("flavor = \"pandoc\"").unwrap();
+        let gfm = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
+        assert!(pandoc.extensions.auto_identifiers);
+        assert!(gfm.extensions.auto_identifiers);
+    }
+
+    #[test]
     fn footnotes_enabled_by_default_for_gfm() {
         let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
         assert!(cfg.extensions.footnotes);
@@ -2202,6 +2215,7 @@ mod tests {
     fn commonmark_defaults_match_minimal_set() {
         let cfg = toml::from_str::<Config>("flavor = \"common-mark\"").unwrap();
         assert!(cfg.extensions.raw_html);
+        assert!(!cfg.extensions.auto_identifiers);
         assert!(!cfg.extensions.autolinks);
         assert!(!cfg.extensions.inline_links);
         assert!(!cfg.extensions.reference_links);

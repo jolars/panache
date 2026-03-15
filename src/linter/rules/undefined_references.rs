@@ -35,7 +35,7 @@ impl Rule for UndefinedReferencesRule {
                 .filter(|label| !label.is_empty()),
         );
 
-        if config.extensions.implicit_header_references {
+        if config.extensions.implicit_header_references && config.extensions.auto_identifiers {
             reference_labels.extend(
                 symbol_index
                     .heading_label_entries()
@@ -157,6 +157,19 @@ mod tests {
         let input = "# Heading Name\n\nSee [Heading Name].\n";
         let diagnostics = parse_and_lint(input);
         assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn implicit_heading_references_require_auto_identifiers() {
+        let input = "# Heading Name\n\nSee [Heading Name].\n";
+        let mut config = Config::default();
+        config.extensions.implicit_header_references = true;
+        config.extensions.auto_identifiers = false;
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = UndefinedReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "undefined-reference-label");
     }
 
     #[test]

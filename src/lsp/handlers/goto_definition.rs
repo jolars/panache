@@ -118,6 +118,7 @@ pub(crate) async fn goto_definition(
             }
 
             if config.extensions.implicit_header_references
+                && config.extensions.auto_identifiers
                 && let Some(label) = helpers::extract_crossref_key(&node)
                 && let Some(definition) =
                     helpers::find_implicit_header_definition_node(&root, &label)
