@@ -9,7 +9,9 @@ use panache::{format, parse};
 use serde_json::json;
 
 mod cli;
+mod diagnostic_renderer;
 use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands};
+use diagnostic_renderer::print_diagnostics;
 
 /// Supported file extensions for formatting
 const SUPPORTED_EXTENSIONS: &[&str] = &["md", "qmd", "Rmd", "markdown", "mdown", "mkd"];
@@ -773,7 +775,7 @@ fn main() -> io::Result<()> {
                     let fixed_output = apply_fixes(&input, &diagnostics);
                     print!("{}", fixed_output);
                 } else {
-                    print_diagnostics(&diagnostics, None, use_color);
+                    print_diagnostics(&diagnostics, None, Some(&input), use_color);
                 }
 
                 if check {
@@ -843,7 +845,12 @@ fn main() -> io::Result<()> {
                             file_path.display()
                         );
                     } else {
-                        print_diagnostics(&root_doc.diagnostics, Some(file_path), use_color);
+                        print_diagnostics(
+                            &root_doc.diagnostics,
+                            Some(file_path.as_path()),
+                            Some(&root_doc.input),
+                            use_color,
+                        );
                     }
                 }
 
@@ -854,7 +861,12 @@ fn main() -> io::Result<()> {
                         }
                         any_issues = true;
                         total_issues += doc.diagnostics.len();
-                        print_diagnostics(&doc.diagnostics, Some(&doc.path), use_color);
+                        print_diagnostics(
+                            &doc.diagnostics,
+                            Some(doc.path.as_path()),
+                            Some(&doc.input),
+                            use_color,
+                        );
                     }
                 }
             }
@@ -875,42 +887,6 @@ fn main() -> io::Result<()> {
             Ok(())
         }
     }
-}
-
-fn print_diagnostics(
-    diagnostics: &[panache::linter::Diagnostic],
-    file: Option<&PathBuf>,
-    use_color: bool,
-) {
-    use panache::linter::Severity;
-
-    let file_name = file.and_then(|p| p.to_str()).unwrap_or("<stdin>");
-
-    for diag in diagnostics {
-        let severity_str = match (&diag.severity, use_color) {
-            (Severity::Error, true) => "\x1b[31merror\x1b[0m", // red
-            (Severity::Warning, true) => "\x1b[33mwarning\x1b[0m", // yellow
-            (Severity::Info, true) => "\x1b[34minfo\x1b[0m",   // blue
-            (Severity::Error, false) => "error",
-            (Severity::Warning, false) => "warning",
-            (Severity::Info, false) => "info",
-        };
-
-        println!(
-            "{severity_str}[{}]: {} at {}:{}:{}",
-            diag.code, diag.message, file_name, diag.location.line, diag.location.column
-        );
-
-        if let Some(fix) = &diag.fix {
-            if use_color {
-                println!("  \x1b[36mhelp\x1b[0m: {}", fix.message); // cyan
-            } else {
-                println!("  help: {}", fix.message);
-            }
-        }
-    }
-
-    println!("\nFound {} issue(s)", diagnostics.len());
 }
 
 #[derive(Debug, Clone)]

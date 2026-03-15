@@ -118,8 +118,11 @@ Description
 **Diagnostic:**
 
 ```
-warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2
-  --> document.qmd:3:1
+warning: [heading-hierarchy] Heading level skipped from h1 to h3; expected h2
+ --> document.qmd:3:1
+  |
+3 | ### Subsection
+  | ^^^^^^^^^^^^^^
 ```
 
 **Auto-fix:** Changes `### Subsection` to `## Subsection`.
@@ -586,11 +589,17 @@ panache lint document.qmd
 Output:
 
 ```
-warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2
-  --> document.qmd:3:1
+warning: [heading-hierarchy] Heading level skipped from h1 to h3; expected h2
+ --> document.qmd:3:1
+  |
+3 | ### Skipped Level
+  | ^^^^^^^^^^^^^^^^^^
 
-warning[heading-hierarchy]: Heading level skipped from h3 to h4; expected h3
-  --> document.qmd:5:1
+warning: [heading-hierarchy] Heading level skipped from h3 to h4; expected h3
+ --> document.qmd:5:1
+  |
+5 | #### Another Skip
+  | ^^^^^^^^^^^^^^^^^
 ```
 
 Apply auto-fix:

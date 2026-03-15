@@ -181,6 +181,29 @@ fn test_lint_stdin() {
 }
 
 #[test]
+fn test_lint_stdin_shows_source_snippet() {
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--color", "never"])
+        .write_stdin("# Heading\n\n### Subheading")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--> <stdin>:3:1"))
+        .stdout(predicate::str::contains("3 | ### Subheading"))
+        .stdout(predicate::str::contains("^"))
+        .stdout(predicate::str::contains(
+            "help: Change heading level from 3 to 2",
+        ))
+        .stdout(predicate::str::contains(
+            "= note: configure this rule in panache.toml",
+        ))
+        .stdout(predicate::str::contains(
+            "help: Change heading level from 3 to 2",
+        ))
+        .stdout(predicate::str::contains("3 - ### Subheading").not())
+        .stdout(predicate::str::contains("3 + ## Subheading").not());
+}
+
+#[test]
 fn test_lint_color_always_shows_ansi_diagnostics() {
     cargo_bin_cmd!("panache")
         .args(["lint", "--color", "always"])
