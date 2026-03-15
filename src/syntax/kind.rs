@@ -182,6 +182,7 @@ pub enum SyntaxKind {
     DIV_FENCE_CLOSE,
     DIV_INFO,
     DIV_CONTENT,
+    EMOJI, // :alias:
 }
 
 impl From<SyntaxKind> for rowan::SyntaxKind {

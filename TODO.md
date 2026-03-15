@@ -478,7 +478,7 @@ for initial implementation.
 #### Non-Default: GitHub-specific
 
 - [x] Extension: `alerts` - GitHub/Quarto alert/callout boxes (non-default)
-- [ ] Extension: `emoji` - `:emoji:` syntax (non-default)
+- [x] Extension: `emoji` - `:emoji:` syntax (non-default)
 - [ ] Extension: `wikilinks_title_after_pipe` - `[[link|title]]` (non-default)
 
 #### Non-Default: Quarto-Specific

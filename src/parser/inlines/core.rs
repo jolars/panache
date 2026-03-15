@@ -34,6 +34,7 @@ use super::citations::{
     try_parse_bracketed_citation,
 };
 use super::code_spans::{emit_code_span, try_parse_code_span};
+use super::emoji::{emit_emoji, try_parse_emoji};
 use super::escapes::{EscapeType, emit_escape, try_parse_escape};
 use super::inline_footnotes::{
     emit_footnote_reference, emit_inline_footnote, try_parse_footnote_reference,
@@ -1053,6 +1054,16 @@ fn parse_inline_range_nested(
     parse_inline_range_impl(text, start, end, config, builder, true)
 }
 
+fn is_emoji_boundary(text: &str, pos: usize) -> bool {
+    if pos > 0 {
+        let prev = text.as_bytes()[pos - 1] as char;
+        if prev.is_ascii_alphanumeric() || prev == '_' {
+            return false;
+        }
+    }
+    true
+}
+
 fn parse_inline_range_impl(
     text: &str,
     start: usize,
@@ -1252,6 +1263,22 @@ fn parse_inline_range_impl(
                 emit_code_span(builder, content, backtick_count, attributes);
             }
 
+            pos += len;
+            text_start = pos;
+            continue;
+        }
+
+        // Try textual emoji aliases: :smile:
+        if byte == b':'
+            && config.extensions.emoji
+            && is_emoji_boundary(text, pos)
+            && let Some((len, _alias)) = try_parse_emoji(&text[pos..])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            log::debug!("Matched emoji at pos {}", pos);
+            emit_emoji(builder, &text[pos..pos + len]);
             pos += len;
             text_start = pos;
             continue;

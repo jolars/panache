@@ -295,6 +295,36 @@ Description
 :   Labels facilitates debugging. Add a label with either `#| label: my-chunk`
     or inline `label=my-chunk`.
 
+### `unknown-emoji-alias`
+
+Detects `:alias:` emoji shortcodes that are not recognized.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Requirements
+:   Requires `extensions.emoji = true` in configuration
+
+Description
+:   Checks parsed emoji aliases against the emoji shortcode dataset and warns
+    when an alias is unknown.
+
+**Example violation:**
+
+```markdown
+Looks good :smile:, but this one is wrong :not-a-real-emoji:.
+```
+
+**Diagnostic:**
+
+```
+warning[unknown-emoji-alias]: Unknown emoji alias ':not-a-real-emoji:'
+  --> document.qmd:1:40
+```
+
 ## Diagnostic Format
 
 Diagnostics are displayed in a compiler-style format:
@@ -507,6 +537,7 @@ undefined-references = true
 citation-keys = true
 chunk-label-spaces = true
 missing-chunk-labels = true
+unknown-emoji-alias = true
 ```
 
 All rules are enabled by default when omitted. You can disable a specific rule:

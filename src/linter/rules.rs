@@ -5,6 +5,7 @@ use crate::syntax::SyntaxNode;
 pub mod chunk_label_spaces;
 pub mod citation_keys;
 pub mod duplicate_references;
+pub mod emoji_aliases;
 pub mod heading_hierarchy;
 pub mod missing_chunk_labels;
 pub mod undefined_references;

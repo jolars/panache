@@ -248,3 +248,41 @@ missing-chunk-labels = false
         .collect();
     assert!(missing.is_empty());
 }
+
+#[test]
+fn test_unknown_emoji_alias() {
+    let diagnostics = lint_file_with_config(
+        "emoji_aliases.md",
+        r#"
+[extensions]
+emoji = true
+"#,
+    );
+
+    let emoji_issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "unknown-emoji-alias")
+        .collect();
+    assert_eq!(emoji_issues.len(), 1, "Should flag one unknown emoji alias");
+    assert!(emoji_issues[0].message.contains(":not-a-real-emoji:"));
+}
+
+#[test]
+fn test_unknown_emoji_alias_can_be_disabled() {
+    let diagnostics = lint_file_with_config(
+        "emoji_aliases.md",
+        r#"
+[extensions]
+emoji = true
+
+[lint.rules]
+unknown-emoji-alias = false
+"#,
+    );
+
+    let emoji_issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "unknown-emoji-alias")
+        .collect();
+    assert!(emoji_issues.is_empty());
+}

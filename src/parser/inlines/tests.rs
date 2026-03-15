@@ -1040,6 +1040,22 @@ mod extension_guard_tests {
     }
 
     #[test]
+    fn emoji_enabled_parses_colon_alias() {
+        let mut config = Config::default();
+        config.extensions.emoji = true;
+        let tree = parse_with_config("Hello :smile: world", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::EMOJI), 1);
+    }
+
+    #[test]
+    fn emoji_disabled_keeps_colon_alias_literal() {
+        let mut config = Config::default();
+        config.extensions.emoji = false;
+        let tree = parse_with_config("Hello :smile: world", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::EMOJI), 0);
+    }
+
+    #[test]
     fn crossrefs_enabled_without_citations_still_parse_crossref() {
         let mut config = Config::default();
         config.extensions.citations = false;
