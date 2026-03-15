@@ -3,12 +3,7 @@ DOCUMENT@0..66
     BLOCKQUOTE_MARKER@0..1 ">"
     WHITESPACE@1..2 " "
     PARAGRAPH@2..66
-      LINK@2..8
-        LINK_START@2..3
-          LINK_START@2..3 "["
-        LINK_TEXT@3..7
-          TEXT@3..7 "!TIP"
-        TEXT@7..8 "]"
+      TEXT@2..8 "[!TIP]"
       NEWLINE@8..9 "\n"
       BLOCKQUOTE_MARKER@9..10 ">"
       WHITESPACE@10..11 " "

@@ -241,6 +241,69 @@ impl Default for Extensions {
 }
 
 impl Extensions {
+    /// Baseline with all modeled extensions disabled.
+    fn none_defaults() -> Self {
+        Self {
+            blank_before_header: false,
+            blank_before_blockquote: false,
+            header_attributes: false,
+            implicit_header_references: false,
+            fancy_lists: false,
+            startnum: false,
+            example_lists: false,
+            task_lists: false,
+            definition_lists: false,
+            backtick_code_blocks: false,
+            fenced_code_blocks: false,
+            fenced_code_attributes: false,
+            inline_code_attributes: false,
+            simple_tables: false,
+            multiline_tables: false,
+            grid_tables: false,
+            pipe_tables: false,
+            table_captions: false,
+            fenced_divs: false,
+            native_divs: false,
+            line_blocks: false,
+            intraword_underscores: false,
+            strikeout: false,
+            superscript: false,
+            subscript: false,
+            inline_links: false,
+            reference_links: false,
+            shortcut_reference_links: false,
+            link_attributes: false,
+            autolinks: false,
+            inline_images: false,
+            implicit_figures: false,
+            tex_math_dollars: false,
+            tex_math_single_backslash: false,
+            tex_math_double_backslash: false,
+            inline_footnotes: false,
+            footnotes: false,
+            citations: false,
+            bracketed_spans: false,
+            native_spans: false,
+            yaml_metadata_block: false,
+            pandoc_title_block: false,
+            raw_html: false,
+            markdown_in_html_blocks: false,
+            raw_tex: false,
+            raw_attribute: false,
+            all_symbols_escapable: false,
+            escaped_line_breaks: false,
+            autolink_bare_uris: false,
+            hard_line_breaks: false,
+            alerts: false,
+            emoji: false,
+            mark: false,
+            quarto_callouts: false,
+            quarto_crossrefs: false,
+            quarto_shortcodes: false,
+            bookdown_references: false,
+        }
+    }
+
     /// Get the default extension set for a given flavor.
     pub fn for_flavor(flavor: Flavor) -> Self {
         match flavor {
@@ -354,16 +417,9 @@ impl Extensions {
     fn quarto_defaults() -> Self {
         let mut ext = Self::pandoc_defaults();
 
-        // Quarto enables additional extensions
-        ext.task_lists = true;
-        ext.implicit_figures = true;
-        ext.implicit_header_references = true;
-
-        // Quarto-specific
         ext.quarto_callouts = true;
         ext.quarto_crossrefs = true;
         ext.quarto_shortcodes = true;
-        ext.bookdown_references = false;
 
         ext
     }
@@ -372,111 +428,36 @@ impl Extensions {
     fn rmarkdown_defaults() -> Self {
         let mut ext = Self::pandoc_defaults();
 
-        // RMarkdown specifics
-        ext.task_lists = true;
         ext.tex_math_dollars = true;
         ext.tex_math_single_backslash = true; // RMarkdown enables \(...\) and \[...\] by default
         ext.bookdown_references = true;
-        ext.implicit_header_references = true;
 
         ext
     }
 
     /// GitHub Flavored Markdown defaults.
     fn gfm_defaults() -> Self {
-        let mut ext = Self::pandoc_defaults();
+        let mut ext = Self::none_defaults();
 
-        // GFM-specific
         ext.pipe_tables = true;
+        ext.raw_html = true;
         ext.task_lists = true;
+        ext.emoji = true;
         ext.strikeout = true;
         ext.autolink_bare_uris = true;
+        ext.yaml_metadata_block = true;
+        ext.footnotes = true;
+        ext.tex_math_dollars = true;
         ext.alerts = true;
-
-        // GFM doesn't support some Pandoc features
-        ext.definition_lists = false;
-        ext.footnotes = false;
 
         ext
     }
 
     /// CommonMark (minimal standard).
     fn commonmark_defaults() -> Self {
-        Self {
-            // CommonMark is minimal - most extensions OFF
-            blank_before_header: true,
-            blank_before_blockquote: true,
-            header_attributes: false,
-            implicit_header_references: false,
-
-            fancy_lists: false,
-            startnum: false,
-            example_lists: false,
-            task_lists: false,
-            definition_lists: false,
-
-            backtick_code_blocks: true,
-            fenced_code_blocks: false,
-            fenced_code_attributes: false,
-            inline_code_attributes: false,
-
-            simple_tables: false,
-            multiline_tables: false,
-            grid_tables: false,
-            pipe_tables: false,
-            table_captions: false,
-
-            fenced_divs: false,
-            native_divs: false,
-            line_blocks: false,
-
-            intraword_underscores: false,
-            strikeout: false,
-            superscript: false,
-            subscript: false,
-
-            inline_links: true,
-            reference_links: true,
-            shortcut_reference_links: false,
-            link_attributes: false,
-            autolinks: true,
-
-            inline_images: true,
-            implicit_figures: false,
-
-            tex_math_dollars: false,
-            tex_math_single_backslash: false,
-            tex_math_double_backslash: false,
-
-            inline_footnotes: false,
-            footnotes: false,
-            citations: false,
-
-            bracketed_spans: false,
-            native_spans: false,
-
-            yaml_metadata_block: false,
-            pandoc_title_block: false,
-
-            raw_html: true,
-            markdown_in_html_blocks: false,
-            raw_tex: false,
-            raw_attribute: false,
-
-            all_symbols_escapable: true,
-            escaped_line_breaks: true,
-
-            autolink_bare_uris: false,
-            hard_line_breaks: false,
-            alerts: false,
-            emoji: false,
-            mark: false,
-
-            quarto_callouts: false,
-            quarto_crossrefs: false,
-            quarto_shortcodes: false,
-            bookdown_references: false,
-        }
+        let mut ext = Self::none_defaults();
+        ext.raw_html = true;
+        ext
     }
 
     /// Merge user-specified extension overrides with flavor defaults.
@@ -2200,6 +2181,30 @@ mod tests {
     fn alerts_enabled_by_default_for_gfm() {
         let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
         assert!(cfg.extensions.alerts);
+    }
+
+    #[test]
+    fn footnotes_enabled_by_default_for_gfm() {
+        let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
+        assert!(cfg.extensions.footnotes);
+    }
+
+    #[test]
+    fn gfm_disables_non_gfm_pandoc_extensions() {
+        let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
+        assert!(!cfg.extensions.citations);
+        assert!(!cfg.extensions.definition_lists);
+        assert!(!cfg.extensions.fenced_divs);
+        assert!(!cfg.extensions.raw_tex);
+    }
+
+    #[test]
+    fn commonmark_defaults_match_minimal_set() {
+        let cfg = toml::from_str::<Config>("flavor = \"common-mark\"").unwrap();
+        assert!(cfg.extensions.raw_html);
+        assert!(!cfg.extensions.autolinks);
+        assert!(!cfg.extensions.inline_links);
+        assert!(!cfg.extensions.reference_links);
     }
 
     #[test]
