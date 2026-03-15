@@ -110,6 +110,9 @@ wrap = "reflow"
 `reflow`
 :   Reformat paragraphs to fit within line width (default)
 
+`sentence`
+:   Wrap after each sentence.
+
 `preserve`
 :   Keep existing line breaks
 
