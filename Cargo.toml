@@ -15,6 +15,7 @@ categories = [
     "parser-implementations",
 ]
 authors = ["Johan Larsson <johan@jolars.co>"]
+exclude = ["release-assets"]
 
 [workspace]
 members = ["crates/panache-wasm"]
