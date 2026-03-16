@@ -312,16 +312,6 @@ Instead of listing every file, understand the patterns:
 - Includes binary download/install logic and extension settings wiring
 - Build/package via `npm run compile` and `npm run package` in `editors/code/`
 
-**Path-specific Copilot instructions** (`.github/instructions/`):
-
-- `parser.instructions.md`: parser + syntax guidance
-- `formatter.instructions.md`: formatter + golden expected guidance
-- `lsp.instructions.md`: LSP + LSP test guidance
-- `integration-tests.instructions.md`: integration test guidance
-- `linter.instructions.md`: linter + diagnostics guidance
-- `config.instructions.md`: configuration/defaults/deprecation guidance
-- `vscode-extension.instructions.md`: VS Code extension guidance
-
 ## Important Development Rules
 
 ### DO
