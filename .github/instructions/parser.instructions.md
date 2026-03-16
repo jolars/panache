@@ -11,6 +11,8 @@ Parser and syntax changes must preserve lossless CST behavior.
   during parse).
 - Prefer existing block dispatcher and inline parser utilities over introducing
   parallel parsing paths.
+- Keep parser behavior independent of formatter/linter policy; parser should
+  remain lossless syntax capture only.
 - For bug fixes and new parsing behavior, add a focused test first (unit or
   golden case).
 - If golden snapshots change, validate each case and ensure formatting

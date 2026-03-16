@@ -11,5 +11,7 @@ Integration tests should reflect user-visible behavior and minimize brittleness.
   `tests/golden_cases.rs`.
 - Update expected outputs/CST only when behavior intentionally changed and after
   manual diff review.
+- For CLI diagnostics, prefer focused substring/order assertions over asserting
+  entire rendered blocks (to reduce brittleness across renderer/layout tweaks).
 - Keep tests deterministic (no timing or environment-sensitive assumptions
   unless already established by the suite).

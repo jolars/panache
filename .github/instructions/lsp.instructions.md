@@ -9,6 +9,10 @@ transitions.
 - Ensure UTF-16/UTF-8 position and range conversions remain correct.
 - Prefer typed syntax wrappers for feature logic (symbols, diagnostics,
   definitions, etc.).
+- Reuse shared conversion/state helpers (Salsa/document maps/range conversion)
+  rather than re-implementing protocol mapping logic.
 - Keep state updates explicit; avoid silent failure paths that hide
   diagnostics/actions.
+- If lint/diagnostic payloads change, explicitly verify expected LSP diagnostic
+  fields remain stable unless the protocol output change is intentional.
 - Validate with targeted LSP integration tests before running the full suite.
