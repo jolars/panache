@@ -121,10 +121,10 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           if [ -f panache-${{ matrix.target }}.tar.gz ]; then
-            gh release upload "$TAG" panache-${{ matrix.target }}.tar.gz
+            gh release upload --clobber "$TAG" panache-${{ matrix.target }}.tar.gz
           fi
           if [ -f panache-${{ matrix.target }}.zip ]; then
-            gh release upload "$TAG" panache-${{ matrix.target }}.zip
+            gh release upload --clobber "$TAG" panache-${{ matrix.target }}.zip
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -179,7 +179,7 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           DEB_FILE=$(ls target/${{ matrix.target }}/debian/*.deb)
-          gh release upload "$TAG" "$DEB_FILE"
+          gh release upload --clobber "$TAG" "$DEB_FILE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -189,6 +189,6 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           RPM_FILE=$(ls target/${{ matrix.target }}/generate-rpm/*.rpm)
-          gh release upload "$TAG" "$RPM_FILE"
+          gh release upload --clobber "$TAG" "$RPM_FILE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

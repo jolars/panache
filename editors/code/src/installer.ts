@@ -19,6 +19,11 @@ interface TargetAsset {
   binaryName: string;
 }
 
+const HTTP_TIMEOUT_MS = 15_000;
+const MAX_REDIRECTS = 5;
+const DOWNLOAD_RETRIES = 4;
+const RETRY_DELAY_MS = 1_500;
+
 function detectTargetAsset(): TargetAsset {
   const binaryName = process.platform === "win32" ? "panache.exe" : "panache";
   if (process.platform === "darwin" && process.arch === "arm64") {
@@ -45,7 +50,11 @@ function detectTargetAsset(): TargetAsset {
   throw new Error(`Unsupported platform: ${process.platform}-${process.arch}`);
 }
 
-function httpGet(url: string): Promise<Buffer> {
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function httpGet(url: string, redirectCount = 0): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const request = https.get(
       url,
@@ -62,7 +71,14 @@ function httpGet(url: string): Promise<Buffer> {
           response.statusCode < 400 &&
           response.headers.location
         ) {
-          void httpGet(response.headers.location).then(resolve, reject);
+          if (redirectCount >= MAX_REDIRECTS) {
+            reject(new Error(`Too many redirects when fetching ${url}`));
+            return;
+          }
+          void httpGet(response.headers.location, redirectCount + 1).then(
+            resolve,
+            reject,
+          );
           return;
         }
         if (response.statusCode !== 200) {
@@ -74,8 +90,33 @@ function httpGet(url: string): Promise<Buffer> {
         response.on("end", () => resolve(Buffer.concat(chunks)));
       },
     );
+    const timeout = setTimeout(() => {
+      request.destroy(new Error(`Request timed out after ${HTTP_TIMEOUT_MS}ms`));
+    }, HTTP_TIMEOUT_MS);
+    request.on("close", () => {
+      clearTimeout(timeout);
+    });
     request.on("error", reject);
   });
+}
+
+async function withRetries<T>(
+  operation: () => Promise<T>,
+  operationName: string,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= DOWNLOAD_RETRIES; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt < DOWNLOAD_RETRIES) {
+        await sleep(RETRY_DELAY_MS);
+      }
+    }
+  }
+  const reason = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(`${operationName} failed after ${DOWNLOAD_RETRIES} attempts: ${reason}`);
 }
 
 async function findFileRecursive(
@@ -108,14 +149,20 @@ export async function resolvePanacheBinary(
     tag === "latest"
       ? `https://api.github.com/repos/${repo}/releases/latest`
       : `https://api.github.com/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`;
-  const releaseBody = await httpGet(releasesUrl);
-  const release = JSON.parse(releaseBody.toString("utf8")) as ReleaseResponse;
-  const asset = release.assets.find((item) => item.name === target.archiveName);
-  if (!asset) {
-    throw new Error(
-      `No release asset '${target.archiveName}' found for ${repo}@${tag}`,
-    );
-  }
+  const { release, asset } = await withRetries(
+    async () => {
+      const releaseBody = await httpGet(releasesUrl);
+      const release = JSON.parse(releaseBody.toString("utf8")) as ReleaseResponse;
+      const asset = release.assets.find((item) => item.name === target.archiveName);
+      if (!asset) {
+        throw new Error(
+          `No release asset '${target.archiveName}' found for ${repo}@${tag}`,
+        );
+      }
+      return { release, asset };
+    },
+    `Fetching release metadata from ${releasesUrl}`,
+  );
 
   const installRoot = path.join(globalStoragePath, "bin", release.tag_name);
   await fs.mkdir(installRoot, { recursive: true });
@@ -128,7 +175,10 @@ export async function resolvePanacheBinary(
   }
 
   const archivePath = path.join(installRoot, asset.name);
-  const archive = await httpGet(asset.browser_download_url);
+  const archive = await withRetries(
+    () => httpGet(asset.browser_download_url),
+    `Downloading ${asset.name}`,
+  );
   await fs.writeFile(archivePath, archive);
 
   if (asset.name.endsWith(".zip")) {
