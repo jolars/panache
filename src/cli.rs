@@ -227,6 +227,11 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         #[arg(help = "Automatically fix violations where possible")]
         fix: bool,
 
+        /// Diagnostic rendering format
+        #[arg(long, value_enum, default_value = "human")]
+        #[arg(help = "Diagnostic rendering format")]
+        message_format: MessageFormat,
+
         /// Enforce exclude patterns even for explicitly provided files
         #[arg(long)]
         #[arg(help = "Apply exclude patterns to explicitly provided files")]
@@ -283,4 +288,10 @@ pub enum ColorMode {
     Auto,
     Always,
     Never,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum MessageFormat {
+    Human,
+    Short,
 }

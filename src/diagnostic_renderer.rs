@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use crate::cli::MessageFormat;
 use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
 use panache::linter::{Diagnostic, Severity};
 
@@ -8,6 +9,7 @@ pub(crate) fn print_diagnostics(
     file: Option<&Path>,
     source: Option<&str>,
     use_color: bool,
+    message_format: MessageFormat,
 ) {
     let file_name = file.and_then(Path::to_str).unwrap_or("<stdin>");
     let renderer = if use_color {
@@ -17,6 +19,19 @@ pub(crate) fn print_diagnostics(
     };
 
     for diag in diagnostics {
+        if matches!(message_format, MessageFormat::Short) {
+            println!(
+                "{}[{}]: {} at {}:{}:{}",
+                severity_name(&diag.severity),
+                diag.code,
+                diag.message,
+                file_name,
+                diag.location.line,
+                diag.location.column
+            );
+            continue;
+        }
+
         if let Some(source) = source {
             print_source_snippet(diag, file_name, source, &renderer, diag.fix.as_ref());
         } else {

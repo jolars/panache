@@ -112,6 +112,12 @@ Configure rules in panache.toml with [lint] section.
 
 * `--check` — Exit with code 1 if violations found (CI mode)
 * `--fix` — Automatically fix violations where possible
+* `--message-format <MESSAGE_FORMAT>` — Diagnostic rendering format
+
+  Default value: `human`
+
+  Possible values: `human`, `short`
+
 * `--force-exclude` — Apply exclude patterns to explicitly provided files
 
 

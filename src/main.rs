@@ -732,6 +732,7 @@ fn main() -> io::Result<()> {
             files,
             check,
             fix,
+            message_format,
             force_exclude,
         } => {
             // Handle stdin case
@@ -775,7 +776,7 @@ fn main() -> io::Result<()> {
                     let fixed_output = apply_fixes(&input, &diagnostics);
                     print!("{}", fixed_output);
                 } else {
-                    print_diagnostics(&diagnostics, None, Some(&input), use_color);
+                    print_diagnostics(&diagnostics, None, Some(&input), use_color, message_format);
                 }
 
                 if check {
@@ -850,6 +851,7 @@ fn main() -> io::Result<()> {
                             Some(file_path.as_path()),
                             Some(&root_doc.input),
                             use_color,
+                            message_format,
                         );
                     }
                 }
@@ -866,6 +868,7 @@ fn main() -> io::Result<()> {
                             Some(doc.path.as_path()),
                             Some(&doc.input),
                             use_color,
+                            message_format,
                         );
                     }
                 }

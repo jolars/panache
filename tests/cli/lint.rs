@@ -204,6 +204,20 @@ fn test_lint_stdin_shows_source_snippet() {
 }
 
 #[test]
+fn test_lint_stdin_short_message_format() {
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--message-format", "short", "--color", "never"])
+        .write_stdin("# Heading\n\n### Subheading")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "warning[heading-hierarchy]: Heading level skipped from h1 to h3; expected h2 at <stdin>:3:1",
+        ))
+        .stdout(predicate::str::contains("3 | ### Subheading").not())
+        .stdout(predicate::str::contains("= note:").not());
+}
+
+#[test]
 fn test_lint_color_always_shows_ansi_diagnostics() {
     cargo_bin_cmd!("panache")
         .args(["lint", "--color", "always"])
