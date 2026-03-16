@@ -172,6 +172,10 @@ impl Formatter {
         false
     }
 
+    fn horizontal_rule_text(&self, available_width: usize) -> String {
+        "-".repeat(available_width.max(3))
+    }
+
     fn bare_fence_paragraph_line(&self, node: &SyntaxNode) -> Option<String> {
         let mut atoms = Vec::new();
 
@@ -440,8 +444,9 @@ impl Formatter {
             }
 
             SyntaxKind::HORIZONTAL_RULE => {
-                // Output normalized horizontal rule (always use "---")
-                self.output.push_str("---");
+                // Output normalized horizontal rule using full available width.
+                self.output
+                    .push_str(&self.horizontal_rule_text(self.config.line_width));
                 self.output.push('\n');
 
                 // Ensure blank line after if followed by block element
@@ -920,7 +925,10 @@ impl Formatter {
                         }
                         SyntaxKind::HORIZONTAL_RULE => {
                             self.output.push_str(&content_prefix);
-                            self.output.push_str("---");
+                            let available_width =
+                                self.config.line_width.saturating_sub(content_prefix.len());
+                            self.output
+                                .push_str(&self.horizontal_rule_text(available_width));
                             self.output.push('\n');
                         }
                         SyntaxKind::HEADING => {

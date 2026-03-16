@@ -9,7 +9,7 @@ This paragraph is followed by a blockquote:
 
 Back to a paragraph after the blockquote.
 
----
+--------------------------------------------------------------------------------
 
 ## Paragraph Before List
 

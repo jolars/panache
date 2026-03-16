@@ -34,3 +34,21 @@ fn horizontal_rule_before_setext_like_paragraph_stays_idempotent() {
     let second = format(&first, None, None);
     assert_eq!(first, second);
 }
+
+#[test]
+fn horizontal_rule_expands_to_line_width() {
+    let cfg = panache::ConfigBuilder::default().line_width(12).build();
+    let input = "***\n";
+    let expected = "------------\n";
+    let out = format(input, Some(cfg), None);
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn blockquote_horizontal_rule_respects_available_width() {
+    let cfg = panache::ConfigBuilder::default().line_width(12).build();
+    let input = "> ***\n";
+    let expected = "> ----------\n";
+    let out = format(input, Some(cfg), None);
+    assert_eq!(out, expected);
+}

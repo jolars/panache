@@ -21,6 +21,6 @@ Second section after additional metadata.
 
 Para before horizontal rule
 
----
+--------------------------------------------------------------------------------
 
 Para after horizontal rule
