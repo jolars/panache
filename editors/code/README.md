@@ -1,6 +1,6 @@
-# Panache for VS Code
+# Panache
 
-Language server support for Pandoc, Quarto, and R Markdown documents.
+A language server for Pandoc, Quarto, and R Markdown.
 
 ## Features
 
@@ -9,7 +9,7 @@ Language server support for Pandoc, Quarto, and R Markdown documents.
 - Diagnostics and code actions from Panache
 - Works for Markdown, Quarto (`.qmd`), and R Markdown (`.Rmd`, `.rmd`)
 
-## Binary installation
+## Binary Installation
 
 By default, the extension downloads a platform-specific `panache` binary from
 GitHub releases and uses that binary for the language server.
@@ -35,5 +35,5 @@ You can also provide your own binary path:
 
 ## Links
 
-- Panache repository: <https://github.com/jolars/panache>
-- Documentation: <https://github.com/jolars/panache#readme>
+- Main repository: <https://github.com/jolars/panache>
+- Documentation: <https://jolars.github.io/panache/>
