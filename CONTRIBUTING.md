@@ -1,10 +1,6 @@
 # Contributing to Panache
 
-Thanks for your interest in contributing to panache.
-
-Panache is a formatter, linter, and LSP for Pandoc/Quarto/R Markdown, and the
-project is still in early development. Small, focused pull requests are usually
-easier to review and merge.
+Thanks for your interest in contributing to Panache.
 
 ## Getting Started
 
@@ -24,6 +20,10 @@ cargo check && cargo test && cargo clippy --all-targets --all-features -- -D war
 - Keep edits minimal and targeted to the requested behavior.
 - Follow existing module and naming patterns in the area you touch.
 - Do not edit `CHANGELOG.md` manually; releases are automated.
+- Small, focused PRs are easier to review and merge; avoid large refactors or
+  multiple behavior changes in one PR.
+- Before spending time on a change, consider opening an issue to discuss the
+  approach and ensure alignment with project goals.
 
 ## Working in Core Areas
 
