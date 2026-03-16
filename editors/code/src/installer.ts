@@ -15,7 +15,7 @@ interface ReleaseResponse {
 }
 
 interface TargetAsset {
-  archiveName: string;
+  archiveNames: string[];
   binaryName: string;
 }
 
@@ -27,28 +27,34 @@ const RETRY_DELAY_MS = 1_500;
 function detectTargetAsset(): TargetAsset {
   const binaryName = process.platform === "win32" ? "panache.exe" : "panache";
   if (process.platform === "darwin" && process.arch === "arm64") {
-    return { archiveName: "panache-aarch64-apple-darwin.tar.gz", binaryName };
+    return { archiveNames: ["panache-aarch64-apple-darwin.tar.gz"], binaryName };
   }
   if (process.platform === "darwin" && process.arch === "x64") {
-    return { archiveName: "panache-x86_64-apple-darwin.tar.gz", binaryName };
+    return { archiveNames: ["panache-x86_64-apple-darwin.tar.gz"], binaryName };
   }
   if (process.platform === "linux" && process.arch === "arm64") {
     return {
-      archiveName: "panache-aarch64-unknown-linux-gnu.tar.gz",
+      archiveNames: [
+        "panache-aarch64-unknown-linux-gnu.tar.gz",
+        "panache-aarch64-unknown-linux-musl.tar.gz",
+      ],
       binaryName,
     };
   }
   if (process.platform === "linux" && process.arch === "x64") {
     return {
-      archiveName: "panache-x86_64-unknown-linux-gnu.tar.gz",
+      archiveNames: [
+        "panache-x86_64-unknown-linux-gnu.tar.gz",
+        "panache-x86_64-unknown-linux-musl.tar.gz",
+      ],
       binaryName,
     };
   }
   if (process.platform === "win32" && process.arch === "x64") {
-    return { archiveName: "panache-x86_64-pc-windows-msvc.zip", binaryName };
+    return { archiveNames: ["panache-x86_64-pc-windows-msvc.zip"], binaryName };
   }
   if (process.platform === "win32" && process.arch === "arm64") {
-    return { archiveName: "panache-aarch64-pc-windows-msvc.zip", binaryName };
+    return { archiveNames: ["panache-aarch64-pc-windows-msvc.zip"], binaryName };
   }
   throw new Error(`Unsupported platform: ${process.platform}-${process.arch}`);
 }
@@ -156,10 +162,14 @@ export async function resolvePanacheBinary(
     async () => {
       const releaseBody = await httpGet(releasesUrl);
       const release = JSON.parse(releaseBody.toString("utf8")) as ReleaseResponse;
-      const asset = release.assets.find((item) => item.name === target.archiveName);
+      const asset = target.archiveNames
+        .map((archiveName) =>
+          release.assets.find((item) => item.name === archiveName),
+        )
+        .find((item): item is ReleaseAsset => item !== undefined);
       if (!asset) {
         throw new Error(
-          `No release asset '${target.archiveName}' found for ${repo}@${tag}`,
+          `No release asset '${target.archiveNames.join("' or '")}' found for ${repo}@${tag}`,
         );
       }
       return { release, asset };
