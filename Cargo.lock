@@ -880,6 +880,7 @@ dependencies = [
  "dirs",
  "emojis",
  "env_logger",
+ "globset",
  "ignore",
  "log",
  "predicates",

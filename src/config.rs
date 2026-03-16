@@ -4,7 +4,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use regex::Regex;
+use globset::GlobBuilder;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// The flavor of Markdown to parse and format.
@@ -1894,36 +1894,12 @@ fn pattern_specificity(pattern: &str) -> (usize, usize, usize) {
 }
 
 fn glob_matches_path(pattern: &str, path: &str) -> bool {
-    let regex = glob_pattern_to_regex(pattern);
-    Regex::new(&regex)
-        .map(|compiled| compiled.is_match(path))
+    let normalized_pattern = pattern.replace('\\', "/");
+    GlobBuilder::new(&normalized_pattern)
+        .literal_separator(true)
+        .build()
+        .map(|glob| glob.compile_matcher().is_match(path))
         .unwrap_or(false)
-}
-
-fn glob_pattern_to_regex(pattern: &str) -> String {
-    let mut out = String::from("^");
-    let normalized = pattern.replace('\\', "/");
-    let mut chars = normalized.chars().peekable();
-    while let Some(ch) = chars.next() {
-        match ch {
-            '*' => {
-                if chars.peek() == Some(&'*') {
-                    let _ = chars.next();
-                    out.push_str(".*");
-                } else {
-                    out.push_str("[^/]*");
-                }
-            }
-            '?' => out.push_str("[^/]"),
-            '.' | '+' | '(' | ')' | '|' | '^' | '$' | '{' | '}' | '[' | ']' => {
-                out.push('\\');
-                out.push(ch);
-            }
-            _ => out.push(ch),
-        }
-    }
-    out.push('$');
-    out
 }
 
 #[cfg(test)]
