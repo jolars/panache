@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::metadata::project::{BookdownFiles, read_bookdown_files};
+use regex::Regex;
 use rowan::{NodeOrToken, TextRange};
+use serde::Deserialize;
 
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
@@ -304,6 +306,11 @@ pub fn find_project_documents(
     } else {
         None
     };
+    let quarto_render = if is_bookdown {
+        None
+    } else {
+        read_quarto_render(project_root)
+    };
     let walker = ignore::WalkBuilder::new(project_root).build();
 
     for entry in walker.flatten() {
@@ -331,12 +338,146 @@ pub fn find_project_documents(
         if ext == "md" && !config.extensions.quarto_shortcodes {
             continue;
         }
+        if !is_bookdown && !is_quarto_render_target(path, project_root, quarto_render.as_deref()) {
+            continue;
+        }
         if seen.insert(path.to_path_buf()) {
             docs.push(path.to_path_buf());
         }
     }
 
     docs
+}
+
+#[derive(Debug, Deserialize)]
+struct QuartoProjectConfig {
+    project: Option<QuartoProjectSection>,
+}
+
+#[derive(Debug, Deserialize)]
+struct QuartoProjectSection {
+    render: Option<StringOrVec>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum StringOrVec {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+impl StringOrVec {
+    fn into_vec(self) -> Vec<String> {
+        match self {
+            Self::Single(value) => vec![value],
+            Self::Multiple(values) => values,
+        }
+    }
+}
+
+fn read_quarto_render(project_root: &Path) -> Option<Vec<String>> {
+    let quarto_config = project_root.join("_quarto.yml");
+    if !quarto_config.exists() {
+        return None;
+    }
+    let yaml = std::fs::read_to_string(quarto_config).ok()?;
+    let parsed: QuartoProjectConfig = serde_saphyr::from_str(&yaml).ok()?;
+    parsed.project?.render.map(StringOrVec::into_vec)
+}
+
+fn is_quarto_render_target(path: &Path, root: &Path, render: Option<&[String]>) -> bool {
+    let Some(rel_path) = relative_path_string(path, root) else {
+        return false;
+    };
+    if let Some(patterns) = render {
+        return matches_render_patterns(&rel_path, patterns);
+    }
+    is_default_quarto_target(path, &rel_path)
+}
+
+fn is_default_quarto_target(path: &Path, rel_path: &str) -> bool {
+    if matches!(
+        path.file_name().and_then(|name| name.to_str()),
+        Some("README.md") | Some("README.qmd")
+    ) {
+        return false;
+    }
+    !rel_path
+        .split('/')
+        .any(|component| component.starts_with('.') || component.starts_with('_'))
+}
+
+fn relative_path_string(path: &Path, root: &Path) -> Option<String> {
+    let relative = path.strip_prefix(root).ok()?;
+    let components: Vec<String> = relative
+        .iter()
+        .map(|component| component.to_string_lossy().to_string())
+        .collect();
+    if components.is_empty() {
+        None
+    } else {
+        Some(components.join("/"))
+    }
+}
+
+fn matches_render_patterns(rel_path: &str, patterns: &[String]) -> bool {
+    let mut included = false;
+    for raw_pattern in patterns {
+        let trimmed = raw_pattern.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let (is_exclusion, pattern) = if let Some(pattern) = trimmed.strip_prefix('!') {
+            (true, pattern.trim())
+        } else {
+            (false, trimmed)
+        };
+        if pattern.is_empty() {
+            continue;
+        }
+        if quarto_render_pattern_matches(rel_path, pattern) {
+            included = !is_exclusion;
+        }
+    }
+    included
+}
+
+fn quarto_render_pattern_matches(rel_path: &str, pattern: &str) -> bool {
+    let normalized = pattern.trim_start_matches("./");
+    if let Some(dir) = normalized.strip_suffix('/') {
+        if dir.is_empty() {
+            return false;
+        }
+        return rel_path == dir || rel_path.starts_with(&format!("{dir}/"));
+    }
+    wildcard_match(rel_path, normalized)
+}
+
+fn wildcard_match(path: &str, pattern: &str) -> bool {
+    let mut regex = String::from("^");
+    let mut chars = pattern.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '*' => {
+                if chars.peek() == Some(&'*') {
+                    chars.next();
+                    regex.push_str(".*");
+                } else {
+                    regex.push_str("[^/]*");
+                }
+            }
+            '?' => regex.push_str("[^/]"),
+            '.' | '+' | '(' | ')' | '|' | '^' | '$' | '{' | '}' | '[' | ']' | '\\' => {
+                regex.push('\\');
+                regex.push(ch);
+            }
+            _ => regex.push(ch),
+        }
+    }
+    regex.push('$');
+    Regex::new(&regex)
+        .map(|compiled| compiled.is_match(path))
+        .unwrap_or(false)
 }
 
 fn include_not_found_diagnostic(input: &str, range: TextRange, path: &Path) -> Diagnostic {
@@ -543,6 +684,76 @@ mod tests {
             );
         }
         assert!(definitions.find_reference("ref").is_some());
+    }
+
+    #[test]
+    fn find_project_documents_applies_quarto_default_render_rules() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+        fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+        fs::create_dir_all(root.join("_partials")).unwrap();
+        fs::create_dir_all(root.join(".hidden")).unwrap();
+        fs::write(root.join("doc.qmd"), "# Doc\n").unwrap();
+        fs::write(root.join("README.qmd"), "# Readme\n").unwrap();
+        fs::write(root.join("_partials").join("part.qmd"), "# Part\n").unwrap();
+        fs::write(root.join(".hidden").join("hidden.qmd"), "# Hidden\n").unwrap();
+
+        let docs = find_project_documents(root, &Config::default(), false);
+        assert!(docs.contains(&root.join("doc.qmd")));
+        assert!(!docs.contains(&root.join("README.qmd")));
+        assert!(!docs.contains(&root.join("_partials").join("part.qmd")));
+        assert!(!docs.contains(&root.join(".hidden").join("hidden.qmd")));
+    }
+
+    #[test]
+    fn find_project_documents_applies_quarto_render_patterns() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+        fs::write(
+            root.join("_quarto.yml"),
+            "project:\n  render:\n    - \"*.qmd\"\n    - \"!ignored.qmd\"\n    - \"!ignored-dir/\"\n    - \"nested/kept.qmd\"\n",
+        )
+        .unwrap();
+        fs::create_dir_all(root.join("nested")).unwrap();
+        fs::create_dir_all(root.join("ignored-dir")).unwrap();
+        fs::write(root.join("doc.qmd"), "# Doc\n").unwrap();
+        fs::write(root.join("ignored.qmd"), "# Ignored\n").unwrap();
+        fs::write(root.join("ignored-dir").join("child.qmd"), "# Child\n").unwrap();
+        fs::write(root.join("nested").join("kept.qmd"), "# Kept\n").unwrap();
+
+        let docs = find_project_documents(root, &Config::default(), false);
+        assert!(docs.contains(&root.join("doc.qmd")));
+        assert!(docs.contains(&root.join("nested").join("kept.qmd")));
+        assert!(!docs.contains(&root.join("ignored.qmd")));
+        assert!(!docs.contains(&root.join("ignored-dir").join("child.qmd")));
+    }
+
+    #[test]
+    fn project_graph_excludes_non_render_targets_from_project_documents() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.qmd");
+        let non_rendered = root.join("non-rendered.qmd");
+
+        fs::write(
+            root.join("_quarto.yml"),
+            "project:\n  render:\n    - doc.qmd\n",
+        )
+        .unwrap();
+        fs::write(&doc_path, "See [link][ref].\n").unwrap();
+        fs::write(&non_rendered, "[ref]: https://example.com\n").unwrap();
+
+        let input = fs::read_to_string(&doc_path).unwrap();
+        let config = Config::default();
+        let graph = {
+            let db = crate::salsa::SalsaDb::default();
+            let file = crate::salsa::FileText::new(&db, input.clone());
+            let config_input = crate::salsa::FileConfig::new(&db, config.clone());
+            crate::salsa::project_graph(&db, file, config_input, doc_path.clone()).clone()
+        };
+
+        assert!(graph.documents().contains(&doc_path));
+        assert!(!graph.documents().contains(&non_rendered));
     }
 
     #[test]
