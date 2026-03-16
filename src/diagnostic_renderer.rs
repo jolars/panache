@@ -101,6 +101,20 @@ fn print_source_snippet(
         .path(file_name)
         .annotation(primary);
 
+    let snippet = if diag.code == "heading-hierarchy" {
+        if let Some(context_span) = find_previous_heading_span(source, start) {
+            snippet.annotation(
+                AnnotationKind::Context
+                    .span(context_span)
+                    .label("previous heading is here"),
+            )
+        } else {
+            snippet
+        }
+    } else {
+        snippet
+    };
+
     let title = format!("[{}] {}", diag.code, diag.message);
     let report = &[severity_level(&diag.severity)
         .primary_title(&title)
@@ -126,4 +140,32 @@ fn severity_name(severity: &Severity) -> &'static str {
 
 fn print_subdiag(kind: &str, message: &str) {
     println!("  = {kind}: {message}");
+}
+
+fn find_previous_heading_span(
+    source: &str,
+    before_offset: usize,
+) -> Option<std::ops::Range<usize>> {
+    let mut line_start = 0usize;
+    let mut prev_heading = None;
+
+    for line in source.lines() {
+        let line_end = line_start + line.len();
+        if line_end >= before_offset {
+            break;
+        }
+
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') {
+            let indent = line.len() - trimmed.len();
+            let hashes = trimmed.chars().take_while(|c| *c == '#').count();
+            if hashes > 0 {
+                prev_heading = Some((line_start + indent)..(line_start + indent + hashes));
+            }
+        }
+
+        line_start = line_end + 1;
+    }
+
+    prev_heading
 }

@@ -199,6 +199,7 @@ fn test_lint_stdin_shows_source_snippet() {
         .stdout(predicate::str::contains(
             "help: Change heading level from 3 to 2",
         ))
+        .stdout(predicate::str::contains("previous heading is here"))
         .stdout(predicate::str::contains("3 - ### Subheading").not())
         .stdout(predicate::str::contains("3 + ## Subheading").not());
 }
@@ -215,6 +216,49 @@ fn test_lint_stdin_short_message_format() {
         ))
         .stdout(predicate::str::contains("3 | ### Subheading").not())
         .stdout(predicate::str::contains("= note:").not());
+}
+
+#[test]
+fn test_lint_file_short_message_format() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("short.qmd");
+    fs::write(&test_file, "# Heading\n\n### Subheading\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "lint",
+            "--message-format",
+            "short",
+            "--color",
+            "never",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "warning[heading-hierarchy]: Heading level skipped",
+        ))
+        .stdout(predicate::str::contains("short.qmd:3:1"))
+        .stdout(predicate::str::contains("3 | ### Subheading").not())
+        .stdout(predicate::str::contains("= note:").not());
+}
+
+#[test]
+fn test_lint_short_message_format_preserves_diagnostic_order() {
+    let mut cmd = cargo_bin_cmd!("panache");
+    cmd.args(["lint", "--message-format", "short", "--color", "never"])
+        .write_stdin("# H1\n\n### H3\n\n##### H5\n");
+
+    let output = cmd.output().unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let first = stdout.find("<stdin>:3:1").unwrap();
+    let second = stdout.find("<stdin>:5:1").unwrap();
+    assert!(
+        first < second,
+        "expected diagnostics in source order: {stdout}"
+    );
 }
 
 #[test]
