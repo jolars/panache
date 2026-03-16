@@ -2,12 +2,25 @@
 
 A language server for Pandoc, Quarto, and R Markdown.
 
+## Quick start
+
+1. Install the **Panache** extension.
+2. Open a regular Markdown (`.md`, Pandoc-style), Quarto (`.qmd`), or R Markdown
+   (`.Rmd`, `.rmd`) file.
+3. The extension starts `panache lsp` automatically.
+
+By default, the extension downloads a platform-specific `panache` binary from
+GitHub releases on first use.
+
 ## Features
 
-- Starts `panache lsp` automatically
-- Document formatting via LSP
-- Diagnostics and code actions from Panache
-- Works for Markdown, Quarto (`.qmd`), and R Markdown (`.Rmd`, `.rmd`)
+- Starts `panache lsp` automatically when you open supported documents.
+- Formats documents using Panache's formatter, including Pandoc-style constructs
+  such as fenced divs, tables, math, citations, and attributes.
+- Surfaces Panache diagnostics and code actions in the editor (including
+  auto-fixable lint rules such as heading hierarchy).
+- Works for regular Markdown (`.md`, Pandoc-style), Quarto (`.qmd`), and R
+  Markdown (`.Rmd`, `.rmd`).
 
 ## Binary Installation
 
@@ -23,6 +36,35 @@ You can also provide your own binary path:
 }
 ```
 
+## Common setup examples
+
+Use a local binary and disable downloads:
+
+```json
+{
+  "panache.downloadBinary": false,
+  "panache.commandPath": "/usr/local/bin/panache"
+}
+```
+
+Pin to a specific release from a specific repository:
+
+```json
+{
+  "panache.releaseTag": "v2.20.0",
+  "panache.githubRepo": "jolars/panache"
+}
+```
+
+## Requirements and troubleshooting
+
+- **NixOS**: auto-download is skipped by default unless explicitly configured.
+  Set `panache.commandPath` to your installed binary.
+- **Offline / restricted networks / proxies**: set `panache.downloadBinary` to
+  `false` and provide `panache.commandPath`.
+- If download fails, the extension shows a warning and falls back to
+  `panache.commandPath`.
+
 ## Settings
 
 - `panache.downloadBinary`: auto-download Panache binary (default: `true`)
@@ -32,6 +74,11 @@ You can also provide your own binary path:
 - `panache.serverArgs`: extra args after `panache lsp`
 - `panache.serverEnv`: extra environment variables
 - `panache.trace.server`: LSP trace level (`off`, `messages`, `verbose`)
+
+## Security and trust
+
+When `panache.downloadBinary` is enabled, binaries are downloaded from GitHub
+releases configured by `panache.githubRepo` and `panache.releaseTag`.
 
 ## Links
 
