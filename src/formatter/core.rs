@@ -542,11 +542,12 @@ impl Formatter {
 
                             if !lines.is_empty() {
                                 self.output.push(' ');
-                                self.output.push_str(&lines[0]);
+                                self.output
+                                    .push_str(lines[0].trim_start_matches([' ', '\t']));
                                 self.output.push('\n');
                                 for line in lines.iter().skip(1) {
                                     self.output.push_str(&" ".repeat(child_indent));
-                                    self.output.push_str(line);
+                                    self.output.push_str(line.trim_start_matches([' ', '\t']));
                                     self.output.push('\n');
                                 }
                                 continue;
@@ -568,7 +569,7 @@ impl Formatter {
                                     let text = child.text().to_string();
                                     for line in text.lines() {
                                         self.output.push_str(&" ".repeat(child_indent));
-                                        self.output.push_str(line);
+                                        self.output.push_str(line.trim_start_matches([' ', '\t']));
                                         self.output.push('\n');
                                     }
                                 }
@@ -577,7 +578,7 @@ impl Formatter {
                                         self.wrapped_lines_for_paragraph(child, available_width);
                                     for line in lines {
                                         self.output.push_str(&" ".repeat(child_indent));
-                                        self.output.push_str(&line);
+                                        self.output.push_str(line.trim_start_matches([' ', '\t']));
                                         self.output.push('\n');
                                     }
                                 }
@@ -585,7 +586,7 @@ impl Formatter {
                                     let lines = self.sentence_lines_for_paragraph(child);
                                     for line in lines {
                                         self.output.push_str(&" ".repeat(child_indent));
-                                        self.output.push_str(&line);
+                                        self.output.push_str(line.trim_start_matches([' ', '\t']));
                                         self.output.push('\n');
                                     }
                                 }
