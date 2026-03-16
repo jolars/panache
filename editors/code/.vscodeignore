@@ -1,4 +1,11 @@
-**/*.map
-**/*.ts
+.gitignore
 .vscode/**
+src/**
 tsconfig.json
+package-lock.json
+node_modules/**
+dist/**/*.map
+dist/installer.js
+dist/webExtension.js
+dist/webExtension.js.map
+*.vsix

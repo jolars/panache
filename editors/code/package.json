@@ -94,9 +94,15 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p .",
-    "watch": "tsc -w -p .",
+    "vscode:prepublish": "npm run clean && npm run check-types && npm run bundle:prod",
+    "compile": "npm run clean && npm run check-types && npm run bundle",
+    "clean": "rm -rf dist",
+    "check-types": "tsc --noEmit -p .",
+    "bundle": "esbuild src/extension.ts --bundle --platform=node --target=node20 --format=cjs --sourcemap --external:vscode --outfile=dist/extension.js",
+    "bundle:prod": "esbuild src/extension.ts --bundle --platform=node --target=node20 --format=cjs --minify --external:vscode --outfile=dist/extension.js",
+    "watch": "npm-run-all -p watch:esbuild watch:tsc",
+    "watch:esbuild": "esbuild src/extension.ts --bundle --platform=node --target=node20 --format=cjs --sourcemap --watch --external:vscode --outfile=dist/extension.js",
+    "watch:tsc": "tsc --noEmit -w -p .",
     "package": "vsce package"
   },
   "dependencies": {
@@ -109,6 +115,8 @@
     "@types/node": "^25.5.0",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.0",
+    "npm-run-all": "^4.1.5",
     "typescript": "^5.8.2"
   }
 }
