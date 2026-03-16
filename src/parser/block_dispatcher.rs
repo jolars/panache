@@ -18,8 +18,8 @@ use super::blocks::blockquotes::{
     strip_n_blockquote_markers,
 };
 use super::blocks::code_blocks::{
-    CodeBlockType, FenceInfo, InfoString, is_closing_fence, parse_fenced_code_block,
-    try_parse_fence_open,
+    CodeBlockType, FenceInfo, InfoString, is_closing_fence, is_gfm_math_fence,
+    parse_fenced_code_block, parse_fenced_math_block, try_parse_fence_open,
 };
 use super::blocks::definition_lists::{
     next_line_is_definition_marker, try_parse_definition_marker,
@@ -1285,15 +1285,27 @@ impl BlockParser for FencedCodeBlockParser {
         // Calculate total indent: base content indent + list indent
         let total_indent = ctx.content_indent + list_indent_stripped;
 
-        let new_pos = parse_fenced_code_block(
-            builder,
-            lines,
-            line_pos,
-            fence,
-            ctx.blockquote_depth,
-            total_indent,
-            None,
-        );
+        let new_pos = if ctx.config.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
+            parse_fenced_math_block(
+                builder,
+                lines,
+                line_pos,
+                fence,
+                ctx.blockquote_depth,
+                total_indent,
+                None,
+            )
+        } else {
+            parse_fenced_code_block(
+                builder,
+                lines,
+                line_pos,
+                fence,
+                ctx.blockquote_depth,
+                total_indent,
+                None,
+            )
+        };
 
         new_pos - line_pos
     }

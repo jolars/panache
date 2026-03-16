@@ -967,6 +967,24 @@ mod extension_guard_tests {
     }
 
     #[test]
+    fn tex_math_gfm_enabled_parses_backtick_dollar_inline_math() {
+        let mut config = Config::default();
+        config.extensions.tex_math_dollars = false;
+        config.extensions.tex_math_gfm = true;
+        let tree = parse_with_config("$`x^2`$", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_MATH), 1);
+    }
+
+    #[test]
+    fn tex_math_gfm_disabled_keeps_backtick_dollar_inline_literal() {
+        let mut config = Config::default();
+        config.extensions.tex_math_dollars = false;
+        config.extensions.tex_math_gfm = false;
+        let tree = parse_with_config("$`x^2`$", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_MATH), 0);
+    }
+
+    #[test]
     fn all_symbols_escapable_disabled_stops_symbol_escapes() {
         let mut config = Config::default();
         config.extensions.all_symbols_escapable = false;

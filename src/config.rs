@@ -152,6 +152,9 @@ pub struct Extensions {
     /// Dollar-delimited math $x$ and $$equation$$
     #[serde(alias = "tex_math_dollars")]
     pub tex_math_dollars: bool,
+    /// [NON-DEFAULT] GFM math: inline $`...`$ and fenced ``` math blocks
+    #[serde(alias = "tex_math_gfm")]
+    pub tex_math_gfm: bool,
     /// [NON-DEFAULT] Single backslash math \(...\) and \[...\] (RMarkdown default)
     #[serde(alias = "tex_math_single_backslash")]
     pub tex_math_single_backslash: bool,
@@ -281,6 +284,7 @@ impl Extensions {
             inline_images: false,
             implicit_figures: false,
             tex_math_dollars: false,
+            tex_math_gfm: false,
             tex_math_single_backslash: false,
             tex_math_double_backslash: false,
             inline_footnotes: false,
@@ -375,6 +379,7 @@ impl Extensions {
 
             // Math
             tex_math_dollars: true,
+            tex_math_gfm: false,
             tex_math_single_backslash: false,
             tex_math_double_backslash: false,
 
@@ -454,6 +459,7 @@ impl Extensions {
         ext.yaml_metadata_block = true;
         ext.footnotes = true;
         ext.tex_math_dollars = true;
+        ext.tex_math_gfm = true;
         ext.alerts = true;
 
         ext
@@ -2480,6 +2486,12 @@ mod tests {
     }
 
     #[test]
+    fn tex_math_gfm_enabled_by_default_for_gfm() {
+        let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
+        assert!(cfg.extensions.tex_math_gfm);
+    }
+
+    #[test]
     fn gfm_disables_non_gfm_pandoc_extensions() {
         let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
         assert!(!cfg.extensions.citations);
@@ -3138,11 +3150,13 @@ fn test_snake_case_alias_backwards_compat() {
             [extensions]
             quarto_crossrefs = false
             tex_math_dollars = true
+            tex_math_gfm = true
         "#;
     let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
     assert!(!cfg.extensions.quarto_crossrefs);
     assert!(cfg.extensions.tex_math_dollars);
+    assert!(cfg.extensions.tex_math_gfm);
 }
 
 #[test]
@@ -3154,11 +3168,13 @@ fn test_kebab_case_new_format() {
             [extensions]
             quarto-crossrefs = false
             tex-math-dollars = true
+            tex-math-gfm = true
         "#;
     let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
     assert!(!cfg.extensions.quarto_crossrefs);
     assert!(cfg.extensions.tex_math_dollars);
+    assert!(cfg.extensions.tex_math_gfm);
 }
 
 #[test]

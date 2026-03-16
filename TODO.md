@@ -389,7 +389,7 @@ for initial implementation.
       enabled for RMarkdown)
 - [x] Extension: `tex_math_double_backslash` - `\\( \\)` and `\\[ \\]`
       (non-default)
-- [ ] Extension: `tex_math_gfm` - GitHub Flavored Markdown math (non-default)
+- [x] Extension: `tex_math_gfm` - GitHub Flavored Markdown math (non-default)
 
 #### Non-Default: Metadata
 

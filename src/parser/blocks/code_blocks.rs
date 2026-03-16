@@ -442,6 +442,10 @@ pub(crate) struct FenceInfo {
     pub info_string: String,
 }
 
+pub(crate) fn is_gfm_math_fence(fence: &FenceInfo) -> bool {
+    fence.info_string.trim() == "math"
+}
+
 /// Try to detect a fenced code block opening from content.
 /// Returns fence info if this is a valid opening fence.
 pub(crate) fn try_parse_fence_open(content: &str) -> Option<FenceInfo> {
@@ -1181,6 +1185,137 @@ pub(crate) fn parse_fenced_code_block(
 
     builder.finish_node(); // CodeBlock
 
+    current_pos
+}
+
+/// Parse a GFM math fence (``` math ... ```) as DISPLAY_MATH while preserving bytes.
+pub(crate) fn parse_fenced_math_block(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    start_pos: usize,
+    fence: FenceInfo,
+    bq_depth: usize,
+    base_indent: usize,
+    first_line_override: Option<&str>,
+) -> usize {
+    builder.start_node(SyntaxKind::DISPLAY_MATH.into());
+
+    let (first_trimmed, _first_inner) = prepare_fence_open_line(
+        builder,
+        lines[start_pos],
+        first_line_override,
+        bq_depth,
+        base_indent,
+    );
+    let (opening_without_newline, opening_newline) = strip_newline(first_trimmed);
+    builder.token(
+        SyntaxKind::DISPLAY_MATH_MARKER.into(),
+        opening_without_newline,
+    );
+    if !opening_newline.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), opening_newline);
+    }
+
+    let mut current_pos = start_pos + 1;
+    let mut content_lines: Vec<&str> = Vec::new();
+    let mut found_closing = false;
+
+    while current_pos < lines.len() {
+        let line = lines[current_pos];
+        let (line_bq_depth, _) = count_blockquote_markers(line);
+        if line_bq_depth < bq_depth {
+            break;
+        }
+
+        let inner = if bq_depth > 0 {
+            strip_n_blockquote_markers(line, bq_depth)
+        } else {
+            line
+        };
+        let base_indent_bytes = byte_index_at_column(inner, base_indent);
+        let inner_stripped = if base_indent > 0 && inner.len() >= base_indent_bytes {
+            &inner[base_indent_bytes..]
+        } else {
+            inner
+        };
+
+        if is_closing_fence(inner_stripped, &fence) {
+            found_closing = true;
+            current_pos += 1;
+            break;
+        }
+
+        content_lines.push(line);
+        current_pos += 1;
+    }
+
+    if !content_lines.is_empty() {
+        let mut content = String::new();
+        for content_line in content_lines {
+            let after_indent =
+                emit_content_line_prefixes(builder, content_line, bq_depth, base_indent);
+            let (line_without_newline, newline_str) = strip_newline(after_indent);
+            content.push_str(line_without_newline);
+            content.push_str(newline_str);
+        }
+        builder.token(SyntaxKind::TEXT.into(), &content);
+    }
+
+    if found_closing {
+        let closing_line = lines[current_pos - 1];
+        let closing_after_blockquote = if bq_depth > 0 {
+            let stripped = strip_n_blockquote_markers(closing_line, bq_depth);
+            let prefix_len = closing_line.len().saturating_sub(stripped.len());
+            if prefix_len > 0 {
+                emit_blockquote_prefix_tokens(builder, &closing_line[..prefix_len]);
+            }
+            stripped
+        } else {
+            closing_line
+        };
+
+        let base_indent_bytes = byte_index_at_column(closing_after_blockquote, base_indent);
+        if base_indent > 0 && closing_after_blockquote.len() >= base_indent_bytes {
+            let indent_str = &closing_after_blockquote[..base_indent_bytes];
+            if !indent_str.is_empty() {
+                builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
+            }
+        }
+
+        let closing_stripped =
+            if base_indent > 0 && closing_after_blockquote.len() >= base_indent_bytes {
+                &closing_after_blockquote[base_indent_bytes..]
+            } else {
+                closing_after_blockquote
+            };
+        let (closing_without_newline, newline_str) = strip_newline(closing_stripped);
+        let closing_trimmed_start = strip_leading_spaces(closing_without_newline);
+        let leading_ws_len = closing_without_newline.len() - closing_trimmed_start.len();
+        let closing_count = closing_trimmed_start
+            .chars()
+            .take_while(|&c| c == fence.fence_char)
+            .count();
+        let trailing_after_marker = &closing_trimmed_start[closing_count..];
+
+        if leading_ws_len > 0 {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &closing_without_newline[..leading_ws_len],
+            );
+        }
+        builder.token(
+            SyntaxKind::DISPLAY_MATH_MARKER.into(),
+            &closing_trimmed_start[..closing_count],
+        );
+        if !trailing_after_marker.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), trailing_after_marker);
+        }
+        if !newline_str.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+        }
+    }
+
+    builder.finish_node(); // DisplayMath
     current_pos
 }
 

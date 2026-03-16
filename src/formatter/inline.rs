@@ -270,6 +270,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         }
                     } else {
                         match original_marker.as_str() {
+                            "$`" => ("$`", "`$"),
                             r"\(" => (r"\(", r"\)"),
                             r"\\(" => (r"\\(", r"\\)"),
                             _ => ("$", "$"), // Default to $

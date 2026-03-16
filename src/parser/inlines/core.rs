@@ -48,11 +48,11 @@ use super::links::{
 };
 use super::math::{
     emit_display_math, emit_display_math_environment, emit_double_backslash_display_math,
-    emit_double_backslash_inline_math, emit_inline_math, emit_single_backslash_display_math,
-    emit_single_backslash_inline_math, try_parse_display_math,
+    emit_double_backslash_inline_math, emit_gfm_inline_math, emit_inline_math,
+    emit_single_backslash_display_math, emit_single_backslash_inline_math, try_parse_display_math,
     try_parse_double_backslash_display_math, try_parse_double_backslash_inline_math,
-    try_parse_inline_math, try_parse_math_environment, try_parse_single_backslash_display_math,
-    try_parse_single_backslash_inline_math,
+    try_parse_gfm_inline_math, try_parse_inline_math, try_parse_math_environment,
+    try_parse_single_backslash_display_math, try_parse_single_backslash_inline_math,
 };
 use super::native_spans::{emit_native_span, try_parse_native_span};
 use super::raw_inline::is_raw_inline;
@@ -1365,6 +1365,21 @@ fn parse_inline_range_impl(
             }
             log::debug!("Matched strikeout at pos {}", pos);
             emit_strikeout(builder, content, config);
+            pos += len;
+            text_start = pos;
+            continue;
+        }
+
+        // Try GFM inline math: $`...`$
+        if byte == b'$'
+            && config.extensions.tex_math_gfm
+            && let Some((len, content)) = try_parse_gfm_inline_math(&text[pos..])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            log::debug!("Matched GFM inline math at pos {}", pos);
+            emit_gfm_inline_math(builder, content);
             pos += len;
             text_start = pos;
             continue;

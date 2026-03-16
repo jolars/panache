@@ -653,15 +653,29 @@ impl<'a> Parser<'a> {
                                 .token(SyntaxKind::WHITESPACE.into(), indent_str);
                         }
                         let fence_line = current_line[content_start..].to_string();
-                        let new_pos = code_blocks::parse_fenced_code_block(
-                            &mut self.builder,
-                            &self.lines,
-                            self.pos,
-                            fence,
-                            bq_depth,
-                            content_col,
-                            Some(&fence_line),
-                        );
+                        let new_pos = if self.config.extensions.tex_math_gfm
+                            && code_blocks::is_gfm_math_fence(&fence)
+                        {
+                            code_blocks::parse_fenced_math_block(
+                                &mut self.builder,
+                                &self.lines,
+                                self.pos,
+                                fence,
+                                bq_depth,
+                                content_col,
+                                Some(&fence_line),
+                            )
+                        } else {
+                            code_blocks::parse_fenced_code_block(
+                                &mut self.builder,
+                                &self.lines,
+                                self.pos,
+                                fence,
+                                bq_depth,
+                                content_col,
+                                Some(&fence_line),
+                            )
+                        };
                         self.pos = new_pos - 1;
                     } else {
                         let (_, newline_str) = strip_newline(current_line);

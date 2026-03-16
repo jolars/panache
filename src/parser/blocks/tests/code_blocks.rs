@@ -437,6 +437,19 @@ fn raw_attribute_respects_extension_guard_for_fenced_code() {
     );
 }
 
+#[test]
+fn tex_math_gfm_parses_math_fence_as_display_math() {
+    let input = "``` math\nx + y\n```\n";
+    let mut config = Config::default();
+    config.extensions.tex_math_gfm = true;
+
+    let tree = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&tree, SyntaxKind::DISPLAY_MATH).is_some(),
+        "tex_math_gfm enabled should parse ``` math fences as display math"
+    );
+}
+
 // Indented code block tests
 
 #[test]

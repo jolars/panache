@@ -1575,6 +1575,7 @@ impl Formatter {
                             }
                         } else {
                             match original_marker.as_str() {
+                                "$`" => ("$`", "`$"),
                                 r"\(" => (r"\(", r"\)"),
                                 r"\\(" => (r"\\(", r"\\)"),
                                 _ => ("$", "$"), // Default to $

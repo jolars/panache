@@ -79,6 +79,38 @@ pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
     None
 }
 
+/// Try to parse GFM inline math: $`...`$
+/// Extension: tex_math_gfm
+pub fn try_parse_gfm_inline_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with("$`") {
+        return None;
+    }
+
+    let rest = &text[2..];
+    if rest.is_empty() {
+        return None;
+    }
+
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+        if ch == '\n' {
+            return None;
+        }
+        if rest[pos..].starts_with("`$") {
+            if pos == 0 {
+                return None;
+            }
+            let math_content = &rest[..pos];
+            let total_len = 2 + pos + 2; // $` + content + `$
+            return Some((total_len, math_content));
+        }
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
 /// Try to parse single backslash inline math: \(...\)
 /// Extension: tex_math_single_backslash
 pub fn try_parse_single_backslash_inline_math(text: &str) -> Option<(usize, &str)> {
@@ -314,6 +346,15 @@ pub fn emit_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
     // Closing $
     builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "$");
 
+    builder.finish_node();
+}
+
+/// Emit a GFM inline math node: $`...`$
+pub fn emit_gfm_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::INLINE_MATH.into());
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "$`");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "`$");
     builder.finish_node();
 }
 

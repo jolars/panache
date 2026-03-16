@@ -433,12 +433,17 @@ implicit-figures = true
 ```toml
 [extensions]
 tex-math-dollars = true
+tex-math-gfm = false
 tex-math-single-backslash = false
 tex-math-double-backslash = false
 ```
 
 `tex-math-dollars`
 :   Dollar-delimited math `$x$` and `$$equation$$` (default: enabled)
+
+`tex-math-gfm`
+:   GFM math: inline `$`...`$` and fenced ```` ``` math ```` blocks (default:
+    disabled, enabled for GFM flavor)
 
 `tex-math-single-backslash`
 :   Single backslash math `\(...\)` and `\[...\]` (default: disabled, enabled
