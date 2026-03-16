@@ -11,11 +11,6 @@ Code](https://img.shields.io/visual-studio-marketplace/v/jolars.panache?label=vs
 
 A language server, formatter, and linter for Pandoc, Quarto, and R Markdown.
 
-## Work in Progress
-
-This project is in early development. Expect bugs, missing features, and
-breaking changes.
-
 ## Installation
 
 ### From crates.io
