@@ -2,7 +2,7 @@ name: Update AUR
 
 on:
   workflow_run:
-    workflows: ["Build Release Binaries"]
+    workflows: ["Release"]
     types:
       - completed
   workflow_dispatch:
