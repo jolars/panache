@@ -1,8 +1,7 @@
 name: Build Release Binaries
 
 on:
-  release:
-    types: [published]
+  workflow_call:
   workflow_dispatch:
     inputs:
       upload:
@@ -106,7 +105,6 @@ jobs:
           Remove-Item -Recurse -Force dist
 
       - name: Upload artifact (for testing)
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
         with:
           name: panache-${{ matrix.target }}
@@ -115,8 +113,7 @@ jobs:
             panache-${{ matrix.target }}.zip
 
       - name: Upload binary to release
-        if: github.event_name == 'release' || (github.event_name ==
-          'workflow_dispatch' && inputs.upload == 'true')
+        if: github.event_name == 'workflow_dispatch' && inputs.upload == 'true'
         shell: bash
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
@@ -148,24 +145,21 @@ jobs:
           cargo generate-rpm --target ${{ matrix.target }}
 
       - name: Upload DEB artifact (for testing)
-        if: matrix.build_packages == true && github.event_name ==
-          'workflow_dispatch'
+        if: matrix.build_packages == true
         run: |
           DEB_FILE=$(ls target/${{ matrix.target }}/debian/*.deb)
           cp "$DEB_FILE" .
         continue-on-error: true
 
       - name: Upload RPM artifact (for testing)
-        if: matrix.build_packages == true && github.event_name ==
-          'workflow_dispatch'
+        if: matrix.build_packages == true
         run: |
           RPM_FILE=$(ls target/${{ matrix.target }}/generate-rpm/*.rpm)
           cp "$RPM_FILE" .
         continue-on-error: true
 
       - name: Upload package artifacts
-        if: matrix.build_packages == true && github.event_name ==
-          'workflow_dispatch'
+        if: matrix.build_packages == true
         uses: actions/upload-artifact@v7
         with:
           name: panache-packages-${{ matrix.target }}
@@ -174,8 +168,7 @@ jobs:
             *.rpm
 
       - name: Upload DEB package
-        if: matrix.build_packages == true && (github.event_name == 'release' ||
-          (github.event_name == 'workflow_dispatch' && inputs.upload == 'true'))
+        if: matrix.build_packages == true && github.event_name == 'workflow_dispatch' && inputs.upload == 'true'
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           DEB_FILE=$(ls target/${{ matrix.target }}/debian/*.deb)
@@ -184,8 +177,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload RPM package
-        if: matrix.build_packages == true && (github.event_name == 'release' ||
-          (github.event_name == 'workflow_dispatch' && inputs.upload == 'true'))
+        if: matrix.build_packages == true && github.event_name == 'workflow_dispatch' && inputs.upload == 'true'
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           RPM_FILE=$(ls target/${{ matrix.target }}/generate-rpm/*.rpm)

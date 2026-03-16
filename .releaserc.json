@@ -46,13 +46,6 @@
     ],
     "semantic-release-cargo",
     [
-      "semantic-release-vsce",
-      {
-        "packageVsix": true,
-        "packageRoot": "editors/code"
-      }
-    ],
-    [
       "@semantic-release/git",
       {
         "message": "chore(release): release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
@@ -71,9 +64,25 @@
       {
         "assets": [
           {
-            "path": "editors/code/*.vsix"
+            "path": "release-assets/*.tar.gz"
+          },
+          {
+            "path": "release-assets/*.zip"
+          },
+          {
+            "path": "release-assets/*.deb"
+          },
+          {
+            "path": "release-assets/*.rpm"
           }
         ]
+      }
+    ],
+    [
+      "semantic-release-vsce",
+      {
+        "packageVsix": true,
+        "packageRoot": "editors/code"
       }
     ]
   ],

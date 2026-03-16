@@ -16,9 +16,14 @@ jobs:
       pages: write
       id-token: write
 
+  build-release-assets:
+    uses: ./.github/workflows/packages.yml
+    permissions:
+      contents: read
+
   release:
     name: Release
-    needs: build-and-test
+    needs: [build-and-test, build-release-assets]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -37,6 +42,13 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: panache-*
+          merge-multiple: true
+          path: release-assets
 
       - run: npm ci --prefix editors/code --no-audit --no-fund
 
