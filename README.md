@@ -45,7 +45,7 @@ curl --proto '=https' --tlsv1.2 -LsSf \
 For Windows PowerShell:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "iwr https://github.com/jolars/panache/releases/latest/download/panache-installer.ps1 | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://github.com/jolars/panache/releases/latest/download/panache-installer.ps1 | iex"
 ```
 
 ### Arch Linux
