@@ -306,12 +306,21 @@ Instead of listing every file, understand the patterns:
 - `cli/`: CLI integration tests
 - `format/`: Feature-specific unit tests
 
+**Editor extension** (`editors/code/`):
+
+- VS Code extension that launches `panache lsp`
+- Includes binary download/install logic and extension settings wiring
+- Build/package via `npm run compile` and `npm run package` in `editors/code/`
+
 **Path-specific Copilot instructions** (`.github/instructions/`):
 
 - `parser.instructions.md`: parser + syntax guidance
 - `formatter.instructions.md`: formatter + golden expected guidance
 - `lsp.instructions.md`: LSP + LSP test guidance
 - `integration-tests.instructions.md`: integration test guidance
+- `linter.instructions.md`: linter + diagnostics guidance
+- `config.instructions.md`: configuration/defaults/deprecation guidance
+- `vscode-extension.instructions.md`: VS Code extension guidance
 
 ## Important Development Rules
 
@@ -364,6 +373,8 @@ Instead of listing every file, understand the patterns:
 - **Documentation site**: `docs/` (Quarto-based, published to GitHub Pages)
 - **Playground**: `docs/playground/` (WASM-based web interface)
 - **WASM crate**: `crates/panache-wasm/` for browser integration
+- **VS Code extension**: `editors/code/` (publishes editor integration that runs
+  `panache lsp`)
 
 ## Public API (`src/lib.rs`)
 
