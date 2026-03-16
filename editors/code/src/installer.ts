@@ -47,6 +47,9 @@ function detectTargetAsset(): TargetAsset {
   if (process.platform === "win32" && process.arch === "x64") {
     return { archiveName: "panache-x86_64-pc-windows-msvc.zip", binaryName };
   }
+  if (process.platform === "win32" && process.arch === "arm64") {
+    return { archiveName: "panache-aarch64-pc-windows-msvc.zip", binaryName };
+  }
   throw new Error(`Unsupported platform: ${process.platform}-${process.arch}`);
 }
 

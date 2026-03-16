@@ -52,6 +52,11 @@ jobs:
             os: windows-latest
             build_packages: false
 
+          # Windows ARM64
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+            build_packages: false
+
     steps:
       - uses: actions/checkout@v6
         with:
