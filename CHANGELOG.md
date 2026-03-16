@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.21.0](https://github.com/jolars/panache/compare/v2.20.0...v2.21.0) (2026-03-16)
+
+### Features
+
+* build binaries for linux musl too ([d6ada87](https://github.com/jolars/panache/commit/d6ada875d04cd2152142300b29570a7439420851))
+* build binaries for windows arm too ([05f8c46](https://github.com/jolars/panache/commit/05f8c460137e4536e8d0638add505a22c4b787a6))
+* **cli:** add `--message-format <fmt>` for linter ([2eafc8c](https://github.com/jolars/panache/commit/2eafc8c7091bf80d234d970ca07323ad273688c9))
+* **config:** add `[format]` as replacement for `[style]` ([c86ef90](https://github.com/jolars/panache/commit/c86ef90eef1cb55028d80e6029385b328782dd84))
+* **config:** add include, exclude, extend-include/exclude ([0d3a05e](https://github.com/jolars/panache/commit/0d3a05ed48755d0b4a760b8ac9624add508cea55)), closes [#71](https://github.com/jolars/panache/issues/71)
+* **config:** expose `auto-identifiers` extension ([bdf0081](https://github.com/jolars/panache/commit/bdf0081912a53a37bf7da45fe15e8671f148c01e))
+* **config:** move rules to `[lint.rules]` category ([6fc9ade](https://github.com/jolars/panache/commit/6fc9ade2a56565172269afbd6db9b336f3517470))
+* **formatter:** drop blanklines at start of document ([e784c3d](https://github.com/jolars/panache/commit/e784c3de6eb5fcd15ba9edb5d6978ee3d9dd99e8))
+* **formatter:** remove code block config options ([3dd5846](https://github.com/jolars/panache/commit/3dd5846a47ed94f92771a78728d97045a4292515))
+* **linter:** add contextual hint for heading hierarchy lint ([1ce7a18](https://github.com/jolars/panache/commit/1ce7a1870f8297ba931486a292c2e803fce18195))
+* **linter:** improve lint display ([bd74591](https://github.com/jolars/panache/commit/bd74591473d60dff422d54f56ba7f59f7191c912))
+* **lsp:** adapt project graphs to `project.render` settings ([be63ee9](https://github.com/jolars/panache/commit/be63ee9aefefd73b6f59ae45a2be23f7914430dc))
+* **parser,linter:** add support for github emojis `:smile:` ([116fad2](https://github.com/jolars/panache/commit/116fad2effc0829d6af1a7575c5861ee321760a9))
+
+### Bug Fixes
+
+* **config:** correctly align GFM flavor with Pandoc ([7f151f8](https://github.com/jolars/panache/commit/7f151f87f012de7edbcd73a275c0f05e16fd358a))
+* exclude release-assets from crate package to prevent crates.io 413 error ([#77](https://github.com/jolars/panache/issues/77)) ([34d8196](https://github.com/jolars/panache/commit/34d8196f1ecb4e57a1760e092051894ad57c02a9))
+* fix problem with `--force-exclude` ([f77b670](https://github.com/jolars/panache/commit/f77b670f1fc8829c84de96823f3562513b1fecb8))
+* fix relative path from root issue on macos ([22470ab](https://github.com/jolars/panache/commit/22470aba892160d6141999a120d7dcf783c77aab))
+* **parser:** add multiple missing extensions guards ([b8e2e37](https://github.com/jolars/panache/commit/b8e2e37157058359412be47d8bfa006e8c6f7bd8))
+
+### Performance Improvements
+
+* **editors:** bundle vsix extension and use esbuild ([815635c](https://github.com/jolars/panache/commit/815635cf393581a72bba07ff9f486f0263e70c57))
+
 ## [2.20.0](https://github.com/jolars/panache/compare/v2.19.0...v2.20.0) (2026-03-13)
 
 ### Features
