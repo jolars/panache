@@ -50,6 +50,11 @@ jobs:
           merge-multiple: true
           path: target/release-assets
 
+      - name: Stage installer scripts
+        run: |
+          cp scripts/panache-installer.sh target/release-assets/panache-installer.sh
+          cp scripts/panache-installer.ps1 target/release-assets/panache-installer.ps1
+
       - run: npm ci --prefix editors/code --no-audit --no-fund
 
       - run: npm audit signatures --prefix editors/code

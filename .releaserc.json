@@ -74,6 +74,12 @@
           },
           {
             "path": "target/release-assets/*.rpm"
+          },
+          {
+            "path": "target/release-assets/panache-installer.sh"
+          },
+          {
+            "path": "target/release-assets/panache-installer.ps1"
           }
         ]
       }

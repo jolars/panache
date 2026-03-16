@@ -29,6 +29,25 @@ page](https://github.com/jolars/panache/releases) for Linux, macOS, and Windows.
 For Linux, packages are available for generic distributions (tarballs) as well
 as Debian/Ubuntu (`.deb`) and Fedora/RHEL/openSUSE (`.rpm`).
 
+If you prefer a one-liner installer that picks the right release artifact for
+your platform, you can use the installer scripts below. These scripts download
+from this repository's latest GitHub release and install to a user-local
+directory by default. If you prefer, download and inspect the script before
+running it.
+
+For macOS and Linux:
+
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf \
+    https://github.com/jolars/panache/releases/latest/download/panache-installer.sh | sh
+```
+
+For Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iwr https://github.com/jolars/panache/releases/latest/download/panache-installer.ps1 | iex"
+```
+
 ### Arch Linux
 
 There is also an Arch Linux package available in the AUR:
