@@ -49,6 +49,21 @@ Panache is available in the Arch User Repository (AUR):
 yay -S panache-bin
 ```
 
+### Nix OS
+
+Panache is available in NixOS via the `panache` package in `nixpkgs`. To add it
+to your system configuration, include it in the `environment.systemPackages`:
+
+```nix
+{ pkgs, ... }:
+
+{
+  environment.systemPackages = [
+    pkgs.panache
+  ];
+}
+```
+
 ### From Source
 
 Clone the repository and build:

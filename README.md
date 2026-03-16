@@ -38,6 +38,21 @@ There is also an Arch Linux package available in the AUR:
 yay -S panache-bin # or your preferred AUR helper
 ```
 
+### NixOS
+
+Panache is available in NixOS via the `panache` package in `nixpkgs`. To add it
+to your system configuration, include it in the `environment.systemPackages`:
+
+```nix
+{ pkgs, ... }:
+
+{
+  environment.systemPackages = [
+    pkgs.panache
+  ];
+}
+```
+
 ### VS Code Extension
 
 If you are running VS Code or an editor that supports VS Code extensions (like
