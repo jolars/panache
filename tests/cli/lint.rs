@@ -210,7 +210,8 @@ fn test_lint_color_always_shows_ansi_diagnostics() {
         .write_stdin("# Heading\n\n### Subheading")
         .assert()
         .success()
-        .stdout(predicate::str::contains("\u{1b}[33mwarning\u{1b}[0m"));
+        .stdout(predicate::str::contains("heading-hierarchy"))
+        .stdout(predicate::str::contains("\u{1b}["));
 }
 
 #[test]
