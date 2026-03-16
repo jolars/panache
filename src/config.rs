@@ -4,6 +4,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// The flavor of Markdown to parse and format.
@@ -960,6 +961,8 @@ struct RawConfig {
     include: Option<Vec<String>>,
     #[serde(default)]
     extend_include: Vec<String>,
+    #[serde(default)]
+    flavor_overrides: HashMap<String, Flavor>,
 }
 
 fn default_line_width() -> usize {
@@ -1014,6 +1017,7 @@ pub const DEFAULT_EXCLUDE_PATTERNS: &[&str] = &[
 
 pub const DEFAULT_INCLUDE_PATTERNS: &[&str] =
     &["*.md", "*.qmd", "*.Rmd", "*.markdown", "*.mdown", "*.mkd"];
+const MARKDOWN_FAMILY_EXTENSIONS: &[&str] = &["md", "markdown", "mdown", "mkd"];
 
 /// Resolve a single formatter name to a FormatterConfig.
 ///
@@ -1238,6 +1242,7 @@ impl RawConfig {
             extend_exclude: self.extend_exclude,
             include: self.include,
             extend_include: self.extend_include,
+            flavor_overrides: self.flavor_overrides,
         }
     }
 }
@@ -1446,6 +1451,7 @@ pub struct Config {
     pub extend_exclude: Vec<String>,
     pub include: Option<Vec<String>>,
     pub extend_include: Vec<String>,
+    pub flavor_overrides: HashMap<String, Flavor>,
 }
 
 impl<'de> Deserialize<'de> for Config {
@@ -1481,6 +1487,7 @@ impl Default for Config {
             extend_exclude: Vec::new(),
             include: None,
             extend_include: Vec::new(),
+            flavor_overrides: HashMap::new(),
         }
     }
 }
@@ -1755,10 +1762,12 @@ fn xdg_config_path() -> Option<PathBuf> {
 /// Flavor detection logic (when input_file is provided):
 /// - .qmd files: Always use Quarto flavor
 /// - .Rmd files: Always use RMarkdown flavor
-/// - .md files: Use `flavor` from config (defaults to Pandoc)
+/// - Markdown-family files (.md/.markdown/.mdown/.mkd): Use most-specific
+///   `flavor-overrides` match when provided, else use `flavor` from config
 /// - Other extensions: Use `flavor` from config
 ///
-/// The `flavor` config field determines the default flavor for .md files and stdin.
+/// The `flavor` config field determines the default flavor for stdin and files
+/// without a matching extension override.
 pub fn load(
     explicit: Option<&Path>,
     start_dir: &Path,
@@ -1780,35 +1789,141 @@ pub fn load(
         (Config::default(), None)
     };
 
-    // Detect flavor from file extension
-    if let Some(input_path) = input_file
-        && let Some(ext) = input_path.extension().and_then(|e| e.to_str())
-    {
-        let detected_flavor = match ext.to_lowercase().as_str() {
-            "qmd" => {
-                log::debug!("Using Quarto flavor for .qmd file");
-                Some(Flavor::Quarto)
-            }
-            "rmd" => {
-                log::debug!("Using RMarkdown flavor for .Rmd file");
-                Some(Flavor::RMarkdown)
-            }
-            "md" => {
-                // For .md files, use the flavor from config
-                log::debug!("Using {:?} flavor for .md file (from config)", cfg.flavor);
-                Some(cfg.flavor)
-            }
-            _ => None,
-        };
-
-        if let Some(flavor) = detected_flavor {
-            cfg.flavor = flavor;
-            // Update extensions to match the detected flavor
-            cfg.extensions = Extensions::for_flavor(flavor);
-        }
+    if let Some(flavor) = detect_flavor(input_file, cfg_path.as_deref(), &cfg) {
+        cfg.flavor = flavor;
+        cfg.extensions = Extensions::for_flavor(flavor);
     }
 
     Ok((cfg, cfg_path))
+}
+
+fn detect_flavor(
+    input_file: Option<&Path>,
+    cfg_path: Option<&Path>,
+    cfg: &Config,
+) -> Option<Flavor> {
+    let input_path = input_file?;
+    let ext = input_path.extension().and_then(|e| e.to_str())?;
+    let ext_lower = ext.to_lowercase();
+
+    match ext_lower.as_str() {
+        "qmd" => {
+            log::debug!("Using Quarto flavor for .qmd file");
+            Some(Flavor::Quarto)
+        }
+        "rmd" => {
+            log::debug!("Using RMarkdown flavor for .Rmd file");
+            Some(Flavor::RMarkdown)
+        }
+        _ if MARKDOWN_FAMILY_EXTENSIONS.contains(&ext_lower.as_str()) => {
+            let base_dir = cfg_path.and_then(Path::parent);
+            let override_flavor =
+                detect_flavor_override(input_path, base_dir, &cfg.flavor_overrides);
+            let final_flavor = override_flavor.unwrap_or(cfg.flavor);
+            if let Some(flavor) = override_flavor {
+                log::debug!(
+                    "Using {:?} flavor for {} (matched flavor-overrides)",
+                    flavor,
+                    input_path.display()
+                );
+            } else {
+                log::debug!(
+                    "Using {:?} flavor for {} (from config)",
+                    final_flavor,
+                    input_path.display()
+                );
+            }
+            Some(final_flavor)
+        }
+        _ => None,
+    }
+}
+
+fn detect_flavor_override(
+    input_path: &Path,
+    base_dir: Option<&Path>,
+    overrides: &HashMap<String, Flavor>,
+) -> Option<Flavor> {
+    if overrides.is_empty() {
+        return None;
+    }
+
+    let full_path = normalize_path_for_matching(input_path);
+    let rel_path = base_dir
+        .and_then(|base| input_path.strip_prefix(base).ok())
+        .map(normalize_path_for_matching);
+    let file_name = input_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string());
+
+    let mut best: Option<((usize, usize, usize), Flavor)> = None;
+    for (pattern, flavor) in overrides {
+        let matched = glob_matches_path(pattern, &full_path)
+            || rel_path
+                .as_deref()
+                .is_some_and(|relative| glob_matches_path(pattern, relative))
+            || file_name
+                .as_deref()
+                .is_some_and(|name| glob_matches_path(pattern, name));
+        if !matched {
+            continue;
+        }
+
+        let score = pattern_specificity(pattern);
+        if best.is_none_or(|(best_score, _)| score > best_score) {
+            best = Some((score, *flavor));
+        }
+    }
+
+    best.map(|(_, flavor)| flavor)
+}
+
+fn normalize_path_for_matching(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
+fn pattern_specificity(pattern: &str) -> (usize, usize, usize) {
+    let literal_chars = pattern.chars().filter(|c| *c != '*' && *c != '?').count();
+    let segment_count = pattern
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .count();
+    let wildcard_count = pattern.chars().filter(|c| *c == '*' || *c == '?').count();
+    (literal_chars, segment_count, usize::MAX - wildcard_count)
+}
+
+fn glob_matches_path(pattern: &str, path: &str) -> bool {
+    let regex = glob_pattern_to_regex(pattern);
+    Regex::new(&regex)
+        .map(|compiled| compiled.is_match(path))
+        .unwrap_or(false)
+}
+
+fn glob_pattern_to_regex(pattern: &str) -> String {
+    let mut out = String::from("^");
+    let normalized = pattern.replace('\\', "/");
+    let mut chars = normalized.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '*' => {
+                if chars.peek() == Some(&'*') {
+                    let _ = chars.next();
+                    out.push_str(".*");
+                } else {
+                    out.push_str("[^/]*");
+                }
+            }
+            '?' => out.push_str("[^/]"),
+            '.' | '+' | '(' | ')' | '|' | '^' | '$' | '{' | '}' | '[' | ']' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out.push('$');
+    out
 }
 
 #[cfg(test)]
@@ -2035,6 +2150,75 @@ mod tests {
         assert!(cfg.extend_exclude.is_empty());
         assert!(cfg.include.is_none());
         assert!(cfg.extend_include.is_empty());
+    }
+
+    #[test]
+    fn flavor_overrides_parse() {
+        let toml_str = r#"
+            [flavor-overrides]
+            "README.md" = "gfm"
+            "docs/**/*.md" = "quarto"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        assert_eq!(cfg.flavor_overrides.get("README.md"), Some(&Flavor::Gfm));
+        assert_eq!(
+            cfg.flavor_overrides.get("docs/**/*.md"),
+            Some(&Flavor::Quarto)
+        );
+    }
+
+    #[test]
+    fn flavor_override_uses_most_specific_match() {
+        let mut overrides = HashMap::new();
+        overrides.insert("docs/**/*.md".to_string(), Flavor::Pandoc);
+        overrides.insert("docs/README.md".to_string(), Flavor::Gfm);
+        let input = Path::new("/project/docs/README.md");
+
+        let flavor = detect_flavor_override(input, Some(Path::new("/project")), &overrides);
+        assert_eq!(flavor, Some(Flavor::Gfm));
+    }
+
+    #[test]
+    fn detect_flavor_uses_override_for_markdown_family() {
+        let mut cfg = Config {
+            flavor: Flavor::Pandoc,
+            ..Config::default()
+        };
+        cfg.flavor_overrides
+            .insert("README.md".to_string(), Flavor::Gfm);
+
+        let flavor = detect_flavor(
+            Some(Path::new("/project/README.md")),
+            Some(Path::new("/project/panache.toml")),
+            &cfg,
+        );
+        assert_eq!(flavor, Some(Flavor::Gfm));
+    }
+
+    #[test]
+    fn detect_flavor_keeps_qmd_rmd_extension_defaults() {
+        let mut cfg = Config {
+            flavor: Flavor::Gfm,
+            ..Config::default()
+        };
+        cfg.flavor_overrides
+            .insert("docs/**/*.qmd".to_string(), Flavor::Pandoc);
+        cfg.flavor_overrides
+            .insert("docs/**/*.Rmd".to_string(), Flavor::Quarto);
+
+        let qmd_flavor = detect_flavor(
+            Some(Path::new("/project/docs/chapter.qmd")),
+            Some(Path::new("/project/panache.toml")),
+            &cfg,
+        );
+        let rmd_flavor = detect_flavor(
+            Some(Path::new("/project/docs/chapter.Rmd")),
+            Some(Path::new("/project/panache.toml")),
+            &cfg,
+        );
+
+        assert_eq!(qmd_flavor, Some(Flavor::Quarto));
+        assert_eq!(rmd_flavor, Some(Flavor::RMarkdown));
     }
 
     #[test]

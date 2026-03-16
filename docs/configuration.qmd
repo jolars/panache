@@ -58,6 +58,27 @@ Set the maximum line width for text wrapping:
 line-width = 80
 ```
 
+### Flavor Overrides
+
+Use `flavor-overrides` to pick flavor by path pattern for Markdown-family files
+(`.md`, `.markdown`, `.mdown`, `.mkd`):
+
+```toml
+flavor = "quarto"
+
+[flavor-overrides]
+"README.md" = "gfm"
+"docs/**/*.md" = "quarto"
+```
+
+Panache applies flavor in this order:
+
+1. `.qmd` files always use `quarto`
+2. `.Rmd` files always use `rmarkdown`
+3. Markdown-family files use the most specific matching `flavor-overrides`
+   pattern
+4. Otherwise, Panache falls back to top-level `flavor`
+
 ### File Selection (Directory Traversal)
 
 When you run commands on directories (`panache format .`, `panache lint .`,

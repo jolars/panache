@@ -170,13 +170,7 @@ support.
 
 ### Per-File Pattern Overrides
 
-- [ ] Glob pattern flavor overrides - `[flavor_overrides]` with file patterns
-      - Override flavor for specific files or patterns
-      - Example: `"README.md" = "gfm"` or `"docs/**/*.md" = "gfm"`
-      - Useful for projects with mixed Markdown files (e.g., README.md as GFM,
-        docs as Pandoc)
-      - Could potentially extend to per-pattern extension overrides:
-        `[pattern_overrides."docs/**/*.md".extensions]`
+- [x] Glob pattern flavor overrides - `[flavor_overrides]` with file patterns
 
 ## Linter
 
