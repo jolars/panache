@@ -480,12 +480,15 @@ impl Extensions {
     /// # Returns
     /// A new Extensions struct with flavor defaults merged with user overrides
     pub fn merge_with_flavor(user_overrides: HashMap<String, bool>, flavor: Flavor) -> Self {
+        let defaults = Self::for_flavor(flavor);
+        Self::merge_overrides(defaults, user_overrides)
+    }
+
+    fn merge_overrides(base: Extensions, user_overrides: HashMap<String, bool>) -> Self {
         use serde_json::{Map, Value};
 
-        // Start with flavor defaults
-        let defaults = Self::for_flavor(flavor);
         let defaults_value =
-            serde_json::to_value(&defaults).expect("Failed to serialize flavor defaults");
+            serde_json::to_value(&base).expect("Failed to serialize extension defaults");
 
         let mut merged = if let Value::Object(obj) = defaults_value {
             obj
@@ -908,7 +911,7 @@ struct RawConfig {
     #[serde(default)]
     flavor: Flavor,
     #[serde(default)]
-    extensions: Option<HashMap<String, bool>>,
+    extensions: Option<toml::Value>,
     #[serde(default)]
     line_ending: Option<LineEnding>,
     #[serde(default = "default_line_width")]
@@ -1217,10 +1220,7 @@ impl RawConfig {
         };
 
         Config {
-            extensions: self.extensions.map_or_else(
-                || Extensions::for_flavor(self.flavor),
-                |user_overrides| Extensions::merge_with_flavor(user_overrides, self.flavor),
-            ),
+            extensions: resolve_extensions_for_flavor(self.extensions.as_ref(), self.flavor),
             line_ending: self.line_ending.or(Some(LineEnding::Auto)),
             flavor: self.flavor,
             line_width: self.line_width,
@@ -1245,6 +1245,75 @@ impl RawConfig {
             flavor_overrides: self.flavor_overrides,
         }
     }
+}
+
+fn parse_flavor_key(s: &str) -> Option<Flavor> {
+    match s.replace('_', "-").to_lowercase().as_str() {
+        "pandoc" => Some(Flavor::Pandoc),
+        "quarto" => Some(Flavor::Quarto),
+        "rmarkdown" | "r-markdown" => Some(Flavor::RMarkdown),
+        "gfm" => Some(Flavor::Gfm),
+        "common-mark" | "commonmark" => Some(Flavor::CommonMark),
+        _ => None,
+    }
+}
+
+fn resolve_extensions_for_flavor(
+    extensions_value: Option<&toml::Value>,
+    flavor: Flavor,
+) -> Extensions {
+    let Some(value) = extensions_value else {
+        return Extensions::for_flavor(flavor);
+    };
+
+    let Some(table) = value.as_table() else {
+        eprintln!("Warning: [extensions] must be a table; using flavor defaults.");
+        return Extensions::for_flavor(flavor);
+    };
+
+    let mut global_overrides = HashMap::new();
+    let mut flavor_overrides = HashMap::new();
+
+    for (key, val) in table {
+        if let Some(enabled) = val.as_bool() {
+            global_overrides.insert(key.clone(), enabled);
+            continue;
+        }
+
+        let Some(flavor_table) = val.as_table() else {
+            eprintln!(
+                "Warning: [extensions] entry '{}' must be a boolean or table; ignoring.",
+                key
+            );
+            continue;
+        };
+
+        let Some(target_flavor) = parse_flavor_key(key) else {
+            eprintln!(
+                "Warning: [extensions.{}] is not a known flavor table; ignoring.",
+                key
+            );
+            continue;
+        };
+
+        if target_flavor != flavor {
+            continue;
+        }
+
+        for (sub_key, sub_val) in flavor_table {
+            let Some(enabled) = sub_val.as_bool() else {
+                eprintln!(
+                    "Warning: [extensions.{}] entry '{}' must be true or false; ignoring.",
+                    key, sub_key
+                );
+                continue;
+            };
+            flavor_overrides.insert(sub_key.clone(), enabled);
+        }
+    }
+
+    let base = Extensions::merge_with_flavor(global_overrides, flavor);
+    Extensions::merge_overrides(base, flavor_overrides)
 }
 
 /// Resolve formatter configuration from both old and new formats.
@@ -1694,22 +1763,12 @@ fn parse_config_str(s: &str, path: &Path) -> io::Result<Config> {
     check_deprecated_formatter_names(s, path);
     check_deprecated_code_block_style_options(s, path);
 
-    let mut config: Config = toml::from_str(s).map_err(|e| {
+    let config: Config = toml::from_str(s).map_err(|e| {
         io::Error::new(
             io::ErrorKind::InvalidData,
             format!("invalid config {}: {e}", path.display()),
         )
     })?;
-
-    // IMPORTANT: If no extensions were explicitly set in the TOML,
-    // serde will have used Extensions::default() (Pandoc defaults).
-    // We need to apply flavor-specific defaults when the user didn't
-    // explicitly override them. Since we can't detect which fields
-    // were set vs. defaulted by serde, we compare with Extensions::default()
-    // and if they match, replace with flavor-specific defaults.
-    if config.extensions == Extensions::default() {
-        config.extensions = Extensions::for_flavor(config.flavor);
-    }
 
     Ok(config)
 }
@@ -1791,7 +1850,15 @@ pub fn load(
 
     if let Some(flavor) = detect_flavor(input_file, cfg_path.as_deref(), &cfg) {
         cfg.flavor = flavor;
-        cfg.extensions = Extensions::for_flavor(flavor);
+        cfg.extensions = if let Some(path) = cfg_path.as_deref() {
+            fs::read_to_string(path)
+                .ok()
+                .and_then(|s| toml::from_str::<toml::Value>(&s).ok())
+                .map(|root| resolve_extensions_for_flavor(root.get("extensions"), flavor))
+                .unwrap_or_else(|| Extensions::for_flavor(flavor))
+        } else {
+            Extensions::for_flavor(flavor)
+        };
     }
 
     Ok((cfg, cfg_path))
@@ -2340,6 +2407,56 @@ mod tests {
         // Other Quarto defaults should remain
         assert!(cfg.extensions.quarto_callouts);
         assert!(cfg.extensions.quarto_shortcodes);
+    }
+
+    #[test]
+    fn extensions_per_flavor_override_wins_over_global() {
+        let toml_str = r#"
+            flavor = "gfm"
+
+            [extensions]
+            task-lists = false
+            citations = true
+
+            [extensions.gfm]
+            task-lists = true
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert!(cfg.extensions.task_lists);
+        assert!(cfg.extensions.citations);
+    }
+
+    #[test]
+    fn extensions_per_flavor_table_is_ignored_for_other_flavors() {
+        let toml_str = r#"
+            flavor = "pandoc"
+
+            [extensions]
+            citations = false
+
+            [extensions.gfm]
+            citations = true
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert!(!cfg.extensions.citations);
+    }
+
+    #[test]
+    fn extensions_per_flavor_commonmark_alias_works() {
+        let toml_str = r#"
+            flavor = "common-mark"
+
+            [extensions]
+            citations = true
+
+            [extensions.commonmark]
+            citations = false
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert!(!cfg.extensions.citations);
     }
 
     #[test]

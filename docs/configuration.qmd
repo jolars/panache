@@ -215,6 +215,23 @@ citations = true
 task-lists = true
 ```
 
+You can also scope extension overrides to a specific flavor:
+
+```toml
+[extensions]
+citations = true
+task-lists = false
+
+[extensions.gfm]
+task-lists = true
+```
+
+Precedence for the active flavor is:
+
+1. flavor defaults
+2. global `[extensions]`
+3. `[extensions.<flavor>]`
+
 ### Block-Level Extensions
 
 #### Headings
