@@ -48,7 +48,7 @@ jobs:
         with:
           pattern: panache-*
           merge-multiple: true
-          path: release-assets
+          path: target/release-assets
 
       - run: npm ci --prefix editors/code --no-audit --no-fund
 

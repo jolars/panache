@@ -64,16 +64,16 @@
       {
         "assets": [
           {
-            "path": "release-assets/*.tar.gz"
+            "path": "target/release-assets/*.tar.gz"
           },
           {
-            "path": "release-assets/*.zip"
+            "path": "target/release-assets/*.zip"
           },
           {
-            "path": "release-assets/*.deb"
+            "path": "target/release-assets/*.deb"
           },
           {
-            "path": "release-assets/*.rpm"
+            "path": "target/release-assets/*.rpm"
           }
         ]
       }
