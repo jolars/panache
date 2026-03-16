@@ -299,13 +299,90 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
 }
 
 fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)> {
+    fn is_unclosed_double_quoted(value: &str) -> bool {
+        if !value.starts_with('"') {
+            return false;
+        }
+        let mut escaped = false;
+        let mut quote_count = 0usize;
+        for ch in value.chars() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == '"' {
+                quote_count += 1;
+            }
+        }
+        quote_count % 2 == 1
+    }
+
+    fn option_value(line: &str, prefix: &str) -> Option<String> {
+        if !is_hashpipe_option_line(line, prefix) {
+            return None;
+        }
+        let after_prefix = &line[prefix.len()..];
+        let rest = after_prefix.trim_start_matches([' ', '\t']);
+        let colon_idx = rest.find(':')?;
+        Some(
+            rest[colon_idx + 1..]
+                .trim_start_matches([' ', '\t'])
+                .trim_end_matches([' ', '\t'])
+                .to_string(),
+        )
+    }
+
+    fn continuation_value(line: &str, prefix: &str) -> Option<String> {
+        if !line.starts_with(prefix) {
+            return None;
+        }
+        let after_prefix = &line[prefix.len()..];
+        let first = after_prefix.chars().next()?;
+        if first != ' ' && first != '\t' {
+            return None;
+        }
+        let value = after_prefix
+            .trim_start_matches([' ', '\t'])
+            .trim_end_matches([' ', '\t']);
+        if value.is_empty() {
+            None
+        } else {
+            Some(value.to_string())
+        }
+    }
+
     let mut header_end = 0usize;
     let mut saw_prefix = false;
+    let mut open_multiline: Option<String> = None;
 
     for line in content.split_inclusive('\n') {
         let trimmed = line.trim_start();
-        if trimmed.starts_with(prefix) {
+        if let Some(mut value) = open_multiline.take() {
+            let Some(fragment) = continuation_value(trimmed, prefix) else {
+                break;
+            };
+            if !value.ends_with(' ') {
+                value.push(' ');
+            }
+            value.push_str(&fragment);
+            header_end += line.len();
+            if is_unclosed_double_quoted(&value) {
+                open_multiline = Some(value);
+            }
+            continue;
+        }
+
+        if is_hashpipe_option_line(trimmed, prefix) {
             saw_prefix = true;
+            if let Some(value) = option_value(trimmed, prefix)
+                && is_unclosed_double_quoted(&value)
+            {
+                open_multiline = Some(value);
+            }
             header_end += line.len();
             continue;
         }
@@ -320,6 +397,25 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
     } else {
         None
     }
+}
+
+fn is_hashpipe_option_line(line: &str, prefix: &str) -> bool {
+    if !line.starts_with(prefix) {
+        return false;
+    }
+    let after_prefix = &line[prefix.len()..];
+    let rest = after_prefix.trim_start_matches([' ', '\t']);
+    let Some(colon_idx) = rest.find(':') else {
+        return false;
+    };
+    let key = rest[..colon_idx].trim_end_matches([' ', '\t']);
+    if key.is_empty() {
+        return false;
+    }
+    let value = rest[colon_idx + 1..]
+        .trim_start_matches([' ', '\t'])
+        .trim_end_matches([' ', '\t']);
+    !value.is_empty()
 }
 
 /// Determine the minimum fence length needed to avoid conflicts with content
@@ -496,7 +592,7 @@ fn format_info_string(info_node: &SyntaxNode, info: &InfoString) -> String {
 /// while keeping complex expressions in the inline position.
 /// If the language's comment syntax is unknown, returns false to fall back to inline format.
 fn format_code_block_hashpipe(
-    code_block_node: &SyntaxNode,
+    _code_block_node: &SyntaxNode,
     info_node: &SyntaxNode,
     content: &str,
     fence_char: char,
@@ -512,11 +608,11 @@ fn format_code_block_hashpipe(
 
     // Classify options into simple (hashpipe) vs complex (inline)
     // Extract from CST nodes
-    let code_content_node = code_block_node
-        .children()
-        .find(|child| child.kind() == SyntaxKind::CODE_CONTENT);
+    let Some(comment_prefix) = hashpipe::get_comment_prefix(language) else {
+        return false; // Unknown language - fall back to inline format
+    };
     let ((simple, complex), had_content_hashpipe) =
-        hashpipe::split_options_from_cst_with_content(info_node, code_content_node.as_ref());
+        hashpipe::split_options_from_cst_with_content(info_node, content, comment_prefix);
 
     // Try to get hashpipe lines - returns None for unknown languages
     let hashpipe_lines = match hashpipe::format_as_hashpipe(language, &simple, config.line_width) {

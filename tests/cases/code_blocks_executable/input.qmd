@@ -28,3 +28,10 @@ Julia chunk with label:
 #| echo: false
 using Plots
 ```
+
+```{r}
+#| fig-cap: "A multiline caption
+#|  that spans multiple lines and demonstrates
+#|  wrapping."
+a <- 1
+```

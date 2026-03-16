@@ -160,7 +160,8 @@ pub fn normalize_value(value: &str) -> String {
 /// When both sources provide the same normalized key, inline info-string options win.
 pub fn split_options_from_cst_with_content(
     info_node: &SyntaxNode,
-    code_content_node: Option<&SyntaxNode>,
+    content: &str,
+    prefix: &str,
 ) -> ((Vec<ClassifiedOption>, Vec<CstOption>), bool) {
     #[derive(Clone)]
     enum Entry {
@@ -266,16 +267,11 @@ pub fn split_options_from_cst_with_content(
         break;
     }
 
-    // 2) Existing leading hashpipe options parsed under CODE_CONTENT (lower precedence)
-    if let Some(content_node) = code_content_node {
-        for child in content_node.children() {
-            if let Some(opt) = ChunkOption::cast(child)
-                && let (Some(key), Some(value)) = (opt.key(), opt.value())
-            {
-                had_content_hashpipe = true;
-                push_content_option(&mut entries, key, value, opt.is_quoted());
-            }
-        }
+    // 2) Existing leading hashpipe options from CODE_CONTENT text (lower precedence).
+    // Parse multiline quoted values so rewrapping can normalize them.
+    for (key, value) in extract_leading_hashpipe_options(content, prefix) {
+        had_content_hashpipe = true;
+        push_content_option(&mut entries, key, value, false);
     }
 
     let mut simple = Vec::new();
@@ -288,6 +284,88 @@ pub fn split_options_from_cst_with_content(
     }
 
     ((simple, complex), had_content_hashpipe)
+}
+
+fn extract_leading_hashpipe_options(content: &str, prefix: &str) -> Vec<(String, String)> {
+    let mut options = Vec::new();
+    let lines: Vec<&str> = content.lines().collect();
+    let mut i = 0usize;
+
+    while i < lines.len() {
+        let trimmed = lines[i].trim_start();
+        if !trimmed.starts_with(prefix) {
+            break;
+        }
+        let after_prefix = &trimmed[prefix.len()..];
+        let rest = after_prefix.trim_start_matches([' ', '\t']);
+        let Some(colon_idx) = rest.find(':') else {
+            break;
+        };
+        let key = rest[..colon_idx].trim_end_matches([' ', '\t']);
+        if key.is_empty() {
+            break;
+        }
+        let value = rest[colon_idx + 1..]
+            .trim_start_matches([' ', '\t'])
+            .trim_end_matches([' ', '\t']);
+        if value.is_empty() {
+            break;
+        }
+
+        let mut merged_value = value.to_string();
+        i += 1;
+
+        if is_unclosed_double_quoted(&merged_value) {
+            while i < lines.len() {
+                let next_trimmed = lines[i].trim_start();
+                if !next_trimmed.starts_with(prefix) {
+                    break;
+                }
+                let next_after_prefix = &next_trimmed[prefix.len()..];
+                if !next_after_prefix.starts_with([' ', '\t']) {
+                    break;
+                }
+                let continuation = next_after_prefix.trim_start_matches([' ', '\t']);
+                if continuation.is_empty() {
+                    break;
+                }
+                if !merged_value.ends_with(' ') {
+                    merged_value.push(' ');
+                }
+                merged_value.push_str(continuation);
+                i += 1;
+                if !is_unclosed_double_quoted(&merged_value) {
+                    break;
+                }
+            }
+        }
+
+        options.push((key.to_string(), merged_value));
+    }
+
+    options
+}
+
+fn is_unclosed_double_quoted(value: &str) -> bool {
+    if !value.starts_with('"') {
+        return false;
+    }
+    let mut escaped = false;
+    let mut quote_count = 0usize;
+    for ch in value.chars() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '"' {
+            quote_count += 1;
+        }
+    }
+    quote_count % 2 == 1
 }
 
 /// Classify an option value for hashpipe conversion.
@@ -368,7 +446,7 @@ pub fn format_hashpipe_option_with_wrap(
         return vec![first_line];
     }
 
-    let continuation_prefix = format!("{}  ", prefix); // 2 spaces after prefix
+    let continuation_prefix = format!("{}   ", prefix); // 3 spaces after prefix
     let available_continuation = line_width.saturating_sub(continuation_prefix.len());
 
     let mut lines = Vec::new();
@@ -526,7 +604,7 @@ mod tests {
 
         assert!(lines.len() > 1, "Should wrap into multiple lines");
         assert!(lines[0].starts_with("#| fig-cap:"));
-        assert!(lines[1].starts_with("#|  ")); // 2-space indent
+        assert!(lines[1].starts_with("#|   ")); // 3-space indent
         assert!(lines[0].len() <= 80);
         // Continuation lines might be slightly over due to word boundaries
     }

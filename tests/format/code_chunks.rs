@@ -131,3 +131,18 @@ fn inline_options_override_existing_hashpipe_options() {
     assert_eq!(output.matches("#| label:").count(), 1);
     assert!(output.contains("#| label: \"from-content\""));
 }
+
+#[test]
+fn multiline_hashpipe_value_continuation_is_not_dropped() {
+    let input = "```{r}\n#| fig-cap: \"A multiline caption\n#|  that spans multiple lines and demonstrates\n#|  wrapping.\"\na <- 1\n```\n";
+    let output = format(input, Some(quarto_config()), None);
+
+    assert!(
+        output.contains(
+            "#| fig-cap: \"A multiline caption that spans multiple lines and demonstrates"
+        )
+    );
+    assert!(output.contains("#|   wrapping.\""));
+    assert!(!output.contains("#|  that spans multiple lines and demonstrates"));
+    assert!(output.contains("a <- 1"));
+}
