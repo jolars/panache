@@ -7,45 +7,17 @@ This document tracks implementation status for panache's features.
 - [ ] Incremental parsing and caching for LSP performance (Implemented, but
       crude and often reparses entire document on change; needs optimization)
 
-### Salsa/LSP refactor follow-ups
+### Performance
 
-- [x] Remove `DocumentState.metadata` and replace it with a minimal
-      YAML-frontmatter status (`yaml_ok: bool` or
-      `yaml_error: Option<YamlError>`). Salsa (`crate::salsa::metadata`) is now
-      the single source of truth for metadata + bibliography parsing.
-- [x] (correctness) Decide watcher policy for uncached dependency files: keep
-      `update_file_text_if_cached(...)` (bounded memory) or selectively insert
-      (`update_file_text(...)`) for workspace dependency types
-      (bibs/includes/metadata).
-- [x] (correctness) Model YAML frontmatter parsing as a salsa query (e.g.
-      `yaml_metadata_parse_result(...) -> Result<...>`) so diagnostics/handlers
-      don’t need a separate pre-check.
-- [x] (optional) Move more LSP diagnostics/lint derivations behind salsa where
-      it makes sense (be careful with non-`Send` rowan/CST types; keep external
-      linter execution at the async boundary, outside salsa queries).
-      - [x] Built-in lint + YAML/metadata diagnostics now derived via salsa
-            query (`built_in_lint_plan`); external linters remain async in LSP.
-      - [x] Remove duplicate parse in diagnostics path by deriving external
-            linter jobs from the same salsa lint-plan query.
-      - [x] Remove duplicate bibliography diagnostics by deriving bibliography
-            diagnostics from linter rules only (while keeping YAML parse
-            diagnostics query-derived).
-- [x] [performance] Apply salsa LRU tuning for long-running LSP sessions (see
-      `salsa/book/src/tuning.md`): add `#[salsa::tracked(lru = N)]` to
-      high-churn tracked queries where appropriate (`project_graph`,
-      `definition_index`).
-- [ ] [performance] Evaluate `#[salsa::interned]` for common keys (paths/labels)
-      if it reduces memory/cost.
-- [ ] [performance] Evaluate salsa durability policy (`set_with_durability`)
-      with measurements (e.g., open buffers LOW, stable dependency files
-      MEDIUM/HIGH), and only roll out with a clear update/invalidation policy.
+- [ ] Evaluate `#[salsa::interned]` for common keys (paths/labels) if it reduces
+      memory/cost.
+- [ ] Evaluate salsa durability policy (`set_with_durability`) with measurements
+      (e.g., open buffers LOW, stable dependency files MEDIUM/HIGH), and only
+      roll out with a clear update/invalidation policy.
       - [x] Wire conservative defaults: open buffers LOW, config MEDIUM,
             dependency/disk-loaded files HIGH, watcher refreshes MEDIUM.
       - [x] Add ignored durability measurement harness
             (`tests/durability_bench.rs`) for HIGH vs LOW revalidation cost.
-- [x] [performance] Audit long-running query loops and add cancellation checks
-      (`db.unwind_if_revision_cancelled()` in current salsa) where appropriate
-      to improve cancellation responsiveness.
 
 ### Core LSP Capabilities
 
@@ -55,9 +27,7 @@ This document tracks implementation status for panache's features.
 - [X] `textDocument/didClose` - Track document closes
 - [X] Configuration discovery from workspace root (`.panache.toml`)
 
-### Future LSP Features
-
-#### Diagnostics
+### Diagnostics
 
 - [x] Syntax error diagnostics - Report parsing errors as diagnostics
 - [x] Lint warnings - Configurable linting rules (e.g., heading levels, list
@@ -66,7 +36,7 @@ This document tracks implementation status for panache's features.
 - [x] Footnote validation - Check for undefined footnotes (also in linter)
 - [x] Link validation - Check for broken internal links/references
 
-#### Code Actions
+### Code Actions
 
 - [ ] Convert between bullet/ordered lists
 - [X] Convert loose/compact lists
@@ -75,7 +45,7 @@ This document tracks implementation status for panache's features.
 - [ ] Convert between inline/reference links
 - [X] Convert between inline/reference footnotes
 
-#### Navigation & Symbols
+### Navigation & Symbols
 
 - [x] Document outline - `textDocument/documentSymbol` for headings, tables,
       figures
@@ -90,13 +60,13 @@ This document tracks implementation status for panache's features.
             `@cite` keys
       - [ ] Go to definition for headings - Jump to heading target for internal
             links
-- [ ] Find references - Find all uses of a reference link/footnote/citation
-      - [ ] Find references for citations - Find all `@cite` uses of a
+- [x] Find references - Find all uses of a reference link/footnote/citation
+      - [x] Find references for citations - Find all `@cite` uses of a
             bibliography entry
       - [ ] Find references for headings - Find all internal links to a heading
       - [ ] Find references for reference links - Find all `[text][ref]` links
 
-#### Completion
+### Completion
 
 - [x] Citation completion - `textDocument/completion` for `@cite` keys from
       bibliography
@@ -105,7 +75,7 @@ This document tracks implementation status for panache's features.
 - [ ] Attribute completion - Complete class names and attributes in
       `{.class #id}`
 
-#### Inlay Hints (low priority)
+### Inlay Hints (low priority)
 
 Personally I think inlay hints are distractive and I am not sure what we want to
 support.
@@ -115,20 +85,20 @@ support.
 - [ ] Citation key hints - Show bibliography entries for `@cite` keys
 - [ ] Footnote content hints - Show footnote content as inlay hints
 
-#### Hover Information
+### Hover Information
 
 - [ ] Link preview - `textDocument/hover` to show link target
 - [ ] Reference preview - Show reference definition on hover
 - [x] Footnote preview - Show footnote content inline
 - [x] Citation preview - Show bibliography entry for citation (approximate)
 
-#### Advanced
+### Advanced
 
 - [x] Range formatting - `textDocument/rangeFormatting` for selected text only
 - [ ] On-type formatting - `textDocument/onTypeFormatting` for auto-formatting
       triggers (not sure about this, low priority)
-- [ ] **Document links** - `textDocument/documentLink` for clickable links
-- [ ] **Semantic tokens** - Syntax highlighting via LSP
+- [ ] Document links - `textDocument/documentLink` for clickable links
+- [ ] Semantic tokens - Syntax highlighting via LSP
 - [ ] Rename
       - [x] Citations - Rename `@cite` keys and update bibliography
       - [x] Reference links - Rename `[ref]` labels and update definitions
@@ -139,37 +109,10 @@ support.
       - [ ] Rmarkdown (Bookdown)
 - [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload config
 
-## Pandoc Test Adoption
-
-- [ ] Pandoc Reader Tests (Markdown.hs)
-      - [x] Autolinks/bare URIs
-      - [ ] Links/references edge cases
-      - [ ] Headers/implicit refs
-      - [ ] Emphasis/strong
-      - [ ] Lists/definition lists
-      - [ ] Footnotes/citations
-- [ ] Pandoc Reader Tests (markdown-reader-more.txt)
-      - [ ] URLs with spaces/punctuation
-      - [ ] Multilingual URLs
-      - [ ] Entities in links/titles
-      - [ ] Parentheses/backslashes in URLs
-      - [ ] Reference link fallbacks
-
 ## Configuration System
 
 - [x] Enable turning on or off linting rules in `[lint]` section
-
-### Per-Flavor Extension Configuration
-
-- [ ] Per-flavor extension overrides - `[extensions.gfm]`,
-      `[extensions.quarto]`, `[extensions.rmarkdown]`, etc.
-      - Allow fine-grained control of extensions for specific flavors
-      - Example: Enable `task_lists` only for GFM, disable `citations` for
-        CommonMark
-      - Falls back to global `[extensions]` settings when not specified
-
-### Per-File Pattern Overrides
-
+- [x] Per-flavor extension overrides - `[extensions.gfm]`,
 - [x] Glob pattern flavor overrides - `[flavor_overrides]` with file patterns
 
 ## Linter
@@ -359,7 +302,7 @@ implemented.
 - [x] Nested inline elements in alt text (code, emphasis, math)
 - [x] Reference images `![alt][ref]`
 - [x] Image attributes `![alt](url){#id .class key=value}`
-- [ ] Extension: `implicit_figures`
+- [x] Extension: `implicit_figures`
 
 #### Math
 
@@ -512,8 +455,8 @@ for initial implementation.
 - [x] Formatter with normalized spacing
 - [x] Extension flag `quarto_shortcodes` (enabled for Quarto flavor)
 - [x] Golden test coverage
-- [ ] LSP diagnostics for malformed shortcodes (future)
-- [ ] Completion for built-in shortcode names (future)
+- [ ] LSP diagnostics for malformed shortcodes
+- [ ] Completion for built-in shortcode names
 
 ### Known Differences from Pandoc
 
