@@ -49,6 +49,16 @@ pub(crate) fn try_parse_yaml_block(
         return None;
     }
 
+    // Find a closing delimiter before emitting; otherwise this is not a valid YAML block.
+    let mut closing_pos = None;
+    for (i, content_line) in lines.iter().enumerate().skip(pos + 1) {
+        if content_line.trim() == "---" || content_line.trim() == "..." {
+            closing_pos = Some(i);
+            break;
+        }
+    }
+    let closing_pos = closing_pos?;
+
     // Start metadata node
     builder.start_node(SyntaxKind::YAML_METADATA.into());
 
@@ -59,39 +69,19 @@ pub(crate) fn try_parse_yaml_block(
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
-    let mut current_pos = pos + 1;
-    let mut found_closing = false;
-
-    // Collect content until we find closing delimiter
-    while current_pos < lines.len() {
-        let content_line = lines[current_pos];
-
-        // Check for closing delimiter
-        if content_line.trim() == "---" || content_line.trim() == "..." {
-            found_closing = true;
-            let (text, newline_str) = strip_newline(content_line);
-            builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), text);
-            if !newline_str.is_empty() {
-                builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-            }
-            current_pos += 1;
-            break;
-        }
-
-        // Add content line
+    for content_line in lines.iter().take(closing_pos).skip(pos + 1) {
         emit_line_tokens(builder, content_line);
-        current_pos += 1;
+    }
+
+    let (closing_text, closing_newline) = strip_newline(lines[closing_pos]);
+    builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), closing_text);
+    if !closing_newline.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), closing_newline);
     }
 
     builder.finish_node(); // YamlMetadata
 
-    if found_closing {
-        Some(current_pos)
-    } else {
-        // No closing delimiter found - this might be a horizontal rule after all
-        // or malformed YAML. For now, accept it.
-        Some(current_pos)
-    }
+    Some(closing_pos + 1)
 }
 
 /// Try to parse a Pandoc title block starting at the beginning of document.
@@ -201,6 +191,14 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
         let result = try_parse_yaml_block(&lines, 0, &mut builder, true);
         assert_eq!(result, Some(3));
+    }
+
+    #[test]
+    fn test_yaml_without_closing_delimiter_is_not_yaml_block() {
+        let lines = vec!["---", "title: Test", "Content"];
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_yaml_block(&lines, 0, &mut builder, true);
+        assert_eq!(result, None);
     }
 
     #[test]

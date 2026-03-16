@@ -2116,12 +2116,15 @@ pub(crate) fn try_parse_multiline_table(
         if line.trim().is_empty() {
             found_blank_line = true;
             pos += 1;
-            // Check if next line is closing dashes (full-width or column sep for headerless)
+            // Check if next line is a valid closing separator for this table shape.
             if pos < lines.len() {
                 let next = lines[pos];
-                if try_parse_multiline_separator(next).is_some()
-                    || (is_column_sep_start && is_column_separator(next))
-                {
+                let is_valid_closer = if is_full_width_start {
+                    try_parse_multiline_separator(next).is_some()
+                } else {
+                    is_column_separator(next)
+                };
+                if is_valid_closer {
                     found_closing_sep = true;
                     pos += 1; // Include the closing separator
                     break;
@@ -2130,8 +2133,8 @@ pub(crate) fn try_parse_multiline_table(
             continue;
         }
 
-        // Check for closing full-width dashes
-        if try_parse_multiline_separator(line).is_some() {
+        // Check for closing full-width dashes (only for full-width-start tables).
+        if is_full_width_start && try_parse_multiline_separator(line).is_some() {
             found_closing_sep = true;
             pos += 1;
             break;
@@ -2527,6 +2530,35 @@ mod multiline_table_tests {
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 6);
+    }
+
+    #[test]
+    fn test_headerless_multiline_table_does_not_close_on_full_width_rule() {
+        let input = vec![
+            "- - - - -",
+            "Third section with underscores.",
+            "",
+            "_____",
+            "",
+            "> Quote before rule",
+            ">",
+            "> ***",
+            ">",
+            "> Quote after rule",
+            "",
+            "Final paragraph.",
+            "",
+            "Here's a horizontal rule:",
+            "",
+            "---",
+            "Text directly after the horizontal rule.",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+
+        assert!(result.is_none());
     }
 
     #[test]

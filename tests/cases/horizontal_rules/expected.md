@@ -17,3 +17,9 @@ Third section with underscores.
 > Quote after rule
 
 Final paragraph.
+
+Here's a horizontal rule:
+
+---
+
+Text directly after the horizontal rule.

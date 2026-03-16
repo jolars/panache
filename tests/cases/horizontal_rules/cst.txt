@@ -1,4 +1,4 @@
-DOCUMENT@0..190
+DOCUMENT@0..263
   PARAGRAPH@0..28
     TEXT@0..27 "First section with co ..."
     NEWLINE@27..28 "\n"
@@ -56,4 +56,17 @@ DOCUMENT@0..190
   PARAGRAPH@173..190
     TEXT@173..189 "Final paragraph."
     NEWLINE@189..190 "\n"
+  BLANK_LINE@190..191
+    BLANK_LINE@190..191 "\n"
+  PARAGRAPH@191..217
+    TEXT@191..216 "Here's a horizontal r ..."
+    NEWLINE@216..217 "\n"
+  BLANK_LINE@217..218
+    BLANK_LINE@217..218 "\n"
+  HORIZONTAL_RULE@218..222
+    HORIZONTAL_RULE@218..221 "---"
+    NEWLINE@221..222 "\n"
+  PARAGRAPH@222..263
+    TEXT@222..262 "Text directly after t ..."
+    NEWLINE@262..263 "\n"
 

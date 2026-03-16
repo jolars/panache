@@ -331,7 +331,7 @@ impl BlockParser for YamlMetadataParser {
             return None;
         }
 
-        // YAML needs blank line before OR be at document start
+        // Fast guard: mid-document YAML requires a preceding blank line.
         if !ctx.has_blank_before && !ctx.at_document_start {
             return None;
         }
@@ -342,6 +342,10 @@ impl BlockParser for YamlMetadataParser {
             // This is a horizontal rule, not YAML
             return None;
         }
+
+        // Only claim YAML when a full block parse succeeds (including closing delimiter).
+        let mut tmp = GreenNodeBuilder::new();
+        try_parse_yaml_block(lines, line_pos, &mut tmp, ctx.at_document_start)?;
 
         // Cache the `at_document_start` flag for emission (avoids any ambiguity if ctx changes).
         Some((
