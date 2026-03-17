@@ -147,7 +147,7 @@ exclude = ["tests/"]
 }
 
 #[test]
-fn test_lint_explicit_file_respects_force_exclude() {
+fn test_lint_explicit_file_force_exclude_noops_when_all_filtered() {
     let temp_dir = TempDir::new().unwrap();
     let config = temp_dir.path().join(".panache.toml");
     let excluded_dir = temp_dir.path().join("tests");
@@ -166,8 +166,7 @@ exclude = ["tests/"]
         .current_dir(temp_dir.path())
         .args(["lint", "--force-exclude", excluded.to_str().unwrap()])
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("No supported files found"));
+        .success();
 }
 
 #[test]

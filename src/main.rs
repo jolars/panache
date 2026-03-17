@@ -521,6 +521,9 @@ fn main() -> io::Result<()> {
                 expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?;
 
             if expanded_files.is_empty() {
+                if force_exclude {
+                    return Ok(());
+                }
                 eprintln!("Error: No supported files found");
                 std::process::exit(1);
             }
@@ -811,6 +814,9 @@ fn main() -> io::Result<()> {
                 expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?;
 
             if expanded_files.is_empty() {
+                if force_exclude {
+                    return Ok(());
+                }
                 eprintln!("Error: No supported files found");
                 std::process::exit(1);
             }
