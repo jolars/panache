@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.22.0](https://github.com/jolars/panache/compare/v2.21.0...v2.22.0) (2026-03-17)
+
+### Features
+
+* add automatic installer scripts ([1f20e76](https://github.com/jolars/panache/commit/1f20e763874093a16e45ce369768b3cde7c4ec8c))
+* add suppor for `tex_math_gfm` extension ([70e74cb](https://github.com/jolars/panache/commit/70e74cbaa7f4effc95353f8b3a1d5186a27f468e))
+* **config:** add `extensions.<flavor>` ([2accb02](https://github.com/jolars/panache/commit/2accb02da95065d78a830c4e26791e166c985d25))
+* **config:** add `flavor-overrides` config option ([6f54ff4](https://github.com/jolars/panache/commit/6f54ff42a70bc5440e2de9c3aed6971e01e19f9c))
+* **formatter:** format horizontal rules to line-width ([4910606](https://github.com/jolars/panache/commit/49106063a936608b2367eb2ad56d2b4ed1f93c6f))
+
+### Bug Fixes
+
+* **formatter:** handle hashpipe YAML correct ([27b3df6](https://github.com/jolars/panache/commit/27b3df6c505a6007654b2ccd1fdbdcbf7b21c135))
+* **formatter:** mitigate indentation infinite growth ([264e49c](https://github.com/jolars/panache/commit/264e49cb76af764550a82c135cb4952a85c81128)), closes [#78](https://github.com/jolars/panache/issues/78)
+* **parser,formatter:** handle multiline exec options ([e19c8ed](https://github.com/jolars/panache/commit/e19c8ed48d6640fd928b5c66a74d56c675b04cf1))
+* **parser:** don't parse horizontal rules as metadata/table ([b695b3d](https://github.com/jolars/panache/commit/b695b3d36103aad91aa9fcb634bb50fc773035e2))
+
 ## [2.21.0](https://github.com/jolars/panache/compare/v2.20.0...v2.21.0) (2026-03-16)
 
 ### Features
