@@ -137,12 +137,44 @@ fn multiline_hashpipe_value_continuation_is_not_dropped() {
     let input = "```{r}\n#| fig-cap: \"A multiline caption\n#|  that spans multiple lines and demonstrates\n#|  wrapping.\"\na <- 1\n```\n";
     let output = format(input, Some(quarto_config()), None);
 
-    assert!(
-        output.contains(
-            "#| fig-cap: \"A multiline caption that spans multiple lines and demonstrates"
-        )
-    );
-    assert!(output.contains("#|   wrapping.\""));
+    assert!(output.contains(
+        "#| fig-cap: \"A multiline caption that spans multiple lines and demonstrates wrapping.\""
+    ));
     assert!(!output.contains("#|  that spans multiple lines and demonstrates"));
+    assert!(output.contains("a <- 1"));
+}
+
+#[test]
+fn inline_options_override_hashpipe_block_scalar_without_leaking_old_lines() {
+    let input = "```{r, fig.cap=\"Inline caption\"}\n#| fig-cap: |\n#|   A caption\n#|   spanning some lines\na <- 1\n```\n";
+    let output = format(input, Some(quarto_config()), None);
+
+    assert!(output.contains("#| fig-cap: \"Inline caption\""));
+    assert!(!output.contains("#| fig-cap: |"));
+    assert!(!output.contains("#|   A caption"));
+    assert!(!output.contains("#|   spanning some lines"));
+    assert!(output.contains("a <- 1"));
+}
+
+#[test]
+fn inline_options_override_hashpipe_folded_block_scalar_without_leaking_old_lines() {
+    let input = "```{r, fig.cap=\"Inline caption\"}\n#| fig-cap: >-\n#|   A folded caption\n#|   spanning some lines\na <- 1\n```\n";
+    let output = format(input, Some(quarto_config()), None);
+
+    assert!(output.contains("#| fig-cap: \"Inline caption\""));
+    assert!(!output.contains("#| fig-cap: >-"));
+    assert!(!output.contains("#|   A folded caption"));
+    assert!(!output.contains("#|   spanning some lines"));
+    assert!(output.contains("a <- 1"));
+}
+
+#[test]
+fn hashpipe_indented_yaml_value_is_preserved_as_hashpipe_header() {
+    let input = "```{r}\n#| list:\n#|   - a\n#|   - b\na <- 1\n```\n";
+    let output = format(input, Some(quarto_config()), None);
+
+    assert!(output.contains("#| list:"));
+    assert!(output.contains("#|   - a"));
+    assert!(output.contains("#|   - b"));
     assert!(output.contains("a <- 1"));
 }

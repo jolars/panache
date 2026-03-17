@@ -1,10 +1,9 @@
+use panache::config::WrapMode;
 use panache::{Config, format};
 use std::collections::HashMap;
 
 #[test]
-fn test_yaml_frontmatter_with_external_formatter() {
-    // Create a shim formatter that strips ALL whitespace (mimics yamlfmt)
-    // Using tr instead of sed for simplicity
+fn test_yaml_frontmatter_ignores_external_yaml_formatter() {
     let mut formatters = HashMap::new();
     formatters.insert(
         "yaml".to_string(),
@@ -24,23 +23,36 @@ fn test_yaml_frontmatter_with_external_formatter() {
     let input = "---\ntitle: CLI Reference\n---\n\n# Test\n";
     let output = format(input, Some(config), None);
 
-    // Debug: print the output
-    println!("Output: {:?}", output);
-    println!("First 30 chars: {:?}", &output[..30.min(output.len())]);
+    assert!(
+        !output.contains("title:CLIReference"),
+        "External YAML formatter should not be applied to frontmatter"
+    );
+    assert!(output.contains("title: CLI Reference"));
+}
 
-    // If the formatter ran, the title would have no whitespace at all (title:CLIReference)
-    // This should cause the bug to manifest
-    // Expected bug: "---title:CLIReference---" (newline after --- removed)
-    // Expected correct: "---\ntitle:CLIReference\n---" (newlines preserved around content)
+#[test]
+fn test_yaml_frontmatter_uses_builtin_yaml_formatter_by_default() {
+    let input = "---\necho:    false\nlist:\n  -  a\n  -     b\n---\n\n# Test\n";
+    let output = format(input, None, None);
 
-    if output.contains("title:CLIReference") {
-        // Formatter ran - check if delimiters are preserved
-        assert!(
-            output.starts_with("---\n"),
-            "Expected frontmatter to start with '---\\n', got: {:?}",
-            &output[..20.min(output.len())]
-        );
-    } else {
-        println!("SKIP: Formatter did not run (tr command not available or failed)");
-    }
+    assert!(output.contains("\necho: false\n"));
+    assert!(output.contains("\nlist:\n  - a\n  - b\n"));
+}
+
+#[test]
+fn test_yaml_frontmatter_reflow_respects_wrap_mode() {
+    let input = "---\ntitle: This is a very long yaml scalar that should format differently when wrapping is enabled.\n---\n\n# Test\n";
+    let preserve = Config {
+        wrap: Some(WrapMode::Preserve),
+        line_width: 30,
+        ..Default::default()
+    };
+    let reflow = Config {
+        wrap: Some(WrapMode::Reflow),
+        line_width: 30,
+        ..Default::default()
+    };
+    let preserved = format(input, Some(preserve), None);
+    let reflowed = format(input, Some(reflow), None);
+    assert_ne!(preserved, reflowed);
 }

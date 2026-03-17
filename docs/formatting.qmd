@@ -524,7 +524,7 @@ blank-lines = "preserve"
 
 ### YAML
 
-YAML frontmatter is preserved:
+YAML frontmatter is parsed and normalized by Panache's built-in YAML formatter:
 
 ```markdown
 ---
@@ -533,6 +533,10 @@ author: "Author Name"
 date: "2026-02-11"
 ---
 ```
+
+By default this means spacing and list indentation are normalized in the
+frontmatter block. This frontmatter formatting is always handled internally by
+Panache.
 
 ### Pandoc Title Block
 

@@ -39,6 +39,8 @@ salsa = "0.26.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde-saphyr = "0.0.21"
 serde_json = "1.0"
+yaml_parser = "0.2"
+pretty_yaml = "0.6"
 similar = { version = "2.6.0", features = ["text"] }
 tempfile = "3.26"
 tokio = { version = "1", features = [

@@ -86,6 +86,22 @@ async fn test_format_document_with_umlauts_frontmatter() {
 }
 
 #[tokio::test]
+async fn test_format_document_normalizes_yaml_frontmatter_with_builtin_engine() {
+    let server = TestLspServer::new();
+    let content = "---\necho:    false\nlist:\n  -  a\n  -     b\n---\n\n# intro\n";
+
+    server
+        .open_document("file:///frontmatter.qmd", content, "quarto")
+        .await;
+
+    let edits = server.format_document("file:///frontmatter.qmd").await;
+    assert!(edits.is_some());
+    let edit = &edits.unwrap()[0];
+    assert!(edit.new_text.contains("\necho: false\n"));
+    assert!(edit.new_text.contains("\nlist:\n  - a\n  - b\n"));
+}
+
+#[tokio::test]
 async fn test_range_formatting_fenced_code_case_file() {
     let server = TestLspServer::new();
 

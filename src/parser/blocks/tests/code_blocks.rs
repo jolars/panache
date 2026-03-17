@@ -362,6 +362,73 @@ fn executable_chunk_multiline_hashpipe_continuation_is_not_top_level_text() {
 }
 
 #[test]
+fn executable_chunk_block_scalar_hashpipe_continuation_is_not_top_level_text() {
+    let input = "```{r}\n#| fig-cap: |\n#|   A caption\n#|   spanning some lines\na <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
+    let code_content = code_block
+        .children()
+        .find(|n| n.kind() == SyntaxKind::CODE_CONTENT)
+        .expect("expected code content");
+
+    let has_top_level_continuation_text = code_content.children_with_tokens().any(|el| match el {
+        rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
+            t.text().trim_start().starts_with("#|   ")
+        }
+        _ => false,
+    });
+    assert!(
+        !has_top_level_continuation_text,
+        "block-scalar hashpipe continuation should not be emitted as top-level TEXT token"
+    );
+}
+
+#[test]
+fn executable_chunk_folded_block_scalar_hashpipe_continuation_is_not_top_level_text() {
+    let input =
+        "```{r}\n#| fig-cap: >-\n#|   A folded caption\n#|   spanning some lines\na <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
+    let code_content = code_block
+        .children()
+        .find(|n| n.kind() == SyntaxKind::CODE_CONTENT)
+        .expect("expected code content");
+
+    let has_top_level_continuation_text = code_content.children_with_tokens().any(|el| match el {
+        rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
+            t.text().trim_start().starts_with("#|   ")
+        }
+        _ => false,
+    });
+    assert!(
+        !has_top_level_continuation_text,
+        "folded block-scalar hashpipe continuation should not be emitted as top-level TEXT token"
+    );
+}
+
+#[test]
+fn executable_chunk_indented_hashpipe_value_continuation_is_not_top_level_text() {
+    let input = "```{r}\n#| list:\n#|   - a\n#|   - b\na <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
+    let code_content = code_block
+        .children()
+        .find(|n| n.kind() == SyntaxKind::CODE_CONTENT)
+        .expect("expected code content");
+
+    let has_top_level_continuation_text = code_content.children_with_tokens().any(|el| match el {
+        rowan::NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
+            t.text().trim_start().starts_with("#|   - ")
+        }
+        _ => false,
+    });
+    assert!(
+        !has_top_level_continuation_text,
+        "indented hashpipe continuation should not be emitted as top-level TEXT token"
+    );
+}
+
+#[test]
 fn display_code_block_keeps_hashpipe_line_as_plain_text() {
     let input = "```r\n#| label: foobar\na <- 1\n```\n";
     let node = parse_blocks_quarto(input);

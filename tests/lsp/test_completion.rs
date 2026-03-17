@@ -199,3 +199,28 @@ async fn test_completion_with_ris_bibliography() {
         "Expected RIS bibliography completion"
     );
 }
+
+#[tokio::test]
+async fn test_completion_returns_none_for_invalid_yaml_frontmatter() {
+    let server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    std::fs::write(root.join("refs.yaml"), "- id: cslkey\n  title: Sample\n").unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str()).await;
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    let content = "---\nbibliography: [\n---\n\nText [@] citation.";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.completion(doc_uri.as_str(), 4, 7).await;
+    assert!(
+        result.is_none(),
+        "Expected no completion when YAML frontmatter is invalid"
+    );
+}

@@ -17,6 +17,7 @@ pub mod range_utils;
 pub mod salsa;
 pub mod syntax;
 mod utils;
+mod yaml_engine;
 
 pub use config::BlankLines;
 pub use config::Config;

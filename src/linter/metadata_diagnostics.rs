@@ -14,8 +14,10 @@ pub fn yaml_error_diagnostic(error: &YamlError, text: &str) -> Option<Diagnostic
             message,
             line,
             column,
+            byte_offset,
         } => {
-            let offset = line_col_to_offset(text, *line as usize, *column as usize);
+            let offset = (*byte_offset)
+                .unwrap_or_else(|| line_col_to_offset(text, *line as usize, *column as usize));
             let range = TextRange::new((offset as u32).into(), (offset as u32).into());
             Some(Diagnostic::warning(
                 Location::from_range(range, text),
@@ -198,5 +200,22 @@ mod tests {
         assert_eq!(line_col_to_offset(text, 1, 1), 0);
         assert_eq!(line_col_to_offset(text, 1, 2), 2);
         assert_eq!(line_col_to_offset(text, 1, 3), 3);
+    }
+
+    #[test]
+    fn yaml_error_diagnostic_prefers_byte_offset_mapping() {
+        let text = "---\ntitle: [\n---\n";
+        let diag = yaml_error_diagnostic(
+            &YamlError::ParseError {
+                message: "bad yaml".to_string(),
+                line: 1,
+                column: 1,
+                byte_offset: Some(8),
+            },
+            text,
+        )
+        .expect("diagnostic");
+        let start: usize = diag.location.range.start().into();
+        assert_eq!(start, 8);
     }
 }

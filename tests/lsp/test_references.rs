@@ -138,3 +138,43 @@ async fn test_references_citation_with_declaration() {
     assert!(refs.iter().any(|loc| loc.uri == bib_uri));
     assert!(refs.iter().any(|loc| loc.uri == doc_uri));
 }
+
+#[tokio::test]
+async fn test_references_citation_skips_bibliography_declaration_for_invalid_yaml() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+
+    let bib_path = root.join("refs.bib");
+    fs::write(&bib_path, "@article{oldkey,\n  title = {Old}\n}\n").unwrap();
+
+    let doc_path = root.join("doc.qmd");
+    fs::write(&doc_path, "---\nbibliography: [\n---\nSee [@oldkey].\n").unwrap();
+
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let bib_uri = Uri::from_file_path(&bib_path).unwrap();
+    let root_uri = Uri::from_file_path(root).unwrap();
+    let server = TestLspServer::new();
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let refs = server
+        .references(doc_uri.as_str(), 3, 7, true)
+        .await
+        .expect("references");
+
+    assert!(
+        refs.iter().all(|loc| loc.uri != bib_uri),
+        "Invalid YAML should suppress bibliography declaration references"
+    );
+    assert!(
+        refs.iter().any(|loc| loc.uri == doc_uri),
+        "Document citation usage should still be reported"
+    );
+}

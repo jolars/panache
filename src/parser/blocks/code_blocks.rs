@@ -607,9 +607,6 @@ fn emit_hashpipe_option_line(
         .saturating_sub(after_colon.trim_start_matches([' ', '\t']).len());
     let value_with_trailing = &after_colon[value_ws_prefix_len..];
     let value = value_with_trailing.trim_end_matches([' ', '\t']);
-    if value.is_empty() {
-        return false;
-    }
     let value_ws_suffix = &value_with_trailing[value.len()..];
 
     builder.start_node(SyntaxKind::CHUNK_OPTION.into());
@@ -639,22 +636,24 @@ fn emit_hashpipe_option_line(
         );
     }
 
-    if let Some(quote) = value.chars().next()
-        && (quote == '"' || quote == '\'')
-        && value.ends_with(quote)
-        && value.len() >= 2
-    {
-        builder.token(SyntaxKind::CHUNK_OPTION_QUOTE.into(), &value[..1]);
-        builder.token(
-            SyntaxKind::CHUNK_OPTION_VALUE.into(),
-            &value[1..value.len() - 1],
-        );
-        builder.token(
-            SyntaxKind::CHUNK_OPTION_QUOTE.into(),
-            &value[value.len() - 1..],
-        );
-    } else {
-        builder.token(SyntaxKind::CHUNK_OPTION_VALUE.into(), value);
+    if !value.is_empty() {
+        if let Some(quote) = value.chars().next()
+            && (quote == '"' || quote == '\'')
+            && value.ends_with(quote)
+            && value.len() >= 2
+        {
+            builder.token(SyntaxKind::CHUNK_OPTION_QUOTE.into(), &value[..1]);
+            builder.token(
+                SyntaxKind::CHUNK_OPTION_VALUE.into(),
+                &value[1..value.len() - 1],
+            );
+            builder.token(
+                SyntaxKind::CHUNK_OPTION_QUOTE.into(),
+                &value[value.len() - 1..],
+            );
+        } else {
+            builder.token(SyntaxKind::CHUNK_OPTION_VALUE.into(), value);
+        }
     }
 
     if !value_ws_suffix.is_empty() {
@@ -718,10 +717,7 @@ fn is_hashpipe_option_line(line_without_newline: &str, prefix: &str) -> bool {
     if key.is_empty() {
         return false;
     }
-    let value = rest[colon_idx + 1..]
-        .trim_start_matches([' ', '\t'])
-        .trim_end_matches([' ', '\t']);
-    !value.is_empty()
+    true
 }
 
 fn is_hashpipe_continuation_line(line_without_newline: &str, prefix: &str) -> bool {
@@ -750,11 +746,7 @@ fn hashpipe_option_value(line_without_newline: &str, prefix: &str) -> Option<Str
     let value = rest[colon_idx + 1..]
         .trim_start_matches([' ', '\t'])
         .trim_end_matches([' ', '\t']);
-    if value.is_empty() {
-        None
-    } else {
-        Some(value.to_string())
-    }
+    Some(value.to_string())
 }
 
 fn hashpipe_continuation_value(line_without_newline: &str, prefix: &str) -> Option<String> {
@@ -769,6 +761,38 @@ fn hashpipe_continuation_value(line_without_newline: &str, prefix: &str) -> Opti
             .trim_end_matches([' ', '\t'])
             .to_string(),
     )
+}
+
+fn is_yaml_block_scalar_indicator(value: &str) -> bool {
+    let s = value.trim();
+    if s.is_empty() {
+        return false;
+    }
+    let mut chars = s.chars();
+    let Some(style) = chars.next() else {
+        return false;
+    };
+    if style != '|' && style != '>' {
+        return false;
+    }
+    chars.all(|ch| ch == '+' || ch == '-' || ch.is_ascii_digit())
+}
+
+fn leading_ws_count(text: &str) -> usize {
+    text.chars().take_while(|c| matches!(c, ' ' | '\t')).count()
+}
+
+fn is_hashpipe_block_scalar_continuation_line(line_without_newline: &str, prefix: &str) -> bool {
+    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
+    if !trimmed_start.starts_with(prefix) {
+        return false;
+    }
+    let after_prefix = &trimmed_start[prefix.len()..];
+    let text = after_prefix.trim_end_matches([' ', '\t']);
+    if text.is_empty() {
+        return true;
+    }
+    leading_ws_count(after_prefix) >= 2
 }
 
 fn is_unclosed_double_quoted(value: &str) -> bool {
@@ -1215,9 +1239,17 @@ pub(crate) fn parse_fenced_code_block(
                 }
                 line_idx += 1;
 
-                let mut multiline_value = hashpipe_option_value(line_without_newline, prefix)
-                    .filter(|value| is_unclosed_double_quoted(value));
-                while let Some(mut current_value) = multiline_value.take() {
+                let option_value = hashpipe_option_value(line_without_newline, prefix);
+                let mut multiline_value = option_value
+                    .as_ref()
+                    .filter(|value| is_unclosed_double_quoted(value))
+                    .cloned();
+                let in_block_scalar = option_value
+                    .as_ref()
+                    .is_some_and(|value| is_yaml_block_scalar_indicator(value));
+                let in_indented_value = option_value.as_ref().is_some_and(|value| value.is_empty());
+
+                while multiline_value.is_some() || in_block_scalar || in_indented_value {
                     if line_idx >= content_lines.len() {
                         break;
                     }
@@ -1230,30 +1262,54 @@ pub(crate) fn parse_fenced_code_block(
                     );
                     let (continuation_without_newline, continuation_newline) =
                         strip_newline(continuation_after_indent);
-                    let Some(continuation_value) =
-                        hashpipe_continuation_value(continuation_without_newline, prefix)
-                    else {
-                        break;
-                    };
 
-                    if !emit_hashpipe_continuation_line(
-                        builder,
-                        continuation_without_newline,
-                        prefix,
-                    ) {
-                        break;
+                    if in_block_scalar || in_indented_value {
+                        if !is_hashpipe_block_scalar_continuation_line(
+                            continuation_without_newline,
+                            prefix,
+                        ) {
+                            break;
+                        }
+                        if !emit_hashpipe_continuation_line(
+                            builder,
+                            continuation_without_newline,
+                            prefix,
+                        ) {
+                            break;
+                        }
+                        if !continuation_newline.is_empty() {
+                            builder.token(SyntaxKind::NEWLINE.into(), continuation_newline);
+                        }
+                        line_idx += 1;
+                        continue;
                     }
-                    if !continuation_newline.is_empty() {
-                        builder.token(SyntaxKind::NEWLINE.into(), continuation_newline);
-                    }
-                    line_idx += 1;
 
-                    if !current_value.ends_with(' ') {
-                        current_value.push(' ');
-                    }
-                    current_value.push_str(&continuation_value);
-                    if is_unclosed_double_quoted(&current_value) {
-                        multiline_value = Some(current_value);
+                    if let Some(mut current_value) = multiline_value.take() {
+                        let Some(continuation_value) =
+                            hashpipe_continuation_value(continuation_without_newline, prefix)
+                        else {
+                            break;
+                        };
+
+                        if !emit_hashpipe_continuation_line(
+                            builder,
+                            continuation_without_newline,
+                            prefix,
+                        ) {
+                            break;
+                        }
+                        if !continuation_newline.is_empty() {
+                            builder.token(SyntaxKind::NEWLINE.into(), continuation_newline);
+                        }
+                        line_idx += 1;
+
+                        if !current_value.ends_with(' ') {
+                            current_value.push(' ');
+                        }
+                        current_value.push_str(&continuation_value);
+                        if is_unclosed_double_quoted(&current_value) {
+                            multiline_value = Some(current_value);
+                        }
                     }
                 }
             }

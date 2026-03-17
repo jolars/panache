@@ -1179,4 +1179,28 @@ mod tests {
         );
         assert_eq!(index.citation_usages("cite").map(|v| v.len()), Some(1));
     }
+
+    #[test]
+    fn yaml_metadata_parse_result_recomputes_after_file_update() {
+        let mut db = SalsaDb::default();
+        let path = PathBuf::from("/tmp/yaml_recompute.qmd");
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        let file = db.update_file_text(path.clone(), "---\ntitle: [\n---\n\n# Test\n".to_string());
+        let first = yaml_metadata_parse_result(&db, file, config, path.clone()).clone();
+        assert!(first.is_err(), "expected initial YAML parse failure");
+
+        let fixed = crate::format(
+            "---\necho:    false\nlist:\n  -  a\n  -     b\n---\n\n# Test\n",
+            None,
+            None,
+        );
+        let file = db.update_file_text(path.clone(), fixed);
+        let second = yaml_metadata_parse_result(&db, file, config, path).clone();
+        assert!(second.is_ok(), "expected YAML parse success after update");
+    }
 }

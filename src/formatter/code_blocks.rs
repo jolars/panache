@@ -355,35 +355,81 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
         }
     }
 
+    fn is_yaml_block_scalar_indicator(value: &str) -> bool {
+        let s = value.trim();
+        if s.is_empty() {
+            return false;
+        }
+        let mut chars = s.chars();
+        let Some(style) = chars.next() else {
+            return false;
+        };
+        if style != '|' && style != '>' {
+            return false;
+        }
+        chars.all(|ch| ch == '+' || ch == '-' || ch.is_ascii_digit())
+    }
+
+    fn leading_ws_count(text: &str) -> usize {
+        text.chars().take_while(|c| matches!(c, ' ' | '\t')).count()
+    }
+
+    fn is_block_scalar_continuation_line(after_prefix: &str) -> bool {
+        let text = after_prefix.trim_end_matches(['\n', '\r']);
+        if text.trim().is_empty() {
+            return true;
+        }
+        leading_ws_count(text) >= 2
+    }
+
     let mut header_end = 0usize;
     let mut saw_prefix = false;
-    let mut open_multiline: Option<String> = None;
+    let mut open_quoted: Option<String> = None;
+    let mut open_block_scalar = false;
+    let lines: Vec<&str> = content.split_inclusive('\n').collect();
+    let mut i = 0usize;
 
-    for line in content.split_inclusive('\n') {
+    while i < lines.len() {
+        let line = lines[i];
         let trimmed = line.trim_start();
-        if let Some(mut value) = open_multiline.take() {
-            let Some(fragment) = continuation_value(trimmed, prefix) else {
-                break;
-            };
+
+        if let Some(mut value) = open_quoted.take()
+            && let Some(fragment) = continuation_value(trimmed, prefix)
+        {
             if !value.ends_with(' ') {
                 value.push(' ');
             }
             value.push_str(&fragment);
             header_end += line.len();
+            i += 1;
             if is_unclosed_double_quoted(&value) {
-                open_multiline = Some(value);
+                open_quoted = Some(value);
             }
             continue;
         }
 
+        if open_block_scalar {
+            if let Some(after_prefix) = trimmed.strip_prefix(prefix)
+                && is_block_scalar_continuation_line(after_prefix)
+            {
+                header_end += line.len();
+                i += 1;
+                continue;
+            }
+            open_block_scalar = false;
+        }
+
         if is_hashpipe_option_line(trimmed, prefix) {
             saw_prefix = true;
-            if let Some(value) = option_value(trimmed, prefix)
-                && is_unclosed_double_quoted(&value)
-            {
-                open_multiline = Some(value);
+            if let Some(value) = option_value(trimmed, prefix) {
+                if is_unclosed_double_quoted(&value) {
+                    open_quoted = Some(value);
+                } else if is_yaml_block_scalar_indicator(&value) {
+                    open_block_scalar = true;
+                }
             }
             header_end += line.len();
+            i += 1;
             continue;
         }
         break;
@@ -412,10 +458,7 @@ fn is_hashpipe_option_line(line: &str, prefix: &str) -> bool {
     if key.is_empty() {
         return false;
     }
-    let value = rest[colon_idx + 1..]
-        .trim_start_matches([' ', '\t'])
-        .trim_end_matches([' ', '\t']);
-    !value.is_empty()
+    true
 }
 
 /// Determine the minimum fence length needed to avoid conflicts with content
@@ -615,7 +658,12 @@ fn format_code_block_hashpipe(
         hashpipe::split_options_from_cst_with_content(info_node, content, comment_prefix);
 
     // Try to get hashpipe lines - returns None for unknown languages
-    let hashpipe_lines = match hashpipe::format_as_hashpipe(language, &simple, config.line_width) {
+    let hashpipe_lines = match hashpipe::format_as_hashpipe(
+        language,
+        &simple,
+        config.line_width,
+        config.wrap.as_ref(),
+    ) {
         Some(lines) => lines,
         None => return false, // Unknown language - fall back to inline format
     };

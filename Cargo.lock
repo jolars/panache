@@ -884,6 +884,7 @@ dependencies = [
  "ignore",
  "log",
  "predicates",
+ "pretty_yaml",
  "rayon",
  "regex",
  "rowan",
@@ -900,6 +901,7 @@ dependencies = [
  "unicode-width",
  "uuid",
  "which",
+ "yaml_parser 0.2.3",
 ]
 
 [[package]]
@@ -1006,6 +1008,17 @@ checksum = "d0de1b847b39c8131db0467e9df1ff60e6d0562ab8e9a16e568ad0fdb372e2f2"
 dependencies = [
  "predicates-core",
  "termtree",
+]
+
+[[package]]
+name = "pretty_yaml"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f5db2b0044c0dae209c173c6049f210c9449092b07304c9c8b8d555c606e93e"
+dependencies = [
+ "rowan",
+ "tiny_pretty",
+ "yaml_parser 0.3.0",
 ]
 
 [[package]]
@@ -1467,6 +1480,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "tiny_pretty"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "650d82e943da333637be9f1567d33d605e76810a26464edfd7ae74f7ef181e95"
+
+[[package]]
 name = "tokio"
 version = "1.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1901,6 +1920,9 @@ name = "winnow"
 version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "wit-bindgen"
@@ -1988,6 +2010,26 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
+]
+
+[[package]]
+name = "yaml_parser"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c422c39fd59a9dc11efa2b2be26cf9130c6ef9cb744da112a2e9e59c649e471"
+dependencies = [
+ "rowan",
+ "winnow",
+]
+
+[[package]]
+name = "yaml_parser"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71ebb04c72edf699612d543f6c421142527b85ac180156017fa26be49dc0762f"
+dependencies = [
+ "rowan",
+ "winnow",
 ]
 
 [[package]]

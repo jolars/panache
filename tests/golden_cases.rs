@@ -257,5 +257,6 @@ golden_test_cases!(
     writer_indented_code_escapes,
     yaml_metadata,
     yaml_metadata_dots_closer,
+    yaml_metadata_normalization,
     yaml_metadata_opening_blank_not_metadata,
 );

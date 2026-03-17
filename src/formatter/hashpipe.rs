@@ -3,9 +3,11 @@
 //! Converts inline chunk options to Quarto's new hashpipe format with proper
 //! line wrapping and language-specific comment prefixes.
 
+use crate::config::WrapMode;
 use crate::parser::utils::chunk_options::ChunkOptionValue;
 use crate::parser::utils::chunk_options::hashpipe_comment_prefix;
 use crate::syntax::{AstNode, ChunkLabel, ChunkOption, SyntaxKind, SyntaxNode};
+use crate::yaml_engine;
 
 /// A chunk option with a classified value (simple or expression).
 type ClassifiedOption = (String, ChunkOptionValue);
@@ -308,9 +310,6 @@ fn extract_leading_hashpipe_options(content: &str, prefix: &str) -> Vec<(String,
         let value = rest[colon_idx + 1..]
             .trim_start_matches([' ', '\t'])
             .trim_end_matches([' ', '\t']);
-        if value.is_empty() {
-            break;
-        }
 
         let mut merged_value = value.to_string();
         i += 1;
@@ -338,12 +337,77 @@ fn extract_leading_hashpipe_options(content: &str, prefix: &str) -> Vec<(String,
                     break;
                 }
             }
+        } else if is_yaml_block_scalar_indicator(&merged_value) {
+            while i < lines.len() {
+                let next_trimmed = lines[i].trim_start();
+                if !next_trimmed.starts_with(prefix) {
+                    break;
+                }
+                let next_after_prefix = &next_trimmed[prefix.len()..];
+                if !is_block_scalar_continuation_line(next_after_prefix) {
+                    break;
+                }
+                merged_value.push('\n');
+                merged_value.push_str(next_after_prefix);
+                i += 1;
+            }
+        } else if merged_value.is_empty() {
+            while i < lines.len() {
+                let next_trimmed = lines[i].trim_start();
+                if !next_trimmed.starts_with(prefix) {
+                    break;
+                }
+                let next_after_prefix = &next_trimmed[prefix.len()..];
+                if !is_block_scalar_continuation_line(next_after_prefix) {
+                    break;
+                }
+                merged_value.push('\n');
+                merged_value.push_str(strip_single_yaml_prefix_space(next_after_prefix));
+                i += 1;
+            }
         }
 
         options.push((key.to_string(), merged_value));
     }
 
     options
+}
+
+fn strip_single_yaml_prefix_space(after_prefix: &str) -> &str {
+    if let Some(rest) = after_prefix.strip_prefix(' ') {
+        rest
+    } else if let Some(rest) = after_prefix.strip_prefix('\t') {
+        rest
+    } else {
+        after_prefix
+    }
+}
+
+fn is_yaml_block_scalar_indicator(value: &str) -> bool {
+    let s = value.trim();
+    if s.is_empty() {
+        return false;
+    }
+    let mut chars = s.chars();
+    let Some(style) = chars.next() else {
+        return false;
+    };
+    if style != '|' && style != '>' {
+        return false;
+    }
+    chars.all(|ch| ch == '+' || ch == '-' || ch.is_ascii_digit())
+}
+
+fn leading_ws_count(text: &str) -> usize {
+    text.chars().take_while(|c| matches!(c, ' ' | '\t')).count()
+}
+
+fn is_block_scalar_continuation_line(after_prefix: &str) -> bool {
+    let text = after_prefix.trim_end_matches(['\n', '\r']);
+    if text.trim().is_empty() {
+        return true;
+    }
+    leading_ws_count(text) >= 2
 }
 
 fn is_unclosed_double_quoted(value: &str) -> bool {
@@ -430,6 +494,23 @@ pub fn format_hashpipe_option_with_wrap(
     value: &str,
     line_width: usize,
 ) -> Vec<String> {
+    if let Some((first, rest)) = value.split_once('\n')
+        && is_yaml_block_scalar_indicator(first)
+    {
+        let mut lines = vec![format!("{} {}: {}", prefix, key, first)];
+        lines.extend(rest.split('\n').map(|line| format!("{}{}", prefix, line)));
+        return lines;
+    }
+    if let Some((first, rest)) = value.split_once('\n') {
+        let mut lines = vec![if first.is_empty() {
+            format!("{} {}:", prefix, key)
+        } else {
+            format!("{} {}: {}", prefix, key, first)
+        }];
+        lines.extend(rest.split('\n').map(|line| format!("{} {}", prefix, line)));
+        return lines;
+    }
+
     let first_line = format!("{} {}: {}", prefix, key, value);
 
     // Check if wrapping is needed
@@ -494,9 +575,11 @@ pub fn format_as_hashpipe(
     language: &str,
     options: &[ClassifiedOption],
     line_width: usize,
+    wrap: Option<&WrapMode>,
 ) -> Option<Vec<String>> {
     let prefix = get_comment_prefix(language)?; // Return None if unknown language
     let mut output = Vec::new();
+    let mut yaml_entries: Vec<(String, String)> = Vec::new();
 
     for (key, value) in options {
         // Only format simple values
@@ -511,8 +594,34 @@ pub fn format_as_hashpipe(
                 norm_val
             };
 
+            yaml_entries.push((norm_key.clone(), value_str.clone()));
             let lines = format_hashpipe_option_with_wrap(prefix, &norm_key, &value_str, line_width);
             output.extend(lines);
+        }
+    }
+
+    if !yaml_entries.is_empty() {
+        let yaml_text = yaml_entries
+            .iter()
+            .map(|(key, value)| format!("{}: {}\n", key, value))
+            .collect::<String>();
+        let yaml_config = crate::config::Config {
+            line_width,
+            wrap: wrap.cloned(),
+            ..Default::default()
+        };
+        if let Ok(formatted_yaml) = yaml_engine::format_yaml_with_config(&yaml_text, &yaml_config) {
+            let lines = formatted_yaml
+                .lines()
+                .map(|line| {
+                    if line.is_empty() {
+                        prefix.to_string()
+                    } else {
+                        format!("{} {}", prefix, line)
+                    }
+                })
+                .collect::<Vec<_>>();
+            return Some(lines);
         }
     }
 
@@ -610,6 +719,23 @@ mod tests {
     }
 
     #[test]
+    fn test_format_hashpipe_option_block_scalar() {
+        let value = "|\n   A caption\n   spanning lines";
+        let lines = format_hashpipe_option_with_wrap("#|", "fig-cap", value, 80);
+        assert_eq!(
+            lines,
+            vec!["#| fig-cap: |", "#|   A caption", "#|   spanning lines"]
+        );
+    }
+
+    #[test]
+    fn test_format_hashpipe_option_indented_yaml_multiline() {
+        let value = "\n  - a\n  - b";
+        let lines = format_hashpipe_option_with_wrap("#|", "list", value, 80);
+        assert_eq!(lines, vec!["#| list:", "#|   - a", "#|   - b"]);
+    }
+
+    #[test]
     fn test_format_as_hashpipe_simple() {
         let options = vec![
             (
@@ -622,7 +748,7 @@ mod tests {
             ),
         ];
 
-        let lines = format_as_hashpipe("r", &options, 80).unwrap();
+        let lines = format_as_hashpipe("r", &options, 80, None).unwrap();
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0], "#| echo: true");
         assert_eq!(lines[1], "#| fig-width: 7");
@@ -641,7 +767,7 @@ mod tests {
             ),
         ];
 
-        let lines = format_as_hashpipe("r", &options, 80).unwrap();
+        let lines = format_as_hashpipe("r", &options, 80, None).unwrap();
         assert_eq!(lines.len(), 1); // Only echo, label skipped
         assert_eq!(lines[0], "#| echo: true");
     }
@@ -654,7 +780,7 @@ mod tests {
         )];
 
         // Unknown language should return None
-        let result = format_as_hashpipe("fortran", &options, 80);
+        let result = format_as_hashpipe("fortran", &options, 80, None);
         assert!(result.is_none());
     }
 }

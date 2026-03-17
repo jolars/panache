@@ -20,6 +20,7 @@ pub enum YamlError {
         message: String,
         line: u64,
         column: u64,
+        byte_offset: Option<usize>,
     },
     /// Invalid YAML structure.
     StructureError(String),
@@ -33,6 +34,7 @@ impl std::fmt::Display for YamlError {
                 message,
                 line,
                 column,
+                ..
             } => {
                 write!(f, "YAML parse error at {}:{}: {}", line, column, message)
             }
@@ -51,12 +53,14 @@ impl From<serde_saphyr::Error> for YamlError {
                 message: err.to_string(),
                 line: location.line(),
                 column: location.column(),
+                byte_offset: None,
             }
         } else {
             Self::ParseError {
                 message: err.to_string(),
                 line: 0,
                 column: 0,
+                byte_offset: None,
             }
         }
     }
@@ -106,9 +110,23 @@ pub(super) fn parse_frontmatter(
 ) -> Result<DocumentMetadata, YamlError> {
     // Extract just the YAML content (strip delimiters)
     let yaml_content = strip_yaml_delimiters(yaml_text);
+    let content_start = yaml_content_start_offset(yaml_text);
+    let doc_base_offset = u32::from(yaml_offset) as usize + content_start;
+
+    crate::yaml_engine::validate_yaml(&yaml_content).map_err(|err| {
+        let content_byte_offset = err.offset.min(yaml_content.len());
+        let (line, column) = byte_offset_to_line_col_1based(&yaml_content, content_byte_offset);
+        YamlError::ParseError {
+            message: err.message,
+            line: line as u64,
+            column: column as u64,
+            byte_offset: Some(doc_base_offset + content_byte_offset),
+        }
+    })?;
 
     // Parse with serde-saphyr
-    let frontmatter: Frontmatter = serde_saphyr::from_str(&yaml_content)?;
+    let frontmatter: Frontmatter = serde_saphyr::from_str(&yaml_content)
+        .map_err(|err| map_yaml_parse_error(err, &yaml_content, yaml_offset, content_start))?;
 
     // Extract bibliography info if present
     let bibliography = frontmatter
@@ -143,6 +161,105 @@ pub(super) fn parse_frontmatter(
         title: frontmatter.title,
         raw_yaml: yaml_content.to_string(),
     })
+}
+
+fn map_yaml_parse_error(
+    err: serde_saphyr::Error,
+    yaml_content: &str,
+    yaml_offset: TextSize,
+    content_start: usize,
+) -> YamlError {
+    if let Some(location) = err.location() {
+        let line = location.line();
+        let column = location.column();
+        let content_byte_offset =
+            line_col_to_byte_offset_1based(yaml_content, line as usize, column as usize)
+                .unwrap_or(yaml_content.len());
+        let absolute = u32::from(yaml_offset) as usize + content_start + content_byte_offset;
+        YamlError::ParseError {
+            message: err.to_string(),
+            line,
+            column,
+            byte_offset: Some(absolute),
+        }
+    } else {
+        YamlError::from(err)
+    }
+}
+
+fn line_col_to_byte_offset_1based(input: &str, line: usize, column: usize) -> Option<usize> {
+    if line == 0 || column == 0 {
+        return None;
+    }
+
+    let mut offset = 0usize;
+    let bytes = input.as_bytes();
+
+    for (idx, text_line) in input.lines().enumerate() {
+        let line_no = idx + 1;
+        if line_no == line {
+            let line_byte_offset = text_line
+                .char_indices()
+                .nth(column.saturating_sub(1))
+                .map(|(byte, _)| byte)
+                .unwrap_or(text_line.len());
+            return Some(offset + line_byte_offset);
+        }
+
+        let line_end_offset = offset + text_line.len();
+        let line_ending_len = if line_end_offset + 1 < input.len()
+            && bytes[line_end_offset] == b'\r'
+            && bytes[line_end_offset + 1] == b'\n'
+        {
+            2
+        } else if line_end_offset < input.len() && bytes[line_end_offset] == b'\n' {
+            1
+        } else {
+            0
+        };
+
+        offset += text_line.len() + line_ending_len;
+    }
+
+    if line == input.lines().count() + 1 && column == 1 {
+        Some(offset)
+    } else {
+        None
+    }
+}
+
+fn byte_offset_to_line_col_1based(input: &str, offset: usize) -> (usize, usize) {
+    let mut line = 1usize;
+    let mut line_start = 0usize;
+    let mut i = 0usize;
+    let bytes = input.as_bytes();
+    let target = offset.min(input.len());
+
+    while i < target {
+        if bytes[i] == b'\n' {
+            line += 1;
+            line_start = i + 1;
+        }
+        i += 1;
+    }
+    let col = input[line_start..target].chars().count() + 1;
+    (line, col)
+}
+
+fn yaml_content_start_offset(text: &str) -> usize {
+    let Some(first) = text.lines().next() else {
+        return 0;
+    };
+    if first.trim() != "---" {
+        return 0;
+    }
+    if text[first.len()..].starts_with("\r\n") {
+        first.len() + 2
+    } else if text[first.len()..].starts_with('\n') {
+        first.len() + 1
+    } else {
+        first.len()
+    }
 }
 
 /// Strip YAML delimiters (---) from frontmatter text.
@@ -209,6 +326,40 @@ mod tests {
     }
 
     #[test]
+    fn test_yaml_content_start_offset() {
+        let yaml = "---\ntitle: Test\n---";
+        assert_eq!(yaml_content_start_offset(yaml), 4);
+    }
+
+    #[test]
+    fn test_yaml_content_start_offset_crlf() {
+        let yaml = "---\r\ntitle: Test\r\n---";
+        assert_eq!(yaml_content_start_offset(yaml), 5);
+    }
+
+    #[test]
+    fn test_parse_error_includes_document_byte_offset() {
+        let yaml = "---\ntitle: [\n---";
+        let base = TextSize::from(10);
+        let err = parse_frontmatter(yaml, base, Path::new("test.qmd")).expect_err("parse error");
+        match err {
+            YamlError::ParseError {
+                line,
+                column,
+                byte_offset,
+                ..
+            } => {
+                let local =
+                    line_col_to_byte_offset_1based("title: [", line as usize, column as usize)
+                        .unwrap_or("title: [".len());
+                let expected = 10 + yaml_content_start_offset(yaml) + local;
+                assert_eq!(byte_offset, Some(expected));
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
     fn test_string_or_array_single() {
         // Test via Frontmatter struct, not directly
         use serde::Deserialize;
@@ -241,5 +392,13 @@ bibliography:
 "#;
         let value: Test = serde_saphyr::from_str(yaml).unwrap();
         assert_eq!(value.bibliography.paths(), vec!["refs.bib", "other.bib"]);
+    }
+
+    #[test]
+    fn test_byte_offset_to_line_col_1based() {
+        let input = "a\néx\n";
+        assert_eq!(byte_offset_to_line_col_1based(input, 0), (1, 1));
+        assert_eq!(byte_offset_to_line_col_1based(input, 2), (2, 1));
+        assert_eq!(byte_offset_to_line_col_1based(input, 4), (2, 2));
     }
 }
