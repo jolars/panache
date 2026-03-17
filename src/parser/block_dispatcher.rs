@@ -38,7 +38,10 @@ use super::blocks::lists::{
     ListDelimiter, ListMarker, OrderedMarker, is_content_nested_bullet_marker,
     try_parse_list_marker,
 };
-use super::blocks::metadata::{try_parse_pandoc_title_block, try_parse_yaml_block};
+use super::blocks::metadata::{
+    emit_yaml_block, find_yaml_block_closing_pos, try_parse_pandoc_title_block,
+    try_parse_yaml_block,
+};
 use super::blocks::raw_blocks;
 use super::blocks::raw_blocks::extract_environment_name;
 use super::blocks::reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
@@ -309,6 +312,11 @@ impl BlockParser for PandocTitleBlockParser {
 
 /// YAML metadata block parser (--- ... ---/...)
 pub(crate) struct YamlMetadataParser;
+#[derive(Debug, Clone)]
+pub(crate) struct YamlMetadataPrepared {
+    pub at_document_start: bool,
+    pub closing_pos: usize,
+}
 
 impl BlockParser for YamlMetadataParser {
     fn detect_prepared(
@@ -343,14 +351,15 @@ impl BlockParser for YamlMetadataParser {
             return None;
         }
 
-        // Only claim YAML when a full block parse succeeds (including closing delimiter).
-        let mut tmp = GreenNodeBuilder::new();
-        try_parse_yaml_block(lines, line_pos, &mut tmp, ctx.at_document_start)?;
+        let closing_pos = find_yaml_block_closing_pos(lines, line_pos, ctx.at_document_start)?;
 
         // Cache the `at_document_start` flag for emission (avoids any ambiguity if ctx changes).
         Some((
             BlockDetectionResult::Yes,
-            Some(Box::new(ctx.at_document_start)),
+            Some(Box::new(YamlMetadataPrepared {
+                at_document_start: ctx.at_document_start,
+                closing_pos,
+            })),
         ))
     }
 
@@ -362,15 +371,19 @@ impl BlockParser for YamlMetadataParser {
         line_pos: usize,
         payload: Option<&dyn Any>,
     ) -> usize {
-        let at_document_start = payload
-            .and_then(|p| p.downcast_ref::<bool>().copied())
-            .unwrap_or(ctx.at_document_start);
-
-        if let Some(new_pos) = try_parse_yaml_block(lines, line_pos, builder, at_document_start) {
-            new_pos - line_pos
-        } else {
-            1
+        if let Some(prepared) = payload.and_then(|p| p.downcast_ref::<YamlMetadataPrepared>())
+            && let Some(new_pos) = emit_yaml_block(lines, line_pos, prepared.closing_pos, builder)
+        {
+            return new_pos - line_pos;
         }
+
+        let at_document_start = payload
+            .and_then(|p| p.downcast_ref::<YamlMetadataPrepared>())
+            .map(|p| p.at_document_start)
+            .unwrap_or(ctx.at_document_start);
+        try_parse_yaml_block(lines, line_pos, builder, at_document_start)
+            .map(|new_pos| new_pos - line_pos)
+            .unwrap_or(1)
     }
 
     fn name(&self) -> &'static str {

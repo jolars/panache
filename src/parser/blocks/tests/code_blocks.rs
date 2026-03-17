@@ -429,6 +429,48 @@ fn executable_chunk_indented_hashpipe_value_continuation_is_not_top_level_text()
 }
 
 #[test]
+fn executable_chunk_emits_hashpipe_yaml_preamble_node() {
+    let input = "```{r}\n#| echo: false\n#| fig-cap: |\n#|   A caption\nx <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
+    let code_content = code_block
+        .children()
+        .find(|n| n.kind() == SyntaxKind::CODE_CONTENT)
+        .expect("expected code content");
+    let preamble = code_content
+        .children()
+        .find(|n| n.kind() == SyntaxKind::HASHPIPE_YAML_PREAMBLE)
+        .expect("expected hashpipe preamble node");
+    assert_eq!(
+        preamble.text().to_string(),
+        "#| echo: false\n#| fig-cap: |\n#|   A caption\n"
+    );
+}
+
+#[test]
+fn executable_chunk_emits_hashpipe_yaml_content_node() {
+    let input = "```{r}\n#| echo: false\n#| fig-cap: |\n#|   A caption\nx <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
+    let code_content = code_block
+        .children()
+        .find(|n| n.kind() == SyntaxKind::CODE_CONTENT)
+        .expect("expected code content");
+    let preamble = code_content
+        .children()
+        .find(|n| n.kind() == SyntaxKind::HASHPIPE_YAML_PREAMBLE)
+        .expect("expected hashpipe preamble node");
+    let preamble_content = preamble
+        .children()
+        .find(|n| n.kind() == SyntaxKind::HASHPIPE_YAML_CONTENT)
+        .expect("expected hashpipe preamble content node");
+    assert_eq!(
+        preamble_content.text().to_string(),
+        "#| echo: false\n#| fig-cap: |\n#|   A caption\n"
+    );
+}
+
+#[test]
 fn display_code_block_keeps_hashpipe_line_as_plain_text() {
     let input = "```r\n#| label: foobar\na <- 1\n```\n";
     let node = parse_blocks_quarto(input);

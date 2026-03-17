@@ -1,9 +1,8 @@
 //! YAML metadata block parsing utilities.
 
+use crate::parser::utils::helpers::{emit_line_tokens, strip_newline};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
-
-use crate::parser::utils::helpers::{emit_line_tokens, strip_newline};
 
 /// Try to parse a YAML metadata block starting at the given position.
 /// Returns the new position after the block if successful, None otherwise.
@@ -16,6 +15,15 @@ pub(crate) fn try_parse_yaml_block(
     lines: &[&str],
     pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
+    at_document_start: bool,
+) -> Option<usize> {
+    let closing_pos = find_yaml_block_closing_pos(lines, pos, at_document_start)?;
+    emit_yaml_block(lines, pos, closing_pos, builder)
+}
+
+pub(crate) fn find_yaml_block_closing_pos(
+    lines: &[&str],
+    pos: usize,
     at_document_start: bool,
 ) -> Option<usize> {
     if pos >= lines.len() {
@@ -57,21 +65,33 @@ pub(crate) fn try_parse_yaml_block(
             break;
         }
     }
-    let closing_pos = closing_pos?;
+    closing_pos
+}
 
+pub(crate) fn emit_yaml_block(
+    lines: &[&str],
+    pos: usize,
+    closing_pos: usize,
+    builder: &mut GreenNodeBuilder<'static>,
+) -> Option<usize> {
+    if pos >= lines.len() || closing_pos <= pos || closing_pos >= lines.len() {
+        return None;
+    }
     // Start metadata node
     builder.start_node(SyntaxKind::YAML_METADATA.into());
 
     // Opening delimiter - strip newline before emitting
-    let (text, newline_str) = strip_newline(line);
+    let (text, newline_str) = strip_newline(lines[pos]);
     builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), text);
     if !newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
+    builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
     for content_line in lines.iter().take(closing_pos).skip(pos + 1) {
         emit_line_tokens(builder, content_line);
     }
+    builder.finish_node(); // YAML_METADATA_CONTENT
 
     let (closing_text, closing_newline) = strip_newline(lines[closing_pos]);
     builder.token(SyntaxKind::YAML_METADATA_DELIM.into(), closing_text);
@@ -199,6 +219,28 @@ mod tests {
         let mut builder = GreenNodeBuilder::new();
         let result = try_parse_yaml_block(&lines, 0, &mut builder, true);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_find_yaml_block_closing_pos() {
+        let lines = vec!["---", "title: Test", "---", "Content"];
+        let result = find_yaml_block_closing_pos(&lines, 0, true);
+        assert_eq!(result, Some(2));
+    }
+
+    #[test]
+    fn test_yaml_block_emits_content_node() {
+        let input = "---\ntitle: Test\nlist:\n  - a\n---\n";
+        let tree = crate::parse(input, Some(crate::Config::default()));
+        let metadata = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_METADATA)
+            .expect("yaml metadata node");
+        let content = metadata
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_METADATA_CONTENT)
+            .expect("yaml metadata content node");
+        assert_eq!(content.text().to_string(), "title: Test\nlist:\n  - a\n");
     }
 
     #[test]

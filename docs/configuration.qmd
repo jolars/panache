@@ -592,7 +592,8 @@ opt-in—you choose which languages to format.
 
 YAML is special: Panache has built-in YAML formatting for frontmatter and
 hashpipe chunk options. External YAML formatters apply only to fenced code
-blocks with YAML language.
+blocks with YAML language. The YAML parser/formatter path is implemented in
+Panache-owned in-repo components.
 
 ### Basic Usage
 

@@ -2,8 +2,9 @@ DOCUMENT@0..86
   YAML_METADATA@0..25
     YAML_METADATA_DELIM@0..3 "---"
     NEWLINE@3..5 "\r\n"
-    TEXT@5..18 "title: \"Test\""
-    NEWLINE@18..20 "\r\n"
+    YAML_METADATA_CONTENT@5..20
+      TEXT@5..18 "title: \"Test\""
+      NEWLINE@18..20 "\r\n"
     YAML_METADATA_DELIM@20..23 "---"
     NEWLINE@23..25 "\r\n"
   BLANK_LINE@25..27

@@ -1,7 +1,7 @@
 //! Tests for incremental document synchronization.
 
 use super::helpers::*;
-use tower_lsp_server::ls_types::{GotoDefinitionResponse, Uri};
+use tower_lsp_server::ls_types::{DocumentSymbolResponse, GotoDefinitionResponse, Uri};
 
 #[tokio::test]
 async fn test_incremental_edit_simple() {
@@ -173,5 +173,52 @@ async fn test_multiple_documents() {
     assert_eq!(
         server.get_document_content("file:///doc2.qmd").await,
         Some("# Modified 2".to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_incremental_edit_preserves_yaml_frontmatter_document_symbol() {
+    let server = TestLspServer::new();
+    let content = "---\ntitle: Old\n---\n\n# Heading\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let before = server
+        .get_symbols("file:///test.qmd")
+        .await
+        .expect("symbols before edit");
+    let DocumentSymbolResponse::Nested(before_symbols) = before else {
+        panic!("Expected nested symbols");
+    };
+    assert!(
+        before_symbols
+            .iter()
+            .any(|symbol| symbol.name == "YAML Frontmatter"),
+        "Expected YAML frontmatter symbol before edit"
+    );
+
+    server
+        .edit_document(
+            "file:///test.qmd",
+            vec![incremental_change(1, 7, 1, 10, "Updated Title")],
+        )
+        .await;
+
+    let after = server
+        .get_symbols("file:///test.qmd")
+        .await
+        .expect("symbols after edit");
+    let DocumentSymbolResponse::Nested(after_symbols) = after else {
+        panic!("Expected nested symbols");
+    };
+    let yaml_symbol = after_symbols
+        .iter()
+        .find(|symbol| symbol.name == "YAML Frontmatter")
+        .expect("yaml symbol after edit");
+    assert_eq!(yaml_symbol.range.start.line, 0);
+    assert!(
+        yaml_symbol.range.end.line >= 2,
+        "frontmatter symbol should still span the YAML block"
     );
 }

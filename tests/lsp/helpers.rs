@@ -3,6 +3,7 @@
 //! This module provides utilities to test LSP functionality in-memory
 //! without spawning the binary or dealing with stdio protocol.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use tower_lsp_server::ls_types::*;
 use tower_lsp_server::{LanguageServer, LspService};
@@ -248,6 +249,32 @@ impl TestLspServer {
         let db = db.lock().await;
         let file = db.file_text(path.to_path_buf())?;
         Some(file.text(&*db).clone())
+    }
+
+    /// Get built-in lint diagnostics for a document from Salsa (test-only).
+    pub async fn get_built_in_diagnostics(
+        &self,
+        uri: &str,
+    ) -> Option<Vec<panache::linter::diagnostics::Diagnostic>> {
+        let parsed_uri: Uri = uri.parse().ok()?;
+        let state = {
+            let doc_map = self.lsp.document_map();
+            let docs = doc_map.lock().await;
+            docs.get(uri).cloned()
+        }?;
+
+        let path = state
+            .path
+            .clone()
+            .or_else(|| parsed_uri.to_file_path().map(|p| p.into_owned()))
+            .unwrap_or_else(|| PathBuf::from("<memory>"));
+
+        let db = self.lsp.salsa_db();
+        let db = db.lock().await;
+        let plan =
+            panache::salsa::built_in_lint_plan(&*db, state.salsa_file, state.salsa_config, path)
+                .clone();
+        Some(plan.diagnostics)
     }
 
     /// Trigger the file watcher handler (test-only).

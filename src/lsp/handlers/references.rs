@@ -47,12 +47,15 @@ pub(crate) async fn references(
     let Some(doc_path) = doc_path.clone() else {
         return Ok(None);
     };
+    let Some(offset) = position_to_offset(&content, position) else {
+        return Ok(None);
+    };
+    if helpers::is_offset_in_yaml_frontmatter(&SyntaxNode::new_root(green_tree.clone()), offset) {
+        return Ok(None);
+    }
 
     let target = {
         let root = SyntaxNode::new_root(green_tree.clone());
-        let Some(offset) = position_to_offset(&content, position) else {
-            return Ok(None);
-        };
         let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
             return Ok(None);
         };
@@ -128,13 +131,8 @@ pub(crate) async fn references(
         }
 
         if include_declaration {
-            let yaml_ok = crate::salsa::yaml_metadata_parse_result(
-                &*db,
-                salsa_file,
-                salsa_config,
-                doc_path.clone(),
-            )
-            .is_ok();
+            let yaml_ok =
+                helpers::is_yaml_frontmatter_valid(&SyntaxNode::new_root(green_tree.clone()));
             if yaml_ok {
                 Some(
                     crate::salsa::citation_definition_index(

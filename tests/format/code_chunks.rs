@@ -178,3 +178,28 @@ fn hashpipe_indented_yaml_value_is_preserved_as_hashpipe_header() {
     assert!(output.contains("#|   - b"));
     assert!(output.contains("a <- 1"));
 }
+
+#[test]
+fn hashpipe_block_scalar_formatting_is_idempotent() {
+    let input =
+        "```{r}\n#| fig-cap: |\n#|   A caption\n#|   spanning some lines\nplot(1:10)\n```\n";
+    let output1 = format(input, Some(quarto_config()), None);
+    let output2 = format(&output1, Some(quarto_config()), None);
+
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+    assert!(output2.contains("#| fig-cap: |"));
+    assert!(output2.contains("#|   A caption"));
+    assert!(output2.contains("#|   spanning some lines"));
+}
+
+#[test]
+fn hashpipe_folded_block_scalar_formatting_is_idempotent() {
+    let input = "```{r}\n#| fig-cap: >-\n#|   A folded caption\n#|   spanning some lines\nplot(1:10)\n```\n";
+    let output1 = format(input, Some(quarto_config()), None);
+    let output2 = format(&output1, Some(quarto_config()), None);
+
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+    assert!(output2.contains("#| fig-cap: >-"));
+    assert!(output2.contains("#|   A folded caption"));
+    assert!(output2.contains("#|   spanning some lines"));
+}

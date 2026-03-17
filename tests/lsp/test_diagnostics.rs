@@ -45,3 +45,115 @@ async fn test_diagnostics_on_heading_hierarchy_issue() {
 }
 
 // Document diagnostics are not currently supported in the test harness.
+
+#[tokio::test]
+async fn test_code_actions_filter_quickfixes_to_requested_range() {
+    let server = TestLspServer::new();
+    let content = "# Heading 1\n\n### Heading 3\n\nContent.\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let code_actions = server
+        .get_code_actions(
+            "file:///test.qmd",
+            0, // Request only first line range
+            0,
+            0,
+            20,
+        )
+        .await
+        .expect("code actions response");
+
+    let has_heading_fix = code_actions.iter().any(|action| {
+        if let CodeActionOrCommand::CodeAction(ca) = action {
+            ca.title.contains("heading")
+        } else {
+            false
+        }
+    });
+
+    assert!(
+        !has_heading_fix,
+        "Heading hierarchy quickfix should not appear outside requested range"
+    );
+}
+
+#[tokio::test]
+async fn test_code_actions_no_refactors_inside_yaml_frontmatter() {
+    let server = TestLspServer::new();
+    let content = "---\ntitle: Report\nlist:\n  - a\n  - b\n---\n\nBody.\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let code_actions = server
+        .get_code_actions(
+            "file:///test.qmd",
+            3, // inside frontmatter list item
+            2,
+            3,
+            8,
+        )
+        .await
+        .expect("code actions response");
+
+    let has_refactor = code_actions.iter().any(|action| {
+        if let CodeActionOrCommand::CodeAction(ca) = action {
+            ca.kind
+                .as_ref()
+                .is_some_and(|kind| *kind == CodeActionKind::REFACTOR)
+        } else {
+            false
+        }
+    });
+    assert!(
+        !has_refactor,
+        "Refactor code actions should not be offered inside YAML frontmatter"
+    );
+}
+
+#[tokio::test]
+async fn test_hashpipe_yaml_parse_error_in_built_in_lint_plan() {
+    let server = TestLspServer::new();
+    let content = "```{r}\n#| fig-cap: [\na <- 1\n```\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let diagnostics = server
+        .get_built_in_diagnostics("file:///test.qmd")
+        .await
+        .expect("diagnostics");
+
+    let yaml_parse_error = diagnostics
+        .iter()
+        .find(|diag| diag.code == "yaml-parse-error")
+        .expect("expected yaml-parse-error diagnostic");
+    assert!(
+        yaml_parse_error.message.contains("YAML parse error"),
+        "expected YAML parse error message, got: {}",
+        yaml_parse_error.message
+    );
+}
+
+#[tokio::test]
+async fn test_hashpipe_folded_scalar_parse_error_maps_to_host_position() {
+    let server = TestLspServer::new();
+    let content = "```{r}\n#| fig-cap: >-\n#|   A folded caption\n#| bad: [\na <- 1\n```\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let diagnostics = server
+        .get_built_in_diagnostics("file:///test.qmd")
+        .await
+        .expect("diagnostics");
+
+    let yaml_parse_error = diagnostics
+        .iter()
+        .find(|diag| diag.code == "yaml-parse-error")
+        .expect("expected yaml-parse-error diagnostic");
+    assert_eq!(yaml_parse_error.location.line, 4);
+    assert_eq!(yaml_parse_error.location.column, 9);
+}

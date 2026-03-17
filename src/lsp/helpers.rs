@@ -8,7 +8,10 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::salsa::Db;
-use crate::syntax::{AstNode, ChunkOption, Citation, Crossref, SyntaxKind, SyntaxNode};
+use crate::syntax::{
+    AstNode, ChunkOption, Citation, Crossref, SyntaxKind, SyntaxNode,
+    collect_embedded_frontmatter_yaml_cst,
+};
 use crate::utils::pandoc_slugify;
 use rowan::{NodeOrToken, TextRange, TextSize};
 
@@ -155,6 +158,18 @@ pub(crate) fn find_node_at_offset(root: &SyntaxNode, offset: usize) -> Option<Sy
         NodeOrToken::Node(node) => Some(node),
         NodeOrToken::Token(token) => token.parent(),
     }
+}
+
+pub(crate) fn is_offset_in_yaml_frontmatter(root: &SyntaxNode, offset: usize) -> bool {
+    collect_embedded_frontmatter_yaml_cst(root).is_some_and(|embedding| {
+        let range = embedding.parsed().host_range();
+        range.start <= offset && offset < range.end
+    })
+}
+
+pub(crate) fn is_yaml_frontmatter_valid(root: &SyntaxNode) -> bool {
+    collect_embedded_frontmatter_yaml_cst(root)
+        .is_none_or(|embedding| embedding.parsed().is_valid())
 }
 
 /// Normalize a label for case-insensitive matching (collapses whitespace, lowercases)

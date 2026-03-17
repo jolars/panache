@@ -18,6 +18,8 @@ pub mod salsa;
 pub mod syntax;
 mod utils;
 mod yaml_engine;
+#[cfg(test)]
+mod yaml_regions;
 
 pub use config::BlankLines;
 pub use config::Config;

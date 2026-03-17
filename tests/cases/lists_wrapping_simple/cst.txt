@@ -2,8 +2,9 @@ DOCUMENT@0..1668
   YAML_METADATA@0..37
     YAML_METADATA_DELIM@0..3 "---"
     NEWLINE@3..4 "\n"
-    TEXT@4..32 "title: \"List Wrapping ..."
-    NEWLINE@32..33 "\n"
+    YAML_METADATA_CONTENT@4..33
+      TEXT@4..32 "title: \"List Wrapping ..."
+      NEWLINE@32..33 "\n"
     YAML_METADATA_DELIM@33..36 "---"
     NEWLINE@36..37 "\n"
   BLANK_LINE@37..38

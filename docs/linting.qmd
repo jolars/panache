@@ -337,6 +337,34 @@ warning[unknown-emoji-alias]: Unknown emoji alias ':not-a-real-emoji:'
   --> document.qmd:1:40
 ```
 
+## YAML parse diagnostics
+
+Panache emits `yaml-parse-error` diagnostics when embedded YAML content is
+invalid. This currently applies to both document frontmatter (`--- ... ---`) and
+executable chunk hashpipe options (`#| ...`).
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+**Example (hashpipe):**
+
+````markdown
+```{r}
+#| echo: [
+1 + 1
+```
+````
+
+**Diagnostic:**
+
+```
+warning[yaml-parse-error]: YAML parse error: ...
+  --> document.qmd:2:10
+```
+
 ## Diagnostic Format
 
 Diagnostics are displayed in a compiler-style format:

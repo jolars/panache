@@ -178,3 +178,40 @@ async fn test_references_citation_skips_bibliography_declaration_for_invalid_yam
         "Document citation usage should still be reported"
     );
 }
+
+#[tokio::test]
+async fn test_references_returns_none_inside_yaml_frontmatter() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+    fs::write(
+        root.join("refs.bib"),
+        "@article{known,\n  title = {Known}\n}\n",
+    )
+    .unwrap();
+
+    let doc_path = root.join("doc.qmd");
+    fs::write(
+        &doc_path,
+        "---\ntitle: \"@known\"\nbibliography: refs.bib\n---\n\nSee [@known].\n",
+    )
+    .unwrap();
+
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let root_uri = Uri::from_file_path(root).unwrap();
+    let server = TestLspServer::new();
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let refs = server.references(doc_uri.as_str(), 1, 10, true).await;
+    assert!(
+        refs.is_none(),
+        "Expected no references when cursor is inside YAML frontmatter"
+    );
+}

@@ -2,8 +2,9 @@ DOCUMENT@0..734
   YAML_METADATA@0..31
     YAML_METADATA_DELIM@0..3 "---"
     NEWLINE@3..4 "\n"
-    TEXT@4..26 "title: Task Lists Test"
-    NEWLINE@26..27 "\n"
+    YAML_METADATA_CONTENT@4..27
+      TEXT@4..26 "title: Task Lists Test"
+      NEWLINE@26..27 "\n"
     YAML_METADATA_DELIM@27..30 "---"
     NEWLINE@30..31 "\n"
   BLANK_LINE@31..32

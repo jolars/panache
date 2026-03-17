@@ -11,7 +11,7 @@ use crate::lsp::conversions::offset_to_position;
 use crate::lsp::helpers::get_document_content_and_tree;
 use crate::syntax::{
     AstNode, GridTable, Heading, ImageLink, MultilineTable, PipeTable, SimpleTable, SyntaxKind,
-    SyntaxNode,
+    SyntaxNode, collect_embedded_frontmatter_yaml_cst,
 };
 
 pub async fn document_symbol(
@@ -23,7 +23,6 @@ pub async fn document_symbol(
 ) -> Result<Option<DocumentSymbolResponse>> {
     let uri = params.text_document.uri;
     log::debug!("document_symbol request for: {}", *uri);
-
     // Use helper to get document content and tree
     let (content, syntax_tree) =
         match get_document_content_and_tree(&document_map, &salsa_db, &uri).await {
@@ -34,9 +33,10 @@ pub async fn document_symbol(
             }
         };
     log::debug!("Document content length: {} bytes", content.len());
+    let yaml_frontmatter_region = collect_embedded_frontmatter_yaml_cst(&syntax_tree);
 
     // Build symbols synchronously (SyntaxNode is not Send)
-    let symbols = build_document_symbols(&syntax_tree, &content);
+    let symbols = build_document_symbols(&syntax_tree, &content, yaml_frontmatter_region.as_ref());
 
     log::debug!("Found {} top-level symbols", symbols.len());
     if symbols.is_empty() {
@@ -46,14 +46,17 @@ pub async fn document_symbol(
     }
 }
 
-fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbol> {
+fn build_document_symbols(
+    root: &SyntaxNode,
+    content: &str,
+    yaml_frontmatter_region: Option<&crate::syntax::YamlEmbeddedCst>,
+) -> Vec<DocumentSymbol> {
     let mut symbols = Vec::new();
     let mut heading_stack: Vec<(usize, DocumentSymbol)> = Vec::new();
     let db = crate::salsa::SalsaDb::default();
     let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, root);
     let heading_levels: std::collections::HashMap<rowan::TextRange, usize> =
         symbol_index.heading_sequence().iter().copied().collect();
-
     log::debug!("build_document_symbols: root kind = {:?}", root.kind());
 
     // Root is now DOCUMENT node directly
@@ -61,6 +64,9 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
         log::warn!("Root is not a DOCUMENT node: {:?}", root.kind());
         return symbols;
     }
+    symbols.extend(
+        yaml_frontmatter_region.and_then(|region| extract_yaml_region_symbol(region, content)),
+    );
 
     for node in root.children() {
         match node.kind() {
@@ -145,6 +151,32 @@ fn build_document_symbols(root: &SyntaxNode, content: &str) -> Vec<DocumentSymbo
     }
 
     symbols
+}
+
+fn extract_yaml_region_symbol(
+    region: &crate::syntax::YamlEmbeddedCst,
+    content: &str,
+) -> Option<DocumentSymbol> {
+    let parsed = region.parsed();
+    let host_range = parsed.host_range();
+    let range = Range {
+        start: offset_to_position(content, host_range.start),
+        end: offset_to_position(content, host_range.end),
+    };
+    #[allow(deprecated)]
+    Some(DocumentSymbol {
+        name: "YAML Frontmatter".to_string(),
+        detail: Some(match parsed.document_shape_summary() {
+            Some(summary) => format!("{} ({})", parsed.id(), summary),
+            None => format!("{} (invalid YAML)", parsed.id()),
+        }),
+        kind: SymbolKind::NAMESPACE,
+        tags: None,
+        deprecated: None,
+        range,
+        selection_range: range,
+        children: None,
+    })
 }
 
 fn extract_heading_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {
@@ -252,7 +284,7 @@ mod tests {
         let content = "# H1\n\n## H2\n\n### H3\n\n## H2 Again\n\n# H1 Again";
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let symbols = build_document_symbols(&tree, content);
+        let symbols = build_document_symbols(&tree, content, None);
 
         assert_eq!(symbols.len(), 2); // Two H1 headings
 
@@ -280,7 +312,7 @@ mod tests {
         let content = "# Heading\n\n| col1 | col2 |\n|------|------|\n| a    | b    |\n";
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let symbols = build_document_symbols(&tree, content);
+        let symbols = build_document_symbols(&tree, content, None);
 
         assert_eq!(symbols.len(), 1);
         let heading = &symbols[0];
@@ -297,7 +329,7 @@ mod tests {
         let content = "# Heading\n\n| col1 | col2 |\n|------|------|\n| a    | b    |\n: Results\n";
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let symbols = build_document_symbols(&tree, content);
+        let symbols = build_document_symbols(&tree, content, None);
 
         assert_eq!(symbols.len(), 1);
         let children = symbols[0].children.as_ref().unwrap();
@@ -310,7 +342,7 @@ mod tests {
         let content = "# Heading\n\n![Figure caption](image.png)\n";
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let symbols = build_document_symbols(&tree, content);
+        let symbols = build_document_symbols(&tree, content, None);
 
         assert_eq!(symbols.len(), 1);
         let children = symbols[0].children.as_ref().unwrap();
@@ -324,7 +356,7 @@ mod tests {
         let content = "# Heading\n\n![](image.png)\n";
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let symbols = build_document_symbols(&tree, content);
+        let symbols = build_document_symbols(&tree, content, None);
 
         assert_eq!(symbols.len(), 1);
         let children = symbols[0].children.as_ref().unwrap();
@@ -337,7 +369,7 @@ mod tests {
         let content = "# \n\n## Subtitle";
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let symbols = build_document_symbols(&tree, content);
+        let symbols = build_document_symbols(&tree, content, None);
 
         assert_eq!(symbols.len(), 1);
         assert_eq!(symbols[0].name, "(empty)");
@@ -352,7 +384,7 @@ mod tests {
         let content = "| col1 | col2 |\n|------|------|\n| a    | b    |\n\n![Figure](image.png)";
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let symbols = build_document_symbols(&tree, content);
+        let symbols = build_document_symbols(&tree, content, None);
 
         // Tables and figures at root level when no headings
         assert_eq!(symbols.len(), 2);
@@ -385,7 +417,7 @@ Another table:
 "#;
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let symbols = build_document_symbols(&tree, content);
+        let symbols = build_document_symbols(&tree, content, None);
 
         assert_eq!(symbols.len(), 1); // One H1
         let h1 = &symbols[0];
@@ -402,5 +434,36 @@ Another table:
         // H2 should have figure + h3
         assert!(h2_children.iter().any(|s| s.name.starts_with("Figure:")));
         assert!(h2_children.iter().any(|s| s.name == "Subsection"));
+    }
+
+    #[test]
+    fn test_yaml_frontmatter_symbol_uses_parsed_summary_detail() {
+        let content = "---\ntitle: Test\n---\n\n# H1\n";
+        let config = Config::default();
+        let tree = crate::parser::parse(content, Some(config));
+        let yaml_frontmatter_region = collect_embedded_frontmatter_yaml_cst(&tree);
+        let symbols = build_document_symbols(&tree, content, yaml_frontmatter_region.as_ref());
+        let yaml_symbol = symbols
+            .iter()
+            .find(|symbol| symbol.name == "YAML Frontmatter")
+            .expect("yaml frontmatter symbol");
+        let detail = yaml_symbol.detail.as_ref().expect("yaml symbol detail");
+        assert!(detail.contains("Root"));
+        assert!(detail.contains("BlockMap"));
+    }
+
+    #[test]
+    fn test_yaml_frontmatter_symbol_shows_invalid_yaml_detail() {
+        let content = "---\ntitle: [\n---\n\n# H1\n";
+        let config = Config::default();
+        let tree = crate::parser::parse(content, Some(config));
+        let yaml_frontmatter_region = collect_embedded_frontmatter_yaml_cst(&tree);
+        let symbols = build_document_symbols(&tree, content, yaml_frontmatter_region.as_ref());
+        let yaml_symbol = symbols
+            .iter()
+            .find(|symbol| symbol.name == "YAML Frontmatter")
+            .expect("yaml frontmatter symbol");
+        let detail = yaml_symbol.detail.as_ref().expect("yaml symbol detail");
+        assert!(detail.contains("invalid YAML"));
     }
 }

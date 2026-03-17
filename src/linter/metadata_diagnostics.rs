@@ -34,6 +34,22 @@ pub fn yaml_error_diagnostic(error: &YamlError, text: &str) -> Option<Diagnostic
     }
 }
 
+pub(crate) fn yaml_parse_error_at_offset_diagnostic(
+    text: &str,
+    offset: usize,
+    message: Option<&str>,
+) -> Diagnostic {
+    let range = TextRange::new((offset as u32).into(), (offset as u32).into());
+    Diagnostic::warning(
+        Location::from_range(range, text),
+        "yaml-parse-error",
+        format!(
+            "YAML parse error: {}",
+            message.unwrap_or("invalid YAML content")
+        ),
+    )
+}
+
 pub fn metadata_diagnostics(metadata: &DocumentMetadata, text: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     diagnostics.extend(check_bibliography_parse(metadata, text));
@@ -217,5 +233,14 @@ mod tests {
         .expect("diagnostic");
         let start: usize = diag.location.range.start().into();
         assert_eq!(start, 8);
+    }
+
+    #[test]
+    fn yaml_parse_error_at_offset_diagnostic_uses_host_error_offset() {
+        let text = "---\ntitle: [\n---\n";
+        let diag = yaml_parse_error_at_offset_diagnostic(text, 11, Some("expected ]"));
+        let start: usize = diag.location.range.start().into();
+        assert_eq!(start, 11);
+        assert_eq!(diag.code, "yaml-parse-error");
     }
 }

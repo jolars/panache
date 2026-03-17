@@ -247,3 +247,41 @@ plot(1:10)
         "expected chunk label definition edit"
     );
 }
+
+#[tokio::test]
+async fn test_rename_returns_none_inside_yaml_frontmatter() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    fs::write(root.join("_quarto.yml"), "project: default\n").unwrap();
+    fs::write(
+        root.join("refs.bib"),
+        "@article{known,\n  title = {Known}\n}\n",
+    )
+    .unwrap();
+
+    let doc_path = root.join("doc.qmd");
+    fs::write(
+        &doc_path,
+        "---\ntitle: \"@known\"\nbibliography: refs.bib\n---\n\nSee [@known].\n",
+    )
+    .unwrap();
+
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap();
+    let root_uri = Uri::from_file_path(root).unwrap();
+
+    let server = TestLspServer::new();
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let edit = server.rename(doc_uri.as_str(), 1, 10, "renamed").await;
+    assert!(
+        edit.is_none(),
+        "Expected no rename edits when cursor is inside YAML frontmatter"
+    );
+}

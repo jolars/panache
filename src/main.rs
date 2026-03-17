@@ -758,12 +758,25 @@ fn main() -> io::Result<()> {
                     .as_deref()
                     .unwrap_or(Path::new("stdin.md"));
                 let metadata = panache::metadata::extract_project_metadata(&tree, stdin_path).ok();
-                let diagnostics = panache::linter::lint_with_external_sync_and_metadata(
+                let mut diagnostics = panache::linter::lint_with_external_sync_and_metadata(
                     &tree,
                     &input,
                     &cfg,
                     metadata.as_ref(),
                 );
+                let db = panache::salsa::SalsaDb::default();
+                let yaml_diags = panache::salsa::built_in_lint_plan(
+                    &db,
+                    panache::salsa::FileText::new(&db, input.clone()),
+                    panache::salsa::FileConfig::new(&db, cfg.clone()),
+                    stdin_path.to_path_buf(),
+                )
+                .diagnostics
+                .iter()
+                .filter(|d| d.code == "yaml-parse-error")
+                .cloned()
+                .collect::<Vec<_>>();
+                merge_missing_diagnostics(&mut diagnostics, yaml_diags);
 
                 if diagnostics.is_empty() {
                     if !check {
@@ -949,6 +962,18 @@ fn lint_loaded_document_with_includes(
     let metadata = panache::metadata::extract_project_metadata(&tree, doc_path).ok();
     let mut diagnostics =
         panache::linter::lint_with_external_sync_and_metadata(&tree, input, cfg, metadata.as_ref());
+    let yaml_diags = panache::salsa::built_in_lint_plan(
+        db,
+        panache::salsa::FileText::new(db, input.to_string()),
+        panache::salsa::FileConfig::new(db, cfg.clone()),
+        doc_path.clone(),
+    )
+    .diagnostics
+    .iter()
+    .filter(|d| d.code == "yaml-parse-error")
+    .cloned()
+    .collect::<Vec<_>>();
+    merge_missing_diagnostics(&mut diagnostics, yaml_diags);
 
     let base_dir = doc_path.parent().unwrap_or(Path::new("."));
     let project_root = panache::includes::find_quarto_root(doc_path);
@@ -1040,4 +1065,18 @@ fn apply_fixes(input: &str, diagnostics: &[panache::linter::Diagnostic]) -> Stri
 
     output.push_str(&input[last_end..]);
     output
+}
+
+fn merge_missing_diagnostics(
+    diagnostics: &mut Vec<panache::linter::Diagnostic>,
+    additional: Vec<panache::linter::Diagnostic>,
+) {
+    for diag in additional {
+        if diagnostics.iter().any(|existing| {
+            existing.code == diag.code && existing.location.range == diag.location.range
+        }) {
+            continue;
+        }
+        diagnostics.push(diag);
+    }
 }

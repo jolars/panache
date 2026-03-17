@@ -29,25 +29,23 @@ pub(crate) async fn goto_definition(
     let position = params.text_document_position_params.position;
     let config = helpers::get_config(client, &workspace_root, uri).await;
 
-    let (salsa_file, salsa_config, doc_path) = {
+    let (salsa_file, salsa_config, doc_path, green_tree) = {
         let map = document_map.lock().await;
         match map.get(&uri.to_string()) {
-            Some(state) => (state.salsa_file, state.salsa_config, state.path.clone()),
+            Some(state) => (
+                state.salsa_file,
+                state.salsa_config,
+                state.path.clone(),
+                state.tree.clone(),
+            ),
             None => return Ok(None),
         }
     };
 
     let citation_def_index = if let Some(doc_path) = doc_path.clone() {
-        let yaml_ok = {
-            let db = salsa_db.lock().await;
-            crate::salsa::yaml_metadata_parse_result(
-                &*db,
-                salsa_file,
-                salsa_config,
-                doc_path.clone(),
-            )
-            .is_ok()
-        };
+        let yaml_ok = helpers::is_yaml_frontmatter_valid(&crate::syntax::SyntaxNode::new_root(
+            green_tree.clone(),
+        ));
         if yaml_ok {
             let db = salsa_db.lock().await;
             Some(
@@ -66,6 +64,19 @@ pub(crate) async fn goto_definition(
         map.get(&uri.to_string())
             .and_then(|state| state.path.clone())
     };
+    let content_for_offset = {
+        let db = salsa_db.lock().await;
+        salsa_file.text(&*db).clone()
+    };
+    let Some(offset) = conversions::position_to_offset(&content_for_offset, position) else {
+        return Ok(None);
+    };
+    if helpers::is_offset_in_yaml_frontmatter(
+        &crate::syntax::SyntaxNode::new_root(green_tree.clone()),
+        offset,
+    ) {
+        return Ok(None);
+    }
 
     enum PendingDefinition {
         Citation(String),
@@ -77,11 +88,6 @@ pub(crate) async fn goto_definition(
         let Some((content, root)) =
             helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
         else {
-            return Ok(None);
-        };
-
-        // Convert LSP position to byte offset
-        let Some(offset) = conversions::position_to_offset(&content, position) else {
             return Ok(None);
         };
 

@@ -68,6 +68,24 @@ async fn test_document_symbols_with_table() {
 }
 
 #[tokio::test]
+async fn test_document_symbols_include_yaml_frontmatter_symbol() {
+    let server = TestLspServer::new();
+    let content = "---\ntitle: Report\n---\n\n# Report\n\nBody.";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let symbols = server.get_symbols("file:///test.qmd").await;
+    let Some(DocumentSymbolResponse::Nested(syms)) = symbols else {
+        panic!("Expected nested document symbols");
+    };
+    assert!(
+        syms.iter().any(|symbol| symbol.name == "YAML Frontmatter"),
+        "Expected a YAML frontmatter document symbol"
+    );
+}
+
+#[tokio::test]
 async fn test_folding_ranges_headings() {
     let server = TestLspServer::new();
 

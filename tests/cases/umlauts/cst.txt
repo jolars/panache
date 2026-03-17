@@ -2,10 +2,11 @@ DOCUMENT@0..62
   YAML_METADATA@0..38
     YAML_METADATA_DELIM@0..3 "---"
     NEWLINE@3..4 "\n"
-    TEXT@4..16 "author: Test"
-    NEWLINE@16..17 "\n"
-    TEXT@17..33 "title: smörgås"
-    NEWLINE@33..34 "\n"
+    YAML_METADATA_CONTENT@4..34
+      TEXT@4..16 "author: Test"
+      NEWLINE@16..17 "\n"
+      TEXT@17..33 "title: smörgås"
+      NEWLINE@33..34 "\n"
     YAML_METADATA_DELIM@34..37 "---"
     NEWLINE@37..38 "\n"
   PARAGRAPH@38..54

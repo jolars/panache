@@ -38,10 +38,31 @@ pub(crate) async fn hover(
     let Some(doc_path) = doc_path else {
         return Ok(None);
     };
-    let yaml_ok = {
+    let content_for_offset = {
         let db = salsa_db.lock().await;
-        crate::salsa::yaml_metadata_parse_result(&*db, salsa_file, salsa_config, doc_path.clone())
-            .is_ok()
+        salsa_file.text(&*db).clone()
+    };
+    let Some(offset) = conversions::position_to_offset(&content_for_offset, position) else {
+        return Ok(None);
+    };
+    let in_frontmatter_region = {
+        let Some((_content, root)) =
+            helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
+        else {
+            return Ok(None);
+        };
+        helpers::is_offset_in_yaml_frontmatter(&root, offset)
+    };
+    if in_frontmatter_region {
+        return Ok(None);
+    }
+    let yaml_ok = {
+        let Some((_content, root)) =
+            helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
+        else {
+            return Ok(None);
+        };
+        helpers::is_yaml_frontmatter_valid(&root)
     };
     if !yaml_ok {
         return Ok(None);
@@ -53,14 +74,9 @@ pub(crate) async fn hover(
     };
 
     let pending_footnote = {
-        let Some((content, root)) =
+        let Some((_content, root)) =
             helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
         else {
-            return Ok(None);
-        };
-
-        // Convert LSP position to byte offset
-        let Some(offset) = conversions::position_to_offset(&content, position) else {
             return Ok(None);
         };
 

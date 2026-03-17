@@ -2,18 +2,19 @@ DOCUMENT@0..347
   YAML_METADATA@0..99
     YAML_METADATA_DELIM@0..3 "---"
     NEWLINE@3..4 "\n"
-    TEXT@4..26 "title: \"Test Document\""
-    NEWLINE@26..27 "\n"
-    TEXT@27..43 "author: John Doe"
-    NEWLINE@43..44 "\n"
-    TEXT@44..60 "date: 2024-01-01"
-    NEWLINE@60..61 "\n"
-    TEXT@61..70 "keywords:"
-    NEWLINE@70..71 "\n"
-    TEXT@71..83 "  - markdown"
-    NEWLINE@83..84 "\n"
-    TEXT@84..94 "  - quarto"
-    NEWLINE@94..95 "\n"
+    YAML_METADATA_CONTENT@4..95
+      TEXT@4..26 "title: \"Test Document\""
+      NEWLINE@26..27 "\n"
+      TEXT@27..43 "author: John Doe"
+      NEWLINE@43..44 "\n"
+      TEXT@44..60 "date: 2024-01-01"
+      NEWLINE@60..61 "\n"
+      TEXT@61..70 "keywords:"
+      NEWLINE@70..71 "\n"
+      TEXT@71..83 "  - markdown"
+      NEWLINE@83..84 "\n"
+      TEXT@84..94 "  - quarto"
+      NEWLINE@94..95 "\n"
     YAML_METADATA_DELIM@95..98 "---"
     NEWLINE@98..99 "\n"
   PARAGRAPH@99..114
@@ -34,8 +35,9 @@ DOCUMENT@0..347
   YAML_METADATA@199..242
     YAML_METADATA_DELIM@199..202 "---"
     NEWLINE@202..203 "\n"
-    TEXT@203..237 "subtitle: \"A subtitle ..."
-    NEWLINE@237..238 "\n"
+    YAML_METADATA_CONTENT@203..238
+      TEXT@203..237 "subtitle: \"A subtitle ..."
+      NEWLINE@237..238 "\n"
     YAML_METADATA_DELIM@238..241 "---"
     NEWLINE@241..242 "\n"
   BLANK_LINE@242..243

@@ -364,3 +364,36 @@ plot(1:10)
     };
     assert_eq!(location.range.start.line, 3);
 }
+
+#[tokio::test]
+async fn test_goto_definition_returns_none_inside_yaml_frontmatter() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let bib_path = root.join("refs.bib");
+    let doc_path = root.join("doc.qmd");
+
+    std::fs::write(&bib_path, "@book{known,}\n").unwrap();
+    std::fs::write(
+        &doc_path,
+        "---\ntitle: \"@known\"\nbibliography: refs.bib\n---\n\nSee [@known].\n",
+    )
+    .unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &std::fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let result = server.goto_definition(doc_uri.as_str(), 1, 10).await;
+    assert!(
+        result.is_none(),
+        "Expected no goto definition when cursor is inside YAML frontmatter"
+    );
+}

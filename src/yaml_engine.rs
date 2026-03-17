@@ -1,19 +1,9 @@
 use crate::config::{Config, WrapMode};
-
-#[derive(Debug, Clone)]
-pub(crate) struct YamlParseError {
-    pub message: String,
-    pub offset: usize,
-}
+use crate::syntax::YamlParseError;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn validate_yaml(input: &str) -> Result<(), YamlParseError> {
-    yaml_parser::parse(input)
-        .map(|_| ())
-        .map_err(|err| YamlParseError {
-            message: err.message().to_string(),
-            offset: err.offset(),
-        })
+    crate::syntax::validate_yaml_text(input)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -23,7 +13,7 @@ pub(crate) fn validate_yaml(_input: &str) -> Result<(), YamlParseError> {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn format_yaml_with_config(input: &str, config: &Config) -> Result<String, String> {
-    validate_yaml(input).map_err(|e| e.message)?;
+    validate_yaml(input).map_err(|e| e.message().to_string())?;
     let mut options = pretty_yaml::config::FormatOptions::default();
     options.layout.print_width = config.line_width;
     options.language.prose_wrap = prose_wrap_for_config(config);
@@ -62,8 +52,8 @@ mod tests {
     #[test]
     fn validate_yaml_reports_offset() {
         let err = validate_yaml("a: [\n").expect_err("should fail");
-        assert!(err.offset <= 4);
-        assert!(!err.message.is_empty());
+        assert!(err.offset() <= 4);
+        assert!(!err.message().is_empty());
     }
 
     #[cfg(not(target_arch = "wasm32"))]

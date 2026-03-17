@@ -114,10 +114,10 @@ pub(super) fn parse_frontmatter(
     let doc_base_offset = u32::from(yaml_offset) as usize + content_start;
 
     crate::yaml_engine::validate_yaml(&yaml_content).map_err(|err| {
-        let content_byte_offset = err.offset.min(yaml_content.len());
+        let content_byte_offset = err.offset().min(yaml_content.len());
         let (line, column) = byte_offset_to_line_col_1based(&yaml_content, content_byte_offset);
         YamlError::ParseError {
-            message: err.message,
+            message: err.message().to_string(),
             line: line as u64,
             column: column as u64,
             byte_offset: Some(doc_base_offset + content_byte_offset),

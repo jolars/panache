@@ -59,7 +59,7 @@ impl Rule for MissingChunkLabelsRule {
                 .children()
                 .find(|child| child.kind() == SyntaxKind::CODE_CONTENT)
                 .map(|content| {
-                    content.children().any(|child| {
+                    content.descendants().any(|child| {
                         ChunkOption::cast(child)
                             .and_then(|opt| opt.key())
                             .is_some_and(|key| key.eq_ignore_ascii_case("label"))

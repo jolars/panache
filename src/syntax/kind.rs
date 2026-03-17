@@ -112,6 +112,7 @@ pub enum SyntaxKind {
     // Composite nodes
     DOCUMENT,
     YAML_METADATA,
+    YAML_METADATA_CONTENT, // Content lines inside YAML metadata block
     PANDOC_TITLE_BLOCK,
     FENCED_DIV,
     PARAGRAPH,
@@ -168,12 +169,14 @@ pub enum SyntaxKind {
     CODE_LANGUAGE, // Parsed language identifier (r, python, etc.)
 
     // Chunk options (for executable chunks like {r, echo=TRUE})
-    CHUNK_OPTIONS,      // Container for all chunk options
-    CHUNK_OPTION,       // Single option (key=value pair)
-    CHUNK_OPTION_KEY,   // Option name (e.g., echo, fig.cap)
-    CHUNK_OPTION_VALUE, // Option value (e.g., TRUE, "text")
-    CHUNK_OPTION_QUOTE, // Quote character (" or ') if present
-    CHUNK_LABEL,        // Special case: unlabeled first option in {r mylabel}
+    CHUNK_OPTIONS,          // Container for all chunk options
+    CHUNK_OPTION,           // Single option (key=value pair)
+    CHUNK_OPTION_KEY,       // Option name (e.g., echo, fig.cap)
+    CHUNK_OPTION_VALUE,     // Option value (e.g., TRUE, "text")
+    CHUNK_OPTION_QUOTE,     // Quote character (" or ') if present
+    CHUNK_LABEL,            // Special case: unlabeled first option in {r mylabel}
+    HASHPIPE_YAML_PREAMBLE, // Hashpipe YAML option preamble region inside CODE_CONTENT
+    HASHPIPE_YAML_CONTENT,  // Content lines belonging to hashpipe YAML preamble
 
     CODE_CONTENT,
 

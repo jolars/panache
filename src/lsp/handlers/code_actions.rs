@@ -8,7 +8,7 @@ use tower_lsp_server::ls_types::*;
 
 use crate::linter;
 use crate::lsp::DocumentState;
-use crate::syntax::{AstNode, List};
+use crate::syntax::{AstNode, List, collect_embedded_frontmatter_yaml_cst};
 
 use super::super::conversions::{convert_diagnostic, offset_to_position, position_to_offset};
 use super::super::helpers::get_document_and_config;
@@ -23,7 +23,6 @@ pub(crate) async fn code_action(
     params: CodeActionParams,
 ) -> Result<Option<CodeActionResponse>> {
     let uri = params.text_document.uri;
-
     // Use helper to get document and config
     let (text, config) = match get_document_and_config(
         client,
@@ -37,6 +36,21 @@ pub(crate) async fn code_action(
         Some(result) => result,
         None => return Ok(None),
     };
+    let request_range = params.range;
+    let request_start_offset = position_to_offset(&text, request_range.start);
+    let request_end_offset = position_to_offset(&text, request_range.end)
+        .or_else(|| request_start_offset.map(|start| start.saturating_add(1)));
+    let in_frontmatter_region =
+        if let (Some(start), Some(end)) = (request_start_offset, request_end_offset) {
+            let root_for_yaml = crate::parse(&text, Some(config.clone()));
+            let end = end.max(start.saturating_add(1));
+            collect_embedded_frontmatter_yaml_cst(&root_for_yaml).is_some_and(|embedding| {
+                let host_range = embedding.parsed().host_range();
+                host_range.start < end && start < host_range.end
+            })
+        } else {
+            false
+        };
 
     #[derive(Debug)]
     struct ExternalLintJob {
@@ -131,6 +145,10 @@ pub(crate) async fn code_action(
     // Add lint fix code actions
     for diag in diagnostics {
         if let Some(ref fix) = diag.fix {
+            let lsp_diag = convert_diagnostic(&diag, &text);
+            if !ranges_overlap(lsp_diag.range, request_range) {
+                continue;
+            }
             let mut changes = HashMap::new();
             let text_edits: Vec<TextEdit> = fix
                 .edits
@@ -150,7 +168,7 @@ pub(crate) async fn code_action(
             let action = CodeAction {
                 title: fix.message.clone(),
                 kind: Some(CodeActionKind::QUICKFIX),
-                diagnostics: Some(vec![convert_diagnostic(&diag, &text)]),
+                diagnostics: Some(vec![lsp_diag]),
                 edit: Some(WorkspaceEdit {
                     changes: Some(changes),
                     ..Default::default()
@@ -166,7 +184,8 @@ pub(crate) async fn code_action(
 
     // Add list conversion code actions (refactoring)
     // Parse tree synchronously (SyntaxNode is not Send, can't use spawn_blocking)
-    if let Some(offset) = position_to_offset(&text, params.range.start)
+    if !in_frontmatter_region
+        && let Some(offset) = position_to_offset(&text, request_range.start)
         && let Some(list_node) = list_conversion::find_list_at_position(&tree, offset)
         && let Some(list) = List::cast(list_node.clone())
     {
@@ -214,7 +233,7 @@ pub(crate) async fn code_action(
     }
 
     // Add footnote conversion code actions (refactoring)
-    if let Some(offset) = position_to_offset(&text, params.range.start) {
+    if !in_frontmatter_region && let Some(offset) = position_to_offset(&text, request_range.start) {
         // Check for reference footnote at cursor
         if let Some(ref_node) =
             footnote_conversion::find_footnote_reference_at_position(&tree, offset)
@@ -268,4 +287,9 @@ pub(crate) async fn code_action(
     }
 
     Ok(Some(actions))
+}
+
+fn ranges_overlap(a: Range, b: Range) -> bool {
+    (a.start.line, a.start.character) < (b.end.line, b.end.character)
+        && (b.start.line, b.start.character) < (a.end.line, a.end.character)
 }

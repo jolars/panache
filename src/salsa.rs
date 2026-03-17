@@ -8,7 +8,7 @@ use crate::metadata::DocumentMetadata;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{
     AstNode, ChunkOption, Citation, Crossref, FootnoteDefinition, ReferenceDefinition, SyntaxKind,
-    SyntaxNode,
+    SyntaxNode, YamlRegion, collect_embedded_frontmatter_yaml_cst, collect_embedded_yaml_cst,
 };
 use crate::utils::normalize_label;
 use salsa::{Accumulator, Durability, Setter};
@@ -125,6 +125,55 @@ pub fn yaml_metadata_parse_result(
     crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path).map(|_| ())
 }
 
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+pub fn yaml_regions_for_file(db: &dyn Db, file: FileText, config: FileConfig) -> Vec<YamlRegion> {
+    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    collect_embedded_yaml_cst(&tree)
+        .into_iter()
+        .map(|embedding| embedding.parsed().to_region())
+        .collect()
+}
+
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+pub fn yaml_embedded_regions_in_host_range(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+    start_offset: usize,
+    end_offset: usize,
+) -> Vec<YamlRegion> {
+    if start_offset >= end_offset {
+        return Vec::new();
+    }
+    yaml_regions_for_file(db, file, config)
+        .iter()
+        .filter(|region| {
+            region.host_range.start < end_offset && start_offset < region.host_range.end
+        })
+        .cloned()
+        .collect()
+}
+
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+pub fn yaml_frontmatter_is_valid(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+    path: PathBuf,
+) -> bool {
+    let text = file.text(db);
+    let cfg = config.config(db).clone();
+    let tree = crate::parse(text, Some(cfg));
+    let Some(frontmatter) = collect_embedded_frontmatter_yaml_cst(&tree) else {
+        // No in-document frontmatter to validate; allow project-file metadata flows.
+        return true;
+    };
+    if !frontmatter.parsed().is_valid() {
+        return false;
+    }
+    yaml_metadata_parse_result(db, file, config, path).is_ok()
+}
+
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types), lru = 64)]
 pub fn built_in_lint_plan(
     db: &dyn Db,
@@ -135,20 +184,63 @@ pub fn built_in_lint_plan(
     let text = file.text(db);
     let cfg = config.config(db).clone();
     let tree = crate::parse(text, Some(cfg.clone()));
-
-    let yaml = yaml_metadata_parse_result(db, file, config, path.clone()).clone();
-    let metadata = yaml
-        .as_ref()
-        .ok()
-        .map(|_| metadata(db, file, config, path).clone());
+    let embedded_yaml = collect_embedded_yaml_cst(&tree);
+    let parsed_yaml_regions: Vec<_> = embedded_yaml
+        .iter()
+        .map(|embedding| embedding.parsed())
+        .collect();
+    let frontmatter =
+        collect_embedded_frontmatter_yaml_cst(&tree).map(|embedded| embedded.parsed().clone());
+    let frontmatter = frontmatter.as_ref();
+    let has_frontmatter = frontmatter.is_some();
+    let frontmatter_parse_ok = frontmatter.as_ref().is_none_or(|parsed| parsed.is_valid());
+    let yaml = if has_frontmatter && frontmatter_parse_ok {
+        Some(yaml_metadata_parse_result(db, file, config, path.clone()).clone())
+    } else {
+        None
+    };
+    let metadata = if frontmatter_parse_ok && yaml.as_ref().is_none_or(Result::is_ok) {
+        Some(metadata(db, file, config, path).clone())
+    } else {
+        None
+    };
 
     let mut diagnostics = Vec::new();
-    if let Err(yaml_error) = yaml
+    if let Some(parsed) = frontmatter
+        && let Some(err) = parsed.error()
+    {
+        let host_offset = parsed
+            .parse_error_host_offset()
+            .expect("yaml parse error offset must map to host offset");
+        diagnostics.push(
+            crate::linter::metadata_diagnostics::yaml_parse_error_at_offset_diagnostic(
+                text,
+                host_offset,
+                Some(err.message()),
+            ),
+        );
+    } else if let Some(Err(yaml_error)) = yaml
         && let Some(diag) =
             crate::linter::metadata_diagnostics::yaml_error_diagnostic(&yaml_error, text)
     {
         diagnostics.push(diag);
     }
+    diagnostics.extend(parsed_yaml_regions.iter().filter_map(|parsed| {
+        if !parsed.is_hashpipe() {
+            return None;
+        }
+        let err = parsed.error()?;
+        let host_offset = parsed
+            .parse_error_host_offset()
+            .expect("yaml parse error offset must map to host offset");
+        Some(
+            crate::linter::metadata_diagnostics::yaml_parse_error_at_offset_diagnostic(
+                text,
+                host_offset,
+                Some(err.message()),
+            ),
+        )
+    }));
 
     diagnostics.extend(crate::linter::lint_with_metadata(
         &tree,
@@ -1202,5 +1294,219 @@ mod tests {
         let file = db.update_file_text(path.clone(), fixed);
         let second = yaml_metadata_parse_result(&db, file, config, path).clone();
         assert!(second.is_ok(), "expected YAML parse success after update");
+    }
+
+    #[test]
+    fn yaml_regions_for_file_recomputes_after_file_update() {
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        let file = db.update_file_text(
+            PathBuf::from("/tmp/yaml_regions.qmd"),
+            "# Test\n".to_string(),
+        );
+        let first = yaml_regions_for_file(&db, file, config).clone();
+        assert!(
+            first.is_empty(),
+            "expected no YAML regions in plain markdown input"
+        );
+
+        let updated = "---\ntitle: Test\n---\n\n```{r}\n#| echo: false\n1 + 1\n```\n".to_string();
+        let file = db.update_file_text(PathBuf::from("/tmp/yaml_regions.qmd"), updated);
+        let second = yaml_regions_for_file(&db, file, config).clone();
+
+        assert_eq!(second.len(), 2, "expected frontmatter + hashpipe regions");
+        assert!(
+            second
+                .iter()
+                .any(|region| matches!(region.kind, crate::syntax::YamlRegionKind::Frontmatter))
+        );
+        assert!(
+            second
+                .iter()
+                .any(|region| matches!(region.kind, crate::syntax::YamlRegionKind::Hashpipe))
+        );
+    }
+
+    #[test]
+    fn yaml_embedded_regions_in_host_range_recomputes_after_file_update() {
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        let file = db.update_file_text(
+            PathBuf::from("/tmp/yaml_embedded_regions_update.qmd"),
+            "# Test\n".to_string(),
+        );
+        let first = yaml_embedded_regions_in_host_range(&db, file, config, 0, 6).clone();
+        assert!(
+            first.is_empty(),
+            "expected no YAML regions in plain markdown"
+        );
+
+        let updated = "---\ntitle: Test\n---\n\n```{r}\n#| echo: false\n1 + 1\n```\n".to_string();
+        let file = db.update_file_text(
+            PathBuf::from("/tmp/yaml_embedded_regions_update.qmd"),
+            updated.clone(),
+        );
+        let second =
+            yaml_embedded_regions_in_host_range(&db, file, config, 0, updated.len()).clone();
+
+        assert_eq!(
+            second.len(),
+            2,
+            "expected regions for frontmatter + hashpipe"
+        );
+        assert!(
+            second
+                .iter()
+                .any(|region| matches!(region.kind, crate::syntax::YamlRegionKind::Frontmatter))
+        );
+        assert!(
+            second
+                .iter()
+                .any(|region| matches!(region.kind, crate::syntax::YamlRegionKind::Hashpipe))
+        );
+    }
+
+    #[test]
+    fn yaml_frontmatter_is_valid_depends_on_region_and_parse_state() {
+        let mut db = SalsaDb::default();
+        let path = PathBuf::from("/tmp/yaml_validity.qmd");
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        let file = db.update_file_text(path.clone(), "# Test\n".to_string());
+        assert!(
+            *yaml_frontmatter_is_valid(&db, file, config, path.clone()),
+            "no frontmatter should be treated as valid for project metadata flows"
+        );
+
+        let file = db.update_file_text(path.clone(), "---\nbibliography: [\n---\n".to_string());
+        assert!(
+            !*yaml_frontmatter_is_valid(&db, file, config, path.clone()),
+            "invalid frontmatter YAML should be invalid"
+        );
+
+        let file = db.update_file_text(
+            path.clone(),
+            "---\nbibliography: refs.bib\n---\n".to_string(),
+        );
+        assert!(
+            *yaml_frontmatter_is_valid(&db, file, config, path),
+            "valid frontmatter YAML should be valid"
+        );
+    }
+
+    #[test]
+    fn built_in_lint_plan_uses_project_bibliography_without_frontmatter() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir");
+        let root = temp_dir.path();
+        let doc_path = root.join("doc.qmd");
+        let bib_path = root.join("refs.bib");
+        std::fs::write(root.join("_quarto.yml"), "bibliography: refs.bib\n")
+            .expect("project config");
+        std::fs::write(&bib_path, "@article{known,\n  title = {Known}\n}\n").expect("bib file");
+
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+
+        let _bib_file = db.update_file_text(
+            bib_path.clone(),
+            "@article{known,\n  title = {Known}\n}\n".to_string(),
+        );
+        let file = db.update_file_text(doc_path.clone(), "See [@known].\n".to_string());
+
+        let plan = built_in_lint_plan(&db, file, config, doc_path).clone();
+        assert!(
+            plan.diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.code != "missing-bibliography-key"),
+            "project bibliography should satisfy citation key lint without frontmatter"
+        );
+    }
+
+    #[test]
+    fn built_in_lint_plan_reports_frontmatter_yaml_parse_error() {
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+        let path = PathBuf::from("/tmp/lint_yaml_summary_error.qmd");
+        let file = db.update_file_text(path.clone(), "---\ntitle: [\n---\n".to_string());
+
+        let plan = built_in_lint_plan(&db, file, config, path).clone();
+        assert!(
+            plan.diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "yaml-parse-error"),
+            "expected yaml parse diagnostic from invalid frontmatter YAML"
+        );
+    }
+
+    #[test]
+    fn built_in_lint_plan_reports_hashpipe_yaml_parse_error() {
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+        let path = PathBuf::from("/tmp/lint_hashpipe_yaml_error.qmd");
+        let input = "```{r}\n#| echo: [\n1 + 1\n```\n".to_string();
+        let file = db.update_file_text(path.clone(), input);
+
+        let plan = built_in_lint_plan(&db, file, config, path).clone();
+        assert!(
+            plan.diagnostics.iter().any(|diagnostic| {
+                diagnostic.code == "yaml-parse-error"
+                    && diagnostic.message.contains("YAML parse error")
+            }),
+            "expected yaml parse diagnostic from invalid hashpipe YAML"
+        );
+    }
+
+    #[test]
+    fn yaml_embedded_regions_in_host_range_resolves_regions_with_stable_ids() {
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+        let path = PathBuf::from("/tmp/yaml_embedded_regions.qmd");
+        let input = "---\ntitle: Test\n---\n\n```{r}\n#| echo: false\n1 + 1\n```\n".to_string();
+        let file = db.update_file_text(path, input.clone());
+
+        let regions =
+            yaml_embedded_regions_in_host_range(&db, file, config, 0, input.len()).clone();
+        assert_eq!(regions.len(), 2, "expected frontmatter + hashpipe regions");
+        assert!(regions.iter().any(|region| !region.id.is_empty()));
+        assert!(
+            regions
+                .iter()
+                .any(|region| matches!(region.kind, crate::syntax::YamlRegionKind::Frontmatter))
+        );
+        assert!(
+            regions
+                .iter()
+                .any(|region| matches!(region.kind, crate::syntax::YamlRegionKind::Hashpipe))
+        );
     }
 }

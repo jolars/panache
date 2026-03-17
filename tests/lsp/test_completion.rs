@@ -224,3 +224,27 @@ async fn test_completion_returns_none_for_invalid_yaml_frontmatter() {
         "Expected no completion when YAML frontmatter is invalid"
     );
 }
+
+#[tokio::test]
+async fn test_completion_returns_none_inside_yaml_frontmatter() {
+    let server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    std::fs::write(root.join("refs.bib"), "@book{known,}\n").unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str()).await;
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    let content = "---\ntitle: \"@\"\nbibliography: refs.bib\n---\n\nText [@] citation.";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.completion(doc_uri.as_str(), 1, 9).await;
+    assert!(
+        result.is_none(),
+        "Expected no citation completion when cursor is inside YAML frontmatter"
+    );
+}

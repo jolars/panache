@@ -9,7 +9,9 @@ use tower_lsp_server::Client;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
+use crate::syntax::SyntaxNode;
 
+use super::super::helpers;
 use super::diagnostics::lint_and_publish;
 
 pub(crate) async fn did_change_watched_files(
@@ -71,14 +73,9 @@ pub(crate) async fn did_change_watched_files(
                 .into_iter()
                 .filter_map(|(uri_str, state)| {
                     let doc_path = state.path?;
-                    if !crate::salsa::yaml_metadata_parse_result(
-                        &*db,
-                        state.salsa_file,
-                        state.salsa_config,
-                        doc_path.clone(),
-                    )
-                    .is_ok()
-                    {
+                    if !helpers::is_yaml_frontmatter_valid(&SyntaxNode::new_root(
+                        state.tree.clone(),
+                    )) {
                         return None;
                     }
                     let metadata = crate::salsa::metadata(

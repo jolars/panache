@@ -14,6 +14,7 @@ mod links;
 mod lists;
 mod references;
 mod tables;
+mod yaml;
 
 pub use ast::*;
 pub use chunk_options::*;
@@ -25,6 +26,7 @@ pub use links::*;
 pub use lists::*;
 pub use references::*;
 pub use tables::*;
+pub use yaml::*;
 
 pub type SyntaxNode = rowan::SyntaxNode<PanacheLanguage>;
 pub type SyntaxToken = rowan::SyntaxToken<PanacheLanguage>;

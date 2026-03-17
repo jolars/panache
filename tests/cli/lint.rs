@@ -349,6 +349,31 @@ fn test_lint_inline_references_in_metadata() {
 }
 
 #[test]
+fn test_lint_reports_hashpipe_yaml_parse_error() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".panache.toml");
+    let doc_path = temp_dir.path().join("doc.qmd");
+    fs::write(
+        &config_path,
+        r#"flavor = "quarto"
+
+[lint.rules]
+missing-chunk-labels = false
+"#,
+    )
+    .unwrap();
+    fs::write(&doc_path, "```{r}\n#| echo: [\n1 + 1\n```\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["lint", "--color", "never", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("yaml-parse-error"))
+        .stdout(predicate::str::contains("YAML parse error"));
+}
+
+#[test]
 fn test_lint_csl_yaml_bibliography() {
     let temp_dir = TempDir::new().unwrap();
     let bib_path = temp_dir.path().join("refs.yaml");

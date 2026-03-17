@@ -901,7 +901,7 @@ dependencies = [
  "unicode-width",
  "uuid",
  "which",
- "yaml_parser 0.2.3",
+ "yaml_parser",
 ]
 
 [[package]]
@@ -1018,7 +1018,7 @@ checksum = "6f5db2b0044c0dae209c173c6049f210c9449092b07304c9c8b8d555c606e93e"
 dependencies = [
  "rowan",
  "tiny_pretty",
- "yaml_parser 0.3.0",
+ "yaml_parser",
 ]
 
 [[package]]
@@ -2010,16 +2010,6 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
-]
-
-[[package]]
-name = "yaml_parser"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c422c39fd59a9dc11efa2b2be26cf9130c6ef9cb744da112a2e9e59c649e471"
-dependencies = [
- "rowan",
- "winnow",
 ]
 
 [[package]]

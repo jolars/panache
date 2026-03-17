@@ -536,7 +536,8 @@ date: "2026-02-11"
 
 By default this means spacing and list indentation are normalized in the
 frontmatter block. This frontmatter formatting is always handled internally by
-Panache.
+Panache. The YAML parser/formatter implementation is shipped in Panache-owned
+workspace crates.
 
 ### Pandoc Title Block
 

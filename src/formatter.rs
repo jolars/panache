@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::syntax::SyntaxNode;
+use crate::syntax::{SyntaxNode, YamlFrontmatterRegion};
 
 mod blockquotes;
 pub mod code_blocks;
@@ -35,6 +35,10 @@ pub async fn format_tree_async(
     );
 
     let input = tree.text().to_string();
+    let frontmatter_region = metadata::collect_yaml_frontmatter_region(tree);
+    let frontmatter_yaml = frontmatter_region
+        .as_ref()
+        .map(|region| region.content.trim_end().to_string());
 
     // Step 1: Run external formatters and apply inline by block identity.
     let formatted_code = if !config.formatters.is_empty() {
@@ -54,7 +58,7 @@ pub async fn format_tree_async(
 
     // Step 1b: Format YAML frontmatter with built-in YAML engine
     let yaml_config = config.clone();
-    let formatted_yaml_future = metadata::collect_yaml_metadata(tree).map(|yaml_content| {
+    let formatted_yaml_future = frontmatter_yaml.clone().map(|yaml_content| {
         tokio::spawn(async move {
             crate::yaml_engine::format_yaml_with_config(&yaml_content, &yaml_config)
         })
@@ -67,19 +71,22 @@ pub async fn format_tree_async(
     if let Some(handle) = formatted_yaml_future
         && let Ok(Ok(formatted_yaml)) = handle.await
     {
-        // Collect original YAML to find and replace
-        if let Some(original_yaml) = metadata::collect_yaml_metadata(tree) {
-            log::debug!(
-                "Applying formatted YAML: {} bytes -> {} bytes",
-                original_yaml.len(),
-                formatted_yaml.len()
-            );
-            // Wrap formatted YAML with newline to preserve frontmatter structure
-            // collect_yaml_metadata strips the leading newline after ---, so add it back
-            let wrapped_formatted = format!("\n{}\n", formatted_yaml.trim_end());
-            // Look for the pattern: newline + original_yaml + newline
-            // and replace with: newline + formatted_yaml + newline
-            output = output.replace(&format!("\n{}\n", original_yaml), &wrapped_formatted);
+        let original_yaml = frontmatter_yaml.unwrap_or_default();
+        log::debug!(
+            "Applying formatted YAML: {} bytes -> {} bytes",
+            original_yaml.len(),
+            formatted_yaml.len()
+        );
+        if let Some(region) = frontmatter_region.as_ref()
+            && let Some(replaced) = apply_formatted_yaml_at_range(
+                &output,
+                region,
+                &format!("{}\n", formatted_yaml.trim_end()),
+            )
+        {
+            output = replaced;
+        } else {
+            log::warn!("Skipping YAML apply: no valid frontmatter region range");
         }
     }
 
@@ -97,6 +104,10 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     );
 
     let input = tree.text().to_string();
+    let frontmatter_region = metadata::collect_yaml_frontmatter_region(tree);
+    let frontmatter_yaml = frontmatter_region
+        .as_ref()
+        .map(|region| region.content.trim_end().to_string());
 
     // Step 1: Run external formatters synchronously if configured
     let formatted_code = if !config.formatters.is_empty() {
@@ -116,7 +127,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
 
     // Step 1b: Run YAML frontmatter formatter synchronously with built-in YAML engine
     #[cfg(not(target_arch = "wasm32"))]
-    let formatted_yaml = if let Some(yaml_content) = metadata::collect_yaml_metadata(tree) {
+    let formatted_yaml = if let Some(yaml_content) = frontmatter_yaml.clone() {
         match crate::yaml_engine::format_yaml_with_config(&yaml_content, config) {
             Ok(formatted) if formatted != yaml_content => Some((yaml_content, formatted)),
             _ => None,
@@ -138,16 +149,41 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
             original_yaml.len(),
             formatted_yaml.len()
         );
-        // Wrap formatted YAML with newline to preserve frontmatter structure
-        // collect_yaml_metadata strips the leading newline after ---, so add it back
-        let wrapped_formatted = format!("\n{}\n", formatted_yaml.trim_end());
-        // Look for the pattern: newline + original_yaml + newline
-        // and replace with: newline + formatted_yaml + newline
-        output = output.replace(&format!("\n{}\n", original_yaml), &wrapped_formatted);
+        if let Some(region) = frontmatter_region.as_ref()
+            && let Some(replaced) = apply_formatted_yaml_at_range(
+                &output,
+                region,
+                &format!("{}\n", formatted_yaml.trim_end()),
+            )
+        {
+            output = replaced;
+        } else {
+            log::warn!("Skipping YAML apply: no valid frontmatter region range");
+        }
     }
 
     log::debug!("Formatting complete: {} bytes output", output.len());
 
     // Ensure exactly one trailing newline
     output.trim_end().to_string() + "\n"
+}
+
+fn apply_formatted_yaml_at_range(
+    output: &str,
+    region: &YamlFrontmatterRegion,
+    formatted_yaml_with_trailing_newline: &str,
+) -> Option<String> {
+    if region.content_range.end > output.len()
+        || region.content_range.start > region.content_range.end
+    {
+        return None;
+    }
+    let mut out = String::with_capacity(
+        output.len() - (region.content_range.end - region.content_range.start)
+            + formatted_yaml_with_trailing_newline.len(),
+    );
+    out.push_str(&output[..region.content_range.start]);
+    out.push_str(formatted_yaml_with_trailing_newline);
+    out.push_str(&output[region.content_range.end..]);
+    Some(out)
 }
