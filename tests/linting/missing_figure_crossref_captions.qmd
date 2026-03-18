@@ -1,0 +1,14 @@
+See @fig-plot.
+
+```{r}
+#| label: fig-plot
+plot(1, 1)
+```
+
+See @fig-captioned.
+
+```{r}
+#| label: fig-captioned
+#| fig-cap: "A caption"
+plot(2, 2)
+```

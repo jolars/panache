@@ -270,6 +270,64 @@ missing-chunk-labels = false
 }
 
 #[test]
+fn test_missing_figure_crossref_captions_quarto_is_not_flagged() {
+    let diagnostics = lint_file_with_config(
+        "missing_figure_crossref_captions.qmd",
+        r#"
+flavor = "quarto"
+"#,
+    );
+    let caption_issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "figure-crossref-captions")
+        .collect();
+
+    assert!(
+        caption_issues.is_empty(),
+        "Quarto figure crossrefs should not require fig-cap"
+    );
+}
+
+#[test]
+fn test_missing_figure_crossref_captions_bookdown() {
+    let diagnostics = lint_file_with_config(
+        "missing_figure_crossref_captions.Rmd",
+        r#"
+flavor = "rmarkdown"
+"#,
+    );
+    let caption_issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "figure-crossref-captions")
+        .collect();
+
+    assert_eq!(
+        caption_issues.len(),
+        1,
+        "Should flag one bookdown figure crossref with missing caption"
+    );
+    assert!(caption_issues[0].message.contains("@fig:a-label"));
+}
+
+#[test]
+fn test_missing_figure_crossref_captions_can_be_disabled() {
+    let diagnostics = lint_file_with_config(
+        "missing_figure_crossref_captions.Rmd",
+        r#"
+flavor = "rmarkdown"
+
+[lint.rules]
+figure-crossref-captions = false
+"#,
+    );
+    let caption_issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "figure-crossref-captions")
+        .collect();
+    assert!(caption_issues.is_empty());
+}
+
+#[test]
 fn test_unknown_emoji_alias() {
     let diagnostics = lint_file_with_config(
         "emoji_aliases.md",

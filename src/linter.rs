@@ -109,6 +109,11 @@ fn default_registry(config: &Config) -> RuleRegistry {
             rules::missing_chunk_labels::MissingChunkLabelsRule,
         ));
     }
+    if config.lint.is_rule_enabled("figure-crossref-captions") {
+        registry.register(Box::new(
+            rules::figure_crossref_captions::FigureCrossrefCaptionsRule,
+        ));
+    }
     if config.lint.is_rule_enabled("unknown-emoji-alias") {
         registry.register(Box::new(rules::emoji_aliases::EmojiAliasesRule));
     }

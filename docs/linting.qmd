@@ -307,6 +307,23 @@ Description
 :   Labels facilitates debugging. Add a label with either `#| label: my-chunk`
     or inline `label=my-chunk`.
 
+### `figure-crossref-captions`
+
+Detects figure cross-references that point to chunk labels without a figure
+caption option.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Description
+:   Bookdown figure cross-references (`\@ref(fig:...)`) require a captioned
+    chunk to create a resolvable figure label at render time. When the target
+    chunk has a `label` but no `fig-cap`/`fig.cap`, the crossref will not
+    resolve.
+
 ### `unknown-emoji-alias`
 
 Detects `:alias:` emoji shortcodes that are not recognized.
@@ -577,6 +594,7 @@ undefined-references = true
 citation-keys = true
 chunk-label-spaces = true
 missing-chunk-labels = true
+figure-crossref-captions = true
 unknown-emoji-alias = true
 ```
 

@@ -1,0 +1,18 @@
+---
+output: bookdown::html_document2
+---
+
+Figure \@ref(fig:a-label)
+
+```{r}
+#| label: a-label
+plot(1, 1)
+```
+
+Figure \@ref(fig:captioned)
+
+```{r}
+#| label: captioned
+#| fig-cap: "A caption"
+plot(2, 2)
+```
