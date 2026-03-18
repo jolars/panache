@@ -1022,6 +1022,7 @@ pub const DEFAULT_EXCLUDE_PATTERNS: &[&str] = &[
     "renv/",
     "target/",
     "tests/testthat/_snaps",
+    "**/LICENSE.md",
 ];
 
 pub const DEFAULT_INCLUDE_PATTERNS: &[&str] =
@@ -2199,6 +2200,11 @@ mod tests {
         assert!(cfg.extend_exclude.is_empty());
         assert!(cfg.include.is_none());
         assert!(cfg.extend_include.is_empty());
+    }
+
+    #[test]
+    fn default_exclude_patterns_include_license_md() {
+        assert!(DEFAULT_EXCLUDE_PATTERNS.contains(&"**/LICENSE.md"));
     }
 
     #[test]

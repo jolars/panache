@@ -92,7 +92,9 @@ extend-include = ["*.Rmd"]
 ```
 
 `exclude`
-:   Base exclude patterns. If set, replaces Panache's default exclude base.
+:   Base exclude patterns. If set, replaces Panache's default exclude base. The
+    default exclude base includes common build/cache directories and
+    `**/LICENSE.md`.
 
 `extend-exclude`
 :   Additional exclude patterns appended to the base set.
