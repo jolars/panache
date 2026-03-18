@@ -1,6 +1,5 @@
 [formatters]
 r = "air"
-yaml = "yamlfmt"
 toml = "taplo"
 bash = "shfmt"
 sh = "shfmt"
