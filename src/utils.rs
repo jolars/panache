@@ -1,4 +1,4 @@
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, Heading, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;
 
@@ -215,6 +215,48 @@ pub fn crossref_symbol_labels(label: &str, bookdown_references: bool) -> Vec<Str
     labels
 }
 
+#[derive(Debug, Clone)]
+pub struct ImplicitHeadingId {
+    pub id: String,
+    pub heading: SyntaxNode,
+}
+
+pub fn implicit_heading_ids(tree: &SyntaxNode) -> Vec<ImplicitHeadingId> {
+    let mut out = Vec::new();
+    let mut seen: HashMap<String, usize> = HashMap::new();
+
+    for heading in tree.descendants().filter_map(Heading::cast) {
+        let raw_text = heading
+            .content()
+            .map(|content| content.text())
+            .unwrap_or_default();
+        let normalized = normalize_label(&raw_text);
+        if normalized.is_empty() {
+            continue;
+        }
+
+        let base = pandoc_slugify(&normalized);
+        if base.is_empty() {
+            continue;
+        }
+
+        let count = seen.entry(base.clone()).or_insert(0);
+        let id = if *count == 0 {
+            base
+        } else {
+            format!("{}-{}", base, *count)
+        };
+        *count += 1;
+
+        out.push(ImplicitHeadingId {
+            id,
+            heading: heading.syntax().clone(),
+        });
+    }
+
+    out
+}
+
 /// Generate a Pandoc-style auto identifier from heading text.
 pub fn pandoc_slugify(text: &str) -> String {
     let mut out = String::new();
@@ -246,7 +288,7 @@ pub fn pandoc_slugify(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{crossref_resolution_labels, crossref_symbol_labels};
+    use super::{crossref_resolution_labels, crossref_symbol_labels, implicit_heading_ids};
 
     #[test]
     fn crossref_resolution_labels_keep_exact_match() {
@@ -266,5 +308,15 @@ mod tests {
         assert!(labels.iter().any(|label| label == "plot"));
         assert!(labels.iter().any(|label| label == "fig:plot"));
         assert!(labels.iter().any(|label| label == "tab:plot"));
+    }
+
+    #[test]
+    fn implicit_heading_ids_use_pandoc_duplicate_suffixes() {
+        let tree = crate::parse("# Heading\n\n# Heading\n\n# Heading\n", None);
+        let ids = implicit_heading_ids(&tree)
+            .into_iter()
+            .map(|entry| entry.id)
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["heading", "heading-1", "heading-2"]);
     }
 }

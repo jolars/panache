@@ -19,6 +19,7 @@ mod lsp {
     pub(super) mod test_hover;
     pub(super) mod test_incremental_edits;
     pub(super) mod test_navigation;
+    pub(super) mod test_prepare_rename;
     pub(super) mod test_references;
     pub(super) mod test_rename;
 }

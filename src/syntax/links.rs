@@ -111,6 +111,41 @@ impl LinkDest {
             .trim_end_matches(')')
             .to_string()
     }
+
+    /// Returns the range for a hash-anchor id within destination text (without '#').
+    pub fn hash_anchor_id_range(&self) -> Option<rowan::TextRange> {
+        let text = self.0.text().to_string();
+        let hash_idx = text.find('#')?;
+        let after_hash = &text[hash_idx + 1..];
+        let id_len = after_hash
+            .chars()
+            .take_while(|ch| !ch.is_whitespace() && *ch != ')')
+            .map(char::len_utf8)
+            .sum::<usize>();
+        if id_len == 0 {
+            return None;
+        }
+        let node_start: usize = self.0.text_range().start().into();
+        let start = rowan::TextSize::from((node_start + hash_idx + 1) as u32);
+        let end = rowan::TextSize::from((node_start + hash_idx + 1 + id_len) as u32);
+        Some(rowan::TextRange::new(start, end))
+    }
+
+    /// Returns the hash-anchor id within destination text (without '#').
+    pub fn hash_anchor_id(&self) -> Option<String> {
+        let text = self.0.text().to_string();
+        let hash_idx = text.find('#')?;
+        let after_hash = &text[hash_idx + 1..];
+        let id_len = after_hash
+            .chars()
+            .take_while(|ch| !ch.is_whitespace() && *ch != ')')
+            .map(char::len_utf8)
+            .sum::<usize>();
+        if id_len == 0 {
+            return None;
+        }
+        Some(after_hash[..id_len].to_string())
+    }
 }
 
 pub struct LinkRef(SyntaxNode);

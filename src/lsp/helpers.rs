@@ -8,10 +8,10 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkOption, Citation, Crossref, Heading, Link,
-    ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
+    AstNode, AttributeNode, ChunkOption, Citation, Crossref, Link, ParsedYamlRegionSnapshot,
+    SyntaxKind, SyntaxNode,
 };
-use crate::utils::pandoc_slugify;
+use crate::utils::normalize_label;
 use rowan::{NodeOrToken, TextRange, TextSize};
 
 use super::config::load_config;
@@ -179,23 +179,6 @@ pub(crate) fn is_yaml_frontmatter_valid(parsed_yaml_regions: &[ParsedYamlRegionS
         .is_none_or(ParsedYamlRegionSnapshot::is_valid)
 }
 
-/// Normalize a label for case-insensitive matching (collapses whitespace, lowercases)
-fn normalize_label(label: &str) -> String {
-    label
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
-}
-
-fn normalize_heading_text(text: &str) -> String {
-    normalize_label(text)
-}
-
-fn implicit_header_id(text: &str) -> String {
-    pandoc_slugify(text)
-}
-
 /// Extract the reference label from a LinkRef or FootnoteReference node
 pub(crate) fn extract_reference_label(node: &SyntaxNode) -> Option<(String, bool)> {
     match node.kind() {
@@ -348,119 +331,49 @@ pub(crate) fn extract_heading_link_target(node: &SyntaxNode) -> Option<String> {
     None
 }
 
-pub(crate) fn find_heading_id_definition_node(
-    root: &SyntaxNode,
-    label: &str,
-) -> Option<SyntaxNode> {
-    let target = normalize_label(label);
-    for attribute in root.descendants().filter_map(AttributeNode::cast) {
-        let Some(id) = attribute.id() else {
-            continue;
-        };
-        if normalize_label(&id) != target {
-            continue;
+pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> {
+    if let Some(crossref) = Crossref::cast(node.clone()) {
+        return crossref.keys().first().map(|key| key.text_range());
+    }
+    if let Some(citation) = Citation::cast(node.clone()) {
+        return citation.keys().first().map(|key| key.text_range());
+    }
+    if let Some(option) = ChunkOption::cast(node.clone())
+        && option
+            .key()
+            .is_some_and(|key| key.eq_ignore_ascii_case("label"))
+    {
+        return option.value_range();
+    }
+    if let Some(attribute) = AttributeNode::cast(node.clone())
+        && attribute.id().is_some()
+    {
+        return attribute.id_value_range();
+    }
+    if let Some(link) = Link::cast(node.clone()) {
+        if let Some(dest) = link.dest() {
+            return dest.hash_anchor_id_range();
         }
-        if !attribute_has_heading_ancestor(attribute.syntax()) {
-            continue;
-        }
-        if let Some(heading) = attribute
-            .syntax()
-            .ancestors()
-            .find(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
-        {
-            return Some(heading);
+        if link.reference().is_none() {
+            return link.text().map(|text| text.syntax().text_range());
         }
     }
+
     None
 }
 
-pub(crate) fn collect_heading_rename_ranges(root: &SyntaxNode, label: &str) -> Vec<TextRange> {
-    let target = normalize_label(label);
-    let mut ranges = Vec::new();
-
-    for attribute in root.descendants().filter_map(AttributeNode::cast) {
-        let Some(id) = attribute.id() else {
-            continue;
-        };
-        if normalize_label(&id) != target {
-            continue;
-        }
-        if !attribute_has_heading_ancestor(attribute.syntax()) {
-            continue;
-        }
-        if let Some(range) = attribute.id_value_range() {
-            ranges.push(range);
-        }
-    }
-
-    for link in root.descendants().filter_map(Link::cast) {
-        if let Some(dest) = link.dest() {
-            let text = dest.syntax().text().to_string();
-            if let Some((range, id)) = hash_anchor_id_range(dest.syntax().text_range(), &text)
-                && normalize_label(&id) == target
-            {
-                ranges.push(range);
-            }
-            continue;
-        }
-
-        if link.reference().is_none()
-            && let Some(text_node) = link.text()
-            && normalize_label(&text_node.text_content()) == target
-        {
-            ranges.push(text_node.syntax().text_range());
-        }
-    }
-
-    ranges.sort_by_key(|range| range.start());
-    ranges.dedup();
-    ranges
-}
-
-pub(crate) fn collect_implicit_heading_id_insert_ranges(
+pub(crate) fn find_symbol_text_range_at_offset(
     root: &SyntaxNode,
-    label: &str,
-) -> Vec<TextRange> {
-    let target = normalize_label(label);
-    let mut ranges = Vec::new();
-    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    offset: usize,
+) -> Option<TextRange> {
+    let mut node = find_node_at_offset(root, offset)?;
 
-    for heading in root.descendants().filter_map(Heading::cast) {
-        let raw_text = heading
-            .content()
-            .map(|content| content.text())
-            .unwrap_or_default();
-        let cleaned = normalize_heading_text(&raw_text);
-        if cleaned.is_empty() {
-            continue;
+    loop {
+        if let Some(range) = extract_symbol_text_range(&node) {
+            return Some(range);
         }
-        let base = implicit_header_id(&cleaned);
-        if base.is_empty() {
-            continue;
-        }
-        let count = seen.entry(base.clone()).or_insert(0);
-        let id = if *count == 0 {
-            base.clone()
-        } else {
-            format!("{}-{}", base, *count)
-        };
-        *count += 1;
-
-        if normalize_label(&id) != target {
-            continue;
-        }
-
-        if heading_has_explicit_id(heading.syntax()) {
-            continue;
-        }
-
-        if let Some(content) = heading.content() {
-            let pos = content.syntax().text_range().end();
-            ranges.push(TextRange::new(pos, pos));
-        }
+        node = node.parent()?;
     }
-
-    ranges
 }
 
 fn attribute_has_heading_ancestor(node: &SyntaxNode) -> bool {
@@ -468,18 +381,9 @@ fn attribute_has_heading_ancestor(node: &SyntaxNode) -> bool {
         .any(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
 }
 
-fn heading_has_explicit_id(heading: &SyntaxNode) -> bool {
-    heading
-        .children()
-        .filter_map(AttributeNode::cast)
-        .any(|attribute| attribute.id().is_some())
-}
-
 fn heading_target_from_link(link: &Link) -> Option<String> {
     if let Some(dest) = link.dest() {
-        let text = dest.syntax().text().to_string();
-        let (_, id) = hash_anchor_id_range(dest.syntax().text_range(), &text)?;
-        let id = normalize_label(&id);
+        let id = normalize_label(&dest.hash_anchor_id()?);
         return (!id.is_empty()).then_some(id);
     }
 
@@ -493,97 +397,8 @@ fn heading_target_from_link(link: &Link) -> Option<String> {
     None
 }
 
-fn hash_anchor_id_range(base_range: TextRange, dest_text: &str) -> Option<(TextRange, String)> {
-    let hash_idx = dest_text.find('#')?;
-    let after_hash = &dest_text[hash_idx + 1..];
-    let id_len = after_hash
-        .chars()
-        .take_while(|ch| !ch.is_whitespace() && *ch != ')')
-        .map(char::len_utf8)
-        .sum::<usize>();
-    if id_len == 0 {
-        return None;
-    }
-    let id = after_hash[..id_len].to_string();
-
-    let node_start: usize = base_range.start().into();
-    let start = TextSize::from((node_start + hash_idx + 1) as u32);
-    let end = TextSize::from((node_start + hash_idx + 1 + id_len) as u32);
-    Some((TextRange::new(start, end), id))
-}
-
-pub(crate) fn find_crossref_definition_node(root: &SyntaxNode, label: &str) -> Option<SyntaxNode> {
-    let target = normalize_label(label);
-    if let Some(attribute) = root
-        .descendants()
-        .filter_map(AttributeNode::cast)
-        .find(|attribute| {
-            attribute
-                .id()
-                .is_some_and(|id| normalize_label(&id) == target)
-        })
-    {
-        return Some(attribute.syntax().clone());
-    }
-
-    root.descendants().find(|node| {
-        if let Some(option) = ChunkOption::cast(node.clone())
-            && let (Some(key), Some(value)) = (option.key(), option.value())
-            && key.eq_ignore_ascii_case("label")
-        {
-            return normalize_label(&value) == target;
-        }
-        false
-    })
-}
-
-pub(crate) fn find_implicit_header_definition_node(
-    root: &SyntaxNode,
-    label: &str,
-) -> Option<SyntaxNode> {
-    let target = normalize_label(label);
-    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-
-    for node in root.descendants() {
-        if node.kind() != SyntaxKind::HEADING {
-            continue;
-        }
-        let Some(content) = node
-            .children()
-            .find(|child| child.kind() == SyntaxKind::HEADING_CONTENT)
-        else {
-            continue;
-        };
-        let raw_text = content
-            .descendants_with_tokens()
-            .filter_map(|it| it.into_token())
-            .filter(|token| token.kind() == SyntaxKind::TEXT)
-            .map(|token| token.text().to_string())
-            .collect::<String>();
-        let cleaned = normalize_heading_text(&raw_text);
-        if cleaned.is_empty() {
-            continue;
-        }
-        let base = implicit_header_id(&cleaned);
-        if base.is_empty() {
-            continue;
-        }
-        let count = seen.entry(base.clone()).or_insert(0);
-        let id = if *count == 0 {
-            base.clone()
-        } else {
-            format!("{}-{}", base, *count)
-        };
-        *count += 1;
-
-        if normalize_label(&id) == target {
-            return Some(node.clone());
-        }
-    }
-    None
-}
-
 /// Extract the label from a definition node (ReferenceDefinition or FootnoteDefinition)
+#[cfg(test)]
 fn extract_definition_label(node: &SyntaxNode) -> Option<String> {
     match node.kind() {
         SyntaxKind::REFERENCE_DEFINITION => {
@@ -625,6 +440,7 @@ fn extract_definition_label(node: &SyntaxNode) -> Option<String> {
 }
 
 /// Find a definition node matching the given label
+#[cfg(test)]
 pub(crate) fn find_definition_node(
     root: &SyntaxNode,
     label: &str,
@@ -707,10 +523,10 @@ mod tests {
 
     #[test]
     fn test_normalize_label() {
-        assert_eq!(normalize_label("Foo"), "foo");
-        assert_eq!(normalize_label("foo bar"), "foo bar");
-        assert_eq!(normalize_label("foo  bar"), "foo bar");
-        assert_eq!(normalize_label(" foo bar "), "foo bar");
+        assert_eq!(crate::utils::normalize_label("Foo"), "foo");
+        assert_eq!(crate::utils::normalize_label("foo bar"), "foo bar");
+        assert_eq!(crate::utils::normalize_label("foo  bar"), "foo bar");
+        assert_eq!(crate::utils::normalize_label(" foo bar "), "foo bar");
     }
 
     #[test]
@@ -793,51 +609,6 @@ mod tests {
         let root = parse("[text][ref]");
         let def = find_definition_node(&root, "ref", false);
         assert!(def.is_none());
-    }
-
-    #[test]
-    fn test_find_crossref_definition_node() {
-        let input = "See @eq-test.\n\n$$\nE = mc^2\n$$ {#eq-test}\n";
-        let mut config = Config::default();
-        config.extensions.quarto_crossrefs = true;
-        let root = crate::parser::parse(input, Some(config));
-
-        let def = find_crossref_definition_node(&root, "eq-test");
-        assert!(def.is_some());
-        assert_eq!(def.unwrap().kind(), SyntaxKind::ATTRIBUTE);
-    }
-
-    #[test]
-    fn test_find_crossref_definition_node_chunk_label() {
-        let input = "See @fig-plot.\n\n```{r}\n#| label: fig-plot\nx <- 1\n```\n";
-        let mut config = Config::default();
-        config.flavor = crate::config::Flavor::Quarto;
-        config.extensions.quarto_crossrefs = true;
-        let root = crate::parser::parse(input, Some(config));
-
-        let def = find_crossref_definition_node(&root, "fig-plot");
-        assert!(def.is_some());
-        assert_eq!(def.unwrap().kind(), SyntaxKind::CHUNK_OPTION);
-    }
-
-    #[test]
-    fn test_find_implicit_header_definition_node() {
-        let input = "# Implicit Header\n\nSee \\@ref(implicit-header).\n";
-        let root = parse(input);
-
-        let def = find_implicit_header_definition_node(&root, "implicit-header");
-        assert!(def.is_some());
-        assert_eq!(def.unwrap().kind(), SyntaxKind::HEADING);
-    }
-
-    #[test]
-    fn test_find_implicit_header_definition_node_duplicates() {
-        let input = "# Implicit Header\n\n# Implicit Header\n";
-        let root = parse(input);
-
-        let def = find_implicit_header_definition_node(&root, "implicit-header-1");
-        assert!(def.is_some());
-        assert_eq!(def.unwrap().kind(), SyntaxKind::HEADING);
     }
 
     #[test]

@@ -289,3 +289,25 @@ async fn test_references_returns_none_inside_yaml_frontmatter() {
         "Expected no references when cursor is inside YAML frontmatter"
     );
 }
+
+#[tokio::test]
+async fn test_references_heading_hash_link_and_id_are_consistent() {
+    let server = TestLspServer::new();
+    let content = "# Heading {#heading}\n\nSee [label](#heading).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let hash_locations = server
+        .references("file:///test.md", 2, 14, true)
+        .await
+        .expect("references from hash link");
+    let id_locations = server
+        .references("file:///test.md", 0, 12, true)
+        .await
+        .expect("references from heading id");
+
+    assert_eq!(hash_locations, id_locations);
+    assert!(hash_locations.iter().any(|loc| loc.range.start.line == 0));
+    assert!(hash_locations.iter().any(|loc| loc.range.start.line == 2));
+}

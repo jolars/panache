@@ -48,6 +48,18 @@ impl ChunkOption {
         })
     }
 
+    /// Get the value token range, if present.
+    pub fn value_range(&self) -> Option<rowan::TextRange> {
+        self.0.children_with_tokens().find_map(|child| {
+            if let rowan::NodeOrToken::Token(token) = child
+                && token.kind() == SyntaxKind::CHUNK_OPTION_VALUE
+            {
+                return Some(token.text_range());
+            }
+            None
+        })
+    }
+
     /// Check if the value is quoted (has CHUNK_OPTION_QUOTE nodes).
     pub fn is_quoted(&self) -> bool {
         self.0.children_with_tokens().any(|child| {

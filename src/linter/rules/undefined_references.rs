@@ -1,8 +1,8 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, Crossref, FootnoteReference, Heading, Link, SyntaxNode};
-use crate::utils::{crossref_resolution_labels, normalize_label, pandoc_slugify};
+use crate::syntax::{AstNode, Crossref, FootnoteReference, Link, SyntaxNode};
+use crate::utils::{crossref_resolution_labels, implicit_heading_ids, normalize_label};
 use std::collections::HashSet;
 
 pub struct UndefinedReferencesRule;
@@ -118,29 +118,10 @@ impl Rule for UndefinedReferencesRule {
 }
 
 fn collect_implicit_heading_ids(tree: &SyntaxNode) -> HashSet<String> {
-    let mut out = HashSet::new();
-    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-
-    for heading in tree.descendants().filter_map(Heading::cast) {
-        let text = normalize_label(&heading.text());
-        if text.is_empty() {
-            continue;
-        }
-        let base = pandoc_slugify(&text);
-        if base.is_empty() {
-            continue;
-        }
-        let count = seen.entry(base.clone()).or_insert(0);
-        let id = if *count == 0 {
-            base
-        } else {
-            format!("{}-{}", base, *count)
-        };
-        *count += 1;
-        out.insert(id);
-    }
-
-    out
+    implicit_heading_ids(tree)
+        .into_iter()
+        .map(|entry| entry.id)
+        .collect()
 }
 
 fn extract_reference_label_and_node(link: &Link) -> Option<(String, SyntaxNode)> {

@@ -56,7 +56,12 @@ impl LanguageServer for PanacheLsp {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions::default()),
                 references_provider: Some(OneOf::Left(true)),
-                rename_provider: Some(OneOf::Left(true)),
+                rename_provider: Some(OneOf::Right(RenameOptions {
+                    prepare_provider: Some(true),
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                })),
                 workspace: Some(WorkspaceServerCapabilities {
                     workspace_folders: Some(WorkspaceFoldersServerCapabilities {
                         supported: Some(true),
@@ -261,6 +266,20 @@ impl LanguageServer for PanacheLsp {
 
     async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
         handlers::rename::rename(
+            &self.client,
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await
+    }
+
+    async fn prepare_rename(
+        &self,
+        params: TextDocumentPositionParams,
+    ) -> Result<Option<PrepareRenameResponse>> {
+        handlers::prepare_rename::prepare_rename(
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.salsa_db),

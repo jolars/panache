@@ -401,6 +401,23 @@ impl TestLspServer {
 
         self.lsp.rename(params).await.unwrap()
     }
+
+    /// Prepare rename at a specific position.
+    pub async fn prepare_rename(
+        &self,
+        uri: &str,
+        line: u32,
+        character: u32,
+    ) -> Option<PrepareRenameResponse> {
+        let params = TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier {
+                uri: uri.parse().unwrap(),
+            },
+            position: Position { line, character },
+        };
+
+        self.lsp.prepare_rename(params).await.unwrap()
+    }
 }
 
 /// Wrapper that delegates all LanguageServer methods to the inner Arc<PanacheLsp>.
@@ -505,6 +522,13 @@ impl LanguageServer for LspWrapper {
         params: RenameParams,
     ) -> tower_lsp_server::jsonrpc::Result<Option<WorkspaceEdit>> {
         self.inner.rename(params).await
+    }
+
+    async fn prepare_rename(
+        &self,
+        params: TextDocumentPositionParams,
+    ) -> tower_lsp_server::jsonrpc::Result<Option<PrepareRenameResponse>> {
+        self.inner.prepare_rename(params).await
     }
 }
 

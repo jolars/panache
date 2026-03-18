@@ -13,7 +13,7 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
-use crate::syntax::SyntaxKind;
+use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 
 use super::super::{conversions, helpers};
 
@@ -87,207 +87,16 @@ pub(crate) async fn goto_definition(
             return Ok(None);
         };
 
-        // Find the node at this offset
-        let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
-            return Ok(None);
-        };
-
-        // Walk up the tree to find a citation, reference, or footnote
-        let pending = loop {
-            if let Some(key) = helpers::extract_citation_key(&node) {
-                break Some(PendingDefinition::Citation(key));
+        let pending = match resolve_symbol_target_at_offset(&root, offset) {
+            Some(SymbolTarget::Citation(key)) => Some(PendingDefinition::Citation(key)),
+            Some(SymbolTarget::Crossref(label)) => Some(PendingDefinition::Crossref(label)),
+            Some(SymbolTarget::HeadingId(label)) | Some(SymbolTarget::HeadingLink(label)) => {
+                Some(PendingDefinition::HeadingLink(label))
             }
-
-            // Quarto crossref: jump to attribute definition
-            if let Some(label) = helpers::extract_crossref_key(&node)
-                && let Some(definition) = helpers::find_crossref_definition_node(&root, &label)
-            {
-                let start_offset: usize = definition.text_range().start().into();
-                let end_offset: usize = definition.text_range().end().into();
-
-                let start_position = conversions::offset_to_position(&content, start_offset);
-                let end_position = conversions::offset_to_position(&content, end_offset);
-
-                let location = Location {
-                    uri: uri.clone(),
-                    range: Range {
-                        start: start_position,
-                        end: end_position,
-                    },
-                };
-
-                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            Some(SymbolTarget::Reference { label, is_footnote }) => {
+                Some(PendingDefinition::Reference { label, is_footnote })
             }
-
-            if config.extensions.implicit_header_references
-                && config.extensions.auto_identifiers
-                && let Some(label) = helpers::extract_crossref_key(&node)
-                && let Some(definition) =
-                    helpers::find_implicit_header_definition_node(&root, &label)
-            {
-                let start_offset: usize = definition.text_range().start().into();
-                let end_offset: usize = definition.text_range().end().into();
-
-                let start_position = conversions::offset_to_position(&content, start_offset);
-                let end_position = conversions::offset_to_position(&content, end_offset);
-
-                let location = Location {
-                    uri: uri.clone(),
-                    range: Range {
-                        start: start_position,
-                        end: end_position,
-                    },
-                };
-
-                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-            }
-
-            if let Some(label) = helpers::extract_crossref_key(&node) {
-                break Some(PendingDefinition::Crossref(label));
-            }
-
-            if let Some(label) = helpers::extract_heading_id_key(&node)
-                && let Some(definition) = helpers::find_heading_id_definition_node(&root, &label)
-            {
-                let start_offset: usize = definition.text_range().start().into();
-                let end_offset: usize = definition.text_range().end().into();
-
-                let start_position = conversions::offset_to_position(&content, start_offset);
-                let end_position = conversions::offset_to_position(&content, end_offset);
-
-                let location = Location {
-                    uri: uri.clone(),
-                    range: Range {
-                        start: start_position,
-                        end: end_position,
-                    },
-                };
-
-                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-            }
-
-            if let Some(label) = helpers::extract_heading_link_target(&node) {
-                if let Some(definition) = helpers::find_heading_id_definition_node(&root, &label) {
-                    let start_offset: usize = definition.text_range().start().into();
-                    let end_offset: usize = definition.text_range().end().into();
-
-                    let start_position = conversions::offset_to_position(&content, start_offset);
-                    let end_position = conversions::offset_to_position(&content, end_offset);
-
-                    let location = Location {
-                        uri: uri.clone(),
-                        range: Range {
-                            start: start_position,
-                            end: end_position,
-                        },
-                    };
-
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-                }
-
-                if config.extensions.implicit_header_references
-                    && config.extensions.auto_identifiers
-                    && let Some(definition) =
-                        helpers::find_implicit_header_definition_node(&root, &label)
-                {
-                    let start_offset: usize = definition.text_range().start().into();
-                    let end_offset: usize = definition.text_range().end().into();
-
-                    let start_position = conversions::offset_to_position(&content, start_offset);
-                    let end_position = conversions::offset_to_position(&content, end_offset);
-
-                    let location = Location {
-                        uri: uri.clone(),
-                        range: Range {
-                            start: start_position,
-                            end: end_position,
-                        },
-                    };
-
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-                }
-
-                break Some(PendingDefinition::HeadingLink(label));
-            }
-
-            // Fallback: find reference/footnote definition at this node
-            if let Some((label, is_footnote)) = helpers::extract_reference_label(&node)
-                && let Some(definition) = helpers::find_definition_node(&root, &label, is_footnote)
-            {
-                let start_offset: usize = definition.text_range().start().into();
-                let end_offset: usize = definition.text_range().end().into();
-
-                let start_position = conversions::offset_to_position(&content, start_offset);
-                let end_position = conversions::offset_to_position(&content, end_offset);
-
-                let location = Location {
-                    uri: uri.clone(),
-                    range: Range {
-                        start: start_position,
-                        end: end_position,
-                    },
-                };
-
-                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-            }
-
-            if let Some((label, is_footnote)) = helpers::extract_reference_label(&node) {
-                break Some(PendingDefinition::Reference { label, is_footnote });
-            }
-
-            if node.kind() == SyntaxKind::LINK
-                && let Some(link_ref) = node
-                    .children()
-                    .find(|child| child.kind() == SyntaxKind::LINK_REF)
-                && let Some((label, is_footnote)) = helpers::extract_reference_label(&link_ref)
-                && let Some(definition) = helpers::find_definition_node(&root, &label, is_footnote)
-            {
-                let start_offset: usize = definition.text_range().start().into();
-                let end_offset: usize = definition.text_range().end().into();
-
-                let start_position = conversions::offset_to_position(&content, start_offset);
-                let end_position = conversions::offset_to_position(&content, end_offset);
-
-                let location = Location {
-                    uri: uri.clone(),
-                    range: Range {
-                        start: start_position,
-                        end: end_position,
-                    },
-                };
-
-                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-            }
-
-            if node.kind() == SyntaxKind::IMAGE_LINK
-                && let Some(link_ref) = node
-                    .children()
-                    .find(|child| child.kind() == SyntaxKind::LINK_REF)
-                && let Some((label, is_footnote)) = helpers::extract_reference_label(&link_ref)
-                && let Some(definition) = helpers::find_definition_node(&root, &label, is_footnote)
-            {
-                let start_offset: usize = definition.text_range().start().into();
-                let end_offset: usize = definition.text_range().end().into();
-
-                let start_position = conversions::offset_to_position(&content, start_offset);
-                let end_position = conversions::offset_to_position(&content, end_offset);
-
-                let location = Location {
-                    uri: uri.clone(),
-                    range: Range {
-                        start: start_position,
-                        end: end_position,
-                    },
-                };
-
-                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
-            }
-
-            // Move up to parent, or return None if at root
-            match node.parent() {
-                Some(parent) => node = parent,
-                None => break None,
-            }
+            None => None,
         };
 
         (content, pending)
@@ -298,8 +107,130 @@ pub(crate) async fn goto_definition(
     };
 
     // Cross-document lookup (done after CST traversal to avoid holding non-Send nodes across await).
+    let doc_indices = {
+        let Some(doc_path) = doc_path.clone() else {
+            return Ok(None);
+        };
+        let db = salsa_db.lock().await;
+        let mut doc_paths =
+            crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
+                .documents()
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>();
+        if !doc_paths.contains(&doc_path) {
+            doc_paths.push(doc_path.clone());
+        }
+        doc_paths.sort();
+        doc_paths.dedup();
+
+        let mut per_doc = Vec::new();
+        for path in &doc_paths {
+            let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
+            let (file, text) = if doc_uri == *uri {
+                (salsa_file, content.clone())
+            } else {
+                let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
+                    continue;
+                };
+                (file, file.text(&*db).clone())
+            };
+            let symbol_index =
+                crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
+            per_doc.push((doc_uri, text, symbol_index));
+        }
+        per_doc
+    };
     let definition_index =
         helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
+
+    if let PendingDefinition::HeadingLink(label) = &pending {
+        for (doc_uri, text, symbol_index) in &doc_indices {
+            if let Some(ranges) = symbol_index.heading_explicit_definition_ranges(label)
+                && let Some(range) = ranges.first()
+            {
+                let start = conversions::offset_to_position(text, range.start().into());
+                let end = conversions::offset_to_position(text, range.end().into());
+                let location = Location {
+                    uri: doc_uri.clone(),
+                    range: Range { start, end },
+                };
+                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            }
+        }
+
+        if config.extensions.implicit_header_references && config.extensions.auto_identifiers {
+            for (doc_uri, text, symbol_index) in &doc_indices {
+                if let Some(ranges) = symbol_index.heading_implicit_definition_ranges(label)
+                    && let Some(range) = ranges.first()
+                {
+                    let start = conversions::offset_to_position(text, range.start().into());
+                    let end = conversions::offset_to_position(text, range.end().into());
+                    let location = Location {
+                        uri: doc_uri.clone(),
+                        range: Range { start, end },
+                    };
+                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                }
+            }
+        }
+    }
+
+    if let PendingDefinition::Crossref(label) = &pending {
+        for (doc_uri, text, symbol_index) in &doc_indices {
+            for candidate in
+                crate::utils::crossref_symbol_labels(label, config.extensions.bookdown_references)
+            {
+                if let Some(ranges) = symbol_index.crossref_declarations(&candidate)
+                    && let Some(range) = ranges.first()
+                {
+                    let start = conversions::offset_to_position(text, range.start().into());
+                    let end = conversions::offset_to_position(text, range.end().into());
+                    let location = Location {
+                        uri: doc_uri.clone(),
+                        range: Range { start, end },
+                    };
+                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                }
+
+                if config.extensions.implicit_header_references
+                    && config.extensions.auto_identifiers
+                    && let Some(ranges) =
+                        symbol_index.heading_implicit_definition_ranges(&candidate)
+                    && let Some(range) = ranges.first()
+                {
+                    let start = conversions::offset_to_position(text, range.start().into());
+                    let end = conversions::offset_to_position(text, range.end().into());
+                    let location = Location {
+                        uri: doc_uri.clone(),
+                        range: Range { start, end },
+                    };
+                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                }
+            }
+        }
+    }
+
+    if let PendingDefinition::Reference { label, is_footnote } = &pending {
+        for (doc_uri, text, symbol_index) in &doc_indices {
+            let ranges = if *is_footnote {
+                symbol_index.footnote_definitions(label)
+            } else {
+                symbol_index.reference_definitions(label)
+            };
+            if let Some(ranges) = ranges
+                && let Some(range) = ranges.first()
+            {
+                let start = conversions::offset_to_position(text, range.start().into());
+                let end = conversions::offset_to_position(text, range.end().into());
+                let location = Location {
+                    uri: doc_uri.clone(),
+                    range: Range { start, end },
+                };
+                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            }
+        }
+    }
 
     let definition =
         match pending {

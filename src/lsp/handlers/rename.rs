@@ -7,6 +7,7 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
+use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::metadata::{inline_bib_conflicts, inline_reference_map};
 use crate::syntax::SyntaxNode;
 
@@ -51,27 +52,14 @@ pub(crate) async fn rename(
     if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
         return Ok(None);
     }
-    // First handle crossref/chunk-label rename without requiring bibliography metadata.
-    let maybe_crossref_key = {
+    let target = {
         let root = SyntaxNode::new_root(green_tree.clone());
-        let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
-            return Ok(None);
-        };
-        loop {
-            if let Some(key) = helpers::extract_crossref_key(&node) {
-                break Some(key);
-            }
-            if let Some(key) = helpers::extract_chunk_label_key(&node) {
-                break Some(key);
-            }
-            match node.parent() {
-                Some(parent) => node = parent,
-                None => break None,
-            }
-        }
+        resolve_symbol_target_at_offset(&root, offset)
     };
-    if let Some(old_key) = maybe_crossref_key {
-        let old_norm = normalize_label(&old_key);
+
+    // First handle crossref/chunk-label rename without requiring bibliography metadata.
+    if let Some(SymbolTarget::Crossref(old_key)) = target.as_ref() {
+        let old_norm = normalize_label(old_key);
         let search_keys =
             crate::utils::crossref_symbol_labels(&old_norm, config.extensions.bookdown_references);
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
@@ -124,9 +112,10 @@ pub(crate) async fn rename(
             }
 
             if config.extensions.bookdown_references {
-                let root = crate::parse(&text, Some(config.clone()));
-                let insert_ranges =
-                    helpers::collect_implicit_heading_id_insert_ranges(&root, &old_norm);
+                let insert_ranges = symbol_index
+                    .implicit_heading_insert_ranges(&old_norm)
+                    .cloned()
+                    .unwrap_or_default();
                 edits.extend(text_edits_from_ranges(
                     &insert_ranges,
                     &text,
@@ -149,26 +138,10 @@ pub(crate) async fn rename(
         }));
     }
 
-    let maybe_heading_key = {
-        let root = SyntaxNode::new_root(green_tree.clone());
-        let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
-            return Ok(None);
-        };
-        loop {
-            if let Some(key) = helpers::extract_heading_link_target(&node) {
-                break Some(key);
-            }
-            if let Some(key) = helpers::extract_heading_id_key(&node) {
-                break Some(key);
-            }
-            match node.parent() {
-                Some(parent) => node = parent,
-                None => break None,
-            }
-        }
-    };
-    if let Some(old_key) = maybe_heading_key {
-        let old_norm = normalize_label(&old_key);
+    if let Some(SymbolTarget::HeadingLink(old_key) | SymbolTarget::HeadingId(old_key)) =
+        target.as_ref()
+    {
+        let old_norm = normalize_label(old_key);
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
         let per_doc = {
@@ -196,14 +169,25 @@ pub(crate) async fn rename(
                     };
                     file.text(&*db).clone()
                 };
-                out.push((doc_uri, text));
+                let file = if doc_uri == uri {
+                    salsa_file
+                } else {
+                    let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
+                        continue;
+                    };
+                    file
+                };
+                let symbol_index =
+                    crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone())
+                        .clone();
+                out.push((doc_uri, text, symbol_index));
             }
             out
         };
 
-        for (doc_uri, text) in per_doc {
-            let root = crate::parse(&text, Some(config.clone()));
-            let ranges = helpers::collect_heading_rename_ranges(&root, &old_norm);
+        for (doc_uri, text, symbol_index) in per_doc {
+            let ranges = symbol_index.heading_rename_ranges(&old_norm);
+
             let edits = text_edits_from_ranges(&ranges, &text, &new_name);
             if edits.is_empty() {
                 continue;
@@ -229,22 +213,12 @@ pub(crate) async fn rename(
         let db = salsa_db.lock().await;
         crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
-    let (old_key, old_norm) = {
-        let root = SyntaxNode::new_root(green_tree.clone());
-        let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
-            return Ok(None);
-        };
-        let old_key = loop {
-            if let Some(key) = helpers::extract_citation_key(&node) {
-                break key;
-            }
-            match node.parent() {
-                Some(parent) => node = parent,
-                None => return Ok(None),
-            }
-        };
-        let old_norm = normalize_label(&old_key);
-        (old_key, old_norm)
+    let (old_key, old_norm) = match target {
+        Some(SymbolTarget::Citation(key)) => {
+            let norm = normalize_label(&key);
+            (key, norm)
+        }
+        _ => return Ok(None),
     };
 
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();

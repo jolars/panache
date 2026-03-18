@@ -6,11 +6,11 @@ use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkOption, Citation, Crossref, FootnoteDefinition,
+    AstNode, AttributeNode, ChunkOption, Citation, Crossref, FootnoteDefinition, Heading, Link,
     ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode, YamlRegion,
     collect_parsed_yaml_region_snapshots,
 };
-use crate::utils::normalize_label;
+use crate::utils::{implicit_heading_ids, normalize_label};
 use salsa::{Accumulator, Durability, Setter};
 
 #[salsa::input]
@@ -305,6 +305,11 @@ pub struct SymbolUsageIndex {
     crossref_declarations: HashMap<String, Vec<rowan::TextRange>>,
     crossref_declaration_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
     chunk_label_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
+    heading_id_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
+    heading_link_usages: HashMap<String, Vec<rowan::TextRange>>,
+    implicit_heading_insert_ranges: HashMap<String, Vec<rowan::TextRange>>,
+    heading_explicit_definition_ranges: HashMap<String, Vec<rowan::TextRange>>,
+    heading_implicit_definition_ranges: HashMap<String, Vec<rowan::TextRange>>,
     reference_definitions: HashMap<String, Vec<rowan::TextRange>>,
     footnote_definitions: HashMap<String, Vec<rowan::TextRange>>,
     heading_labels: HashMap<String, Vec<rowan::TextRange>>,
@@ -337,10 +342,31 @@ impl SymbolUsageIndex {
             .get(&normalize_label(key))
     }
 
+    pub fn heading_id_value_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.heading_id_value_ranges.get(&normalize_label(key))
+    }
+
+    pub fn heading_link_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.heading_link_usages.get(&normalize_label(key))
+    }
+
+    pub fn implicit_heading_insert_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.implicit_heading_insert_ranges
+            .get(&normalize_label(key))
+    }
+
     pub fn crossref_declaration_entries(
         &self,
     ) -> impl Iterator<Item = (&String, &Vec<rowan::TextRange>)> {
         self.crossref_declarations.iter()
+    }
+
+    pub fn reference_definitions(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.reference_definitions.get(&normalize_label(key))
+    }
+
+    pub fn footnote_definitions(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.footnote_definitions.get(&normalize_label(key))
     }
 
     pub fn reference_definition_entries(
@@ -357,6 +383,41 @@ impl SymbolUsageIndex {
 
     pub fn heading_label_entries(&self) -> impl Iterator<Item = (&String, &Vec<rowan::TextRange>)> {
         self.heading_labels.iter()
+    }
+
+    pub fn heading_reference_ranges(
+        &self,
+        key: &str,
+        include_declaration: bool,
+    ) -> Vec<rowan::TextRange> {
+        let normalized = normalize_label(key);
+        let mut ranges = self
+            .heading_link_usages
+            .get(&normalized)
+            .cloned()
+            .unwrap_or_default();
+
+        if include_declaration && let Some(id_ranges) = self.heading_id_value_ranges(&normalized) {
+            ranges.extend(id_ranges.iter().copied());
+        }
+
+        ranges.sort_by_key(|range| range.start());
+        ranges.dedup();
+        ranges
+    }
+
+    pub fn heading_rename_ranges(&self, key: &str) -> Vec<rowan::TextRange> {
+        self.heading_reference_ranges(key, true)
+    }
+
+    pub fn heading_explicit_definition_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.heading_explicit_definition_ranges
+            .get(&normalize_label(key))
+    }
+
+    pub fn heading_implicit_definition_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.heading_implicit_definition_ranges
+            .get(&normalize_label(key))
     }
 
     pub fn heading_sequence(&self) -> &[(rowan::TextRange, usize)] {
@@ -423,6 +484,38 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
         }
     }
 
+    for link in tree.descendants().filter_map(Link::cast) {
+        db.unwind_if_revision_cancelled();
+        if let Some(dest) = link.dest() {
+            let Some(id) = dest.hash_anchor_id() else {
+                continue;
+            };
+            let Some(range) = dest.hash_anchor_id_range() else {
+                continue;
+            };
+            index
+                .heading_link_usages
+                .entry(normalize_label(&id))
+                .or_default()
+                .push(range);
+            continue;
+        }
+
+        if link.reference().is_none()
+            && let Some(text) = link.text()
+        {
+            let label = normalize_label(&text.text_content());
+            if label.is_empty() {
+                continue;
+            }
+            index
+                .heading_link_usages
+                .entry(label)
+                .or_default()
+                .push(text.syntax().text_range());
+        }
+    }
+
     for node in tree
         .descendants()
         .filter(|node| node.kind() == SyntaxKind::CITATION)
@@ -476,6 +569,28 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
                     .entry(normalize_label(&id))
                     .or_default()
                     .push(id_range);
+                if attribute
+                    .syntax()
+                    .ancestors()
+                    .any(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
+                {
+                    index
+                        .heading_id_value_ranges
+                        .entry(normalize_label(&id))
+                        .or_default()
+                        .push(id_range);
+                    if let Some(heading) = attribute
+                        .syntax()
+                        .ancestors()
+                        .find(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
+                    {
+                        index
+                            .heading_explicit_definition_ranges
+                            .entry(normalize_label(&id))
+                            .or_default()
+                            .push(heading.text_range());
+                    }
+                }
             }
         }
     }
@@ -514,7 +629,40 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
         }
     }
 
+    for entry in implicit_heading_ids(tree) {
+        db.unwind_if_revision_cancelled();
+        index
+            .heading_implicit_definition_ranges
+            .entry(normalize_label(&entry.id))
+            .or_default()
+            .push(entry.heading.text_range());
+
+        if heading_has_explicit_id(&entry.heading) {
+            continue;
+        }
+        let Some(heading) = Heading::cast(entry.heading.clone()) else {
+            continue;
+        };
+        let Some(content) = heading.content() else {
+            continue;
+        };
+        let pos = content.syntax().text_range().end();
+        let range = rowan::TextRange::new(pos, pos);
+        index
+            .implicit_heading_insert_ranges
+            .entry(normalize_label(&entry.id))
+            .or_default()
+            .push(range);
+    }
+
     index
+}
+
+fn heading_has_explicit_id(heading: &SyntaxNode) -> bool {
+    heading
+        .children()
+        .filter_map(AttributeNode::cast)
+        .any(|attribute| attribute.id().is_some())
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -1292,6 +1440,73 @@ mod tests {
             "expected one heading label"
         );
         assert_eq!(index.citation_usages("cite").map(|v| v.len()), Some(1));
+    }
+
+    #[test]
+    fn symbol_usage_index_collects_heading_ranges_for_links_and_ids() {
+        let db = SalsaDb::default();
+        let tree = crate::parse(
+            "# Heading {#heading}\n\nSee [heading].\n\nSee [label](#heading).\n",
+            None,
+        );
+        let index = symbol_usage_index_from_tree(&db, &tree);
+
+        assert_eq!(
+            index
+                .heading_id_value_ranges("heading")
+                .map(|ranges| ranges.len()),
+            Some(1)
+        );
+        assert_eq!(
+            index
+                .heading_link_usages("heading")
+                .map(|ranges| ranges.len()),
+            Some(2)
+        );
+        assert_eq!(index.heading_reference_ranges("heading", true).len(), 3);
+        assert_eq!(index.heading_rename_ranges("heading").len(), 3);
+    }
+
+    #[test]
+    fn symbol_usage_index_collects_implicit_heading_insert_ranges() {
+        let db = SalsaDb::default();
+        let mut config = crate::Config {
+            flavor: crate::config::Flavor::RMarkdown,
+            ..Default::default()
+        };
+        config.extensions.bookdown_references = true;
+        let tree = crate::parse(
+            "# Heading\n\n## Heading 2\n\nA ref to \\@ref(heading-2).\n",
+            Some(config),
+        );
+        let index = symbol_usage_index_from_tree(&db, &tree);
+
+        assert_eq!(
+            index
+                .implicit_heading_insert_ranges("heading-2")
+                .map(|ranges| ranges.len()),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn symbol_usage_index_collects_heading_definition_ranges() {
+        let db = SalsaDb::default();
+        let tree = crate::parse("# A\n\n# B {#beta}\n", None);
+        let index = symbol_usage_index_from_tree(&db, &tree);
+
+        assert_eq!(
+            index
+                .heading_implicit_definition_ranges("a")
+                .map(|ranges| ranges.len()),
+            Some(1)
+        );
+        assert_eq!(
+            index
+                .heading_explicit_definition_ranges("beta")
+                .map(|ranges| ranges.len()),
+            Some(1)
+        );
     }
 
     #[test]

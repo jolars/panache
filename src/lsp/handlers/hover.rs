@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+
 use tokio::sync::Mutex;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
@@ -62,7 +63,7 @@ pub(crate) async fn hover(
 
     let metadata = {
         let db = salsa_db.lock().await;
-        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path).clone()
+        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
 
     let pending_footnote = {
@@ -82,21 +83,6 @@ pub(crate) async fn hover(
             if let Some((label, is_footnote)) = helpers::extract_reference_label(&node) {
                 // Only handle footnotes (not regular references)
                 if is_footnote {
-                    // First try local definition (no cross-document index needed)
-                    if let Some(footnote_def) = helpers::find_definition_node(&root, &label, true)
-                        .and_then(FootnoteDefinition::cast)
-                    {
-                        let content = footnote_def.content();
-                        let trimmed = content.trim();
-                        return Ok(Some(Hover {
-                            contents: HoverContents::Markup(MarkupContent {
-                                kind: MarkupKind::Markdown,
-                                value: trimmed.to_string(),
-                            }),
-                            range: None,
-                        }));
-                    }
-
                     break Some(label);
                 }
             }
@@ -140,42 +126,68 @@ pub(crate) async fn hover(
         return Ok(None);
     };
 
-    // Cross-document footnote lookup (done after CST traversal to avoid holding non-Send nodes
-    // across await points).
-    let definition_index =
-        helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
-    let Some(location) = definition_index.find_footnote(&label) else {
-        return Ok(None);
-    };
-
-    let text = {
+    // Cross-document footnote lookup via symbol usage index.
+    let doc_indices = {
         let db = salsa_db.lock().await;
-        db.file_text_if_cached(location.path())
-            .map(|file| file.text(&*db).clone())
-            .or_else(|| std::fs::read_to_string(location.path()).ok())
+        let mut doc_paths =
+            crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
+                .documents()
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>();
+        if !doc_paths.contains(&doc_path) {
+            doc_paths.push(doc_path.clone());
+        }
+        doc_paths.sort();
+        doc_paths.dedup();
+
+        let mut per_doc = Vec::new();
+        for path in &doc_paths {
+            let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
+            let (file, text) = if doc_uri == *uri {
+                (salsa_file, content_for_offset.clone())
+            } else {
+                let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
+                    continue;
+                };
+                (file, file.text(&*db).clone())
+            };
+            let symbol_index =
+                crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
+            per_doc.push((text, symbol_index));
+        }
+
+        per_doc
     };
 
-    let Some(text) = text else {
-        return Ok(None);
-    };
+    for (text, symbol_index) in doc_indices {
+        let Some(ranges) = symbol_index.footnote_definitions(&label) else {
+            continue;
+        };
+        let Some(range) = ranges.first() else {
+            continue;
+        };
 
-    let tree = crate::parse(&text, None);
-    let Some(footnote_def) = tree
-        .descendants()
-        .filter_map(FootnoteDefinition::cast)
-        .find(|def| def.id() == label)
-    else {
-        return Ok(None);
-    };
+        let tree = crate::parse(&text, None);
+        let Some(footnote_def) = tree
+            .descendants()
+            .filter_map(FootnoteDefinition::cast)
+            .find(|def| def.syntax().text_range() == *range)
+        else {
+            continue;
+        };
 
-    let trimmed = footnote_def.content().trim().to_string();
-    Ok(Some(Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: trimmed,
-        }),
-        range: None,
-    }))
+        let trimmed = footnote_def.content().trim().to_string();
+        return Ok(Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: trimmed,
+            }),
+            range: None,
+        }));
+    }
+
+    Ok(None)
 }
 
 /// Format a bibliography entry for hover display.
@@ -303,13 +315,18 @@ mod tests {
         assert_eq!(label, "1");
         assert!(is_footnote);
 
-        // Find the definition
-        let definition =
-            helpers::find_definition_node(&root, &label, true).expect("Should find definition");
-
-        // Cast to FootnoteDefinition
-        let footnote_def =
-            FootnoteDefinition::cast(definition).expect("Should cast to FootnoteDefinition");
+        let db = crate::salsa::SalsaDb::default();
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root);
+        let range = index
+            .footnote_definitions(&label)
+            .and_then(|ranges| ranges.first())
+            .copied()
+            .expect("Should find definition range");
+        let footnote_def = root
+            .descendants()
+            .filter_map(FootnoteDefinition::cast)
+            .find(|def| def.syntax().text_range() == range)
+            .expect("Should find footnote definition by range");
 
         // Extract content
         let content = footnote_def.content();
@@ -321,12 +338,18 @@ mod tests {
         let input = "Text[^1]\n\n[^1]: First line\n    Second line";
         let root = parse(input, None);
 
-        // Find the definition
-        let definition =
-            helpers::find_definition_node(&root, "1", true).expect("Should find definition");
-
-        let footnote_def =
-            FootnoteDefinition::cast(definition).expect("Should cast to FootnoteDefinition");
+        let db = crate::salsa::SalsaDb::default();
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root);
+        let range = index
+            .footnote_definitions("1")
+            .and_then(|ranges| ranges.first())
+            .copied()
+            .expect("Should find definition range");
+        let footnote_def = root
+            .descendants()
+            .filter_map(FootnoteDefinition::cast)
+            .find(|def| def.syntax().text_range() == range)
+            .expect("Should find footnote definition by range");
 
         let content = footnote_def.content();
         assert!(content.contains("First line"));
@@ -338,8 +361,9 @@ mod tests {
         let input = "Text with footnote[^missing]";
         let root = parse(input, None);
 
-        let definition = helpers::find_definition_node(&root, "missing", true);
-        assert!(definition.is_none());
+        let db = crate::salsa::SalsaDb::default();
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root);
+        assert!(index.footnote_definitions("missing").is_none());
     }
 
     #[test]
@@ -347,14 +371,33 @@ mod tests {
         let input = "[^1]: Text with *emphasis* and `code`.";
         let root = parse(input, None);
 
-        let definition =
-            helpers::find_definition_node(&root, "1", true).expect("Should find definition");
-
-        let footnote_def =
-            FootnoteDefinition::cast(definition).expect("Should cast to FootnoteDefinition");
+        let db = crate::salsa::SalsaDb::default();
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root);
+        let range = index
+            .footnote_definitions("1")
+            .and_then(|ranges| ranges.first())
+            .copied()
+            .expect("Should find definition range");
+        let footnote_def = root
+            .descendants()
+            .filter_map(FootnoteDefinition::cast)
+            .find(|def| def.syntax().text_range() == range)
+            .expect("Should find footnote definition by range");
 
         let content = footnote_def.content();
         assert!(content.contains("*emphasis*"));
         assert!(content.contains("`code`"));
+    }
+
+    #[test]
+    fn footnote_definition_index_contains_definition_range() {
+        let db = crate::salsa::SalsaDb::default();
+        let text = "Text[^a]\n\n[^a]: Hello world\n";
+        let tree = parse(text, None);
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &tree);
+        assert_eq!(
+            index.footnote_definitions("a").map(|ranges| ranges.len()),
+            Some(1)
+        );
     }
 }

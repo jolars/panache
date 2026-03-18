@@ -12,6 +12,7 @@ mod documents;
 mod handlers;
 mod helpers;
 mod server;
+mod symbols;
 
 /// State for a single document in the LSP.
 #[derive(Clone)]

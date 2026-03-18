@@ -7,16 +7,12 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
+use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::syntax::SyntaxNode;
 use crate::utils::normalize_label;
 
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
-
-enum Target {
-    Crossref(String),
-    Citation { key: String, norm: String },
-}
 
 pub(crate) async fn references(
     client: &tower_lsp_server::Client,
@@ -58,31 +54,7 @@ pub(crate) async fn references(
 
     let target = {
         let root = SyntaxNode::new_root(green_tree.clone());
-        let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
-            return Ok(None);
-        };
-
-        loop {
-            if let Some(key) = helpers::extract_citation_key(&node) {
-                break Some(Target::Citation {
-                    norm: normalize_label(&key),
-                    key,
-                });
-            }
-            if let Some(key) = helpers::extract_crossref_key(&node) {
-                break Some(Target::Crossref(normalize_label(&key)));
-            }
-            if let Some(key) = helpers::extract_chunk_label_key(&node) {
-                break Some(Target::Crossref(normalize_label(&key)));
-            }
-            if let Some(key) = helpers::extract_attribute_id_key(&node) {
-                break Some(Target::Crossref(normalize_label(&key)));
-            }
-            match node.parent() {
-                Some(parent) => node = parent,
-                None => break None,
-            }
-        }
+        resolve_symbol_target_at_offset(&root, offset)
     };
     let Some(target) = target else {
         return Ok(None);
@@ -117,9 +89,21 @@ pub(crate) async fn references(
             let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
 
             match &target {
-                Target::Crossref(label) => {
+                SymbolTarget::Crossref(label)
+                | SymbolTarget::HeadingLink(label)
+                | SymbolTarget::HeadingId(label) => {
+                    if matches!(
+                        &target,
+                        SymbolTarget::HeadingLink(_) | SymbolTarget::HeadingId(_)
+                    ) {
+                        let ranges =
+                            symbol_index.heading_reference_ranges(label, include_declaration);
+                        add_locations(&mut locations, &doc_uri, &text, &ranges);
+                        continue;
+                    }
+
                     for candidate in crate::utils::crossref_symbol_labels(
-                        label,
+                        &normalize_label(label),
                         config.extensions.bookdown_references,
                     ) {
                         if let Some(ranges) = symbol_index.crossref_usages(&candidate) {
@@ -132,8 +116,25 @@ pub(crate) async fn references(
                         }
                     }
                 }
-                Target::Citation { norm, .. } => {
-                    if let Some(ranges) = symbol_index.citation_usages(norm) {
+                SymbolTarget::Citation(key) => {
+                    let norm = normalize_label(key);
+                    if let Some(ranges) = symbol_index.citation_usages(&norm) {
+                        add_locations(&mut locations, &doc_uri, &text, ranges);
+                    }
+                }
+                SymbolTarget::Reference { label, is_footnote } => {
+                    let norm = normalize_label(label);
+                    if *is_footnote {
+                        if let Some(ranges) = symbol_index
+                            .footnote_definition_entries()
+                            .find_map(|(id, ranges)| (id == &norm).then_some(ranges))
+                        {
+                            add_locations(&mut locations, &doc_uri, &text, ranges);
+                        }
+                    } else if let Some(ranges) = symbol_index
+                        .reference_definition_entries()
+                        .find_map(|(id, ranges)| (id == &norm).then_some(ranges))
+                    {
                         add_locations(&mut locations, &doc_uri, &text, ranges);
                     }
                 }
@@ -161,7 +162,7 @@ pub(crate) async fn references(
     };
 
     if include_declaration
-        && let (Target::Citation { key, .. }, Some(index)) = (&target, citation_def_index.as_ref())
+        && let (SymbolTarget::Citation(key), Some(index)) = (&target, citation_def_index.as_ref())
     {
         let db = salsa_db.lock().await;
         locations.extend(helpers::citation_definition_locations(

@@ -1,0 +1,48 @@
+use super::helpers::*;
+use tower_lsp_server::ls_types::PrepareRenameResponse;
+
+#[tokio::test]
+async fn test_prepare_rename_bookdown_hyphenated_crossref_selects_full_key() {
+    let server = TestLspServer::new();
+    let content = "# Heading\n\n## Heading 2\n\nA ref to \\@ref(heading-2).\n";
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let response = server
+        .prepare_rename("file:///test.Rmd", 4, 20)
+        .await
+        .expect("prepare rename response");
+
+    let PrepareRenameResponse::Range(range) = response else {
+        panic!("expected prepare rename range");
+    };
+
+    assert_eq!(range.start.line, 4);
+    assert_eq!(range.start.character, 15);
+    assert_eq!(range.end.line, 4);
+    assert_eq!(range.end.character, 24);
+}
+
+#[tokio::test]
+async fn test_prepare_rename_heading_hash_link_selects_anchor_without_hash() {
+    let server = TestLspServer::new();
+    let content = "# Heading {#heading}\n\nSee [label](#heading).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let response = server
+        .prepare_rename("file:///test.md", 2, 15)
+        .await
+        .expect("prepare rename response");
+
+    let PrepareRenameResponse::Range(range) = response else {
+        panic!("expected prepare rename range");
+    };
+
+    assert_eq!(range.start.line, 2);
+    assert_eq!(range.start.character, 13);
+    assert_eq!(range.end.line, 2);
+    assert_eq!(range.end.character, 20);
+}
