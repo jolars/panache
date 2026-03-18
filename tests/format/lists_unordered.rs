@@ -94,3 +94,14 @@ fn list_item_with_hard_breaks_stays_idempotent() {
     let output2 = format(&output1, None, None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn list_item_wraps_at_configured_line_width() {
+    let cfg = panache::ConfigBuilder::default().line_width(80).build();
+    let input =
+        "- Foo and bar are (univariate) data variables, used when there is a need for foob\n";
+    let expected =
+        "- Foo and bar are (univariate) data variables, used when there is a need for\n  foob\n";
+    let output = format(input, Some(cfg), None);
+    assert_eq!(output, expected);
+}

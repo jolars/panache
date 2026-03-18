@@ -276,7 +276,7 @@ pub(super) fn wrap_words_first_fit(words: &[WrapWord], line_widths: &[usize]) ->
             .get(out.len())
             .copied()
             .unwrap_or(default_line_width);
-        let spacer = usize::from(!line.is_empty() && !w.whitespace.is_empty());
+        let spacer = usize::from(!line.is_empty());
         if !line.is_empty() && line_width + spacer + ww > line_limit {
             out.push(std::mem::take(&mut line));
             line_width = 0;
