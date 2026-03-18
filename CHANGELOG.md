@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.23.0](https://github.com/jolars/panache/compare/v2.22.0...v2.23.0) (2026-03-18)
+
+### Features
+
+* **config:** exclude `LICENSE.md` files by default ([8cdad49](https://github.com/jolars/panache/commit/8cdad49c136d89b34ba6b2287a110ca637fb9bc5)), closes [#80](https://github.com/jolars/panache/issues/80)
+* **linter,lsp:** unify bookdown chunk label resolution ([a71301f](https://github.com/jolars/panache/commit/a71301f105364c421a193388209f7901545aec51))
+* **linter:** warn on uncaptioned bookdown figure crossrefs ([2de688a](https://github.com/jolars/panache/commit/2de688a49cb2cafd2f1e9cf84f8f649fac280eac))
+* **lsp,linter:** support bookdown-style divs ([d6f08af](https://github.com/jolars/panache/commit/d6f08af6464cb5cd6c7a513e2f8aaa4a6f73ba0a))
+* **lsp:** add support for Pandoc heading links ([9690922](https://github.com/jolars/panache/commit/969092248c8b3a14da1ec3e2d89d550c4e382f5e))
+
+### Bug Fixes
+
+* **cli:** fix exit code with `--force-exclude` ([f140a7b](https://github.com/jolars/panache/commit/f140a7bd0248ba37c03eb5c52bef97531aa3d589)), closes [#82](https://github.com/jolars/panache/issues/82)
+* **formatter:** enforce wrapping in list item ([c9266cb](https://github.com/jolars/panache/commit/c9266cb4501710785ad7c490f7b1c2574203bace)), closes [#81](https://github.com/jolars/panache/issues/81)
+* **lsp:** correctly report heading symbols ([97d8bdb](https://github.com/jolars/panache/commit/97d8bdb15cbbc084e238d32c33db56d182234e6a)), closes [#84](https://github.com/jolars/panache/issues/84)
+* **lsp:** handle bookdown crossrefs with dashes ([101e546](https://github.com/jolars/panache/commit/101e546e6f7c624739513db55794b38b6c14a71f))
+
 ## [2.22.0](https://github.com/jolars/panache/compare/v2.21.0...v2.22.0) (2026-03-17)
 
 ### Features
