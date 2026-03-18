@@ -24,36 +24,6 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         }
     }
 
-    /// Registry-based "does this look like the start of some nested block structure" probe.
-    ///
-    /// Important: this is intended for *blank-line keep-open decisions*, so it uses
-    /// `has_blank_before_strict = false` to avoid treating indented code blocks as nested.
-    #[allow(dead_code)]
-    pub(crate) fn has_nested_block_structure(&self, content: &str) -> bool {
-        let block_ctx = BlockContext {
-            content,
-            has_blank_before: true,
-            // For blank-line container-keep decisions we do NOT want indented code blocks
-            // to count as “nested structure” (that would keep definitions open incorrectly).
-            has_blank_before_strict: false,
-            at_document_start: false,
-            in_fenced_div: false,
-            blockquote_depth: 0,
-            config: self.config,
-            content_indent: 0,
-            indent_to_emit: None,
-            list_indent_info: None,
-            in_list: false,
-            next_line: None,
-        };
-
-        // We intentionally pass empty `lines` here so lookahead-sensitive blocks (e.g. setext)
-        // won't count as nested structure for blank-line keep-open decisions.
-        self.block_registry
-            .detect_prepared(&block_ctx, &[], 0)
-            .is_some()
-    }
-
     pub(crate) fn compute_levels_to_keep(
         &self,
         current_bq_depth: usize,
