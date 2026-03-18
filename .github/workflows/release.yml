@@ -44,7 +44,7 @@ jobs:
           node-version: "lts/*"
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: panache-*
           merge-multiple: true
