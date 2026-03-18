@@ -86,6 +86,46 @@ async fn test_document_symbols_include_yaml_frontmatter_symbol() {
 }
 
 #[tokio::test]
+async fn test_document_symbols_headings_use_outline_visible_kind_for_qmd() {
+    let server = TestLspServer::new();
+    let content = "---\ntitle: Report\n---\n\n# Report\n\n## Details\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let symbols = server.get_symbols("file:///test.qmd").await;
+    let Some(DocumentSymbolResponse::Nested(syms)) = symbols else {
+        panic!("Expected nested document symbols");
+    };
+
+    let heading = syms
+        .iter()
+        .find(|symbol| symbol.name == "Report")
+        .expect("Expected heading symbol");
+    assert_eq!(heading.kind, SymbolKind::NAMESPACE);
+}
+
+#[tokio::test]
+async fn test_document_symbols_headings_use_outline_visible_kind_for_rmd() {
+    let server = TestLspServer::new();
+    let content = "---\ntitle: Report\n---\n\n# Report\n\n## Details\n";
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let symbols = server.get_symbols("file:///test.Rmd").await;
+    let Some(DocumentSymbolResponse::Nested(syms)) = symbols else {
+        panic!("Expected nested document symbols");
+    };
+
+    let heading = syms
+        .iter()
+        .find(|symbol| symbol.name == "Report")
+        .expect("Expected heading symbol");
+    assert_eq!(heading.kind, SymbolKind::NAMESPACE);
+}
+
+#[tokio::test]
 async fn test_folding_ranges_headings() {
     let server = TestLspServer::new();
 

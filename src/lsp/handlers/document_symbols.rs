@@ -201,7 +201,7 @@ fn extract_heading_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSy
             text
         },
         detail: None,
-        kind: SymbolKind::STRING,
+        kind: SymbolKind::NAMESPACE,
         tags: None,
         deprecated: None,
         range,
@@ -297,7 +297,7 @@ mod tests {
 
         let h1_first = &symbols[0];
         assert_eq!(h1_first.name, "H1");
-        assert_eq!(h1_first.kind, SymbolKind::STRING);
+        assert_eq!(h1_first.kind, SymbolKind::NAMESPACE);
         assert_eq!(h1_first.children.as_ref().unwrap().len(), 2); // Two H2 children
 
         let h2_first = &h1_first.children.as_ref().unwrap()[0];
