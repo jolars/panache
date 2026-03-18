@@ -118,6 +118,9 @@ pub(crate) async fn rename(
                 if let Some(ranges) = symbol_index.chunk_label_value_ranges(search_key) {
                     edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
                 }
+                if let Some(ranges) = symbol_index.crossref_declaration_value_ranges(search_key) {
+                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
+                }
             }
             if edits.is_empty() {
                 continue;

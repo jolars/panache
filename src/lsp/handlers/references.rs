@@ -75,6 +75,9 @@ pub(crate) async fn references(
             if let Some(key) = helpers::extract_chunk_label_key(&node) {
                 break Some(Target::Crossref(normalize_label(&key)));
             }
+            if let Some(key) = helpers::extract_attribute_id_key(&node) {
+                break Some(Target::Crossref(normalize_label(&key)));
+            }
             match node.parent() {
                 Some(parent) => node = parent,
                 None => break None,

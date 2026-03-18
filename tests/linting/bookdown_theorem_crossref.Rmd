@@ -1,0 +1,9 @@
+---
+output: bookdown::html_document2
+---
+
+Exercise \@ref(exr:mu)
+
+::: {#mu .exercise}
+foobar
+:::

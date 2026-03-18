@@ -5,10 +5,10 @@ use std::sync::{Arc, Mutex};
 use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
-use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{
-    AstNode, ChunkOption, Citation, Crossref, FootnoteDefinition, ParsedYamlRegionSnapshot,
-    ReferenceDefinition, SyntaxKind, SyntaxNode, YamlRegion, collect_parsed_yaml_region_snapshots,
+    AstNode, AttributeNode, ChunkOption, Citation, Crossref, FootnoteDefinition,
+    ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode, YamlRegion,
+    collect_parsed_yaml_region_snapshots,
 };
 use crate::utils::normalize_label;
 use salsa::{Accumulator, Durability, Setter};
@@ -303,6 +303,7 @@ pub struct SymbolUsageIndex {
     citation_references: HashMap<String, Vec<rowan::TextRange>>,
     crossref_usages: HashMap<String, Vec<rowan::TextRange>>,
     crossref_declarations: HashMap<String, Vec<rowan::TextRange>>,
+    crossref_declaration_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
     chunk_label_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
     reference_definitions: HashMap<String, Vec<rowan::TextRange>>,
     footnote_definitions: HashMap<String, Vec<rowan::TextRange>>,
@@ -329,6 +330,11 @@ impl SymbolUsageIndex {
 
     pub fn chunk_label_value_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.chunk_label_value_ranges.get(&normalize_label(key))
+    }
+
+    pub fn crossref_declaration_value_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.crossref_declaration_value_ranges
+            .get(&normalize_label(key))
     }
 
     pub fn crossref_declaration_entries(
@@ -456,20 +462,21 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
         }
     }
 
-    for node in tree.descendants() {
+    for attribute in tree.descendants().filter_map(AttributeNode::cast) {
         db.unwind_if_revision_cancelled();
-        if node.kind() != SyntaxKind::ATTRIBUTE {
-            continue;
-        }
-        let text = node.text().to_string();
-        if let Some(attrs) = try_parse_trailing_attributes(&text).map(|(attrs, _)| attrs)
-            && let Some(id) = attrs.identifier
-        {
+        if let Some(id) = attribute.id() {
             index
                 .crossref_declarations
                 .entry(normalize_label(&id))
                 .or_default()
-                .push(node.text_range());
+                .push(attribute.syntax().text_range());
+            if let Some(id_range) = attribute.id_value_range() {
+                index
+                    .crossref_declaration_value_ranges
+                    .entry(normalize_label(&id))
+                    .or_default()
+                    .push(id_range);
+            }
         }
     }
 
@@ -637,18 +644,12 @@ pub fn definition_index(
         insert_footnote(db, &mut index, &id, location);
     }
 
-    for node in tree.descendants() {
+    for attribute in tree.descendants().filter_map(AttributeNode::cast) {
         db.unwind_if_revision_cancelled();
-        if node.kind() != SyntaxKind::ATTRIBUTE {
-            continue;
-        }
-        let text = node.text().to_string();
-        if let Some(attrs) = try_parse_trailing_attributes(&text).map(|(attrs, _)| attrs)
-            && let Some(id) = attrs.identifier
-        {
+        if let Some(id) = attribute.id() {
             let location = DefinitionLocation {
                 path: path.clone(),
-                range: node.text_range(),
+                range: attribute.syntax().text_range(),
             };
             insert_crossref(db, &mut index, &id, location);
         }

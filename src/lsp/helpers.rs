@@ -6,10 +6,10 @@ use tower_lsp_server::ls_types::{Location, Range, Uri};
 
 use crate::Config;
 use crate::lsp::DocumentState;
-use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, ChunkOption, Citation, Crossref, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
+    AstNode, AttributeNode, ChunkOption, Citation, Crossref, ParsedYamlRegionSnapshot, SyntaxKind,
+    SyntaxNode,
 };
 use crate::utils::pandoc_slugify;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -290,21 +290,38 @@ pub(crate) fn extract_chunk_label_key(node: &SyntaxNode) -> Option<String> {
     None
 }
 
+pub(crate) fn extract_attribute_id_key(node: &SyntaxNode) -> Option<String> {
+    if let Some(attribute) = AttributeNode::cast(node.clone())
+        && let Some(id) = attribute.id()
+    {
+        return Some(id);
+    }
+
+    let mut current = node.clone();
+    while let Some(parent) = current.parent() {
+        if let Some(attribute) = AttributeNode::cast(parent.clone())
+            && let Some(id) = attribute.id()
+        {
+            return Some(id);
+        }
+        current = parent;
+    }
+
+    None
+}
+
 pub(crate) fn find_crossref_definition_node(root: &SyntaxNode, label: &str) -> Option<SyntaxNode> {
     let target = normalize_label(label);
-    if let Some(node) = root.descendants().find(|node| {
-        if node.kind() != SyntaxKind::ATTRIBUTE {
-            return false;
-        }
-        let text = node.text().to_string();
-        if let Some(attrs) = try_parse_trailing_attributes(&text).map(|(attrs, _)| attrs)
-            && let Some(id) = attrs.identifier
-        {
-            return normalize_label(&id) == target;
-        }
-        false
-    }) {
-        return Some(node);
+    if let Some(attribute) = root
+        .descendants()
+        .filter_map(AttributeNode::cast)
+        .find(|attribute| {
+            attribute
+                .id()
+                .is_some_and(|id| normalize_label(&id) == target)
+        })
+    {
+        return Some(attribute.syntax().clone());
     }
 
     root.descendants().find(|node| {

@@ -224,4 +224,18 @@ mod tests {
         let diagnostics = rule.check(&tree, input, &config, None);
         assert!(diagnostics.is_empty());
     }
+
+    #[test]
+    fn accepts_bookdown_theorem_environment_crossref() {
+        let input = "Exercise \\@ref(exr:mu)\n\n::: {#mu .exercise}\nfoobar\n:::\n";
+        let mut config = Config {
+            flavor: Flavor::RMarkdown,
+            ..Default::default()
+        };
+        config.extensions.bookdown_references = true;
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = UndefinedReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert!(diagnostics.is_empty());
+    }
 }

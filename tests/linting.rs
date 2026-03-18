@@ -192,6 +192,26 @@ flavor = "rmarkdown"
 }
 
 #[test]
+fn test_bookdown_theorem_crossref_is_resolved() {
+    let diagnostics = lint_file_with_config(
+        "bookdown_theorem_crossref.Rmd",
+        r#"
+flavor = "rmarkdown"
+"#,
+    );
+
+    let missing_ref: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-reference-label")
+        .collect();
+
+    assert!(
+        missing_ref.is_empty(),
+        "Bookdown theorem cross-reference should resolve against fenced div id"
+    );
+}
+
+#[test]
 fn test_chunk_label_spaces() {
     let diagnostics = lint_file_with_config(
         "chunk_label_spaces.md",

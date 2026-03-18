@@ -389,6 +389,27 @@ plot(1, 1)
 }
 
 #[tokio::test]
+async fn test_goto_definition_bookdown_theorem_crossref_fenced_div() {
+    let server = TestLspServer::new();
+
+    let content = r#"Exercise \@ref(exr:mu)
+
+::: {#mu .exercise}
+foobar
+:::
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let result = server.goto_definition("file:///test.Rmd", 0, 18).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 2);
+}
+
+#[tokio::test]
 async fn test_goto_definition_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();

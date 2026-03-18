@@ -286,6 +286,41 @@ plot(1, 1)
 }
 
 #[tokio::test]
+async fn test_rename_bookdown_theorem_crossref_updates_div_id() {
+    let server = TestLspServer::new();
+    let content = r#"Exercise \@ref(exr:mu).
+
+::: {#mu .exercise}
+foobar
+:::
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let edit = server
+        .rename("file:///test.Rmd", 0, 18, "renamed-label")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.Rmd".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert!(
+        edits.iter().any(|e| e.new_text == "renamed-label"),
+        "expected rename edits to use new key"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 0),
+        "expected theorem crossref reference edit"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 2),
+        "expected fenced div id edit"
+    );
+}
+
+#[tokio::test]
 async fn test_rename_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();

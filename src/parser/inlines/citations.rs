@@ -182,7 +182,7 @@ pub(crate) fn is_quarto_crossref_key(key: &str) -> bool {
 
 pub(crate) const BOOKDOWN_LABEL_PREFIXES: &[&str] = &[
     "eq", "fig", "tab", "thm", "lem", "cor", "prp", "cnj", "def", "exm", "exr", "sol", "rem",
-    "alg", "sec",
+    "alg", "sec", "hyp",
 ];
 
 pub(crate) fn is_bookdown_label(label: &str) -> bool {

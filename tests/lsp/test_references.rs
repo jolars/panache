@@ -75,6 +75,54 @@ plot(1, 1)
 }
 
 #[tokio::test]
+async fn test_references_bookdown_theorem_crossref_with_declaration() {
+    let server = TestLspServer::new();
+    let content = r#"Exercise \@ref(exr:mu)
+Again \@ref(exr:mu)
+
+::: {#mu .exercise}
+foobar
+:::
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let refs = server
+        .references("file:///test.Rmd", 0, 18, true)
+        .await
+        .expect("references");
+
+    assert!(refs.iter().filter(|loc| loc.range.start.line == 0).count() == 1);
+    assert!(refs.iter().filter(|loc| loc.range.start.line == 1).count() == 1);
+    assert!(refs.iter().any(|loc| loc.range.start.line == 3));
+}
+
+#[tokio::test]
+async fn test_references_bookdown_theorem_from_div_id_with_declaration() {
+    let server = TestLspServer::new();
+    let content = r#"Exercise \@ref(exr:mu)
+Again \@ref(exr:mu)
+
+::: {#mu .exercise}
+foobar
+:::
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let refs = server
+        .references("file:///test.Rmd", 3, 7, true)
+        .await
+        .expect("references");
+
+    assert!(refs.iter().filter(|loc| loc.range.start.line == 0).count() == 1);
+    assert!(refs.iter().filter(|loc| loc.range.start.line == 1).count() == 1);
+    assert!(refs.iter().any(|loc| loc.range.start.line == 3));
+}
+
+#[tokio::test]
 async fn test_references_citation_without_declaration() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
