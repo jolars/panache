@@ -410,6 +410,29 @@ foobar
 }
 
 #[tokio::test]
+async fn test_goto_definition_bookdown_section_crossref_with_hyphenated_slug() {
+    let server = TestLspServer::new();
+
+    let content = r#"# Heading
+
+A ref to \@ref(heading).
+
+## Heading 2
+
+A ref to \@ref(heading-2).
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let result = server.goto_definition("file:///test.Rmd", 6, 16).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 4);
+}
+
+#[tokio::test]
 async fn test_goto_definition_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();

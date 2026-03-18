@@ -122,6 +122,18 @@ pub(crate) async fn rename(
                     edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
                 }
             }
+
+            if config.extensions.bookdown_references {
+                let root = crate::parse(&text, Some(config.clone()));
+                let insert_ranges =
+                    helpers::collect_implicit_heading_id_insert_ranges(&root, &old_norm);
+                edits.extend(text_edits_from_ranges(
+                    &insert_ranges,
+                    &text,
+                    &format!(" {{#{}}}", new_name),
+                ));
+            }
+
             if edits.is_empty() {
                 continue;
             }

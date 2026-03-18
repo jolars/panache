@@ -1,8 +1,8 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, Crossref, FootnoteReference, Link, SyntaxNode};
-use crate::utils::{crossref_resolution_labels, normalize_label};
+use crate::syntax::{AstNode, Crossref, FootnoteReference, Heading, Link, SyntaxNode};
+use crate::utils::{crossref_resolution_labels, normalize_label, pandoc_slugify};
 use std::collections::HashSet;
 
 pub struct UndefinedReferencesRule;
@@ -42,6 +42,11 @@ impl Rule for UndefinedReferencesRule {
                     .map(|(label, _)| label.clone())
                     .filter(|label| !label.is_empty()),
             );
+        }
+
+        let mut crossref_labels = reference_labels.clone();
+        if config.extensions.bookdown_references && config.extensions.auto_identifiers {
+            crossref_labels.extend(collect_implicit_heading_ids(tree));
         }
 
         let footnote_ids: HashSet<String> = symbol_index
@@ -96,7 +101,7 @@ impl Rule for UndefinedReferencesRule {
                     crossref_resolution_labels(&normalized, config.extensions.bookdown_references);
                 if candidates
                     .iter()
-                    .any(|candidate| reference_labels.contains(candidate))
+                    .any(|candidate| crossref_labels.contains(candidate))
                 {
                     continue;
                 }
@@ -110,6 +115,32 @@ impl Rule for UndefinedReferencesRule {
 
         diagnostics
     }
+}
+
+fn collect_implicit_heading_ids(tree: &SyntaxNode) -> HashSet<String> {
+    let mut out = HashSet::new();
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+    for heading in tree.descendants().filter_map(Heading::cast) {
+        let text = normalize_label(&heading.text());
+        if text.is_empty() {
+            continue;
+        }
+        let base = pandoc_slugify(&text);
+        if base.is_empty() {
+            continue;
+        }
+        let count = seen.entry(base.clone()).or_insert(0);
+        let id = if *count == 0 {
+            base
+        } else {
+            format!("{}-{}", base, *count)
+        };
+        *count += 1;
+        out.insert(id);
+    }
+
+    out
 }
 
 fn extract_reference_label_and_node(link: &Link) -> Option<(String, SyntaxNode)> {
@@ -228,6 +259,20 @@ mod tests {
     #[test]
     fn accepts_bookdown_theorem_environment_crossref() {
         let input = "Exercise \\@ref(exr:mu)\n\n::: {#mu .exercise}\nfoobar\n:::\n";
+        let mut config = Config {
+            flavor: Flavor::RMarkdown,
+            ..Default::default()
+        };
+        config.extensions.bookdown_references = true;
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = UndefinedReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn accepts_bookdown_section_crossref_with_hyphenated_slug() {
+        let input = "# Heading\n\nA ref to \\@ref(heading).\n\n## Heading 2\n\nA ref to \\@ref(heading-2).\n";
         let mut config = Config {
             flavor: Flavor::RMarkdown,
             ..Default::default()

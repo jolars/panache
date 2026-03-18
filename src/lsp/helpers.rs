@@ -8,8 +8,8 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkOption, Citation, Crossref, Link, ParsedYamlRegionSnapshot,
-    SyntaxKind, SyntaxNode,
+    AstNode, AttributeNode, ChunkOption, Citation, Crossref, Heading, Link,
+    ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
 };
 use crate::utils::pandoc_slugify;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -417,9 +417,62 @@ pub(crate) fn collect_heading_rename_ranges(root: &SyntaxNode, label: &str) -> V
     ranges
 }
 
+pub(crate) fn collect_implicit_heading_id_insert_ranges(
+    root: &SyntaxNode,
+    label: &str,
+) -> Vec<TextRange> {
+    let target = normalize_label(label);
+    let mut ranges = Vec::new();
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+    for heading in root.descendants().filter_map(Heading::cast) {
+        let raw_text = heading
+            .content()
+            .map(|content| content.text())
+            .unwrap_or_default();
+        let cleaned = normalize_heading_text(&raw_text);
+        if cleaned.is_empty() {
+            continue;
+        }
+        let base = implicit_header_id(&cleaned);
+        if base.is_empty() {
+            continue;
+        }
+        let count = seen.entry(base.clone()).or_insert(0);
+        let id = if *count == 0 {
+            base.clone()
+        } else {
+            format!("{}-{}", base, *count)
+        };
+        *count += 1;
+
+        if normalize_label(&id) != target {
+            continue;
+        }
+
+        if heading_has_explicit_id(heading.syntax()) {
+            continue;
+        }
+
+        if let Some(content) = heading.content() {
+            let pos = content.syntax().text_range().end();
+            ranges.push(TextRange::new(pos, pos));
+        }
+    }
+
+    ranges
+}
+
 fn attribute_has_heading_ancestor(node: &SyntaxNode) -> bool {
     node.ancestors()
         .any(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
+}
+
+fn heading_has_explicit_id(heading: &SyntaxNode) -> bool {
+    heading
+        .children()
+        .filter_map(AttributeNode::cast)
+        .any(|attribute| attribute.id().is_some())
 }
 
 fn heading_target_from_link(link: &Link) -> Option<String> {

@@ -321,6 +321,45 @@ foobar
 }
 
 #[tokio::test]
+async fn test_rename_bookdown_section_crossref_with_hyphenated_slug() {
+    let server = TestLspServer::new();
+    let content = r#"# Heading
+
+A ref to \@ref(heading).
+
+## Heading 2
+
+A ref to \@ref(heading-2).
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let edit = server
+        .rename("file:///test.Rmd", 6, 16, "renamed-section")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.Rmd".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert!(
+        edits.iter().any(|e| e.new_text == "renamed-section"),
+        "expected rename edits to use new key"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 6),
+        "expected bookdown section crossref edit"
+    );
+    assert!(
+        edits
+            .iter()
+            .any(|e| e.range.start.line == 4 && e.new_text == " {#renamed-section}"),
+        "expected explicit heading id insertion for implicit heading slug"
+    );
+}
+
+#[tokio::test]
 async fn test_rename_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
