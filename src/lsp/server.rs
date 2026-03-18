@@ -15,22 +15,27 @@ fn watched_document_glob() -> Vec<FileSystemWatcher> {
         .collect()
 }
 
+fn legacy_root_uri(params: &InitializeParams) -> Option<Uri> {
+    let value = serde_json::to_value(params).ok()?;
+    value
+        .get("rootUri")
+        .cloned()
+        .and_then(|root_uri| serde_json::from_value(root_uri).ok())
+}
+
 impl LanguageServer for PanacheLsp {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         // Store workspace root for config discovery
-        // Try workspace_folders first, fall back to deprecated root_uri
-        if let Some(folders) = params.workspace_folders
+        // Try workspace_folders first, then legacy rootUri fallback.
+        if let Some(folders) = params.workspace_folders.as_ref()
             && let Some(folder) = folders.first()
             && let Some(path) = folder.uri.to_file_path()
         {
             *self.workspace_root.lock().await = Some(path.into_owned());
-        } else {
-            #[allow(deprecated)]
-            if let Some(root_uri) = params.root_uri
-                && let Some(path) = root_uri.to_file_path()
-            {
-                *self.workspace_root.lock().await = Some(path.into_owned());
-            }
+        } else if let Some(root_uri) = legacy_root_uri(&params)
+            && let Some(path) = root_uri.to_file_path()
+        {
+            *self.workspace_root.lock().await = Some(path.into_owned());
         }
 
         Ok(InitializeResult {

@@ -1,3 +1,4 @@
+use serde_json::json;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -170,20 +171,17 @@ fn extract_yaml_region_symbol(
         start: offset_to_position(content, host_range.start),
         end: offset_to_position(content, host_range.end),
     };
-    #[allow(deprecated)]
-    Some(DocumentSymbol {
-        name: "YAML Frontmatter".to_string(),
-        detail: Some(match region.document_shape_summary() {
+    Some(make_document_symbol(
+        "YAML Frontmatter".to_string(),
+        Some(match region.document_shape_summary() {
             Some(summary) => format!("{} ({})", region.id(), summary),
             None => format!("{} (invalid YAML)", region.id()),
         }),
-        kind: SymbolKind::NAMESPACE,
-        tags: None,
-        deprecated: None,
+        SymbolKind::NAMESPACE,
         range,
-        selection_range: range,
-        children: None,
-    })
+        range,
+        None,
+    ))
 }
 
 fn extract_heading_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {
@@ -193,21 +191,18 @@ fn extract_heading_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSy
 
     let range = node_to_range(node, content)?;
 
-    #[allow(deprecated)]
-    Some(DocumentSymbol {
-        name: if text.is_empty() {
+    Some(make_document_symbol(
+        if text.is_empty() {
             "(empty)".to_string()
         } else {
             text
         },
-        detail: None,
-        kind: SymbolKind::NAMESPACE,
-        tags: None,
-        deprecated: None,
+        None,
+        SymbolKind::NAMESPACE,
         range,
-        selection_range: range,
-        children: Some(Vec::new()),
-    })
+        range,
+        Some(Vec::new()),
+    ))
 }
 
 fn extract_table_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {
@@ -228,17 +223,14 @@ fn extract_table_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymb
     let range = node_to_range(node, content)?;
     let selection_range = node_to_range(node, content)?;
 
-    #[allow(deprecated)]
-    Some(DocumentSymbol {
+    Some(make_document_symbol(
         name,
-        detail: None,
-        kind: SymbolKind::ARRAY,
-        tags: None,
-        deprecated: None,
+        None,
+        SymbolKind::ARRAY,
         range,
         selection_range,
-        children: None,
-    })
+        None,
+    ))
 }
 
 fn extract_figure_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {
@@ -257,17 +249,34 @@ fn extract_figure_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSym
     let range = node_to_range(node, content)?;
     let selection_range = node_to_range(node, content)?;
 
-    #[allow(deprecated)]
-    Some(DocumentSymbol {
+    Some(make_document_symbol(
         name,
-        detail: None,
-        kind: SymbolKind::OBJECT,
-        tags: None,
-        deprecated: None,
+        None,
+        SymbolKind::OBJECT,
         range,
         selection_range,
-        children: None,
-    })
+        None,
+    ))
+}
+
+fn make_document_symbol(
+    name: String,
+    detail: Option<String>,
+    kind: SymbolKind,
+    range: Range,
+    selection_range: Range,
+    children: Option<Vec<DocumentSymbol>>,
+) -> DocumentSymbol {
+    serde_json::from_value(json!({
+        "name": name,
+        "detail": detail,
+        "kind": kind,
+        "tags": null,
+        "range": range,
+        "selectionRange": selection_range,
+        "children": children,
+    }))
+    .expect("failed to build DocumentSymbol")
 }
 
 fn node_to_range(node: &SyntaxNode, content: &str) -> Option<Range> {
