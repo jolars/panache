@@ -76,6 +76,7 @@ pub(crate) async fn goto_definition(
     enum PendingDefinition {
         Citation(String),
         Crossref(String),
+        HeadingLink(String),
         Reference { label: String, is_footnote: bool },
     }
 
@@ -143,6 +144,70 @@ pub(crate) async fn goto_definition(
 
             if let Some(label) = helpers::extract_crossref_key(&node) {
                 break Some(PendingDefinition::Crossref(label));
+            }
+
+            if let Some(label) = helpers::extract_heading_id_key(&node)
+                && let Some(definition) = helpers::find_heading_id_definition_node(&root, &label)
+            {
+                let start_offset: usize = definition.text_range().start().into();
+                let end_offset: usize = definition.text_range().end().into();
+
+                let start_position = conversions::offset_to_position(&content, start_offset);
+                let end_position = conversions::offset_to_position(&content, end_offset);
+
+                let location = Location {
+                    uri: uri.clone(),
+                    range: Range {
+                        start: start_position,
+                        end: end_position,
+                    },
+                };
+
+                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            }
+
+            if let Some(label) = helpers::extract_heading_link_target(&node) {
+                if let Some(definition) = helpers::find_heading_id_definition_node(&root, &label) {
+                    let start_offset: usize = definition.text_range().start().into();
+                    let end_offset: usize = definition.text_range().end().into();
+
+                    let start_position = conversions::offset_to_position(&content, start_offset);
+                    let end_position = conversions::offset_to_position(&content, end_offset);
+
+                    let location = Location {
+                        uri: uri.clone(),
+                        range: Range {
+                            start: start_position,
+                            end: end_position,
+                        },
+                    };
+
+                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                }
+
+                if config.extensions.implicit_header_references
+                    && config.extensions.auto_identifiers
+                    && let Some(definition) =
+                        helpers::find_implicit_header_definition_node(&root, &label)
+                {
+                    let start_offset: usize = definition.text_range().start().into();
+                    let end_offset: usize = definition.text_range().end().into();
+
+                    let start_position = conversions::offset_to_position(&content, start_offset);
+                    let end_position = conversions::offset_to_position(&content, end_offset);
+
+                    let location = Location {
+                        uri: uri.clone(),
+                        range: Range {
+                            start: start_position,
+                            end: end_position,
+                        },
+                    };
+
+                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                }
+
+                break Some(PendingDefinition::HeadingLink(label));
             }
 
             // Fallback: find reference/footnote definition at this node
@@ -236,30 +301,32 @@ pub(crate) async fn goto_definition(
     let definition_index =
         helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
 
-    let definition = match pending {
-        PendingDefinition::Citation(key) => {
-            let Some(index) = citation_def_index.as_ref() else {
-                return Ok(None);
-            };
-            let db = salsa_db.lock().await;
-            let mut locations =
-                helpers::citation_definition_locations(index, &key, uri, &content, &*db);
-            if locations.is_empty() {
-                return Ok(None);
+    let definition =
+        match pending {
+            PendingDefinition::Citation(key) => {
+                let Some(index) = citation_def_index.as_ref() else {
+                    return Ok(None);
+                };
+                let db = salsa_db.lock().await;
+                let mut locations =
+                    helpers::citation_definition_locations(index, &key, uri, &content, &*db);
+                if locations.is_empty() {
+                    return Ok(None);
+                }
+                return Ok(Some(GotoDefinitionResponse::Scalar(locations.remove(0))));
             }
-            return Ok(Some(GotoDefinitionResponse::Scalar(locations.remove(0))));
-        }
-        PendingDefinition::Crossref(label) => {
-            definition_index.find_crossref_resolved(&label, config.extensions.bookdown_references)
-        }
-        PendingDefinition::Reference { label, is_footnote } => {
-            if is_footnote {
-                definition_index.find_footnote(&label)
-            } else {
-                definition_index.find_reference(&label)
+            PendingDefinition::Crossref(label) => definition_index
+                .find_crossref_resolved(&label, config.extensions.bookdown_references),
+            PendingDefinition::HeadingLink(label) => definition_index
+                .find_crossref_resolved(&label, config.extensions.bookdown_references),
+            PendingDefinition::Reference { label, is_footnote } => {
+                if is_footnote {
+                    definition_index.find_footnote(&label)
+                } else {
+                    definition_index.find_reference(&label)
+                }
             }
-        }
-    };
+        };
 
     let Some(definition) = definition else {
         return Ok(None);

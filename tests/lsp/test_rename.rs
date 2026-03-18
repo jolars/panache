@@ -357,3 +357,37 @@ async fn test_rename_returns_none_inside_yaml_frontmatter() {
         "Expected no rename edits when cursor is inside YAML frontmatter"
     );
 }
+
+#[tokio::test]
+async fn test_rename_heading_reference_updates_shortcut_and_hash_links() {
+    let server = TestLspServer::new();
+    let content = "# Heading {#heading}\n\nA ref to [heading].\n\nA ref to [foobar](#heading).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let edit = server
+        .rename("file:///test.md", 2, 11, "renamed-heading")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.md".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 0),
+        "expected heading id declaration edit"
+    );
+    assert!(
+        edits
+            .iter()
+            .any(|e| e.range.start.line == 2 && e.new_text == "renamed-heading"),
+        "expected shortcut heading reference edit"
+    );
+    assert!(
+        edits
+            .iter()
+            .any(|e| e.range.start.line == 4 && e.new_text == "renamed-heading"),
+        "expected hash heading reference edit"
+    );
+}

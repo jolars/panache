@@ -441,3 +441,35 @@ async fn test_goto_definition_returns_none_inside_yaml_frontmatter() {
         "Expected no goto definition when cursor is inside YAML frontmatter"
     );
 }
+
+#[tokio::test]
+async fn test_goto_definition_shortcut_heading_reference() {
+    let server = TestLspServer::new();
+
+    let content = "# Heading {#heading}\n\nA ref to [heading].\n\nA ref to [foobar](#heading).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let result = server.goto_definition("file:///test.md", 2, 11).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 0);
+}
+
+#[tokio::test]
+async fn test_goto_definition_inline_hash_heading_reference() {
+    let server = TestLspServer::new();
+
+    let content = "# Heading {#heading}\n\nA ref to [heading].\n\nA ref to [foobar](#heading).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let result = server.goto_definition("file:///test.md", 4, 21).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 0);
+}

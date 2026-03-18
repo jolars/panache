@@ -8,8 +8,8 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkOption, Citation, Crossref, ParsedYamlRegionSnapshot, SyntaxKind,
-    SyntaxNode,
+    AstNode, AttributeNode, ChunkOption, Citation, Crossref, Link, ParsedYamlRegionSnapshot,
+    SyntaxKind, SyntaxNode,
 };
 use crate::utils::pandoc_slugify;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -308,6 +308,155 @@ pub(crate) fn extract_attribute_id_key(node: &SyntaxNode) -> Option<String> {
     }
 
     None
+}
+
+pub(crate) fn extract_heading_id_key(node: &SyntaxNode) -> Option<String> {
+    if let Some(attribute) = AttributeNode::cast(node.clone())
+        && let Some(id) = attribute.id()
+        && attribute_has_heading_ancestor(attribute.syntax())
+    {
+        return Some(normalize_label(&id));
+    }
+
+    let mut current = node.clone();
+    while let Some(parent) = current.parent() {
+        if let Some(attribute) = AttributeNode::cast(parent.clone())
+            && let Some(id) = attribute.id()
+            && attribute_has_heading_ancestor(attribute.syntax())
+        {
+            return Some(normalize_label(&id));
+        }
+        current = parent;
+    }
+
+    None
+}
+
+pub(crate) fn extract_heading_link_target(node: &SyntaxNode) -> Option<String> {
+    if let Some(link) = Link::cast(node.clone()) {
+        return heading_target_from_link(&link);
+    }
+
+    let mut current = node.clone();
+    while let Some(parent) = current.parent() {
+        if let Some(link) = Link::cast(parent.clone()) {
+            return heading_target_from_link(&link);
+        }
+        current = parent;
+    }
+
+    None
+}
+
+pub(crate) fn find_heading_id_definition_node(
+    root: &SyntaxNode,
+    label: &str,
+) -> Option<SyntaxNode> {
+    let target = normalize_label(label);
+    for attribute in root.descendants().filter_map(AttributeNode::cast) {
+        let Some(id) = attribute.id() else {
+            continue;
+        };
+        if normalize_label(&id) != target {
+            continue;
+        }
+        if !attribute_has_heading_ancestor(attribute.syntax()) {
+            continue;
+        }
+        if let Some(heading) = attribute
+            .syntax()
+            .ancestors()
+            .find(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
+        {
+            return Some(heading);
+        }
+    }
+    None
+}
+
+pub(crate) fn collect_heading_rename_ranges(root: &SyntaxNode, label: &str) -> Vec<TextRange> {
+    let target = normalize_label(label);
+    let mut ranges = Vec::new();
+
+    for attribute in root.descendants().filter_map(AttributeNode::cast) {
+        let Some(id) = attribute.id() else {
+            continue;
+        };
+        if normalize_label(&id) != target {
+            continue;
+        }
+        if !attribute_has_heading_ancestor(attribute.syntax()) {
+            continue;
+        }
+        if let Some(range) = attribute.id_value_range() {
+            ranges.push(range);
+        }
+    }
+
+    for link in root.descendants().filter_map(Link::cast) {
+        if let Some(dest) = link.dest() {
+            let text = dest.syntax().text().to_string();
+            if let Some((range, id)) = hash_anchor_id_range(dest.syntax().text_range(), &text)
+                && normalize_label(&id) == target
+            {
+                ranges.push(range);
+            }
+            continue;
+        }
+
+        if link.reference().is_none()
+            && let Some(text_node) = link.text()
+            && normalize_label(&text_node.text_content()) == target
+        {
+            ranges.push(text_node.syntax().text_range());
+        }
+    }
+
+    ranges.sort_by_key(|range| range.start());
+    ranges.dedup();
+    ranges
+}
+
+fn attribute_has_heading_ancestor(node: &SyntaxNode) -> bool {
+    node.ancestors()
+        .any(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
+}
+
+fn heading_target_from_link(link: &Link) -> Option<String> {
+    if let Some(dest) = link.dest() {
+        let text = dest.syntax().text().to_string();
+        let (_, id) = hash_anchor_id_range(dest.syntax().text_range(), &text)?;
+        let id = normalize_label(&id);
+        return (!id.is_empty()).then_some(id);
+    }
+
+    if link.reference().is_none()
+        && let Some(text) = link.text()
+    {
+        let label = normalize_label(&text.text_content());
+        return (!label.is_empty()).then_some(label);
+    }
+
+    None
+}
+
+fn hash_anchor_id_range(base_range: TextRange, dest_text: &str) -> Option<(TextRange, String)> {
+    let hash_idx = dest_text.find('#')?;
+    let after_hash = &dest_text[hash_idx + 1..];
+    let id_len = after_hash
+        .chars()
+        .take_while(|ch| !ch.is_whitespace() && *ch != ')')
+        .map(char::len_utf8)
+        .sum::<usize>();
+    if id_len == 0 {
+        return None;
+    }
+    let id = after_hash[..id_len].to_string();
+
+    let node_start: usize = base_range.start().into();
+    let start = TextSize::from((node_start + hash_idx + 1) as u32);
+    let end = TextSize::from((node_start + hash_idx + 1 + id_len) as u32);
+    Some((TextRange::new(start, end), id))
 }
 
 pub(crate) fn find_crossref_definition_node(root: &SyntaxNode, label: &str) -> Option<SyntaxNode> {

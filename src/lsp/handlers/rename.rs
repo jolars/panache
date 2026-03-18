@@ -137,6 +137,78 @@ pub(crate) async fn rename(
         }));
     }
 
+    let maybe_heading_key = {
+        let root = SyntaxNode::new_root(green_tree.clone());
+        let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
+            return Ok(None);
+        };
+        loop {
+            if let Some(key) = helpers::extract_heading_link_target(&node) {
+                break Some(key);
+            }
+            if let Some(key) = helpers::extract_heading_id_key(&node) {
+                break Some(key);
+            }
+            match node.parent() {
+                Some(parent) => node = parent,
+                None => break None,
+            }
+        }
+    };
+    if let Some(old_key) = maybe_heading_key {
+        let old_norm = normalize_label(&old_key);
+        let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+
+        let per_doc = {
+            let db = salsa_db.lock().await;
+            let mut doc_paths =
+                crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
+                    .documents()
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>();
+            if !doc_paths.contains(&doc_path) {
+                doc_paths.push(doc_path.clone());
+            }
+            doc_paths.sort();
+            doc_paths.dedup();
+
+            let mut out = Vec::new();
+            for path in &doc_paths {
+                let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
+                let text = if doc_uri == uri {
+                    content.clone()
+                } else {
+                    let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
+                        continue;
+                    };
+                    file.text(&*db).clone()
+                };
+                out.push((doc_uri, text));
+            }
+            out
+        };
+
+        for (doc_uri, text) in per_doc {
+            let root = crate::parse(&text, Some(config.clone()));
+            let ranges = helpers::collect_heading_rename_ranges(&root, &old_norm);
+            let edits = text_edits_from_ranges(&ranges, &text, &new_name);
+            if edits.is_empty() {
+                continue;
+            }
+            changes.entry(doc_uri).or_default().extend(edits);
+        }
+
+        if changes.is_empty() {
+            return Ok(None);
+        }
+
+        return Ok(Some(WorkspaceEdit {
+            changes: Some(changes),
+            ..Default::default()
+        }));
+    }
+
     if !helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions) {
         return Ok(None);
     }
