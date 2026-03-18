@@ -80,42 +80,40 @@ fn collect_chunk_figure_caption_state(tree: &SyntaxNode) -> HashMap<String, bool
                 open.children()
                     .find(|child| child.kind() == SyntaxKind::CODE_INFO)
             })
-        {
-            if let Some(chunk_options) = info_node
+            && let Some(chunk_options) = info_node
                 .children()
                 .find(|child| child.kind() == SyntaxKind::CHUNK_OPTIONS)
-            {
-                for option_or_label in chunk_options.children() {
-                    if let Some(chunk_label) = ChunkLabel::cast(option_or_label.clone()) {
-                        let label = normalize_label(&chunk_label.text());
+        {
+            for option_or_label in chunk_options.children() {
+                if let Some(chunk_label) = ChunkLabel::cast(option_or_label.clone()) {
+                    let label = normalize_label(&chunk_label.text());
+                    if !label.is_empty() {
+                        labels.push(label);
+                    }
+                    continue;
+                }
+
+                let Some(option) = ChunkOption::cast(option_or_label) else {
+                    continue;
+                };
+                let Some(key) = option.key() else {
+                    continue;
+                };
+
+                if key.eq_ignore_ascii_case("label") {
+                    if let Some(value) = option.value() {
+                        let label = normalize_label(&value);
                         if !label.is_empty() {
                             labels.push(label);
                         }
-                        continue;
                     }
+                    continue;
+                }
 
-                    let Some(option) = ChunkOption::cast(option_or_label) else {
-                        continue;
-                    };
-                    let Some(key) = option.key() else {
-                        continue;
-                    };
-
-                    if key.eq_ignore_ascii_case("label") {
-                        if let Some(value) = option.value() {
-                            let label = normalize_label(&value);
-                            if !label.is_empty() {
-                                labels.push(label);
-                            }
-                        }
-                        continue;
-                    }
-
-                    if is_figure_caption_option_key(&key)
-                        && option.value().is_some_and(|v| !v.is_empty())
-                    {
-                        has_caption = true;
-                    }
+                if is_figure_caption_option_key(&key)
+                    && option.value().is_some_and(|v| !v.is_empty())
+                {
+                    has_caption = true;
                 }
             }
         }
