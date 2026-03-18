@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use rowan::TextRange;
 use serde::{Deserialize, Serialize};
-use serde_saphyr::Spanned;
 
 use crate::bib::BibEntry;
 
@@ -16,7 +15,7 @@ pub struct InlineReference {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReferenceEntry {
-    pub id: Option<Spanned<String>>,
+    pub id: Option<String>,
 }
 
 #[derive(Debug, Clone)]

@@ -9,7 +9,7 @@
 //! - YAML frontmatter remains **opaque** in the CST (stored as TEXT nodes)
 //! - Semantic parsing happens on-demand using `yaml_parser` AST traversal
 //! - Metadata offsets are derived from YAML token ranges and mapped to document offsets
-//! - CSL-YAML bibliography parsing still uses `serde-saphyr` for now
+//! - CSL-YAML bibliography parsing is handled through `yaml_parser`
 //!
 //! # Usage
 //!

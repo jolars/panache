@@ -42,7 +42,6 @@ regex = "1.12.2"
 rowan = "0.16.1"
 salsa = "0.26.0"
 serde = { version = "1.0.228", features = ["derive"] }
-serde-saphyr = "0.0.21"
 serde_json = "1.0"
 yaml_parser = "0.3.0"
 pretty_yaml = "0.6.0"

@@ -3,7 +3,7 @@
 //! This module provides unified parsing for bibliography files:
 //! - BibTeX (.bib) - Full field extraction with typed structures
 //! - CSL JSON (.json) - Full field extraction via serde
-//! - CSL YAML (.yaml, .yml) - Full field extraction via serde
+//! - CSL YAML (.yaml, .yml) - Full field extraction via yaml_parser
 //! - RIS (.ris) - Full field extraction with validation
 //!
 //! All formats are unified into `BibEntry` for consistent LSP features.
