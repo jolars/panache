@@ -21,6 +21,9 @@ members = [
     "crates/panache-wasm",
 ]
 
+[lib]
+doctest = false
+
 [[bin]]
 name = "panache"
 path = "src/main.rs"
