@@ -369,7 +369,7 @@ Auto-fix
 **Example (hashpipe):**
 
 ````markdown
-```{r}
+```{{r}}
 #| echo: [
 1 + 1
 ```
