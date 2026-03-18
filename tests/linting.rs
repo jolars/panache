@@ -172,6 +172,26 @@ undefined-references = false
 }
 
 #[test]
+fn test_bookdown_chunk_crossref_is_resolved() {
+    let diagnostics = lint_file_with_config(
+        "bookdown_chunk_crossref.Rmd",
+        r#"
+flavor = "rmarkdown"
+"#,
+    );
+
+    let missing_ref: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-reference-label")
+        .collect();
+
+    assert!(
+        missing_ref.is_empty(),
+        "Bookdown chunk cross-reference should resolve against chunk labels"
+    );
+}
+
+#[test]
 fn test_chunk_label_spaces() {
     let diagnostics = lint_file_with_config(
         "chunk_label_spaces.md",

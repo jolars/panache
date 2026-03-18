@@ -249,7 +249,9 @@ pub(crate) async fn goto_definition(
             }
             return Ok(Some(GotoDefinitionResponse::Scalar(locations.remove(0))));
         }
-        PendingDefinition::Crossref(label) => definition_index.find_crossref(&label),
+        PendingDefinition::Crossref(label) => {
+            definition_index.find_crossref_resolved(&label, config.extensions.bookdown_references)
+        }
         PendingDefinition::Reference { label, is_footnote } => {
             if is_footnote {
                 definition_index.find_footnote(&label)

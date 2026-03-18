@@ -15,15 +15,16 @@ use super::super::helpers;
 use crate::utils::normalize_label;
 
 pub(crate) async fn rename(
-    _client: &tower_lsp_server::Client,
+    client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: RenameParams,
 ) -> Result<Option<WorkspaceEdit>> {
     let uri = params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
     let new_name = params.new_name;
+    let config = helpers::get_config(client, &workspace_root, &uri).await;
 
     let (salsa_file, salsa_config, doc_path, content, green_tree, parsed_yaml_regions) = {
         let map = document_map.lock().await;
@@ -71,6 +72,8 @@ pub(crate) async fn rename(
     };
     if let Some(old_key) = maybe_crossref_key {
         let old_norm = normalize_label(&old_key);
+        let search_keys =
+            crate::utils::crossref_symbol_labels(&old_norm, config.extensions.bookdown_references);
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
         let per_doc = {
@@ -108,11 +111,13 @@ pub(crate) async fn rename(
 
         for (doc_uri, text, symbol_index) in per_doc {
             let mut edits = Vec::new();
-            if let Some(ranges) = symbol_index.crossref_usages(&old_norm) {
-                edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
-            }
-            if let Some(ranges) = symbol_index.chunk_label_value_ranges(&old_norm) {
-                edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
+            for search_key in &search_keys {
+                if let Some(ranges) = symbol_index.crossref_usages(search_key) {
+                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
+                }
+                if let Some(ranges) = symbol_index.chunk_label_value_ranges(search_key) {
+                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
+                }
             }
             if edits.is_empty() {
                 continue;

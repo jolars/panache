@@ -249,6 +249,43 @@ plot(1:10)
 }
 
 #[tokio::test]
+async fn test_rename_bookdown_chunk_label_updates_crossrefs_and_definition() {
+    let server = TestLspServer::new();
+    let content = r#"Figure \@ref(fig:a-label).
+
+```{r}
+#| label: a-label
+#| fig-cap: "A caption."
+plot(1, 1)
+```
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let edit = server
+        .rename("file:///test.Rmd", 0, 16, "renamed-label")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.Rmd".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert!(
+        edits.iter().any(|e| e.new_text == "renamed-label"),
+        "expected rename edits to use new key"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 0),
+        "expected bookdown crossref reference edit"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 3),
+        "expected chunk label definition edit"
+    );
+}
+
+#[tokio::test]
 async fn test_rename_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();

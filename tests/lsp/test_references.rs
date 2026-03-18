@@ -49,6 +49,32 @@ plot(1:10)
 }
 
 #[tokio::test]
+async fn test_references_bookdown_crossref_chunk_label_with_declaration() {
+    let server = TestLspServer::new();
+    let content = r#"Figure \@ref(fig:a-label)
+Figure \@ref(fig:a-label)
+
+```{r}
+#| label: a-label
+#| fig-cap: "A caption."
+plot(1, 1)
+```
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let refs = server
+        .references("file:///test.Rmd", 0, 16, true)
+        .await
+        .expect("references");
+
+    assert!(refs.iter().filter(|loc| loc.range.start.line == 0).count() == 1);
+    assert!(refs.iter().filter(|loc| loc.range.start.line == 1).count() == 1);
+    assert!(refs.iter().any(|loc| loc.range.start.line == 4));
+}
+
+#[tokio::test]
 async fn test_references_citation_without_declaration() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();

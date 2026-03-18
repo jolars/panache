@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
 use crate::syntax::{AstNode, Crossref, FootnoteReference, Link, SyntaxNode};
-use crate::utils::normalize_label;
+use crate::utils::{crossref_resolution_labels, normalize_label};
 use std::collections::HashSet;
 
 pub struct UndefinedReferencesRule;
@@ -88,7 +88,16 @@ impl Rule for UndefinedReferencesRule {
             for key in crossref.keys() {
                 let label = key.text();
                 let normalized = normalize_label(&label);
-                if normalized.is_empty() || reference_labels.contains(&normalized) {
+                if normalized.is_empty() {
+                    continue;
+                }
+
+                let candidates =
+                    crossref_resolution_labels(&normalized, config.extensions.bookdown_references);
+                if candidates
+                    .iter()
+                    .any(|candidate| reference_labels.contains(candidate))
+                {
                     continue;
                 }
                 diagnostics.push(Diagnostic::warning(
@@ -200,5 +209,19 @@ mod tests {
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "undefined-reference-label");
         assert!(diagnostics[0].message.contains("@fig-missing"));
+    }
+
+    #[test]
+    fn accepts_bookdown_prefixed_crossref_to_chunk_label() {
+        let input = "See \\@ref(fig:plot).\n\n```{r}\n#| label: plot\n#| fig-cap: \"Plot\"\nplot(1:10)\n```\n";
+        let mut config = Config {
+            flavor: Flavor::RMarkdown,
+            ..Default::default()
+        };
+        config.extensions.bookdown_references = true;
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = UndefinedReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert!(diagnostics.is_empty());
     }
 }

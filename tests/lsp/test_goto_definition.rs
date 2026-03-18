@@ -366,6 +366,29 @@ plot(1:10)
 }
 
 #[tokio::test]
+async fn test_goto_definition_bookdown_crossref_chunk_label() {
+    let server = TestLspServer::new();
+
+    let content = r#"Figure \@ref(fig:a-label)
+
+```{r}
+#| label: a-label
+#| fig-cap: "A caption."
+plot(1, 1)
+```
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let result = server.goto_definition("file:///test.Rmd", 0, 16).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 3);
+}
+
+#[tokio::test]
 async fn test_goto_definition_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();

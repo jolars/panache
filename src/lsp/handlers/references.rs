@@ -19,15 +19,16 @@ enum Target {
 }
 
 pub(crate) async fn references(
-    _client: &tower_lsp_server::Client,
+    client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: ReferenceParams,
 ) -> Result<Option<Vec<Location>>> {
     let uri = params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
     let include_declaration = params.context.include_declaration;
+    let config = helpers::get_config(client, &workspace_root, &uri).await;
 
     let (salsa_file, salsa_config, doc_path, content, green_tree, parsed_yaml_regions) = {
         let map = document_map.lock().await;
@@ -114,13 +115,18 @@ pub(crate) async fn references(
 
             match &target {
                 Target::Crossref(label) => {
-                    if let Some(ranges) = symbol_index.crossref_usages(label) {
-                        add_locations(&mut locations, &doc_uri, &text, ranges);
-                    }
-                    if include_declaration
-                        && let Some(ranges) = symbol_index.crossref_declarations(label)
-                    {
-                        add_locations(&mut locations, &doc_uri, &text, ranges);
+                    for candidate in crate::utils::crossref_symbol_labels(
+                        label,
+                        config.extensions.bookdown_references,
+                    ) {
+                        if let Some(ranges) = symbol_index.crossref_usages(&candidate) {
+                            add_locations(&mut locations, &doc_uri, &text, ranges);
+                        }
+                        if include_declaration
+                            && let Some(ranges) = symbol_index.crossref_declarations(&candidate)
+                        {
+                            add_locations(&mut locations, &doc_uri, &text, ranges);
+                        }
                     }
                 }
                 Target::Citation { norm, .. } => {

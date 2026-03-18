@@ -754,6 +754,19 @@ impl DefinitionIndex {
         self.crossrefs.get(&key)
     }
 
+    pub fn find_crossref_resolved(
+        &self,
+        id: &str,
+        bookdown_references: bool,
+    ) -> Option<&DefinitionLocation> {
+        for candidate in crate::utils::crossref_resolution_labels(id, bookdown_references) {
+            if let Some(location) = self.crossrefs.get(&candidate) {
+                return Some(location);
+            }
+        }
+        None
+    }
+
     pub fn merge_from(&mut self, other: &DefinitionIndex) {
         for (key, value) in &other.references {
             self.references

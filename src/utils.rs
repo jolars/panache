@@ -173,6 +173,48 @@ pub fn normalize_label(label: &str) -> String {
         .to_lowercase()
 }
 
+pub fn crossref_resolution_labels(label: &str, bookdown_references: bool) -> Vec<String> {
+    let normalized = normalize_label(label);
+    let mut labels = vec![normalized.clone()];
+
+    if !bookdown_references {
+        return labels;
+    }
+
+    if let Some((_, unprefixed)) = normalized.split_once(':')
+        && !unprefixed.is_empty()
+        && crate::parser::inlines::citations::has_bookdown_prefix(&normalized)
+        && !labels.iter().any(|candidate| candidate == unprefixed)
+    {
+        labels.push(unprefixed.to_string());
+    }
+
+    labels
+}
+
+pub fn crossref_symbol_labels(label: &str, bookdown_references: bool) -> Vec<String> {
+    let mut labels = crossref_resolution_labels(label, bookdown_references);
+
+    if !bookdown_references {
+        return labels;
+    }
+
+    let normalized = normalize_label(label);
+    let is_prefixed = crate::parser::inlines::citations::has_bookdown_prefix(&normalized);
+    if is_prefixed {
+        return labels;
+    }
+
+    for prefix in crate::parser::inlines::citations::BOOKDOWN_LABEL_PREFIXES {
+        let candidate = format!("{}:{}", prefix, normalized);
+        if !labels.iter().any(|existing| existing == &candidate) {
+            labels.push(candidate);
+        }
+    }
+
+    labels
+}
+
 /// Generate a Pandoc-style auto identifier from heading text.
 pub fn pandoc_slugify(text: &str) -> String {
     let mut out = String::new();
@@ -200,4 +242,29 @@ pub fn pandoc_slugify(text: &str) -> String {
     }
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{crossref_resolution_labels, crossref_symbol_labels};
+
+    #[test]
+    fn crossref_resolution_labels_keep_exact_match() {
+        let labels = crossref_resolution_labels("fig-plot", false);
+        assert_eq!(labels, vec!["fig-plot".to_string()]);
+    }
+
+    #[test]
+    fn crossref_resolution_labels_include_unprefixed_bookdown_key() {
+        let labels = crossref_resolution_labels("fig:plot", true);
+        assert_eq!(labels, vec!["fig:plot".to_string(), "plot".to_string()]);
+    }
+
+    #[test]
+    fn crossref_symbol_labels_include_bookdown_prefixed_variants() {
+        let labels = crossref_symbol_labels("plot", true);
+        assert!(labels.iter().any(|label| label == "plot"));
+        assert!(labels.iter().any(|label| label == "fig:plot"));
+        assert!(labels.iter().any(|label| label == "tab:plot"));
+    }
 }
