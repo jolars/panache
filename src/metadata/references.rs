@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use rowan::{TextRange, TextSize};
+use rowan::TextRange;
 use serde::{Deserialize, Serialize};
 use serde_saphyr::Spanned;
 
@@ -17,32 +17,6 @@ pub struct InlineReference {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReferenceEntry {
     pub id: Option<Spanned<String>>,
-}
-
-pub(crate) fn extract_inline_references(
-    entries: Vec<ReferenceEntry>,
-    yaml_offset: TextSize,
-    doc_path: &Path,
-) -> Vec<InlineReference> {
-    let mut inline = Vec::new();
-
-    for entry in entries {
-        let Some(id) = entry.id else {
-            continue;
-        };
-        let span = id.referenced.span();
-        let yaml_byte_offset = span.byte_offset().unwrap_or(span.offset());
-        let yaml_byte_len = span.byte_len().unwrap_or(span.len());
-        let start = yaml_offset + TextSize::from(yaml_byte_offset as u32);
-        let end = start + TextSize::from(yaml_byte_len as u32);
-        inline.push(InlineReference {
-            id: id.value,
-            range: TextRange::new(start, end),
-            path: doc_path.to_path_buf(),
-        });
-    }
-
-    inline
 }
 
 #[derive(Debug, Clone)]

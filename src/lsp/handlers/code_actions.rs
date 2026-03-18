@@ -8,7 +8,7 @@ use tower_lsp_server::ls_types::*;
 
 use crate::linter;
 use crate::lsp::DocumentState;
-use crate::syntax::{AstNode, List, collect_embedded_frontmatter_yaml_cst};
+use crate::syntax::{AstNode, List};
 
 use super::super::conversions::{convert_diagnostic, offset_to_position, position_to_offset};
 use super::super::helpers::get_document_and_config;
@@ -37,17 +37,25 @@ pub(crate) async fn code_action(
         None => return Ok(None),
     };
     let request_range = params.range;
+    let parsed_yaml_regions = {
+        let map = document_map.lock().await;
+        map.get(&uri.to_string())
+            .map(|state| state.parsed_yaml_regions.clone())
+            .unwrap_or_default()
+    };
     let request_start_offset = position_to_offset(&text, request_range.start);
     let request_end_offset = position_to_offset(&text, request_range.end)
         .or_else(|| request_start_offset.map(|start| start.saturating_add(1)));
     let in_frontmatter_region =
         if let (Some(start), Some(end)) = (request_start_offset, request_end_offset) {
-            let root_for_yaml = crate::parse(&text, Some(config.clone()));
             let end = end.max(start.saturating_add(1));
-            collect_embedded_frontmatter_yaml_cst(&root_for_yaml).is_some_and(|embedding| {
-                let host_range = embedding.parsed().host_range();
-                host_range.start < end && start < host_range.end
-            })
+            parsed_yaml_regions
+                .iter()
+                .find(|region| region.is_frontmatter())
+                .is_some_and(|frontmatter| {
+                    let host_range = frontmatter.host_range();
+                    host_range.start < end && start < host_range.end
+                })
         } else {
             false
         };

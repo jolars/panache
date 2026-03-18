@@ -34,22 +34,21 @@ pub(crate) async fn completion(
         return Ok(None);
     }
 
-    let (salsa_file, salsa_config, doc_path) = {
+    let (salsa_file, salsa_config, doc_path, parsed_yaml_regions) = {
         let map = document_map.lock().await;
         match map.get(&uri.to_string()) {
-            Some(state) => (state.salsa_file, state.salsa_config, state.path.clone()),
+            Some(state) => (
+                state.salsa_file,
+                state.salsa_config,
+                state.path.clone(),
+                state.parsed_yaml_regions.clone(),
+            ),
             None => return Ok(None),
         }
     };
 
-    let offset_in_frontmatter = {
-        let Some((_content, root)) =
-            helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
-        else {
-            return Ok(None);
-        };
-        helpers::is_offset_in_yaml_frontmatter(&root, offset)
-    };
+    let offset_in_frontmatter =
+        helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset);
     if offset_in_frontmatter {
         return Ok(None);
     }
@@ -57,14 +56,7 @@ pub(crate) async fn completion(
     let Some(doc_path) = doc_path else {
         return Ok(None);
     };
-    let yaml_ok = {
-        let Some((_content, root)) =
-            helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
-        else {
-            return Ok(None);
-        };
-        helpers::is_yaml_frontmatter_valid(&root)
-    };
+    let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
     if !yaml_ok {
         return Ok(None);
     }

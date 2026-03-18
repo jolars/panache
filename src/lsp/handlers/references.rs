@@ -29,7 +29,7 @@ pub(crate) async fn references(
     let position = params.text_document_position.position;
     let include_declaration = params.context.include_declaration;
 
-    let (salsa_file, salsa_config, doc_path, content, green_tree) = {
+    let (salsa_file, salsa_config, doc_path, content, green_tree, parsed_yaml_regions) = {
         let map = document_map.lock().await;
         let Some(state) = map.get(&uri.to_string()) else {
             return Ok(None);
@@ -41,6 +41,7 @@ pub(crate) async fn references(
             state.path.clone(),
             state.salsa_file.text(&*db).clone(),
             state.tree.clone(),
+            state.parsed_yaml_regions.clone(),
         )
     };
 
@@ -50,7 +51,7 @@ pub(crate) async fn references(
     let Some(offset) = position_to_offset(&content, position) else {
         return Ok(None);
     };
-    if helpers::is_offset_in_yaml_frontmatter(&SyntaxNode::new_root(green_tree.clone()), offset) {
+    if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
         return Ok(None);
     }
 
@@ -131,8 +132,7 @@ pub(crate) async fn references(
         }
 
         if include_declaration {
-            let yaml_ok =
-                helpers::is_yaml_frontmatter_valid(&SyntaxNode::new_root(green_tree.clone()));
+            let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
             if yaml_ok {
                 Some(
                     crate::salsa::citation_definition_index(

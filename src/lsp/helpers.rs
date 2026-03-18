@@ -9,8 +9,7 @@ use crate::lsp::DocumentState;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, ChunkOption, Citation, Crossref, SyntaxKind, SyntaxNode,
-    collect_embedded_frontmatter_yaml_cst,
+    AstNode, ChunkOption, Citation, Crossref, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
 };
 use crate::utils::pandoc_slugify;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -160,16 +159,24 @@ pub(crate) fn find_node_at_offset(root: &SyntaxNode, offset: usize) -> Option<Sy
     }
 }
 
-pub(crate) fn is_offset_in_yaml_frontmatter(root: &SyntaxNode, offset: usize) -> bool {
-    collect_embedded_frontmatter_yaml_cst(root).is_some_and(|embedding| {
-        let range = embedding.parsed().host_range();
-        range.start <= offset && offset < range.end
-    })
+pub(crate) fn is_offset_in_yaml_frontmatter(
+    parsed_yaml_regions: &[ParsedYamlRegionSnapshot],
+    offset: usize,
+) -> bool {
+    parsed_yaml_regions
+        .iter()
+        .find(|region| region.is_frontmatter())
+        .is_some_and(|frontmatter| {
+            let range = frontmatter.host_range();
+            range.start <= offset && offset < range.end
+        })
 }
 
-pub(crate) fn is_yaml_frontmatter_valid(root: &SyntaxNode) -> bool {
-    collect_embedded_frontmatter_yaml_cst(root)
-        .is_none_or(|embedding| embedding.parsed().is_valid())
+pub(crate) fn is_yaml_frontmatter_valid(parsed_yaml_regions: &[ParsedYamlRegionSnapshot]) -> bool {
+    parsed_yaml_regions
+        .iter()
+        .find(|region| region.is_frontmatter())
+        .is_none_or(ParsedYamlRegionSnapshot::is_valid)
 }
 
 /// Normalize a label for case-insensitive matching (collapses whitespace, lowercases)

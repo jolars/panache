@@ -11,7 +11,7 @@ use crate::lsp::conversions::offset_to_position;
 use crate::lsp::helpers::get_document_content_and_tree;
 use crate::syntax::{
     AstNode, GridTable, Heading, ImageLink, MultilineTable, PipeTable, SimpleTable, SyntaxKind,
-    SyntaxNode, collect_embedded_frontmatter_yaml_cst,
+    SyntaxNode,
 };
 
 pub async fn document_symbol(
@@ -23,6 +23,12 @@ pub async fn document_symbol(
 ) -> Result<Option<DocumentSymbolResponse>> {
     let uri = params.text_document.uri;
     log::debug!("document_symbol request for: {}", *uri);
+    let parsed_yaml_regions = {
+        let map = document_map.lock().await;
+        map.get(&uri.to_string())
+            .map(|state| state.parsed_yaml_regions.clone())
+            .unwrap_or_default()
+    };
     // Use helper to get document content and tree
     let (content, syntax_tree) =
         match get_document_content_and_tree(&document_map, &salsa_db, &uri).await {
@@ -33,10 +39,12 @@ pub async fn document_symbol(
             }
         };
     log::debug!("Document content length: {} bytes", content.len());
-    let yaml_frontmatter_region = collect_embedded_frontmatter_yaml_cst(&syntax_tree);
+    let yaml_frontmatter_region = parsed_yaml_regions
+        .iter()
+        .find(|region| region.is_frontmatter());
 
     // Build symbols synchronously (SyntaxNode is not Send)
-    let symbols = build_document_symbols(&syntax_tree, &content, yaml_frontmatter_region.as_ref());
+    let symbols = build_document_symbols(&syntax_tree, &content, yaml_frontmatter_region);
 
     log::debug!("Found {} top-level symbols", symbols.len());
     if symbols.is_empty() {
@@ -49,7 +57,7 @@ pub async fn document_symbol(
 fn build_document_symbols(
     root: &SyntaxNode,
     content: &str,
-    yaml_frontmatter_region: Option<&crate::syntax::YamlEmbeddedCst>,
+    yaml_frontmatter_region: Option<&crate::syntax::ParsedYamlRegionSnapshot>,
 ) -> Vec<DocumentSymbol> {
     let mut symbols = Vec::new();
     let mut heading_stack: Vec<(usize, DocumentSymbol)> = Vec::new();
@@ -154,11 +162,10 @@ fn build_document_symbols(
 }
 
 fn extract_yaml_region_symbol(
-    region: &crate::syntax::YamlEmbeddedCst,
+    region: &crate::syntax::ParsedYamlRegionSnapshot,
     content: &str,
 ) -> Option<DocumentSymbol> {
-    let parsed = region.parsed();
-    let host_range = parsed.host_range();
+    let host_range = region.host_range();
     let range = Range {
         start: offset_to_position(content, host_range.start),
         end: offset_to_position(content, host_range.end),
@@ -166,9 +173,9 @@ fn extract_yaml_region_symbol(
     #[allow(deprecated)]
     Some(DocumentSymbol {
         name: "YAML Frontmatter".to_string(),
-        detail: Some(match parsed.document_shape_summary() {
-            Some(summary) => format!("{} ({})", parsed.id(), summary),
-            None => format!("{} (invalid YAML)", parsed.id()),
+        detail: Some(match region.document_shape_summary() {
+            Some(summary) => format!("{} ({})", region.id(), summary),
+            None => format!("{} (invalid YAML)", region.id()),
         }),
         kind: SymbolKind::NAMESPACE,
         tags: None,
@@ -441,8 +448,9 @@ Another table:
         let content = "---\ntitle: Test\n---\n\n# H1\n";
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let yaml_frontmatter_region = collect_embedded_frontmatter_yaml_cst(&tree);
-        let symbols = build_document_symbols(&tree, content, yaml_frontmatter_region.as_ref());
+        let parsed = crate::syntax::collect_parsed_yaml_region_snapshots(&tree);
+        let yaml_frontmatter_region = parsed.iter().find(|region| region.is_frontmatter());
+        let symbols = build_document_symbols(&tree, content, yaml_frontmatter_region);
         let yaml_symbol = symbols
             .iter()
             .find(|symbol| symbol.name == "YAML Frontmatter")
@@ -457,8 +465,9 @@ Another table:
         let content = "---\ntitle: [\n---\n\n# H1\n";
         let config = Config::default();
         let tree = crate::parser::parse(content, Some(config));
-        let yaml_frontmatter_region = collect_embedded_frontmatter_yaml_cst(&tree);
-        let symbols = build_document_symbols(&tree, content, yaml_frontmatter_region.as_ref());
+        let parsed = crate::syntax::collect_parsed_yaml_region_snapshots(&tree);
+        let yaml_frontmatter_region = parsed.iter().find(|region| region.is_frontmatter());
+        let symbols = build_document_symbols(&tree, content, yaml_frontmatter_region);
         let yaml_symbol = symbols
             .iter()
             .find(|symbol| symbol.name == "YAML Frontmatter")

@@ -1,7 +1,6 @@
 use std::ops::Range;
 
-use crate::parser::blocks::code_blocks::{CodeBlockType, InfoString};
-use crate::parser::utils::chunk_options::hashpipe_comment_prefix;
+use crate::parser::utils::yaml_regions::hashpipe_language_and_prefix;
 use crate::syntax::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +32,14 @@ pub struct YamlRegion {
 pub struct ParsedYamlRegion {
     region: YamlRegion,
     parse_result: Result<yaml_parser::SyntaxNode, yaml_parser::SyntaxError>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedYamlRegionSnapshot {
+    region: YamlRegion,
+    parse_ok: bool,
+    error: Option<YamlParseError>,
+    document_shape_summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -286,6 +293,54 @@ impl ParsedYamlRegion {
             None => format!("{:?} docs={}", root.kind(), doc_count),
         })
     }
+
+    pub fn to_snapshot(&self) -> ParsedYamlRegionSnapshot {
+        ParsedYamlRegionSnapshot {
+            region: self.region.clone(),
+            parse_ok: self.is_valid(),
+            error: self.error(),
+            document_shape_summary: self.document_shape_summary(),
+        }
+    }
+}
+
+impl ParsedYamlRegionSnapshot {
+    pub fn id(&self) -> &str {
+        &self.region.id
+    }
+
+    pub fn is_frontmatter(&self) -> bool {
+        matches!(self.region.kind, YamlRegionKind::Frontmatter)
+    }
+
+    pub fn is_hashpipe(&self) -> bool {
+        matches!(self.region.kind, YamlRegionKind::Hashpipe)
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.parse_ok
+    }
+
+    pub fn error(&self) -> Option<&YamlParseError> {
+        self.error.as_ref()
+    }
+
+    pub fn host_range(&self) -> Range<usize> {
+        self.region.host_range.clone()
+    }
+
+    pub fn parse_error_host_offset(&self) -> Option<usize> {
+        let err = self.error()?;
+        self.region.yaml_to_host_offsets.get(err.offset()).copied()
+    }
+
+    pub fn document_shape_summary(&self) -> Option<&str> {
+        self.document_shape_summary.as_deref()
+    }
+
+    pub fn to_region(&self) -> YamlRegion {
+        self.region.clone()
+    }
 }
 
 pub fn collect_frontmatter_region(tree: &SyntaxNode) -> Option<YamlFrontmatterRegion> {
@@ -349,12 +404,7 @@ pub fn collect_hashpipe_regions(tree: &SyntaxNode) -> Vec<YamlRegion> {
         let (Some(info_text), Some(content_node)) = (info_text, content_node) else {
             continue;
         };
-        let info = InfoString::parse(&info_text);
-        let language = match info.block_type {
-            CodeBlockType::Executable { language } => language,
-            _ => continue,
-        };
-        let Some(prefix) = hashpipe_comment_prefix(&language) else {
+        let Some((language, prefix)) = hashpipe_language_and_prefix(&info_text) else {
             continue;
         };
 
@@ -411,6 +461,13 @@ pub fn collect_parsed_frontmatter_region(tree: &SyntaxNode) -> Option<ParsedYaml
     collect_parsed_yaml_regions(tree)
         .into_iter()
         .find(|region| region.is_frontmatter())
+}
+
+pub fn collect_parsed_yaml_region_snapshots(tree: &SyntaxNode) -> Vec<ParsedYamlRegionSnapshot> {
+    collect_parsed_yaml_regions(tree)
+        .iter()
+        .map(ParsedYamlRegion::to_snapshot)
+        .collect()
 }
 
 pub fn validate_yaml_text(input: &str) -> Result<(), YamlParseError> {

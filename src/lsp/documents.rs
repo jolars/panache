@@ -43,7 +43,11 @@ pub(crate) async fn did_open(
     log::debug!("did_open uri={}, bytes={}", uri, text.len());
     let start = Instant::now();
     let config = get_config(client, &workspace_root, &params.text_document.uri).await;
-    let tree = GreenNode::from(crate::parse(&text, Some(config.clone())).green());
+    let (tree, parsed_yaml_regions) = {
+        let syntax_tree = crate::parse(&text, Some(config.clone()));
+        let parsed_yaml_regions = crate::syntax::collect_parsed_yaml_region_snapshots(&syntax_tree);
+        (GreenNode::from(syntax_tree.green()), parsed_yaml_regions)
+    };
     let (salsa_file, salsa_config) = {
         let mut db = salsa_db.lock().await;
         let path = params
@@ -79,6 +83,7 @@ pub(crate) async fn did_open(
                 salsa_file,
                 salsa_config,
                 tree,
+                parsed_yaml_regions,
             },
         );
     }
@@ -182,12 +187,16 @@ pub(crate) async fn did_change(
 
             GreenNode::from(new_tree.green())
         };
+        let parsed_yaml_regions = crate::syntax::collect_parsed_yaml_region_snapshots(
+            &SyntaxNode::new_root(green.clone()),
+        );
         {
             let mut document_map = document_map.lock().await;
             let Some(doc_state) = document_map.get_mut(&uri_string) else {
                 return;
             };
             doc_state.tree = green;
+            doc_state.parsed_yaml_regions = parsed_yaml_regions;
         }
 
         (

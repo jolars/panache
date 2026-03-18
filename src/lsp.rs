@@ -24,6 +24,8 @@ pub struct DocumentState {
     pub salsa_config: crate::salsa::FileConfig,
     /// Cached syntax tree for incremental parsing.
     pub tree: GreenNode,
+    /// Cached parsed YAML regions for this document revision.
+    pub parsed_yaml_regions: Vec<crate::syntax::ParsedYamlRegionSnapshot>,
 }
 
 pub struct PanacheLsp {

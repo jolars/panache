@@ -21,3 +21,5 @@ pub mod list_item_buffer;
 pub mod marker_utils;
 #[path = "utils/text_buffer.rs"]
 pub mod text_buffer;
+#[path = "utils/yaml_regions.rs"]
+pub mod yaml_regions;

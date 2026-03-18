@@ -9,7 +9,6 @@ use tower_lsp_server::Client;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
-use crate::syntax::SyntaxNode;
 
 use super::super::helpers;
 use super::diagnostics::lint_and_publish;
@@ -73,9 +72,7 @@ pub(crate) async fn did_change_watched_files(
                 .into_iter()
                 .filter_map(|(uri_str, state)| {
                     let doc_path = state.path?;
-                    if !helpers::is_yaml_frontmatter_valid(&SyntaxNode::new_root(
-                        state.tree.clone(),
-                    )) {
+                    if !helpers::is_yaml_frontmatter_valid(&state.parsed_yaml_regions) {
                         return None;
                     }
                     let metadata = crate::salsa::metadata(

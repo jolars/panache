@@ -7,9 +7,9 @@
 //! # Architecture
 //!
 //! - YAML frontmatter remains **opaque** in the CST (stored as TEXT nodes)
-//! - Semantic parsing happens on-demand using serde-saphyr
-//! - `Spanned<T>` provides byte-precise positions for diagnostics
-//! - Position mapping: `document_offset = yaml_node.start() + yaml_span.offset()`
+//! - Semantic parsing happens on-demand using `yaml_parser` AST traversal
+//! - Metadata offsets are derived from YAML token ranges and mapped to document offsets
+//! - CSL-YAML bibliography parsing still uses `serde-saphyr` for now
 //!
 //! # Usage
 //!
@@ -66,7 +66,7 @@ pub struct DocumentMetadata {
 
 /// Extract metadata from a syntax tree.
 ///
-/// Finds YAML frontmatter in the document, parses it with serde-saphyr,
+/// Finds YAML frontmatter in the document, parses it with `yaml_parser`,
 /// and extracts structured metadata including bibliography paths.
 ///
 /// # Arguments

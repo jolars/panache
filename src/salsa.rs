@@ -7,8 +7,8 @@ use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::parser::utils::attributes::try_parse_trailing_attributes;
 use crate::syntax::{
-    AstNode, ChunkOption, Citation, Crossref, FootnoteDefinition, ReferenceDefinition, SyntaxKind,
-    SyntaxNode, YamlRegion, collect_embedded_frontmatter_yaml_cst, collect_embedded_yaml_cst,
+    AstNode, ChunkOption, Citation, Crossref, FootnoteDefinition, ParsedYamlRegionSnapshot,
+    ReferenceDefinition, SyntaxKind, SyntaxNode, YamlRegion, collect_parsed_yaml_region_snapshots,
 };
 use crate::utils::normalize_label;
 use salsa::{Accumulator, Durability, Setter};
@@ -127,11 +127,20 @@ pub fn yaml_metadata_parse_result(
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
 pub fn yaml_regions_for_file(db: &dyn Db, file: FileText, config: FileConfig) -> Vec<YamlRegion> {
-    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
-    collect_embedded_yaml_cst(&tree)
-        .into_iter()
-        .map(|embedding| embedding.parsed().to_region())
+    parsed_yaml_regions_for_file(db, file, config)
+        .iter()
+        .map(ParsedYamlRegionSnapshot::to_region)
         .collect()
+}
+
+#[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
+pub fn parsed_yaml_regions_for_file(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+) -> Vec<ParsedYamlRegionSnapshot> {
+    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    collect_parsed_yaml_region_snapshots(&tree)
 }
 
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
@@ -161,14 +170,15 @@ pub fn yaml_frontmatter_is_valid(
     config: FileConfig,
     path: PathBuf,
 ) -> bool {
-    let text = file.text(db);
-    let cfg = config.config(db).clone();
-    let tree = crate::parse(text, Some(cfg));
-    let Some(frontmatter) = collect_embedded_frontmatter_yaml_cst(&tree) else {
+    let frontmatter = parsed_yaml_regions_for_file(db, file, config)
+        .iter()
+        .find(|region| region.is_frontmatter())
+        .cloned();
+    let Some(frontmatter) = frontmatter else {
         // No in-document frontmatter to validate; allow project-file metadata flows.
         return true;
     };
-    if !frontmatter.parsed().is_valid() {
+    if !frontmatter.is_valid() {
         return false;
     }
     yaml_metadata_parse_result(db, file, config, path).is_ok()
@@ -184,13 +194,11 @@ pub fn built_in_lint_plan(
     let text = file.text(db);
     let cfg = config.config(db).clone();
     let tree = crate::parse(text, Some(cfg.clone()));
-    let embedded_yaml = collect_embedded_yaml_cst(&tree);
-    let parsed_yaml_regions: Vec<_> = embedded_yaml
+    let parsed_yaml_regions: Vec<_> = parsed_yaml_regions_for_file(db, file, config).to_vec();
+    let frontmatter = parsed_yaml_regions
         .iter()
-        .map(|embedding| embedding.parsed())
-        .collect();
-    let frontmatter =
-        collect_embedded_frontmatter_yaml_cst(&tree).map(|embedded| embedded.parsed().clone());
+        .find(|parsed| parsed.is_frontmatter())
+        .cloned();
     let frontmatter = frontmatter.as_ref();
     let has_frontmatter = frontmatter.is_some();
     let frontmatter_parse_ok = frontmatter.as_ref().is_none_or(|parsed| parsed.is_valid());

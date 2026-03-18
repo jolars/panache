@@ -3,11 +3,9 @@
 use std::path::Path;
 
 use rowan::TextSize;
-use serde::Deserialize;
-use serde_saphyr::Spanned;
+use rowan::ast::AstNode as _;
 
-use super::references::extract_inline_references;
-use super::{BibliographyParse, DocumentMetadata, ReferenceEntry};
+use super::{BibliographyInfo, BibliographyParse, DocumentMetadata, InlineReference};
 use crate::bib;
 
 /// Errors that can occur during YAML parsing.
@@ -45,55 +43,10 @@ impl std::fmt::Display for YamlError {
 
 impl std::error::Error for YamlError {}
 
-impl From<serde_saphyr::Error> for YamlError {
-    fn from(err: serde_saphyr::Error) -> Self {
-        // Extract location from serde-saphyr error if available
-        if let Some(location) = err.location() {
-            Self::ParseError {
-                message: err.to_string(),
-                line: location.line(),
-                column: location.column(),
-                byte_offset: None,
-            }
-        } else {
-            Self::ParseError {
-                message: err.to_string(),
-                line: 0,
-                column: 0,
-                byte_offset: None,
-            }
-        }
-    }
-}
-
-/// Internal representation of YAML frontmatter fields.
-#[derive(Debug, Deserialize)]
-struct Frontmatter {
-    /// Document title.
-    title: Option<String>,
-    /// Bibliography files (string or array).
-    bibliography: Option<Spanned<StringOrArray>>,
-    /// Inline YAML references.
-    references: Option<Vec<ReferenceEntry>>,
-    // Additional fields can be added here as needed
-}
-
-/// Helper type to deserialize both string and array forms.
-#[derive(Debug, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum StringOrArray {
-    Single(String),
-    Multiple(Vec<String>),
-}
-
-impl StringOrArray {
-    /// Get all paths from the value.
-    pub fn paths(&self) -> Vec<&str> {
-        match self {
-            Self::Single(s) => vec![s.as_str()],
-            Self::Multiple(v) => v.iter().map(|s| s.as_str()).collect(),
-        }
-    }
+#[derive(Debug, Clone)]
+struct ScalarValue {
+    value: String,
+    range: std::ops::Range<usize>,
 }
 
 /// Parse YAML frontmatter and extract metadata.
@@ -124,17 +77,49 @@ pub(super) fn parse_frontmatter(
         }
     })?;
 
-    // Parse with serde-saphyr
-    let frontmatter: Frontmatter = serde_saphyr::from_str(&yaml_content)
-        .map_err(|err| map_yaml_parse_error(err, &yaml_content, yaml_offset, content_start))?;
+    let root = yaml_parser::ast::Root::cast(yaml_parser::parse(&yaml_content).map_err(|err| {
+        let content_byte_offset = err.offset().min(yaml_content.len());
+        let (line, column) = byte_offset_to_line_col_1based(&yaml_content, content_byte_offset);
+        YamlError::ParseError {
+            message: err.message().to_string(),
+            line: line as u64,
+            column: column as u64,
+            byte_offset: Some(doc_base_offset + content_byte_offset),
+        }
+    })?)
+    .ok_or_else(|| YamlError::StructureError("Invalid YAML root".to_string()))?;
+    let map = root
+        .documents()
+        .next()
+        .and_then(|doc| doc.block())
+        .and_then(|block| block.block_map());
 
-    // Extract bibliography info if present
-    let bibliography = frontmatter
-        .bibliography
-        .map(|spanned| {
-            super::bibliography::extract_bibliography_info(spanned, yaml_offset, doc_path)
+    let title = map
+        .as_ref()
+        .and_then(|map| map_entry_value(map, "title"))
+        .and_then(block_map_value_to_scalar);
+    let bibliography_values = map
+        .as_ref()
+        .and_then(|map| map_entry_value(map, "bibliography"))
+        .map(block_map_value_to_scalar_list)
+        .unwrap_or_default();
+    let bibliography = if bibliography_values.is_empty() {
+        None
+    } else {
+        let doc_dir = doc_path.parent().unwrap_or_else(|| Path::new("."));
+        let paths = bibliography_values
+            .iter()
+            .map(|entry| doc_dir.join(&entry.value))
+            .collect();
+        let source_ranges = bibliography_values
+            .iter()
+            .map(|entry| absolute_text_range(doc_base_offset, entry.range.start..entry.range.end))
+            .collect();
+        Some(BibliographyInfo {
+            paths,
+            source_ranges,
         })
-        .transpose()?;
+    };
 
     let bibliography_parse = bibliography.as_ref().map(|info| {
         let index = bib::load_bibliography(&info.paths);
@@ -147,9 +132,10 @@ pub(super) fn parse_frontmatter(
             index,
         }
     });
-    let inline_references = frontmatter
-        .references
-        .map(|refs| extract_inline_references(refs, yaml_offset, doc_path))
+    let inline_references = map
+        .as_ref()
+        .and_then(|map| map_entry_value(map, "references"))
+        .map(|value| extract_inline_references_from_yaml(value, doc_base_offset, doc_path))
         .unwrap_or_default();
 
     Ok(DocumentMetadata {
@@ -158,35 +144,140 @@ pub(super) fn parse_frontmatter(
         bibliography_parse,
         inline_references,
         citations: super::CitationInfo { keys: Vec::new() },
-        title: frontmatter.title,
+        title: title.map(|entry| entry.value),
         raw_yaml: yaml_content.to_string(),
     })
 }
 
-fn map_yaml_parse_error(
-    err: serde_saphyr::Error,
-    yaml_content: &str,
-    yaml_offset: TextSize,
-    content_start: usize,
-) -> YamlError {
-    if let Some(location) = err.location() {
-        let line = location.line();
-        let column = location.column();
-        let content_byte_offset =
-            line_col_to_byte_offset_1based(yaml_content, line as usize, column as usize)
-                .unwrap_or(yaml_content.len());
-        let absolute = u32::from(yaml_offset) as usize + content_start + content_byte_offset;
-        YamlError::ParseError {
-            message: err.to_string(),
-            line,
-            column,
-            byte_offset: Some(absolute),
-        }
-    } else {
-        YamlError::from(err)
-    }
+fn map_entry_value(
+    map: &yaml_parser::ast::BlockMap,
+    key: &str,
+) -> Option<yaml_parser::ast::BlockMapValue> {
+    map.entries()
+        .find(|entry| block_map_entry_key(entry).as_deref() == Some(key))
+        .and_then(|entry| entry.value())
 }
 
+fn block_map_entry_key(entry: &yaml_parser::ast::BlockMapEntry) -> Option<String> {
+    let key = entry.key()?;
+    if let Some(flow) = key.flow() {
+        return flow_scalar_text(&flow);
+    }
+    let block = key.block()?;
+    let flow = block_to_flow_scalar(&block)?;
+    flow_scalar_text(&flow)
+}
+
+fn block_map_value_to_scalar(value: yaml_parser::ast::BlockMapValue) -> Option<ScalarValue> {
+    if let Some(flow) = value.flow() {
+        return flow_scalar(&flow);
+    }
+    let block = value.block()?;
+    let flow = block_to_flow_scalar(&block)?;
+    flow_scalar(&flow)
+}
+
+fn block_map_value_to_scalar_list(value: yaml_parser::ast::BlockMapValue) -> Vec<ScalarValue> {
+    if let Some(single) = block_map_value_to_scalar(value.clone()) {
+        return vec![single];
+    }
+    if let Some(flow) = value.flow()
+        && let Some(seq) = flow.flow_seq()
+    {
+        return seq
+            .entries()
+            .into_iter()
+            .flat_map(|entries| entries.entries())
+            .filter_map(|entry| entry.flow().and_then(|flow| flow_scalar(&flow)))
+            .collect();
+    }
+    if let Some(block) = value.block()
+        && let Some(seq) = block.block_seq()
+    {
+        return seq
+            .entries()
+            .filter_map(|entry| {
+                if let Some(flow) = entry.flow() {
+                    return flow_scalar(&flow);
+                }
+                let block = entry.block()?;
+                let flow = block_to_flow_scalar(&block)?;
+                flow_scalar(&flow)
+            })
+            .collect();
+    }
+    Vec::new()
+}
+
+fn extract_inline_references_from_yaml(
+    references: yaml_parser::ast::BlockMapValue,
+    doc_base_offset: usize,
+    doc_path: &Path,
+) -> Vec<InlineReference> {
+    let Some(block) = references.block() else {
+        return Vec::new();
+    };
+    let Some(seq) = block.block_seq() else {
+        return Vec::new();
+    };
+    seq.entries()
+        .filter_map(|entry| {
+            let block = entry.block()?;
+            let map = block.block_map()?;
+            let id_value = map_entry_value(&map, "id")?;
+            let id = block_map_value_to_scalar(id_value)?;
+            Some(InlineReference {
+                id: id.value,
+                range: absolute_text_range(doc_base_offset, id.range),
+                path: doc_path.to_path_buf(),
+            })
+        })
+        .collect()
+}
+
+fn block_to_flow_scalar(block: &yaml_parser::ast::Block) -> Option<yaml_parser::ast::Flow> {
+    block
+        .syntax()
+        .children()
+        .find_map(yaml_parser::ast::Flow::cast)
+}
+
+fn flow_scalar(flow: &yaml_parser::ast::Flow) -> Option<ScalarValue> {
+    let token = if let Some(token) = flow.plain_scalar() {
+        token
+    } else if let Some(token) = flow.single_quoted_scalar() {
+        token
+    } else if let Some(token) = flow.double_qouted_scalar() {
+        token
+    } else {
+        return None;
+    };
+    let mut value = token.text().to_string();
+    if token.kind() == yaml_parser::SyntaxKind::SINGLE_QUOTED_SCALAR {
+        value = value.trim_matches('\'').to_string();
+    } else if token.kind() == yaml_parser::SyntaxKind::DOUBLE_QUOTED_SCALAR {
+        value = value.trim_matches('"').to_string();
+    }
+    let start: usize = token.text_range().start().into();
+    let end: usize = token.text_range().end().into();
+    Some(ScalarValue {
+        value,
+        range: start..end,
+    })
+}
+
+fn flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
+    flow_scalar(flow).map(|scalar| scalar.value)
+}
+
+fn absolute_text_range(base_offset: usize, range: std::ops::Range<usize>) -> rowan::TextRange {
+    rowan::TextRange::new(
+        rowan::TextSize::from((base_offset + range.start) as u32),
+        rowan::TextSize::from((base_offset + range.end) as u32),
+    )
+}
+
+#[cfg(test)]
 fn line_col_to_byte_offset_1based(input: &str, line: usize, column: usize) -> Option<usize> {
     if line == 0 || column == 0 {
         return None;
@@ -361,37 +452,21 @@ mod tests {
 
     #[test]
     fn test_string_or_array_single() {
-        // Test via Frontmatter struct, not directly
-        use serde::Deserialize;
-
-        #[derive(Deserialize)]
-        struct Test {
-            bibliography: StringOrArray,
-        }
-
-        let yaml = r#"
-bibliography: refs.bib
-"#;
-        let value: Test = serde_saphyr::from_str(yaml).unwrap();
-        assert_eq!(value.bibliography.paths(), vec!["refs.bib"]);
+        let yaml = "---\nbibliography: refs.bib\n---";
+        let metadata = parse_frontmatter(yaml, TextSize::from(0), Path::new("test.qmd")).unwrap();
+        let bib = metadata.bibliography.expect("bibliography");
+        assert_eq!(bib.paths.len(), 1);
+        assert!(bib.paths[0].ends_with("refs.bib"));
     }
 
     #[test]
     fn test_string_or_array_multiple() {
-        use serde::Deserialize;
-
-        #[derive(Deserialize)]
-        struct Test {
-            bibliography: StringOrArray,
-        }
-
-        let yaml = r#"
-bibliography: 
-  - refs.bib
-  - other.bib
-"#;
-        let value: Test = serde_saphyr::from_str(yaml).unwrap();
-        assert_eq!(value.bibliography.paths(), vec!["refs.bib", "other.bib"]);
+        let yaml = "---\nbibliography:\n  - refs.bib\n  - other.bib\n---";
+        let metadata = parse_frontmatter(yaml, TextSize::from(0), Path::new("test.qmd")).unwrap();
+        let bib = metadata.bibliography.expect("bibliography");
+        assert_eq!(bib.paths.len(), 2);
+        assert!(bib.paths[0].ends_with("refs.bib"));
+        assert!(bib.paths[1].ends_with("other.bib"));
     }
 
     #[test]

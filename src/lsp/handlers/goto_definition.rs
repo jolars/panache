@@ -29,23 +29,21 @@ pub(crate) async fn goto_definition(
     let position = params.text_document_position_params.position;
     let config = helpers::get_config(client, &workspace_root, uri).await;
 
-    let (salsa_file, salsa_config, doc_path, green_tree) = {
+    let (salsa_file, salsa_config, doc_path, parsed_yaml_regions) = {
         let map = document_map.lock().await;
         match map.get(&uri.to_string()) {
             Some(state) => (
                 state.salsa_file,
                 state.salsa_config,
                 state.path.clone(),
-                state.tree.clone(),
+                state.parsed_yaml_regions.clone(),
             ),
             None => return Ok(None),
         }
     };
 
     let citation_def_index = if let Some(doc_path) = doc_path.clone() {
-        let yaml_ok = helpers::is_yaml_frontmatter_valid(&crate::syntax::SyntaxNode::new_root(
-            green_tree.clone(),
-        ));
+        let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
         if yaml_ok {
             let db = salsa_db.lock().await;
             Some(
@@ -71,10 +69,7 @@ pub(crate) async fn goto_definition(
     let Some(offset) = conversions::position_to_offset(&content_for_offset, position) else {
         return Ok(None);
     };
-    if helpers::is_offset_in_yaml_frontmatter(
-        &crate::syntax::SyntaxNode::new_root(green_tree.clone()),
-        offset,
-    ) {
+    if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
         return Ok(None);
     }
 
