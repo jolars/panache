@@ -55,6 +55,16 @@ pub(crate) struct ListMarkerMatch {
     pub(crate) spaces_after_bytes: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(in crate::parser) struct ListItemEmissionInput<'a> {
+    pub content: &'a str,
+    pub marker_len: usize,
+    pub spaces_after_cols: usize,
+    pub spaces_after_bytes: usize,
+    pub indent_cols: usize,
+    pub indent_bytes: usize,
+}
+
 /// Parse a Roman numeral (lower or upper case).
 /// Returns (numeral_string, length) if valid, None otherwise.
 fn try_parse_roman_numeral(text: &str, uppercase: bool) -> Option<(String, usize)> {
@@ -557,44 +567,42 @@ pub(crate) fn markers_match(a: &ListMarker, b: &ListMarker) -> bool {
 /// Emit a list item node to the builder (marker and whitespace only).
 /// Returns (content_col, text_to_buffer) where text_to_buffer is the content that should be
 /// added to the list item buffer for later inline parsing.
-pub(crate) fn emit_list_item(
+pub(in crate::parser) fn emit_list_item(
     builder: &mut GreenNodeBuilder<'static>,
-    content: &str,
-    marker_len: usize,
-    spaces_after_cols: usize,
-    spaces_after_bytes: usize,
-    indent_cols: usize,
-    indent_bytes: usize,
+    item: &ListItemEmissionInput<'_>,
 ) -> (usize, String) {
     builder.start_node(SyntaxKind::LIST_ITEM.into());
 
     // Emit leading indentation for lossless parsing
-    if indent_bytes > 0 {
-        builder.token(SyntaxKind::WHITESPACE.into(), &content[..indent_bytes]);
+    if item.indent_bytes > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &item.content[..item.indent_bytes],
+        );
     }
 
-    let marker_text = &content[indent_bytes..indent_bytes + marker_len];
+    let marker_text = &item.content[item.indent_bytes..item.indent_bytes + item.marker_len];
     builder.token(SyntaxKind::LIST_MARKER.into(), marker_text);
 
-    if spaces_after_bytes > 0 {
-        let space_start = indent_bytes + marker_len;
-        let space_end = space_start + spaces_after_bytes;
-        if space_end <= content.len() {
+    if item.spaces_after_bytes > 0 {
+        let space_start = item.indent_bytes + item.marker_len;
+        let space_end = space_start + item.spaces_after_bytes;
+        if space_end <= item.content.len() {
             builder.token(
                 SyntaxKind::WHITESPACE.into(),
-                &content[space_start..space_end],
+                &item.content[space_start..space_end],
             );
         }
     }
 
-    let content_col = indent_cols + marker_len + spaces_after_cols;
-    let content_start = indent_bytes + marker_len + spaces_after_bytes;
+    let content_col = item.indent_cols + item.marker_len + item.spaces_after_cols;
+    let content_start = item.indent_bytes + item.marker_len + item.spaces_after_bytes;
 
     // Extract text content to be buffered (instead of emitting it directly).
     // If the item starts with a task checkbox, emit it as a dedicated token so it
     // doesn't get parsed as a link.
-    let text_to_buffer = if content_start < content.len() {
-        let rest = &content[content_start..];
+    let text_to_buffer = if content_start < item.content.len() {
+        let rest = &item.content[content_start..];
         if (rest.starts_with("[ ]") || rest.starts_with("[x]") || rest.starts_with("[X]"))
             && rest
                 .as_bytes()
@@ -909,17 +917,11 @@ pub(in crate::parser) fn find_matching_list_level(
 }
 
 /// Start a nested list within an existing list item.
-#[allow(clippy::too_many_arguments)]
 pub(in crate::parser) fn start_nested_list(
     containers: &mut ContainerStack,
     builder: &mut GreenNodeBuilder<'static>,
-    content: &str,
     marker: &ListMarker,
-    marker_len: usize,
-    spaces_after_cols: usize,
-    spaces_after_bytes: usize,
-    indent_cols: usize,
-    indent_bytes: usize,
+    item: &ListItemEmissionInput<'_>,
     indent_to_emit: Option<&str>,
 ) {
     // Emit the indent if needed
@@ -931,20 +933,12 @@ pub(in crate::parser) fn start_nested_list(
     builder.start_node(SyntaxKind::LIST.into());
     containers.push(Container::List {
         marker: marker.clone(),
-        base_indent_cols: indent_cols,
+        base_indent_cols: item.indent_cols,
         has_blank_between_items: false,
     });
 
     // Add the nested list item
-    let (content_col, text_to_buffer) = emit_list_item(
-        builder,
-        content,
-        marker_len,
-        spaces_after_cols,
-        spaces_after_bytes,
-        indent_cols,
-        indent_bytes,
-    );
+    let (content_col, text_to_buffer) = emit_list_item(builder, item);
     let mut buffer = ListItemBuffer::new();
     if !text_to_buffer.is_empty() {
         buffer.push_text(text_to_buffer);
@@ -986,36 +980,33 @@ pub(in crate::parser) fn is_content_nested_bullet_marker(
 
 /// Add a list item that contains a nested empty list (for cases like `- *`).
 /// This creates: LIST_ITEM (outer) -> LIST (nested) -> LIST_ITEM (empty inner)
-#[allow(clippy::too_many_arguments)]
 pub(in crate::parser) fn add_list_item_with_nested_empty_list(
     containers: &mut ContainerStack,
     builder: &mut GreenNodeBuilder<'static>,
-    content: &str,
-    marker_len: usize,
-    spaces_after_cols: usize,
-    spaces_after_bytes: usize,
-    indent_cols: usize,
-    indent_bytes: usize,
+    item: &ListItemEmissionInput<'_>,
     nested_marker: char,
 ) {
     // First, emit the outer list item (just marker + whitespace)
     builder.start_node(SyntaxKind::LIST_ITEM.into());
 
     // Emit leading indentation for lossless parsing
-    if indent_bytes > 0 {
-        builder.token(SyntaxKind::WHITESPACE.into(), &content[..indent_bytes]);
+    if item.indent_bytes > 0 {
+        builder.token(
+            SyntaxKind::WHITESPACE.into(),
+            &item.content[..item.indent_bytes],
+        );
     }
 
-    let marker_text = &content[indent_bytes..indent_bytes + marker_len];
+    let marker_text = &item.content[item.indent_bytes..item.indent_bytes + item.marker_len];
     builder.token(SyntaxKind::LIST_MARKER.into(), marker_text);
 
-    if spaces_after_bytes > 0 {
-        let space_start = indent_bytes + marker_len;
-        let space_end = space_start + spaces_after_bytes;
-        if space_end <= content.len() {
+    if item.spaces_after_bytes > 0 {
+        let space_start = item.indent_bytes + item.marker_len;
+        let space_end = space_start + item.spaces_after_bytes;
+        if space_end <= item.content.len() {
             builder.token(
                 SyntaxKind::WHITESPACE.into(),
-                &content[space_start..space_end],
+                &item.content[space_start..space_end],
             );
         }
     }
@@ -1028,9 +1019,9 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
     builder.token(SyntaxKind::LIST_MARKER.into(), &nested_marker.to_string());
 
     // Extract and emit the newline from original content (lossless)
-    let content_start = indent_bytes + marker_len + spaces_after_bytes;
-    if content_start < content.len() {
-        let remaining = &content[content_start..];
+    let content_start = item.indent_bytes + item.marker_len + item.spaces_after_bytes;
+    if content_start < item.content.len() {
+        let remaining = &item.content[content_start..];
         // Skip the nested marker character (1 byte) and get the newline
         if remaining.len() > 1 {
             let (_, newline_str) = strip_newline(&remaining[1..]);
@@ -1044,7 +1035,7 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
     builder.finish_node(); // Close nested LIST
 
     // Push container for the outer list item
-    let content_col = indent_cols + marker_len + spaces_after_cols;
+    let content_col = item.indent_cols + item.marker_len + item.spaces_after_cols;
     containers.push(Container::ListItem {
         content_col,
         buffer: ListItemBuffer::new(),
@@ -1052,30 +1043,16 @@ pub(in crate::parser) fn add_list_item_with_nested_empty_list(
 }
 
 /// Add a list item to the current list.
-#[allow(clippy::too_many_arguments)]
 pub(in crate::parser) fn add_list_item(
     containers: &mut ContainerStack,
     builder: &mut GreenNodeBuilder<'static>,
-    content: &str,
-    marker_len: usize,
-    spaces_after_cols: usize,
-    spaces_after_bytes: usize,
-    indent_cols: usize,
-    indent_bytes: usize,
+    item: &ListItemEmissionInput<'_>,
 ) {
-    let (content_col, text_to_buffer) = emit_list_item(
-        builder,
-        content,
-        marker_len,
-        spaces_after_cols,
-        spaces_after_bytes,
-        indent_cols,
-        indent_bytes,
-    );
+    let (content_col, text_to_buffer) = emit_list_item(builder, item);
 
     log::debug!(
         "add_list_item: content={:?}, text_to_buffer={:?}",
-        content,
+        item.content,
         text_to_buffer
     );
 

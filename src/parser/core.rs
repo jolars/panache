@@ -24,7 +24,10 @@ use super::utils::continuation::ContinuationPolicy;
 use container_stack::{Container, ContainerStack, byte_index_at_column, leading_indent};
 use definition_lists::{emit_definition_marker, emit_term};
 use line_blocks::{parse_line_block, try_parse_line_block_start};
-use lists::{is_content_nested_bullet_marker, start_nested_list, try_parse_list_marker};
+use lists::{
+    ListItemEmissionInput, is_content_nested_bullet_marker, start_nested_list,
+    try_parse_list_marker,
+};
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
 use text_buffer::TextBuffer;
 
@@ -404,6 +407,14 @@ impl<'a> Parser<'a> {
             &prepared.marker,
             prepared.indent_cols,
         );
+        let list_item = ListItemEmissionInput {
+            content,
+            marker_len: prepared.marker_len,
+            spaces_after_cols: prepared.spaces_after_cols,
+            spaces_after_bytes: prepared.spaces_after,
+            indent_cols: prepared.indent_cols,
+            indent_bytes: prepared.indent_bytes,
+        };
         let current_content_col = paragraphs::current_content_col(&self.containers);
 
         if current_content_col > 0 && prepared.indent_cols >= current_content_col {
@@ -437,25 +448,11 @@ impl<'a> Parser<'a> {
                         lists::add_list_item_with_nested_empty_list(
                             &mut self.containers,
                             &mut self.builder,
-                            content,
-                            prepared.marker_len,
-                            prepared.spaces_after_cols,
-                            prepared.spaces_after,
-                            prepared.indent_cols,
-                            prepared.indent_bytes,
+                            &list_item,
                             nested_marker,
                         );
                     } else {
-                        lists::add_list_item(
-                            &mut self.containers,
-                            &mut self.builder,
-                            content,
-                            prepared.marker_len,
-                            prepared.spaces_after_cols,
-                            prepared.spaces_after,
-                            prepared.indent_cols,
-                            prepared.indent_bytes,
-                        );
+                        lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
                     }
                     return;
                 }
@@ -466,13 +463,8 @@ impl<'a> Parser<'a> {
             start_nested_list(
                 &mut self.containers,
                 &mut self.builder,
-                content,
                 &prepared.marker,
-                prepared.marker_len,
-                prepared.spaces_after_cols,
-                prepared.spaces_after,
-                prepared.indent_cols,
-                prepared.indent_bytes,
+                &list_item,
                 indent_to_emit,
             );
             return;
@@ -497,25 +489,11 @@ impl<'a> Parser<'a> {
                 lists::add_list_item_with_nested_empty_list(
                     &mut self.containers,
                     &mut self.builder,
-                    content,
-                    prepared.marker_len,
-                    prepared.spaces_after_cols,
-                    prepared.spaces_after,
-                    prepared.indent_cols,
-                    prepared.indent_bytes,
+                    &list_item,
                     nested_marker,
                 );
             } else {
-                lists::add_list_item(
-                    &mut self.containers,
-                    &mut self.builder,
-                    content,
-                    prepared.marker_len,
-                    prepared.spaces_after_cols,
-                    prepared.spaces_after,
-                    prepared.indent_cols,
-                    prepared.indent_bytes,
-                );
+                lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
             }
             return;
         }
@@ -545,25 +523,11 @@ impl<'a> Parser<'a> {
             lists::add_list_item_with_nested_empty_list(
                 &mut self.containers,
                 &mut self.builder,
-                content,
-                prepared.marker_len,
-                prepared.spaces_after_cols,
-                prepared.spaces_after,
-                prepared.indent_cols,
-                prepared.indent_bytes,
+                &list_item,
                 nested_marker,
             );
         } else {
-            lists::add_list_item(
-                &mut self.containers,
-                &mut self.builder,
-                content,
-                prepared.marker_len,
-                prepared.spaces_after_cols,
-                prepared.spaces_after,
-                prepared.indent_cols,
-                prepared.indent_bytes,
-            );
+            lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
         }
     }
 
@@ -1176,27 +1140,33 @@ impl<'a> Parser<'a> {
                             marker_match.marker_len,
                             marker_match.spaces_after_bytes,
                         ) {
+                            let list_item = ListItemEmissionInput {
+                                content: line,
+                                marker_len: marker_match.marker_len,
+                                spaces_after_cols: marker_match.spaces_after_cols,
+                                spaces_after_bytes: marker_match.spaces_after_bytes,
+                                indent_cols,
+                                indent_bytes,
+                            };
                             lists::add_list_item_with_nested_empty_list(
                                 &mut self.containers,
                                 &mut self.builder,
-                                line,
-                                marker_match.marker_len,
-                                marker_match.spaces_after_cols,
-                                marker_match.spaces_after_bytes,
-                                indent_cols,
-                                indent_bytes,
+                                &list_item,
                                 nested_marker,
                             );
                         } else {
+                            let list_item = ListItemEmissionInput {
+                                content: line,
+                                marker_len: marker_match.marker_len,
+                                spaces_after_cols: marker_match.spaces_after_cols,
+                                spaces_after_bytes: marker_match.spaces_after_bytes,
+                                indent_cols,
+                                indent_bytes,
+                            };
                             lists::add_list_item(
                                 &mut self.containers,
                                 &mut self.builder,
-                                line,
-                                marker_match.marker_len,
-                                marker_match.spaces_after_cols,
-                                marker_match.spaces_after_bytes,
-                                indent_cols,
-                                indent_bytes,
+                                &list_item,
                             );
                         }
                         self.pos += 1;
@@ -1341,28 +1311,30 @@ impl<'a> Parser<'a> {
                         marker_match.marker_len,
                         marker_match.spaces_after_bytes,
                     ) {
+                        let list_item = ListItemEmissionInput {
+                            content: line,
+                            marker_len: marker_match.marker_len,
+                            spaces_after_cols: marker_match.spaces_after_cols,
+                            spaces_after_bytes: marker_match.spaces_after_bytes,
+                            indent_cols,
+                            indent_bytes,
+                        };
                         lists::add_list_item_with_nested_empty_list(
                             &mut self.containers,
                             &mut self.builder,
-                            line,
-                            marker_match.marker_len,
-                            marker_match.spaces_after_cols,
-                            marker_match.spaces_after_bytes,
-                            indent_cols,
-                            indent_bytes,
+                            &list_item,
                             nested_marker,
                         );
                     } else {
-                        lists::add_list_item(
-                            &mut self.containers,
-                            &mut self.builder,
-                            line,
-                            marker_match.marker_len,
-                            marker_match.spaces_after_cols,
-                            marker_match.spaces_after_bytes,
+                        let list_item = ListItemEmissionInput {
+                            content: line,
+                            marker_len: marker_match.marker_len,
+                            spaces_after_cols: marker_match.spaces_after_cols,
+                            spaces_after_bytes: marker_match.spaces_after_bytes,
                             indent_cols,
                             indent_bytes,
-                        );
+                        };
+                        lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
                     }
                     self.pos += 1;
                     return true;

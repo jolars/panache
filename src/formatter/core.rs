@@ -309,7 +309,6 @@ impl Formatter {
     }
 
     // The large format_node_sync method - keeping it here for now, can extract later
-    #[allow(clippy::too_many_lines)]
     pub(super) fn format_node_sync(&mut self, node: &SyntaxNode, indent: usize) {
         // Check if formatting is ignored - if so, preserve content exactly
         // Exception: Always process DOCUMENT, COMMENT, and HTML_BLOCK nodes (may contain directives)

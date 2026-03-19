@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use tower_lsp_server::Client;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::{
-    Location, Position, Range, SymbolInformation, SymbolKind, Uri, WorkspaceSymbolParams,
+    Location, OneOf, Position, Range, SymbolKind, Uri, WorkspaceSymbol, WorkspaceSymbolParams,
     WorkspaceSymbolResponse,
 };
 
@@ -99,18 +99,18 @@ pub(crate) async fn workspace_symbol(
         symbols.extend(symbols_for_document(&uri, &content, &outline, &query));
     }
 
-    symbols.sort_by(compare_symbol_information);
+    symbols.sort_by(compare_workspace_symbol);
     symbols.dedup_by(|a, b| {
         a.name == b.name
             && a.kind == b.kind
-            && a.location.uri == b.location.uri
-            && a.location.range == b.location.range
+            && workspace_symbol_uri(a) == workspace_symbol_uri(b)
+            && workspace_symbol_range(a) == workspace_symbol_range(b)
     });
 
     if symbols.is_empty() {
         Ok(None)
     } else {
-        Ok(Some(WorkspaceSymbolResponse::Flat(symbols)))
+        Ok(Some(WorkspaceSymbolResponse::Nested(symbols)))
     }
 }
 
@@ -146,7 +146,7 @@ fn symbols_for_document(
     content: &str,
     outline: &[HeadingOutlineEntry],
     query: &str,
-) -> Vec<SymbolInformation> {
+) -> Vec<WorkspaceSymbol> {
     let mut symbols = Vec::new();
     let mut heading_stack: Vec<(usize, String)> = Vec::new();
 
@@ -165,7 +165,7 @@ fn symbols_for_document(
             continue;
         }
 
-        symbols.push(make_symbol_information(
+        symbols.push(make_workspace_symbol(
             entry.title.clone(),
             SymbolKind::NAMESPACE,
             Location {
@@ -179,20 +179,19 @@ fn symbols_for_document(
     symbols
 }
 
-#[allow(deprecated)]
-fn make_symbol_information(
+fn make_workspace_symbol(
     name: String,
     kind: SymbolKind,
     location: Location,
     container_name: Option<String>,
-) -> SymbolInformation {
-    SymbolInformation {
+) -> WorkspaceSymbol {
+    WorkspaceSymbol {
         name,
         kind,
         tags: None,
-        deprecated: None,
-        location,
         container_name,
+        location: OneOf::Left(location),
+        data: None,
     }
 }
 
@@ -203,22 +202,57 @@ fn range_from_text_range(content: &str, range: rowan::TextRange) -> Range {
     }
 }
 
-fn compare_symbol_information(a: &SymbolInformation, b: &SymbolInformation) -> std::cmp::Ordering {
-    compare_locations(&a.location, &b.location)
+fn compare_workspace_symbol(a: &WorkspaceSymbol, b: &WorkspaceSymbol) -> std::cmp::Ordering {
+    compare_locations(workspace_symbol_location(a), workspace_symbol_location(b))
         .then(a.name.cmp(&b.name))
         .then(a.container_name.cmp(&b.container_name))
 }
 
-fn compare_locations(a: &Location, b: &Location) -> std::cmp::Ordering {
-    a.uri
-        .as_str()
-        .cmp(b.uri.as_str())
-        .then(compare_positions(&a.range.start, &b.range.start))
-        .then(compare_positions(&a.range.end, &b.range.end))
+fn workspace_symbol_location(symbol: &WorkspaceSymbol) -> Option<&Location> {
+    match &symbol.location {
+        OneOf::Left(location) => Some(location),
+        OneOf::Right(_) => None,
+    }
 }
 
-fn compare_positions(a: &Position, b: &Position) -> std::cmp::Ordering {
-    a.line.cmp(&b.line).then(a.character.cmp(&b.character))
+fn workspace_symbol_uri(symbol: &WorkspaceSymbol) -> &Uri {
+    match &symbol.location {
+        OneOf::Left(location) => &location.uri,
+        OneOf::Right(location) => &location.uri,
+    }
+}
+
+fn workspace_symbol_range(symbol: &WorkspaceSymbol) -> Option<&Range> {
+    workspace_symbol_location(symbol).map(|location| &location.range)
+}
+
+fn compare_locations(a: Option<&Location>, b: Option<&Location>) -> std::cmp::Ordering {
+    let a_uri = a.map(|location| location.uri.as_str()).unwrap_or("");
+    let b_uri = b.map(|location| location.uri.as_str()).unwrap_or("");
+
+    a_uri
+        .cmp(b_uri)
+        .then_with(|| {
+            compare_positions(
+                a.map(|location| &location.range.start),
+                b.map(|location| &location.range.start),
+            )
+        })
+        .then_with(|| {
+            compare_positions(
+                a.map(|location| &location.range.end),
+                b.map(|location| &location.range.end),
+            )
+        })
+}
+
+fn compare_positions(a: Option<&Position>, b: Option<&Position>) -> std::cmp::Ordering {
+    match (a, b) {
+        (Some(a), Some(b)) => a.line.cmp(&b.line).then(a.character.cmp(&b.character)),
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (Some(_), None) => std::cmp::Ordering::Greater,
+        (None, None) => std::cmp::Ordering::Equal,
+    }
 }
 
 #[cfg(test)]

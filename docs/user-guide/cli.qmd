@@ -8,10 +8,7 @@ This document contains the help content for the `panache` command-line program.
 
 ## `panache`
 
-Panache is a CLI formatter and LSP for Quarto (.qmd), Pandoc, and Markdown files
-written in Rust. It understands Quarto/Pandoc-specific syntax that other
-formatters like Prettier and mdformat struggle with, including fenced divs,
-tables, and math formatting.
+Panache is a CLI formatter and LSP for Quarto (.qmd), Pandoc, and Markdown files written in Rust. It understands Quarto/Pandoc-specific syntax that other formatters like Prettier and mdformat struggle with, including fenced divs, tables, and math formatting.
 
 **Usage:** `panache [OPTIONS] <COMMAND>`
 
@@ -19,127 +16,89 @@ For help with a specific command, see: `panache help <command>`.
 
 ###### **Subcommands:**
 
-- `format` — Format a Quarto, Pandoc, or Markdown document
-- `parse` — Parse and display the CST tree for debugging
-- `lsp` — Start the Language Server Protocol server
-- `lint` — Lint a Quarto, Pandoc, or Markdown document
-- `debug` — Debug utilities for parser/formatter diagnostics
+* `format` — Format a Quarto, Pandoc, or Markdown document
+* `parse` — Parse and display the CST tree for debugging
+* `lsp` — Start the Language Server Protocol server
+* `lint` — Lint a Quarto, Pandoc, or Markdown document
+* `debug` — Debug utilities for parser/formatter diagnostics
 
 ###### **Options:**
 
-- `--config <CONFIG>` — Path to a custom configuration file. If not specified,
-  panache will search for .panache.toml or panache.toml in the current directory
-  and its parents, then fall back to \~/.config/panache/config.toml.
-
-- `--stdin-filename <PATH>` — Synthetic filename to associate with stdin input.
-  This is useful for editor integrations that pipe content via stdin but still
-  need panache to infer flavor/extensions from file extension (for example:
-  --stdin-filename doc.qmd).
-
-- `--color <WHEN>` — Control when colored output is used
+* `--config <CONFIG>` — Path to a custom configuration file. If not specified, panache will search for .panache.toml or panache.toml in the current directory and its parents, then fall back to ~/.config/panache/config.toml.
+* `--stdin-filename <PATH>` — Synthetic filename to associate with stdin input. This is useful for editor integrations that pipe content via stdin but still need panache to infer flavor/extensions from file extension (for example: --stdin-filename doc.qmd).
+* `--color <WHEN>` — Control when colored output is used
 
   Default value: `auto`
 
   Possible values: `auto`, `always`, `never`
 
-- `--no-color` — Disable colored output (equivalent to --color never)
+* `--no-color` — Disable colored output (equivalent to --color never)
+* `--isolated` — Ignore all discovered configuration files
 
-- `--isolated` — Ignore all discovered configuration files
+
 
 ## `panache format`
 
-Format a Quarto, Pandoc, or R Markdown document according to Panache's
-formatting rules. By default, formats files in place. Use --check to verify
-formatting without making changes. With --verify, panache runs parser/formatter
-invariants without writing changes to disk. Stdin input always outputs to
-stdout.
+Format a Quarto, Pandoc, or R Markdown document according to Panache's formatting rules. By default, formats files in place. Use --check to verify formatting without making changes. With --verify, panache runs parser/formatter invariants without writing changes to disk. Stdin input always outputs to stdout.
 
 **Usage:** `panache format [OPTIONS] [FILES]...`
 
 ###### **Arguments:**
 
-- `<FILES>` — Path(s) to the input file(s) or directories to format. If not
-  provided, reads from stdin. Supports .qmd, .md, .Rmd, and other Markdown-based
-  formats. When file paths are provided, the files are formatted in place by
-  default. Stdin input always outputs to stdout. Supports glob patterns (e.g.,
-  \*.md) and directories (e.g., . or docs/). Directories are traversed
-  recursively, respecting .gitignore files.
+* `<FILES>` — Path(s) to the input file(s) or directories to format. If not provided, reads from stdin. Supports .qmd, .md, .Rmd, and other Markdown-based formats. When file paths are provided, the files are formatted in place by default. Stdin input always outputs to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
 
 ###### **Options:**
 
-- `--check` — Check if the file is already formatted according to panache's
-  rules without making any changes. If the file is not formatted, displays a
-  diff and exits with code 1. If formatted, exits with code 0. Useful for CI/CD
-  pipelines.
-- `--range <START:END>` — Format only the specified line range. Lines are
-  1-indexed and inclusive. The range will be expanded to complete block
-  boundaries to ensure well-formed output. For example, if you select part of a
-  list, the entire list will be formatted. Format: --range START:END (e.g.,
-  --range 5:10 formats lines 5 through 10).
+* `--check` — Check if the file is already formatted according to panache's rules without making any changes. If the file is not formatted, displays a diff and exits with code 1. If formatted, exits with code 0. Useful for CI/CD pipelines.
+* `--range <START:END>` — Format only the specified line range. Lines are 1-indexed and inclusive. The range will be expanded to complete block boundaries to ensure well-formed output. For example, if you select part of a list, the entire list will be formatted. Format: --range START:END (e.g., --range 5:10 formats lines 5 through 10). 
 
-  Note: This feature is experimental. Range filtering may not work correctly in
-  all cases.
-- `--verify` — Run smoke-check invariants: (1) parser losslessness (input ==
-  parsed CST text) and (2) formatter idempotency (format(format(x)) ==
-  format(x)). When formatting files by path (including directories), --verify
-  does not write any changes to disk. Exits with code 1 when verification fails.
+   Note: This feature is experimental. Range filtering may not work correctly in all cases.
+* `--verify` — Run smoke-check invariants: (1) parser losslessness (input == parsed CST text) and (2) formatter idempotency (format(format(x)) == format(x)). When formatting files by path (including directories), --verify does not write any changes to disk. Exits with code 1 when verification fails. 
 
-  Deprecated: prefer `panache debug format --checks all`.
-- `--force-exclude` — Apply exclude patterns to explicitly provided files
+   Deprecated: prefer `panache debug format --checks all`.
+* `--force-exclude` — Apply exclude patterns to explicitly provided files
+
+
 
 ## `panache parse`
 
-Parse a document and display its Concrete Syntax Tree (CST) for debugging and
-understanding how panache interprets the document structure. The CST shows all
-block and inline elements detected by the parser.
+Parse a document and display its Concrete Syntax Tree (CST) for debugging and understanding how panache interprets the document structure. The CST shows all block and inline elements detected by the parser.
 
 **Usage:** `panache parse [OPTIONS] [FILE]`
 
 ###### **Arguments:**
 
-- `<FILE>` — Path to the input file to parse. If not provided, reads from stdin.
-  The parser respects extension flags from the configuration file.
+* `<FILE>` — Path to the input file to parse. If not provided, reads from stdin. The parser respects extension flags from the configuration file.
 
 ###### **Options:**
 
-- `--json <PATH>` — Write the parsed CST to the given JSON file instead of
-  printing the debug tree. The output includes node kinds, text ranges, and
-  token text.
-- `--quiet` — Suppress CST output to stdout. Useful with --verify for
-  smoke-testing large files without terminal spam. Verification failures still
-  print diagnostics and exit non-zero.
-- `--verify` — Run parser losslessness verification (input == parsed CST text).
-  Exits with code 1 when verification fails.
+* `--json <PATH>` — Write the parsed CST to the given JSON file instead of printing the debug tree. The output includes node kinds, text ranges, and token text.
+* `--quiet` — Suppress CST output to stdout. Useful with --verify for smoke-testing large files without terminal spam. Verification failures still print diagnostics and exit non-zero.
+* `--verify` — Run parser losslessness verification (input == parsed CST text). Exits with code 1 when verification fails. 
 
-  Deprecated: prefer `panache debug format --checks losslessness`.
+   Deprecated: prefer `panache debug format --checks losslessness`.
+
+
 
 ## `panache lsp`
 
-Start the panache Language Server Protocol (LSP) server for editor integration.
-The LSP server provides formatting capabilities to editors like VS Code, Neovim,
-and others that support LSP.
+Start the panache Language Server Protocol (LSP) server for editor integration. The LSP server provides formatting capabilities to editors like VS Code, Neovim, and others that support LSP.
 
 **Usage:** `panache lsp [OPTIONS]`
 
-The LSP server communicates via stdin/stdout and is typically launched
-automatically by your editor's LSP client. You generally don't need to run this
-command manually.
+The LSP server communicates via stdin/stdout and is typically launched automatically by your editor's LSP client. You generally don't need to run this command manually.
 
-For editor configuration examples, see:
-https://github.com/jolars/panache#editor-integration
+For editor configuration examples, see: https://github.com/jolars/panache#editor-integration
 
 ###### **Options:**
 
-- `--debug` — Enable verbose LSP debug logging to
-  \~/.local/state/panache/lsp-debug.log (or
-  $XDG_STATE_HOME/panache/lsp-debug.log when XDG_STATE_HOME is set). Logs are
-  written to file to avoid interfering with the LSP protocol over stdout.
+* `--debug` — Enable verbose LSP debug logging to ~/.local/state/panache/lsp-debug.log (or $XDG_STATE_HOME/panache/lsp-debug.log when XDG_STATE_HOME is set). Logs are written to file to avoid interfering with the LSP protocol over stdout.
+
+
 
 ## `panache lint`
 
-Lint a document to check for correctness issues and best practice violations.
-Unlike the formatter which handles style, the linter catches semantic problems
-like syntax errors, heading hierarchy issues, and broken references.
+Lint a document to check for correctness issues and best practice violations. Unlike the formatter which handles style, the linter catches semantic problems like syntax errors, heading hierarchy issues, and broken references.
 
 **Usage:** `panache lint [OPTIONS] [FILES]...`
 
@@ -147,36 +106,33 @@ Configure rules in panache.toml with [lint] section.
 
 ###### **Arguments:**
 
-- `<FILES>` — Path(s) to the input file(s) or directories to check. If not
-  provided, reads from stdin. Supports .qmd, .md, .Rmd, and other Markdown-based
-  formats. Supports glob patterns (e.g., \*.md) and directories (e.g., . or
-  docs/). Directories are traversed recursively, respecting .gitignore files.
+* `<FILES>` — Path(s) to the input file(s) or directories to check. If not provided, reads from stdin. Supports .qmd, .md, .Rmd, and other Markdown-based formats. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
 
 ###### **Options:**
 
-- `--check` — Exit with code 1 if violations found (CI mode)
-
-- `--fix` — Automatically fix violations where possible
-
-- `--message-format <MESSAGE_FORMAT>` — Diagnostic rendering format
+* `--check` — Exit with code 1 if violations found (CI mode)
+* `--fix` — Automatically fix violations where possible
+* `--message-format <MESSAGE_FORMAT>` — Diagnostic rendering format
 
   Default value: `human`
 
   Possible values: `human`, `short`
 
-- `--force-exclude` — Apply exclude patterns to explicitly provided files
+* `--force-exclude` — Apply exclude patterns to explicitly provided files
+
+
 
 ## `panache debug`
 
-Debugging utilities for parse/format workflows. These commands are intended for
-diagnosing parser losslessness and formatter idempotency failures in
-repositories.
+Debugging utilities for parse/format workflows. These commands are intended for diagnosing parser losslessness and formatter idempotency failures in repositories.
 
 **Usage:** `panache debug <COMMAND>`
 
 ###### **Subcommands:**
 
-- `format` — Run parser+formatter checks and emit diagnostics
+* `format` — Run parser+formatter checks and emit diagnostics
+
+
 
 ## `panache debug format`
 
@@ -186,18 +142,19 @@ Run parser+formatter checks and emit diagnostics
 
 ###### **Arguments:**
 
-- `<FILES>` — Input file path(s) or directories
+* `<FILES>` — Input file path(s) or directories
 
 ###### **Options:**
 
-- `--checks <CHECKS>` — Which checks to run
+* `--checks <CHECKS>` — Which checks to run
 
   Default value: `all`
 
   Possible values: `idempotency`, `losslessness`, `all`
 
-- `--json` — Emit JSON output for machine-readable tooling
+* `--json` — Emit JSON output for machine-readable tooling
+* `--dump-dir <DIR>` — Directory where failing artifacts are written
+* `--force-exclude` — Apply exclude patterns to explicitly provided files
 
-- `--dump-dir <DIR>` — Directory where failing artifacts are written
 
-- `--force-exclude` — Apply exclude patterns to explicitly provided files
+
