@@ -58,7 +58,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Install Rust
+      - name: Lint with Panache
         uses: jolars/panache-action@v1
         with:
           path: docs/
