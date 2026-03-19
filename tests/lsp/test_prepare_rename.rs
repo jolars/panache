@@ -46,3 +46,26 @@ async fn test_prepare_rename_heading_hash_link_selects_anchor_without_hash() {
     assert_eq!(range.end.line, 2);
     assert_eq!(range.end.character, 20);
 }
+
+#[tokio::test]
+async fn test_prepare_rename_inline_chunk_label_selects_full_hyphenated_label() {
+    let server = TestLspServer::new();
+    let content = "```{r}\n#| label: my-label\n1 + 1\n```\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let response = server
+        .prepare_rename("file:///test.qmd", 1, 12)
+        .await
+        .expect("prepare rename response");
+
+    let PrepareRenameResponse::Range(range) = response else {
+        panic!("expected prepare rename range");
+    };
+
+    assert_eq!(range.start.line, 1);
+    assert_eq!(range.start.character, 10);
+    assert_eq!(range.end.line, 1);
+    assert_eq!(range.end.character, 18);
+}

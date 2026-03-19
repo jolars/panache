@@ -8,8 +8,8 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkOption, Citation, Crossref, Link, ParsedYamlRegionSnapshot,
-    SyntaxKind, SyntaxNode,
+    AstNode, AttributeNode, ChunkLabel, ChunkOption, Citation, Crossref, Link,
+    ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
 };
 use crate::utils::normalize_label;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -252,6 +252,10 @@ pub(crate) fn extract_crossref_key(node: &SyntaxNode) -> Option<String> {
 }
 
 pub(crate) fn extract_chunk_label_key(node: &SyntaxNode) -> Option<String> {
+    if let Some(label) = ChunkLabel::cast(node.clone()) {
+        return Some(label.text());
+    }
+
     if let Some(option) = ChunkOption::cast(node.clone())
         && let (Some(key), Some(value)) = (option.key(), option.value())
         && key.eq_ignore_ascii_case("label")
@@ -261,6 +265,10 @@ pub(crate) fn extract_chunk_label_key(node: &SyntaxNode) -> Option<String> {
 
     let mut current = node.clone();
     while let Some(parent) = current.parent() {
+        if let Some(label) = ChunkLabel::cast(parent.clone()) {
+            return Some(label.text());
+        }
+
         if let Some(option) = ChunkOption::cast(parent.clone())
             && let (Some(key), Some(value)) = (option.key(), option.value())
             && key.eq_ignore_ascii_case("label")
@@ -344,6 +352,9 @@ pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> 
             .is_some_and(|key| key.eq_ignore_ascii_case("label"))
     {
         return option.value_range();
+    }
+    if let Some(label) = ChunkLabel::cast(node.clone()) {
+        return Some(label.syntax().text_range());
     }
     if let Some(attribute) = AttributeNode::cast(node.clone())
         && attribute.id().is_some()
