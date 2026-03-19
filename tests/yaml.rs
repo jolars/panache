@@ -1,5 +1,5 @@
 use panache::parser::yaml::{
-    ShadowYamlOptions, ShadowYamlOutcome, parse_basic_entry, parse_shadow,
+    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_basic_entry, parse_shadow,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,6 +21,18 @@ fn read_lines(path: &Path) -> Vec<String> {
 
 fn fixture_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURE_DIR)
+}
+
+fn render_shadow_report(label: &str, report: &panache::parser::yaml::ShadowYamlReport) -> String {
+    format!(
+        "{label}\noutcome={:?}\nreason={}\nkind={:?}\nbytes={}\nlines={}\nnormalized={:?}\n",
+        report.outcome,
+        report.shadow_reason,
+        report.input_kind,
+        report.input_len_bytes,
+        report.line_count,
+        report.normalized_input
+    )
 }
 
 #[test]
@@ -71,8 +83,105 @@ fn yaml_allowlist_cases_snapshot() {
 fn yaml_shadow_defaults_to_noop_and_does_not_replace_pipeline() {
     let report = parse_shadow("title: Shadow", ShadowYamlOptions::default());
     assert_eq!(report.outcome, ShadowYamlOutcome::SkippedDisabled);
+    assert_eq!(report.shadow_reason, "shadow-disabled");
     assert!(report.normalized_input.is_none());
 
     let parsed = parse_basic_entry("title: Shadow");
     assert!(parsed.is_some());
+}
+
+#[test]
+fn yaml_shadow_report_snapshot_shape() {
+    let disabled = parse_shadow("title: Snapshot", ShadowYamlOptions::default());
+    let enabled_plain = parse_shadow(
+        "title: Snapshot",
+        ShadowYamlOptions {
+            enabled: true,
+            input_kind: YamlInputKind::Plain,
+        },
+    );
+    let enabled_hashpipe = parse_shadow(
+        "#| title: Snapshot",
+        ShadowYamlOptions {
+            enabled: true,
+            input_kind: YamlInputKind::Hashpipe,
+        },
+    );
+
+    let snapshot = [
+        render_shadow_report("[disabled]", &disabled),
+        render_shadow_report("[enabled-plain]", &enabled_plain),
+        render_shadow_report("[enabled-hashpipe]", &enabled_hashpipe),
+    ]
+    .join("\n");
+
+    let expected = "[disabled]
+outcome=SkippedDisabled
+reason=shadow-disabled
+kind=Plain
+bytes=15
+lines=1
+normalized=None
+
+[enabled-plain]
+outcome=PrototypeParsed
+reason=prototype-basic-entry-parsed
+kind=Plain
+bytes=15
+lines=1
+normalized=Some(\"title: Snapshot\")
+
+[enabled-hashpipe]
+outcome=PrototypeParsed
+reason=prototype-basic-entry-parsed
+kind=Hashpipe
+bytes=18
+lines=1
+normalized=Some(\"title: Snapshot\")
+";
+
+    assert_eq!(snapshot, expected);
+}
+
+#[test]
+fn yaml_shadow_report_snapshot_multiline_crlf_shape() {
+    let plain_multiline = parse_shadow(
+        "title: Snapshot\r\nauthor: Me\r\n",
+        ShadowYamlOptions {
+            enabled: true,
+            input_kind: YamlInputKind::Plain,
+        },
+    );
+    let hashpipe_multiline = parse_shadow(
+        "#| title: Snapshot\r\n#| author: Me\r\n",
+        ShadowYamlOptions {
+            enabled: true,
+            input_kind: YamlInputKind::Hashpipe,
+        },
+    );
+
+    let snapshot = [
+        render_shadow_report("[enabled-plain-crlf-multiline]", &plain_multiline),
+        render_shadow_report("[enabled-hashpipe-crlf-multiline]", &hashpipe_multiline),
+    ]
+    .join("\n");
+
+    let expected = "[enabled-plain-crlf-multiline]
+outcome=PrototypeRejected
+reason=prototype-basic-entry-rejected
+kind=Plain
+bytes=29
+lines=2
+normalized=Some(\"title: Snapshot\\r\\nauthor: Me\\r\\n\")
+
+[enabled-hashpipe-crlf-multiline]
+outcome=PrototypeRejected
+reason=prototype-basic-entry-rejected
+kind=Hashpipe
+bytes=35
+lines=2
+normalized=Some(\"title: Snapshot\\nauthor: Me\")
+";
+
+    assert_eq!(snapshot, expected);
 }

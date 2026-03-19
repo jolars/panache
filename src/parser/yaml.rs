@@ -43,6 +43,7 @@ pub enum ShadowYamlOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShadowYamlReport {
     pub outcome: ShadowYamlOutcome,
+    pub shadow_reason: &'static str,
     pub input_kind: YamlInputKind,
     pub input_len_bytes: usize,
     pub line_count: usize,
@@ -65,6 +66,7 @@ pub fn parse_shadow(input: &str, options: ShadowYamlOptions) -> ShadowYamlReport
     if !options.enabled {
         return ShadowYamlReport {
             outcome: ShadowYamlOutcome::SkippedDisabled,
+            shadow_reason: "shadow-disabled",
             input_kind: options.input_kind,
             input_len_bytes: input.len(),
             line_count,
@@ -85,6 +87,11 @@ pub fn parse_shadow(input: &str, options: ShadowYamlOptions) -> ShadowYamlReport
             ShadowYamlOutcome::PrototypeParsed
         } else {
             ShadowYamlOutcome::PrototypeRejected
+        },
+        shadow_reason: if parsed {
+            "prototype-basic-entry-parsed"
+        } else {
+            "prototype-basic-entry-rejected"
         },
         input_kind: options.input_kind,
         input_len_bytes: input.len(),
@@ -218,6 +225,7 @@ mod tests {
     fn shadow_parse_is_disabled_by_default() {
         let report = parse_shadow("title: My Title", ShadowYamlOptions::default());
         assert_eq!(report.outcome, ShadowYamlOutcome::SkippedDisabled);
+        assert_eq!(report.shadow_reason, "shadow-disabled");
         assert_eq!(report.normalized_input, None);
     }
 
@@ -231,6 +239,7 @@ mod tests {
             },
         );
         assert_eq!(report.outcome, ShadowYamlOutcome::SkippedDisabled);
+        assert_eq!(report.shadow_reason, "shadow-disabled");
     }
 
     #[test]
@@ -243,6 +252,7 @@ mod tests {
             },
         );
         assert_eq!(report.outcome, ShadowYamlOutcome::PrototypeParsed);
+        assert_eq!(report.shadow_reason, "prototype-basic-entry-parsed");
         assert_eq!(report.normalized_input.as_deref(), Some("title: My Title"));
     }
 
@@ -256,6 +266,7 @@ mod tests {
             },
         );
         assert_eq!(report.outcome, ShadowYamlOutcome::PrototypeRejected);
+        assert_eq!(report.shadow_reason, "prototype-basic-entry-rejected");
     }
 
     #[test]
@@ -268,6 +279,7 @@ mod tests {
             },
         );
         assert_eq!(report.outcome, ShadowYamlOutcome::PrototypeParsed);
+        assert_eq!(report.shadow_reason, "prototype-basic-entry-parsed");
         assert_eq!(report.normalized_input.as_deref(), Some("title: My Title"));
     }
 }
