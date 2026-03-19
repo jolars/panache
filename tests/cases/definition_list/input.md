@@ -78,3 +78,13 @@ Term
 :  The following is also not a continuation.
 
    A paragraph.
+
+Output
+:   ```markdown
+    ---
+    echo: false
+    list:
+      - a
+      - b
+    ---
+    ```

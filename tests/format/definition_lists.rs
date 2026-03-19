@@ -51,3 +51,12 @@ fn definition_list_fenced_code_info_has_no_space_after_fence() {
     assert!(output.contains("# Heading 1\n\n    # Heading 2"));
     assert!(!output.contains("# Heading 1\n    \n    # Heading 2"));
 }
+
+#[test]
+fn definition_list_fenced_code_preserves_yaml_nested_list_indent() {
+    let input = "Output\n:   ```markdown\n    ---\n    echo: false\n    list:\n      - a\n      - b\n    ---\n    ```\n";
+    let output = format(input, None, None);
+
+    assert!(output.contains("list:\n      - a\n      - b"));
+    assert!(!output.contains("list:\n    - a\n    - b"));
+}

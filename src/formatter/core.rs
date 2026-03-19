@@ -1389,6 +1389,57 @@ impl Formatter {
                             match n.kind() {
                                 SyntaxKind::CODE_BLOCK => {
                                     if self.output.ends_with(":   ") {
+                                        let leading_indent_columns = |line: &str| -> usize {
+                                            let mut cols = 0usize;
+                                            for ch in line.chars() {
+                                                match ch {
+                                                    ' ' => cols += 1,
+                                                    '\t' => cols += 4 - (cols % 4),
+                                                    _ => break,
+                                                }
+                                            }
+                                            cols
+                                        };
+
+                                        let strip_leading_columns =
+                                            |line: &str, columns: usize| -> String {
+                                                let mut cols = 0usize;
+                                                let mut idx = 0usize;
+
+                                                for (byte_idx, ch) in line.char_indices() {
+                                                    if cols >= columns {
+                                                        idx = byte_idx;
+                                                        break;
+                                                    }
+
+                                                    match ch {
+                                                        ' ' => {
+                                                            cols += 1;
+                                                            idx = byte_idx + ch.len_utf8();
+                                                        }
+                                                        '\t' => {
+                                                            cols += 4 - (cols % 4);
+                                                            idx = byte_idx + ch.len_utf8();
+                                                        }
+                                                        _ => {
+                                                            idx = byte_idx;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+
+                                                if cols >= columns {
+                                                    line[idx..].to_string()
+                                                } else if line
+                                                    .chars()
+                                                    .all(|c| matches!(c, ' ' | '\t'))
+                                                {
+                                                    String::new()
+                                                } else {
+                                                    line.to_string()
+                                                }
+                                            };
+
                                         let saved_output = self.output.clone();
                                         self.output.clear();
                                         self.format_code_block(n);
@@ -1397,26 +1448,38 @@ impl Formatter {
 
                                         let mut lines = formatted.lines();
                                         if let Some(first_line) = lines.next() {
-                                            let trimmed = first_line.trim_start();
-                                            let rest = trimmed.to_string();
-                                            self.output.push_str(&rest);
+                                            self.output.push_str(first_line.trim_start());
                                             self.output.push('\n');
                                         }
                                         let mut lines_vec: Vec<&str> = lines.collect();
                                         if !lines_vec.is_empty() {
                                             // Remove trailing closing fence line to control its indent
                                             let closing = lines_vec.pop().unwrap();
+
+                                            let content_indent_cols = lines_vec
+                                                .iter()
+                                                .filter(|line| !line.trim().is_empty())
+                                                .map(|line| leading_indent_columns(line))
+                                                .min()
+                                                .unwrap_or(0);
+
                                             for line in &lines_vec {
                                                 if line.trim().is_empty() {
                                                     self.output.push('\n');
                                                     continue;
                                                 }
                                                 self.output.push_str(&" ".repeat(def_indent));
-                                                self.output.push_str(line.trim_start());
+                                                self.output.push_str(&strip_leading_columns(
+                                                    line,
+                                                    content_indent_cols,
+                                                ));
                                                 self.output.push('\n');
                                             }
                                             self.output.push_str(&" ".repeat(def_indent));
-                                            self.output.push_str(closing.trim_start());
+                                            self.output.push_str(&strip_leading_columns(
+                                                closing,
+                                                content_indent_cols,
+                                            ));
                                             self.output.push('\n');
                                         }
                                     } else {

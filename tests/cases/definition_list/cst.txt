@@ -1,4 +1,4 @@
-DOCUMENT@0..1430
+DOCUMENT@0..1524
   HEADING@0..19
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -327,4 +327,43 @@ DOCUMENT@0..1430
   PARAGRAPH@1414..1430
     TEXT@1414..1429 "   A paragraph."
     NEWLINE@1429..1430 "\n"
+  BLANK_LINE@1430..1431
+    BLANK_LINE@1430..1431 "\n"
+  DEFINITION_LIST@1431..1524
+    DEFINITION_ITEM@1431..1524
+      TERM@1431..1438
+        TEXT@1431..1437 "Output"
+        NEWLINE@1437..1438 "\n"
+      DEFINITION@1438..1524
+        DEFINITION_MARKER@1438..1439 ":"
+        WHITESPACE@1439..1442 "   "
+        CODE_BLOCK@1442..1524
+          CODE_FENCE_OPEN@1442..1454
+            CODE_FENCE_MARKER@1442..1445 "```"
+            CODE_INFO@1445..1453
+              CODE_LANGUAGE@1445..1453 "markdown"
+            NEWLINE@1453..1454 "\n"
+          CODE_CONTENT@1454..1516
+            WHITESPACE@1454..1458 "    "
+            TEXT@1458..1461 "---"
+            NEWLINE@1461..1462 "\n"
+            WHITESPACE@1462..1466 "    "
+            TEXT@1466..1477 "echo: false"
+            NEWLINE@1477..1478 "\n"
+            WHITESPACE@1478..1482 "    "
+            TEXT@1482..1487 "list:"
+            NEWLINE@1487..1488 "\n"
+            WHITESPACE@1488..1492 "    "
+            TEXT@1492..1497 "  - a"
+            NEWLINE@1497..1498 "\n"
+            WHITESPACE@1498..1502 "    "
+            TEXT@1502..1507 "  - b"
+            NEWLINE@1507..1508 "\n"
+            WHITESPACE@1508..1512 "    "
+            TEXT@1512..1515 "---"
+            NEWLINE@1515..1516 "\n"
+          WHITESPACE@1516..1520 "    "
+          CODE_FENCE_CLOSE@1520..1524
+            CODE_FENCE_MARKER@1520..1523 "```"
+            NEWLINE@1523..1524 "\n"
 
