@@ -1,4 +1,6 @@
-use panache::parser::yaml::parse_basic_entry;
+use panache::parser::yaml::{
+    ShadowYamlOptions, ShadowYamlOutcome, parse_basic_entry, parse_shadow,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -63,4 +65,14 @@ fn yaml_allowlist_cases_snapshot() {
 
         insta::assert_snapshot!(format!("yaml_suite_{}", case_id), snapshot);
     }
+}
+
+#[test]
+fn yaml_shadow_defaults_to_noop_and_does_not_replace_pipeline() {
+    let report = parse_shadow("title: Shadow", ShadowYamlOptions::default());
+    assert_eq!(report.outcome, ShadowYamlOutcome::SkippedDisabled);
+    assert!(report.normalized_input.is_none());
+
+    let parsed = parse_basic_entry("title: Shadow");
+    assert!(parsed.is_some());
 }
