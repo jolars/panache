@@ -65,3 +65,71 @@ include = ["*.qmd"]
         .success()
         .stdout(predicate::str::contains("files: 1"));
 }
+
+#[test]
+fn test_debug_format_dump_passes_requires_dump_dir() {
+    cargo_bin_cmd!("panache")
+        .args(["debug", "format", "--dump-passes"])
+        .write_stdin("# Heading\n\nParagraph.\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "Error: --dump-passes requires --dump-dir <DIR>",
+        ));
+}
+
+#[test]
+fn test_debug_format_dump_passes_writes_artifacts() {
+    let temp_dir = TempDir::new().unwrap();
+    let dump_dir = temp_dir.path().join("debug-artifacts");
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "debug",
+            "format",
+            "--checks",
+            "all",
+            "--dump-dir",
+            dump_dir.to_str().unwrap(),
+            "--dump-passes",
+        ])
+        .write_stdin("# Heading\n\nParagraph.\n")
+        .assert()
+        .success();
+
+    let entries = fs::read_dir(&dump_dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+
+    assert!(
+        entries
+            .iter()
+            .any(|name| name == "stdin.losslessness.input.txt"),
+        "missing losslessness input artifact"
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|name| name == "stdin.losslessness.parsed.txt"),
+        "missing losslessness parsed artifact"
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|name| name == "stdin.idempotency.input.txt"),
+        "missing idempotency input artifact"
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|name| name == "stdin.idempotency.once.txt"),
+        "missing idempotency first-pass artifact"
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|name| name == "stdin.idempotency.twice.txt"),
+        "missing idempotency second-pass artifact"
+    );
+}

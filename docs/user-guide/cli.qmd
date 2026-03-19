@@ -154,6 +154,7 @@ Run parser+formatter checks and emit diagnostics
 
 * `--json` — Emit JSON output for machine-readable tooling
 * `--dump-dir <DIR>` — Directory where failing artifacts are written
+* `--dump-passes` — Write input/parse/format pass artifacts to --dump-dir for every file
 * `--force-exclude` — Apply exclude patterns to explicitly provided files
 
 

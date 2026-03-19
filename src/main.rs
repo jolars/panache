@@ -347,29 +347,110 @@ fn sanitize_path_for_filename(path: &str) -> String {
         .collect()
 }
 
+struct DebugFailure {
+    kind: CheckKind,
+    left: String,
+    right: String,
+}
+
+#[derive(Default)]
+struct DebugRunArtifacts {
+    losslessness: Option<(String, String)>,
+    idempotency: Option<(String, String, String)>,
+    failures: Vec<DebugFailure>,
+}
+
+fn write_debug_artifacts(
+    dump_dir: &Path,
+    stem: &str,
+    artifacts: &DebugRunArtifacts,
+    dump_passes: bool,
+) -> io::Result<()> {
+    fs::create_dir_all(dump_dir)?;
+
+    if let Some((input, tree_text)) = artifacts.losslessness.as_ref()
+        && (dump_passes
+            || artifacts
+                .failures
+                .iter()
+                .any(|failure| matches!(failure.kind, CheckKind::Losslessness)))
+    {
+        fs::write(
+            dump_dir.join(format!("{stem}.losslessness.input.txt")),
+            input,
+        )?;
+        fs::write(
+            dump_dir.join(format!("{stem}.losslessness.parsed.txt")),
+            tree_text,
+        )?;
+    }
+
+    if let Some((input, once, twice)) = artifacts.idempotency.as_ref()
+        && (dump_passes
+            || artifacts
+                .failures
+                .iter()
+                .any(|failure| matches!(failure.kind, CheckKind::Idempotency)))
+    {
+        fs::write(
+            dump_dir.join(format!("{stem}.idempotency.input.txt")),
+            input,
+        )?;
+        fs::write(dump_dir.join(format!("{stem}.idempotency.once.txt")), once)?;
+        fs::write(
+            dump_dir.join(format!("{stem}.idempotency.twice.txt")),
+            twice,
+        )?;
+    }
+
+    for failure in &artifacts.failures {
+        let kind = failure.kind.label();
+        fs::write(
+            dump_dir.join(format!("{stem}.{kind}.left.txt")),
+            &failure.left,
+        )?;
+        fs::write(
+            dump_dir.join(format!("{stem}.{kind}.right.txt")),
+            &failure.right,
+        )?;
+    }
+
+    Ok(())
+}
+
 fn run_debug_checks_for_content(
     input: &str,
     cfg: &panache::Config,
     checks: DebugChecks,
-) -> Vec<(CheckKind, String, String)> {
-    let mut failures = Vec::new();
+) -> DebugRunArtifacts {
+    let mut artifacts = DebugRunArtifacts::default();
 
     if matches!(checks, DebugChecks::Losslessness | DebugChecks::All) {
         let tree_text = parse(input, Some(cfg.clone())).text().to_string();
+        artifacts.losslessness = Some((input.to_string(), tree_text.clone()));
         if input != tree_text {
-            failures.push((CheckKind::Losslessness, input.to_string(), tree_text));
+            artifacts.failures.push(DebugFailure {
+                kind: CheckKind::Losslessness,
+                left: input.to_string(),
+                right: tree_text,
+            });
         }
     }
 
     if matches!(checks, DebugChecks::Idempotency | DebugChecks::All) {
         let once = format(input, Some(cfg.clone()), None);
         let twice = format(&once, Some(cfg.clone()), None);
+        artifacts.idempotency = Some((input.to_string(), once.clone(), twice.clone()));
         if once != twice {
-            failures.push((CheckKind::Idempotency, once, twice));
+            artifacts.failures.push(DebugFailure {
+                kind: CheckKind::Idempotency,
+                left: once,
+                right: twice,
+            });
         }
     }
 
-    failures
+    artifacts
 }
 
 fn main() -> io::Result<()> {
@@ -606,8 +687,14 @@ fn main() -> io::Result<()> {
                 checks,
                 json,
                 dump_dir,
+                dump_passes,
                 force_exclude,
             } => {
+                if dump_passes && dump_dir.is_none() {
+                    eprintln!("Error: --dump-passes requires --dump-dir <DIR>");
+                    std::process::exit(1);
+                }
+
                 let use_stdin = files.is_empty();
                 let targets = if use_stdin {
                     vec![]
@@ -642,22 +729,20 @@ fn main() -> io::Result<()> {
                     let input = read_all(None)?;
                     files_checked += 1;
 
-                    let failures = run_debug_checks_for_content(&input, &cfg, checks);
-                    for (kind, left, right) in failures {
+                    let artifacts = run_debug_checks_for_content(&input, &cfg, checks);
+                    if let Some(dir) = dump_dir.as_ref() {
+                        write_debug_artifacts(dir, "stdin", &artifacts, dump_passes)?;
+                    }
+
+                    for failure in &artifacts.failures {
                         failure_count += 1;
                         if !json {
-                            eprintln!("Debug check failed ({}) in <stdin>", kind.label());
-                            print_diff("<stdin>", &left, &right, use_color);
-                        }
-                        if let Some(dir) = dump_dir.as_ref() {
-                            fs::create_dir_all(dir)?;
-                            let stem = format!("stdin.{}", kind.label());
-                            fs::write(dir.join(format!("{stem}.left.txt")), &left)?;
-                            fs::write(dir.join(format!("{stem}.right.txt")), &right)?;
+                            eprintln!("Debug check failed ({}) in <stdin>", failure.kind.label());
+                            print_diff("<stdin>", &failure.left, &failure.right, use_color);
                         }
                         json_failures.push(json!({
                             "file": "<stdin>",
-                            "kind": kind.label(),
+                            "kind": failure.kind.label(),
                         }));
                     }
                 } else {
@@ -673,27 +758,25 @@ fn main() -> io::Result<()> {
                         files_checked += 1;
                         let file_label = file_path.to_str().unwrap_or("<unknown>");
 
-                        let failures = run_debug_checks_for_content(&input, &cfg, checks);
-                        for (kind, left, right) in failures {
+                        let artifacts = run_debug_checks_for_content(&input, &cfg, checks);
+                        if let Some(dir) = dump_dir.as_ref() {
+                            let safe = sanitize_path_for_filename(file_label);
+                            write_debug_artifacts(dir, &safe, &artifacts, dump_passes)?;
+                        }
+
+                        for failure in &artifacts.failures {
                             failure_count += 1;
                             if !json {
                                 eprintln!(
                                     "Debug check failed ({}) in {}",
-                                    kind.label(),
+                                    failure.kind.label(),
                                     file_label
                                 );
-                                print_diff(file_label, &left, &right, use_color);
-                            }
-                            if let Some(dir) = dump_dir.as_ref() {
-                                fs::create_dir_all(dir)?;
-                                let safe = sanitize_path_for_filename(file_label);
-                                let stem = format!("{}.{}", safe, kind.label());
-                                fs::write(dir.join(format!("{stem}.left.txt")), &left)?;
-                                fs::write(dir.join(format!("{stem}.right.txt")), &right)?;
+                                print_diff(file_label, &failure.left, &failure.right, use_color);
                             }
                             json_failures.push(json!({
                                 "file": file_label,
-                                "kind": kind.label(),
+                                "kind": failure.kind.label(),
                             }));
                         }
                     }
@@ -715,6 +798,19 @@ fn main() -> io::Result<()> {
                         "All checks passed (checks: {}, files: {})",
                         format!("{:?}", checks).to_lowercase(),
                         files_checked
+                    );
+                }
+
+                if dump_passes
+                    && !json
+                    && let Some(dir) = dump_dir.as_ref()
+                {
+                    eprintln!("Wrote debug artifacts to {}", dir.display());
+                }
+
+                if failure_count > 0 && !json && dump_dir.is_none() {
+                    eprintln!(
+                        "Tip: rerun with --dump-dir <DIR> --dump-passes to inspect input, parse, and format passes."
                     );
                 }
 

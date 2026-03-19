@@ -269,6 +269,11 @@ pub enum DebugCommands {
         #[arg(long, value_name = "DIR")]
         dump_dir: Option<PathBuf>,
 
+        /// Dump intermediate check artifacts even when checks pass
+        #[arg(long)]
+        #[arg(help = "Write input/parse/format pass artifacts to --dump-dir for every file")]
+        dump_passes: bool,
+
         /// Enforce exclude patterns even for explicitly provided files
         #[arg(long)]
         #[arg(help = "Apply exclude patterns to explicitly provided files")]
