@@ -1,0 +1,6 @@
+---
+title: "User Guide"
+---
+
+This section of the documentation provides user-facing guides and instructions
+for using Panache, including installation.

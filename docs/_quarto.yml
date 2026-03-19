@@ -6,14 +6,22 @@ project:
 
 website:
   title: "Panache"
-  description: "A language server, code formatter, and linter for Pandoc Markdown, Quarto, and R Markdown."
-  site-url: "https://jolars.github.io/panache/"
+  description: "A language server, code formatter, and linter for Pandoc, Quarto, and R Markdown."
+
+  site-url: "https://panache.bz"
   repo-url: "https://github.com/jolars/panache"
+  issue-url: "https://github.com/jolars/panache/issues"
+
   repo-actions: [edit, issue]
+
   search: true
 
+  favicon: images/favicon.svg
+  twitter-card: true
+
+  image: images/og.png
+
   open-graph:
-    title: "Panache - A language server, code formatter, and linter for Pandoc Markdown, Quarto, and R Markdown."
     locale: en_US
 
   page-footer:
@@ -24,26 +32,51 @@ website:
         aria-label: "Source for this webpage"
 
   navbar:
-    logo: images/logo.svg
+    logo:
+      light: images/logo-with-text.svg
+      dark: images/logo-with-text-dark.svg
+    logo-alt: "Panache logo"
+
     title: false
+
+    tools:
+      - icon: github
+        href: "https://github.com/jolars/panache"
+
     left:
       - href: index.qmd
-        text: Home
+        text: Overview
       - href: getting-started.qmd
         text: Getting Started
-      - href: configuration.qmd
-        text: Configuration
-      - href: formatting.qmd
-        text: Formatting
-      - href: linting.qmd
-        text: Linting
-      - href: lsp.qmd
-        text: LSP
-      - href: cli.qmd
-        text: CLI
-      - href: integrations.qmd
-      - href: playground
+      - href: user-guide
+        text: User Guide
+      - href: playground/
         text: Playground
+      - text: Help
+        menu:
+          - text: Report a bug
+            icon: "bug"
+            href: "https://github.com/jolars/panache/issues"
+          - text: Ask a question
+            icon: "chat-right-text"
+            href: "https://github.com/jolars/panache/discussions"
+
+  sidebar:
+    - id: user-guide
+      text: User Guide
+      style: floating
+      contents:
+        - user-guide/index.qmd
+        - href: user-guide/formatting.qmd
+          text: Formatting
+        - href: user-guide/linting.qmd
+          text: Linting
+        - href: user-guide/configuration.qmd
+          text: Configuration
+        - href: user-guide/cli.qmd
+          text: Command Line Interface
+        - href: user-guide/integrations.qmd
+          text: Editor Integration
 
 resources:
   - "playground/**"
@@ -53,9 +86,12 @@ highlight-style: breeze
 format:
   html:
     toc: true
-    theme: cosmo
+    theme:
+      light: cosmo
+      dark: [cosmo, theme-dark.scss]
     html-math-method: katex
     pagetitle: "{{< meta title >}}"
+    code-copy: true
 
 toc: true
 date-format: "D MMMM YYYY"

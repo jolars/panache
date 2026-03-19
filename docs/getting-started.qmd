@@ -241,7 +241,7 @@ citations = true
 ```
 
 To see all the available configuration options, check the [Configuration
-guide](configuration.qmd).
+guide](user-guide/configuration.qmd).
 
 Panache looks for configuration files in this order:
 
@@ -298,8 +298,8 @@ Custom    formatting   and   no    lint    warnings
 These directives work anywhere in your document, including inside lists,
 blockquotes, and other nested structures.
 
-See the [Formatting](formatting.qmd) and [Linting](linting.qmd) guides for more
-details.
+See the [Formatting](user-guide/formatting.qmd) and
+[Linting](user-guide/linting.qmd) guides for more details.
 
 ## Getting Help
 

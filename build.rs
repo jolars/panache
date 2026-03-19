@@ -62,7 +62,7 @@ fn generate_cli_markdown() -> Result<()> {
     }
 
     let cmd = Cli::command();
-    let docs_dir = PathBuf::from("docs");
+    let docs_dir = PathBuf::from("docs/user-guide");
 
     // Only proceed if docs directory exists
     if !docs_dir.exists() {

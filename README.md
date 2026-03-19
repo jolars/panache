@@ -186,9 +186,9 @@ panache lsp
 
 Most users will want to configure their editor to start the language server
 automatically when editing. See [the language server
-documentation](https://jolars.github.io/panache/lsp) for guides on configuring
-your editor. For VS Code and related editors such as Positron, there is a [VS
-Code Marketplace
+documentation](https://jolars.github.io/panache/user-guide/lsp) for guides on
+configuring your editor. For VS Code and related editors such as Positron, there
+is a [VS Code Marketplace
 extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
 and [Open VSX extension](https://open-vsx.org/extension/jolars/panache) that
 provides an LSP client and additional features.

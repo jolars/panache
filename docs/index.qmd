@@ -36,8 +36,8 @@ yay -S panache-bin # or your preferred AUR helper
 
 ### VS Code Extension
 
-If you are running VS Code or an editor that supports VS
-Code extensions (like Positron), you can install the [Panache
+If you are running VS Code or an editor that supports VS Code extensions (like
+Positron), you can install the [Panache
 extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
 from the VS Code Marketplace or the [Open VSX
 extension](https://open-vsx.org/extension/jolars/panache), which will
@@ -48,7 +48,7 @@ editing supported files.
 
 To get the most out of Panache, you should set up the language server in your
 editor to integrate diagnostics, formatting, code actions, and much more. See
-the [LSP documentation](lsp.qmd) for editor integration instructions.
+the [LSP documentation](user-guide/lsp.qmd) for editor integration instructions.
 
 But if you just want to quickly format or lint a document from the command line,
 you can do so with the `panache` CLI.
@@ -84,9 +84,9 @@ panache format <document.qmd
 To learn more about panache, check out the following documentation:
 
 - [Getting Started](getting-started.qmd) - Installation and first steps
-- [Configuration](configuration.qmd) - Customize panache behavior
-- [Language Server](lsp.qmd) - Editor integration guide
-- [Formatting](formatting.qmd) - Formatting rules and examples
-- [Linting](linting.qmd) - Formatting rules and examples
-- [LSP](lsp.qmd) - Editor integration guide
-- [CLI Reference](cli.qmd) - Command-line options
+- [Configuration](user-guide/configuration.qmd) - Customize panache behavior
+- [Language Server](user-guide/lsp.qmd) - Editor integration guide
+- [Formatting](user-guide/formatting.qmd) - Formatting rules and examples
+- [Linting](user-guide/linting.qmd) - Formatting rules and examples
+- [LSP](user-guide/lsp.qmd) - Editor integration guide
+- [CLI Reference](user-guide/cli.qmd) - Command-line options

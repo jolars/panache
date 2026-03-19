@@ -1,0 +1,41 @@
+---
+title: Playground
+---
+
+Try Panache in your browser. The embedded app below stays inside the docs site,
+and you can still open it directly in a separate tab if you prefer.
+
+[Open standalone playground](./playground.html){target="_blank" rel="noopener"}
+
+<style>
+  .playground-shell {
+    margin-top: 1rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.08);
+    background: var(--bs-body-bg, #fff);
+  }
+
+  .playground-frame {
+    display: block;
+    width: 100%;
+    min-height: 75vh;
+    border: 0;
+  }
+
+  @media (max-width: 768px) {
+    .playground-frame {
+      min-height: 85vh;
+    }
+  }
+</style>
+
+<div class="playground-shell">
+  <iframe
+    class="playground-frame"
+    src="./playground.html"
+    title="Panache playground"
+    loading="lazy"
+  ></iframe>
+</div>

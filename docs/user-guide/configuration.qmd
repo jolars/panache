@@ -198,11 +198,6 @@ tab-width = 4
 `tab-width`
 :   Number of spaces per tab when normalizing (default 4).
 
-### Code Block Style (Deprecated)
-
-`[format.code-blocks]` and top-level `[code-blocks]` are deprecated and now
-no-ops. If explicitly set, panache prints a warning during config loading.
-
 ## Extensions
 
 Panache supports most of the Pandoc extensions. Defaults vary by flavor, but you

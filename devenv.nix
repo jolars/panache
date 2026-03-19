@@ -83,7 +83,7 @@
 
         excludes = [
           "^(pandoc|assets|tests)"
-          "docs/cli.qmd"
+          "docs/user-guide/cli.qmd"
         ];
       };
 
