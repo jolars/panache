@@ -36,6 +36,7 @@ pub(crate) async fn workspace_symbol(
 
     let mut candidate_paths: HashSet<PathBuf> = HashSet::new();
     let mut path_configs: HashMap<PathBuf, crate::salsa::FileConfig> = HashMap::new();
+    let mut path_uris: HashMap<PathBuf, Uri> = HashMap::new();
     let mut memory_docs: Vec<(Uri, String, GreenNode)> = Vec::new();
 
     {
@@ -46,6 +47,9 @@ pub(crate) async fn workspace_symbol(
                 path_configs
                     .entry(path.clone())
                     .or_insert(state.salsa_config);
+                if let Ok(uri) = uri_str.parse::<Uri>() {
+                    path_uris.entry(path.clone()).or_insert(uri);
+                }
 
                 let graph = crate::salsa::project_graph(
                     &*db,
@@ -78,7 +82,8 @@ pub(crate) async fn workspace_symbol(
             let Some(config) = path_configs.get(&path).copied() else {
                 continue;
             };
-            let Some(uri) = Uri::from_file_path(&path) else {
+            let uri = Uri::from_file_path(&path).or_else(|| path_uris.get(&path).cloned());
+            let Some(uri) = uri else {
                 continue;
             };
 

@@ -176,9 +176,11 @@ async fn test_folding_ranges_code_block() {
 async fn test_workspace_symbols_include_open_standalone_document() {
     let server = TestLspServer::new();
     let content = "# Intro\n\n## Methods\n";
-    server
-        .open_document("file:///standalone.md", content, "markdown")
-        .await;
+    let temp_dir = TempDir::new().unwrap();
+    let uri = Uri::from_file_path(temp_dir.path().join("standalone.md"))
+        .unwrap()
+        .to_string();
+    server.open_document(&uri, content, "markdown").await;
 
     let symbols = server.get_workspace_symbols("intro").await;
     let Some(symbols) = symbols else {
@@ -192,11 +194,18 @@ async fn test_workspace_symbols_include_open_standalone_document() {
 #[tokio::test]
 async fn test_workspace_symbols_include_multiple_open_documents() {
     let server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let doc1_uri = Uri::from_file_path(temp_dir.path().join("doc1.qmd"))
+        .unwrap()
+        .to_string();
+    let doc2_uri = Uri::from_file_path(temp_dir.path().join("doc2.qmd"))
+        .unwrap()
+        .to_string();
     server
-        .open_document("file:///doc1.qmd", "# Alpha\n\n## Shared\n", "quarto")
+        .open_document(&doc1_uri, "# Alpha\n\n## Shared\n", "quarto")
         .await;
     server
-        .open_document("file:///doc2.qmd", "# Beta\n\n## Shared\n", "quarto")
+        .open_document(&doc2_uri, "# Beta\n\n## Shared\n", "quarto")
         .await;
 
     let symbols = server.get_workspace_symbols("shared").await;
