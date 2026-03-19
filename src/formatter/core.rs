@@ -259,6 +259,128 @@ impl Formatter {
         code_blocks::format_code_block(node, &self.config, &self.formatted_code, &mut self.output);
     }
 
+    fn format_code_block_to_string(&mut self, node: &SyntaxNode) -> String {
+        let saved_output = self.output.clone();
+        self.output.clear();
+        self.format_code_block(node);
+        let formatted = self.output.clone();
+        self.output = saved_output;
+        formatted
+    }
+
+    fn leading_indent_columns(line: &str) -> usize {
+        let mut cols = 0usize;
+        for ch in line.chars() {
+            match ch {
+                ' ' => cols += 1,
+                '\t' => cols += 4 - (cols % 4),
+                _ => break,
+            }
+        }
+        cols
+    }
+
+    fn strip_leading_columns(line: &str, columns: usize) -> String {
+        let mut cols = 0usize;
+        let mut idx = 0usize;
+
+        for (byte_idx, ch) in line.char_indices() {
+            if cols >= columns {
+                idx = byte_idx;
+                break;
+            }
+
+            match ch {
+                ' ' => {
+                    cols += 1;
+                    idx = byte_idx + ch.len_utf8();
+                }
+                '\t' => {
+                    cols += 4 - (cols % 4);
+                    idx = byte_idx + ch.len_utf8();
+                }
+                _ => {
+                    idx = byte_idx;
+                    break;
+                }
+            }
+        }
+
+        if cols >= columns {
+            line[idx..].to_string()
+        } else if line.chars().all(|c| matches!(c, ' ' | '\t')) {
+            String::new()
+        } else {
+            line.to_string()
+        }
+    }
+
+    fn format_container_code_block(
+        &mut self,
+        node: &SyntaxNode,
+        first_line_prefix: &str,
+        continuation_indent: usize,
+        trim_first_line_start: bool,
+        normalize_content_indent: bool,
+        indent_blank_content_lines: bool,
+    ) {
+        let formatted = self.format_code_block_to_string(node);
+
+        let mut lines = formatted.lines();
+        if let Some(first_line) = lines.next() {
+            self.output.push_str(first_line_prefix);
+            if trim_first_line_start {
+                self.output.push_str(first_line.trim_start());
+            } else {
+                self.output.push_str(first_line);
+            }
+            self.output.push('\n');
+        }
+
+        let mut remaining: Vec<&str> = lines.collect();
+        if remaining.is_empty() {
+            return;
+        }
+
+        let closing = remaining.pop().unwrap();
+        let content_indent_cols = if normalize_content_indent {
+            remaining
+                .iter()
+                .filter(|line| !line.trim().is_empty())
+                .map(|line| Self::leading_indent_columns(line))
+                .min()
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        let continuation_prefix = " ".repeat(continuation_indent);
+        for line in remaining {
+            if line.trim().is_empty() && !indent_blank_content_lines {
+                self.output.push('\n');
+                continue;
+            }
+
+            self.output.push_str(&continuation_prefix);
+            if normalize_content_indent {
+                self.output
+                    .push_str(&Self::strip_leading_columns(line, content_indent_cols));
+            } else {
+                self.output.push_str(line);
+            }
+            self.output.push('\n');
+        }
+
+        self.output.push_str(&continuation_prefix);
+        if normalize_content_indent {
+            self.output
+                .push_str(&Self::strip_leading_columns(closing, content_indent_cols));
+        } else {
+            self.output.push_str(closing);
+        }
+        self.output.push('\n');
+    }
+
     /// Format a code block that is a continuation of a definition or list item.
     /// Adds indentation prefix to each line of the fenced code block.
     pub(super) fn format_indented_code_block(&mut self, node: &SyntaxNode, indent: usize) {
@@ -284,23 +406,7 @@ impl Formatter {
 
         let indent_str = " ".repeat(indent);
 
-        // Save current output and format code block to temp buffer
-        let saved_output = self.output.clone();
-        self.output.clear();
-
-        // Use the standard code block formatter
-        self.format_code_block(node);
-
-        // Get the formatted output and restore original
-        let code_output = self.output.clone();
-        self.output = saved_output;
-
-        // Add indentation to each line
-        for line in code_output.lines() {
-            self.output.push_str(&indent_str);
-            self.output.push_str(line);
-            self.output.push('\n');
-        }
+        self.format_container_code_block(node, &indent_str, indent, false, false, true);
 
         // Ensure we end with exactly one newline
         if !self.output.ends_with('\n') {
@@ -1389,99 +1495,9 @@ impl Formatter {
                             match n.kind() {
                                 SyntaxKind::CODE_BLOCK => {
                                     if self.output.ends_with(":   ") {
-                                        let leading_indent_columns = |line: &str| -> usize {
-                                            let mut cols = 0usize;
-                                            for ch in line.chars() {
-                                                match ch {
-                                                    ' ' => cols += 1,
-                                                    '\t' => cols += 4 - (cols % 4),
-                                                    _ => break,
-                                                }
-                                            }
-                                            cols
-                                        };
-
-                                        let strip_leading_columns =
-                                            |line: &str, columns: usize| -> String {
-                                                let mut cols = 0usize;
-                                                let mut idx = 0usize;
-
-                                                for (byte_idx, ch) in line.char_indices() {
-                                                    if cols >= columns {
-                                                        idx = byte_idx;
-                                                        break;
-                                                    }
-
-                                                    match ch {
-                                                        ' ' => {
-                                                            cols += 1;
-                                                            idx = byte_idx + ch.len_utf8();
-                                                        }
-                                                        '\t' => {
-                                                            cols += 4 - (cols % 4);
-                                                            idx = byte_idx + ch.len_utf8();
-                                                        }
-                                                        _ => {
-                                                            idx = byte_idx;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-
-                                                if cols >= columns {
-                                                    line[idx..].to_string()
-                                                } else if line
-                                                    .chars()
-                                                    .all(|c| matches!(c, ' ' | '\t'))
-                                                {
-                                                    String::new()
-                                                } else {
-                                                    line.to_string()
-                                                }
-                                            };
-
-                                        let saved_output = self.output.clone();
-                                        self.output.clear();
-                                        self.format_code_block(n);
-                                        let formatted = self.output.clone();
-                                        self.output = saved_output;
-
-                                        let mut lines = formatted.lines();
-                                        if let Some(first_line) = lines.next() {
-                                            self.output.push_str(first_line.trim_start());
-                                            self.output.push('\n');
-                                        }
-                                        let mut lines_vec: Vec<&str> = lines.collect();
-                                        if !lines_vec.is_empty() {
-                                            // Remove trailing closing fence line to control its indent
-                                            let closing = lines_vec.pop().unwrap();
-
-                                            let content_indent_cols = lines_vec
-                                                .iter()
-                                                .filter(|line| !line.trim().is_empty())
-                                                .map(|line| leading_indent_columns(line))
-                                                .min()
-                                                .unwrap_or(0);
-
-                                            for line in &lines_vec {
-                                                if line.trim().is_empty() {
-                                                    self.output.push('\n');
-                                                    continue;
-                                                }
-                                                self.output.push_str(&" ".repeat(def_indent));
-                                                self.output.push_str(&strip_leading_columns(
-                                                    line,
-                                                    content_indent_cols,
-                                                ));
-                                                self.output.push('\n');
-                                            }
-                                            self.output.push_str(&" ".repeat(def_indent));
-                                            self.output.push_str(&strip_leading_columns(
-                                                closing,
-                                                content_indent_cols,
-                                            ));
-                                            self.output.push('\n');
-                                        }
+                                        self.format_container_code_block(
+                                            n, "", def_indent, true, true, false,
+                                        );
                                     } else {
                                         // Add blank line before code block if needed
                                         if !self.output.ends_with("\n\n") {
