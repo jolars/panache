@@ -5,6 +5,9 @@ applyTo: "src/parser/yaml.rs,src/parser/yaml/**/*.rs,src/parser/**/*.rs,src/synt
 Panache has a planned long-term in-tree YAML parser initiative. Treat current
 work as groundwork unless explicitly marked as a production rollout.
 
+Timeline expectation: this is a multi-month effort. Do not propose or imply
+short-term replacement of the existing `yaml_parser` pipeline.
+
 - Keep all YAML parser changes lossless and CST-first: preserve markers,
   whitespace, comments, and scalar style trivia.
 - Design for both plain YAML files and hashpipe-prefixed YAML so one parser core

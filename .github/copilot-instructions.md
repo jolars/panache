@@ -313,6 +313,8 @@ Instead of listing every file, understand the patterns:
 - Long-term YAML parser groundwork lives in `src/parser/yaml.rs`; treat it as an
   incremental, shadow-mode-first effort toward full CST/LSP/formatting
   integration.
+- This YAML work is intentionally long-horizon (many months). Do not frame it as
+  a near-term replacement for the existing `yaml_parser` dependency.
 
 **Editor extension** (`editors/code/`):
 
