@@ -132,6 +132,17 @@ fn bare_fence_without_closing_fence_does_not_interrupt_paragraph() {
 }
 
 #[test]
+fn fence_with_info_without_closing_fence_is_not_code_block() {
+    let input = "````markdown\n";
+    let tree = crate::parse(input, None);
+
+    let code_block = tree
+        .descendants()
+        .find(|n| n.kind() == SyntaxKind::CODE_BLOCK);
+    assert!(code_block.is_none(), "Should not contain fenced code block");
+}
+
+#[test]
 fn code_block_with_language_can_interrupt_paragraph() {
     // Test with language identifier
     let input = "Some text:\n```r\na <- 1\n```\n";
@@ -221,11 +232,8 @@ fn closing_fence_must_have_at_least_same_length() {
     let input = "````\ncode\n```\n";
     let node = parse_blocks(input);
 
-    // Code block should be parsed, but without proper closing
-    assert!(find_first(&node, SyntaxKind::CODE_BLOCK).is_some());
-
-    let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "code\n```\n"); // The ``` becomes part of content
+    // Without a valid closing fence, this should stay paragraph content.
+    assert!(find_first(&node, SyntaxKind::CODE_BLOCK).is_none());
 }
 
 #[test]
@@ -244,11 +252,8 @@ fn mixed_fence_chars_dont_close() {
     let input = "```\ncode\n~~~\n";
     let node = parse_blocks(input);
 
-    // Should parse code block but ~~~ becomes content
-    assert!(find_first(&node, SyntaxKind::CODE_BLOCK).is_some());
-
-    let content = get_code_content(&node).unwrap();
-    assert_eq!(content, "code\n~~~\n");
+    // Without a matching closing fence, this should stay paragraph content.
+    assert!(find_first(&node, SyntaxKind::CODE_BLOCK).is_none());
 }
 
 #[test]

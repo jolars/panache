@@ -31,6 +31,11 @@ pub(super) fn format_code_block(
     formatted_code: &FormattedCodeMap,
     output: &mut String,
 ) {
+    if is_unclosed_fenced_code_block(node) {
+        output.push_str(&node.text().to_string());
+        return;
+    }
+
     let (info_node, language, extracted_content) = extract_code_block_parts(node);
     let mut content = extracted_content;
     let language_key = language.unwrap_or_default();
@@ -117,6 +122,17 @@ pub(super) fn format_code_block(
         output.push(fence_char);
     }
     output.push('\n');
+}
+
+fn is_unclosed_fenced_code_block(node: &SyntaxNode) -> bool {
+    let has_open = node
+        .children()
+        .any(|child| child.kind() == SyntaxKind::CODE_FENCE_OPEN);
+    let has_close = node
+        .children()
+        .any(|child| child.kind() == SyntaxKind::CODE_FENCE_CLOSE);
+
+    has_open && !has_close
 }
 
 fn extract_raw_code_block_content(node: &SyntaxNode) -> Option<String> {

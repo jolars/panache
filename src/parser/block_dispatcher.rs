@@ -1218,7 +1218,7 @@ impl BlockParser for FencedCodeBlockParser {
         // For bare fences (```), allow interruption only in explicit transcript-like
         // contexts and only when a matching closer exists later.
         let has_info = !fence.info_string.trim().is_empty();
-        let has_matching_closer = !has_info && !ctx.has_blank_before && {
+        let has_matching_closer = {
             let mut found = false;
             for raw_line in lines.iter().skip(line_pos + 1) {
                 let (line_bq_depth, inner) = count_blockquote_markers(raw_line);
@@ -1242,6 +1242,11 @@ impl BlockParser for FencedCodeBlockParser {
             }
             found
         };
+
+        if !has_matching_closer {
+            return None;
+        }
+
         let next_nonblank_is_command = lines
             .iter()
             .skip(line_pos + 1)

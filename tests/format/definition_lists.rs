@@ -60,3 +60,12 @@ fn definition_list_fenced_code_preserves_yaml_nested_list_indent() {
     assert!(output.contains("list:\n      - a\n      - b"));
     assert!(!output.contains("list:\n    - a\n    - b"));
 }
+
+#[test]
+fn definition_list_unclosed_fence_with_info_stays_unclosed() {
+    let input = "Input\n:   \n\n````markdown\n";
+    let output = format(input, None, None);
+
+    assert!(output.contains("\\`\\`\\`\\`markdown\n"));
+    assert!(!output.contains("```markdown\n```\n"));
+}
