@@ -56,7 +56,7 @@ tokio = { version = "1", features = [
     "macros",
     "fs",
 ], optional = true }
-toml = "1.0.6"
+toml = "1.0.7"
 tower-lsp-server = { version = "0.23", optional = true }
 unicode-width = "0.2"
 uuid = { version = "1.22.0", features = ["v4"], optional = true }
