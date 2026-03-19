@@ -605,8 +605,12 @@ pub fn format_as_hashpipe(
             .iter()
             .map(|(key, value)| format!("{}: {}\n", key, value))
             .collect::<String>();
+        // pretty_yaml wraps to the width of raw YAML text. Hashpipe output adds
+        // a comment prefix (`#| `, `//| `, `--| `) before every rendered line,
+        // so subtract that width to keep final emitted lines within line_width.
+        let yaml_print_width = line_width.saturating_sub(prefix.len() + 1);
         let yaml_config = crate::config::Config {
-            line_width,
+            line_width: yaml_print_width,
             wrap: wrap.cloned(),
             ..Default::default()
         };

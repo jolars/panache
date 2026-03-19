@@ -203,3 +203,22 @@ fn hashpipe_folded_block_scalar_formatting_is_idempotent() {
     assert!(output2.contains("#|   A folded caption"));
     assert!(output2.contains("#|   spanning some lines"));
 }
+
+#[test]
+fn hashpipe_yaml_wrap_accounts_for_comment_prefix_width() {
+    let input = "```{r}\n#| fig-cap: This is a very long caption that should be truncated in the output to ensure that it does not take up too much space in the rendered document. The caption continues with more details about the figure and its significance in the context of the analysis being performed.\n```\n";
+    let config = quarto_config();
+    let output = format(input, Some(config.clone()), None);
+
+    for line in output.lines() {
+        if line.starts_with("#|") {
+            assert!(
+                line.len() <= config.line_width,
+                "hashpipe line exceeded width ({} > {}): {}",
+                line.len(),
+                config.line_width,
+                line
+            );
+        }
+    }
+}

@@ -50,3 +50,9 @@ x <- 1
 a <- 2
 b <- 3
 ```
+
+## Chunk with very long caption
+
+```{r}
+#| fig-cap: This is a very long caption that should be truncated in the output to ensure that it does not take up too much space in the rendered document. The caption continues with more details about the figure and its significance in the context of the analysis being performed.
+```
