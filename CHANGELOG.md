@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.24.0](https://github.com/jolars/panache/compare/v2.23.0...v2.24.0) (2026-03-19)
+
+### Features
+
+* **formatter:** report missing external formatters jointly ([1e5cd25](https://github.com/jolars/panache/commit/1e5cd254d3156509cb5b583e5ef68578b8476372))
+* **lsp:** add workspace heading symbols ([ac6a8d9](https://github.com/jolars/panache/commit/ac6a8d9f59c0a3d3079825a03860e80ae39ac277))
+
 ## [2.23.0](https://github.com/jolars/panache/compare/v2.22.0...v2.23.0) (2026-03-18)
 
 ### Features
