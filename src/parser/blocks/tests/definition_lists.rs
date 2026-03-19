@@ -25,3 +25,11 @@ fn definition_list_plain_does_not_start_list_without_blank_line() {
         "Expected no list without blank line in definition"
     );
 }
+
+#[test]
+fn definition_marker_without_content_preserves_newline_losslessly() {
+    let input = "Input\n:   \n\n````markdown\n";
+    let tree = parse_blocks(input);
+
+    assert_eq!(tree.text().to_string(), input);
+}

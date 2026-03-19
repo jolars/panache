@@ -598,6 +598,14 @@ impl<'a> Parser<'a> {
                     }
                 }
 
+                if !*has_content {
+                    let current_line = self.lines[self.pos];
+                    let (_, newline_str) = strip_newline(current_line);
+                    if !newline_str.is_empty() {
+                        self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+                    }
+                }
+
                 let content_col = *indent + 1 + *spaces_after_cols;
                 let content_start_bytes = indent_bytes + 1 + *spaces_after;
                 let after_marker_and_spaces = content.get(content_start_bytes..).unwrap_or("");
