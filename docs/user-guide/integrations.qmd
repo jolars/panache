@@ -60,7 +60,7 @@ repos:
 
 ## GitHub Actions
 
-Integrate panache into your CI pipeline using GitHub Actions:
+Use the dedicated panache action for a one-line setup:
 
 ```yaml
 name: panache
@@ -68,15 +68,69 @@ on:
   pull_request:
   push:
     branches: [main]
+
 jobs:
   format-and-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+      - uses: jolars/panache-action@v1
+```
+
+This workflow:
+
+1. Installs panache from official releases
+2. Checks that all files are formatted (`--check` mode)
+3. Runs the linter in CI mode (`--check` mode)
+
+Both steps will fail (exit code 1) if issues are found, preventing the PR from
+merging.
+
+### Common options
+
+Pin a specific panache CLI release:
+
+```yaml
+- uses: jolars/panache-action@v1
+  with:
+    panache-version: v2.23.0
+```
+
+Run only one check:
+
+```yaml
+- uses: jolars/panache-action@v1
+  with:
+    lint: "false" # format only
+```
+
+```yaml
+- uses: jolars/panache-action@v1
+  with:
+    format: "false" # lint only
+```
+
+### Manual setup (advanced)
+
+If you prefer installing via Rust directly, you can keep using a manual
+workflow:
+
+```yaml
+name: panache
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  format-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/bin/
@@ -91,13 +145,3 @@ jobs:
       - name: Run linter
         run: panache lint --check .
 ```
-
-This workflow:
-
-1. Installs Rust and panache
-2. Caches the cargo installation for faster subsequent runs
-3. Checks that all files are formatted (`--check` mode)
-4. Runs the linter in CI mode (`--check` mode)
-
-Both steps will fail (exit code 1) if issues are found, preventing the PR from
-merging.
