@@ -65,12 +65,12 @@ uuid = { version = "1.22.0", features = ["v4"], optional = true }
 similar-asserts = "1.7.0"
 insta = "1.43.2"
 tokio = { version = "1", features = ["macros", "rt"] }
-which = "8.0"
 assert_cmd = "2.0"
 predicates = "3.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rayon = "1.10.0"
+which = "8.0"
 
 [features]
 default = ["cli", "lsp"]
