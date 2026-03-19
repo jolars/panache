@@ -14,7 +14,7 @@ async fn test_prepare_rename_bookdown_hyphenated_crossref_selects_full_key() {
         .await
         .expect("prepare rename response");
 
-    let PrepareRenameResponse::Range(range) = response else {
+    let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = response else {
         panic!("expected prepare rename range");
     };
 
@@ -22,6 +22,7 @@ async fn test_prepare_rename_bookdown_hyphenated_crossref_selects_full_key() {
     assert_eq!(range.start.character, 15);
     assert_eq!(range.end.line, 4);
     assert_eq!(range.end.character, 24);
+    assert_eq!(placeholder, "heading-2");
 }
 
 #[tokio::test]
@@ -37,7 +38,7 @@ async fn test_prepare_rename_heading_hash_link_selects_anchor_without_hash() {
         .await
         .expect("prepare rename response");
 
-    let PrepareRenameResponse::Range(range) = response else {
+    let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = response else {
         panic!("expected prepare rename range");
     };
 
@@ -45,6 +46,7 @@ async fn test_prepare_rename_heading_hash_link_selects_anchor_without_hash() {
     assert_eq!(range.start.character, 13);
     assert_eq!(range.end.line, 2);
     assert_eq!(range.end.character, 20);
+    assert_eq!(placeholder, "heading");
 }
 
 #[tokio::test]
@@ -60,7 +62,7 @@ async fn test_prepare_rename_inline_chunk_label_selects_full_hyphenated_label() 
         .await
         .expect("prepare rename response");
 
-    let PrepareRenameResponse::Range(range) = response else {
+    let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = response else {
         panic!("expected prepare rename range");
     };
 
@@ -68,6 +70,7 @@ async fn test_prepare_rename_inline_chunk_label_selects_full_hyphenated_label() 
     assert_eq!(range.start.character, 10);
     assert_eq!(range.end.line, 1);
     assert_eq!(range.end.character, 18);
+    assert_eq!(placeholder, "my-label");
 }
 
 #[tokio::test]
@@ -83,7 +86,7 @@ async fn test_prepare_rename_executable_chunk_label_selects_full_hyphenated_labe
         .await
         .expect("prepare rename response");
 
-    let PrepareRenameResponse::Range(range) = response else {
+    let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = response else {
         panic!("expected prepare rename range");
     };
 
@@ -91,6 +94,7 @@ async fn test_prepare_rename_executable_chunk_label_selects_full_hyphenated_labe
     assert_eq!(range.start.character, 6);
     assert_eq!(range.end.line, 0);
     assert_eq!(range.end.character, 14);
+    assert_eq!(placeholder, "my-label");
 }
 
 #[tokio::test]
@@ -106,7 +110,7 @@ async fn test_prepare_rename_executable_chunk_option_label_selects_full_hyphenat
         .await
         .expect("prepare rename response");
 
-    let PrepareRenameResponse::Range(range) = response else {
+    let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = response else {
         panic!("expected prepare rename range");
     };
 
@@ -114,4 +118,5 @@ async fn test_prepare_rename_executable_chunk_option_label_selects_full_hyphenat
     assert_eq!(range.start.character, 16);
     assert_eq!(range.end.line, 0);
     assert_eq!(range.end.character, 24);
+    assert_eq!(placeholder, "my-label");
 }

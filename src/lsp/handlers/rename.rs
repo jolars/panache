@@ -47,6 +47,12 @@ pub(crate) async fn rename(
         return Ok(None);
     };
     let Some(offset) = position_to_offset(&content, position) else {
+        log::debug!(
+            "rename: position_to_offset failed uri={:?} line={} char={}",
+            uri,
+            position.line,
+            position.character
+        );
         return Ok(None);
     };
     if helpers::is_offset_in_yaml_frontmatter(&parsed_yaml_regions, offset) {
@@ -56,6 +62,15 @@ pub(crate) async fn rename(
         let root = SyntaxNode::new_root(green_tree.clone());
         resolve_symbol_target_at_offset(&root, offset)
     };
+    log::debug!(
+        "rename: uri={:?} req=({}, {}) offset={} new_name={:?} target={:?}",
+        uri,
+        position.line,
+        position.character,
+        offset,
+        new_name,
+        target
+    );
 
     // First handle crossref/chunk-label rename without requiring bibliography metadata.
     if let Some(SymbolTarget::Crossref(old_key)) = target.as_ref() {
@@ -126,10 +141,21 @@ pub(crate) async fn rename(
             if edits.is_empty() {
                 continue;
             }
+            log::debug!(
+                "rename[crossref]: uri={:?} edits={} keys={:?}",
+                doc_uri,
+                edits.len(),
+                search_keys
+            );
             changes.entry(doc_uri).or_default().extend(edits);
         }
 
         if changes.is_empty() {
+            log::debug!(
+                "rename[crossref]: no edits produced old_key={:?} old_norm={:?}",
+                old_key,
+                old_norm
+            );
             return Ok(None);
         }
         return Ok(Some(WorkspaceEdit {

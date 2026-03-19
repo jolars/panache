@@ -6,9 +6,9 @@ use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkOption, Citation, Crossref, FootnoteDefinition, Heading, Link,
-    ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode, YamlRegion,
-    collect_parsed_yaml_region_snapshots,
+    AstNode, AttributeNode, ChunkLabel, ChunkOption, Citation, Crossref, FootnoteDefinition,
+    Heading, Link, ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode,
+    YamlRegion, collect_parsed_yaml_region_snapshots,
 };
 use crate::utils::{implicit_heading_ids, normalize_label};
 use salsa::{Accumulator, Durability, Setter};
@@ -664,6 +664,30 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
                 .or_default()
                 .push(value_range);
         }
+    }
+
+    for label in tree.descendants().filter_map(ChunkLabel::cast) {
+        db.unwind_if_revision_cancelled();
+        let value = label.text();
+        if value.is_empty() {
+            continue;
+        }
+
+        index
+            .crossref_declarations
+            .entry(normalize_label(&value))
+            .or_default()
+            .push(label.syntax().text_range());
+        index
+            .chunk_label_value_ranges
+            .entry(normalize_label(&value))
+            .or_default()
+            .push(label.syntax().text_range());
+        index
+            .crossref_declaration_value_ranges
+            .entry(normalize_label(&value))
+            .or_default()
+            .push(label.syntax().text_range());
     }
 
     for entry in implicit_heading_ids(tree) {

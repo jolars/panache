@@ -266,6 +266,12 @@ impl LanguageServer for PanacheLsp {
     }
 
     async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        log::debug!(
+            "lsp.rename request uri={:?} line={} char={}",
+            params.text_document_position.text_document.uri,
+            params.text_document_position.position.line,
+            params.text_document_position.position.character
+        );
         handlers::rename::rename(
             &self.client,
             Arc::clone(&self.document_map),
@@ -280,6 +286,12 @@ impl LanguageServer for PanacheLsp {
         &self,
         params: TextDocumentPositionParams,
     ) -> Result<Option<PrepareRenameResponse>> {
+        log::debug!(
+            "lsp.prepareRename request uri={:?} line={} char={}",
+            params.text_document.uri,
+            params.position.line,
+            params.position.character
+        );
         handlers::prepare_rename::prepare_rename(
             &self.client,
             Arc::clone(&self.document_map),

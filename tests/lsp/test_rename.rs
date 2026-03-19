@@ -360,6 +360,104 @@ A ref to \@ref(heading-2).
 }
 
 #[tokio::test]
+async fn test_rename_executable_chunk_label_updates_crossref_and_definition() {
+    let server = TestLspServer::new();
+    let content = r#"See @fig-my-label.
+
+```{r fig-my-label}
+plot(1, 1)
+```
+"#;
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let edit = server
+        .rename("file:///test.qmd", 2, 10, "fig-renamed")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.qmd".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert!(
+        edits.iter().any(|e| e.new_text == "fig-renamed"),
+        "expected rename edits to use new key"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 0),
+        "expected crossref reference edit"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 2),
+        "expected chunk label definition edit"
+    );
+}
+
+#[tokio::test]
+async fn test_rename_hashpipe_label_with_hyphen_updates_from_value_cursor() {
+    let server = TestLspServer::new();
+    let content = r#"See @fig-my-other-label.
+
+```{r}
+#| label: fig-my-other-label
+plot(1, 1)
+```
+"#;
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let edit = server
+        .rename("file:///test.qmd", 3, 15, "fig-renamed")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.qmd".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 0),
+        "expected crossref usage edit"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 3),
+        "expected chunk label declaration edit"
+    );
+}
+
+#[tokio::test]
+async fn test_rename_chunk_option_label_with_hyphen_updates_from_value_cursor() {
+    let server = TestLspServer::new();
+    let content = r#"See @fig-my-other-label.
+
+```{r, label = "fig-my-other-label"}
+plot(1, 1)
+```
+"#;
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let edit = server
+        .rename("file:///test.qmd", 2, 18, "fig-renamed")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.qmd".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 0),
+        "expected crossref usage edit"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 2),
+        "expected chunk option declaration edit"
+    );
+}
+
+#[tokio::test]
 async fn test_rename_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();
