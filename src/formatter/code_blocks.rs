@@ -1,6 +1,10 @@
 use crate::config::{Config, Flavor};
 #[cfg(feature = "lsp")]
 use crate::external_formatters::format_code_async;
+#[cfg(feature = "lsp")]
+use crate::external_formatters_common::{
+    find_missing_formatter_commands, log_missing_formatter_commands,
+};
 use crate::parser::blocks::code_blocks::{CodeBlockType, InfoString};
 use crate::syntax::{AstNode, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
@@ -871,6 +875,8 @@ pub async fn spawn_and_await_formatters(
 
     let timeout = Duration::from_secs(30);
     let semaphore = Arc::new(Semaphore::new(config.external_max_parallel.max(1)));
+    let missing_formatters = Arc::new(find_missing_formatter_commands(&config.formatters));
+    log_missing_formatter_commands(&missing_formatters);
 
     let mut join_set = JoinSet::new();
 
@@ -894,6 +900,7 @@ pub async fn spawn_and_await_formatters(
         let code = block.formatter_input.clone();
         let original = block.original.clone();
         let hashpipe_prefix = block.hashpipe_prefix.clone();
+        let missing_formatters = Arc::clone(&missing_formatters);
 
         join_set.spawn(async move {
             let _permit = permit;
@@ -902,8 +909,13 @@ pub async fn spawn_and_await_formatters(
             let mut current_code = code;
 
             for (idx, formatter_cfg) in formatter_configs.iter().enumerate() {
-                if formatter_cfg.cmd.is_empty() {
+                let formatter_cmd = formatter_cfg.cmd.trim();
+                if formatter_cmd.is_empty() {
                     continue;
+                }
+
+                if missing_formatters.contains(formatter_cmd) {
+                    return (lang, original, hashpipe_prefix, Ok(current_code));
                 }
 
                 log::debug!(

@@ -5,13 +5,15 @@
 
 use std::io::Write;
 use std::process::{Command, Stdio};
-use std::{collections::HashSet, path::Path};
 
 use std::thread;
 use std::time::Duration;
 
 use crate::config::FormatterConfig;
 pub use crate::external_formatters_common::FormatterError;
+use crate::external_formatters_common::{
+    find_missing_formatter_commands, log_missing_formatter_commands,
+};
 use crate::formatter::code_blocks::{ExternalCodeBlock, FormattedCodeMap};
 
 /// Format a code block using an external formatter (synchronous).
@@ -232,14 +234,7 @@ pub fn run_formatters_parallel(
     use rayon::prelude::*;
 
     let missing_formatters = find_missing_formatter_commands(formatters);
-    if !missing_formatters.is_empty() {
-        let mut sorted_missing: Vec<_> = missing_formatters.iter().map(String::as_str).collect();
-        sorted_missing.sort_unstable();
-        log::warn!(
-            "External formatter command(s) not found: {}. Configured external formatting for these tools will be skipped.",
-            sorted_missing.join(", ")
-        );
-    }
+    log_missing_formatter_commands(&missing_formatters);
 
     let max_parallel = max_parallel.max(1);
 
@@ -312,83 +307,4 @@ pub fn run_formatters_parallel(
             })
             .collect::<FormattedCodeMap>()
     })
-}
-
-fn find_missing_formatter_commands(
-    formatters: &std::collections::HashMap<String, Vec<FormatterConfig>>,
-) -> HashSet<String> {
-    formatters
-        .values()
-        .flat_map(|configs| configs.iter())
-        .filter_map(|cfg| {
-            let cmd = cfg.cmd.trim();
-            if cmd.is_empty() || command_exists(cmd) {
-                None
-            } else {
-                Some(cmd.to_string())
-            }
-        })
-        .collect()
-}
-
-fn command_exists(cmd: &str) -> bool {
-    if has_path_separator(cmd) {
-        return Path::new(cmd).exists();
-    }
-    which::which(cmd).is_ok()
-}
-
-fn has_path_separator(cmd: &str) -> bool {
-    cmd.contains(std::path::MAIN_SEPARATOR)
-        || cfg!(windows) && (cmd.contains('/') || cmd.contains('\\'))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::FormatterConfig;
-    use std::collections::HashMap;
-
-    #[test]
-    fn reports_missing_commands_once() {
-        let mut formatters = HashMap::new();
-        formatters.insert(
-            "python".to_string(),
-            vec![
-                FormatterConfig {
-                    cmd: "definitely-not-a-real-formatter-123".to_string(),
-                    args: vec![],
-                    enabled: true,
-                    stdin: true,
-                },
-                FormatterConfig {
-                    cmd: "definitely-not-a-real-formatter-123".to_string(),
-                    args: vec![],
-                    enabled: true,
-                    stdin: true,
-                },
-            ],
-        );
-
-        let missing = find_missing_formatter_commands(&formatters);
-        assert_eq!(missing.len(), 1);
-        assert!(missing.contains("definitely-not-a-real-formatter-123"));
-    }
-
-    #[test]
-    fn skips_empty_commands() {
-        let mut formatters = HashMap::new();
-        formatters.insert(
-            "python".to_string(),
-            vec![FormatterConfig {
-                cmd: "   ".to_string(),
-                args: vec![],
-                enabled: true,
-                stdin: true,
-            }],
-        );
-
-        let missing = find_missing_formatter_commands(&formatters);
-        assert!(missing.is_empty());
-    }
 }
