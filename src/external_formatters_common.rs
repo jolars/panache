@@ -67,17 +67,31 @@ pub fn find_missing_formatter_commands(
 
 /// Log one consolidated warning for missing external formatter commands.
 pub fn log_missing_formatter_commands(missing: &HashSet<String>) {
-    if missing.is_empty() {
+    let Some(message) = missing_formatter_warning_message(missing) else {
         return;
+    };
+
+    // CLI users often run without RUST_LOG configured, in which case warn logs
+    // are filtered out. Fall back to stderr so this warning is still visible.
+    if log::log_enabled!(log::Level::Warn) {
+        log::warn!("{}", message);
+    } else {
+        eprintln!("Warning: {}", message);
+    }
+}
+
+fn missing_formatter_warning_message(missing: &HashSet<String>) -> Option<String> {
+    if missing.is_empty() {
+        return None;
     }
 
     let mut sorted_missing: Vec<_> = missing.iter().map(String::as_str).collect();
     sorted_missing.sort_unstable();
 
-    log::warn!(
+    Some(format!(
         "External formatter command(s) not found: {}. Configured external formatting for these tools will be skipped.",
         sorted_missing.join(", ")
-    );
+    ))
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -98,9 +112,9 @@ fn has_path_separator(cmd: &str) -> bool {
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
-    use super::find_missing_formatter_commands;
+    use super::{find_missing_formatter_commands, missing_formatter_warning_message};
     use crate::config::FormatterConfig;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     #[test]
     fn reports_missing_commands_once() {
@@ -143,5 +157,20 @@ mod tests {
 
         let missing = find_missing_formatter_commands(&formatters);
         assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn warning_message_sorts_and_deduplicates_commands() {
+        let missing = HashSet::from([
+            "black".to_string(),
+            "rustfmt".to_string(),
+            "black".to_string(),
+        ]);
+
+        let message = missing_formatter_warning_message(&missing).expect("message expected");
+        assert_eq!(
+            message,
+            "External formatter command(s) not found: black, rustfmt. Configured external formatting for these tools will be skipped."
+        );
     }
 }
