@@ -16,7 +16,7 @@ website:
 
   search: true
 
-  favicon: images/favicon.svg
+  favicon: images/logo.svg
   twitter-card: true
 
   image: images/og.png
@@ -50,7 +50,7 @@ website:
         text: Getting Started
       - href: user-guide
         text: User Guide
-      - href: playground/
+      - href: playground/index.html
         text: Playground
       - text: Help
         menu:
@@ -71,12 +71,14 @@ website:
           text: Formatting
         - href: user-guide/linting.qmd
           text: Linting
+        - href: user-guide/lsp.qmd
+          text: Language Server
         - href: user-guide/configuration.qmd
           text: Configuration
         - href: user-guide/cli.qmd
           text: Command Line Interface
         - href: user-guide/integrations.qmd
-          text: Editor Integration
+          text: Integrations
 
 resources:
   - "playground/**"
