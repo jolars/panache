@@ -623,9 +623,3 @@ Ignore directives work inside lists, blockquotes, and other nested structures:
 
 See [Linting](linting.qmd) for information about linting-specific ignore
 directives.
-
-## See Also
-
-- [Configuration](configuration.qmd) - Control formatting behavior
-- [CLI Reference](cli.qmd) - Format command options
-- [Getting Started](getting-started.qmd) - Basic usage examples
