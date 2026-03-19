@@ -64,6 +64,9 @@ Pin to a specific release from a specific repository:
   `false` and provide `panache.commandPath`.
 - If download fails, the extension shows a warning and falls back to
   `panache.commandPath`.
+- The extension contributes `quarto` (`.qmd`) and `rmarkdown` (`.Rmd`, `.rmd`)
+  language registrations, so it works even without installing a separate Quarto
+  extension. If Quarto is also installed, both can coexist.
 
 ## Settings
 
