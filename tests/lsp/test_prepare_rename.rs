@@ -69,3 +69,49 @@ async fn test_prepare_rename_inline_chunk_label_selects_full_hyphenated_label() 
     assert_eq!(range.end.line, 1);
     assert_eq!(range.end.character, 18);
 }
+
+#[tokio::test]
+async fn test_prepare_rename_executable_chunk_label_selects_full_hyphenated_label() {
+    let server = TestLspServer::new();
+    let content = "```{r my-label}\nplot(1, 1)\n```\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let response = server
+        .prepare_rename("file:///test.qmd", 0, 7)
+        .await
+        .expect("prepare rename response");
+
+    let PrepareRenameResponse::Range(range) = response else {
+        panic!("expected prepare rename range");
+    };
+
+    assert_eq!(range.start.line, 0);
+    assert_eq!(range.start.character, 6);
+    assert_eq!(range.end.line, 0);
+    assert_eq!(range.end.character, 14);
+}
+
+#[tokio::test]
+async fn test_prepare_rename_executable_chunk_option_label_selects_full_hyphenated_label() {
+    let server = TestLspServer::new();
+    let content = "```{r, label = \"my-label\"}\nplot(1, 1)\n```\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let response = server
+        .prepare_rename("file:///test.qmd", 0, 17)
+        .await
+        .expect("prepare rename response");
+
+    let PrepareRenameResponse::Range(range) = response else {
+        panic!("expected prepare rename range");
+    };
+
+    assert_eq!(range.start.line, 0);
+    assert_eq!(range.start.character, 16);
+    assert_eq!(range.end.line, 0);
+    assert_eq!(range.end.character, 24);
+}
