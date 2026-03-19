@@ -45,7 +45,12 @@ plot(1:10)
         .expect("references");
 
     assert!(refs.iter().any(|loc| loc.range.start.line == 0));
-    assert!(refs.iter().any(|loc| loc.range.start.line == 3));
+    let declaration = refs
+        .iter()
+        .find(|loc| loc.range.start.line == 3)
+        .expect("declaration reference on chunk label line");
+    assert_eq!(declaration.range.start.character, 10);
+    assert_eq!(declaration.range.end.character, 18);
 }
 
 #[tokio::test]

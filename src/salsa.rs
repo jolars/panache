@@ -663,6 +663,11 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
                 .entry(normalize_label(&value))
                 .or_default()
                 .push(value_range);
+            index
+                .crossref_declaration_value_ranges
+                .entry(normalize_label(&value))
+                .or_default()
+                .push(value_range);
         }
     }
 

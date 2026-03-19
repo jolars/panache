@@ -110,7 +110,8 @@ pub(crate) async fn references(
                             add_locations(&mut locations, &doc_uri, &text, ranges);
                         }
                         if include_declaration
-                            && let Some(ranges) = symbol_index.crossref_declarations(&candidate)
+                            && let Some(ranges) =
+                                symbol_index.crossref_declaration_value_ranges(&candidate)
                         {
                             add_locations(&mut locations, &doc_uri, &text, ranges);
                         }
