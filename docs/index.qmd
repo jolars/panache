@@ -25,6 +25,40 @@ page](https://github.com/jolars/panache/releases) for Linux, macOS, and Windows.
 For Linux, packages are available for generic distributions (tarballs) as well
 as Debian/Ubuntu (`.deb`) and Fedora/RHEL/openSUSE (`.rpm`).
 
+If you prefer a one-liner installer that picks the right release artifact for
+your platform, you can use the installer scripts below.
+
+::: {.panel-tabset}
+#### Linux and macOS
+
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf \
+    https://github.com/jolars/panache/releases/latest/download/panache-installer.sh | sh
+```
+
+#### Windows (PowerShell)
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://github.com/jolars/panache/releases/latest/download/panache-installer.ps1 | iex"
+```
+
+:::
+
+### Nix OS
+
+Panache is available in NixOS in the `panache` package in `nixpkgs`. To add it
+to your system configuration, include it in the `environment.systemPackages`:
+
+```nix
+{ pkgs, ... }:
+
+{
+  environment.systemPackages = [
+    pkgs.panache
+  ];
+}
+```
+
 ### Arch Linux
 
 There is also an Arch Linux package available in the AUR:
