@@ -19,6 +19,11 @@ pub struct TestLspServer {
     lsp: Arc<PanacheLsp>,
 }
 
+pub struct WorkspaceSymbolSummary {
+    pub name: String,
+    pub location: Location,
+}
+
 impl TestLspServer {
     /// Create a new test LSP server.
     ///
@@ -179,7 +184,7 @@ impl TestLspServer {
     /// Get workspace symbols for a query.
     ///
     /// Simulates the `workspace/symbol` request.
-    pub async fn get_workspace_symbols(&self, query: &str) -> Option<Vec<SymbolInformation>> {
+    pub async fn get_workspace_symbols(&self, query: &str) -> Option<Vec<WorkspaceSymbolSummary>> {
         let params = WorkspaceSymbolParams {
             query: query.to_string(),
             work_done_progress_params: WorkDoneProgressParams::default(),
@@ -187,9 +192,31 @@ impl TestLspServer {
         };
 
         match self.lsp.symbol(params).await.unwrap() {
-            Some(WorkspaceSymbolResponse::Flat(symbols)) => Some(symbols),
-            Some(WorkspaceSymbolResponse::Nested(_)) => {
-                panic!("Expected flat workspace symbols response")
+            Some(WorkspaceSymbolResponse::Flat(symbols)) => Some(
+                symbols
+                    .into_iter()
+                    .map(|symbol| WorkspaceSymbolSummary {
+                        name: symbol.name,
+                        location: symbol.location,
+                    })
+                    .collect(),
+            ),
+            Some(WorkspaceSymbolResponse::Nested(symbols)) => {
+                let flat: Vec<WorkspaceSymbolSummary> = symbols
+                    .into_iter()
+                    .filter_map(|symbol| {
+                        let location = match symbol.location {
+                            OneOf::Left(location) => location,
+                            OneOf::Right(_) => return None,
+                        };
+
+                        Some(WorkspaceSymbolSummary {
+                            name: symbol.name,
+                            location,
+                        })
+                    })
+                    .collect();
+                Some(flat)
             }
             None => None,
         }
