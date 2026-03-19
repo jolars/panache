@@ -5,8 +5,7 @@ pub fn collect_yaml_frontmatter_region(
 ) -> Option<crate::syntax::YamlFrontmatterRegion> {
     let frontmatter = tree
         .children()
-        .skip_while(|node| node.kind() == SyntaxKind::BLANK_LINE)
-        .next()
+        .find(|node| node.kind() != SyntaxKind::BLANK_LINE)
         .filter(|node| node.kind() == SyntaxKind::YAML_METADATA)?;
 
     let content = frontmatter
