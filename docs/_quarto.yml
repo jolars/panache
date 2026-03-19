@@ -24,6 +24,8 @@ website:
         aria-label: "Source for this webpage"
 
   navbar:
+    logo: images/logo.svg
+    title: false
     left:
       - href: index.qmd
         text: Home
