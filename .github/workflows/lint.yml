@@ -60,3 +60,5 @@ jobs:
 
       - name: Install Rust
         uses: jolars/panache-action@v1
+        with:
+          path: docs/
