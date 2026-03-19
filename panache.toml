@@ -1,3 +1,5 @@
+extend-exclude = ["docs/user-guide/cli.qmd"]
+
 [formatters]
 r = "air"
 toml = "taplo"
