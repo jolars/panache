@@ -1,15 +1,27 @@
-use crate::syntax::SyntaxNode;
+use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub fn collect_yaml_frontmatter_region(
     tree: &SyntaxNode,
 ) -> Option<crate::syntax::YamlFrontmatterRegion> {
-    crate::syntax::collect_embedded_frontmatter_yaml_cst(tree).map(|embedding| {
-        let region = embedding.parsed().to_region();
-        crate::syntax::YamlFrontmatterRegion {
-            id: region.id,
-            host_range: region.host_range,
-            content_range: region.content_range,
-            content: region.content,
-        }
+    let frontmatter = tree
+        .children()
+        .skip_while(|node| node.kind() == SyntaxKind::BLANK_LINE)
+        .next()
+        .filter(|node| node.kind() == SyntaxKind::YAML_METADATA)?;
+
+    let content = frontmatter
+        .children()
+        .find(|child| child.kind() == SyntaxKind::YAML_METADATA_CONTENT)?;
+
+    let host_start: usize = frontmatter.text_range().start().into();
+    let host_end: usize = frontmatter.text_range().end().into();
+    let content_start: usize = content.text_range().start().into();
+    let content_end: usize = content.text_range().end().into();
+
+    Some(crate::syntax::YamlFrontmatterRegion {
+        id: format!("frontmatter:{}:{}", content_start, content_end),
+        host_range: host_start..host_end,
+        content_range: content_start..content_end,
+        content: content.text().to_string(),
     })
 }
