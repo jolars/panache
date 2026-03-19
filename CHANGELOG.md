@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.24.1](https://github.com/jolars/panache/compare/v2.24.0...v2.24.1) (2026-03-19)
+
+### Bug Fixes
+
+* **formatter:** account for prefix when formatting hashpipe ([b3471c2](https://github.com/jolars/panache/commit/b3471c2581ca82edd0c073f8c0decb618258898a))
+* **formatters:** don't hide warnings behind log flag ([59b5dc0](https://github.com/jolars/panache/commit/59b5dc01a656767826c20e318bc7bd631e91123b))
+* **lsp:** handle hyphenated references when renaming ([2d507b8](https://github.com/jolars/panache/commit/2d507b854988c4ed778c1fe3098f00f71ba1dd5c))
+
 ## [2.24.0](https://github.com/jolars/panache/compare/v2.23.0...v2.24.0) (2026-03-19)
 
 ### Features
