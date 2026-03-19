@@ -2,11 +2,10 @@
 title: Getting Started
 ---
 
-To get started with Panache, follow the installation instructions below, then
-explore the basic usage examples for formatting, linting, and parsing your
-Markdown documents. You can also customize Panache's behavior with configuration
-files and use ignore directives to preserve specific formatting or suppress lint
-warnings in certain sections of your documents.
+This guide gets you from zero to a productive Panache setup. You will install
+the CLI, verify it works, run the core commands (`format`, `lint`, and `parse`),
+and learn the minimum configuration and ignore directives you need for
+day-to-day editing.
 
 ## Installation
 
@@ -33,32 +32,21 @@ from this repository's latest GitHub release and install to a user-local
 directory by default. If you prefer, download and inspect the script before
 running it.
 
-For macOS and Linux:
+::: {.panel-tabset}
+### Linux and macOS
 
 ```sh
 curl --proto '=https' --tlsv1.2 -LsSf \
     https://github.com/jolars/panache/releases/latest/download/panache-installer.sh | sh
 ```
 
-For Windows PowerShell:
+### Windows (PowerShell)
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://github.com/jolars/panache/releases/latest/download/panache-installer.ps1 | iex"
 ```
 
-#### Debian/Ubuntu
-
-```bash
-wget https://github.com/jolars/panache/releases/latest/download/panache_ <VERSION >_amd64.deb
-sudo dpkg -i panache_*.deb
-```
-
-#### Fedora/RHEL/openSUSE
-
-```bash
-wget https://github.com/jolars/panache/releases/latest/download/panache- <VERSION >.x86_64.rpm
-sudo rpm -i panache-*.rpm
-```
+:::
 
 ### Arch Linux
 
@@ -307,3 +295,4 @@ See the [Formatting](user-guide/formatting.qmd) and
   [github.com/jolars/panache/issues](https://github.com/jolars/panache/issues)
 - **Discussions**:
   [github.com/jolars/panache/discussions](https://github.com/jolars/panache/discussions)
+  :::
