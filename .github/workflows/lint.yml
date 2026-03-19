@@ -16,8 +16,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  docs:
-    name: Lint
+  clippy:
+    name: Clippy
     runs-on: ubuntu-latest
 
     steps:
@@ -49,3 +49,14 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt -- --check
+
+  panache:
+    name: Panache
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: jolars/panache-action@v1
