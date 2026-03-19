@@ -219,12 +219,13 @@ fn compare_positions(a: &Position, b: &Position) -> std::cmp::Ordering {
 #[cfg(test)]
 mod tests {
     use super::{heading_outline_from_root, symbols_for_document};
+    use std::env;
     use tower_lsp_server::ls_types::Uri;
 
     #[test]
     fn extracts_heading_symbols_with_container_names() {
         let content = "# Top\n\n## Child\n\n### Grandchild\n\n## Sibling\n";
-        let uri = Uri::from_file_path("/tmp/test.qmd").expect("path uri");
+        let uri = Uri::from_file_path(env::temp_dir().join("test.qmd")).expect("path uri");
         let root = crate::parse(content, None);
         let outline = heading_outline_from_root(&root);
         let symbols = symbols_for_document(&uri, content, &outline, "");
@@ -239,7 +240,7 @@ mod tests {
     #[test]
     fn filters_heading_symbols_by_query() {
         let content = "# Intro\n\n## Methods\n\n## Results\n";
-        let uri = Uri::from_file_path("/tmp/test.qmd").expect("path uri");
+        let uri = Uri::from_file_path(env::temp_dir().join("test.qmd")).expect("path uri");
         let root = crate::parse(content, None);
         let outline = heading_outline_from_root(&root);
         let symbols = symbols_for_document(&uri, content, &outline, "intro");
