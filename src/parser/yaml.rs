@@ -94,6 +94,18 @@ mod tests {
     }
 
     #[test]
+    fn accepts_single_line_with_crlf_terminator() {
+        let parsed = parse_basic_entry("title: My Title\r");
+        assert_eq!(
+            parsed,
+            Some(BasicYamlEntry {
+                key: "title",
+                value: "My Title"
+            })
+        );
+    }
+
+    #[test]
     fn builds_basic_rowan_tree() {
         let tree = parse_basic_entry_tree("title: My Title").expect("tree");
         assert_eq!(tree.kind(), SyntaxKind::DOCUMENT);
