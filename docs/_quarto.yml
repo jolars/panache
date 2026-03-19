@@ -50,8 +50,6 @@ website:
         text: Getting Started
       - href: user-guide
         text: User Guide
-      - href: playground/index.html
-        text: Playground
       - text: Help
         menu:
           - text: Report a bug
@@ -60,6 +58,10 @@ website:
           - text: Ask a question
             icon: "chat-right-text"
             href: "https://github.com/jolars/panache/discussions"
+      - href: playground/index.html
+        text: "Playground"
+        icon: box-arrow-up-right
+        target: _blank
 
   sidebar:
     - id: user-guide
