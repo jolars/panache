@@ -1,0 +1,4 @@
+repo=https://github.com/yaml/yaml-test-suite
+tag=data-2022-01-17
+source=git-branch
+layout=data-branch-root

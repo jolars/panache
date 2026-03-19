@@ -1,0 +1,13 @@
+---
+source: tests/yaml_suite.rs
+assertion_line: 50
+expression: snapshot
+---
+case_id: D9TU
+input: "foo: bar\n"
+parsed: Some(
+    BasicYamlEntry {
+        key: "foo",
+        value: "bar",
+    },
+)

@@ -107,7 +107,8 @@ support.
       - [ ] General support for pandoc etc
       - [ ] Quarto - project-wide symbol search for figures, tables, sections
       - [ ] Rmarkdown (Bookdown)
-- [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload config
+- [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload
+      config
 
 ## Configuration System
 
@@ -173,6 +174,21 @@ support.
 - [ ] Avoid temporary green tree when injecting `BLOCKQUOTE_MARKER` tokens into
       inline-parsed paragraphs (current approach parses inlines into a temp
       tree, then replays while inserting markers)
+
+### Long-term YAML parser groundwork
+
+- [ ] Build an in-tree YAML parser module (`src/parser/yaml.rs`) as a long-term
+      project with lossless CST goals.
+- [ ] Target one shared parser core for plain YAML files and hashpipe-prefixed
+      YAML (frontmatter/chunk metadata) with explicit host-range mapping
+      support.
+- [ ] Roll out via shadow/read-only mode with parity checks against existing
+      YAML behavior before any formatter or edit-path replacement.
+- [ ] Add first-class YAML formatting support after parser parity, using shared
+      CST and idempotency-focused formatting tests for both plain YAML and
+      hashpipe-prefixed YAML.
+- [x] Add pinned yaml-test-suite fixtures under `tests/fixtures/yaml-test-suite`
+      with an update script (`scripts/update-yaml-test-suite-fixtures.sh`).
 
 ## Parser - Coverage
 
@@ -250,7 +266,8 @@ implemented.
 
 - [x] Extension: `simple_tables` - Simple table syntax (parsing complete,
       formatting deferred)
-- [x] Extension: `table_captions` - Table captions (both before and after tables)
+- [x] Extension: `table_captions` - Table captions (both before and after
+      tables)
 - [x] Extension: `pipe_tables` - GitHub/PHP Markdown tables (all alignments,
       orgtbl variant)
 - [x] Extension: `multiline_tables` - Multiline cell content (parsing complete,
@@ -397,7 +414,8 @@ for initial implementation.
 
 #### Non-Default: Headings
 
-- [ ] Extension: `mmd_header_identifiers` - MultiMarkdown style IDs (non-default)
+- [ ] Extension: `mmd_header_identifiers` - MultiMarkdown style IDs
+      (non-default)
 
 #### Non-Default: Lists
 

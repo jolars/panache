@@ -1,0 +1,3 @@
+# yaml-test-suite case IDs currently covered by our incremental Panache YAML parser harness.
+# Keep this list intentionally small and grow it with parser capability.
+D9TU

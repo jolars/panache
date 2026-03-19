@@ -70,6 +70,11 @@ tasks:
     cmds:
       - UPDATE_CST=1 cargo test --test golden_cases
 
+  update-yaml-fixtures:
+    desc: Download and refresh yaml-test-suite fixtures (default data-2022-01-17)
+    cmds:
+      - ./scripts/update-yaml-test-suite-fixtures.sh data-2022-01-17
+
   coverage:
     desc: Generate code coverage report
     cmds:

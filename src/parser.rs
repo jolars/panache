@@ -11,6 +11,7 @@ use rowan::{GreenNode, NodeOrToken, TextRange, TextSize};
 pub mod blocks;
 pub mod inlines;
 pub mod utils;
+pub mod yaml;
 
 mod block_dispatcher;
 mod core;

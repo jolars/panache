@@ -103,7 +103,8 @@ RUST_LOG=info ./target/release/panache format document.qmd
 
 - Typed wrappers (`Heading`, `Link`, `Table`) hide syntactic details
 - Pattern borrowed from rust-analyzer
-- Example: `Heading::cast(node).level()` returns `1` without exposing `#` markers
+- Example: `Heading::cast(node).level()` returns `1` without exposing `#`
+  markers
 - Located in `src/syntax/{headings,links,tables,references}.rs`
 
 ### Single-Pass Parsing Architecture
@@ -305,6 +306,13 @@ Instead of listing every file, understand the patterns:
 - `cases/*/`: Golden test scenarios (use `view` to explore)
 - `cli/`: CLI integration tests
 - `format/`: Feature-specific unit tests
+- YAML suite groundwork uses vendored fixtures under
+  `tests/fixtures/yaml-test-suite/` refreshed via
+  `scripts/update-yaml-test-suite-fixtures.sh`; incremental coverage is tracked
+  by `tests/yaml/allowlist.txt`.
+- Long-term YAML parser groundwork lives in `src/parser/yaml.rs`; treat it as an
+  incremental, shadow-mode-first effort toward full CST/LSP/formatting
+  integration.
 
 **Editor extension** (`editors/code/`):
 
