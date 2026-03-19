@@ -1,6 +1,8 @@
 //! Tests for navigation features (document symbols, folding, goto definition).
 
 use super::helpers::*;
+use std::fs;
+use tempfile::TempDir;
 use tower_lsp_server::ls_types::*;
 
 #[tokio::test]
@@ -168,4 +170,80 @@ async fn test_folding_ranges_code_block() {
     // Find the code block fold
     let code_fold = ranges.iter().find(|r| r.start_line == 2);
     assert!(code_fold.is_some(), "Should have fold for code block");
+}
+
+#[tokio::test]
+async fn test_workspace_symbols_include_open_standalone_document() {
+    let server = TestLspServer::new();
+    let content = "# Intro\n\n## Methods\n";
+    server
+        .open_document("file:///standalone.md", content, "markdown")
+        .await;
+
+    let symbols = server.get_workspace_symbols("intro").await;
+    let Some(symbols) = symbols else {
+        panic!("Expected workspace symbols");
+    };
+
+    assert_eq!(symbols.len(), 1);
+    assert_eq!(symbols[0].name, "Intro");
+}
+
+#[tokio::test]
+async fn test_workspace_symbols_include_multiple_open_documents() {
+    let server = TestLspServer::new();
+    server
+        .open_document("file:///doc1.qmd", "# Alpha\n\n## Shared\n", "quarto")
+        .await;
+    server
+        .open_document("file:///doc2.qmd", "# Beta\n\n## Shared\n", "quarto")
+        .await;
+
+    let symbols = server.get_workspace_symbols("shared").await;
+    let Some(symbols) = symbols else {
+        panic!("Expected workspace symbols");
+    };
+
+    assert_eq!(symbols.len(), 2);
+    assert_eq!(symbols[0].name, "Shared");
+    assert_eq!(symbols[1].name, "Shared");
+    assert_ne!(symbols[0].location.uri, symbols[1].location.uri);
+}
+
+#[tokio::test]
+async fn test_workspace_symbols_include_graph_documents() {
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let parent_path = root.join("parent.qmd");
+    let child_path = root.join("child.qmd");
+
+    fs::write(&child_path, "# Child Heading\n\n## Child Section\n").unwrap();
+    fs::write(
+        &parent_path,
+        "{{< include child.qmd >}}\n\n# Parent Heading\n",
+    )
+    .unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).unwrap().to_string();
+    server.initialize(&root_uri).await;
+    server
+        .open_document(
+            &Uri::from_file_path(&parent_path).unwrap().to_string(),
+            &fs::read_to_string(&parent_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let symbols = server.get_workspace_symbols("child heading").await;
+    let Some(symbols) = symbols else {
+        panic!("Expected workspace symbols");
+    };
+
+    assert_eq!(symbols.len(), 1);
+    assert_eq!(symbols[0].name, "Child Heading");
+    assert_eq!(
+        symbols[0].location.uri,
+        Uri::from_file_path(&child_path).unwrap()
+    );
 }

@@ -176,6 +176,25 @@ impl TestLspServer {
         self.lsp.document_symbol(params).await.unwrap()
     }
 
+    /// Get workspace symbols for a query.
+    ///
+    /// Simulates the `workspace/symbol` request.
+    pub async fn get_workspace_symbols(&self, query: &str) -> Option<Vec<SymbolInformation>> {
+        let params = WorkspaceSymbolParams {
+            query: query.to_string(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+
+        match self.lsp.symbol(params).await.unwrap() {
+            Some(WorkspaceSymbolResponse::Flat(symbols)) => Some(symbols),
+            Some(WorkspaceSymbolResponse::Nested(_)) => {
+                panic!("Expected flat workspace symbols response")
+            }
+            None => None,
+        }
+    }
+
     /// Get code actions for a range.
     ///
     /// Simulates the `textDocument/codeAction` request.
@@ -504,6 +523,13 @@ impl LanguageServer for LspWrapper {
         params: ReferenceParams,
     ) -> tower_lsp_server::jsonrpc::Result<Option<Vec<Location>>> {
         self.inner.references(params).await
+    }
+
+    async fn symbol(
+        &self,
+        params: WorkspaceSymbolParams,
+    ) -> tower_lsp_server::jsonrpc::Result<Option<WorkspaceSymbolResponse>> {
+        self.inner.symbol(params).await
     }
 
     async fn hover(&self, params: HoverParams) -> tower_lsp_server::jsonrpc::Result<Option<Hover>> {

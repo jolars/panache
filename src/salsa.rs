@@ -316,6 +316,13 @@ pub struct SymbolUsageIndex {
     heading_sequence: Vec<(rowan::TextRange, usize)>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HeadingOutlineEntry {
+    pub title: String,
+    pub level: usize,
+    pub range: rowan::TextRange,
+}
+
 impl SymbolUsageIndex {
     pub fn citation_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.citation_usages.get(&normalize_label(key))
@@ -434,6 +441,36 @@ pub fn symbol_usage_index(
 ) -> SymbolUsageIndex {
     let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
     symbol_usage_index_from_tree(db, &tree)
+}
+
+#[salsa::tracked(returns(ref), lru = 64)]
+pub fn heading_outline(
+    db: &dyn Db,
+    file: FileText,
+    config: FileConfig,
+    _path: PathBuf,
+) -> Vec<HeadingOutlineEntry> {
+    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    tree.descendants()
+        .filter_map(crate::syntax::Heading::cast)
+        .filter_map(|heading| {
+            let level = heading.level();
+            if level == 0 {
+                return None;
+            }
+
+            let title = heading.text();
+            Some(HeadingOutlineEntry {
+                title: if title.is_empty() {
+                    "(empty)".to_string()
+                } else {
+                    title
+                },
+                level,
+                range: heading.syntax().text_range(),
+            })
+        })
+        .collect()
 }
 
 pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsageIndex {
@@ -1507,6 +1544,22 @@ mod tests {
                 .map(|ranges| ranges.len()),
             Some(1)
         );
+    }
+
+    #[test]
+    fn heading_outline_collects_heading_title_level_and_range() {
+        let mut db = SalsaDb::default();
+        let path = PathBuf::from("/tmp/heading_outline.qmd");
+        let file = db.update_file_text(path.clone(), "# Top\n\n## Child\n".to_string());
+        let config = FileConfig::new(&db, crate::Config::default());
+
+        let outline = heading_outline(&db, file, config, path).clone();
+
+        assert_eq!(outline.len(), 2);
+        assert_eq!(outline[0].title, "Top");
+        assert_eq!(outline[0].level, 1);
+        assert_eq!(outline[1].title, "Child");
+        assert_eq!(outline[1].level, 2);
     }
 
     #[test]

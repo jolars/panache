@@ -56,6 +56,7 @@ impl LanguageServer for PanacheLsp {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions::default()),
                 references_provider: Some(OneOf::Left(true)),
+                workspace_symbol_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Right(RenameOptions {
                     prepare_provider: Some(true),
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -291,6 +292,20 @@ impl LanguageServer for PanacheLsp {
 
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         handlers::references::references(
+            &self.client,
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await
+    }
+
+    async fn symbol(
+        &self,
+        params: WorkspaceSymbolParams,
+    ) -> Result<Option<WorkspaceSymbolResponse>> {
+        handlers::workspace_symbols::workspace_symbol(
             &self.client,
             Arc::clone(&self.document_map),
             Arc::clone(&self.salsa_db),
