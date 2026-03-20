@@ -50,6 +50,8 @@ cargo check && cargo test && cargo clippy --all-targets --all-features -- -D war
   (`didOpen`/`didChange`/`didClose`).
 - Be careful with UTF-16/UTF-8 position/range conversions.
 - Prefer typed syntax wrappers for feature implementations when available.
+- Follow the async/CST safety pattern in `src/lsp/ASYNC_SAFETY.md` (fetch async
+  state first, then traverse CST without awaits).
 - Run targeted LSP tests before full-suite revalidation.
 
 ## Debugging LSP (VS Code + Neovim)
