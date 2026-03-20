@@ -552,6 +552,9 @@ pub fn try_parse_reference_link(
     } else if allow_shortcut {
         // Shortcut reference: [text] with no second bracket pair
         // The text is both the display text and the label
+        if link_text.is_empty() {
+            return None;
+        }
         Some((after_bracket, link_text, link_text.to_string(), true))
     } else {
         // No second bracket pair and shortcut not allowed - not a reference link
@@ -981,6 +984,13 @@ mod tests {
             result,
             Some((11, "link text", "link text".to_string(), true))
         );
+    }
+
+    #[test]
+    fn test_parse_reference_link_shortcut_rejects_empty_label() {
+        let input = "[] rest";
+        let result = try_parse_reference_link(input, true);
+        assert_eq!(result, None);
     }
 
     #[test]
