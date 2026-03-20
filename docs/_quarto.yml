@@ -23,6 +23,7 @@ website:
 
   open-graph:
     locale: en_US
+    image: images/og.png
 
   page-footer:
     left: "panache v{{< meta version >}} | Copyright 2026, Johan Larsson"
