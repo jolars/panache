@@ -113,3 +113,11 @@ fn outdented_item_after_nested_list_formats_at_outer_level() {
     let output = format(input, None, None);
     assert_eq!(output, expected);
 }
+
+#[test]
+fn empty_brackets_in_list_item_are_escaped() {
+    let input = "- [] a\n";
+    let expected = "- \\[\\] a\n";
+    let output = format(input, None, None);
+    assert_eq!(output, expected);
+}
