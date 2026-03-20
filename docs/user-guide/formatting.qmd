@@ -47,16 +47,24 @@ Hard line breaks, which are created either by ending a line with two or more
 spaces (\``) or by using a backslash (`\\n\`), are preserved regardless of the
 wrapping mode:
 
-```markdown
-First line\
-Second line (forced break)
-```
+Input (with `  ` hard break)
+:   ```markdown
+    First line  
+    Second line
+    ```
+
+Output
+:   ```markdown
+    First line\
+    Second line
+    ```
 
 ## Headings
 
 ### ATX Headings
 
-Headings are normalized with consistent spacing:
+Headings are normalized with consistent spacing. Trailing `#` characters in ATX
+headings are removed.
 
 Input
 :   ```markdown
@@ -84,13 +92,19 @@ Output
 
 Attributes are preserved and formatted:
 
-```markdown
-## Heading {#custom-id .my-class key="value"}
-```
+Input
+:   ```markdown
+    ## Heading with classes{.important  .highlight }
+    ```
+
+Output
+:   ```markdown
+    ## Heading with classes {.important .highlight}
+    ```
 
 ### Setext Headings
 
-Setext-style headings are converted to ATX style for consistency:
+Setext-style headings are converted to ATX style.
 
 Input
 
@@ -113,32 +127,36 @@ Output
 
 ### Basic Formatting
 
-Emphasis markers are normalized:
+Emphasis markers are consistently normalized o asterisks (`*`) for italics and
+double asterisks (`**`) for bold. Underscores are converted to asterisks.
+Ambiguous cases are resolved by escaping emphasis markers to avoid idempotency
+issues.
 
-**Input:**
+Input
+:   ```markdown
+    Single asterisks: *italic text*
 
-```markdown
-*italic* _also italic_
-**bold** __also bold__
-***bold italic***
-```
+    Single underscores: _italic text_
 
-**Output:**
+    Double asterisks: **bold text**
 
-```markdown
-*italic* *also italic*
-**bold** **also bold**
-***bold italic***
-```
+    Double underscores: __bold text__
 
-### Nested Emphasis
+    **foo*
+    ```
 
-Nested emphasis is handled correctly:
+Output
+:   ```markdown
+    Single asterisks: *italic text*
 
-```markdown
-**bold with *nested italic* inside**
-*italic with **nested bold** inside*
-```
+    Single underscores: *italic text*
+
+    Double asterisks: **bold text**
+
+    Double underscores: **bold text**
+
+    \*\*foo\*
+    ```
 
 ## Code
 
@@ -146,10 +164,19 @@ Nested emphasis is handled correctly:
 
 Inline code is preserved with minimal backticks needed:
 
-```markdown
-Use `code` for inline code.
-Use ``code with ` backtick`` for code containing backticks.
-```
+Input
+:   ````markdown
+    Code with spaces: ` code with spaces `
+
+    `` ```r ``
+    ````
+
+Output
+:   `````markdown
+    Code with spaces: `code with spaces`
+
+    ```` ```r ````
+    `````
 
 ### Tab Stops in Code
 
@@ -211,8 +238,8 @@ Indented code blocks are normalized to fenced code blocks for consistency:
 
 Input
 :   ```markdown
-    a <- 1
-    b <- a^2
+        a <- 1
+        b <- a^2
     ```
 
 Output
@@ -228,29 +255,25 @@ Output
 ### Unordered Lists
 
 Bullet list markers are standardized to `-` for consistency. Indentation is
-normalized to 2 spaces per level.
+normalized to 2 spaces per level. Loose lists are converted to tight lights if
+they only contain plain (non-block/paragraph) items.
 
 Input
 :   ```markdown
-    *  Item 1
-    + Nested item
-    *   Deeply nested
-    + Item 2
+    * Item 1
+      + Nested item
+          *  Deeply nested
+
+     +  Item 2
     ```
 
 Output:
 :   ```markdown
     - Item 1
-    - Nested item
-    - Deeply nested
+      - Nested item
+        - Deeply nested
     - Item 2
     ```
-
-::: {.callout-note}
-panache standardizes all bullet list markers to `-` (hyphen) for consistency,
-regardless of the original marker used. This applies to all nesting levels and
-task lists as well.
-:::
 
 ### Ordered Lists
 
@@ -272,16 +295,16 @@ of the text.
 Input
 :   ```markdown
     + [ ] Parent task
-    *   [ ] Nested unchecked task
-    - [x]   Nested checked task
-    - [x] Another parent task
+       *   [ ] Nested unchecked task
+       - [x]   Nested checked task
+    - [X] Another parent task
     ```
 
 Output
 :   ```markdown
     - [ ] Parent task
-    - [ ] Nested unchecked task
-    - [x] Nested checked task
+           - [ ] Nested unchecked task
+           - [x] Nested checked task
     - [x] Another parent task
     ```
 
@@ -298,7 +321,7 @@ Input
 
     Term 2
     :   Definition 2a
-    : Definition 2b
+     : Definition 2b
 
     Term 3
     : Definition
@@ -341,17 +364,17 @@ Input
 
 Output
 :   ```markdown
-    (i) Parens style
-    (ii) Second item
+      (i) Parens style
+     (ii) Second item
     (iii) Third item
 
-    iv. Starting at four
-    v. Five
-    vi. Six
-    vii. Seven
+      iv. Starting at four
+       v. Five
+      vi. Six
+     vii. Seven
     viii. Eight
-    ix. Nine
-    x. Ten
+      ix. Nine
+       x. Ten
     ```
 
 ## Blockquotes
@@ -408,12 +431,30 @@ while preserving content and attributes.
 
 ### Simple Tables
 
-```markdown
-  Header 1   Header 2   Header 3
-  ---------- ---------- ----------
-  Cell 1     Cell 2     Cell 3
-  Cell 4     Cell 5     Cell 6
-```
+We normalize simple tables so that cell contents align with the alignment
+specified in the header row, and spacing within cells is normalized.
+
+Input
+:   ```markdown
+       Right     Left     Center     Default
+     -------     ------ ----------   ---------------
+          12       12      12            12
+       123       123       123          123
+           1     1        1             1
+
+       :  A caption
+    ```
+
+Output
+:   ```markdown
+      Right     Left     Center     Default
+    -------     ------ ----------   -------
+         12     12         12       12
+        123     123       123       123
+          1     1          1        1
+
+    Table: A caption
+    ```
 
 ## Math
 
@@ -472,63 +513,34 @@ Output
     [URL and title](/url/ "title with single quotes")
     ```
 
-### Reference Links
-
-```markdown
-[Link text][ref]
-
-[ref]: https://example.com
-```
-
-### Automatic Links
-
-```markdown
-<https://example.com>
-<email@example.com>
-```
-
-## Images
-
-### Inline Images
-
-```markdown
-![Alt text](image.png)
-![Alt with title](image.png "Title")
-```
-
-### Images with Attributes
-
-```markdown
-![Caption](image.png){#fig-id width=50%}
-```
-
 ## Fenced Divs
 
-Quarto/Pandoc fenced divs are formatted correctly:
+Fenced divs are normalized so that there is no blank line between the opening
+fence and the content and no space between the closing fence and the content.
+Attributes are preserved and normalized. With nested divs, the inner div
 
-```markdown
-::: {.callout-note}
-This is a note callout.
-:::
+Input
+:   ```markdown
+    ::: Warning ::::::
+    This is a warning.
 
-::: {#custom-id .my-class}
-Content with custom attributes.
-:::
-```
+    ::: Danger
+    This is a warning within a warning.
+    :::
+    ::::::::::::::::::
+    ```
 
-### Nested Divs
+Output
 
-```markdown
-::: {.outer}
-Outer content
+:   ```markdown
+    ::: Warning
+    This is a warning.
 
-::: {.inner}
-Inner content
-:::
-
-More outer content
-:::
-```
+    ::::: Danger
+    This is a warning within a warning.
+    :::::
+    :::
+    ```
 
 ## Footnotes
 
@@ -578,27 +590,25 @@ E = mc^2
 ```
 ````
 
-## Horizontal Rules
+## Horizontal Rulers
 
-Horizontal rules are normalized:
+Horizontal rulers are normalized to hyphens and extend to `line-width`.
 
-**Input:**
+Input
+:   ```markdown
+    ---
+    ***
+    ___
+    ```
 
-```markdown
----
-***
-___
-```
+Output (`line-width = 60`):
+:   ```markdown
+    -----------------------------------------------------------
 
-**Output:**
+    -----------------------------------------------------------
 
-```markdown
----
-
----
-
----
-```
+    -----------------------------------------------------------
+    ```
 
 ## Blank Lines
 
@@ -642,15 +652,30 @@ blank-lines = "preserve"
 
 ### YAML
 
-YAML frontmatter is parsed and normalized by Panache's built-in YAML formatter:
+YAML frontmatter is parsed and normalized by
+[`pretty_yaml`](https://github.com/g-plane/pretty_yaml).
 
 ```markdown
 ---
-title: "My Document"
-author: "Author Name"
-date: "2026-02-11"
+echo:    false
+list:
+  -  a
+  -     b
 ---
+Text
 ```
+
+Output
+:   ```markdown
+    ---
+    echo: false
+    list:
+      - a
+      - b
+    ---
+
+    Text
+    ```
 
 By default this means spacing and list indentation are normalized in the
 frontmatter block. This frontmatter formatting is always handled internally by
