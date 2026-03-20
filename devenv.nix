@@ -14,7 +14,6 @@
     pkgs.go-task
     pkgs.jarl
     pkgs.llvmPackages.bintools
-    pkgs.pandoc
     pkgs.prettier
     pkgs.quartoMinimal
     pkgs.air-formatter
