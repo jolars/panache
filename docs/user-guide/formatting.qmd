@@ -61,19 +61,24 @@ Headings are normalized with consistent spacing:
 Input
 :   ```markdown
     #Heading 1
+    Text
+
     ##  Heading 2
+
     ###   Heading 3
     ```
 
-**Output:**
+Output
 
-```markdown
-# Heading 1
+:   ```markdown
+    # Heading 1
 
-## Heading 2
+    Text
 
-### Heading 3
-```
+    ## Heading 2
+
+    ### Heading 3
+    ```
 
 ### Heading Attributes
 
@@ -88,6 +93,7 @@ Attributes are preserved and formatted:
 Setext-style headings are converted to ATX style for consistency:
 
 Input
+
 :   ```markdown
     Heading 1
     =========
@@ -156,52 +162,89 @@ tab-stops = "preserve"
 tab-width = 4
 ```
 
-### Code Blocks
+### Fenced Code Blocks
 
-Fenced code blocks are formatted consistently:
+Fenced code blocks are formatted with consistent fencing and attributes. We
+normalize them to the *shortcut* style from Pandoc.
 
-**Input:**
+Input
+:   ````markdown
+    ```haskell
+    qsort [] = []
+    ```
 
-````markdown
-```python
-def hello():
-    print("Hello")
-```
-````
+    ``` {.haskell}
+    qsort [] = []
+    ```
 
-**Output:**
+    ```haskell {.numberLines}
+    qsort [] = []
+    ```
 
-````markdown
-```python
-def hello():
-    print("Hello")
-```
-````
+    ``` {.haskell .numberLines}
+    qsort [] = []
+    ```
+    ````
+
+Output
+:   ````markdown
+    ```haskell
+    qsort [] = []
+    ```
+
+    ```haskell
+    qsort [] = []
+    ```
+
+    ```haskell {.numberLines}
+    qsort [] = []
+    ```
+
+    ```haskell {.numberLines}
+    qsort [] = []
+    ```
+    ````
+
+### Indented Code Blocks
+
+Indented code blocks are normalized to fenced code blocks for consistency:
+
+Input
+:   ```markdown
+    a <- 1
+    b <- a^2
+    ```
+
+Output
+:   ````markdown
+    ```
+    a <- 1
+    b <- a^2
+    ```
+    ````
 
 ## Lists
 
 ### Unordered Lists
 
-Bullet list markers are standardized to `-` for consistency. All bullet markers
-(`*`, `+`, `-`) are converted to `-` at all nesting levels:
+Bullet list markers are standardized to `-` for consistency. Indentation is
+normalized to 2 spaces per level.
 
-**Input:**
+Input
+:   ```markdown
+    *  Item 1
+    + Nested item
+    *   Deeply nested
+    + Item 2
+    ```
 
-```markdown
-* Item 1
-  + Nested item
-    * Deeply nested
-+ Item 2
-```
-
-**Output:**
-
-```markdown
-- Item 1
-  - Nested item
+Output:
+:   ```markdown
+    - Item 1
+    - Nested item
     - Deeply nested
-- Item 2
-```
+    - Item 2
+    ```
 
 ::: {.callout-note}
 panache standardizes all bullet list markers to `-` (hyphen) for consistency,
@@ -223,65 +266,119 @@ Ordered lists maintain proper numbering:
 
 ### Task Lists
 
-GitHub-style task lists use the standardized `-` marker:
+GitHub-style task lists use the standardized `-` marker, and indent to the start
+of the text.
 
-**Input:**
+Input
+:   ```markdown
+    + [ ] Parent task
+    *   [ ] Nested unchecked task
+    - [x]   Nested checked task
+    - [x] Another parent task
+    ```
 
-```markdown
-* [ ] Unchecked task
-+ [x] Checked task
-- [ ] Another task
-```
-
-**Output:**
-
-```markdown
-- [ ] Unchecked task
-- [x] Checked task
-- [ ] Another task
-```
+Output
+:   ```markdown
+    - [ ] Parent task
+    - [ ] Nested unchecked task
+    - [x] Nested checked task
+    - [x] Another parent task
+    ```
 
 ### Definition Lists
 
-Definition lists preserve loose vs compact spacing:
+Definition lists are indented with three spaces after the marker, flush the
+marker to the left, and indent following lines to four spaces.
 
-```markdown
-Term 1
+Input
+:   ```markdown
+    Term 1
 
-: Definition 1
+    : Definition 1
 
-Term 2
-: Definition 2a
-: Definition 2b
+    Term 2
+    :   Definition 2a
+    : Definition 2b
 
-Term 3
-: Definition 3
-```
+    Term 3
+    : Definition
+    with lazy continuation
+    ```
+
+Output
+:   ```markdown
+    Term 1
+
+    :   Definition 1
+
+    Term 2
+    :   Definition 2a
+    :   Definition 2b
+
+    Term 3
+    :   Definition with lazy continuation
+    ```
+
+### Fancy lists
+
+Fancy lists are indented to line up with the first character of the list item
+text.
+
+Input
+:   ```markdown
+    (i) Parens style
+    (ii) Second item
+    (iii) Third item
+
+    iv. Starting at four
+    v. Five
+    vi. Six
+    vii. Seven
+    viii. Eight
+    ix. Nine
+    x. Ten
+    ```
+
+Output
+:   ```markdown
+    (i) Parens style
+    (ii) Second item
+    (iii) Third item
+
+    iv. Starting at four
+    v. Five
+    vi. Six
+    vii. Seven
+    viii. Eight
+    ix. Nine
+    x. Ten
+    ```
 
 ## Blockquotes
 
 Blockquotes are formatted with consistent `>` markers:
 
-**Input:**
+Input
+:   ```markdown
+    >This is a block quote. This
+    >paragraph has two lines.
+    >
+    > 1. This is a list inside a block quote.
+    > 2. Second item.
 
-```markdown
-This is a blockquote
-that spans multiple lines
-```
+    > This is a block quote. This
+    paragraph has two lines.
+    ```
 
-**Output:**
+Output
+:   ```markdown
+    > This is a block quote. This paragraph has two lines.
+    >
+    > 1. This is a list inside a block quote.
+    > 2. Second item.
 
-```markdown
-This is a blockquote that spans multiple lines
-```
-
-### Nested Blockquotes
-
-```markdown
-Outer quote
-
-Nested quote
-```
+    > This is a block quote. This paragraph has two lines.
+    ```
 
 ## Tables
 
@@ -322,11 +419,7 @@ while preserving content and attributes.
 
 ### Inline Math
 
-Inline math is untouched:
-
-```markdown
-The equation $E = mc^2$ is famous.
-```
+Inline math is (currently) untouched.
 
 ### Display Math
 
@@ -347,12 +440,37 @@ Output
 
 ## Links
 
-### Inline Links
+### Inline L
 
-```markdown
-[Link text](https://example.com)
-[Link with title](https://example.com "Title")
-```
+For links, Panache preserves the original link text and URL but normalizes the
+spacing around attributes, quotes, and parentheses. Descriptions are wrapped if
+reflow wrapping is enabled.
+
+Input
+:   ```markdown
+    [URL and title](/url/ "title").
+
+    [URL and title](/url/  "title preceded by two spaces").
+
+    [URL and title](/url/   "title preceded by a tab").
+
+    [URL and title](/url/ "title with "quotes" in it")
+
+    [URL and title](/url/ 'title with single quotes')
+    ```
+
+Output
+:   ```markdown
+    [URL and title](/url/ "title").
+
+    [URL and title](/url/ "title preceded by two spaces").
+
+    [URL and title](/url/ "title preceded by a tab").
+
+    [URL and title](/url/ "title with "quotes" in it")
+
+    [URL and title](/url/ "title with single quotes")
+    ```
 
 ### Reference Links
 
