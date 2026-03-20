@@ -77,7 +77,7 @@ Term
 Term
 :  The following is also not a continuation.
 
-   A paragraph.
+  A paragraph.
 
 Output
 :   ```markdown
