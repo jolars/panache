@@ -52,14 +52,14 @@ This document tracks implementation status for panache's features.
 - [x] Folding ranges - `textDocument/foldingRange`
       - [x] Code blocks
       - [x] Sections (headings)
-- [ ] Go to definition links, images, footnotes). Enabled for some, but not all,
-      reference types.
+- [x] Go to definition links, images, footnotes).
       - [x] Go to definition for reference links - Jump to `[ref]: url`
             definition
       - [x] Go to definition for citations - Jump to bibliography entry for
             `@cite` keys
-      - [ ] Go to definition for headings - Jump to heading target for internal
+      - [x] Go to definition for headings - Jump to heading target for internal
             links
+      - [x] Go to definition for footnotes - Jump to footnote definition block
 - [x] Find references - Find all uses of a reference link/footnote/citation
       - [x] Find references for citations - Find all `@cite` uses of a
             bibliography entry
@@ -102,10 +102,12 @@ support.
 - [ ] Rename
       - [x] Citations - Rename `@cite` keys and update bibliography
       - [x] Reference links - Rename `[ref]` labels and update definitions
-      - [ ] Headings - Rename heading text and update internal links
+      - [x] Headings - Rename heading text and update internal links
+      - [ ] Footnotes - Rename footnote labels and update definitions/links
+      - [ ] Files - Rename files and update links throughout (maybe complex)
 - [x] Workspace symbols
-      - [ ] General support for pandoc etc
-      - [ ] Quarto - project-wide symbol search for figures, tables, sections
+      - [x] General support for pandoc etc
+      - [x] Quarto - project-wide symbol search for figures, tables, sections
       - [ ] Rmarkdown (Bookdown)
 - [ ] Configuration via LSP - `workspace/didChangeConfiguration` to reload
       config
@@ -144,7 +146,7 @@ support.
 
 ### Configuration
 
-- [ ] Per-rule enable/disable in `.panache.toml` `[lint]` section
+- [x] Per-rule enable/disable in `.panache.toml` `[lint]` section
 - [ ] Severity levels (error, warning, info)
 - [ ] Auto-fix capability per rule (infrastructure exists, rules need
       implementation)
