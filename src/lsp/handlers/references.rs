@@ -56,31 +56,20 @@ pub(crate) async fn references(
 
     let mut locations = Vec::new();
     let citation_def_index = {
-        let db = salsa_db.lock().await;
-        let mut doc_paths =
-            crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
-                .documents()
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
-        if !doc_paths.contains(&doc_path) {
-            doc_paths.push(doc_path.clone());
-        }
-        doc_paths.sort();
-        doc_paths.dedup();
+        let docs = crate::lsp::navigation::project_symbol_documents(
+            &salsa_db,
+            salsa_file,
+            salsa_config,
+            &doc_path,
+            &uri,
+            &content,
+        )
+        .await;
 
-        for path in doc_paths {
-            let (file, text) = if path == doc_path {
-                (salsa_file, content.clone())
-            } else {
-                let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
-                    continue;
-                };
-                (file, file.text(&*db).clone())
-            };
-            let symbol_index =
-                crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
-            let doc_uri = Uri::from_file_path(&path).unwrap_or_else(|| uri.clone());
+        for doc in docs {
+            let doc_uri = doc.uri;
+            let text = doc.text;
+            let symbol_index = doc.symbol_index;
 
             match &target {
                 SymbolTarget::Crossref(label)
@@ -139,6 +128,7 @@ pub(crate) async fn references(
         if include_declaration {
             let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
             if yaml_ok {
+                let db = salsa_db.lock().await;
                 Some(
                     crate::salsa::citation_definition_index(
                         &*db,

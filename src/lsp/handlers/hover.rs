@@ -117,48 +117,25 @@ pub(crate) async fn hover(
     };
 
     // Cross-document footnote lookup via symbol usage index.
-    let doc_indices = {
-        let db = salsa_db.lock().await;
-        let mut doc_paths =
-            crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
-                .documents()
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
-        if !doc_paths.contains(&doc_path) {
-            doc_paths.push(doc_path.clone());
-        }
-        doc_paths.sort();
-        doc_paths.dedup();
+    let doc_indices = crate::lsp::navigation::project_symbol_documents(
+        &salsa_db,
+        salsa_file,
+        salsa_config,
+        &doc_path,
+        uri,
+        &content_for_offset,
+    )
+    .await;
 
-        let mut per_doc = Vec::new();
-        for path in &doc_paths {
-            let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
-            let (file, text) = if doc_uri == *uri {
-                (salsa_file, content_for_offset.clone())
-            } else {
-                let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
-                    continue;
-                };
-                (file, file.text(&*db).clone())
-            };
-            let symbol_index =
-                crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
-            per_doc.push((text, symbol_index));
-        }
-
-        per_doc
-    };
-
-    for (text, symbol_index) in doc_indices {
-        let Some(ranges) = symbol_index.footnote_definitions(&label) else {
+    for doc in doc_indices {
+        let Some(ranges) = doc.symbol_index.footnote_definitions(&label) else {
             continue;
         };
         let Some(range) = ranges.first() else {
             continue;
         };
 
-        let tree = crate::parse(&text, None);
+        let tree = crate::parse(&doc.text, None);
         let Some(footnote_def) = tree
             .descendants()
             .filter_map(FootnoteDefinition::cast)

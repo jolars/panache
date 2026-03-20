@@ -12,6 +12,7 @@ mod conversions;
 mod documents;
 mod handlers;
 mod helpers;
+mod navigation;
 mod server;
 mod symbols;
 

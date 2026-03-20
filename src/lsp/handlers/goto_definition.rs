@@ -98,65 +98,37 @@ pub(crate) async fn goto_definition(
         let Some(doc_path) = doc_path.clone() else {
             return Ok(None);
         };
-        let db = salsa_db.lock().await;
-        let mut doc_paths =
-            crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
-                .documents()
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
-        if !doc_paths.contains(&doc_path) {
-            doc_paths.push(doc_path.clone());
-        }
-        doc_paths.sort();
-        doc_paths.dedup();
-
-        let mut per_doc = Vec::new();
-        for path in &doc_paths {
-            let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
-            let (file, text) = if doc_uri == *uri {
-                (salsa_file, content.clone())
-            } else {
-                let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
-                    continue;
-                };
-                (file, file.text(&*db).clone())
-            };
-            let symbol_index =
-                crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
-            per_doc.push((doc_uri, text, symbol_index));
-        }
-        per_doc
+        crate::lsp::navigation::project_symbol_documents(
+            &salsa_db,
+            salsa_file,
+            salsa_config,
+            &doc_path,
+            uri,
+            &content,
+        )
+        .await
     };
     let definition_index =
         helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
 
     if let PendingDefinition::HeadingLink(label) = &pending {
-        for (doc_uri, text, symbol_index) in &doc_indices {
-            if let Some(ranges) = symbol_index.heading_explicit_definition_ranges(label)
+        for doc in &doc_indices {
+            if let Some(ranges) = doc.symbol_index.heading_explicit_definition_ranges(label)
                 && let Some(range) = ranges.first()
             {
-                let start = conversions::offset_to_position(text, range.start().into());
-                let end = conversions::offset_to_position(text, range.end().into());
-                let location = Location {
-                    uri: doc_uri.clone(),
-                    range: Range { start, end },
-                };
+                let location =
+                    crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
                 return Ok(Some(GotoDefinitionResponse::Scalar(location)));
             }
         }
 
         if config.extensions.implicit_header_references && config.extensions.auto_identifiers {
-            for (doc_uri, text, symbol_index) in &doc_indices {
-                if let Some(ranges) = symbol_index.heading_implicit_definition_ranges(label)
+            for doc in &doc_indices {
+                if let Some(ranges) = doc.symbol_index.heading_implicit_definition_ranges(label)
                     && let Some(range) = ranges.first()
                 {
-                    let start = conversions::offset_to_position(text, range.start().into());
-                    let end = conversions::offset_to_position(text, range.end().into());
-                    let location = Location {
-                        uri: doc_uri.clone(),
-                        range: Range { start, end },
-                    };
+                    let location =
+                        crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
                     return Ok(Some(GotoDefinitionResponse::Scalar(location)));
                 }
             }
@@ -164,34 +136,27 @@ pub(crate) async fn goto_definition(
     }
 
     if let PendingDefinition::Crossref(label) = &pending {
-        for (doc_uri, text, symbol_index) in &doc_indices {
+        for doc in &doc_indices {
             for candidate in
                 crate::utils::crossref_symbol_labels(label, config.extensions.bookdown_references)
             {
-                if let Some(ranges) = symbol_index.crossref_declarations(&candidate)
+                if let Some(ranges) = doc.symbol_index.crossref_declarations(&candidate)
                     && let Some(range) = ranges.first()
                 {
-                    let start = conversions::offset_to_position(text, range.start().into());
-                    let end = conversions::offset_to_position(text, range.end().into());
-                    let location = Location {
-                        uri: doc_uri.clone(),
-                        range: Range { start, end },
-                    };
+                    let location =
+                        crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
                     return Ok(Some(GotoDefinitionResponse::Scalar(location)));
                 }
 
                 if config.extensions.implicit_header_references
                     && config.extensions.auto_identifiers
-                    && let Some(ranges) =
-                        symbol_index.heading_implicit_definition_ranges(&candidate)
+                    && let Some(ranges) = doc
+                        .symbol_index
+                        .heading_implicit_definition_ranges(&candidate)
                     && let Some(range) = ranges.first()
                 {
-                    let start = conversions::offset_to_position(text, range.start().into());
-                    let end = conversions::offset_to_position(text, range.end().into());
-                    let location = Location {
-                        uri: doc_uri.clone(),
-                        range: Range { start, end },
-                    };
+                    let location =
+                        crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
                     return Ok(Some(GotoDefinitionResponse::Scalar(location)));
                 }
             }
@@ -199,21 +164,17 @@ pub(crate) async fn goto_definition(
     }
 
     if let PendingDefinition::Reference { label, is_footnote } = &pending {
-        for (doc_uri, text, symbol_index) in &doc_indices {
+        for doc in &doc_indices {
             let ranges = if *is_footnote {
-                symbol_index.footnote_definitions(label)
+                doc.symbol_index.footnote_definitions(label)
             } else {
-                symbol_index.reference_definitions(label)
+                doc.symbol_index.reference_definitions(label)
             };
             if let Some(ranges) = ranges
                 && let Some(range) = ranges.first()
             {
-                let start = conversions::offset_to_position(text, range.start().into());
-                let end = conversions::offset_to_position(text, range.end().into());
-                let location = Location {
-                    uri: doc_uri.clone(),
-                    range: Range { start, end },
-                };
+                let location =
+                    crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
                 return Ok(Some(GotoDefinitionResponse::Scalar(location)));
             }
         }

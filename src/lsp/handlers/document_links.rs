@@ -7,7 +7,6 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::{DocumentLink, DocumentLinkParams, Range, Uri};
 
 use crate::lsp::DocumentState;
-use crate::salsa::Db;
 use crate::syntax::{AstNode, AutoLink, ImageLink, Link, Shortcode};
 use crate::utils::normalize_label;
 use serde_json::json;
@@ -293,30 +292,17 @@ async fn build_reference_targets(
     doc_content: &str,
     fallback_uri: &Uri,
 ) -> HashMap<String, ReferenceTarget> {
-    let (doc_inputs, parse_config) = {
+    let doc_inputs = crate::lsp::navigation::project_document_inputs(
+        salsa_db,
+        salsa_file,
+        salsa_config,
+        doc_path,
+        doc_content,
+    )
+    .await;
+    let parse_config = {
         let db = salsa_db.lock().await;
-        let graph =
-            crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.to_path_buf())
-                .clone();
-        let mut paths = graph.documents().iter().cloned().collect::<Vec<_>>();
-        if !paths.contains(&doc_path.to_path_buf()) {
-            paths.push(doc_path.to_path_buf());
-        }
-        paths.sort();
-        paths.dedup();
-
-        let mut inputs = Vec::new();
-        for path in paths {
-            if path == doc_path {
-                inputs.push((path, doc_content.to_string()));
-                continue;
-            }
-
-            if let Some(file) = db.file_text(path.clone()) {
-                inputs.push((path, file.text(&*db).clone()));
-            }
-        }
-        (inputs, salsa_config.config(&*db).clone())
+        salsa_config.config(&*db).clone()
     };
 
     let mut out = HashMap::new();
@@ -396,7 +382,7 @@ mod tests {
         extract_first_destination_token, looks_like_uri_scheme, resolve_link_target,
         split_fragment, with_fragment,
     };
-    use std::path::Path;
+    use tempfile::TempDir;
     use tower_lsp_server::ls_types::Uri;
 
     #[test]
@@ -420,28 +406,35 @@ mod tests {
 
     #[test]
     fn resolves_relative_file_target() {
-        let path = Path::new("/workspace/doc.qmd");
-        let uri = Uri::from_file_path(path).expect("doc uri");
+        let temp_dir = TempDir::new().expect("temp dir");
+        let path = temp_dir.path().join("doc.qmd");
+        let uri = Uri::from_file_path(&path).expect("doc uri");
         let target =
-            resolve_link_target("notes/child.md", Some(path), Some(&uri)).expect("file uri");
-        assert_eq!(target.as_str(), "file:///workspace/notes/child.md");
+            resolve_link_target("notes/child.md", Some(&path), Some(&uri)).expect("file uri");
+        let expected = Uri::from_file_path(temp_dir.path().join("notes").join("child.md"))
+            .expect("expected uri");
+        assert_eq!(target, expected);
     }
 
     #[test]
     fn resolves_same_document_anchor() {
-        let path = Path::new("/workspace/doc.qmd");
-        let uri = Uri::from_file_path(path).expect("doc uri");
-        let target = resolve_link_target("#sec-a", Some(path), Some(&uri)).expect("anchor uri");
-        assert_eq!(target.as_str(), "file:///workspace/doc.qmd#sec-a");
+        let temp_dir = TempDir::new().expect("temp dir");
+        let path = temp_dir.path().join("doc.qmd");
+        let uri = Uri::from_file_path(&path).expect("doc uri");
+        let target = resolve_link_target("#sec-a", Some(&path), Some(&uri)).expect("anchor uri");
+        assert_eq!(target.as_str(), format!("{}#sec-a", uri.as_str()));
     }
 
     #[test]
     fn resolves_relative_file_anchor_target() {
-        let path = Path::new("/workspace/doc.qmd");
-        let uri = Uri::from_file_path(path).expect("doc uri");
+        let temp_dir = TempDir::new().expect("temp dir");
+        let path = temp_dir.path().join("doc.qmd");
+        let uri = Uri::from_file_path(&path).expect("doc uri");
         let target =
-            resolve_link_target("notes/child.md#sec-b", Some(path), Some(&uri)).expect("file uri");
-        assert_eq!(target.as_str(), "file:///workspace/notes/child.md#sec-b");
+            resolve_link_target("notes/child.md#sec-b", Some(&path), Some(&uri)).expect("file uri");
+        let base =
+            Uri::from_file_path(temp_dir.path().join("notes").join("child.md")).expect("base uri");
+        assert_eq!(target.as_str(), format!("{}#sec-b", base.as_str()));
     }
 
     #[test]
@@ -453,7 +446,7 @@ mod tests {
 
     #[test]
     fn appends_fragment_to_uri() {
-        let uri = Uri::from_file_path("/workspace/doc.qmd").expect("uri");
+        let uri = "file:///workspace/doc.qmd".parse::<Uri>().expect("uri");
         let with = with_fragment(uri, "section title").expect("uri with fragment");
         assert_eq!(with.as_str(), "file:///workspace/doc.qmd#section%20title");
     }
