@@ -89,7 +89,7 @@ support.
 
 - [ ] Link preview - `textDocument/hover` to show link target
 - [ ] Reference preview - Show reference definition on hover
-- [x] Footnote preview - Show footnote content inline
+- [X] Footnote preview - Show footnote content inline
 - [x] Citation preview - Show bibliography entry for citation (approximate)
 
 ### Advanced
@@ -103,7 +103,7 @@ support.
       - [x] Citations - Rename `@cite` keys and update bibliography
       - [x] Reference links - Rename `[ref]` labels and update definitions
       - [ ] Headings - Rename heading text and update internal links
-- [ ] Workspace symbols
+- [x] Workspace symbols
       - [ ] General support for pandoc etc
       - [ ] Quarto - project-wide symbol search for figures, tables, sections
       - [ ] Rmarkdown (Bookdown)
