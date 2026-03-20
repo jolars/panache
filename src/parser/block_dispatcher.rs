@@ -1220,14 +1220,19 @@ impl BlockParser for FencedCodeBlockParser {
         let has_info = !fence.info_string.trim().is_empty();
         let has_matching_closer = {
             let mut found = false;
+            let container_content_col = ctx.content_indent
+                + ctx
+                    .list_indent_info
+                    .map(|list_info| list_info.content_col)
+                    .unwrap_or(0);
             for raw_line in lines.iter().skip(line_pos + 1) {
                 let (line_bq_depth, inner) = count_blockquote_markers(raw_line);
                 if line_bq_depth < ctx.blockquote_depth {
                     break;
                 }
-                let candidate = if let Some(list_info) = ctx.list_indent_info {
-                    if list_info.content_col > 0 && !inner.is_empty() {
-                        let idx = byte_index_at_column(inner, list_info.content_col);
+                let candidate = if container_content_col > 0 && !inner.is_empty() {
+                    let idx = byte_index_at_column(inner, container_content_col);
+                    if idx <= inner.len() {
                         &inner[idx..]
                     } else {
                         inner

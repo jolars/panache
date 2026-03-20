@@ -1,4 +1,4 @@
-DOCUMENT@0..115
+DOCUMENT@0..450
   DEFINITION_LIST@0..115
     DEFINITION_ITEM@0..115
       TERM@0..5
@@ -51,4 +51,91 @@ DOCUMENT@0..115
             PLAIN@100..115
               TEXT@100..114 "Another bullet"
               NEWLINE@114..115 "\n"
+  BLANK_LINE@115..116
+    BLANK_LINE@115..116 "\n"
+  DEFINITION_LIST@116..225
+    DEFINITION_ITEM@116..225
+      TERM@116..180
+        TEXT@116..179 "Indented with 2 space ..."
+        NEWLINE@179..180 "\n"
+      BLANK_LINE@180..181
+        BLANK_LINE@180..181 "\n"
+      DEFINITION@181..225
+        DEFINITION_MARKER@181..182 ":"
+        WHITESPACE@182..183 " "
+        CODE_BLOCK@183..225
+          CODE_FENCE_OPEN@183..195
+            CODE_FENCE_MARKER@183..186 "```"
+            CODE_INFO@186..194
+              CODE_LANGUAGE@186..194 "markdown"
+            NEWLINE@194..195 "\n"
+          CODE_CONTENT@195..219
+            WHITESPACE@195..197 "  "
+            TEXT@197..205 "    code"
+            NEWLINE@205..206 "\n"
+            WHITESPACE@206..208 "  "
+            TEXT@208..218 "    a <- 1"
+            NEWLINE@218..219 "\n"
+          WHITESPACE@219..221 "  "
+          CODE_FENCE_CLOSE@221..225
+            CODE_FENCE_MARKER@221..224 "```"
+            NEWLINE@224..225 "\n"
+  BLANK_LINE@225..226
+    BLANK_LINE@225..226 "\n"
+  DEFINITION_LIST@226..343
+    DEFINITION_ITEM@226..343
+      TERM@226..290
+        TEXT@226..289 "Indented with 4 space ..."
+        NEWLINE@289..290 "\n"
+      BLANK_LINE@290..291
+        BLANK_LINE@290..291 "\n"
+      DEFINITION@291..343
+        DEFINITION_MARKER@291..292 ":"
+        WHITESPACE@292..295 "   "
+        CODE_BLOCK@295..343
+          CODE_FENCE_OPEN@295..307
+            CODE_FENCE_MARKER@295..298 "```"
+            CODE_INFO@298..306
+              CODE_LANGUAGE@298..306 "markdown"
+            NEWLINE@306..307 "\n"
+          CODE_CONTENT@307..335
+            WHITESPACE@307..311 "    "
+            TEXT@311..319 "    code"
+            NEWLINE@319..320 "\n"
+            WHITESPACE@320..324 "    "
+            TEXT@324..334 "    a <- 1"
+            NEWLINE@334..335 "\n"
+          WHITESPACE@335..339 "    "
+          CODE_FENCE_CLOSE@339..343
+            CODE_FENCE_MARKER@339..342 "```"
+            NEWLINE@342..343 "\n"
+  BLANK_LINE@343..344
+    BLANK_LINE@343..344 "\n"
+  DEFINITION_LIST@344..450
+    DEFINITION_ITEM@344..450
+      TERM@344..412
+        TEXT@344..411 "Indented with tabs, s ..."
+        NEWLINE@411..412 "\n"
+      BLANK_LINE@412..413
+        BLANK_LINE@412..413 "\n"
+      DEFINITION@413..450
+        DEFINITION_MARKER@413..414 ":"
+        WHITESPACE@414..415 "\t"
+        CODE_BLOCK@415..450
+          CODE_FENCE_OPEN@415..427
+            CODE_FENCE_MARKER@415..418 "```"
+            CODE_INFO@418..426
+              CODE_LANGUAGE@418..426 "markdown"
+            NEWLINE@426..427 "\n"
+          CODE_CONTENT@427..445
+            WHITESPACE@427..429 "\t\t"
+            TEXT@429..434 "\tcode"
+            NEWLINE@434..435 "\n"
+            WHITESPACE@435..437 "\t\t"
+            TEXT@437..444 "\ta <- 1"
+            NEWLINE@444..445 "\n"
+          WHITESPACE@445..446 "\t"
+          CODE_FENCE_CLOSE@446..450
+            CODE_FENCE_MARKER@446..449 "```"
+            NEWLINE@449..450 "\n"
 

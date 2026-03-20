@@ -268,18 +268,6 @@ impl Formatter {
         formatted
     }
 
-    fn leading_indent_columns(line: &str) -> usize {
-        let mut cols = 0usize;
-        for ch in line.chars() {
-            match ch {
-                ' ' => cols += 1,
-                '\t' => cols += 4 - (cols % 4),
-                _ => break,
-            }
-        }
-        cols
-    }
-
     fn strip_leading_columns(line: &str, columns: usize) -> String {
         let mut cols = 0usize;
         let mut idx = 0usize;
@@ -311,7 +299,7 @@ impl Formatter {
         } else if line.chars().all(|c| matches!(c, ' ' | '\t')) {
             String::new()
         } else {
-            line.to_string()
+            line[idx..].to_string()
         }
     }
 
@@ -344,12 +332,7 @@ impl Formatter {
 
         let closing = remaining.pop().unwrap();
         let content_indent_cols = if normalize_content_indent {
-            remaining
-                .iter()
-                .filter(|line| !line.trim().is_empty())
-                .map(|line| Self::leading_indent_columns(line))
-                .min()
-                .unwrap_or(0)
+            continuation_indent
         } else {
             0
         };
