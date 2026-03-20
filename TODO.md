@@ -97,7 +97,7 @@ support.
 - [x] Range formatting - `textDocument/rangeFormatting` for selected text only
 - [ ] On-type formatting - `textDocument/onTypeFormatting` for auto-formatting
       triggers (not sure about this, low priority)
-- [ ] Document links - `textDocument/documentLink` for clickable links
+- [x] Document links - `textDocument/documentLink` for clickable links
 - [ ] Semantic tokens - Syntax highlighting via LSP
 - [ ] Rename
       - [x] Citations - Rename `@cite` keys and update bibliography

@@ -1,29 +1,27 @@
 # Image Reference CST Notes
 
-This note captures a parser/CST follow-up discovered while improving LSP
-wrapper coverage for reference-style images (for example, `![alt][img]`).
+This note records the parser/CST normalization for reference-style images (for
+example, `![alt][img]`) and the resulting invariant for typed consumers.
 
-## Current State
+## Current Invariant
 
 - `Link` nodes expose reference labels through a child `LINK_REF` node.
-- `ImageLink` nodes currently encode reference syntax as plain `TEXT` tokens
-  after `IMAGE_ALT` (`]`, `[`, label text, `]`), without a `LINK_REF` child.
+- `ImageLink` nodes expose reference labels through a child `LINK_REF` node for
+  explicit and collapsed reference forms.
 
-That means typed consumers can treat links and image links differently even
-when the source syntax concept is the same (reference label target).
+Typed consumers can treat links and image links consistently for reference
+target extraction.
 
 ## Why This Matters
 
-- Wrapper ergonomics diverge (`Link::reference()` works directly; image
-  reference handling needs token-shape-specific logic).
-- LSP features that should be syntax-agnostic (goto/rename/prepare) need extra
-  image-specific branches.
-- Future AST coverage and refactors are harder than necessary.
+- Wrapper ergonomics are aligned (`Link::reference()` / `ImageLink::reference()`).
+- LSP features can share reference-target extraction paths.
+- AST coverage/refactors no longer depend on token-shape fallbacks.
 
-## Proposed CST Shape Adjustment (Future)
+## Implemented CST Shape
 
-For reference-style images, emit a `LINK_REF` child under `IMAGE_LINK` with the
-same internal token structure used for links.
+For reference-style images, parser emission includes a `LINK_REF` child under
+`IMAGE_LINK`.
 
 Target shape sketch:
 
@@ -31,30 +29,32 @@ Target shape sketch:
 IMAGE_LINK
   IMAGE_LINK_START "!["
   IMAGE_ALT ...
+  TEXT "]"
+  TEXT "["
   LINK_REF
-    TEXT "["
     TEXT "img"
-    TEXT "]"
+  TEXT "]"
 ```
 
 For collapsed and shortcut forms:
 
 - `![alt][]` -> `LINK_REF` with empty label text between brackets
-- `![alt]` -> may remain explicit shortcut encoding or be normalized to an
-  empty/implicit `LINK_REF` form, as long as losslessness is preserved
+- `![alt]` -> shortcut form remains without the second bracket pair (`LINK_REF`
+  is not emitted)
 
 ## Non-Negotiables
 
 - Preserve byte-for-byte losslessness (all markers, whitespace, ordering).
 - Do not move formatter policy into parser logic.
 - Keep existing single-pass inline parsing model.
-- Do not change user-visible formatting behavior as part of CST reshaping.
+- Keep user-visible formatting behavior unchanged.
 
-## Migration Plan
+## Verification Done
 
-1. Add parser tests that assert the new CST node presence for image references.
-2. Add/adjust wrapper tests so `ImageLink::reference()` is the primary path.
-3. Keep temporary compatibility in LSP helpers while landing parser changes.
-4. Remove fallback token scanning once parser shape is stable.
+1. Parser/AST tests assert `LINK_REF` presence for explicit and collapsed image
+   references.
+2. Wrapper methods use `ImageLink::reference()` as the primary source.
+3. LSP helpers/symbol resolution now use shared reference-target extraction.
+4. Token scanning fallback for image reference labels is removed.
 
-This is a structural cleanup item, not a blocker for current LSP behavior.
+This invariant should be maintained for future parser and wrapper changes.

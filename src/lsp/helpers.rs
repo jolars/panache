@@ -195,6 +195,26 @@ pub(crate) fn extract_reference_label(node: &SyntaxNode) -> Option<(String, bool
     None
 }
 
+pub(crate) fn extract_reference_target(node: &SyntaxNode) -> Option<(String, bool)> {
+    if let Some(reference) = extract_reference_label(node) {
+        return Some(reference);
+    }
+
+    if let Some(link) = Link::cast(node.clone())
+        && let Some(link_ref) = link.reference()
+    {
+        return extract_reference_label(link_ref.syntax());
+    }
+
+    if let Some(image) = ImageLink::cast(node.clone())
+        && let Some(label) = image.reference_label()
+    {
+        return Some((normalize_label(&label), false));
+    }
+
+    None
+}
+
 pub(crate) fn extract_citation_key(node: &SyntaxNode) -> Option<String> {
     node_and_ancestors(node)
         .find_map(Citation::cast)
@@ -436,29 +456,9 @@ pub(crate) fn find_definition_at_offset(root: &SyntaxNode, offset: usize) -> Opt
 
     // Walk up the tree to find a reference node
     loop {
-        if let Some((label, is_footnote)) = extract_reference_label(&node) {
+        if let Some((label, is_footnote)) = extract_reference_target(&node) {
             // Found a reference - now find its definition
             let definition = find_definition_node(root, &label, is_footnote)?;
-            return Some(definition.text_range());
-        }
-
-        // Check if this is a Link that might contain a LinkRef
-        if node.kind() == SyntaxKind::LINK
-            && let Some(link_ref) = node
-                .children()
-                .find(|child| child.kind() == SyntaxKind::LINK_REF)
-            && let Some((label, is_footnote)) = extract_reference_label(&link_ref)
-        {
-            let definition = find_definition_node(root, &label, is_footnote)?;
-            return Some(definition.text_range());
-        }
-
-        // Check if this is an ImageLink that might contain a LinkRef
-        if node.kind() == SyntaxKind::IMAGE_LINK
-            && let Some(image) = ImageLink::cast(node.clone())
-            && let Some(label) = image.reference_label()
-        {
-            let definition = find_definition_node(root, &normalize_label(&label), false)?;
             return Some(definition.text_range());
         }
 
