@@ -50,11 +50,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://github.com/j
 
 ### Arch Linux
 
-There is also an Arch Linux package available in the AUR:
+There are also two recipies available for Arch Linux in the AUR:
+[panache](https://aur.archlinux.org/packages/panache/) and
 [panache-bin](https://aur.archlinux.org/packages/panache-bin/).
+The first builds from source for your system, the second uses precompiled binaries attatched to GH releases.
+Install either using `yay` or your favorite AUR helper:
 
 ```bash
-yay -S panache-bin # or your preferred AUR helper
+yay -S panache
+yay -S panache-bin
 ```
 
 ### NixOS
