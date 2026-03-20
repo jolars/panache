@@ -7,7 +7,7 @@ title: Task Lists Test
 - [ ] Unchecked task
 - [x] Checked task
 - [ ] Another unchecked task
-- [X] Checked with capital X
+- [x] Checked with capital X
 
 ## Task Lists with Different Bullets
 

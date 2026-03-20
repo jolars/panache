@@ -34,7 +34,7 @@ Task lists with different markers:
 - [ ] Unchecked with asterisk
 - [x] Checked with asterisk
 - [ ] Unchecked with plus
-- [X] Checked with plus (capital X)
+- [x] Checked with plus (capital X)
 - [ ] Unchecked with hyphen
 - [x] Checked with hyphen
 
