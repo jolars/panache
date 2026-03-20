@@ -75,7 +75,7 @@
 
         name = "panache format";
 
-        entry = "panache format";
+        entry = "cargo run -- format";
 
         language = "system";
 
