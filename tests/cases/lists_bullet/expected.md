@@ -42,3 +42,11 @@ If you need to have two consecutive lists, you can separate them with a comment:
 
 1. uno
 2. dos
+
+- this is a list item indented with tabs
+
+- this is a list item indented with spaces
+
+  - this is an example list item indented with tabs
+
+  - this is an example list item indented with spaces

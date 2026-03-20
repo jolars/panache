@@ -1,4 +1,4 @@
-DOCUMENT@0..938
+DOCUMENT@0..1147
   PARAGRAPH@0..22
     TEXT@0..21 "A simple bullet list:"
     NEWLINE@21..22 "\n"
@@ -163,4 +163,48 @@ DOCUMENT@0..938
       PLAIN@934..938
         TEXT@934..937 "dos"
         NEWLINE@937..938 "\n"
+  BLANK_LINE@938..939
+    BLANK_LINE@938..939 "\n"
+  LIST@939..1147
+    LIST_ITEM@939..981
+      LIST_MARKER@939..940 "+"
+      WHITESPACE@940..941 "\t"
+      PLAIN@941..981
+        TEXT@941..960 "this is a list item"
+        NEWLINE@960..961 "\n"
+        TEXT@961..980 "\tindented with tabs"
+        NEWLINE@980..981 "\n"
+    BLANK_LINE@981..982
+      BLANK_LINE@981..982 "\n"
+    LIST_ITEM@982..1147
+      LIST_MARKER@982..983 "+"
+      WHITESPACE@983..986 "   "
+      PLAIN@986..1031
+        TEXT@986..1005 "this is a list item"
+        NEWLINE@1005..1006 "\n"
+        TEXT@1006..1030 "    indented with spaces"
+        NEWLINE@1030..1031 "\n"
+      BLANK_LINE@1031..1032
+        BLANK_LINE@1031..1032 "\n"
+      LIST@1032..1147
+        LIST_ITEM@1032..1085
+          WHITESPACE@1032..1033 "\t"
+          LIST_MARKER@1033..1034 "+"
+          WHITESPACE@1034..1035 "\t"
+          PLAIN@1035..1085
+            TEXT@1035..1063 "this is an example li ..."
+            NEWLINE@1063..1064 "\n"
+            TEXT@1064..1084 "\t\tindented with tabs"
+            NEWLINE@1084..1085 "\n"
+        BLANK_LINE@1085..1087
+          BLANK_LINE@1085..1087 "\t\n"
+        LIST_ITEM@1087..1147
+          WHITESPACE@1087..1088 "\t"
+          LIST_MARKER@1088..1089 "+"
+          WHITESPACE@1089..1092 "   "
+          PLAIN@1092..1147
+            TEXT@1092..1120 "this is an example li ..."
+            NEWLINE@1120..1121 "\n"
+            TEXT@1121..1146 "\t    indented with sp ..."
+            NEWLINE@1146..1147 "\n"
 
