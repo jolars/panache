@@ -53,7 +53,7 @@ fn bullet_and_ordered_lists_mixed() {
 #[test]
 fn task_lists_use_hyphen() {
     let input = "* [ ] Unchecked task\n* [x] Checked task\n* [X] Also checked\n";
-    let expected = "- [ ] Unchecked task\n- [x] Checked task\n- [X] Also checked\n";
+    let expected = "- [ ] Unchecked task\n- [x] Checked task\n- [x] Also checked\n";
     let result = format(input, None, None);
     assert_eq!(result, expected);
 }

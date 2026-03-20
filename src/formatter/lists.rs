@@ -7,6 +7,14 @@ use rowan::NodeOrToken;
 use super::Formatter;
 
 impl Formatter {
+    fn normalize_task_checkbox(checkbox: &str) -> String {
+        if checkbox == "[X]" {
+            "[x]".to_string()
+        } else {
+            checkbox.to_string()
+        }
+    }
+
     /// Extract the marker text from a ListItem node
     /// Standardizes bullet list markers to "-" for consistency
     pub(super) fn extract_list_marker(node: &SyntaxNode) -> Option<String> {
@@ -309,7 +317,7 @@ impl Formatter {
                         };
                     }
                     SyntaxKind::TASK_CHECKBOX => {
-                        checkbox = Some(t.text().to_string());
+                        checkbox = Some(Self::normalize_task_checkbox(t.text()));
                     }
                     _ => {}
                 }
