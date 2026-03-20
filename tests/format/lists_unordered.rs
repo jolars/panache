@@ -105,3 +105,11 @@ fn list_item_wraps_at_configured_line_width() {
     let output = format(input, Some(cfg), None);
     assert_eq!(output, expected);
 }
+
+#[test]
+fn outdented_item_after_nested_list_formats_at_outer_level() {
+    let input = "* Item 1\n  + Nested item\n      *  Deeply nested\n +  Item 2\n";
+    let expected = "- Item 1\n  - Nested item\n    - Deeply nested\n- Item 2\n";
+    let output = format(input, None, None);
+    assert_eq!(output, expected);
+}

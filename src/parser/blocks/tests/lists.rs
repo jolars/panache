@@ -75,6 +75,36 @@ fn nested_bullet_lists() {
 }
 
 #[test]
+fn outdented_item_after_nested_list_returns_to_outer_level() {
+    let input = "* Item 1\n  + Nested item\n      *  Deeply nested\n +  Item 2\n";
+    let tree = parse_blocks(input);
+    let lists = find_all(&tree, SyntaxKind::LIST);
+
+    let outer_list = lists.first().expect("should have an outer list");
+    assert_eq!(count_children(outer_list, SyntaxKind::LIST_ITEM), 2);
+
+    let top_level_items: Vec<_> = outer_list
+        .children()
+        .filter(|n| n.kind() == SyntaxKind::LIST_ITEM)
+        .collect();
+    let first_item = top_level_items
+        .first()
+        .expect("should have first list item");
+    let second_item = top_level_items
+        .get(1)
+        .expect("should have second list item");
+
+    assert!(
+        find_first(first_item, SyntaxKind::LIST).is_some(),
+        "first item should keep nested list"
+    );
+    assert!(
+        find_first(second_item, SyntaxKind::LIST).is_none(),
+        "second item should be at outer level, not nested"
+    );
+}
+
+#[test]
 fn loose_list_with_blank_lines() {
     let input = "* one\n\n* two\n\n* three\n";
     let tree = parse_blocks(input);

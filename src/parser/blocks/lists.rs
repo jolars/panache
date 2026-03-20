@@ -873,7 +873,7 @@ pub(in crate::parser) fn find_matching_list_level(
 ) -> Option<usize> {
     // Search from deepest (last) to shallowest (first)
     // But for shallow items (0-3 indent), prefer matching at the closest base indent
-    let mut best_match: Option<(usize, usize)> = None; // (index, distance)
+    let mut best_match: Option<(usize, usize, bool)> = None; // (index, distance, base_leq_indent)
 
     for (i, c) in containers.stack.iter().enumerate().rev() {
         if let Container::List {
@@ -897,12 +897,15 @@ pub(in crate::parser) fn find_matching_list_level(
 
             if matches {
                 let distance = indent_cols.abs_diff(*base_indent_cols);
-                if let Some((_, best_dist)) = best_match {
-                    if distance < best_dist {
-                        best_match = Some((i, distance));
+                let base_leq_indent = *base_indent_cols <= indent_cols;
+                if let Some((_, best_dist, best_base_leq)) = best_match {
+                    if distance < best_dist
+                        || (distance == best_dist && base_leq_indent && !best_base_leq)
+                    {
+                        best_match = Some((i, distance, base_leq_indent));
                     }
                 } else {
-                    best_match = Some((i, distance));
+                    best_match = Some((i, distance, base_leq_indent));
                 }
 
                 // If we found an exact match, return immediately
@@ -913,7 +916,7 @@ pub(in crate::parser) fn find_matching_list_level(
         }
     }
 
-    best_match.map(|(i, _)| i)
+    best_match.map(|(i, _, _)| i)
 }
 
 /// Start a nested list within an existing list item.
