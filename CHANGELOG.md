@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.25.0](https://github.com/jolars/panache/compare/v2.24.1...v2.25.0) (2026-03-20)
+
+### Features
+
+* **cli:** add `--dump-passes` to `panache debug format` ([f54549e](https://github.com/jolars/panache/commit/f54549e4d182b5c9a2d58a2c2c4739a0e96662c0))
+* **editors:** provide qmd and rmd languages in vscode ([da9bc5a](https://github.com/jolars/panache/commit/da9bc5ad6bc57ac554f67db6fc37e46e8a07a539))
+* **formatter:** compress simple table columns to content ([98c4e8a](https://github.com/jolars/panache/commit/98c4e8aa7218eaf2d30a7fe106ee8e8a93c865c7))
+
+### Bug Fixes
+
+* **formatter:** don't interpret ````markdown as fenced code ([9e17ebc](https://github.com/jolars/panache/commit/9e17ebccd166d6a987d23a2d7b6fdd3b37fdc250))
+* **formatter:** preserve markers in headerless table ([62ec59a](https://github.com/jolars/panache/commit/62ec59a6b5644ac15ce00ae6b5a4ef9dd0bf016b))
+* **formatter:** recover lost indentation in code block ([2f94707](https://github.com/jolars/panache/commit/2f94707092c327468a76abcf3e544da6f97a1047))
+* **formatter:** restrict yaml frontmatter replacement ([7e9bf72](https://github.com/jolars/panache/commit/7e9bf72523a416752e69fb9c411a514ccdcf71f1))
+* **lsp:** correctly handle renaiming ([b5c0b5b](https://github.com/jolars/panache/commit/b5c0b5bb5f69f8abc402e4a9ae392d2c9be30a51))
+* **lsp:** limit highlight of definition to actual label ([e377024](https://github.com/jolars/panache/commit/e37702404341f659a90591a1430180da61ebf759))
+* **parser,formatter:** fix regression in definition list ([10a2cd7](https://github.com/jolars/panache/commit/10a2cd7cc0c5db59871fc9e338c2b166288b30eb))
+* **parser:** don't treat continuation as code block ([927efeb](https://github.com/jolars/panache/commit/927efebfae35106cecfae67adfbc5b570a1f68ca))
+* **parser:** fix losslessness bug in empty definition ([4ede2f8](https://github.com/jolars/panache/commit/4ede2f81ec29c2ebcb9ea7c81e05dc69fa695c24))
+* **parser:** match pandoc's rules for list item identation ([c15688d](https://github.com/jolars/panache/commit/c15688d4fd6ec690c74e97d18311cf5cbccce814))
+
 ## [2.24.1](https://github.com/jolars/panache/compare/v2.24.0...v2.24.1) (2026-03-19)
 
 ### Bug Fixes
