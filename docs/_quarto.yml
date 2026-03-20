@@ -12,6 +12,8 @@ website:
   repo-url: "https://github.com/jolars/panache"
   issue-url: "https://github.com/jolars/panache/issues"
 
+  llms-txt: true
+
   repo-actions: [edit, issue]
 
   search: true
