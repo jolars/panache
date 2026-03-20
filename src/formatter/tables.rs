@@ -832,10 +832,7 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
     // Top border
     // Headerless grid tables encode alignment markers in the first separator,
     // so preserve markers there when no explicit header rows are present.
-    let has_header_rows = table_data
-        .row_sections
-        .iter()
-        .any(|section| *section == GridRowSection::Header);
+    let has_header_rows = table_data.row_sections.contains(&GridRowSection::Header);
     output.push_str(&make_separator('-', !has_header_rows));
 
     // Format rows
