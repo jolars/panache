@@ -7,7 +7,6 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
-use crate::syntax::SyntaxNode;
 
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
@@ -23,18 +22,14 @@ pub(crate) async fn prepare_rename(
     let position = params.position;
     let _config = helpers::get_config(client, &workspace_root, &uri).await;
 
-    let (content, green_tree, parsed_yaml_regions) = {
-        let map = document_map.lock().await;
-        let Some(state) = map.get(&uri.to_string()) else {
-            return Ok(None);
-        };
-        let db = salsa_db.lock().await;
-        (
-            state.salsa_file.text(&*db).clone(),
-            state.tree.clone(),
-            state.parsed_yaml_regions.clone(),
-        )
+    let Some(ctx) =
+        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, &uri).await
+    else {
+        return Ok(None);
     };
+
+    let content = ctx.content.clone();
+    let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
 
     let Some(offset) = position_to_offset(&content, position) else {
         log::debug!(
@@ -49,7 +44,7 @@ pub(crate) async fn prepare_rename(
         return Ok(None);
     }
 
-    let root = SyntaxNode::new_root(green_tree);
+    let root = ctx.syntax_root();
     let Some(range) = helpers::find_symbol_text_range_at_offset(&root, offset) else {
         log::debug!(
             "prepare_rename: no symbol range uri={:?} line={} char={} offset={}",

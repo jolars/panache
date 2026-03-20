@@ -9,7 +9,6 @@ use tower_lsp_server::ls_types::*;
 use crate::lsp::DocumentState;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::metadata::{inline_bib_conflicts, inline_reference_map};
-use crate::syntax::SyntaxNode;
 
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
@@ -27,21 +26,17 @@ pub(crate) async fn rename(
     let new_name = params.new_name;
     let config = helpers::get_config(client, &workspace_root, &uri).await;
 
-    let (salsa_file, salsa_config, doc_path, content, green_tree, parsed_yaml_regions) = {
-        let map = document_map.lock().await;
-        let Some(state) = map.get(&uri.to_string()) else {
-            return Ok(None);
-        };
-        let db = salsa_db.lock().await;
-        (
-            state.salsa_file,
-            state.salsa_config,
-            state.path.clone(),
-            state.salsa_file.text(&*db).clone(),
-            state.tree.clone(),
-            state.parsed_yaml_regions.clone(),
-        )
+    let Some(ctx) =
+        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, &uri).await
+    else {
+        return Ok(None);
     };
+
+    let salsa_file = ctx.salsa_file;
+    let salsa_config = ctx.salsa_config;
+    let doc_path = ctx.path.clone();
+    let content = ctx.content.clone();
+    let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
 
     let Some(doc_path) = doc_path.clone() else {
         return Ok(None);
@@ -59,7 +54,7 @@ pub(crate) async fn rename(
         return Ok(None);
     }
     let target = {
-        let root = SyntaxNode::new_root(green_tree.clone());
+        let root = ctx.syntax_root();
         resolve_symbol_target_at_offset(&root, offset)
     };
     log::debug!(
@@ -79,40 +74,20 @@ pub(crate) async fn rename(
             crate::utils::crossref_symbol_labels(&old_norm, config.extensions.bookdown_references);
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
-        let per_doc = {
-            let db = salsa_db.lock().await;
-            let mut doc_paths =
-                crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
-                    .documents()
-                    .iter()
-                    .cloned()
-                    .collect::<Vec<_>>();
-            if !doc_paths.contains(&doc_path) {
-                doc_paths.push(doc_path.clone());
-            }
-            doc_paths.sort();
-            doc_paths.dedup();
+        let per_doc = crate::lsp::navigation::project_symbol_documents(
+            &salsa_db,
+            salsa_file,
+            salsa_config,
+            &doc_path,
+            &uri,
+            &content,
+        )
+        .await;
 
-            let mut out = Vec::new();
-            for path in &doc_paths {
-                let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
-                let (file, text) = if doc_uri == uri {
-                    (salsa_file, content.clone())
-                } else {
-                    let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
-                        continue;
-                    };
-                    (file, file.text(&*db).clone())
-                };
-                let symbol_index =
-                    crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone())
-                        .clone();
-                out.push((doc_uri, text, symbol_index));
-            }
-            out
-        };
-
-        for (doc_uri, text, symbol_index) in per_doc {
+        for doc in per_doc {
+            let doc_uri = doc.uri;
+            let text = doc.text;
+            let symbol_index = doc.symbol_index;
             let mut edits = Vec::new();
             for search_key in &search_keys {
                 if let Some(ranges) = symbol_index.crossref_usages(search_key) {
@@ -170,48 +145,20 @@ pub(crate) async fn rename(
         let old_norm = normalize_label(old_key);
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
-        let per_doc = {
-            let db = salsa_db.lock().await;
-            let mut doc_paths =
-                crate::salsa::project_graph(&*db, salsa_file, salsa_config, doc_path.clone())
-                    .documents()
-                    .iter()
-                    .cloned()
-                    .collect::<Vec<_>>();
-            if !doc_paths.contains(&doc_path) {
-                doc_paths.push(doc_path.clone());
-            }
-            doc_paths.sort();
-            doc_paths.dedup();
+        let per_doc = crate::lsp::navigation::project_symbol_documents(
+            &salsa_db,
+            salsa_file,
+            salsa_config,
+            &doc_path,
+            &uri,
+            &content,
+        )
+        .await;
 
-            let mut out = Vec::new();
-            for path in &doc_paths {
-                let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
-                let text = if doc_uri == uri {
-                    content.clone()
-                } else {
-                    let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
-                        continue;
-                    };
-                    file.text(&*db).clone()
-                };
-                let file = if doc_uri == uri {
-                    salsa_file
-                } else {
-                    let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
-                        continue;
-                    };
-                    file
-                };
-                let symbol_index =
-                    crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone())
-                        .clone();
-                out.push((doc_uri, text, symbol_index));
-            }
-            out
-        };
-
-        for (doc_uri, text, symbol_index) in per_doc {
+        for doc in per_doc {
+            let doc_uri = doc.uri;
+            let text = doc.text;
+            let symbol_index = doc.symbol_index;
             let ranges = symbol_index.heading_rename_ranges(&old_norm);
 
             let edits = text_edits_from_ranges(&ranges, &text, &new_name);
@@ -337,29 +284,23 @@ pub(crate) async fn rename(
         doc_paths.push(doc_path.clone());
     }
 
-    doc_paths.sort();
-    doc_paths.dedup();
-
-    let citation_usage_docs = {
-        let db = salsa_db.lock().await;
-        let mut out = Vec::new();
-        for path in &doc_paths {
-            let doc_uri = Uri::from_file_path(path).unwrap_or_else(|| uri.clone());
-            let (file, text) = if doc_uri == uri {
-                (salsa_file, content.clone())
-            } else {
-                let Some(file) = crate::salsa::Db::file_text(&*db, path.clone()) else {
-                    continue;
-                };
-                (file, file.text(&*db).clone())
-            };
-            let symbol_index =
-                crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
-            out.push((doc_uri, text, symbol_index));
-        }
-        out
-    };
-    for (doc_uri, text, symbol_index) in citation_usage_docs {
+    let citation_usage_inputs = crate::lsp::navigation::document_inputs_for_paths(
+        &salsa_db, &doc_path, &content, doc_paths,
+    )
+    .await;
+    let citation_usage_docs = crate::lsp::navigation::indexed_documents_from_inputs(
+        &salsa_db,
+        salsa_file,
+        salsa_config,
+        &doc_path,
+        &uri,
+        citation_usage_inputs,
+    )
+    .await;
+    for doc in citation_usage_docs {
+        let doc_uri = doc.uri;
+        let text = doc.text;
+        let symbol_index = doc.symbol_index;
         let Some(ranges) = symbol_index.citation_usages(&old_norm) else {
             continue;
         };

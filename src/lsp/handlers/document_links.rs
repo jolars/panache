@@ -292,7 +292,7 @@ async fn build_reference_targets(
     doc_content: &str,
     fallback_uri: &Uri,
 ) -> HashMap<String, ReferenceTarget> {
-    let doc_inputs = crate::lsp::navigation::project_document_inputs(
+    let bundle = crate::lsp::navigation::project_document_bundle(
         salsa_db,
         salsa_file,
         salsa_config,
@@ -300,14 +300,10 @@ async fn build_reference_targets(
         doc_content,
     )
     .await;
-    let parse_config = {
-        let db = salsa_db.lock().await;
-        salsa_config.config(&*db).clone()
-    };
 
     let mut out = HashMap::new();
-    for (path, input) in doc_inputs {
-        let tree = crate::parse(&input, Some(parse_config.clone()));
+    for (path, input) in bundle.inputs {
+        let tree = crate::lsp::navigation::parse_with_config(&input, &bundle.parse_config);
         for def in tree
             .descendants()
             .filter_map(crate::syntax::ReferenceDefinition::cast)

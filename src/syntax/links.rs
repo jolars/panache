@@ -214,6 +214,15 @@ impl LinkRef {
             .map(|token| token.text().to_string())
             .collect()
     }
+
+    /// Returns the text range for the reference label (without brackets).
+    pub fn label_range(&self) -> Option<rowan::TextRange> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .find(|token| token.kind() == SyntaxKind::TEXT)
+            .map(|token| token.text_range())
+    }
 }
 
 pub struct ImageLink(SyntaxNode);
@@ -252,6 +261,58 @@ impl ImageLink {
     /// Returns the reference label for reference-style images.
     pub fn reference(&self) -> Option<LinkRef> {
         support::child(&self.0)
+    }
+
+    /// Returns the reference label text for reference-style images.
+    pub fn reference_label(&self) -> Option<String> {
+        let mut saw_open = false;
+        for token in self
+            .0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+        {
+            let text = token.text();
+            if text == "[" {
+                saw_open = true;
+                continue;
+            }
+            if text == "]" {
+                if saw_open {
+                    break;
+                }
+                continue;
+            }
+            if saw_open {
+                return Some(text.to_string());
+            }
+        }
+        None
+    }
+
+    /// Returns the text range for the reference label in reference-style images.
+    pub fn reference_label_range(&self) -> Option<rowan::TextRange> {
+        let mut saw_open = false;
+        for token in self
+            .0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+        {
+            let text = token.text();
+            if text == "[" {
+                saw_open = true;
+                continue;
+            }
+            if text == "]" {
+                if saw_open {
+                    break;
+                }
+                continue;
+            }
+            if saw_open {
+                return Some(token.text_range());
+            }
+        }
+        None
     }
 }
 
@@ -315,5 +376,27 @@ impl Figure {
     /// Returns the image link within the figure.
     pub fn image(&self) -> Option<ImageLink> {
         support::child(&self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AstNode, ImageLink};
+
+    #[test]
+    fn image_reference_label_and_range_are_extracted() {
+        let input = "![Alt text][img]";
+        let tree = crate::parse(input, None);
+        let image = tree
+            .descendants()
+            .find_map(ImageLink::cast)
+            .expect("image link");
+
+        assert_eq!(image.reference_label().as_deref(), Some("img"));
+
+        let range = image.reference_label_range().expect("label range");
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        assert_eq!(&input[start..end], "img");
     }
 }

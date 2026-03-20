@@ -32,6 +32,8 @@ cargo check && cargo test && cargo clippy --all-targets --all-features -- -D war
 - Keep parser behavior lossless (preserve all input bytes/markers in CST).
 - Keep formatting policy in formatter code, not parser code.
 - Prefer existing parser/formatter helpers over introducing parallel logic paths.
+- For known CST-shape follow-ups around image reference wrappers, see
+  `src/syntax/IMAGE_REFERENCE_CST.md`.
 - Use debug checks when validating formatting behavior:
   - `cargo run -- debug format --checks all document.qmd` (idempotency +
     losslessness)

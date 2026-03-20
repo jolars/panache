@@ -120,3 +120,27 @@ async fn test_prepare_rename_executable_chunk_option_label_selects_full_hyphenat
     assert_eq!(range.end.character, 24);
     assert_eq!(placeholder, "my-label");
 }
+
+#[tokio::test]
+async fn test_prepare_rename_image_reference_selects_reference_label() {
+    let server = TestLspServer::new();
+    let content = "![Alt text][img]\n\n[img]: image.png\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let response = server
+        .prepare_rename("file:///test.md", 0, 12)
+        .await
+        .expect("prepare rename response");
+
+    let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = response else {
+        panic!("expected prepare rename range");
+    };
+
+    assert_eq!(range.start.line, 0);
+    assert_eq!(range.start.character, 12);
+    assert_eq!(range.end.line, 0);
+    assert_eq!(range.end.character, 15);
+    assert_eq!(placeholder, "img");
+}

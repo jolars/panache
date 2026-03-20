@@ -8,8 +8,8 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkLabel, ChunkOption, Citation, Crossref, FootnoteReference, Link,
-    LinkRef, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
+    AstNode, AttributeNode, ChunkLabel, ChunkOption, Citation, Crossref, FootnoteReference,
+    ImageLink, Link, LinkRef, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
 };
 use crate::utils::normalize_label;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -321,9 +321,18 @@ pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> 
         if let Some(dest) = link.dest() {
             return dest.hash_anchor_id_range();
         }
+        if let Some(link_ref) = link.reference() {
+            return link_ref.label_range();
+        }
         if link.reference().is_none() {
             return link.text().map(|text| text.syntax().text_range());
         }
+    }
+
+    if let Some(image) = ImageLink::cast(node.clone())
+        && let Some(range) = image.reference_label_range()
+    {
+        return Some(range);
     }
 
     None
@@ -446,12 +455,10 @@ pub(crate) fn find_definition_at_offset(root: &SyntaxNode, offset: usize) -> Opt
 
         // Check if this is an ImageLink that might contain a LinkRef
         if node.kind() == SyntaxKind::IMAGE_LINK
-            && let Some(link_ref) = node
-                .children()
-                .find(|child| child.kind() == SyntaxKind::LINK_REF)
-            && let Some((label, is_footnote)) = extract_reference_label(&link_ref)
+            && let Some(image) = ImageLink::cast(node.clone())
+            && let Some(label) = image.reference_label()
         {
-            let definition = find_definition_node(root, &label, is_footnote)?;
+            let definition = find_definition_node(root, &normalize_label(&label), false)?;
             return Some(definition.text_range());
         }
 

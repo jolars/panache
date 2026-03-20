@@ -37,36 +37,41 @@ pub(crate) async fn workspace_symbol(
     let mut candidate_paths: HashSet<PathBuf> = HashSet::new();
     let mut path_configs: HashMap<PathBuf, crate::salsa::FileConfig> = HashMap::new();
     let mut path_uris: HashMap<PathBuf, Uri> = HashMap::new();
+    let mut memory_states: Vec<(Uri, crate::salsa::FileText, GreenNode)> = Vec::new();
     let mut memory_docs: Vec<(Uri, String, GreenNode)> = Vec::new();
 
-    {
-        let db = salsa_db.lock().await;
-        for (uri_str, state) in &open_documents {
-            if let Some(path) = &state.path {
-                candidate_paths.insert(path.clone());
-                path_configs
-                    .entry(path.clone())
-                    .or_insert(state.salsa_config);
-                if let Ok(uri) = uri_str.parse::<Uri>() {
-                    path_uris.entry(path.clone()).or_insert(uri);
-                }
-
-                let graph = crate::salsa::project_graph(
-                    &*db,
-                    state.salsa_file,
-                    state.salsa_config,
-                    path.clone(),
-                )
-                .clone();
-
-                for graph_path in graph.documents().iter().cloned() {
-                    candidate_paths.insert(graph_path.clone());
-                    path_configs.entry(graph_path).or_insert(state.salsa_config);
-                }
-            } else if let Ok(uri) = uri_str.parse::<Uri>() {
-                let content = state.salsa_file.text(&*db).clone();
-                memory_docs.push((uri, content, state.tree.clone()));
+    for (uri_str, state) in &open_documents {
+        if let Some(path) = &state.path {
+            candidate_paths.insert(path.clone());
+            path_configs
+                .entry(path.clone())
+                .or_insert(state.salsa_config);
+            if let Ok(uri) = uri_str.parse::<Uri>() {
+                path_uris.entry(path.clone()).or_insert(uri);
             }
+
+            let graph_paths = crate::lsp::navigation::project_document_paths(
+                &salsa_db,
+                state.salsa_file,
+                state.salsa_config,
+                path,
+            )
+            .await;
+
+            for graph_path in graph_paths {
+                candidate_paths.insert(graph_path.clone());
+                path_configs.entry(graph_path).or_insert(state.salsa_config);
+            }
+        } else if let Ok(uri) = uri_str.parse::<Uri>() {
+            memory_states.push((uri, state.salsa_file, state.tree.clone()));
+        }
+    }
+
+    if !memory_states.is_empty() {
+        let db = salsa_db.lock().await;
+        for (uri, file, tree) in memory_states {
+            let content = file.text(&*db).clone();
+            memory_docs.push((uri, content, tree));
         }
     }
 

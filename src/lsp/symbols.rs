@@ -1,4 +1,4 @@
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, ImageLink, SyntaxKind, SyntaxNode};
 
 use super::helpers;
 
@@ -56,12 +56,13 @@ pub(crate) fn resolve_symbol_target_at_offset(
         }
 
         if node.kind() == SyntaxKind::IMAGE_LINK
-            && let Some(link_ref) = node
-                .children()
-                .find(|child| child.kind() == SyntaxKind::LINK_REF)
-            && let Some((label, is_footnote)) = helpers::extract_reference_label(&link_ref)
+            && let Some(image) = ImageLink::cast(node.clone())
+            && let Some(label) = image.reference_label()
         {
-            return Some(SymbolTarget::Reference { label, is_footnote });
+            return Some(SymbolTarget::Reference {
+                label: crate::utils::normalize_label(&label),
+                is_footnote: false,
+            });
         }
 
         node = node.parent()?;
