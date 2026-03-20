@@ -265,54 +265,12 @@ impl ImageLink {
 
     /// Returns the reference label text for reference-style images.
     pub fn reference_label(&self) -> Option<String> {
-        let mut saw_open = false;
-        for token in self
-            .0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-        {
-            let text = token.text();
-            if text == "[" {
-                saw_open = true;
-                continue;
-            }
-            if text == "]" {
-                if saw_open {
-                    break;
-                }
-                continue;
-            }
-            if saw_open {
-                return Some(text.to_string());
-            }
-        }
-        None
+        self.reference().map(|link_ref| link_ref.label())
     }
 
     /// Returns the text range for the reference label in reference-style images.
     pub fn reference_label_range(&self) -> Option<rowan::TextRange> {
-        let mut saw_open = false;
-        for token in self
-            .0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-        {
-            let text = token.text();
-            if text == "[" {
-                saw_open = true;
-                continue;
-            }
-            if text == "]" {
-                if saw_open {
-                    break;
-                }
-                continue;
-            }
-            if saw_open {
-                return Some(token.text_range());
-            }
-        }
-        None
+        self.reference().and_then(|link_ref| link_ref.label_range())
     }
 }
 

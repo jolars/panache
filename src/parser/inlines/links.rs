@@ -711,10 +711,12 @@ pub fn emit_reference_image(
     if !is_shortcut {
         // Explicit or implicit reference: ![alt][label] or ![alt][]
         builder.token(SyntaxKind::TEXT.into(), "[");
+        builder.start_node(SyntaxKind::LINK_REF.into());
         // For implicit references, emit empty label (label == alt means implicit from parser)
         if label != alt_text {
             builder.token(SyntaxKind::TEXT.into(), label);
         }
+        builder.finish_node();
         builder.token(SyntaxKind::TEXT.into(), "]");
     }
     // For shortcut references, just ![alt] - no second bracket pair

@@ -17,7 +17,8 @@ DOCUMENT@0..520
         TEXT@42..50 "alt text"
       TEXT@50..51 "]"
       TEXT@51..52 "["
-      TEXT@52..56 "img1"
+      LINK_REF@52..56
+        TEXT@52..56 "img1"
       TEXT@56..57 "]"
     TEXT@57..71 " in paragraph."
     NEWLINE@71..72 "\n"
@@ -32,6 +33,7 @@ DOCUMENT@0..520
         TEXT@95..99 "Logo"
       TEXT@99..100 "]"
       TEXT@100..101 "["
+      LINK_REF@101..101
       TEXT@101..102 "]"
     TEXT@102..115 " shows brand."
     NEWLINE@115..116 "\n"
@@ -58,7 +60,8 @@ DOCUMENT@0..520
         TEXT@176..181 "first"
       TEXT@181..182 "]"
       TEXT@182..183 "["
-      TEXT@183..185 "i1"
+      LINK_REF@183..185
+        TEXT@183..185 "i1"
       TEXT@185..186 "]"
     TEXT@186..191 " and "
     IMAGE_LINK@191..204
@@ -68,7 +71,8 @@ DOCUMENT@0..520
         TEXT@193..199 "second"
       TEXT@199..200 "]"
       TEXT@200..201 "["
-      TEXT@201..203 "i2"
+      LINK_REF@201..203
+        TEXT@201..203 "i2"
       TEXT@203..204 "]"
     TEXT@204..214 " together."
     NEWLINE@214..215 "\n"
@@ -83,7 +87,8 @@ DOCUMENT@0..520
         TEXT@230..237 "missing"
       TEXT@237..238 "]"
       TEXT@238..239 "["
-      TEXT@239..250 "nonexistent"
+      LINK_REF@239..250
+        TEXT@239..250 "nonexistent"
       TEXT@250..251 "]"
     TEXT@251..264 " stays as-is."
     NEWLINE@264..265 "\n"
@@ -98,7 +103,8 @@ DOCUMENT@0..520
         TEXT@286..289 "ALT"
       TEXT@289..290 "]"
       TEXT@290..291 "["
-      TEXT@291..296 "myimg"
+      LINK_REF@291..296
+        TEXT@291..296 "myimg"
       TEXT@296..297 "]"
     TEXT@297..327 " matches lowercase de ..."
     NEWLINE@327..328 "\n"
@@ -121,7 +127,8 @@ DOCUMENT@0..520
           CODE_SPAN_MARKER@362..363 "`"
       TEXT@363..364 "]"
       TEXT@364..365 "["
-      TEXT@365..369 "img1"
+      LINK_REF@365..369
+        TEXT@365..369 "img1"
       TEXT@369..370 "]"
     TEXT@370..387 " with formatting."
     NEWLINE@387..388 "\n"

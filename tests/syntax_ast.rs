@@ -185,6 +185,40 @@ fn image_alt_text_extraction() {
 }
 
 #[test]
+fn image_reference_emits_link_ref_child() {
+    let input = "![alt][img]\n\n[img]: image.png\n";
+    let tree = parse(input, None);
+
+    let image_node = tree
+        .descendants()
+        .find(|n| n.kind() == SyntaxKind::IMAGE_LINK)
+        .expect("Should find IMAGE_LINK node");
+
+    let image = ImageLink::cast(image_node).expect("Should cast to ImageLink");
+    let link_ref = image
+        .reference()
+        .expect("Reference-style image should have LINK_REF child");
+    assert_eq!(link_ref.label(), "img");
+}
+
+#[test]
+fn image_implicit_reference_emits_empty_link_ref_child() {
+    let input = "![alt][]\n\n[alt]: image.png\n";
+    let tree = parse(input, None);
+
+    let image_node = tree
+        .descendants()
+        .find(|n| n.kind() == SyntaxKind::IMAGE_LINK)
+        .expect("Should find IMAGE_LINK node");
+
+    let image = ImageLink::cast(image_node).expect("Should cast to ImageLink");
+    let link_ref = image
+        .reference()
+        .expect("Implicit reference image should have LINK_REF child");
+    assert_eq!(link_ref.label(), "");
+}
+
+#[test]
 fn figure_with_image() {
     let input = "![Caption](image.png)\n\n";
     let tree = parse(input, None);

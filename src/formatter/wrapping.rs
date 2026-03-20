@@ -607,7 +607,9 @@ fn build_pieces_with_mode<'a>(
                                 match child {
                                     NodeOrToken::Node(img_child) => match img_child.kind() {
                                         SyntaxKind::IMAGE_ALT => past_image_alt = true,
-                                        SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE => {
+                                        SyntaxKind::LINK_DEST
+                                        | SyntaxKind::ATTRIBUTE
+                                        | SyntaxKind::LINK_REF => {
                                             if past_image_alt {
                                                 if img_child.kind() == SyntaxKind::LINK_DEST {
                                                     let raw = img_child.text().to_string();
@@ -1130,7 +1132,9 @@ fn wrap_node_greedy_streaming(
                                 match child {
                                     NodeOrToken::Node(img_child) => match img_child.kind() {
                                         SyntaxKind::IMAGE_ALT => past_image_alt = true,
-                                        SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE => {
+                                        SyntaxKind::LINK_DEST
+                                        | SyntaxKind::ATTRIBUTE
+                                        | SyntaxKind::LINK_REF => {
                                             if past_image_alt {
                                                 if img_child.kind() == SyntaxKind::LINK_DEST {
                                                     let raw = img_child.text().to_string();
