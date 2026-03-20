@@ -32,3 +32,10 @@ Indented with tabs, so code keeps one tab-stop of extra indentation
 			code
 			a <- 1
 	```
+
+Input
+:   ```
+    Term
+    
+      : Def
+    ```
