@@ -1,4 +1,4 @@
-DOCUMENT@0..1229
+DOCUMENT@0..1432
   YAML_METADATA@0..32
     YAML_METADATA_DELIM@0..3 "---"
     NEWLINE@3..4 "\n"
@@ -454,4 +454,67 @@ DOCUMENT@0..1229
   PARAGRAPH@1217..1229
     TEXT@1217..1228 "B. Williams"
     NEWLINE@1228..1229 "\n"
+  BLANK_LINE@1229..1230
+    BLANK_LINE@1229..1230 "\n"
+  HEADING@1230..1241
+    ATX_HEADING_MARKER@1230..1232
+      ATX_HEADING_MARKER@1230..1232 "##"
+    WHITESPACE@1232..1233 " "
+    HEADING_CONTENT@1233..1240
+      TEXT@1233..1240 "Complex"
+    NEWLINE@1240..1241 "\n"
+  BLANK_LINE@1241..1242
+    BLANK_LINE@1241..1242 "\n"
+  LIST@1242..1432
+    LIST_ITEM@1242..1260
+      LIST_MARKER@1242..1245 "(2)"
+      WHITESPACE@1245..1246 " "
+      PLAIN@1246..1260
+        TEXT@1246..1259 "begins with 2"
+        NEWLINE@1259..1260 "\n"
+    LIST_ITEM@1260..1432
+      LIST_MARKER@1260..1263 "(3)"
+      WHITESPACE@1263..1264 " "
+      PLAIN@1264..1274
+        TEXT@1264..1273 "and now 3"
+        NEWLINE@1273..1274 "\n"
+      BLANK_LINE@1274..1275
+        BLANK_LINE@1274..1275 "\n"
+      PLAIN@1275..1299
+        TEXT@1275..1298 "    with a continuation"
+        NEWLINE@1298..1299 "\n"
+      BLANK_LINE@1299..1300
+        BLANK_LINE@1299..1300 "\n"
+      LIST@1300..1432
+        LIST_ITEM@1300..1361
+          WHITESPACE@1300..1304 "    "
+          LIST_MARKER@1304..1307 "iv."
+          WHITESPACE@1307..1308 " "
+          PLAIN@1308..1361
+            TEXT@1308..1336 "sublist with roman nu ..."
+            NEWLINE@1336..1337 "\n"
+            TEXT@1337..1360 "        starting with 4"
+            NEWLINE@1360..1361 "\n"
+        LIST_ITEM@1361..1432
+          WHITESPACE@1361..1365 "    "
+          LIST_MARKER@1365..1367 "v."
+          WHITESPACE@1367..1369 "  "
+          PLAIN@1369..1380
+            TEXT@1369..1379 "more items"
+            NEWLINE@1379..1380 "\n"
+          LIST@1380..1432
+            LIST_ITEM@1380..1406
+              WHITESPACE@1380..1388 "        "
+              LIST_MARKER@1388..1391 "(A)"
+              WHITESPACE@1391..1393 "  "
+              PLAIN@1393..1406
+                TEXT@1393..1405 "a subsublist"
+                NEWLINE@1405..1406 "\n"
+            LIST_ITEM@1406..1432
+              WHITESPACE@1406..1414 "        "
+              LIST_MARKER@1414..1417 "(B)"
+              WHITESPACE@1417..1419 "  "
+              PLAIN@1419..1432
+                TEXT@1419..1431 "a subsublist"
+                NEWLINE@1431..1432 "\n"
 

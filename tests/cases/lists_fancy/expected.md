@@ -91,3 +91,15 @@ Should not be a list item:
 M.A. 2007
 
 B. Williams
+
+## Complex
+
+(2) begins with 2
+(3) and now 3
+
+    with a continuation
+
+    iv. sublist with roman numerals, starting with 4
+     v. more items
+        (A) a subsublist
+        (B) a subsublist

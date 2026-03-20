@@ -1793,13 +1793,20 @@ impl BlockParser for IndentedCodeBlockParser {
             return None;
         }
 
+        let list_content_col = ctx
+            .list_indent_info
+            .map(|list_info| list_info.content_col)
+            .unwrap_or(0);
+        let required_indent = list_content_col + 4;
+
         let (indent_cols, _) = leading_indent(ctx.content);
         // Don't treat as code if it's a list marker and not indented enough for code.
-        if indent_cols < 4 && try_parse_list_marker(ctx.content, ctx.config).is_some() {
+        if indent_cols < required_indent && try_parse_list_marker(ctx.content, ctx.config).is_some()
+        {
             return None;
         }
 
-        if !is_indented_code_line(ctx.content) {
+        if indent_cols < required_indent || !is_indented_code_line(ctx.content) {
             return None;
         }
 
@@ -1814,13 +1821,14 @@ impl BlockParser for IndentedCodeBlockParser {
         line_pos: usize,
         _payload: Option<&dyn Any>,
     ) -> usize {
-        let new_pos = parse_indented_code_block(
-            builder,
-            lines,
-            line_pos,
-            ctx.blockquote_depth,
-            ctx.content_indent,
-        );
+        let base_indent = ctx.content_indent
+            + ctx
+                .list_indent_info
+                .map(|list_info| list_info.content_col)
+                .unwrap_or(0);
+
+        let new_pos =
+            parse_indented_code_block(builder, lines, line_pos, ctx.blockquote_depth, base_indent);
         new_pos - line_pos
     }
 

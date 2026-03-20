@@ -105,6 +105,33 @@ fn outdented_item_after_nested_list_returns_to_outer_level() {
 }
 
 #[test]
+fn fancy_list_continuation_with_nested_list_is_not_indented_code() {
+    use crate::config::{Config, Extensions};
+
+    let config = Config {
+        extensions: Extensions {
+            fancy_lists: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let input = "(2) begins with 2\n(3) and now 3\n\n    with a continuation\n\n    iv. sublist with roman numerals,\n        starting with 4\n    v.  more items\n        (A)  a subsublist\n        (B)  a subsublist\n";
+
+    let tree = crate::parser::Parser::new(input, &config).parse();
+
+    assert!(
+        find_first(&tree, SyntaxKind::CODE_BLOCK).is_none(),
+        "continuation content should not parse as indented code"
+    );
+
+    let lists = find_all(&tree, SyntaxKind::LIST);
+    assert!(
+        lists.len() >= 3,
+        "should contain outer, nested roman, and nested alpha lists"
+    );
+}
+
+#[test]
 fn loose_list_with_blank_lines() {
     let input = "* one\n\n* two\n\n* three\n";
     let tree = parse_blocks(input);
