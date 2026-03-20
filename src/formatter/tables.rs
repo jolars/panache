@@ -1006,6 +1006,11 @@ fn determine_simple_alignments(
 ) {
     if let Some(header) = header_line {
         for col in columns.iter_mut() {
+            if col.end > header.len() {
+                col.alignment = Alignment::Default;
+                continue;
+            }
+
             // Extract header text for this column
             let header_text = if col.end <= header.len() {
                 header[col.start..col.end].trim()
@@ -1216,11 +1221,43 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
         return node.text().to_string();
     }
 
-    // For simple tables, use separator dash lengths; for other tables, calculate from content
+    let content_widths = calculate_column_widths(&table_data.rows);
+    let has_header = table_data.has_header;
+
+    // For simple tables, preserve separator-derived geometry unless it's clearly oversized
+    // compared to content; then shrink width while preserving column starts.
     let widths = if let Some(ref widths) = table_data.column_widths {
         widths.clone()
     } else {
-        calculate_column_widths(&table_data.rows)
+        content_widths.clone()
+    };
+
+    let normalized_positions = if let Some(ref positions) = table_data.column_positions {
+        let mut out = Vec::with_capacity(positions.len());
+        for (col_idx, &(start, end)) in positions.iter().enumerate() {
+            let original_width = end.saturating_sub(start);
+            if has_header {
+                let content_width = content_widths.get(col_idx).copied().unwrap_or(3);
+                let alignment = table_data
+                    .alignments
+                    .get(col_idx)
+                    .copied()
+                    .unwrap_or(Alignment::Default);
+                let preferred_width = content_width
+                    + match alignment {
+                        Alignment::Center => 4,
+                        Alignment::Left | Alignment::Right => 2,
+                        Alignment::Default => 0,
+                    };
+                let clamped_width = original_width.min(preferred_width).max(content_width);
+                out.push((start, start + clamped_width));
+            } else {
+                out.push((start, end));
+            }
+        }
+        Some(out)
+    } else {
+        None
     };
 
     // Emit caption before if present
@@ -1231,13 +1268,10 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str("\n\n");
     }
 
-    // Check if we have a header (from TableData, not just first row)
-    let has_header = table_data.has_header;
-
     // For headerless simple tables, emit opening separator first
     if !has_header
-        && table_data.column_positions.is_some()
-        && let Some(ref positions) = table_data.column_positions
+        && normalized_positions.is_some()
+        && let Some(ref positions) = normalized_positions
     {
         let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
         let mut sep_chars: Vec<char> = vec![' '; last_col_end];
@@ -1255,7 +1289,7 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
     // Format header row if present
     if has_header {
         // For simple tables with column positions, use absolute positioning
-        if let Some(ref positions) = table_data.column_positions {
+        if let Some(ref positions) = normalized_positions {
             // Build header line using character buffer
             let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
             let mut line_chars: Vec<char> = vec![' '; last_col_end];
@@ -1358,7 +1392,7 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
 
     // Format data rows
     for row in table_data.rows.iter().skip(if has_header { 1 } else { 0 }) {
-        if let Some(ref positions) = table_data.column_positions {
+        if let Some(ref positions) = normalized_positions {
             // Build row using character buffer
             let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
             let mut line_chars: Vec<char> = vec![' '; last_col_end];
@@ -1440,8 +1474,8 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
 
     // For headerless simple tables, emit closing separator
     if !has_header
-        && table_data.column_positions.is_some()
-        && let Some(ref positions) = table_data.column_positions
+        && normalized_positions.is_some()
+        && let Some(ref positions) = normalized_positions
     {
         let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
         let mut sep_chars: Vec<char> = vec![' '; last_col_end];

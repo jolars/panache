@@ -313,3 +313,13 @@ fn test_multiline_table_with_wide_chars_stays_idempotent() {
     let second = format(&first, None, None);
     assert_eq!(first, second);
 }
+
+#[test]
+fn test_simple_table_compresses_oversized_separator_columns() {
+    let input = "   Right     Left\n -------     --------------\n     12         12\n   123          123\n       1        1\n";
+    let expected =
+        "  Right     Left\n-------     ----\n     12     12\n    123     123\n      1     1\n";
+
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
+}
