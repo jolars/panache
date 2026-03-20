@@ -820,14 +820,47 @@ impl StyleConfig {
     // No flavor-specific defaults needed - just use field defaults
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum PandocCompat {
+    /// Alias for Panache's pinned newest supported Pandoc-compat behavior.
+    ///
+    /// This is intentionally NOT "floating upstream latest". It resolves to
+    /// a concrete version that Panache has verified, and is bumped manually.
+    #[serde(rename = "latest")]
+    Latest,
+    /// Match Pandoc 3.7 behavior for ambiguous syntax edge cases.
+    #[serde(rename = "3.7", alias = "3-7", alias = "v3.7", alias = "v3-7")]
+    V3_7,
+    /// Match Pandoc 3.9 behavior for ambiguous syntax edge cases.
+    #[default]
+    #[serde(rename = "3.9", alias = "3-9", alias = "v3.9", alias = "v3-9")]
+    V3_9,
+}
+
+impl PandocCompat {
+    /// Pinned target for `latest`.
+    pub const PINNED_LATEST: Self = Self::V3_9;
+
+    pub fn effective(self) -> Self {
+        match self {
+            Self::Latest => Self::PINNED_LATEST,
+            other => other,
+        }
+    }
+}
+
 /// Parser configuration.
-///
-/// Reserved for future parser settings. Currently empty as the integrated
-/// inline parsing is the only mode (as of Phase 6, 2026-02-25).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct ParserConfig {
-    // Reserved for future parser configuration options
+    /// Compatibility target for ambiguous Pandoc behavior.
+    pub pandoc_compat: PandocCompat,
+}
+
+impl ParserConfig {
+    pub fn effective_pandoc_compat(&self) -> PandocCompat {
+        self.pandoc_compat.effective()
+    }
 }
 
 /// Linter configuration.
@@ -922,6 +955,8 @@ struct RawConfig {
     line_ending: Option<LineEnding>,
     #[serde(default = "default_line_width")]
     line_width: usize,
+    #[serde(default)]
+    pandoc_compat: Option<PandocCompat>,
 
     // New preferred formatting section
     #[serde(default)]
@@ -945,7 +980,7 @@ struct RawConfig {
     tab_stops: TabStopMode,
     #[serde(default = "default_tab_width")]
     tab_width: usize,
-    // Parser configuration
+    // Parser configuration (deprecated home for pandoc-compat)
     #[serde(default)]
     parser: Option<ParserConfig>,
 
@@ -1172,6 +1207,27 @@ fn resolve_language_formatters(
 impl RawConfig {
     /// Finalize into Config, applying flavor-based defaults where needed
     fn finalize(self) -> Config {
+        let parser_from_section = self.parser.unwrap_or_default();
+        let parser_pandoc_compat = parser_from_section.pandoc_compat;
+
+        let resolved_pandoc_compat = if let Some(pandoc_compat) = self.pandoc_compat {
+            if parser_pandoc_compat != PandocCompat::default()
+                && parser_pandoc_compat != pandoc_compat
+            {
+                eprintln!(
+                    "Warning: Both top-level 'pandoc-compat' and [parser].pandoc-compat are set. Using top-level 'pandoc-compat'."
+                );
+            }
+            pandoc_compat
+        } else {
+            if parser_pandoc_compat != PandocCompat::default() {
+                eprintln!(
+                    "Warning: [parser].pandoc-compat is deprecated. Please use top-level 'pandoc-compat'."
+                );
+            }
+            parser_pandoc_compat
+        };
+
         // Check for deprecated top-level style fields
         let has_deprecated_fields = self.wrap.is_some()
             || self.math_indent != 0
@@ -1243,7 +1299,9 @@ impl RawConfig {
             external_max_parallel: self
                 .external_max_parallel
                 .unwrap_or_else(default_external_max_parallel),
-            parser: self.parser.unwrap_or_default(),
+            parser: ParserConfig {
+                pandoc_compat: resolved_pandoc_compat,
+            },
             built_in_greedy_wrap: style.built_in_greedy_wrap,
             exclude: self.exclude,
             extend_exclude: self.extend_exclude,
@@ -3132,8 +3190,7 @@ mod parser_config_test {
     #[test]
     fn test_parser_config_default() {
         let cfg = Config::default();
-        // ParserConfig is now empty but should still be present
-        assert_eq!(cfg.parser, ParserConfig::default());
+        assert_eq!(cfg.parser.pandoc_compat, PandocCompat::V3_9);
     }
 
     #[test]
@@ -3143,7 +3200,54 @@ mod parser_config_test {
             [parser]
         "#;
         let cfg: Config = toml::from_str(toml_str).unwrap();
-        assert_eq!(cfg.parser, ParserConfig::default());
+        assert_eq!(cfg.parser.pandoc_compat, PandocCompat::V3_9);
+    }
+
+    #[test]
+    fn test_parser_config_pandoc_compat_latest() {
+        let toml_str = r#"
+            pandoc-compat = "latest"
+        "#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(cfg.parser.pandoc_compat, PandocCompat::Latest);
+        assert_eq!(cfg.parser.effective_pandoc_compat(), PandocCompat::V3_9);
+    }
+
+    #[test]
+    fn test_parser_config_pandoc_compat_accepts_version_aliases() {
+        for value in ["3.7", "3-7", "v3.7", "v3-7"] {
+            let toml_str = format!("pandoc-compat = \"{}\"\n", value);
+            let cfg: Config = toml::from_str(&toml_str).unwrap();
+            assert_eq!(cfg.parser.pandoc_compat, PandocCompat::V3_7);
+        }
+
+        for value in ["3.9", "3-9", "v3.9", "v3-9"] {
+            let toml_str = format!("pandoc-compat = \"{}\"\n", value);
+            let cfg: Config = toml::from_str(&toml_str).unwrap();
+            assert_eq!(cfg.parser.pandoc_compat, PandocCompat::V3_9);
+        }
+    }
+
+    #[test]
+    fn test_parser_config_pandoc_compat_parser_section_backwards_compat() {
+        let toml_str = r#"
+            [parser]
+            pandoc-compat = "latest"
+        "#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(cfg.parser.pandoc_compat, PandocCompat::Latest);
+    }
+
+    #[test]
+    fn test_parser_config_pandoc_compat_top_level_takes_precedence() {
+        let toml_str = r#"
+            pandoc-compat = "3.7"
+
+            [parser]
+            pandoc-compat = "latest"
+        "#;
+        let cfg: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(cfg.parser.pandoc_compat, PandocCompat::V3_7);
     }
 }
 

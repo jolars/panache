@@ -4,7 +4,7 @@
 //! logic (especially across blank lines). Keeping this logic in one place reduces the
 //! risk of scattered ad-hoc heuristics diverging as blocks move into the dispatcher.
 
-use crate::config::Config;
+use crate::config::{Config, PandocCompat};
 
 use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
 use crate::parser::blocks::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
@@ -21,6 +21,14 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         Self {
             config,
             block_registry,
+        }
+    }
+
+    fn definition_min_block_indent(&self, content_col: usize) -> usize {
+        if self.config.parser.effective_pandoc_compat() == PandocCompat::V3_7 {
+            content_col.max(4)
+        } else {
+            content_col
         }
     }
 
@@ -75,7 +83,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                     // indent must be measured relative to any outer content containers (e.g.
                     // footnotes). Otherwise a line indented only for the footnote would wrongly
                     // continue the definition.
-                    let min_indent = (*content_col).max(4);
+                    let min_indent = self.definition_min_block_indent(*content_col);
                     let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
                     if effective_indent >= min_indent {
                         keep_level = i + 1;
@@ -162,7 +170,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         if raw_content.trim().is_empty() && indent_cols < content_indent {
             return false;
         }
-        let min_block_indent = content_indent.max(4);
+        let min_block_indent = self.definition_min_block_indent(content_indent);
         if prev_line_blank && indent_cols < min_block_indent {
             return false;
         }

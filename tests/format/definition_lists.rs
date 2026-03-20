@@ -1,5 +1,5 @@
 use panache::Config;
-use panache::config::WrapMode;
+use panache::config::{PandocCompat, ParserConfig, WrapMode};
 use panache::format;
 
 #[test]
@@ -68,4 +68,32 @@ fn definition_list_unclosed_fence_with_info_stays_unclosed() {
 
     assert!(output.contains("\\`\\`\\`\\`markdown\n"));
     assert!(!output.contains("```markdown\n```\n"));
+}
+
+#[test]
+fn definition_list_blankline_continuation_uses_four_space_rule_in_pandoc_3_7_compat() {
+    let input = "apple\n: pomaceous\n\n  fruit\n";
+    let cfg = Config {
+        parser: ParserConfig {
+            pandoc_compat: PandocCompat::V3_7,
+        },
+        ..Default::default()
+    };
+
+    let output = format(input, Some(cfg), None);
+    assert_eq!(output, "apple\n:   pomaceous\n\nfruit\n");
+}
+
+#[test]
+fn definition_list_blankline_continuation_is_dynamic_in_latest_pandoc_compat() {
+    let input = "apple\n: pomaceous\n\n  fruit\n";
+    let cfg = Config {
+        parser: ParserConfig {
+            pandoc_compat: PandocCompat::Latest,
+        },
+        ..Default::default()
+    };
+
+    let output = format(input, Some(cfg), None);
+    assert_eq!(output, "apple\n:   pomaceous\n\n    fruit\n");
 }
