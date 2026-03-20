@@ -248,6 +248,11 @@ impl ImageLink {
     pub fn dest(&self) -> Option<LinkDest> {
         support::child(&self.0)
     }
+
+    /// Returns the reference label for reference-style images.
+    pub fn reference(&self) -> Option<LinkRef> {
+        support::child(&self.0)
+    }
 }
 
 pub struct ImageAlt(SyntaxNode);

@@ -8,8 +8,8 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkLabel, ChunkOption, Citation, Crossref, Link,
-    ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
+    AstNode, AttributeNode, ChunkLabel, ChunkOption, Citation, Crossref, FootnoteReference, Link,
+    LinkRef, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
 };
 use crate::utils::normalize_label;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -181,74 +181,30 @@ pub(crate) fn is_yaml_frontmatter_valid(parsed_yaml_regions: &[ParsedYamlRegionS
 
 /// Extract the reference label from a LinkRef or FootnoteReference node
 pub(crate) fn extract_reference_label(node: &SyntaxNode) -> Option<(String, bool)> {
-    match node.kind() {
-        SyntaxKind::LINK_REF => {
-            // LinkRef contains TEXT child with the label
-            let text = node
-                .children_with_tokens()
-                .filter_map(|child| child.into_token())
-                .filter(|token| token.kind() == SyntaxKind::TEXT)
-                .map(|token| token.text().to_string())
-                .collect::<String>();
-            Some((normalize_label(&text), false))
-        }
-        SyntaxKind::FOOTNOTE_REFERENCE => {
-            // FootnoteReference has TEXT children: "[^", "id", "]"
-            // Extract the middle TEXT token (the ID)
-            let tokens: Vec<_> = node
-                .children_with_tokens()
-                .filter_map(|child| child.into_token())
-                .filter(|token| token.kind() == SyntaxKind::TEXT)
-                .map(|token| token.text().to_string())
-                .collect();
-
-            if tokens.len() >= 2 && tokens[0] == "[^" {
-                // The ID is in the second token
-                let id = &tokens[1];
-                Some((normalize_label(id), true))
-            } else {
-                None
-            }
-        }
-        _ => None,
+    if let Some(link_ref) = LinkRef::cast(node.clone()) {
+        return Some((normalize_label(&link_ref.label()), false));
     }
+
+    if let Some(footnote_ref) = FootnoteReference::cast(node.clone()) {
+        let id = footnote_ref.id();
+        if !id.is_empty() {
+            return Some((normalize_label(&id), true));
+        }
+    }
+
+    None
 }
 
 pub(crate) fn extract_citation_key(node: &SyntaxNode) -> Option<String> {
-    // Try to cast the node itself as a Citation
-    if let Some(citation) = Citation::cast(node.clone()) {
-        // Return the first key (citations can have multiple keys)
-        return citation.keys().first().map(|key| key.text());
-    }
-
-    // If the node is a CITATION_KEY token's parent, walk up to find CITATION
-    let mut current = node.clone();
-    while let Some(parent) = current.parent() {
-        if let Some(citation) = Citation::cast(parent.clone()) {
-            // Check if any of the citation's keys match the position we're at
-            // For simplicity, return the first key
-            return citation.keys().first().map(|key| key.text());
-        }
-        current = parent;
-    }
-
-    None
+    node_and_ancestors(node)
+        .find_map(Citation::cast)
+        .and_then(|citation| citation.keys().first().map(|key| key.text()))
 }
 
 pub(crate) fn extract_crossref_key(node: &SyntaxNode) -> Option<String> {
-    if let Some(crossref) = Crossref::cast(node.clone()) {
-        return crossref.keys().first().map(|key| key.text());
-    }
-
-    let mut current = node.clone();
-    while let Some(parent) = current.parent() {
-        if let Some(crossref) = Crossref::cast(parent.clone()) {
-            return crossref.keys().first().map(|key| key.text());
-        }
-        current = parent;
-    }
-
-    None
+    node_and_ancestors(node)
+        .find_map(Crossref::cast)
+        .and_then(|crossref| crossref.keys().first().map(|key| key.text()))
 }
 
 pub(crate) fn extract_chunk_label_key(node: &SyntaxNode) -> Option<String> {
@@ -392,6 +348,10 @@ fn attribute_has_heading_ancestor(node: &SyntaxNode) -> bool {
         .any(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
 }
 
+fn node_and_ancestors(node: &SyntaxNode) -> impl Iterator<Item = SyntaxNode> {
+    std::iter::once(node.clone()).chain(node.ancestors())
+}
+
 fn heading_target_from_link(link: &Link) -> Option<String> {
     if let Some(dest) = link.dest() {
         let id = normalize_label(&dest.hash_anchor_id()?);
@@ -408,28 +368,18 @@ fn heading_target_from_link(link: &Link) -> Option<String> {
     None
 }
 
+#[cfg(test)]
+fn extract_reference_definition_label(node: &SyntaxNode) -> Option<String> {
+    crate::syntax::ReferenceDefinition::cast(node.clone())
+        .map(|def| normalize_label(&def.label()))
+        .filter(|label| !label.is_empty())
+}
+
 /// Extract the label from a definition node (ReferenceDefinition or FootnoteDefinition)
 #[cfg(test)]
 fn extract_definition_label(node: &SyntaxNode) -> Option<String> {
     match node.kind() {
-        SyntaxKind::REFERENCE_DEFINITION => {
-            // ReferenceDefinition has a Link child with LinkText containing the label
-            node.children()
-                .find(|child| child.kind() == SyntaxKind::LINK)
-                .and_then(|link| {
-                    link.children()
-                        .find(|child| child.kind() == SyntaxKind::LINK_TEXT)
-                })
-                .map(|link_text| {
-                    let text = link_text
-                        .children_with_tokens()
-                        .filter_map(|child| child.into_token())
-                        .filter(|token| token.kind() == SyntaxKind::TEXT)
-                        .map(|token| token.text().to_string())
-                        .collect::<String>();
-                    normalize_label(&text)
-                })
-        }
+        SyntaxKind::REFERENCE_DEFINITION => extract_reference_definition_label(node),
         SyntaxKind::FOOTNOTE_DEFINITION => {
             // FootnoteDefinition has a FootnoteReference token with text like "[^1]: "
             node.children_with_tokens()
@@ -545,11 +495,11 @@ mod tests {
         let root = parse("[text][ref]");
         let link_ref = root
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::LINK_REF)
+            .find_map(LinkRef::cast)
             .expect("Should find LinkRef");
 
         let (label, is_footnote) =
-            extract_reference_label(&link_ref).expect("Should extract label");
+            extract_reference_label(link_ref.syntax()).expect("Should extract label");
         assert_eq!(label, "ref");
         assert!(!is_footnote);
     }
@@ -559,11 +509,11 @@ mod tests {
         let root = parse("[^1]");
         let footnote_ref = root
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+            .find_map(FootnoteReference::cast)
             .expect("Should find FootnoteReference");
 
         let (label, is_footnote) =
-            extract_reference_label(&footnote_ref).expect("Should extract label");
+            extract_reference_label(footnote_ref.syntax()).expect("Should extract label");
         assert_eq!(label, "1");
         assert!(is_footnote);
     }
@@ -573,10 +523,10 @@ mod tests {
         let root = parse("[ref]: /url");
         let def = root
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::REFERENCE_DEFINITION)
+            .find_map(crate::syntax::ReferenceDefinition::cast)
             .expect("Should find ReferenceDefinition");
 
-        let label = extract_definition_label(&def).expect("Should extract label");
+        let label = extract_definition_label(def.syntax()).expect("Should extract label");
         assert_eq!(label, "ref");
     }
 
