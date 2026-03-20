@@ -169,6 +169,16 @@ fn test_grid_table_idempotency() {
 }
 
 #[test]
+fn test_headless_grid_table_with_alignments_idempotency() {
+    let input = "+-----------------:+:----------+:----------:+\n| r1 a             | b         | c          |\n| r1 bis           | b 2       | c 2        |\n+------------------+-----------+------------+\n| r2 d             | e         | f          |\n+------------------+-----------+------------+";
+
+    let first_format = format(input, None, None);
+    let second_format = format(&first_format, None, None);
+
+    assert_eq!(first_format, second_format);
+}
+
+#[test]
 fn test_grid_table_multiline_cell_idempotency() {
     let input = "+-------+----------------------+\n| Var   | Desc                 |\n+=======+======================+\n| `A`   | First line           |\n|       |                      |\n|       | ```                  |\n|       | CODE=1               |\n|       | ```                  |\n+-------+----------------------+\n";
 

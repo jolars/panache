@@ -830,7 +830,13 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
     };
 
     // Top border
-    output.push_str(&make_separator('-', false));
+    // Headerless grid tables encode alignment markers in the first separator,
+    // so preserve markers there when no explicit header rows are present.
+    let has_header_rows = table_data
+        .row_sections
+        .iter()
+        .any(|section| *section == GridRowSection::Header);
+    output.push_str(&make_separator('-', !has_header_rows));
 
     // Format rows
     for (row_idx, row) in table_data.rows.iter().enumerate() {
