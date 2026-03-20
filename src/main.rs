@@ -591,12 +591,21 @@ fn main() -> io::Result<()> {
             }
 
             // Expand paths (handle directories)
-            let traversal_start_dir = start_dir_for(None)?;
+            let traversal_anchor = files.first().map(PathBuf::as_path);
+            let traversal_start_dir = if let Some(anchor) = traversal_anchor {
+                if anchor.is_dir() {
+                    anchor.to_path_buf()
+                } else {
+                    start_dir_for(Some(anchor))?
+                }
+            } else {
+                start_dir_for(None)?
+            };
             let (traversal_cfg, _) = load_config_for_cli(
                 cli.config.as_deref(),
                 cli.isolated,
                 &traversal_start_dir,
-                None,
+                traversal_anchor,
             )?;
             let expanded_files =
                 expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?;
@@ -699,12 +708,21 @@ fn main() -> io::Result<()> {
                 let targets = if use_stdin {
                     vec![]
                 } else {
-                    let traversal_start_dir = start_dir_for(None)?;
+                    let traversal_anchor = files.first().map(PathBuf::as_path);
+                    let traversal_start_dir = if let Some(anchor) = traversal_anchor {
+                        if anchor.is_dir() {
+                            anchor.to_path_buf()
+                        } else {
+                            start_dir_for(Some(anchor))?
+                        }
+                    } else {
+                        start_dir_for(None)?
+                    };
                     let (traversal_cfg, _) = load_config_for_cli(
                         cli.config.as_deref(),
                         cli.isolated,
                         &traversal_start_dir,
-                        None,
+                        traversal_anchor,
                     )?;
                     expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?
                 };
@@ -899,12 +917,21 @@ fn main() -> io::Result<()> {
             }
 
             // Expand paths (handle directories)
-            let traversal_start_dir = start_dir_for(None)?;
+            let traversal_anchor = files.first().map(PathBuf::as_path);
+            let traversal_start_dir = if let Some(anchor) = traversal_anchor {
+                if anchor.is_dir() {
+                    anchor.to_path_buf()
+                } else {
+                    start_dir_for(Some(anchor))?
+                }
+            } else {
+                start_dir_for(None)?
+            };
             let (traversal_cfg, _) = load_config_for_cli(
                 cli.config.as_deref(),
                 cli.isolated,
                 &traversal_start_dir,
-                None,
+                traversal_anchor,
             )?;
             let expanded_files =
                 expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?;

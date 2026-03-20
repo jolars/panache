@@ -39,6 +39,24 @@ impl ReferenceDefinition {
             .map(|text| text.text_content())
             .unwrap_or_default()
     }
+
+    /// Extracts raw destination text from a reference definition body.
+    pub fn destination(&self) -> Option<String> {
+        let tail = self
+            .0
+            .children_with_tokens()
+            .filter_map(|child| child.into_token())
+            .find(|token| token.kind() == SyntaxKind::TEXT)?
+            .text()
+            .to_string();
+
+        let after_colon = tail.trim_start().strip_prefix(':')?.trim_start();
+        if after_colon.is_empty() {
+            return None;
+        }
+
+        Some(after_colon.to_string())
+    }
 }
 
 pub struct FootnoteReference(SyntaxNode);
@@ -241,6 +259,22 @@ impl InlineFootnote {
 mod tests {
     use super::*;
     use crate::parse;
+
+    #[test]
+    fn test_reference_definition_destination() {
+        let input = "[ref]: https://example.com \"Title\"";
+        let root = parse(input, None);
+        let def = root
+            .descendants()
+            .find_map(ReferenceDefinition::cast)
+            .expect("Should find ReferenceDefinition");
+
+        assert_eq!(def.label(), "ref");
+        assert_eq!(
+            def.destination().as_deref(),
+            Some("https://example.com \"Title\"")
+        );
+    }
 
     #[test]
     fn test_footnote_definition_single_line() {

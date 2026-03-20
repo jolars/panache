@@ -14,6 +14,7 @@ mod kind;
 mod links;
 mod lists;
 mod references;
+mod shortcodes;
 mod tables;
 mod yaml;
 
@@ -27,6 +28,7 @@ pub use kind::*;
 pub use links::*;
 pub use lists::*;
 pub use references::*;
+pub use shortcodes::*;
 pub use tables::*;
 pub use yaml::*;
 
@@ -94,6 +96,42 @@ mod tests {
             .expect("should find image");
 
         assert_eq!(image.alt().map(|a| a.text()), Some("Alt text".to_string()));
+    }
+
+    #[test]
+    fn test_autolink_wrapper() {
+        use crate::Config;
+        use crate::parser::parse;
+
+        let input = "<https://example.com>";
+        let tree = parse(input, Some(Config::default()));
+
+        let autolink = tree
+            .descendants()
+            .find_map(AutoLink::cast)
+            .expect("should find autolink");
+
+        assert_eq!(autolink.target(), "https://example.com");
+    }
+
+    #[test]
+    fn test_shortcode_wrapper() {
+        use crate::Config;
+        use crate::parser::parse;
+
+        let input = "{{< include \"chapters/part 1.qmd\" >}}";
+        let tree = parse(input, Some(Config::default()));
+
+        let shortcode = tree
+            .descendants()
+            .find_map(Shortcode::cast)
+            .expect("should find shortcode");
+
+        assert_eq!(shortcode.name().as_deref(), Some("include"));
+        assert_eq!(
+            shortcode.args(),
+            vec!["include".to_string(), "chapters/part 1.qmd".to_string()]
+        );
     }
 
     #[test]

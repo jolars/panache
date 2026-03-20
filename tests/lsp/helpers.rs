@@ -181,6 +181,28 @@ impl TestLspServer {
         self.lsp.document_symbol(params).await.unwrap()
     }
 
+    /// Get document links.
+    ///
+    /// Simulates the `textDocument/documentLink` request.
+    pub async fn document_links(&self, uri: &str) -> Option<Vec<DocumentLink>> {
+        let params = DocumentLinkParams {
+            text_document: TextDocumentIdentifier {
+                uri: uri.parse().unwrap(),
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+
+        self.lsp.document_link(params).await.unwrap()
+    }
+
+    /// Resolve a document link.
+    ///
+    /// Simulates the `documentLink/resolve` request.
+    pub async fn resolve_document_link(&self, link: DocumentLink) -> DocumentLink {
+        self.lsp.document_link_resolve(link).await.unwrap()
+    }
+
     /// Get workspace symbols for a query.
     ///
     /// Simulates the `workspace/symbol` request.
@@ -529,6 +551,20 @@ impl LanguageServer for LspWrapper {
         params: DocumentSymbolParams,
     ) -> tower_lsp_server::jsonrpc::Result<Option<DocumentSymbolResponse>> {
         self.inner.document_symbol(params).await
+    }
+
+    async fn document_link(
+        &self,
+        params: DocumentLinkParams,
+    ) -> tower_lsp_server::jsonrpc::Result<Option<Vec<DocumentLink>>> {
+        self.inner.document_link(params).await
+    }
+
+    async fn document_link_resolve(
+        &self,
+        params: DocumentLink,
+    ) -> tower_lsp_server::jsonrpc::Result<DocumentLink> {
+        self.inner.document_link_resolve(params).await
     }
 
     async fn folding_range(

@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 
 use crate::metadata::project::{BookdownFiles, read_bookdown_files};
 use regex::Regex;
-use rowan::{NodeOrToken, TextRange};
+use rowan::TextRange;
 
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkOption, FootnoteDefinition, ReferenceDefinition, SyntaxKind,
-    SyntaxNode,
+    AstNode, AttributeNode, ChunkOption, FootnoteDefinition, ReferenceDefinition, Shortcode,
+    SyntaxKind, SyntaxNode,
 };
 use crate::utils::normalize_label;
 
@@ -68,23 +68,15 @@ pub fn collect_includes(
 
     let mut resolution = IncludeResolution::default();
 
-    for node in tree.descendants() {
-        if node.kind() != SyntaxKind::SHORTCODE {
+    for shortcode in tree.descendants().filter_map(Shortcode::cast) {
+        if shortcode.is_escaped() {
             continue;
         }
 
-        if is_escaped_shortcode(&node) {
+        if shortcode.name().as_deref() != Some("include") {
             continue;
         }
-
-        let Some(content) = extract_shortcode_content(&node) else {
-            continue;
-        };
-
-        let args = split_shortcode_args(&content);
-        if args.first().map(String::as_str) != Some("include") {
-            continue;
-        }
+        let args = shortcode.args();
         let Some(raw_path) = args.get(1) else {
             continue;
         };
@@ -93,7 +85,7 @@ pub fn collect_includes(
         if !resolved.exists() || !resolved.is_file() {
             resolution.diagnostics.push(include_not_found_diagnostic(
                 input,
-                node.text_range(),
+                shortcode.syntax().text_range(),
                 &resolved,
             ));
             continue;
@@ -101,7 +93,7 @@ pub fn collect_includes(
 
         resolution.includes.push(IncludeOccurrence {
             path: resolved,
-            range: node.text_range(),
+            range: shortcode.syntax().text_range(),
         });
     }
 
@@ -589,55 +581,15 @@ impl DefinitionIndex {
 }
 
 pub fn is_escaped_shortcode(node: &SyntaxNode) -> bool {
-    node.children_with_tokens().any(|child| match child {
-        NodeOrToken::Token(token) => {
-            token.kind() == SyntaxKind::SHORTCODE_MARKER_OPEN && token.text() == "{{{<"
-        }
-        _ => false,
-    })
+    Shortcode::cast(node.clone()).is_some_and(|shortcode| shortcode.is_escaped())
 }
 
 pub fn extract_shortcode_content(node: &SyntaxNode) -> Option<String> {
-    node.children().find_map(|child| {
-        if child.kind() == SyntaxKind::SHORTCODE_CONTENT {
-            Some(child.text().to_string())
-        } else {
-            None
-        }
-    })
+    Shortcode::cast(node.clone()).and_then(|shortcode| shortcode.content())
 }
 
 pub fn split_shortcode_args(content: &str) -> Vec<String> {
-    let mut args = Vec::new();
-    let mut current = String::new();
-    let mut in_quotes = false;
-    let mut quote_char = None;
-
-    for ch in content.trim().chars() {
-        match ch {
-            '"' | '\'' if !in_quotes => {
-                in_quotes = true;
-                quote_char = Some(ch);
-            }
-            c if Some(c) == quote_char && in_quotes => {
-                in_quotes = false;
-                quote_char = None;
-            }
-            c if c.is_whitespace() && !in_quotes => {
-                if !current.is_empty() {
-                    args.push(current.clone());
-                    current.clear();
-                }
-            }
-            c => current.push(c),
-        }
-    }
-
-    if !current.is_empty() {
-        args.push(current);
-    }
-
-    args
+    crate::syntax::split_shortcode_args(content)
 }
 
 #[cfg(test)]

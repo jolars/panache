@@ -42,6 +42,40 @@ impl Link {
     }
 }
 
+pub struct AutoLink(SyntaxNode);
+
+impl AstNode for AutoLink {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::AUTO_LINK
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self(syntax))
+        } else {
+            None
+        }
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl AutoLink {
+    /// Returns the autolink target text without angle brackets.
+    pub fn target(&self) -> String {
+        self.0
+            .children_with_tokens()
+            .filter_map(|it| it.into_token())
+            .filter(|token| token.kind() == SyntaxKind::TEXT)
+            .map(|token| token.text().to_string())
+            .collect()
+    }
+}
+
 pub struct LinkText(SyntaxNode);
 
 impl AstNode for LinkText {
