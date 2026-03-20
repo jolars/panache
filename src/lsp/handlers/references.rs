@@ -8,7 +8,6 @@ use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
-use crate::syntax::SyntaxNode;
 use crate::utils::normalize_label;
 
 use super::super::conversions::{offset_to_position, position_to_offset};
@@ -26,21 +25,16 @@ pub(crate) async fn references(
     let include_declaration = params.context.include_declaration;
     let config = helpers::get_config(client, &workspace_root, &uri).await;
 
-    let (salsa_file, salsa_config, doc_path, content, green_tree, parsed_yaml_regions) = {
-        let map = document_map.lock().await;
-        let Some(state) = map.get(&uri.to_string()) else {
-            return Ok(None);
-        };
-        let db = salsa_db.lock().await;
-        (
-            state.salsa_file,
-            state.salsa_config,
-            state.path.clone(),
-            state.salsa_file.text(&*db).clone(),
-            state.tree.clone(),
-            state.parsed_yaml_regions.clone(),
-        )
+    let Some(ctx) =
+        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, &uri).await
+    else {
+        return Ok(None);
     };
+    let salsa_file = ctx.salsa_file;
+    let salsa_config = ctx.salsa_config;
+    let doc_path = ctx.path.clone();
+    let content = ctx.content.clone();
+    let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
 
     let Some(doc_path) = doc_path.clone() else {
         return Ok(None);
@@ -53,7 +47,7 @@ pub(crate) async fn references(
     }
 
     let target = {
-        let root = SyntaxNode::new_root(green_tree.clone());
+        let root = ctx.syntax_root();
         resolve_symbol_target_at_offset(&root, offset)
     };
     let Some(target) = target else {

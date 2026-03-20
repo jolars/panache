@@ -29,18 +29,15 @@ pub(crate) async fn goto_definition(
     let position = params.text_document_position_params.position;
     let config = helpers::get_config(client, &workspace_root, uri).await;
 
-    let (salsa_file, salsa_config, doc_path, parsed_yaml_regions) = {
-        let map = document_map.lock().await;
-        match map.get(&uri.to_string()) {
-            Some(state) => (
-                state.salsa_file,
-                state.salsa_config,
-                state.path.clone(),
-                state.parsed_yaml_regions.clone(),
-            ),
-            None => return Ok(None),
-        }
+    let Some(ctx) =
+        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, uri).await
+    else {
+        return Ok(None);
     };
+    let salsa_file = ctx.salsa_file;
+    let salsa_config = ctx.salsa_config;
+    let doc_path = ctx.path.clone();
+    let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
 
     let citation_def_index = if let Some(doc_path) = doc_path.clone() {
         let yaml_ok = helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions);
@@ -57,15 +54,8 @@ pub(crate) async fn goto_definition(
         None
     };
 
-    let this_path = {
-        let map = document_map.lock().await;
-        map.get(&uri.to_string())
-            .and_then(|state| state.path.clone())
-    };
-    let content_for_offset = {
-        let db = salsa_db.lock().await;
-        salsa_file.text(&*db).clone()
-    };
+    let this_path = ctx.path.clone();
+    let content_for_offset = ctx.content.clone();
     let Some(offset) = conversions::position_to_offset(&content_for_offset, position) else {
         return Ok(None);
     };
@@ -81,11 +71,8 @@ pub(crate) async fn goto_definition(
     }
 
     let (content, pending) = {
-        let Some((content, root)) =
-            helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
-        else {
-            return Ok(None);
-        };
+        let content = ctx.content.clone();
+        let root = ctx.syntax_root();
 
         let pending = match resolve_symbol_target_at_offset(&root, offset) {
             Some(SymbolTarget::Citation(key)) => Some(PendingDefinition::Citation(key)),

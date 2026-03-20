@@ -7,6 +7,7 @@ use tower_lsp_server::{Client, LspService, Server};
 use rowan::GreenNode;
 
 mod config;
+mod context;
 mod conversions;
 mod documents;
 mod handlers;

@@ -28,26 +28,20 @@ pub(crate) async fn hover(
     let uri = &params.text_document_position_params.text_document.uri;
     let position = params.text_document_position_params.position;
 
-    let (salsa_file, salsa_config, doc_path, parsed_yaml_regions) = {
-        let map = document_map.lock().await;
-        match map.get(&uri.to_string()) {
-            Some(state) => (
-                state.salsa_file,
-                state.salsa_config,
-                state.path.clone(),
-                state.parsed_yaml_regions.clone(),
-            ),
-            None => return Ok(None),
-        }
+    let Some(ctx) =
+        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, uri).await
+    else {
+        return Ok(None);
     };
+    let salsa_file = ctx.salsa_file;
+    let salsa_config = ctx.salsa_config;
+    let doc_path = ctx.path.clone();
+    let parsed_yaml_regions = ctx.parsed_yaml_regions.clone();
 
     let Some(doc_path) = doc_path else {
         return Ok(None);
     };
-    let content_for_offset = {
-        let db = salsa_db.lock().await;
-        salsa_file.text(&*db).clone()
-    };
+    let content_for_offset = ctx.content.clone();
     let Some(offset) = conversions::position_to_offset(&content_for_offset, position) else {
         return Ok(None);
     };
@@ -67,11 +61,7 @@ pub(crate) async fn hover(
     };
 
     let pending_footnote = {
-        let Some((_content, root)) =
-            helpers::get_document_content_and_tree(&document_map, &salsa_db, uri).await
-        else {
-            return Ok(None);
-        };
+        let root = ctx.syntax_root();
 
         // Find the node at this offset
         let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {

@@ -8,7 +8,7 @@ use tower_lsp_server::ls_types::{DocumentLink, DocumentLinkParams, Range, Uri};
 
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
-use crate::syntax::{AstNode, AutoLink, ImageLink, Link, Shortcode, SyntaxNode};
+use crate::syntax::{AstNode, AutoLink, ImageLink, Link, Shortcode};
 use crate::utils::normalize_label;
 use serde_json::json;
 
@@ -21,27 +21,22 @@ pub(crate) async fn document_links(
 ) -> Result<Option<Vec<DocumentLink>>> {
     let uri = params.text_document.uri;
 
-    let (content, tree, doc_path, salsa_file, salsa_config) = {
-        let map = document_map.lock().await;
-        let Some(state) = map.get(&uri.to_string()) else {
-            return Ok(None);
-        };
-        let db = salsa_db.lock().await;
-        (
-            state.salsa_file.text(&*db).clone(),
-            state.tree.clone(),
-            state.path.clone(),
-            state.salsa_file,
-            state.salsa_config,
-        )
+    let Some(ctx) =
+        crate::lsp::context::get_open_document_context(&document_map, &salsa_db, &uri).await
+    else {
+        return Ok(None);
     };
+    let content = ctx.content.clone();
+    let doc_path = ctx.path.clone();
+    let salsa_file = ctx.salsa_file;
+    let salsa_config = ctx.salsa_config;
 
     let reference_targets = if let Some(path) = doc_path.as_deref() {
         build_reference_targets(&salsa_db, salsa_file, salsa_config, path, &content, &uri).await
     } else {
         HashMap::new()
     };
-    let root = SyntaxNode::new_root(tree);
+    let root = ctx.syntax_root();
     let mut links = Vec::new();
 
     for node in root.descendants() {
