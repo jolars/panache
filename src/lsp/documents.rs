@@ -4,11 +4,11 @@ use tokio::sync::Mutex;
 use tower_lsp_server::Client;
 use tower_lsp_server::ls_types::*;
 
-use super::conversions::apply_content_change;
+use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
 use super::handlers::diagnostics::lint_and_publish;
 use super::helpers::get_config;
 use crate::lsp::DocumentState;
-use crate::parser::parse_incremental;
+use crate::parser::parse_incremental_suffix;
 use crate::syntax::SyntaxNode;
 use rowan::GreenNode;
 use salsa::{Durability, Setter};
@@ -128,8 +128,8 @@ pub(crate) async fn did_change(
 
     // Apply incremental changes sequentially
     let mut dependent_uris: Option<Vec<Uri>> = None;
-    let (graph_text, graph_path, _rebuild_full_graph, salsa_file, salsa_config) = {
-        let (salsa_file, salsa_config, original_tree, has_multiple_docs) = {
+    let (graph_text, graph_path, salsa_file, salsa_config) = {
+        let (salsa_file, salsa_config, original_tree_green) = {
             let document_map = document_map.lock().await;
             let Some(doc_state) = document_map.get(&uri_string) else {
                 return;
@@ -138,7 +138,6 @@ pub(crate) async fn did_change(
                 doc_state.salsa_file,
                 doc_state.salsa_config,
                 doc_state.tree.clone(),
-                document_map.len() > 1,
             )
         };
         let original_text = {
@@ -146,47 +145,56 @@ pub(crate) async fn did_change(
             salsa_file.text(&*db).clone()
         };
 
-        // Apply all changes to update the text
-        let mut updated_text = original_text.clone();
-        for change in params.content_changes.iter() {
-            updated_text = apply_content_change(&updated_text, change);
-        }
-
-        // Use incremental parsing for single changes, full reparse for multiple
-        let green = {
-            let new_tree = if params.content_changes.len() == 1 {
-                let change = &params.content_changes[0];
-
-                let (old_edit_start, old_edit_end, new_edit_start, new_edit_end) =
-                    if let Some(range) = &change.range {
-                        let old_start =
-                            super::conversions::position_to_offset(&original_text, range.start)
-                                .unwrap_or(0);
-                        let old_end =
-                            super::conversions::position_to_offset(&original_text, range.end)
-                                .unwrap_or(original_text.len());
-                        let new_end = old_start + change.text.len();
-                        (old_start, old_end, old_start, new_end)
-                    } else {
-                        // Full document replacement
-                        (0, original_text.len(), 0, updated_text.len())
+        let (updated_text, green, strategy) = if params.content_changes.len() == 1 {
+            let change = &params.content_changes[0];
+            match apply_content_change_with_edit_ranges(&original_text, change) {
+                Some((text, old_edit, new_edit)) => {
+                    let updated_tree = {
+                        let old_tree = SyntaxNode::new_root(original_tree_green);
+                        parse_incremental_suffix(
+                            &text,
+                            Some(config.clone()),
+                            &old_tree,
+                            old_edit,
+                            new_edit,
+                        )
+                        .tree
                     };
-
-                parse_incremental(
-                    &updated_text,
-                    Some(config.clone()),
-                    &SyntaxNode::new_root(original_tree),
-                    (old_edit_start, old_edit_end),
-                    (new_edit_start, new_edit_end),
-                )
-                .tree
-            } else {
-                // Multiple changes - do full reparse for now
-                crate::parse(&updated_text, Some(config.clone()))
-            };
-
-            GreenNode::from(new_tree.green())
+                    (
+                        text,
+                        GreenNode::from(updated_tree.green()),
+                        "suffix_incremental_single_change",
+                    )
+                }
+                None => {
+                    let text = apply_content_change(&original_text, change);
+                    let parsed = crate::parse(&text, Some(config.clone()));
+                    (
+                        text,
+                        GreenNode::from(parsed.green()),
+                        "full_reparse_single_change_fallback",
+                    )
+                }
+            }
+        } else {
+            let mut updated_text = original_text.clone();
+            for change in params.content_changes.iter() {
+                updated_text = apply_content_change(&updated_text, change);
+            }
+            let parsed = crate::parse(&updated_text, Some(config.clone()));
+            (
+                updated_text,
+                GreenNode::from(parsed.green()),
+                "full_reparse_multi_change",
+            )
         };
+
+        log::debug!(
+            "did_change parse strategy={} changes={}",
+            strategy,
+            params.content_changes.len()
+        );
+
         let parsed_yaml_regions = crate::syntax::collect_parsed_yaml_region_snapshots(
             &SyntaxNode::new_root(green.clone()),
         );
@@ -206,7 +214,6 @@ pub(crate) async fn did_change(
                 .uri
                 .to_file_path()
                 .map(|p| p.into_owned()),
-            has_multiple_docs,
             salsa_file,
             salsa_config,
         )

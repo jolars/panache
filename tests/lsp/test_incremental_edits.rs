@@ -222,3 +222,68 @@ async fn test_incremental_edit_preserves_yaml_frontmatter_document_symbol() {
         "frontmatter symbol should still span the YAML block"
     );
 }
+
+#[tokio::test]
+async fn test_incremental_edit_multiple_changes_with_utf16_positions() {
+    let server = TestLspServer::new();
+
+    server
+        .open_document("file:///utf16.qmd", "Title\nemoji: 😀\nRésumé\n", "quarto")
+        .await;
+
+    server
+        .edit_document(
+            "file:///utf16.qmd",
+            vec![
+                incremental_change(1, 7, 1, 9, "😎"),
+                incremental_change(2, 1, 2, 2, "e"),
+            ],
+        )
+        .await;
+
+    let content = server.get_document_content("file:///utf16.qmd").await;
+    assert_eq!(content, Some("Title\nemoji: 😎\nResumé\n".to_string()));
+
+    let tree_after = server
+        .get_document_tree("file:///utf16.qmd")
+        .await
+        .expect("tree after utf16 edit");
+    let expected = panache::parse("Title\nemoji: 😎\nResumé\n", None);
+    assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+#[tokio::test]
+async fn test_incremental_edit_multiple_changes_use_full_reparse() {
+    let server = TestLspServer::new();
+
+    server
+        .open_document("file:///cap.qmd", "aaaaaaaaaa\n", "quarto")
+        .await;
+
+    server
+        .edit_document(
+            "file:///cap.qmd",
+            vec![
+                incremental_change(0, 0, 0, 1, "b"),
+                incremental_change(0, 1, 0, 2, "c"),
+                incremental_change(0, 2, 0, 3, "d"),
+                incremental_change(0, 3, 0, 4, "e"),
+                incremental_change(0, 4, 0, 5, "f"),
+                incremental_change(0, 5, 0, 6, "g"),
+                incremental_change(0, 6, 0, 7, "h"),
+                incremental_change(0, 7, 0, 8, "i"),
+                incremental_change(0, 8, 0, 9, "j"),
+            ],
+        )
+        .await;
+
+    let content = server.get_document_content("file:///cap.qmd").await;
+    assert_eq!(content, Some("bcdefghija\n".to_string()));
+
+    let tree_after = server
+        .get_document_tree("file:///cap.qmd")
+        .await
+        .expect("tree after cap edit");
+    let expected = panache::parse("bcdefghija\n", None);
+    assert_eq!(tree_after.to_string(), expected.to_string());
+}

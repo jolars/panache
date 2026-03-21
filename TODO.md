@@ -16,8 +16,8 @@ This document tracks implementation status for panache's features.
 - [x] Wire conservative salsa durability defaults (`set_with_durability`): open
       buffers LOW, config MEDIUM, dependency/disk-loaded files HIGH, watcher
       refreshes MEDIUM.
-- [x] Add ignored durability measurement harness
-      (`tests/durability_bench.rs`) for HIGH vs LOW revalidation cost.
+- [x] Add ignored durability measurement harness (`tests/durability_bench.rs`)
+      for HIGH vs LOW revalidation cost.
 - [ ] Finalize and document durability update/invalidation policy based on
       measurements before broader rollout.
 

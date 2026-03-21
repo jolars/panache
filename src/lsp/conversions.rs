@@ -3,6 +3,9 @@ use tower_lsp_server::ls_types::*;
 use crate::linter;
 use crate::linter::Severity as PanacheSeverity;
 
+pub(crate) type ByteEditRange = (usize, usize);
+pub(crate) type AppliedEditChange = (String, ByteEditRange, ByteEditRange);
+
 /// Helper to convert LSP UTF-16 position to byte offset in UTF-8 string
 pub(crate) fn position_to_offset(text: &str, position: Position) -> Option<usize> {
     let mut offset = 0;
@@ -134,6 +137,27 @@ pub(crate) fn apply_content_change(text: &str, change: &TextDocumentContentChang
             change.text.clone()
         }
     }
+}
+
+pub(crate) fn apply_content_change_with_edit_ranges(
+    text: &str,
+    change: &TextDocumentContentChangeEvent,
+) -> Option<AppliedEditChange> {
+    let range = change.range?;
+    let start_offset = position_to_offset(text, range.start)?;
+    let end_offset = position_to_offset(text, range.end)?;
+    if start_offset > end_offset || end_offset > text.len() {
+        return None;
+    }
+
+    let mut result =
+        String::with_capacity(text.len() - (end_offset - start_offset) + change.text.len());
+    result.push_str(&text[..start_offset]);
+    result.push_str(&change.text);
+    result.push_str(&text[end_offset..]);
+    let new_end = start_offset + change.text.len();
+
+    Some((result, (start_offset, end_offset), (start_offset, new_end)))
 }
 
 #[cfg(test)]

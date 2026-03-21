@@ -11,6 +11,9 @@ cd benches/documents && ./download.sh && cd ../..
 # Run benchmarks
 cargo bench --bench formatting
 
+# Run LSP incremental didChange benchmarks
+cargo bench --bench lsp_incremental
+
 # Generate docs + machine-readable JSON
 ./benches/generate_docs.sh
 ```
@@ -38,6 +41,11 @@ cd benches/documents && ./download.sh && cd ../..
 # Profile only the selected document
 PANACHE_BENCH_DOC=pandoc_manual.md PANACHE_BENCH_ITERATIONS=3 \
     cargo flamegraph --bench formatting
+
+# LSP incremental benchmark knobs
+# PANACHE_LSP_BENCH_CAP=8 (default)
+# PANACHE_LSP_BENCH_ITERATIONS=80 (default)
+# PANACHE_LSP_BENCH_OUTPUT_JSON=benches/lsp_incremental_results.json
 ```
 
 For more detailed profiling:

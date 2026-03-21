@@ -147,3 +147,7 @@ assets = [
 [[bench]]
 name = "formatting"
 harness = false
+
+[[bench]]
+name = "lsp_incremental"
+harness = false

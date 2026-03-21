@@ -157,6 +157,25 @@ pub fn expand_byte_range_to_blocks(tree: &SyntaxNode, start: usize, end: usize) 
     (expanded_start, expanded_end)
 }
 
+/// Find a conservative restart offset for incremental reparsing.
+///
+/// This uses block expansion and then widens to include the previous sibling block,
+/// which helps preserve continuation-sensitive parser context.
+pub fn find_incremental_restart_offset(tree: &SyntaxNode, start: usize, end: usize) -> usize {
+    let (expanded_start, _) = expand_byte_range_to_blocks(tree, start, end);
+    let Some(block) = find_enclosing_block(tree, expanded_start) else {
+        return expanded_start;
+    };
+
+    if let Some(prev) = block.prev_sibling()
+        && is_block_element(prev.kind())
+    {
+        return prev.text_range().start().into();
+    }
+
+    expanded_start
+}
+
 /// Expand a 1-indexed line range to encompass complete block-level elements.
 ///
 /// This is the public API for range formatting. It converts line numbers to byte offsets,
