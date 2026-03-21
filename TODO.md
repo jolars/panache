@@ -532,3 +532,8 @@ matching Pandoc's AST structure exactly.
 
 - [x] Split out WASM support into a separate crate (`crates/panache-wasm`).
 - [ ] Separate additional functionality into dedicated crates (long-term).
+
+## Caching
+
+- [ ] Investigate caching strategies for improved performance, particularly for
+      CLI linting.
