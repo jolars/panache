@@ -44,7 +44,7 @@ Output (`"sentence"`)
 ### Preserving Hard Breaks
 
 Hard line breaks, which are created either by ending a line with two or more
-spaces (\``) or by using a backslash (`\\n\`), are preserved regardless of the
+spaces (``  ``) or by using a backslash (`\n`), are preserved regardless of the
 wrapping mode:
 
 Input (with `  ` hard break)
@@ -64,7 +64,9 @@ Output
 ### ATX Headings
 
 Headings are normalized with consistent spacing. Trailing `#` characters in ATX
-headings are removed.
+headings are removed. Spacing between the `#` characters and the heading text is
+normalized to a single space. Headings are separated from surrounding content by
+a blank line.
 
 Input
 :   ```markdown
@@ -90,7 +92,8 @@ Output
 
 ### Heading Attributes
 
-Attributes are preserved and formatted:
+Attributes are preserved and formatted to have a single space between the class
+names and no space between the class names and the opening `{` character.
 
 Input
 :   ```markdown
