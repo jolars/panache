@@ -4,20 +4,22 @@ This document tracks implementation status for panache's features.
 
 ## Language Server
 
-- [ ] Incremental parsing and caching for LSP performance (Implemented, but
-      crude and often reparses entire document on change; needs optimization)
+- [x] Incremental parsing and caching for LSP performance
+- [ ] Optimize incremental edit handling to avoid full-document reparses for
+      multi-change or complex `didChange` updates.
 
 ### Performance
 
-- [ ] Evaluate `#[salsa::interned]` for common keys (paths/labels) if it reduces
-      memory/cost.
-- [ ] Evaluate salsa durability policy (`set_with_durability`) with measurements
-      (e.g., open buffers LOW, stable dependency files MEDIUM/HIGH), and only
-      roll out with a clear update/invalidation policy.
-      - [x] Wire conservative defaults: open buffers LOW, config MEDIUM,
-            dependency/disk-loaded files HIGH, watcher refreshes MEDIUM.
-      - [x] Add ignored durability measurement harness
-            (`tests/durability_bench.rs`) for HIGH vs LOW revalidation cost.
+- [x] Introduce `#[salsa::interned]` for common keys (paths/labels).
+- [ ] Measure interned key impact (memory/cost) and decide whether to expand to
+      additional key types.
+- [x] Wire conservative salsa durability defaults (`set_with_durability`): open
+      buffers LOW, config MEDIUM, dependency/disk-loaded files HIGH, watcher
+      refreshes MEDIUM.
+- [x] Add ignored durability measurement harness
+      (`tests/durability_bench.rs`) for HIGH vs LOW revalidation cost.
+- [ ] Finalize and document durability update/invalidation policy based on
+      measurements before broader rollout.
 
 ### Core LSP Capabilities
 
@@ -63,7 +65,7 @@ This document tracks implementation status for panache's features.
 - [x] Find references - Find all uses of a reference link/footnote/citation
       - [x] Find references for citations - Find all `@cite` uses of a
             bibliography entry
-      - [ ] Find references for headings - Find all internal links to a heading
+      - [x] Find references for headings - Find all internal links to a heading
       - [ ] Find references for reference links - Find all `[text][ref]` links
 
 ### Completion
@@ -179,13 +181,16 @@ support.
 
 ### Long-term YAML parser groundwork
 
-- [ ] Build an in-tree YAML parser module (`src/parser/yaml.rs`) as a long-term
+- [x] Build an in-tree YAML parser module (`src/parser/yaml.rs`) as a long-term
       project with lossless CST goals.
-- [ ] Target one shared parser core for plain YAML files and hashpipe-prefixed
-      YAML (frontmatter/chunk metadata) with explicit host-range mapping
-      support.
-- [ ] Roll out via shadow/read-only mode with parity checks against existing
-      YAML behavior before any formatter or edit-path replacement.
+- [x] Add shared YAML input/model groundwork for plain YAML files and
+      hashpipe-prefixed YAML (frontmatter/chunk metadata), including host-range
+      mapping scaffolding.
+- [ ] Complete one production-grade shared parser core for plain + hashpipe YAML
+      with full feature coverage.
+- [x] Add shadow/read-only rollout scaffolding for in-tree YAML parsing.
+- [ ] Add robust parity checks against existing YAML behavior before any
+      formatter or edit-path replacement.
 - [ ] Add first-class YAML formatting support after parser parity, using shared
       CST and idempotency-focused formatting tests for both plain YAML and
       hashpipe-prefixed YAML.
@@ -398,7 +403,7 @@ for initial implementation.
 
 #### Non-Default: Links
 
-- [ ] Extension: `autolink_bare_uris` - Bare URLs as links (non-default)
+- [x] Extension: `autolink_bare_uris` - Bare URLs as links (non-default)
 - [ ] Extension: `mmd_link_attributes` - MultiMarkdown link attributes
       (non-default)
 
@@ -421,9 +426,14 @@ for initial implementation.
 
 #### Non-Default: Lists
 
-- [ ] Extension: `lists_without_preceding_blankline` (non-default)
-- [ ] Extension: `four_space_rule` - Four space vs two space list indent
-      (non-default)
+- [x] Extension behavior: lists can start without a preceding blank line
+      (non-default compatibility behavior).
+- [ ] Add explicit extension-gated handling/config semantics for
+      `lists_without_preceding_blankline`.
+- [x] Extension behavior: four-space list indentation rules are supported in
+      compatibility mode.
+- [ ] Add explicit extension-gated handling/config semantics for
+      `four_space_rule`.
 
 #### Non-Default: Line Breaks
 
@@ -513,10 +523,12 @@ matching Pandoc's AST structure exactly.
 
 #### Smart Abbreviation Non-Breaking Spaces
 
-- [ ] Follow Pandoc `Ext_smart` abbreviation behavior: convert the space after
-      recognized abbreviations (for example `M.A. 2007`) to a non-breaking space
-      so wrapping does not split them.
+- [x] Keep recognized abbreviations + following year together during wrapping
+      (for example `M.A. 2007`) so wrapping does not split them.
+- [ ] Follow Pandoc `Ext_smart` behavior exactly by converting the post-
+      abbreviation space to a non-breaking space.
 
 ## Architecture
 
-- [ ] Separate out some functionality into separate crates (long-term)
+- [x] Split out WASM support into a separate crate (`crates/panache-wasm`).
+- [ ] Separate additional functionality into dedicated crates (long-term).
