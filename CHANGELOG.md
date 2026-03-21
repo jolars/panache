@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.26.0](https://github.com/jolars/panache/compare/v2.25.0...v2.26.0) (2026-03-21)
+
+### Features
+
+* **formatter:** escape `]` ([f846ffc](https://github.com/jolars/panache/commit/f846ffc8bb30e3bb5c366dce92fd8b77a69570e1))
+* **formatter:** standardize checkboxes to `[x]` ([59312ba](https://github.com/jolars/panache/commit/59312bad922669e8c7ded41e586505cc109d4f4d))
+* introduce `pandoc-compat` field ([58d9e54](https://github.com/jolars/panache/commit/58d9e543481f17353225da674c413a6f49d23498))
+* **lsp:** implement document links ([eb590e0](https://github.com/jolars/panache/commit/eb590e0489a59fdfbfb8ad0300d2b7a6407b1ce7))
+
+### Bug Fixes
+
+* **parser:** don't accept `[]` as tasklist check box ([8700911](https://github.com/jolars/panache/commit/8700911d6efaaf8c7373a609776506bf7a59ba13))
+* **parser:** emit LINK_REF nodes for reference images ([127946d](https://github.com/jolars/panache/commit/127946de79f8c77754cd359011380a3e53efce46))
+
 ## [2.25.0](https://github.com/jolars/panache/compare/v2.24.1...v2.25.0) (2026-03-20)
 
 ### Features
