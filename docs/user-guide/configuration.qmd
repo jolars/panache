@@ -121,11 +121,12 @@ pandoc-compat = "3.7"
 
     - `3.9` (default): match Pandoc 3.9 behavior.
     - `3.7`: match Pandoc 3.7 behavior.
-    - `latest`: alias for Panache's pinned newest verified target (currently `3.9`).
+    - `latest`: alias for Panache's pinned newest verified target (currently
+      `3.9`).
 
-This option is intentionally narrow in scope and only affects cases where
-Pandoc changed behavior across versions. It is global, so parser, formatter,
-and LSP all use the same target behavior.
+This option is intentionally narrow in scope and only affects cases where Pandoc
+changed behavior across versions. It is global, so parser, formatter, and LSP
+all use the same target behavior.
 
 ## Formatting Style
 
@@ -410,7 +411,6 @@ reference-links = true
 shortcut-reference-links = true
 link-attributes = true
 autolinks = true
-autolink-bare-uris = false
 ```
 
 `inline-links`
