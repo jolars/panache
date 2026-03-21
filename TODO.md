@@ -446,7 +446,7 @@ for initial implementation.
 #### Non-Default: RMarkdown-Specific
 
 - [x] RMarkdown code chunks with output
-- [x] Bookdown-style references (`\@ref(fig-id)`, etc.\`)
+- [x] Bookdown-style references (`\@ref(fig-id)`, etc.)
 
 #### Non-Default: Other
 
