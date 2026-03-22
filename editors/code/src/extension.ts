@@ -77,6 +77,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     "trace.server",
     "off",
   );
+  const experimentalIncrementalParsing = config.get<boolean>(
+    "experimental.incrementalParsing",
+    false,
+  );
 
   const serverOptions: ServerOptions = {
     command: commandPath,
@@ -101,6 +105,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     ],
     outputChannel,
     traceOutputChannel: outputChannel,
+    initializationOptions: {
+      settings: {
+        panache: {
+          experimental: {
+            incrementalParsing: experimentalIncrementalParsing,
+          },
+        },
+      },
+    },
   };
 
   client = new LanguageClient(

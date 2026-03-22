@@ -7,7 +7,7 @@ use tower_lsp_server::ls_types::*;
 use super::conversions::{apply_content_change, apply_content_change_with_edit_ranges};
 use super::handlers::diagnostics::lint_and_publish;
 use super::helpers::get_config;
-use crate::lsp::DocumentState;
+use crate::lsp::{DocumentState, LspRuntimeSettings};
 use crate::parser::parse_incremental_suffix;
 use crate::syntax::SyntaxNode;
 use rowan::GreenNode;
@@ -117,6 +117,7 @@ pub(crate) async fn did_change(
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<std::path::PathBuf>>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
+    runtime_settings: Arc<Mutex<LspRuntimeSettings>>,
     client: &Client,
     params: DidChangeTextDocumentParams,
 ) {
@@ -145,35 +146,52 @@ pub(crate) async fn did_change(
             salsa_file.text(&*db).clone()
         };
 
+        let incremental_enabled = {
+            runtime_settings
+                .lock()
+                .await
+                .experimental_incremental_parsing
+        };
+
         let (updated_text, green, strategy) = if params.content_changes.len() == 1 {
             let change = &params.content_changes[0];
-            match apply_content_change_with_edit_ranges(&original_text, change) {
-                Some((text, old_edit, new_edit)) => {
-                    let updated_tree = {
-                        let old_tree = SyntaxNode::new_root(original_tree_green);
-                        parse_incremental_suffix(
-                            &text,
-                            Some(config.clone()),
-                            &old_tree,
-                            old_edit,
-                            new_edit,
+            if !incremental_enabled {
+                let text = apply_content_change(&original_text, change);
+                let parsed = crate::parse(&text, Some(config.clone()));
+                (
+                    text,
+                    GreenNode::from(parsed.green()),
+                    "full_reparse_single_change_incremental_disabled",
+                )
+            } else {
+                match apply_content_change_with_edit_ranges(&original_text, change) {
+                    Some((text, old_edit, new_edit)) => {
+                        let updated_tree = {
+                            let old_tree = SyntaxNode::new_root(original_tree_green);
+                            parse_incremental_suffix(
+                                &text,
+                                Some(config.clone()),
+                                &old_tree,
+                                old_edit,
+                                new_edit,
+                            )
+                            .tree
+                        };
+                        (
+                            text,
+                            GreenNode::from(updated_tree.green()),
+                            "suffix_incremental_single_change_experimental",
                         )
-                        .tree
-                    };
-                    (
-                        text,
-                        GreenNode::from(updated_tree.green()),
-                        "suffix_incremental_single_change",
-                    )
-                }
-                None => {
-                    let text = apply_content_change(&original_text, change);
-                    let parsed = crate::parse(&text, Some(config.clone()));
-                    (
-                        text,
-                        GreenNode::from(parsed.green()),
-                        "full_reparse_single_change_fallback",
-                    )
+                    }
+                    None => {
+                        let text = apply_content_change(&original_text, change);
+                        let parsed = crate::parse(&text, Some(config.clone()));
+                        (
+                            text,
+                            GreenNode::from(parsed.green()),
+                            "full_reparse_single_change_fallback",
+                        )
+                    }
                 }
             }
         } else {

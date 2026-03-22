@@ -112,6 +112,11 @@
           ],
           "default": "off",
           "description": "Trace communication between VS Code and the Panache language server."
+        },
+        "panache.experimental.incrementalParsing": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable experimental incremental parsing in the Panache language server. This may improve didChange performance but can be unstable."
         }
       }
     }

@@ -55,15 +55,33 @@ impl TestLspServer {
 
     /// Initialize the server with a workspace root.
     pub async fn initialize(&self, root_uri: &str) {
+        self.initialize_with_options(root_uri, None).await;
+    }
+
+    /// Initialize the server with a workspace root and explicit initialization options.
+    pub async fn initialize_with_options(
+        &self,
+        root_uri: &str,
+        initialization_options: Option<serde_json::Value>,
+    ) {
         let folder = WorkspaceFolder {
             uri: root_uri.parse().unwrap(),
             name: "workspace".to_string(),
         };
         let params = InitializeParams {
             workspace_folders: Some(vec![folder]),
+            initialization_options,
             ..Default::default()
         };
         let _ = self.lsp.initialize(params).await;
+    }
+
+    pub async fn experimental_incremental_parsing_enabled(&self) -> bool {
+        self.lsp
+            .runtime_settings()
+            .lock()
+            .await
+            .experimental_incremental_parsing
     }
 
     /// Open a document with the given URI and content.

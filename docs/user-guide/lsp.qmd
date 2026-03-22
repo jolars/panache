@@ -209,9 +209,13 @@ Optional extension settings:
   "panache.releaseTag": "latest",
   "panache.serverArgs": [],
   "panache.serverEnv": { "RUST_LOG": "info" },
-  "panache.trace.server": "off"
+  "panache.trace.server": "off",
+  "panache.experimental.incrementalParsing": false
 }
 ```
+
+`panache.experimental.incrementalParsing` enables an experimental incremental
+parse path for `textDocument/didChange`. It is disabled by default.
 
 ### Positron
 

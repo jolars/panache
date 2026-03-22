@@ -1,6 +1,7 @@
 //! Tests for incremental document synchronization.
 
 use super::helpers::*;
+use serde_json::json;
 use tower_lsp_server::ls_types::{DocumentSymbolResponse, GotoDefinitionResponse, Uri};
 
 #[tokio::test]
@@ -30,6 +31,40 @@ async fn test_incremental_edit_simple() {
     let expected = panache::parse("# Title\n\nNew text.", None);
     assert_eq!(tree_after.text_range(), expected.text_range());
     assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+#[tokio::test]
+async fn test_experimental_incremental_parsing_setting_defaults_to_off() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
+    let server = TestLspServer::new();
+
+    server.initialize(root_uri.as_str()).await;
+    assert!(!server.experimental_incremental_parsing_enabled().await);
+}
+
+#[tokio::test]
+async fn test_experimental_incremental_parsing_setting_can_be_enabled() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
+    let server = TestLspServer::new();
+
+    server
+        .initialize_with_options(
+            root_uri.as_str(),
+            Some(json!({
+                "settings": {
+                    "panache": {
+                        "experimental": {
+                            "incrementalParsing": true
+                        }
+                    }
+                }
+            })),
+        )
+        .await;
+
+    assert!(server.experimental_incremental_parsing_enabled().await);
 }
 
 #[tokio::test]
@@ -285,5 +320,61 @@ async fn test_incremental_edit_multiple_changes_use_full_reparse() {
         .await
         .expect("tree after cap edit");
     let expected = panache::parse("bcdefghija\n", None);
+    assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+#[tokio::test]
+async fn test_incremental_edit_setext_heading_transition_matches_full_parse() {
+    let server = TestLspServer::new();
+
+    server
+        .open_document("file:///setext.qmd", "Intro\nSecond\n\nTail\n", "quarto")
+        .await;
+
+    server
+        .edit_document(
+            "file:///setext.qmd",
+            vec![incremental_change(1, 6, 1, 6, "\n-----")],
+        )
+        .await;
+
+    let content = server.get_document_content("file:///setext.qmd").await;
+    assert_eq!(content, Some("Intro\nSecond\n-----\n\nTail\n".to_string()));
+
+    let tree_after = server
+        .get_document_tree("file:///setext.qmd")
+        .await
+        .expect("tree after setext edit");
+    let expected = panache::parse("Intro\nSecond\n-----\n\nTail\n", None);
+    assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+#[tokio::test]
+async fn test_incremental_edit_lazy_blockquote_transition_matches_full_parse() {
+    let server = TestLspServer::new();
+
+    server
+        .open_document(
+            "file:///blockquote.qmd",
+            "> quoted\nlazy\n\nnext\n",
+            "quarto",
+        )
+        .await;
+
+    server
+        .edit_document(
+            "file:///blockquote.qmd",
+            vec![incremental_change(1, 0, 1, 4, "> line")],
+        )
+        .await;
+
+    let content = server.get_document_content("file:///blockquote.qmd").await;
+    assert_eq!(content, Some("> quoted\n> line\n\nnext\n".to_string()));
+
+    let tree_after = server
+        .get_document_tree("file:///blockquote.qmd")
+        .await
+        .expect("tree after blockquote edit");
+    let expected = panache::parse("> quoted\n> line\n\nnext\n", None);
     assert_eq!(tree_after.to_string(), expected.to_string());
 }

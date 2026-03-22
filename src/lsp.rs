@@ -31,12 +31,18 @@ pub struct DocumentState {
     pub parsed_yaml_regions: Vec<crate::syntax::ParsedYamlRegionSnapshot>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct LspRuntimeSettings {
+    pub experimental_incremental_parsing: bool,
+}
+
 pub struct PanacheLsp {
     client: Client,
     // Use String keys since Uri doesn't implement Send
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
+    runtime_settings: Arc<Mutex<LspRuntimeSettings>>,
 }
 
 impl PanacheLsp {
@@ -46,6 +52,7 @@ impl PanacheLsp {
             document_map: Arc::new(Mutex::new(HashMap::new())),
             workspace_root: Arc::new(Mutex::new(None)),
             salsa_db: Arc::new(Mutex::new(crate::salsa::SalsaDb::default())),
+            runtime_settings: Arc::new(Mutex::new(LspRuntimeSettings::default())),
         }
     }
 
@@ -71,6 +78,11 @@ impl PanacheLsp {
     #[doc(hidden)]
     pub fn salsa_db(&self) -> Arc<Mutex<crate::salsa::SalsaDb>> {
         Arc::clone(&self.salsa_db)
+    }
+
+    #[doc(hidden)]
+    pub fn runtime_settings(&self) -> Arc<Mutex<LspRuntimeSettings>> {
+        Arc::clone(&self.runtime_settings)
     }
 
     /// Trigger didChangeWatchedFiles for tests.

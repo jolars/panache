@@ -1,3 +1,4 @@
+use serde_json::Value;
 use std::sync::Arc;
 use tower_lsp_server::LanguageServer;
 use tower_lsp_server::jsonrpc::Result;
@@ -23,6 +24,28 @@ fn legacy_root_uri(params: &InitializeParams) -> Option<Uri> {
         .and_then(|root_uri| serde_json::from_value(root_uri).ok())
 }
 
+fn experimental_incremental_parsing_from_initialize(params: &InitializeParams) -> bool {
+    fn get_bool(value: &Value, path: &[&str]) -> Option<bool> {
+        let mut current = value;
+        for key in path {
+            current = current.get(key)?;
+        }
+        current.as_bool()
+    }
+
+    let Some(options) = params.initialization_options.as_ref() else {
+        return false;
+    };
+
+    get_bool(
+        options,
+        &["settings", "panache", "experimental", "incrementalParsing"],
+    )
+    .or_else(|| get_bool(options, &["panache", "experimental", "incrementalParsing"]))
+    .or_else(|| get_bool(options, &["experimental", "incrementalParsing"]))
+    .unwrap_or(false)
+}
+
 impl LanguageServer for PanacheLsp {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         // Store workspace root for config discovery
@@ -37,6 +60,16 @@ impl LanguageServer for PanacheLsp {
         {
             *self.workspace_root.lock().await = Some(path.into_owned());
         }
+
+        let experimental_incremental = experimental_incremental_parsing_from_initialize(&params);
+        {
+            let mut runtime_settings = self.runtime_settings.lock().await;
+            runtime_settings.experimental_incremental_parsing = experimental_incremental;
+        }
+        log::debug!(
+            "lsp runtime setting experimental.incrementalParsing={} (initialize options)",
+            experimental_incremental
+        );
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
@@ -158,6 +191,7 @@ impl LanguageServer for PanacheLsp {
             Arc::clone(&self.document_map),
             Arc::clone(&self.workspace_root),
             Arc::clone(&self.salsa_db),
+            Arc::clone(&self.runtime_settings),
             &self.client,
             params,
         )

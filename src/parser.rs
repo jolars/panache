@@ -4,7 +4,9 @@
 //! Quarto documents.
 
 use crate::config::Config;
-use crate::syntax::SyntaxNode;
+use crate::range_utils::find_incremental_restart_offset;
+use crate::syntax::{SyntaxKind, SyntaxNode};
+use rowan::{GreenNode, GreenToken, NodeOrToken};
 
 pub mod blocks;
 pub mod inlines;
@@ -53,17 +55,116 @@ pub struct IncrementalParseResult {
 pub fn parse_incremental_suffix(
     input: &str,
     config: Option<Config>,
-    _old_tree: &SyntaxNode,
-    _old_edit_range: (usize, usize),
-    _new_edit_range: (usize, usize),
+    old_tree: &SyntaxNode,
+    old_edit_range: (usize, usize),
+    new_edit_range: (usize, usize),
 ) -> IncrementalParseResult {
     let config = config.unwrap_or_default();
-    let tree = Parser::new(input, &config).parse();
+    let input_len = input.len();
+
+    let Some(old_edit) = normalize_range(old_edit_range) else {
+        return full_reparse_result(input, &config);
+    };
+    let Some(new_edit) = normalize_range(new_edit_range) else {
+        return full_reparse_result(input, &config);
+    };
+    if new_edit.1 > input_len {
+        return full_reparse_result(input, &config);
+    }
+
+    if old_tree.kind() != SyntaxKind::DOCUMENT {
+        return full_reparse_result(input, &config);
+    }
+
+    let restart = find_incremental_restart_offset(old_tree, old_edit.0, old_edit.1);
+    let old_restart = align_to_document_child_start(old_tree, restart);
+
+    if (old_edit.0..old_edit.1).contains(&old_restart) {
+        return full_reparse_result(input, &config);
+    }
+
+    let new_restart = map_old_offset_to_new(old_restart, old_edit, new_edit, input_len);
+    if !input.is_char_boundary(new_restart) {
+        return full_reparse_result(input, &config);
+    }
+
+    let suffix_text = &input[new_restart..];
+    let suffix_tree = Parser::new(suffix_text, &config).parse();
+
+    let mut children: Vec<NodeOrToken<GreenNode, GreenToken>> = old_tree
+        .children_with_tokens()
+        .filter_map(|element| {
+            let range = element.text_range();
+            let end: usize = range.end().into();
+            if end <= old_restart {
+                Some(element_to_green(element))
+            } else {
+                None
+            }
+        })
+        .collect();
+    children.extend(suffix_tree.children_with_tokens().map(element_to_green));
+
+    let tree = SyntaxNode::new_root(GreenNode::new(SyntaxKind::DOCUMENT.into(), children));
     let len: usize = tree.text_range().end().into();
 
     IncrementalParseResult {
         tree,
+        reparse_range: (new_restart, len),
+    }
+}
+
+fn normalize_range(range: (usize, usize)) -> Option<(usize, usize)> {
+    (range.0 <= range.1).then_some(range)
+}
+
+fn full_reparse_result(input: &str, config: &Config) -> IncrementalParseResult {
+    let tree = Parser::new(input, config).parse();
+    let len: usize = tree.text_range().end().into();
+    IncrementalParseResult {
+        tree,
         reparse_range: (0, len),
+    }
+}
+
+fn align_to_document_child_start(tree: &SyntaxNode, offset: usize) -> usize {
+    for child in tree.children_with_tokens() {
+        let range = child.text_range();
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        if offset <= start {
+            return start;
+        }
+        if offset < end {
+            return start;
+        }
+    }
+    let len: usize = tree.text_range().end().into();
+    len
+}
+
+fn map_old_offset_to_new(
+    old_offset: usize,
+    old_edit: (usize, usize),
+    new_edit: (usize, usize),
+    new_len: usize,
+) -> usize {
+    if old_offset <= old_edit.0 {
+        return old_offset;
+    }
+    if old_offset >= old_edit.1 {
+        let old_span = old_edit.1 - old_edit.0;
+        let new_span = new_edit.1 - new_edit.0;
+        let delta = new_span as isize - old_span as isize;
+        return old_offset.saturating_add_signed(delta).min(new_len);
+    }
+    new_edit.1.min(new_len)
+}
+
+fn element_to_green(element: crate::syntax::SyntaxElement) -> NodeOrToken<GreenNode, GreenToken> {
+    match element {
+        NodeOrToken::Node(node) => NodeOrToken::Node(node.green().into_owned()),
+        NodeOrToken::Token(token) => NodeOrToken::Token(token.green().to_owned()),
     }
 }
 
@@ -99,6 +200,32 @@ mod tests {
         let old_edit = (10, 11);
         let updated = apply_edit(input, old_edit, "alpha");
         let new_edit = (10, 15);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit).tree;
+        let full = parse(&updated, None);
+        assert_eq!(inc.to_string(), full.to_string());
+    }
+
+    #[test]
+    fn incremental_suffix_matches_full_parse_for_setext_transition() {
+        let input = "Intro\nSecond\n\nTail\n";
+        let old_tree = parse(input, None);
+        let old_edit = (5, 5);
+        let updated = apply_edit(input, old_edit, "\n-----");
+        let new_edit = (5, 11);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit).tree;
+        let full = parse(&updated, None);
+        assert_eq!(inc.to_string(), full.to_string());
+    }
+
+    #[test]
+    fn incremental_suffix_matches_full_parse_for_lazy_blockquote_change() {
+        let input = "> quoted\nlazy\n\nnext\n";
+        let old_tree = parse(input, None);
+        let old_edit = (9, 13);
+        let updated = apply_edit(input, old_edit, "> line");
+        let new_edit = (9, 15);
 
         let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit).tree;
         let full = parse(&updated, None);
