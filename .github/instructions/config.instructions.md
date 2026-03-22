@@ -12,7 +12,7 @@ clear migration paths.
 - Maintain backward compatibility for deprecated keys/sections where currently
   supported; keep warnings explicit and actionable.
 - Prefer canonical kebab-case keys while preserving documented aliases.
-- Update `docs/configuration.qmd` whenever defaults, keys, or deprecation
-  behavior changes.
+- Update `docs/user-guide/configuration.qmd` whenever defaults, keys, or
+  deprecation behavior changes.
 - Add focused tests in `src/config.rs` for parsing, precedence, merge behavior,
   and deprecation handling when config behavior changes.
