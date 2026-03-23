@@ -49,9 +49,6 @@ pub struct IncrementalParseResult {
 
 /// Incrementally update a syntax tree by reparsing from a safe restart boundary
 /// to EOF and rebuilding the document root from old prefix + reparsed suffix.
-///
-/// Current implementation is intentionally conservative: it is a facade over a
-/// full-document parse while incremental design work is in progress.
 pub fn parse_incremental_suffix(
     input: &str,
     config: Option<Config>,
@@ -74,6 +71,13 @@ pub fn parse_incremental_suffix(
 
     if old_tree.kind() != SyntaxKind::DOCUMENT {
         return full_reparse_result(input, &config);
+    }
+
+    if let Some(section_window) =
+        find_top_level_heading_section_window(old_tree, old_edit, new_edit, input_len)
+        && let Some(result) = reparse_section_window(input, &config, old_tree, section_window)
+    {
+        return result;
     }
 
     let restart = find_incremental_restart_offset(old_tree, old_edit.0, old_edit.1);
@@ -168,6 +172,127 @@ fn element_to_green(element: crate::syntax::SyntaxElement) -> NodeOrToken<GreenN
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct SectionWindow {
+    old_start: usize,
+    old_end: usize,
+    new_start: usize,
+    new_end: usize,
+}
+
+fn find_top_level_heading_section_window(
+    old_tree: &SyntaxNode,
+    old_edit: (usize, usize),
+    new_edit: (usize, usize),
+    new_len: usize,
+) -> Option<SectionWindow> {
+    let mut previous_heading: Option<(usize, usize)> = None;
+    let mut next_heading: Option<(usize, usize)> = None;
+
+    for child in old_tree.children() {
+        if child.kind() != SyntaxKind::HEADING {
+            continue;
+        }
+
+        let range = child.text_range();
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+
+        if start <= old_edit.0 {
+            previous_heading = Some((start, end));
+        } else {
+            next_heading = Some((start, end));
+            break;
+        }
+    }
+
+    let (previous_start, previous_end) = previous_heading?;
+    let (next_start, next_end) = next_heading?;
+
+    if ranges_intersect(old_edit, (previous_start, previous_end))
+        || ranges_intersect(old_edit, (next_start, next_end))
+    {
+        return None;
+    }
+
+    // Be conservative and only use the section window for edits that are
+    // strictly inside the section body (not touching heading boundaries).
+    if old_edit.0 <= previous_end || old_edit.1 >= next_start {
+        return None;
+    }
+
+    let new_start = map_old_offset_to_new(previous_start, old_edit, new_edit, new_len);
+    let new_end = map_old_offset_to_new(next_start, old_edit, new_edit, new_len);
+    if new_start >= new_end || new_end > new_len {
+        return None;
+    }
+
+    Some(SectionWindow {
+        old_start: previous_start,
+        old_end: next_start,
+        new_start,
+        new_end,
+    })
+}
+
+fn ranges_intersect(a: (usize, usize), b: (usize, usize)) -> bool {
+    a.0 < b.1 && b.0 < a.1
+}
+
+fn reparse_section_window(
+    input: &str,
+    config: &Config,
+    old_tree: &SyntaxNode,
+    section_window: SectionWindow,
+) -> Option<IncrementalParseResult> {
+    if !input.is_char_boundary(section_window.new_start)
+        || !input.is_char_boundary(section_window.new_end)
+    {
+        return None;
+    }
+
+    let reparsed_window = Parser::new(
+        &input[section_window.new_start..section_window.new_end],
+        config,
+    )
+    .parse();
+
+    let mut children: Vec<NodeOrToken<GreenNode, GreenToken>> = Vec::new();
+    let mut inserted_window = false;
+
+    for element in old_tree.children_with_tokens() {
+        let range = element.text_range();
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+
+        if end <= section_window.old_start {
+            children.push(element_to_green(element));
+            continue;
+        }
+
+        if start >= section_window.old_end {
+            if !inserted_window {
+                children.extend(reparsed_window.children_with_tokens().map(element_to_green));
+                inserted_window = true;
+            }
+            children.push(element_to_green(element));
+            continue;
+        }
+
+        // Overlapping element is replaced by the reparsed section window.
+    }
+
+    if !inserted_window {
+        children.extend(reparsed_window.children_with_tokens().map(element_to_green));
+    }
+
+    let tree = SyntaxNode::new_root(GreenNode::new(SyntaxKind::DOCUMENT.into(), children));
+    Some(IncrementalParseResult {
+        tree,
+        reparse_range: (section_window.new_start, section_window.new_end),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,5 +355,27 @@ mod tests {
         let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit).tree;
         let full = parse(&updated, None);
         assert_eq!(inc.to_string(), full.to_string());
+    }
+
+    #[test]
+    fn incremental_uses_heading_section_window_when_available() {
+        let input = "# Intro\n\nalpha\n\n# Middle\n\nbeta section\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let start = input.find("beta").expect("beta in test input");
+        let old_edit = (start, start + 4);
+        let updated = apply_edit(input, old_edit, "BETA");
+        let new_edit = (start, start + 4);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert!(
+            inc.reparse_range.0 > 0,
+            "section reparse should not start at 0"
+        );
+        assert!(
+            inc.reparse_range.1 < updated.len(),
+            "section reparse should stop before EOF"
+        );
     }
 }
