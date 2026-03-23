@@ -19,6 +19,7 @@ Here is some unicode:
 - copyright: ©
 
 Term
+
 :   ```
     ├── pyproject.toml
     ├── .python-version

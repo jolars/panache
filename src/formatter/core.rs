@@ -1418,9 +1418,32 @@ impl Formatter {
             }
 
             SyntaxKind::DEFINITION_ITEM => {
-                let is_compact = DefinitionItem::cast(node.clone())
+                let is_compact_by_structure = DefinitionItem::cast(node.clone())
                     .map(|item| item.is_compact())
                     .unwrap_or(true);
+                let mut has_blank_between_term_and_first_definition = false;
+                let mut seen_term = false;
+                let mut seen_definition = false;
+
+                for child in node.children() {
+                    match child.kind() {
+                        SyntaxKind::TERM => {
+                            seen_term = true;
+                        }
+                        SyntaxKind::BLANK_LINE => {
+                            if seen_term && !seen_definition {
+                                has_blank_between_term_and_first_definition = true;
+                            }
+                        }
+                        SyntaxKind::DEFINITION => {
+                            seen_definition = true;
+                        }
+                        _ => {}
+                    }
+                }
+
+                let is_compact =
+                    is_compact_by_structure && !has_blank_between_term_and_first_definition;
                 let mut saw_term = false;
 
                 for child in node.children() {
@@ -1622,6 +1645,50 @@ impl Formatter {
 
                                     if !is_before_first_para {
                                         self.output.push('\n');
+                                    }
+                                }
+                                SyntaxKind::LIST => {
+                                    let start = self.output.len();
+                                    self.format_node_sync(n, def_indent);
+
+                                    if self.output[..start].ends_with(":   ")
+                                        && self.output[start..].starts_with(&" ".repeat(def_indent))
+                                    {
+                                        self.output.drain(start..start + def_indent);
+                                    }
+                                }
+                                SyntaxKind::BLOCKQUOTE => {
+                                    if self.output.ends_with(":   ") {
+                                        let mut pieces: Vec<String> = Vec::new();
+                                        let block_text = n.text().to_string();
+                                        for line in block_text.lines() {
+                                            let trimmed = line.trim_start();
+                                            let content =
+                                                if let Some(rest) = trimmed.strip_prefix('>') {
+                                                    rest.trim_start()
+                                                } else {
+                                                    trimmed
+                                                };
+                                            if !content.is_empty() {
+                                                pieces.push(content.to_string());
+                                            }
+                                        }
+
+                                        self.output.push_str("> ");
+                                        self.output.push_str(&pieces.join(" "));
+                                        self.output.push('\n');
+
+                                        if let Some(next_non_blank) =
+                                            node.children().skip(i + 1).find(|sibling| {
+                                                sibling.kind() != SyntaxKind::BLANK_LINE
+                                            })
+                                            && is_block_element(next_non_blank.kind())
+                                            && !self.output.ends_with("\n\n")
+                                        {
+                                            self.output.push('\n');
+                                        }
+                                    } else {
+                                        self.format_node_sync(n, def_indent);
                                     }
                                 }
                                 _ => {

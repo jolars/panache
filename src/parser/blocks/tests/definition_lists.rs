@@ -114,3 +114,27 @@ fn definition_marker_after_blank_line_does_not_create_orphan_item() {
         "definition item should keep exactly one term"
     );
 }
+
+#[test]
+fn definition_marker_after_list_definition_closes_nested_list() {
+    let input = "Orange\n:   - a\n    - b\n:   Also a color\n";
+    let tree = parse_blocks(input);
+
+    let definition_item = find_first(&tree, SyntaxKind::DEFINITION_ITEM).expect("definition item");
+    let definitions = definition_item
+        .children()
+        .filter(|child| child.kind() == SyntaxKind::DEFINITION)
+        .count();
+    assert_eq!(
+        definitions, 2,
+        "marker after list definition should create a sibling definition"
+    );
+
+    let nested_definition_item = definition_item
+        .descendants()
+        .any(|node| node.kind() == SyntaxKind::DEFINITION_ITEM && node != definition_item);
+    assert!(
+        !nested_definition_item,
+        "list content should not capture a nested DEFINITION_ITEM"
+    );
+}

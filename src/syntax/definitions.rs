@@ -79,7 +79,7 @@ impl DefinitionItem {
                 SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH => {
                     !has_leading_atx_heading_with_remainder(&blocks[0].text().to_string())
                 }
-                SyntaxKind::CODE_BLOCK => true,
+                SyntaxKind::CODE_BLOCK => false,
                 _ => false,
             }
         })
@@ -155,13 +155,13 @@ mod tests {
     }
 
     #[test]
-    fn definition_item_compact_single_code_block() {
+    fn definition_item_loose_single_code_block() {
         let tree = parse("Term\n: ```r\n  a <- 1\n  ```\n", None);
         let item = tree
             .descendants()
             .find_map(DefinitionItem::cast)
             .expect("definition item");
-        assert!(item.is_compact());
+        assert!(item.is_loose());
     }
 
     #[test]

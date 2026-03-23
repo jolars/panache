@@ -580,6 +580,13 @@ impl<'a> Parser<'a> {
             } => {
                 self.emit_buffered_plain_if_needed();
 
+                while matches!(self.containers.last(), Some(Container::ListItem { .. })) {
+                    self.close_containers_to(self.containers.depth() - 1);
+                }
+                while matches!(self.containers.last(), Some(Container::List { .. })) {
+                    self.close_containers_to(self.containers.depth() - 1);
+                }
+
                 if matches!(self.containers.last(), Some(Container::Definition { .. })) {
                     self.close_containers_to(self.containers.depth() - 1);
                 }
@@ -677,7 +684,44 @@ impl<'a> Parser<'a> {
                         })
                         .unwrap_or(false);
 
-                    if let Some(marker_match) = try_parse_list_marker(content_slice, self.config)
+                    let (blockquote_depth, inner_blockquote_content) =
+                        count_blockquote_markers(content_line);
+
+                    if blockquote_depth > 0 {
+                        self.containers.push(Container::Definition {
+                            content_col,
+                            plain_open: false,
+                            plain_buffer: TextBuffer::new(),
+                        });
+                        definition_pushed = true;
+
+                        let marker_info = parse_blockquote_marker_info(content_line);
+                        for level in 0..blockquote_depth {
+                            self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+                            if let Some(info) = marker_info.get(level) {
+                                blockquotes::emit_one_blockquote_marker(
+                                    &mut self.builder,
+                                    info.leading_spaces,
+                                    info.has_trailing_space,
+                                );
+                            }
+                            self.containers.push(Container::BlockQuote {});
+                        }
+
+                        if !inner_blockquote_content.trim().is_empty() {
+                            paragraphs::start_paragraph_if_needed(
+                                &mut self.containers,
+                                &mut self.builder,
+                            );
+                            paragraphs::append_paragraph_line(
+                                &mut self.containers,
+                                &mut self.builder,
+                                inner_blockquote_content,
+                                self.config,
+                            );
+                        }
+                    } else if let Some(marker_match) =
+                        try_parse_list_marker(content_slice, self.config)
                         && should_start_list_from_first_line
                     {
                         self.containers.push(Container::Definition {

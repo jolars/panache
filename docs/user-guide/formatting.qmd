@@ -4,7 +4,19 @@ title: Formatting
 
 Panache's formatting rules are designed to produce clean, consistent Markdown
 output that adheres to common style guidelines while preserving the semantic
-meaning of the original document.
+meaning of the original document. We often try to stick quite close to the
+output of Pandoc's writer, but not always.
+
+The golden rule is that a markdown document should be readable in its raw form,
+which for instance has guided the decision to convert `---` horizontal rules to
+a full line of hyphens.
+
+Another important principle is that Panache's formatter is *idempotent*: running
+the formatter multiple times on the same document should not produce different
+output after the first run. To make this work, Panache therefore needs to escape
+certain characters that might otherwise cause semantic drift on subsequent
+runs^[This is precisely what Pandoc's
+writer also does.]
 
 ## Text Wrapping
 
@@ -25,17 +37,20 @@ not reflow paragraphs. If `wrap` is set to `sentence`, Panache will break lines
 at sentence boundaries, ensuring that each sentence starts on a new line.
 
 Input
+
 :   ```markdown
     First sentence with a [link text](https://example.com) and inline math $a + b = c$. Second sentence; third sentence!
     ```
 
 Output (`"reflow"`)
+
 :   ```markdown
     First sentence with a [link text](https://example.com) and inline math
     $a + b = c$. Second sentence; third sentence!
     ```
 
 Output (`"sentence"`)
+
 :   ```markdown
     First sentence with a [link text](https://example.com) and inline math $a + b = c$.
     Second sentence; third sentence!
@@ -48,12 +63,14 @@ spaces (``  ``) or by using a backslash (`\n`), are preserved regardless of the
 wrapping mode:
 
 Input (with `  ` hard break)
+
 :   ```markdown
     First line  
     Second line
     ```
 
 Output
+
 :   ```markdown
     First line\
     Second line
@@ -69,6 +86,7 @@ normalized to a single space. Headings are separated from surrounding content by
 a blank line.
 
 Input
+
 :   ```markdown
     #Heading 1
     Text
@@ -79,6 +97,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
     # Heading 1
 
@@ -95,11 +114,13 @@ Attributes are preserved and formatted to have a single space between the class
 names and no space between the class names and the opening `{` character.
 
 Input
+
 :   ```markdown
     ## Heading with classes{.important  .highlight }
     ```
 
 Output
+
 :   ```markdown
     ## Heading with classes {.important .highlight}
     ```
@@ -109,6 +130,7 @@ Output
 Setext-style headings are converted to ATX style.
 
 Input
+
 :   ```markdown
     Heading 1
     =========
@@ -118,6 +140,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
     # Heading 1
 
@@ -134,6 +157,7 @@ Ambiguous cases are resolved by escaping emphasis markers to avoid idempotency
 issues.
 
 Input
+
 :   ```markdown
     Single asterisks: *italic text*
 
@@ -147,6 +171,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
     Single asterisks: *italic text*
 
@@ -166,6 +191,7 @@ Output
 Inline code is preserved with minimal backticks needed:
 
 Input
+
 :   ````markdown
     Code with spaces: ` code with spaces `
 
@@ -173,6 +199,7 @@ Input
     ````
 
 Output
+
 :   `````markdown
     Code with spaces: `code with spaces`
 
@@ -196,6 +223,7 @@ Fenced code blocks are formatted with consistent fencing and attributes. We
 normalize them to the *shortcut* style from Pandoc.
 
 Input
+
 :   ````markdown
     ```haskell
     qsort [] = []
@@ -215,6 +243,7 @@ Input
     ````
 
 Output
+
 :   ````markdown
     ```haskell
     qsort [] = []
@@ -238,12 +267,14 @@ Output
 Indented code blocks are normalized to fenced code blocks for consistency:
 
 Input
+
 :   ```markdown
         a <- 1
         b <- a^2
     ```
 
 Output
+
 :   ````markdown
     ```
     a <- 1
@@ -260,6 +291,7 @@ normalized to 2 spaces per level. Loose lists are converted to tight lights if
 they only contain plain (non-block/paragraph) items.
 
 Input
+
 :   ```markdown
     * Item 1
       + Nested item
@@ -269,6 +301,7 @@ Input
     ```
 
 Output:
+
 :   ```markdown
     - Item 1
       - Nested item
@@ -294,6 +327,7 @@ GitHub-style task lists use the standardized `-` marker, and indent to the start
 of the text.
 
 Input
+
 :   ```markdown
     + [ ] Parent task
        *   [ ] Nested unchecked task
@@ -302,6 +336,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
     - [ ] Parent task
            - [ ] Nested unchecked task
@@ -321,6 +356,7 @@ Panache also normalizes compact vs loose definition items by structure:
   non-paragraph block
 
 Input
+
 :   ```markdown
     Term 1
 
@@ -336,6 +372,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
     Term 1
 
@@ -355,6 +392,7 @@ Fancy lists are indented to line up with the first character of the list item
 text.
 
 Input
+
 :   ```markdown
     (i) Parens style
     (ii) Second item
@@ -370,6 +408,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
       (i) Parens style
      (ii) Second item
@@ -389,6 +428,7 @@ Output
 Blockquotes are formatted with consistent `>` markers:
 
 Input
+
 :   ```markdown
     >This is a block quote. This
     >paragraph has two lines.
@@ -401,6 +441,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
     > This is a block quote. This paragraph has two lines.
     >
@@ -442,6 +483,7 @@ We normalize simple tables so that cell contents align with the alignment
 specified in the header row, and spacing within cells is normalized.
 
 Input
+
 :   ```markdown
        Right     Left     Center     Default
      -------     ------ ----------   ---------------
@@ -453,6 +495,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
       Right     Left     Center     Default
     -------     ------ ----------   -------
@@ -475,11 +518,13 @@ Display math is formatted on its own lines with leading indentation depending on
 the `math-indent` configuration option (default 0):
 
 Input
+
 :   ```markdown
     $$E = mc^2$$
     ```
 
 Output
+
 :   ```markdown
     $$
     E = mc^2
@@ -495,6 +540,7 @@ spacing around attributes, quotes, and parentheses. Descriptions are wrapped if
 reflow wrapping is enabled.
 
 Input
+
 :   ```markdown
     [URL and title](/url/ "title").
 
@@ -508,6 +554,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
     [URL and title](/url/ "title").
 
@@ -527,6 +574,7 @@ fence and the content and no space between the closing fence and the content.
 Attributes are preserved and normalized. With nested divs, the inner div
 
 Input
+
 :   ```markdown
     ::: Warning ::::::
     This is a warning.
@@ -538,6 +586,7 @@ Input
     ```
 
 Output
+
 :   ```markdown
     ::: Warning
     This is a warning.
@@ -601,6 +650,7 @@ E = mc^2
 Horizontal rulers are normalized to hyphens and extend to `line-width`.
 
 Input
+
 :   ```markdown
     ---
     ***
@@ -608,6 +658,7 @@ Input
     ```
 
 Output (`line-width = 60`):
+
 :   ```markdown
     -----------------------------------------------------------
 
@@ -672,6 +723,7 @@ Text
 ```
 
 Output
+
 :   ```markdown
     ---
     echo: false

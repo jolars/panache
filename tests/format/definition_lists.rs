@@ -97,3 +97,25 @@ fn definition_list_blankline_continuation_is_dynamic_in_latest_pandoc_compat() {
     let output = format(input, Some(cfg), None);
     assert_eq!(output, "apple\n\n:   pomaceous\n\n    fruit\n");
 }
+
+#[test]
+fn definition_list_preserves_item_loose_compactness_with_list_blocks() {
+    let input = "Input\n:   - a\n    - b\n\nTerm Loose 1\n\n:   Definition 1\n\nTerm Loose 2\n:   Definition 2\n\nOrange\n:   Also a fruit\n\n:   Also a color\n\nOrange\n\n:   Also a fruit\n\n:   Also a color\n\nOrange\n:   - a\n    - b\n:   Also a color\n";
+
+    let expected = "Input\n\n:   - a\n    - b\n\nTerm Loose 1\n\n:   Definition 1\n\nTerm Loose 2\n:   Definition 2\n\nOrange\n:   Also a fruit\n:   Also a color\n\nOrange\n\n:   Also a fruit\n\n:   Also a color\n\nOrange\n\n:   - a\n    - b\n\n:   Also a color\n";
+
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+
+    assert_eq!(output1, expected);
+    similar_asserts::assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
+fn definition_item_with_code_block_formats_as_loose() {
+    let input = "Example violation\n: ```r\n  a <- 1\n  ```\n";
+    let expected = "Example violation\n\n:   ```r\n    a <- 1\n    ```\n";
+
+    let output = format(input, None, None);
+    assert_eq!(output, expected);
+}

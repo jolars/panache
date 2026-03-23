@@ -150,10 +150,25 @@ fn is_bare_colon_caption_start(line: &str) -> bool {
     trimmed.starts_with(':') && !trimmed.starts_with("::") && !trimmed.starts_with(":::")
 }
 
+fn bare_colon_caption_looks_like_definition_code_block(line: &str) -> bool {
+    let Some((_, rest)) = try_parse_caption_prefix(line) else {
+        return false;
+    };
+    let trimmed = rest.trim_start();
+    trimmed.starts_with("```") || trimmed.starts_with("~~~")
+}
+
 fn is_valid_caption_start_before_table(lines: &[&str], pos: usize) -> bool {
     if !is_table_caption_start(lines[pos]) {
         return false;
     }
+
+    if is_bare_colon_caption_start(lines[pos])
+        && bare_colon_caption_looks_like_definition_code_block(lines[pos])
+    {
+        return false;
+    }
+
     // Avoid stealing definition-list definitions (":   ...") as table captions.
     if is_bare_colon_caption_start(lines[pos]) && pos > 0 && !lines[pos - 1].trim().is_empty() {
         return false;
@@ -1179,6 +1194,29 @@ mod tests {
         assert!(try_parse_caption_prefix(": My caption").is_some());
         assert!(try_parse_caption_prefix(":").is_none()); // Just colon, no content
         assert!(try_parse_caption_prefix("Not a caption").is_none());
+    }
+
+    #[test]
+    fn bare_colon_fenced_code_is_not_table_caption() {
+        let input = "Term\n: ```\n  code\n  ```\n";
+        let tree = crate::parse(input, None);
+
+        assert!(
+            tree.descendants()
+                .any(|node| node.kind() == SyntaxKind::DEFINITION_LIST),
+            "should parse as definition list"
+        );
+        assert!(
+            tree.descendants()
+                .any(|node| node.kind() == SyntaxKind::CODE_BLOCK),
+            "definition should preserve fenced code block"
+        );
+        assert!(
+            !tree
+                .descendants()
+                .any(|node| node.kind() == SyntaxKind::TABLE_CAPTION),
+            "fenced code definition should not be parsed as table caption"
+        );
     }
 
     #[test]

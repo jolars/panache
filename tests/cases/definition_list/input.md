@@ -88,3 +88,8 @@ Output
       - b
     ---
     ```
+
+Orange
+:   > a
+    > b
+    > c

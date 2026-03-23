@@ -47,6 +47,7 @@ b <- 2
 A code block in a definition list:
 
 Input
+
 :   ```markdown
     # Heading 1
 

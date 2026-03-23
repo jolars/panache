@@ -32,6 +32,7 @@ GraphQL
 Loose format (blank line before definition):
 
 Term Loose 1
+
 :   Definition 1
 
 Term Loose 2
@@ -58,6 +59,7 @@ Term 3
 :   Definition with lazy continuation. Second paragraph of the definition.
 
 Example violation
+
 :   ```r
     a <- 1
     ```
@@ -78,6 +80,7 @@ Term
 A paragraph.
 
 Output
+
 :   ```markdown
     ---
     echo: false
@@ -86,3 +89,7 @@ Output
       - b
     ---
     ```
+
+Orange
+
+:   > a b c
