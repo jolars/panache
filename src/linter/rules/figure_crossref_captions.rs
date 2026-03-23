@@ -1,7 +1,7 @@
 use crate::config::{Config, Flavor};
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, ChunkLabel, ChunkOption, Crossref, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, CodeBlock, Crossref, SyntaxNode};
 use crate::utils::{crossref_resolution_labels, normalize_label};
 use std::collections::HashMap;
 
@@ -66,82 +66,16 @@ impl Rule for FigureCrossrefCaptionsRule {
 fn collect_chunk_figure_caption_state(tree: &SyntaxNode) -> HashMap<String, bool> {
     let mut out = HashMap::new();
 
-    for code_block in tree
-        .descendants()
-        .filter(|node| node.kind() == SyntaxKind::CODE_BLOCK)
-    {
-        let mut labels = Vec::new();
-        let mut has_caption = false;
+    for code_block in tree.descendants().filter_map(CodeBlock::cast) {
+        let labels: Vec<String> = code_block
+            .chunk_labels()
+            .into_iter()
+            .map(|label| normalize_label(&label))
+            .filter(|label| !label.is_empty())
+            .collect();
 
-        if let Some(info_node) = code_block
-            .children()
-            .find(|child| child.kind() == SyntaxKind::CODE_FENCE_OPEN)
-            .and_then(|open| {
-                open.children()
-                    .find(|child| child.kind() == SyntaxKind::CODE_INFO)
-            })
-            && let Some(chunk_options) = info_node
-                .children()
-                .find(|child| child.kind() == SyntaxKind::CHUNK_OPTIONS)
-        {
-            for option_or_label in chunk_options.children() {
-                if let Some(chunk_label) = ChunkLabel::cast(option_or_label.clone()) {
-                    let label = normalize_label(&chunk_label.text());
-                    if !label.is_empty() {
-                        labels.push(label);
-                    }
-                    continue;
-                }
-
-                let Some(option) = ChunkOption::cast(option_or_label) else {
-                    continue;
-                };
-                let Some(key) = option.key() else {
-                    continue;
-                };
-
-                if key.eq_ignore_ascii_case("label") {
-                    if let Some(value) = option.value() {
-                        let label = normalize_label(&value);
-                        if !label.is_empty() {
-                            labels.push(label);
-                        }
-                    }
-                    continue;
-                }
-
-                if is_figure_caption_option_key(&key)
-                    && option.value().is_some_and(|v| !v.is_empty())
-                {
-                    has_caption = true;
-                }
-            }
-        }
-
-        if let Some(content) = code_block
-            .children()
-            .find(|child| child.kind() == SyntaxKind::CODE_CONTENT)
-        {
-            for option in content.descendants().filter_map(ChunkOption::cast) {
-                let Some(key) = option.key() else {
-                    continue;
-                };
-                if key.eq_ignore_ascii_case("label") {
-                    if let Some(value) = option.value() {
-                        let label = normalize_label(&value);
-                        if !label.is_empty() {
-                            labels.push(label);
-                        }
-                    }
-                    continue;
-                }
-                if is_figure_caption_option_key(&key)
-                    && option.value().is_some_and(|v| !v.is_empty())
-                {
-                    has_caption = true;
-                }
-            }
-        }
+        let has_caption = code_block.has_chunk_option_key_with_nonempty_value("fig-cap")
+            || code_block.has_chunk_option_key_with_nonempty_value("fig.cap");
 
         for label in labels {
             out.entry(label).or_insert(has_caption);
@@ -153,10 +87,6 @@ fn collect_chunk_figure_caption_state(tree: &SyntaxNode) -> HashMap<String, bool
 
 fn is_bookdown_figure_crossref(label: &str) -> bool {
     label.starts_with("fig:")
-}
-
-fn is_figure_caption_option_key(key: &str) -> bool {
-    key.eq_ignore_ascii_case("fig-cap") || key.eq_ignore_ascii_case("fig.cap")
 }
 
 #[cfg(test)]

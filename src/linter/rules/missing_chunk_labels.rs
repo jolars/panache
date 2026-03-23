@@ -1,8 +1,7 @@
 use crate::config::{Config, Flavor};
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::parser::blocks::code_blocks::{CodeBlockType, InfoString};
-use crate::syntax::{AstNode, ChunkLabel, ChunkOption, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, CodeBlock, SyntaxNode};
 
 pub struct MissingChunkLabelsRule;
 
@@ -23,51 +22,16 @@ impl Rule for MissingChunkLabelsRule {
         }
 
         let mut diagnostics = Vec::new();
-        for node in tree
-            .descendants()
-            .filter(|node| node.kind() == SyntaxKind::CODE_BLOCK)
-        {
-            let Some(info_node) = node
-                .children()
-                .find(|child| child.kind() == SyntaxKind::CODE_FENCE_OPEN)
-                .and_then(|open| {
-                    open.children()
-                        .find(|child| child.kind() == SyntaxKind::CODE_INFO)
-                })
-            else {
-                continue;
-            };
-
-            let info = InfoString::parse(&info_node.text().to_string());
-            if !matches!(info.block_type, CodeBlockType::Executable { .. }) {
+        for code_block in tree.descendants().filter_map(CodeBlock::cast) {
+            if !code_block.is_executable_chunk() {
                 continue;
             }
 
-            let has_inline_label = info_node.children().any(|child| {
-                if child.kind() != SyntaxKind::CHUNK_OPTIONS {
-                    return false;
-                }
-                child.children().any(|opt_or_label| {
-                    ChunkLabel::cast(opt_or_label.clone()).is_some()
-                        || ChunkOption::cast(opt_or_label)
-                            .and_then(|opt| opt.key())
-                            .is_some_and(|key| key.eq_ignore_ascii_case("label"))
-                })
-            });
+            let Some(info_node) = code_block.info().map(|info| info.syntax().clone()) else {
+                continue;
+            };
 
-            let has_hashpipe_label = node
-                .children()
-                .find(|child| child.kind() == SyntaxKind::CODE_CONTENT)
-                .map(|content| {
-                    content.descendants().any(|child| {
-                        ChunkOption::cast(child)
-                            .and_then(|opt| opt.key())
-                            .is_some_and(|key| key.eq_ignore_ascii_case("label"))
-                    })
-                })
-                .unwrap_or(false);
-
-            if has_inline_label || has_hashpipe_label {
+            if code_block.has_chunk_label() {
                 continue;
             }
 

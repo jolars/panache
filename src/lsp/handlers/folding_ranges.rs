@@ -1,3 +1,4 @@
+use rowan::ast::AstNode;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -9,7 +10,7 @@ use tower_lsp_server::ls_types::*;
 use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
 use crate::lsp::helpers::get_document_content_and_tree;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{CodeBlock, FencedDiv, SyntaxKind, SyntaxNode};
 
 pub async fn folding_range(
     _client: &Client,
@@ -60,12 +61,16 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
                 heading_positions.push((level, start_offset));
             }
             SyntaxKind::CODE_BLOCK => {
-                if let Some(range) = extract_code_block_range(&node, content) {
+                if let Some(code_block) = CodeBlock::cast(node.clone())
+                    && let Some(range) = extract_code_block_range(&code_block, content)
+                {
                     ranges.push(range);
                 }
             }
             SyntaxKind::FENCED_DIV => {
-                if let Some(range) = extract_fenced_div_range(&node, content) {
+                if let Some(fenced_div) = FencedDiv::cast(node.clone())
+                    && let Some(range) = extract_fenced_div_range(&fenced_div, content)
+                {
                     ranges.push(range);
                 }
             }
@@ -114,9 +119,9 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
     ranges
 }
 
-fn extract_code_block_range(node: &SyntaxNode, content: &str) -> Option<FoldingRange> {
-    let start_offset: usize = node.text_range().start().into();
-    let end_offset: usize = node.text_range().end().into();
+fn extract_code_block_range(code_block: &CodeBlock, content: &str) -> Option<FoldingRange> {
+    let start_offset: usize = code_block.syntax().text_range().start().into();
+    let end_offset: usize = code_block.syntax().text_range().end().into();
 
     let start_pos = offset_to_position(content, start_offset);
     let end_pos = offset_to_position(content, end_offset.saturating_sub(1));
@@ -136,9 +141,9 @@ fn extract_code_block_range(node: &SyntaxNode, content: &str) -> Option<FoldingR
     }
 }
 
-fn extract_fenced_div_range(node: &SyntaxNode, content: &str) -> Option<FoldingRange> {
-    let start_offset: usize = node.text_range().start().into();
-    let end_offset: usize = node.text_range().end().into();
+fn extract_fenced_div_range(fenced_div: &FencedDiv, content: &str) -> Option<FoldingRange> {
+    let start_offset: usize = fenced_div.syntax().text_range().start().into();
+    let end_offset: usize = fenced_div.syntax().text_range().end().into();
 
     let start_pos = offset_to_position(content, start_offset);
     let end_pos = offset_to_position(content, end_offset.saturating_sub(1));

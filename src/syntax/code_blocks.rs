@@ -1,7 +1,9 @@
 //! Code block and chunk AST node wrappers.
 
 use super::ast::support;
-use super::{AstNode, ChunkOption, HashpipeYamlPreamble, PanacheLanguage, SyntaxKind, SyntaxNode};
+use super::{
+    AstNode, ChunkLabel, ChunkOption, HashpipeYamlPreamble, PanacheLanguage, SyntaxKind, SyntaxNode,
+};
 
 pub struct CodeBlock(SyntaxNode);
 
@@ -54,6 +56,72 @@ impl CodeBlock {
 
     pub fn hashpipe_yaml_preamble(&self) -> Option<HashpipeYamlPreamble> {
         self.0.descendants().find_map(HashpipeYamlPreamble::cast)
+    }
+
+    pub fn hashpipe_chunk_options(&self) -> Vec<ChunkOption> {
+        self.hashpipe_yaml_preamble()
+            .map(|preamble| {
+                preamble
+                    .syntax()
+                    .descendants()
+                    .filter_map(ChunkOption::cast)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn inline_chunk_options(&self) -> Vec<ChunkOption> {
+        self.info()
+            .map(|info| info.chunk_options().collect())
+            .unwrap_or_default()
+    }
+
+    pub fn chunk_options(&self) -> Vec<ChunkOption> {
+        let mut options = self.inline_chunk_options();
+        options.extend(self.hashpipe_chunk_options());
+        options
+    }
+
+    pub fn chunk_labels(&self) -> Vec<String> {
+        let mut labels = Vec::new();
+
+        if let Some(info) = self.info() {
+            for node in info.syntax().descendants() {
+                if let Some(chunk_label) = ChunkLabel::cast(node) {
+                    let text = chunk_label.text();
+                    if !text.is_empty() {
+                        labels.push(text);
+                    }
+                }
+            }
+        }
+
+        for option in self.chunk_options() {
+            let Some(key) = option.key() else {
+                continue;
+            };
+            if key.eq_ignore_ascii_case("label")
+                && let Some(value) = option.value()
+                && !value.is_empty()
+            {
+                labels.push(value);
+            }
+        }
+
+        labels
+    }
+
+    pub fn has_chunk_option_key_with_nonempty_value(&self, key_name: &str) -> bool {
+        self.chunk_options().into_iter().any(|option| {
+            option
+                .key()
+                .is_some_and(|key| key.eq_ignore_ascii_case(key_name))
+                && option.value().is_some_and(|value| !value.is_empty())
+        })
+    }
+
+    pub fn has_chunk_label(&self) -> bool {
+        !self.chunk_labels().is_empty()
     }
 }
 
@@ -183,5 +251,27 @@ mod tests {
             .expect("code block");
 
         assert!(block.hashpipe_yaml_preamble().is_some());
+    }
+
+    #[test]
+    fn code_block_collects_chunk_labels_and_options() {
+        let config = Config {
+            flavor: Flavor::Quarto,
+            ..Default::default()
+        };
+        let tree = parse(
+            "```{r chunk_inline, echo=FALSE}\n#| label: chunk_hashpipe\n#| fig-cap: \"Caption\"\n1 + 1\n```\n",
+            Some(config),
+        );
+        let block = tree
+            .descendants()
+            .find_map(CodeBlock::cast)
+            .expect("code block");
+
+        let labels = block.chunk_labels();
+        assert!(labels.iter().any(|label| label == "chunk_inline"));
+        assert!(labels.iter().any(|label| label == "chunk_hashpipe"));
+        assert!(block.has_chunk_label());
+        assert!(block.has_chunk_option_key_with_nonempty_value("fig-cap"));
     }
 }

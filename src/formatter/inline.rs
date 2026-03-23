@@ -1,7 +1,8 @@
 use crate::config::{Config, MathDelimiterStyle};
 use crate::formatter::shortcodes::format_shortcode;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{DisplayMath, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
+use rowan::ast::AstNode;
 
 fn expand_tabs_code_span(text: &str, tab_width: usize) -> String {
     let mut out = String::with_capacity(text.len());
@@ -307,23 +308,10 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
         SyntaxKind::DISPLAY_MATH => {
             // Display math: $$content$$ or \[content\] or \\[content\\]
             // Format on separate lines with proper normalization
-            let mut content = String::new();
-            let mut opening_marker = None;
-            let mut closing_marker = None;
-
-            for child in node.children_with_tokens() {
-                if let NodeOrToken::Token(tok) = child {
-                    if tok.kind() == SyntaxKind::DISPLAY_MATH_MARKER {
-                        if opening_marker.is_none() {
-                            opening_marker = Some(tok.text().to_string());
-                        } else {
-                            closing_marker = Some(tok.text().to_string());
-                        }
-                    } else if tok.kind() == SyntaxKind::TEXT {
-                        content.push_str(tok.text());
-                    }
-                }
-            }
+            let Some(display_math) = DisplayMath::cast(node.clone()) else {
+                return node.text().to_string();
+            };
+            let content = display_math.content();
 
             // Preserve malformed display math that contains unescaped single-dollar
             // delimiters inside content; normalizing it can cause cross-pass drift.
@@ -354,9 +342,15 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 return node.text().to_string();
             }
 
-            let opening = opening_marker.as_deref().unwrap_or("$$");
-            let closing = closing_marker.as_deref().unwrap_or("$$");
-            let is_environment = opening.starts_with("\\begin{") && closing.starts_with("\\end{");
+            let opening_value = display_math
+                .opening_marker()
+                .unwrap_or_else(|| "$$".to_string());
+            let closing_value = display_math
+                .closing_marker()
+                .unwrap_or_else(|| "$$".to_string());
+            let opening = opening_value.as_str();
+            let closing = closing_value.as_str();
+            let is_environment = display_math.is_environment_form();
 
             // Apply delimiter style preference
             let (open, close) = if is_environment {
