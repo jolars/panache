@@ -1,5 +1,12 @@
 ---
-title: Panache
+title: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
+description-meta: >-
+  Panache provides authoring tools for Pandoc, Quarto, and R Markdown: a
+  language server, formatter, and linter to help you write better documents,
+  more efficiently.
+title-prefix: ""
+image: images/og.png
+image-alt: "Panache logo"
 ---
 
 <img src="images/logo.svg" alt="Panache logo" class="float-end ms-5"
