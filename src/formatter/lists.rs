@@ -1,7 +1,7 @@
 use crate::config::WrapMode;
 use crate::formatter::indent_utils::{calculate_list_item_indent, is_alignable_marker};
 use crate::formatter::wrapping;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{BlockQuote, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
 use super::Formatter;
@@ -423,7 +423,7 @@ impl Formatter {
             node_words
         };
 
-        let in_blockquote = node.ancestors().any(|a| a.kind() == SyntaxKind::BLOCKQUOTE);
+        let in_blockquote = BlockQuote::contains_node(node);
         if in_blockquote {
             words.retain(|w| w.word != ">");
         }

@@ -2,7 +2,7 @@ use crate::config::{Config, WrapMode};
 use crate::directives::{DirectiveTracker, extract_directive_from_node};
 use crate::parser::blocks::headings::{try_parse_atx_heading, try_parse_setext_heading};
 use crate::parser::utils::attributes::parse_attribute_content;
-use crate::syntax::{DefinitionItem, SyntaxKind, SyntaxNode};
+use crate::syntax::{BlockQuote, DefinitionItem, DisplayMath, FencedDiv, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
 
@@ -882,14 +882,9 @@ impl Formatter {
             SyntaxKind::BLOCKQUOTE => {
                 log::trace!("Formatting blockquote");
                 // Determine nesting depth by counting ancestor BlockQuote nodes (including self)
-                let mut depth = 0usize;
-                let mut cur = Some(node.clone());
-                while let Some(n) = cur {
-                    if n.kind() == SyntaxKind::BLOCKQUOTE {
-                        depth += 1;
-                    }
-                    cur = n.parent();
-                }
+                let depth = BlockQuote::cast(node.clone())
+                    .map(|bq| bq.depth())
+                    .unwrap_or(1);
 
                 // Prefixes for quoted content and blank quoted lines
                 let base_indent = " ".repeat(indent);
@@ -1771,62 +1766,22 @@ impl Formatter {
             }
 
             SyntaxKind::FENCED_DIV => {
-                let has_close = node
-                    .children()
-                    .any(|child| child.kind() == SyntaxKind::DIV_FENCE_CLOSE);
-                let has_content = node.children().any(|child| {
-                    !matches!(
-                        child.kind(),
-                        SyntaxKind::DIV_FENCE_OPEN
-                            | SyntaxKind::DIV_INFO
-                            | SyntaxKind::DIV_FENCE_CLOSE
-                    )
-                });
+                let Some(fenced_div) = FencedDiv::cast(node.clone()) else {
+                    self.output.push_str(&node.text().to_string());
+                    return;
+                };
+
+                let has_close = fenced_div.has_closing_fence();
+                let has_content = fenced_div.body_blocks().next().is_some();
 
                 // Normalize fence lengths by nesting depth.
                 let colon_count = 3 + (self.fenced_div_depth * 2);
                 let colons = ":".repeat(colon_count);
 
-                let mut attributes = None;
-                let mut trailing_colons = None;
-                let mut saw_info = false;
-
-                for child in node.children() {
-                    match child.kind() {
-                        SyntaxKind::DIV_FENCE_OPEN => {
-                            // Extract attributes from DivInfo child node
-                            for fence_child in child.children_with_tokens() {
-                                match fence_child {
-                                    NodeOrToken::Node(node)
-                                        if node.kind() == SyntaxKind::DIV_INFO =>
-                                    {
-                                        attributes = Some(node.text().to_string());
-                                        saw_info = true;
-                                    }
-                                    NodeOrToken::Token(token)
-                                        if token.kind() == SyntaxKind::TEXT =>
-                                    {
-                                        let text = token.text().trim();
-                                        if saw_info
-                                            && !text.is_empty()
-                                            && text.chars().all(|c| c == ':')
-                                        {
-                                            trailing_colons = Some(text.to_string());
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-
-                        SyntaxKind::DIV_FENCE_CLOSE => {
-                            // Handled after content.
-                        }
-
-                        // Process any other child nodes (paragraphs, nested divs, etc.)
-                        _ => {}
-                    }
-                }
+                let attributes = fenced_div.info_text();
+                let trailing_colons = fenced_div
+                    .opening_fence()
+                    .and_then(|open| open.trailing_colons());
 
                 // Emit normalized opening fence
                 if !has_close && !has_content {
@@ -1919,30 +1874,23 @@ impl Formatter {
                 // Display math ($$...$$) - format on separate lines
                 // Even though it's parsed as inline, it should display as block-level
 
-                let mut math_content = None;
-                let mut opening_marker: Option<String> = None;
-                let mut closing_marker: Option<String> = None;
+                let Some(display_math) = DisplayMath::cast(node.clone()) else {
+                    self.output.push_str(&node.text().to_string());
+                    return;
+                };
 
-                for child in node.children_with_tokens() {
-                    if let rowan::NodeOrToken::Token(t) = child {
-                        if t.kind() == SyntaxKind::DISPLAY_MATH_MARKER {
-                            let marker_text = t.text().to_string();
-                            if opening_marker.is_none() {
-                                opening_marker = Some(marker_text);
-                            } else if closing_marker.is_none() {
-                                closing_marker = Some(marker_text);
-                            }
-                        } else if t.kind() == SyntaxKind::TEXT {
-                            math_content = Some(t.text().to_string());
-                        }
-                    }
-                }
+                let math_content = Some(display_math.content());
 
                 // Default to $$ if markers not found
-                let opening = opening_marker.as_deref().unwrap_or("$$");
-                let closing_from_tree = closing_marker.as_deref().unwrap_or("$$");
-                let is_environment =
-                    opening.starts_with("\\begin{") && closing_from_tree.starts_with("\\end{");
+                let opening_value = display_math
+                    .opening_marker()
+                    .unwrap_or_else(|| "$$".to_string());
+                let closing_value = display_math
+                    .closing_marker()
+                    .unwrap_or_else(|| "$$".to_string());
+                let opening = opening_value.as_str();
+                let closing_from_tree = closing_value.as_str();
+                let is_environment = display_math.is_environment_form();
 
                 // Apply delimiter style preference
                 use crate::config::MathDelimiterStyle;

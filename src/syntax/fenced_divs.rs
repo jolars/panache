@@ -49,6 +49,10 @@ impl FencedDiv {
             )
         })
     }
+
+    pub fn has_closing_fence(&self) -> bool {
+        self.closing_fence().is_some()
+    }
 }
 
 pub struct DivFenceOpen(SyntaxNode);
@@ -76,6 +80,25 @@ impl AstNode for DivFenceOpen {
 impl DivFenceOpen {
     pub fn info(&self) -> Option<DivInfo> {
         self.0.children().find_map(DivInfo::cast)
+    }
+
+    pub fn trailing_colons(&self) -> Option<String> {
+        let mut saw_info = false;
+        for child in self.0.children_with_tokens() {
+            match child {
+                rowan::NodeOrToken::Node(node) if node.kind() == SyntaxKind::DIV_INFO => {
+                    saw_info = true;
+                }
+                rowan::NodeOrToken::Token(token) if token.kind() == SyntaxKind::TEXT => {
+                    let text = token.text().trim();
+                    if saw_info && !text.is_empty() && text.chars().all(|c| c == ':') {
+                        return Some(text.to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
     }
 }
 
@@ -171,5 +194,15 @@ mod tests {
             .expect("div fence open");
         let info = open.info().expect("div info");
         assert_eq!(info.text(), "warning");
+    }
+
+    #[test]
+    fn fenced_div_open_trailing_colons() {
+        let tree = parse("::: note :::\nBody\n:::\n", None);
+        let open = tree
+            .descendants()
+            .find_map(DivFenceOpen::cast)
+            .expect("div fence open");
+        assert_eq!(open.trailing_colons().as_deref(), Some(":::"));
     }
 }

@@ -40,6 +40,20 @@ impl BlockQuote {
     pub fn nested_blockquotes(&self) -> AstChildren<BlockQuote> {
         support::children(&self.0)
     }
+
+    /// Returns true if the given node is inside any block quote.
+    pub fn contains_node(node: &SyntaxNode) -> bool {
+        node.ancestors()
+            .any(|ancestor| Self::can_cast(ancestor.kind()))
+    }
+
+    /// Returns nesting depth of this block quote (including self).
+    pub fn depth(&self) -> usize {
+        self.0
+            .ancestors()
+            .filter(|ancestor| Self::can_cast(ancestor.kind()))
+            .count()
+    }
 }
 
 #[cfg(test)]
@@ -71,5 +85,16 @@ mod tests {
             .expect("outer blockquote");
 
         assert!(outer.nested_blockquotes().next().is_some());
+        assert_eq!(outer.depth(), 1);
+    }
+
+    #[test]
+    fn blockquote_contains_node_detects_membership() {
+        let tree = parse("> quote\n", None);
+        let blockquote = tree
+            .descendants()
+            .find_map(BlockQuote::cast)
+            .expect("blockquote");
+        assert!(BlockQuote::contains_node(blockquote.syntax()));
     }
 }

@@ -57,6 +57,35 @@ impl DisplayMath {
         let closing = self.closing_marker().unwrap_or_default();
         opening.starts_with("\\begin{") && closing.starts_with("\\end{")
     }
+
+    pub fn has_unescaped_single_dollar_in_content(&self) -> bool {
+        let content = self.content();
+        let chars: Vec<char> = content.chars().collect();
+        let mut idx = 0usize;
+        let mut backslashes = 0usize;
+
+        while idx < chars.len() {
+            let ch = chars[idx];
+            if ch == '\\' {
+                backslashes += 1;
+                idx += 1;
+                continue;
+            }
+
+            let escaped = backslashes % 2 == 1;
+            backslashes = 0;
+            if ch == '$' && !escaped {
+                if idx + 1 < chars.len() && chars[idx + 1] == '$' {
+                    idx += 2;
+                    continue;
+                }
+                return true;
+            }
+            idx += 1;
+        }
+
+        false
+    }
 }
 
 #[cfg(test)]
@@ -89,5 +118,15 @@ mod tests {
         assert!(math.is_environment_form());
         assert_eq!(math.opening_marker().as_deref(), Some("\\begin{align}"));
         assert_eq!(math.closing_marker().as_deref(), Some("\\end{align}\n"));
+    }
+
+    #[test]
+    fn display_math_detects_unescaped_single_dollar() {
+        let tree = parse("$$\nalpha $beta$ gamma\n$$\n", None);
+        let math = tree
+            .descendants()
+            .find_map(DisplayMath::cast)
+            .expect("display math");
+        assert!(math.has_unescaped_single_dollar_in_content());
     }
 }
