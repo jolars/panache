@@ -70,6 +70,63 @@ impl AstNode for Plain {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct LineBlock(SyntaxNode);
+
+impl AstNode for LineBlock {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::LINE_BLOCK
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then(|| Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct LineBlockLine(SyntaxNode);
+
+impl AstNode for LineBlockLine {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::LINE_BLOCK_LINE
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then(|| Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PandocTitleBlock(SyntaxNode);
+
+impl AstNode for PandocTitleBlock {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::PANDOC_TITLE_BLOCK
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then(|| Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

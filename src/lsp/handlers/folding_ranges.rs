@@ -45,7 +45,6 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
     let heading_levels: std::collections::HashMap<rowan::TextRange, usize> =
         symbol_index.heading_sequence().iter().copied().collect();
 
-    // Root is now DOCUMENT node directly
     let Some(document) = Document::cast(root.clone()) else {
         return ranges;
     };

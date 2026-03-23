@@ -45,7 +45,6 @@ pub fn find_all(node: &SyntaxNode, kind: SyntaxKind) -> Vec<SyntaxNode> {
 }
 
 pub fn get_blocks(node: &SyntaxNode) -> Vec<SyntaxNode> {
-    // Root is now DOCUMENT directly
     if node.kind() == SyntaxKind::DOCUMENT {
         node.children().collect()
     } else {

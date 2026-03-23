@@ -60,7 +60,6 @@ mod tests {
         let input = "# Hello World\n\nParagraph.";
         let tree = parse(input, Some(Config::default()));
 
-        // Find heading using typed wrapper (root is now DOCUMENT directly)
         let heading = tree
             .children()
             .find_map(Heading::cast)

@@ -1,7 +1,8 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Edit, Fix, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{Heading, SyntaxNode};
+use rowan::ast::AstNode;
 
 pub struct HeadingHierarchyRule;
 
@@ -66,28 +67,24 @@ fn collect_headings(tree: &SyntaxNode) -> Vec<(rowan::TextRange, usize)> {
 }
 
 fn heading_node_at_range(tree: &SyntaxNode, range: rowan::TextRange) -> Option<SyntaxNode> {
-    tree.descendants()
-        .find(|node| node.kind() == SyntaxKind::HEADING && node.text_range() == range)
+    tree.descendants().find_map(|node| {
+        let heading = Heading::cast(node)?;
+        (heading.syntax().text_range() == range).then(|| heading.syntax().clone())
+    })
 }
 
 fn create_fix(heading: &SyntaxNode, current_level: usize, expected_level: usize) -> Fix {
-    // Find the AtxHeadingMarker node, then get its first token child
-    for child in heading.children() {
-        if child.kind() == SyntaxKind::ATX_HEADING_MARKER {
-            // The marker node contains a token with the actual ### text
-            if let Some(token) = child.first_token() {
-                let range = token.text_range();
-                let replacement = "#".repeat(expected_level);
-
-                return Fix {
-                    message: format!(
-                        "Change heading level from {} to {}",
-                        current_level, expected_level
-                    ),
-                    edits: vec![Edit { range, replacement }],
-                };
-            }
-        }
+    if let Some(heading) = Heading::cast(heading.clone())
+        && let Some(range) = heading.atx_marker_range()
+    {
+        let replacement = "#".repeat(expected_level);
+        return Fix {
+            message: format!(
+                "Change heading level from {} to {}",
+                current_level, expected_level
+            ),
+            edits: vec![Edit { range, replacement }],
+        };
     }
 
     Fix {

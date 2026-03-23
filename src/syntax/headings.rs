@@ -64,6 +64,18 @@ impl Heading {
     pub fn text(&self) -> String {
         self.content().map(|c| c.text()).unwrap_or_default()
     }
+
+    /// Returns the text range of the ATX marker token (e.g. `###`), if this is an ATX heading.
+    pub fn atx_marker_range(&self) -> Option<rowan::TextRange> {
+        self.0
+            .children()
+            .find(|child| child.kind() == SyntaxKind::ATX_HEADING_MARKER)
+            .and_then(|marker_node| {
+                marker_node
+                    .children_with_tokens()
+                    .find_map(|el| el.as_token().map(|token| token.text_range()))
+            })
+    }
 }
 
 pub struct HeadingContent(SyntaxNode);
