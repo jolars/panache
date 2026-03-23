@@ -5,7 +5,7 @@ This document tracks implementation status for Panache's features.
 ## Language Server
 
 - [x] Incremental parsing and caching for LSP performance
-- [ ] Optimize incremental edit handling to avoid full-document reparses for
+- [x] Optimize incremental edit handling to avoid full-document reparses for
       multi-change or complex `didChange` updates.
 
 ### Performance
