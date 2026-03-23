@@ -10,7 +10,7 @@ use tower_lsp_server::ls_types::*;
 use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
 use crate::lsp::helpers::get_document_content_and_tree;
-use crate::syntax::{CodeBlock, FencedDiv, SyntaxKind, SyntaxNode};
+use crate::syntax::{CodeBlock, Document, FencedDiv, SyntaxKind, SyntaxNode, YamlMetadata};
 
 pub async fn folding_range(
     _client: &Client,
@@ -46,14 +46,14 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
         symbol_index.heading_sequence().iter().copied().collect();
 
     // Root is now DOCUMENT node directly
-    if root.kind() != SyntaxKind::DOCUMENT {
+    let Some(document) = Document::cast(root.clone()) else {
         return ranges;
-    }
+    };
 
     // Track heading positions for folding sections
     let mut heading_positions: Vec<(usize, usize)> = Vec::new();
 
-    for node in root.children() {
+    for node in document.blocks() {
         match node.kind() {
             SyntaxKind::HEADING => {
                 let level = heading_levels.get(&node.text_range()).copied().unwrap_or(1);
@@ -75,7 +75,11 @@ fn build_folding_ranges(root: &SyntaxNode, content: &str) -> Vec<FoldingRange> {
                 }
             }
             SyntaxKind::YAML_METADATA => {
-                if let Some(range) = extract_yaml_metadata_range(&node, content) {
+                if let Some(metadata) = YamlMetadata::cast(node.clone())
+                    && let Some(range) = extract_yaml_metadata_range(metadata.syntax(), content)
+                {
+                    ranges.push(range);
+                } else if let Some(range) = extract_yaml_metadata_range(&node, content) {
                     ranges.push(range);
                 }
             }

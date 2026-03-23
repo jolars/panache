@@ -11,8 +11,8 @@ use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
 use crate::lsp::helpers::get_document_content_and_tree;
 use crate::syntax::{
-    AstNode, GridTable, Heading, ImageLink, MultilineTable, PipeTable, SimpleTable, SyntaxKind,
-    SyntaxNode,
+    AstNode, Document, GridTable, Heading, ImageLink, MultilineTable, Paragraph, PipeTable,
+    SimpleTable, SyntaxKind, SyntaxNode,
 };
 
 pub async fn document_symbol(
@@ -69,15 +69,15 @@ fn build_document_symbols(
     log::debug!("build_document_symbols: root kind = {:?}", root.kind());
 
     // Root is now DOCUMENT node directly
-    if root.kind() != SyntaxKind::DOCUMENT {
+    let Some(document) = Document::cast(root.clone()) else {
         log::warn!("Root is not a DOCUMENT node: {:?}", root.kind());
         return symbols;
-    }
+    };
     symbols.extend(
         yaml_frontmatter_region.and_then(|region| extract_yaml_region_symbol(region, content)),
     );
 
-    for node in root.children() {
+    for node in document.blocks() {
         match node.kind() {
             SyntaxKind::HEADING => {
                 if let Some(symbol) = extract_heading_symbol(&node, content) {
@@ -133,15 +133,28 @@ fn build_document_symbols(
             SyntaxKind::PARAGRAPH => {
                 // Check if paragraph contains an ImageLink (figure)
                 // This handles the old case where images were in paragraphs
-                for child in node.children() {
-                    if child.kind() == SyntaxKind::IMAGE_LINK
-                        && let Some(symbol) = extract_figure_symbol(&child, content)
-                    {
-                        // Add to current heading section or root
-                        if let Some((_, heading)) = heading_stack.last_mut() {
-                            heading.children.get_or_insert_with(Vec::new).push(symbol);
-                        } else {
-                            symbols.push(symbol);
+                if let Some(paragraph) = Paragraph::cast(node.clone()) {
+                    for image in paragraph.image_links() {
+                        if let Some(symbol) = extract_figure_symbol(image.syntax(), content) {
+                            // Add to current heading section or root
+                            if let Some((_, heading)) = heading_stack.last_mut() {
+                                heading.children.get_or_insert_with(Vec::new).push(symbol);
+                            } else {
+                                symbols.push(symbol);
+                            }
+                        }
+                    }
+                } else {
+                    for child in node.children() {
+                        if child.kind() == SyntaxKind::IMAGE_LINK
+                            && let Some(symbol) = extract_figure_symbol(&child, content)
+                        {
+                            // Add to current heading section or root
+                            if let Some((_, heading)) = heading_stack.last_mut() {
+                                heading.children.get_or_insert_with(Vec::new).push(symbol);
+                            } else {
+                                symbols.push(symbol);
+                            }
                         }
                     }
                 }
