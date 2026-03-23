@@ -1,6 +1,5 @@
 ---
 title: Panache
-image: images/logo.svg
 ---
 
 <img src="images/logo.svg" alt="Panache logo" class="float-end ms-5"

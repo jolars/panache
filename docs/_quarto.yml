@@ -5,14 +5,15 @@ project:
     port: 4200
 
 website:
-  title: "Panache"
-  description: "A language server, code formatter, and linter for Pandoc, Quarto, and R Markdown."
+  title: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
+  description:
+    "Panache provides authoring tools for Pandoc, Quarto, and R Markdown:
+    a language server, formatter, and linter to help you write better documents,
+    more efficiently."
 
   site-url: "https://panache.bz"
   repo-url: "https://github.com/jolars/panache"
   issue-url: "https://github.com/jolars/panache/issues"
-
-  llms-txt: true
 
   repo-actions: [edit, issue]
 
@@ -25,7 +26,6 @@ website:
 
   open-graph:
     locale: en_US
-    image: images/og.png
 
   page-footer:
     left: "panache v{{< meta version >}} | Copyright 2026, Johan Larsson"
