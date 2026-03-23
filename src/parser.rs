@@ -378,4 +378,82 @@ mod tests {
             "section reparse should stop before EOF"
         );
     }
+
+    #[test]
+    fn incremental_does_not_use_section_window_without_next_heading() {
+        let input = "# Intro\n\nalpha\n\nbeta section\n";
+        let old_tree = parse(input, None);
+        let start = input.find("beta").expect("beta in test input");
+        let old_edit = (start, start + 4);
+        let updated = apply_edit(input, old_edit, "BETA");
+        let new_edit = (start, start + 4);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert_eq!(
+            inc.reparse_range.1,
+            updated.len(),
+            "fallback path should reparse to EOF"
+        );
+    }
+
+    #[test]
+    fn incremental_does_not_use_section_window_when_edit_touches_heading() {
+        let input = "# Intro\n\nalpha\n\n# Middle\n\nbeta\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let middle_start = input
+            .find("# Middle")
+            .expect("middle heading in test input");
+        let old_edit = (middle_start, middle_start + 1);
+        let updated = apply_edit(input, old_edit, "#");
+        let new_edit = (middle_start, middle_start + 1);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert_eq!(
+            inc.reparse_range.1,
+            updated.len(),
+            "edits on headings should avoid section-window reparsing"
+        );
+    }
+
+    #[test]
+    fn incremental_does_not_use_section_window_when_edit_crosses_next_heading() {
+        let input = "# Intro\n\nalpha\n\n# Middle\n\nbeta\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let beta_start = input.find("beta").expect("beta in test input");
+        let end_start = input.find("# End").expect("end heading in test input");
+        let old_edit = (beta_start, end_start + 2);
+        let updated = apply_edit(input, old_edit, "beta\n\n# ");
+        let new_edit = (beta_start, beta_start + 8);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert_eq!(
+            inc.reparse_range.1,
+            updated.len(),
+            "cross-heading edits should avoid section-window reparsing"
+        );
+    }
+
+    #[test]
+    fn incremental_ignores_nested_headings_for_window_boundaries() {
+        let input = "# Intro\n\n> ## Nested\n> quote body\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let quote_start = input.find("quote body").expect("quote body in test input");
+        let old_edit = (quote_start, quote_start + 5);
+        let updated = apply_edit(input, old_edit, "QUOTE");
+        let new_edit = (quote_start, quote_start + 5);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert!(
+            inc.reparse_range.1 < updated.len(),
+            "window boundary should be the next top-level heading, not nested heading"
+        );
+    }
 }
