@@ -25,7 +25,7 @@ Then install the hooks:
 pre-commit install
 ```
 
-panache provides two hook IDs:
+Panache provides two hook IDs:
 
 `panache-format`
 :   Automatically formats files according to panache's formatting rules
