@@ -19,11 +19,10 @@ website:
 
   search: true
 
-  # favicon: images/logo.svg
-  twitter-card: true
-
   image: images/og.png
   image-alt: "Panache logo"
+
+  twitter-card: true
 
   open-graph:
     locale: en_US
