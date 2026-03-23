@@ -4,6 +4,7 @@
 //! allowing us to determine tight vs loose lists and parse inline elements correctly.
 
 use crate::config::Config;
+use crate::parser::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
 use crate::parser::utils::inline_emission;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
@@ -92,6 +93,23 @@ impl ListItemBuffer {
             return;
         }
 
+        // Get text and parse inline elements
+        let text = self.get_text_for_parsing();
+
+        if !text.is_empty() {
+            let line_without_newline = text
+                .strip_suffix("\r\n")
+                .or_else(|| text.strip_suffix('\n'));
+            if let Some(line) = line_without_newline
+                && !line.contains('\n')
+                && !line.contains('\r')
+                && let Some(level) = try_parse_atx_heading(line)
+            {
+                emit_atx_heading(builder, &text, level, config);
+                return;
+            }
+        }
+
         let block_kind = if use_paragraph {
             SyntaxKind::PARAGRAPH
         } else {
@@ -99,9 +117,6 @@ impl ListItemBuffer {
         };
 
         builder.start_node(block_kind.into());
-
-        // Get text and parse inline elements
-        let text = self.get_text_for_parsing();
 
         if !text.is_empty() {
             inline_emission::emit_inlines(builder, &text, config);

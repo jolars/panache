@@ -60,6 +60,27 @@ fn bullet_list_lazy_continuation() {
 }
 
 #[test]
+fn list_item_can_start_with_atx_heading() {
+    let input = "- # Heading\n";
+    let tree = parse_blocks(input);
+
+    let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
+    let list_item = list
+        .children()
+        .find(|n| n.kind() == SyntaxKind::LIST_ITEM)
+        .expect("should find list item");
+
+    assert!(
+        find_first(&list_item, SyntaxKind::HEADING).is_some(),
+        "list item should contain HEADING"
+    );
+    assert!(
+        find_first(&list_item, SyntaxKind::PLAIN).is_none(),
+        "heading-only list item should not be parsed as PLAIN"
+    );
+}
+
+#[test]
 fn nested_bullet_lists() {
     let input = "* fruits\n  + apples\n  + pears\n* vegetables\n";
     let tree = parse_blocks(input);
