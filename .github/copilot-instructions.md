@@ -367,9 +367,6 @@ Instead of listing every file, understand the patterns:
 ## External Resources
 
 - **Pandoc spec**: `assets/pandoc-spec.md` and `assets/pandoc-spec/`
-- **Pandoc repo submodule**: the entire Pandoc repository is added as a
-  submodule at `pandoc/`. Most of the relevant syntax parsing reference files
-  are in `pandoc/src/Text/Pandoc/Readers/Markdown.hs`.
 - **Documentation site**: `docs/` (Quarto-based, published to GitHub Pages)
 - **Playground**: `docs/playground/` (WASM-based web interface)
 - **WASM crate**: `crates/panache-wasm/` for browser integration
