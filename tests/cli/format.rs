@@ -223,6 +223,19 @@ fn test_format_unsupported_extension() {
 }
 
 #[test]
+fn test_format_directory_with_no_supported_files_is_noop() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("note.txt");
+    fs::write(&test_file, "content\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", temp_dir.path().to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No supported files found"));
+}
+
+#[test]
 fn test_format_missing_file() {
     cargo_bin_cmd!("panache")
         .args(["format", "/nonexistent/file.qmd"])

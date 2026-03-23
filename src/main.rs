@@ -241,6 +241,10 @@ fn start_dir_for(input_path: Option<&Path>) -> io::Result<PathBuf> {
     }
 }
 
+fn has_explicit_file_targets(paths: &[PathBuf]) -> bool {
+    paths.iter().any(|path| path.is_file())
+}
+
 fn path_matching_root(
     explicit_config: Option<&Path>,
     discovered_config: Option<&Path>,
@@ -640,8 +644,12 @@ fn main() -> io::Result<()> {
                 if force_exclude {
                     return Ok(());
                 }
-                eprintln!("Error: No supported files found");
-                std::process::exit(1);
+                if has_explicit_file_targets(&files) {
+                    eprintln!("Error: No supported files found");
+                    std::process::exit(1);
+                }
+                println!("No supported files found");
+                return Ok(());
             }
 
             // Handle file(s) case
@@ -759,8 +767,25 @@ fn main() -> io::Result<()> {
                 };
 
                 if !use_stdin && targets.is_empty() {
-                    eprintln!("Error: No supported files found");
-                    std::process::exit(1);
+                    if has_explicit_file_targets(&files) {
+                        eprintln!("Error: No supported files found");
+                        std::process::exit(1);
+                    }
+                    if json {
+                        let output = json!({
+                            "checks": format!("{:?}", checks).to_lowercase(),
+                            "files_checked": 0,
+                            "failure_count": 0,
+                            "failures": Vec::<serde_json::Value>::new(),
+                        });
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&output).map_err(io::Error::other)?
+                        );
+                    } else {
+                        println!("No supported files found");
+                    }
+                    return Ok(());
                 }
 
                 let mut files_checked = 0usize;
@@ -976,8 +1001,12 @@ fn main() -> io::Result<()> {
                 if force_exclude {
                     return Ok(());
                 }
-                eprintln!("Error: No supported files found");
-                std::process::exit(1);
+                if has_explicit_file_targets(&files) {
+                    eprintln!("Error: No supported files found");
+                    std::process::exit(1);
+                }
+                println!("No supported files found");
+                return Ok(());
             }
 
             // Lint files

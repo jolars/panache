@@ -121,6 +121,19 @@ fn test_lint_directory() {
 }
 
 #[test]
+fn test_lint_directory_with_no_supported_files_is_noop() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("note.txt");
+    fs::write(&test_file, "content\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", temp_dir.path().to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No supported files found"));
+}
+
+#[test]
 fn test_lint_directory_respects_exclude_config() {
     let temp_dir = TempDir::new().unwrap();
     let config = temp_dir.path().join(".panache.toml");

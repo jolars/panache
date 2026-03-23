@@ -67,6 +67,38 @@ include = ["*.qmd"]
 }
 
 #[test]
+fn test_debug_format_directory_with_no_supported_files_is_noop() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_txt = temp_dir.path().join("ignore.txt");
+    fs::write(&file_txt, "not markdown\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["debug", "format", temp_dir.path().to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No supported files found"));
+}
+
+#[test]
+fn test_debug_format_json_directory_with_no_supported_files_reports_zero_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_txt = temp_dir.path().join("ignore.txt");
+    fs::write(&file_txt, "not markdown\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "debug",
+            "format",
+            "--json",
+            temp_dir.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"files_checked\": 0"))
+        .stdout(predicate::str::contains("\"failure_count\": 0"));
+}
+
+#[test]
 fn test_debug_format_dump_passes_requires_dump_dir() {
     cargo_bin_cmd!("panache")
         .args(["debug", "format", "--dump-passes"])
