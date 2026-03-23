@@ -236,9 +236,7 @@ impl Formatter {
         let text = node.text().to_string();
         let mut lines = text.lines();
         let first_line = lines.next()?.trim_start_matches([' ', '\t']);
-        if try_parse_atx_heading(first_line).is_none() {
-            return None;
-        }
+        try_parse_atx_heading(first_line)?;
 
         let remainder = lines
             .flat_map(str::split_whitespace)
@@ -259,6 +257,42 @@ impl Formatter {
             WrapMode::Preserve => vec![text.to_string()],
             WrapMode::Reflow | WrapMode::Sentence => wrapping::wrap_text_first_fit(text, width),
         }
+    }
+
+    fn definition_item_is_compact(&self, node: &SyntaxNode) -> bool {
+        if node.kind() != SyntaxKind::DEFINITION_ITEM {
+            return true;
+        }
+
+        let definitions: Vec<_> = node
+            .children()
+            .filter(|child| child.kind() == SyntaxKind::DEFINITION)
+            .collect();
+
+        if definitions.is_empty() {
+            return true;
+        }
+
+        definitions.iter().all(|definition| {
+            let blocks: Vec<_> = definition
+                .children()
+                .filter(|child| child.kind() != SyntaxKind::BLANK_LINE)
+                .collect();
+
+            if blocks.len() != 1 {
+                return false;
+            }
+
+            match blocks[0].kind() {
+                SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH => self
+                    .leading_atx_heading_with_remainder(&blocks[0])
+                    .is_none(),
+                // Keep single code-block definitions compact to avoid ambiguous
+                // caption-like forms before following tables.
+                SyntaxKind::CODE_BLOCK => true,
+                _ => false,
+            }
+        })
     }
 
     fn paragraph_starts_with_setext_heading_candidate(&self, node: &SyntaxNode) -> bool {
@@ -631,13 +665,19 @@ impl Formatter {
                 let child_indent = indent + 4;
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
                 let mut first = true;
-                let mut prev_was_code_or_list = false;
+                let mut pending_blank_lines = 0usize;
 
                 for child in &child_blocks {
-                    // Add blank line between blocks (except after BlankLine or at start)
-                    if !first && prev_was_code_or_list && child.kind() != SyntaxKind::BLANK_LINE {
+                    if child.kind() == SyntaxKind::BLANK_LINE {
+                        pending_blank_lines = pending_blank_lines.saturating_add(1);
+                        continue;
+                    }
+
+                    // Emit exactly one normalized blank line between child blocks.
+                    if !first && !self.output.ends_with("\n\n") {
                         self.output.push('\n');
                     }
+                    pending_blank_lines = 0;
 
                     if first {
                         first = false;
@@ -677,8 +717,6 @@ impl Formatter {
                                 continue;
                             }
                         }
-                        // Multi-line or non-paragraph first block - indent on next line
-                        self.output.push('\n');
                     }
 
                     // Format blocks with indentation
@@ -783,10 +821,6 @@ impl Formatter {
                             self.output.push_str(&formatted);
                         }
                     }
-
-                    // Track if this was a code block or list for spacing
-                    prev_was_code_or_list =
-                        matches!(child.kind(), SyntaxKind::CODE_BLOCK | SyntaxKind::LIST);
                 }
 
                 // If no child blocks, just end with newline
@@ -1355,9 +1389,16 @@ impl Formatter {
                 if indent == 0 && !self.output.is_empty() && !self.output.ends_with("\n\n") {
                     self.output.push('\n');
                 }
+                let mut saw_item = false;
                 for child in node.children() {
                     if child.kind() == SyntaxKind::BLANK_LINE {
                         continue;
+                    }
+                    if child.kind() == SyntaxKind::DEFINITION_ITEM {
+                        if saw_item && !self.output.ends_with("\n\n") {
+                            self.output.push('\n');
+                        }
+                        saw_item = true;
                     }
                     self.format_node_sync(&child, indent);
                 }
@@ -1417,18 +1458,34 @@ impl Formatter {
             }
 
             SyntaxKind::DEFINITION_ITEM => {
-                // Preserve compact vs loose definition lists based on BlankLine nodes.
-                let mut saw_term_blank = false;
+                let is_compact = self.definition_item_is_compact(node);
+                let mut saw_term = false;
+
                 for child in node.children() {
-                    if child.kind() == SyntaxKind::BLANK_LINE {
-                        saw_term_blank = true;
-                    } else if child.kind() == SyntaxKind::DEFINITION && saw_term_blank {
-                        if !self.output.ends_with("\n\n") {
-                            self.output.push('\n');
+                    match child.kind() {
+                        SyntaxKind::BLANK_LINE => {
+                            // Ignore source blank lines and normalize based on AST structure.
                         }
-                        saw_term_blank = false;
+                        SyntaxKind::TERM => {
+                            self.format_node_sync(&child, indent);
+                            saw_term = true;
+                        }
+                        SyntaxKind::DEFINITION => {
+                            if saw_term {
+                                if is_compact {
+                                    if !self.output.ends_with('\n') {
+                                        self.output.push('\n');
+                                    }
+                                } else if !self.output.ends_with("\n\n") {
+                                    self.output.push('\n');
+                                }
+                            } else if !self.output.is_empty() && !self.output.ends_with('\n') {
+                                self.output.push('\n');
+                            }
+                            self.format_node_sync(&child, indent);
+                        }
+                        _ => self.format_node_sync(&child, indent),
                     }
-                    self.format_node_sync(&child, indent);
                 }
             }
 

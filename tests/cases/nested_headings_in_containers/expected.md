@@ -7,6 +7,7 @@
 > Text
 
 Term
+
 :   # Heading
 
     Some text

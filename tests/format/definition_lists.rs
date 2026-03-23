@@ -95,5 +95,5 @@ fn definition_list_blankline_continuation_is_dynamic_in_latest_pandoc_compat() {
     };
 
     let output = format(input, Some(cfg), None);
-    assert_eq!(output, "apple\n:   pomaceous\n\n    fruit\n");
+    assert_eq!(output, "apple\n\n:   pomaceous\n\n    fruit\n");
 }

@@ -396,7 +396,7 @@ impl Formatter {
 
         let mut words = if let Some(ref content) = content_node {
             // Extract words from Plain/PARAGRAPH child (postprocessor wraps all content in one node)
-            wrapping::build_words(&self.config, &content, &|n| self.format_inline_node(n))
+            wrapping::build_words(&self.config, content, &|n| self.format_inline_node(n))
         } else {
             // Backwards compatibility: scan entire ListItem and remove marker/checkbox
             let mut node_words =

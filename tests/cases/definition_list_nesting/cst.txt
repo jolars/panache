@@ -1,5 +1,5 @@
 DOCUMENT@0..499
-  DEFINITION_LIST@0..115
+  DEFINITION_LIST@0..499
     DEFINITION_ITEM@0..115
       TERM@0..5
         TEXT@0..4 "Term"
@@ -51,9 +51,8 @@ DOCUMENT@0..499
             PLAIN@100..115
               TEXT@100..114 "Another bullet"
               NEWLINE@114..115 "\n"
-  BLANK_LINE@115..116
-    BLANK_LINE@115..116 "\n"
-  DEFINITION_LIST@116..225
+    BLANK_LINE@115..116
+      BLANK_LINE@115..116 "\n"
     DEFINITION_ITEM@116..225
       TERM@116..180
         TEXT@116..179 "Indented with 2 space ..."
@@ -80,9 +79,8 @@ DOCUMENT@0..499
           CODE_FENCE_CLOSE@221..225
             CODE_FENCE_MARKER@221..224 "```"
             NEWLINE@224..225 "\n"
-  BLANK_LINE@225..226
-    BLANK_LINE@225..226 "\n"
-  DEFINITION_LIST@226..343
+    BLANK_LINE@225..226
+      BLANK_LINE@225..226 "\n"
     DEFINITION_ITEM@226..343
       TERM@226..290
         TEXT@226..289 "Indented with 4 space ..."
@@ -109,9 +107,8 @@ DOCUMENT@0..499
           CODE_FENCE_CLOSE@339..343
             CODE_FENCE_MARKER@339..342 "```"
             NEWLINE@342..343 "\n"
-  BLANK_LINE@343..344
-    BLANK_LINE@343..344 "\n"
-  DEFINITION_LIST@344..450
+    BLANK_LINE@343..344
+      BLANK_LINE@343..344 "\n"
     DEFINITION_ITEM@344..450
       TERM@344..412
         TEXT@344..411 "Indented with tabs, s ..."
@@ -138,9 +135,8 @@ DOCUMENT@0..499
           CODE_FENCE_CLOSE@446..450
             CODE_FENCE_MARKER@446..449 "```"
             NEWLINE@449..450 "\n"
-  BLANK_LINE@450..451
-    BLANK_LINE@450..451 "\n"
-  DEFINITION_LIST@451..499
+    BLANK_LINE@450..451
+      BLANK_LINE@450..451 "\n"
     DEFINITION_ITEM@451..499
       TERM@451..457
         TEXT@451..456 "Input"

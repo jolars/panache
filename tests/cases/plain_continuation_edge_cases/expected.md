@@ -12,6 +12,7 @@ Term 2
 ## Definition with Blank Lines
 
 Term with blank
+
 :   Definition starts here
 
     Continues after blank line with more content.
@@ -19,6 +20,7 @@ Term with blank
 ## Definition Followed by Nested List
 
 Term before list
+
 :   Definition content here continues on next line
 
     - Nested list inside definition
@@ -47,13 +49,10 @@ Lazy term
 
 Shared term
 :   First definition continues here
-
 :   Second definition also continues
 
 Shared loose term
-
 :   First definition continues here
-
 :   Second definition also continues
 
 ## End with Definition

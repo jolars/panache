@@ -8,7 +8,7 @@ DOCUMENT@0..110
     NEWLINE@18..20 "\r\n"
   BLANK_LINE@20..22
     BLANK_LINE@20..22 "\r\n"
-  DEFINITION_LIST@22..50
+  DEFINITION_LIST@22..78
     DEFINITION_ITEM@22..50
       TERM@22..30
         TEXT@22..28 "Term 1"
@@ -21,9 +21,8 @@ DOCUMENT@0..110
         PLAIN@36..50
           TEXT@36..48 "Definition 1"
           NEWLINE@48..50 "\r\n"
-  BLANK_LINE@50..52
-    BLANK_LINE@50..52 "\r\n"
-  DEFINITION_LIST@52..78
+    BLANK_LINE@50..52
+      BLANK_LINE@50..52 "\r\n"
     DEFINITION_ITEM@52..78
       TERM@52..60
         TEXT@52..58 "Term 2"

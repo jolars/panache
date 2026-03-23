@@ -32,7 +32,6 @@ GraphQL
 Loose format (blank line before definition):
 
 Term Loose 1
-
 :   Definition 1
 
 Term Loose 2
