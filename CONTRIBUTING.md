@@ -33,8 +33,6 @@ cargo check && cargo test && cargo clippy --all-targets --all-features -- -D war
 - Keep formatting policy in formatter code, not parser code.
 - Prefer existing parser/formatter helpers over introducing parallel logic
   paths.
-- For known CST-shape follow-ups around image reference wrappers, see
-  `src/syntax/IMAGE_REFERENCE_CST.md`.
 - Use debug checks when validating formatting behavior:
   - `cargo run -- debug format --checks all document.qmd` (idempotency +
     losslessness)
@@ -53,8 +51,6 @@ cargo check && cargo test && cargo clippy --all-targets --all-features -- -D war
   (`didOpen`/`didChange`/`didClose`).
 - Be careful with UTF-16/UTF-8 position/range conversions.
 - Prefer typed syntax wrappers for feature implementations when available.
-- Follow the async/CST safety pattern in `src/lsp/ASYNC_SAFETY.md` (fetch async
-  state first, then traverse CST without awaits).
 - Run targeted LSP tests before full-suite revalidation.
 
 ## Debugging LSP (VS Code + Neovim)
