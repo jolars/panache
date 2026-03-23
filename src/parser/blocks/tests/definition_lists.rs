@@ -27,6 +27,27 @@ fn definition_list_plain_does_not_start_list_without_blank_line() {
 }
 
 #[test]
+fn definition_list_content_starting_with_list_marker_parses_as_list() {
+    let input = "Term\n:   - One\n    - Two\n";
+    let tree = parse_blocks(input);
+
+    let definition = find_first(&tree, SyntaxKind::DEFINITION).expect("should find definition");
+
+    assert!(
+        find_first(&definition, SyntaxKind::LIST).is_some(),
+        "definition should contain LIST when content starts with list marker"
+    );
+
+    let has_direct_plain_child = definition
+        .children()
+        .any(|child| child.kind() == SyntaxKind::PLAIN);
+    assert!(
+        !has_direct_plain_child,
+        "list-only definition should not have a direct PLAIN child"
+    );
+}
+
+#[test]
 fn definition_marker_without_content_preserves_newline_losslessly() {
     let input = "Input\n:   \n\n````markdown\n";
     let tree = parse_blocks(input);

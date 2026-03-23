@@ -646,6 +646,7 @@ impl<'a> Parser<'a> {
                 let content_start_bytes = indent_bytes + 1 + *spaces_after;
                 let after_marker_and_spaces = content.get(content_start_bytes..).unwrap_or("");
                 let mut plain_buffer = TextBuffer::new();
+                let mut definition_pushed = false;
 
                 if *has_content {
                     let current_line = self.lines[self.pos];
@@ -653,8 +654,82 @@ impl<'a> Parser<'a> {
 
                     let content_start = content_start_bytes.min(trimmed_line.len());
                     let content_slice = &trimmed_line[content_start..];
+                    let content_line = &current_line[content_start_bytes.min(current_line.len())..];
 
-                    if let Some(fence) = code_blocks::try_parse_fence_open(content_slice) {
+                    let should_start_list_from_first_line = self
+                        .lines
+                        .get(self.pos + 1)
+                        .map(|next_line| {
+                            let (next_without_newline, _) = strip_newline(next_line);
+                            if next_without_newline.trim().is_empty() {
+                                return false;
+                            }
+
+                            let (next_indent_cols, _) = leading_indent(next_without_newline);
+                            if next_indent_cols < content_col {
+                                return false;
+                            }
+
+                            let next_content_start =
+                                byte_index_at_column(next_without_newline, content_col);
+                            let next_content = &next_without_newline[next_content_start..];
+                            try_parse_list_marker(next_content, self.config).is_some()
+                        })
+                        .unwrap_or(false);
+
+                    if let Some(marker_match) = try_parse_list_marker(content_slice, self.config)
+                        && should_start_list_from_first_line
+                    {
+                        self.containers.push(Container::Definition {
+                            content_col,
+                            plain_open: false,
+                            plain_buffer: TextBuffer::new(),
+                        });
+                        definition_pushed = true;
+
+                        let (indent_cols, indent_bytes) = leading_indent(content_line);
+                        self.builder.start_node(SyntaxKind::LIST.into());
+                        self.containers.push(Container::List {
+                            marker: marker_match.marker.clone(),
+                            base_indent_cols: indent_cols,
+                            has_blank_between_items: false,
+                        });
+
+                        let list_item = ListItemEmissionInput {
+                            content: content_line,
+                            marker_len: marker_match.marker_len,
+                            spaces_after_cols: marker_match.spaces_after_cols,
+                            spaces_after_bytes: marker_match.spaces_after_bytes,
+                            indent_cols,
+                            indent_bytes,
+                        };
+
+                        if let Some(nested_marker) = is_content_nested_bullet_marker(
+                            content_line,
+                            marker_match.marker_len,
+                            marker_match.spaces_after_bytes,
+                        ) {
+                            lists::add_list_item_with_nested_empty_list(
+                                &mut self.containers,
+                                &mut self.builder,
+                                &list_item,
+                                nested_marker,
+                            );
+                        } else {
+                            lists::add_list_item(
+                                &mut self.containers,
+                                &mut self.builder,
+                                &list_item,
+                            );
+                        }
+                    } else if let Some(fence) = code_blocks::try_parse_fence_open(content_slice) {
+                        self.containers.push(Container::Definition {
+                            content_col,
+                            plain_open: false,
+                            plain_buffer: TextBuffer::new(),
+                        });
+                        definition_pushed = true;
+
                         let bq_depth = self.current_blockquote_depth();
                         if let Some(indent_str) = indent_to_emit {
                             self.builder
@@ -701,11 +776,13 @@ impl<'a> Parser<'a> {
                     }
                 }
 
-                self.containers.push(Container::Definition {
-                    content_col,
-                    plain_open: *has_content,
-                    plain_buffer,
-                });
+                if !definition_pushed {
+                    self.containers.push(Container::Definition {
+                        content_col,
+                        plain_open: *has_content,
+                        plain_buffer,
+                    });
+                }
             }
             DefinitionPrepared::Term { blank_count } => {
                 self.emit_buffered_plain_if_needed();
