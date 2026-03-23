@@ -33,3 +33,20 @@ fn definition_marker_without_content_preserves_newline_losslessly() {
 
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn definition_content_can_start_with_atx_heading() {
+    let input = "Term\n: # Header\n";
+    let tree = parse_blocks(input);
+
+    let definition = find_first(&tree, SyntaxKind::DEFINITION).expect("should find definition");
+
+    assert!(
+        find_first(&definition, SyntaxKind::HEADING).is_some(),
+        "definition should contain HEADING"
+    );
+    assert!(
+        find_first(&definition, SyntaxKind::PLAIN).is_none(),
+        "heading-only definition should not be parsed as PLAIN"
+    );
+}

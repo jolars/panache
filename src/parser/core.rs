@@ -10,6 +10,7 @@ use super::blocks::blockquotes;
 use super::blocks::code_blocks;
 use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
+use super::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
 use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
@@ -157,11 +158,22 @@ impl<'a> Parser<'a> {
                     plain_buffer,
                     ..
                 }) if !plain_buffer.is_empty() => {
-                    // Emit PLAIN node with buffered inline-parsed content
-                    self.builder.start_node(SyntaxKind::PLAIN.into());
                     let text = plain_buffer.get_accumulated_text();
-                    inline_emission::emit_inlines(&mut self.builder, &text, self.config);
-                    self.builder.finish_node();
+                    let line_without_newline = text
+                        .strip_suffix("\r\n")
+                        .or_else(|| text.strip_suffix('\n'));
+                    if let Some(line) = line_without_newline
+                        && !line.contains('\n')
+                        && !line.contains('\r')
+                        && let Some(level) = try_parse_atx_heading(line)
+                    {
+                        emit_atx_heading(&mut self.builder, &text, level, self.config);
+                    } else {
+                        // Emit PLAIN node with buffered inline-parsed content
+                        self.builder.start_node(SyntaxKind::PLAIN.into());
+                        inline_emission::emit_inlines(&mut self.builder, &text, self.config);
+                        self.builder.finish_node();
+                    }
 
                     // Mark PLAIN as closed and clear buffer
                     if let Some(Container::Definition {
@@ -217,11 +229,22 @@ impl<'a> Parser<'a> {
         }) = self.containers.stack.last()
             && !plain_buffer.is_empty()
         {
-            // Emit PLAIN node with buffered inline-parsed content
-            self.builder.start_node(SyntaxKind::PLAIN.into());
             let text = plain_buffer.get_accumulated_text();
-            inline_emission::emit_inlines(&mut self.builder, &text, self.config);
-            self.builder.finish_node();
+            let line_without_newline = text
+                .strip_suffix("\r\n")
+                .or_else(|| text.strip_suffix('\n'));
+            if let Some(line) = line_without_newline
+                && !line.contains('\n')
+                && !line.contains('\r')
+                && let Some(level) = try_parse_atx_heading(line)
+            {
+                emit_atx_heading(&mut self.builder, &text, level, self.config);
+            } else {
+                // Emit PLAIN node with buffered inline-parsed content
+                self.builder.start_node(SyntaxKind::PLAIN.into());
+                inline_emission::emit_inlines(&mut self.builder, &text, self.config);
+                self.builder.finish_node();
+            }
         }
 
         // Mark PLAIN as closed and clear buffer
