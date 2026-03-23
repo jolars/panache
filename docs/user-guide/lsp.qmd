@@ -17,6 +17,7 @@ Document formatting
     `textDocument/rangeFormatting`)
 
 Go to definition
+
 :   Jump from references to definitions (`textDocument/definition`)
 
     - Reference links: `[text][ref]` → `[ref]: url`
@@ -26,12 +27,14 @@ Go to definition
     - Quarto crossrefs: `@fig-label` → chunk/equation/figure label definition
 
 Find references
+
 :   Find all usages of a symbol (`textDocument/references`)
 
     - Quarto crossrefs and chunk labels
     - Citation keys (with optional bibliography/inline-reference declarations)
 
 Document outline
+
 :   Hierarchical view of document structure (`textDocument/documentSymbol`)
 
     - Headings (H1-H6) with proper nesting
@@ -39,6 +42,7 @@ Document outline
     - Figures (images with alt text)
 
 Code folding
+
 :   Fold sections of your document (`textDocument/foldingRange`)
 
     - Headings
@@ -47,6 +51,7 @@ Code folding
     - YAML frontmatter
 
 Diagnostics
+
 :   Real-time linting as you type (`textDocument/publishDiagnostics`)
 
     - Heading hierarchy violations
@@ -56,6 +61,7 @@ Diagnostics
     - External linter integration (e.g., R code linting)
 
 Code actions
+
 :   Quick fixes and refactorings (`textDocument/codeAction`)
 
     - Auto-fix lint issues (e.g., heading hierarchy corrections)
@@ -63,18 +69,21 @@ Code actions
     - Convert footnote styles (inline ↔ reference)
 
 Hover information
+
 :   Contextual information on hover (`textDocument/hover`)
 
     - Footnote definitions
     - Citation previews
 
 Auto-completion
+
 :   Smart completions for Markdown syntax (`textDocument/completion`)
 
     - Citation keys
     - Reference labels
 
 Symbol renaming
+
 :   Rename references and their definitions together (`textDocument/rename`)
 
     - Citation keys

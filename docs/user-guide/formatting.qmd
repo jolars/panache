@@ -79,7 +79,6 @@ Input
     ```
 
 Output
-
 :   ```markdown
     # Heading 1
 
@@ -110,7 +109,6 @@ Output
 Setext-style headings are converted to ATX style.
 
 Input
-
 :   ```markdown
     Heading 1
     =========
@@ -319,7 +317,8 @@ marker to the left, and indent following lines to four spaces.
 Panache also normalizes compact vs loose definition items by structure:
 
 - compact when each definition is a single plain paragraph-like block
-- loose when a definition contains multiple blocks or starts with a non-paragraph block
+- loose when a definition contains multiple blocks or starts with a
+  non-paragraph block
 
 Input
 :   ```markdown
@@ -539,7 +538,6 @@ Input
     ```
 
 Output
-
 :   ```markdown
     ::: Warning
     This is a warning.

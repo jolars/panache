@@ -126,6 +126,7 @@ pandoc-compat = "3.7"
 ```
 
 `pandoc-compat`
+
 :   Compatibility target for ambiguous Pandoc behavior.
 
     - `3.9` (default): match Pandoc 3.9 behavior.
