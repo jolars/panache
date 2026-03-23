@@ -126,6 +126,7 @@ fn heading_outline_from_root(root: &SyntaxNode) -> Vec<HeadingOutlineEntry> {
 
     root.children()
         .filter_map(Heading::cast)
+        .filter(|heading| crate::salsa::is_structural_heading_node(heading.syntax()))
         .filter_map(|heading| {
             let level = heading.level();
             if level == 0 {
@@ -291,5 +292,19 @@ mod tests {
 
         assert_eq!(symbols.len(), 1);
         assert_eq!(symbols[0].name, "Intro");
+    }
+
+    #[test]
+    fn excludes_container_headings_from_outline() {
+        let content = "# Top\n\n- # Item Heading\n\nTerm\n: # Definition Heading\n\n> # Quote Heading\n\n## Child\n";
+        let uri = Uri::from_file_path(env::temp_dir().join("test.qmd")).expect("path uri");
+        let root = crate::parse(content, None);
+        let outline = heading_outline_from_root(&root);
+        let symbols = symbols_for_document(&uri, content, &outline, "");
+
+        assert_eq!(symbols.len(), 2);
+        assert_eq!(symbols[0].name, "Top");
+        assert_eq!(symbols[1].name, "Child");
+        assert_eq!(symbols[1].container_name.as_deref(), Some("Top"));
     }
 }

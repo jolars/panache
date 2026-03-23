@@ -323,6 +323,21 @@ pub struct HeadingOutlineEntry {
     pub range: rowan::TextRange,
 }
 
+pub(crate) fn is_structural_heading_node(node: &SyntaxNode) -> bool {
+    !node.ancestors().skip(1).any(|ancestor| {
+        matches!(
+            ancestor.kind(),
+            SyntaxKind::LIST_ITEM
+                | SyntaxKind::BLOCKQUOTE
+                | SyntaxKind::DEFINITION_ITEM
+                | SyntaxKind::DEFINITION
+                | SyntaxKind::TERM
+                | SyntaxKind::FOOTNOTE_DEFINITION
+                | SyntaxKind::TABLE_CELL
+        )
+    })
+}
+
 impl SymbolUsageIndex {
     pub fn citation_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.citation_usages.get(&normalize_label(key))
@@ -453,6 +468,7 @@ pub fn heading_outline(
     let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
     tree.descendants()
         .filter_map(crate::syntax::Heading::cast)
+        .filter(|heading| is_structural_heading_node(heading.syntax()))
         .filter_map(|heading| {
             let level = heading.level();
             if level == 0 {
@@ -514,7 +530,7 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
             .or_default()
             .push(heading.syntax().text_range());
         let level = heading.level();
-        if level > 0 {
+        if level > 0 && is_structural_heading_node(heading.syntax()) {
             index
                 .heading_sequence
                 .push((heading.syntax().text_range(), level));
@@ -1589,6 +1605,42 @@ mod tests {
         assert_eq!(outline[0].level, 1);
         assert_eq!(outline[1].title, "Child");
         assert_eq!(outline[1].level, 2);
+    }
+
+    #[test]
+    fn symbol_usage_index_heading_sequence_excludes_container_headings() {
+        let db = SalsaDb::default();
+        let tree = crate::parse(
+            "# Top\n\n- # Item Heading\n\nTerm\n: # Definition Heading\n\n> # Quote Heading\n\n## Child\n",
+            None,
+        );
+        let index = symbol_usage_index_from_tree(&db, &tree);
+
+        let levels: Vec<usize> = index
+            .heading_sequence()
+            .iter()
+            .map(|(_, level)| *level)
+            .collect();
+        assert_eq!(levels, vec![1, 2]);
+    }
+
+    #[test]
+    fn heading_outline_excludes_container_headings() {
+        let mut db = SalsaDb::default();
+        let path = PathBuf::from("/tmp/heading_outline_structural.qmd");
+        let file = db.update_file_text(
+            path.clone(),
+            "# Top\n\n- # Item Heading\n\nTerm\n: # Definition Heading\n\n> # Quote Heading\n\n## Child\n"
+                .to_string(),
+        );
+        let config = FileConfig::new(&db, crate::Config::default());
+
+        let outline = heading_outline(&db, file, config, path).clone();
+        let levels: Vec<usize> = outline.iter().map(|entry| entry.level).collect();
+        let titles: Vec<String> = outline.iter().map(|entry| entry.title.clone()).collect();
+
+        assert_eq!(levels, vec![1, 2]);
+        assert_eq!(titles, vec!["Top".to_string(), "Child".to_string()]);
     }
 
     #[test]

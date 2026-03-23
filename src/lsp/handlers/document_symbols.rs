@@ -484,4 +484,18 @@ Another table:
         let detail = yaml_symbol.detail.as_ref().expect("yaml symbol detail");
         assert!(detail.contains("invalid YAML"));
     }
+
+    #[test]
+    fn test_container_headings_are_not_section_symbols() {
+        let content = "# Top\n\n- # Item Heading\n\nTerm\n: # Definition Heading\n\n> # Quote Heading\n\n## Child\n";
+        let config = Config::default();
+        let tree = crate::parser::parse(content, Some(config));
+        let symbols = build_document_symbols(&tree, content, None);
+
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].name, "Top");
+        let children = symbols[0].children.as_ref().expect("top-level children");
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].name, "Child");
+    }
 }

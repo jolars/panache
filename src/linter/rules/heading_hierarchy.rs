@@ -159,4 +159,12 @@ mod tests {
         assert_eq!(fix.edits.len(), 1);
         assert_eq!(fix.edits[0].replacement, "##");
     }
+
+    #[test]
+    fn test_ignores_headings_inside_containers() {
+        let input = "# H1\n\n- # Nested\n\n### H3\n";
+        let diagnostics = parse_and_lint(input);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("h1 to h3"));
+    }
 }
