@@ -69,22 +69,22 @@
         enable = true;
       };
 
-      # panache-format = {
-      #   enable = true;
-      #
-      #   name = "panache format";
-      #
-      #   entry = "cargo run -- format";
-      #
-      #   language = "system";
-      #
-      #   files = "\.(qmd|md|Rmd)$";
-      #
-      #   excludes = [
-      #     "^(pandoc|assets|tests)"
-      #     "docs/user-guide/cli.qmd"
-      #   ];
-      # };
+      panache-format = {
+        enable = true;
+
+        name = "panache format";
+
+        entry = "cargo run --release -- format";
+
+        language = "system";
+
+        files = "\.(qmd|md|Rmd)$";
+
+        excludes = [
+          "^(pandoc|assets|tests)"
+          "docs/user-guide/cli.qmd"
+        ];
+      };
 
       eslint = {
         enable = true;
