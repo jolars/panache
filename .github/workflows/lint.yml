@@ -58,7 +58,24 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Lint with Panache
-        uses: jolars/panache-action@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
         with:
-          path: docs/
+          toolchain: stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Panache format check (docs)
+        run: cargo run -- format --check docs/
+
+      - name: Panache lint check (docs)
+        run: cargo run -- lint --check docs/
