@@ -1,5 +1,6 @@
 ---
-title: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
+title: "Panache"
+title-meta: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
 description-meta: >-
   Panache provides authoring tools for Pandoc, Quarto, and R Markdown: a
   language server, formatter, and linter to help you write better documents,
@@ -7,6 +8,12 @@ description-meta: >-
 title-prefix: ""
 image: images/og.png
 image-alt: "Panache logo"
+
+open-graph:
+  title: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
+
+twitter-card:
+  title: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
 
 format:
   html:
