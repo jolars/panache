@@ -164,6 +164,16 @@ support.
 - [x] Add support for comments to disable formatting on specific lines or blocks
       (e.g., `<!-- something-->`)
 
+### Syntax AST wrappers
+
+- [x] Add wrappers for block quotes, code blocks/chunks, display math, and
+      fenced divs.
+- [ ] Add wrappers for footnote definitions/references.
+- [ ] Add wrapper for alert blocks.
+- [ ] Add wrappers for YAML metadata/title blocks.
+- [ ] Add wrappers for raw TeX blocks/commands.
+- [ ] Consider a Paragraph convenience wrapper for repeated semantic checks.
+
 ### Tables
 
 - [x] Simple tables
