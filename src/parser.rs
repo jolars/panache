@@ -45,10 +45,11 @@ pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
 pub struct IncrementalParseResult {
     pub tree: SyntaxNode,
     pub reparse_range: (usize, usize),
+    pub strategy: &'static str,
 }
 
-/// Incrementally update a syntax tree by reparsing from a safe restart boundary
-/// to EOF and rebuilding the document root from old prefix + reparsed suffix.
+/// Incrementally update a syntax tree by reparsing either a bounded section
+/// window (between top-level headings) or from a safe restart boundary to EOF.
 pub fn parse_incremental_suffix(
     input: &str,
     config: Option<Config>,
@@ -115,6 +116,7 @@ pub fn parse_incremental_suffix(
     IncrementalParseResult {
         tree,
         reparse_range: (new_restart, len),
+        strategy: "suffix_window",
     }
 }
 
@@ -128,6 +130,7 @@ fn full_reparse_result(input: &str, config: &Config) -> IncrementalParseResult {
     IncrementalParseResult {
         tree,
         reparse_range: (0, len),
+        strategy: "full_reparse",
     }
 }
 
@@ -186,6 +189,7 @@ fn find_top_level_heading_section_window(
     new_edit: (usize, usize),
     new_len: usize,
 ) -> Option<SectionWindow> {
+    let old_len: usize = old_tree.text_range().end().into();
     let mut previous_heading: Option<(usize, usize)> = None;
     let mut next_heading: Option<(usize, usize)> = None;
 
@@ -207,7 +211,7 @@ fn find_top_level_heading_section_window(
     }
 
     let (previous_start, previous_end) = previous_heading?;
-    let (next_start, next_end) = next_heading?;
+    let (next_start, next_end) = next_heading.unwrap_or((old_len, old_len));
 
     if ranges_intersect(old_edit, (previous_start, previous_end))
         || ranges_intersect(old_edit, (next_start, next_end))
@@ -290,6 +294,7 @@ fn reparse_section_window(
     Some(IncrementalParseResult {
         tree,
         reparse_range: (section_window.new_start, section_window.new_end),
+        strategy: "section_window",
     })
 }
 
@@ -380,8 +385,8 @@ mod tests {
     }
 
     #[test]
-    fn incremental_does_not_use_section_window_without_next_heading() {
-        let input = "# Intro\n\nalpha\n\nbeta section\n";
+    fn incremental_uses_section_window_for_last_section() {
+        let input = "# Intro\n\nalpha\n\n# Last\n\nbeta section\n";
         let old_tree = parse(input, None);
         let start = input.find("beta").expect("beta in test input");
         let old_edit = (start, start + 4);
@@ -391,10 +396,14 @@ mod tests {
         let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
         let full = parse(&updated, None);
         assert_eq!(inc.tree.to_string(), full.to_string());
+        assert!(
+            inc.reparse_range.0 > 0,
+            "last section should start at the last heading boundary"
+        );
         assert_eq!(
             inc.reparse_range.1,
             updated.len(),
-            "fallback path should reparse to EOF"
+            "last section should end at EOF"
         );
     }
 
@@ -454,6 +463,153 @@ mod tests {
         assert!(
             inc.reparse_range.1 < updated.len(),
             "window boundary should be the next top-level heading, not nested heading"
+        );
+    }
+
+    #[test]
+    fn incremental_section_window_handles_list_tight_loose_transition() {
+        let input = "# Intro\n\nprelude\n\n# Middle\n\n- one\n- two\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let two_start = input.find("- two").expect("list item in test input");
+        let old_edit = (two_start, two_start);
+        let updated = apply_edit(input, old_edit, "\n");
+        let new_edit = (two_start, two_start + 1);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert!(
+            inc.reparse_range.0 > 0 && inc.reparse_range.1 < updated.len(),
+            "list transition inside section should remain section-bounded"
+        );
+    }
+
+    #[test]
+    fn incremental_section_window_handles_blockquote_lazy_transition() {
+        let input = "# Intro\n\nprelude\n\n# Middle\n\n> quoted\nlazy line\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let lazy_start = input.find("lazy line").expect("lazy line in test input");
+        let old_edit = (lazy_start, lazy_start);
+        let updated = apply_edit(input, old_edit, "> ");
+        let new_edit = (lazy_start, lazy_start + 2);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert!(
+            inc.reparse_range.0 > 0 && inc.reparse_range.1 < updated.len(),
+            "blockquote continuation change inside section should remain section-bounded"
+        );
+    }
+
+    #[test]
+    fn incremental_section_window_handles_fenced_div_with_nested_heading() {
+        let input = "# Intro\n\nprelude\n\n# Middle\n\n::: {.callout-note}\n## Nested\nbody text\n:::\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let body_start = input.find("body text").expect("body text in test input");
+        let old_edit = (body_start, body_start + 4);
+        let updated = apply_edit(input, old_edit, "BODY");
+        let new_edit = (body_start, body_start + 4);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert!(
+            inc.reparse_range.0 > 0 && inc.reparse_range.1 < updated.len(),
+            "fenced div edits should use top-level heading boundaries"
+        );
+    }
+
+    #[test]
+    fn incremental_handles_inserting_heading_inside_section_window() {
+        let input = "# Intro\n\nalpha\n\n# Middle\n\nbeta\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let beta_start = input.find("beta").expect("beta in test input");
+        let old_edit = (beta_start, beta_start);
+        let updated = apply_edit(input, old_edit, "## Inserted\n\n");
+        let new_edit = (beta_start, beta_start + "## Inserted\n\n".len());
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert_eq!(
+            inc.strategy, "section_window",
+            "heading insertions within a bounded section should remain section-window mode"
+        );
+    }
+
+    #[test]
+    fn incremental_falls_back_when_deleting_next_heading_boundary() {
+        let input = "# Intro\n\nalpha\n\n# Middle\n\nbeta\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let end_start = input.find("# End\n").expect("end heading in test input");
+        let old_edit = (end_start, end_start + "# End\n\n".len());
+        let updated = apply_edit(input, old_edit, "");
+        let new_edit = (end_start, end_start);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert_ne!(
+            inc.strategy, "section_window",
+            "heading deletions across boundaries should avoid section-window mode"
+        );
+    }
+
+    #[test]
+    fn incremental_falls_back_when_editing_blank_line_after_heading() {
+        let input = "# Intro\n\nalpha\n\n# Middle\n\nbeta\n\n# End\n\nomega\n";
+        let old_tree = parse(input, None);
+        let boundary = input
+            .find("# Middle\n\n")
+            .expect("middle heading boundary in test input");
+        let blank_line_start = boundary + "# Middle\n".len();
+        let old_edit = (blank_line_start, blank_line_start + 1);
+        let updated = apply_edit(input, old_edit, "");
+        let new_edit = (blank_line_start, blank_line_start);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert_ne!(
+            inc.strategy, "section_window",
+            "heading-adjacent blank line edits should avoid section-window mode"
+        );
+    }
+
+    #[test]
+    fn incremental_handles_frontmatter_to_first_heading_edit() {
+        let input = "---\ntitle: Demo\n---\n\n# Intro\n\nalpha\n\n# Next\n\nomega\n";
+        let old_tree = parse(input, None);
+        let title_start = input.find("Demo").expect("frontmatter value in test input");
+        let old_edit = (title_start, title_start + 4);
+        let updated = apply_edit(input, old_edit, "Updated Demo");
+        let new_edit = (title_start, title_start + "Updated Demo".len());
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert_ne!(
+            inc.strategy, "section_window",
+            "frontmatter edits before first heading should use conservative mode"
+        );
+    }
+
+    #[test]
+    fn incremental_handles_frontmatter_delimiter_edit() {
+        let input = "---\ntitle: Demo\n---\n\n# Intro\n\nalpha\n";
+        let old_tree = parse(input, None);
+        let first_delim_start = 0;
+        let old_edit = (first_delim_start, first_delim_start + 3);
+        let updated = apply_edit(input, old_edit, "----");
+        let new_edit = (first_delim_start, first_delim_start + 4);
+
+        let inc = parse_incremental_suffix(&updated, None, &old_tree, old_edit, new_edit);
+        let full = parse(&updated, None);
+        assert_eq!(inc.tree.to_string(), full.to_string());
+        assert_ne!(
+            inc.strategy, "section_window",
+            "frontmatter delimiter edits should stay in conservative mode"
         );
     }
 }

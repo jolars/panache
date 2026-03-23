@@ -31,6 +31,7 @@ struct StrategyRun {
     reparsed_range: OffsetRange,
     used_suffix_path: bool,
     fallback_reason: Option<&'static str>,
+    strategy_used: &'static str,
 }
 
 type OffsetRange = (usize, usize);
@@ -52,6 +53,7 @@ struct CaseResult {
     incremental_reparsed_bytes: usize,
     incremental_reparsed_ratio: f64,
     incremental_used_suffix_path: bool,
+    incremental_strategy_used: String,
     incremental_fallback_reason: Option<String>,
     incremental_fallback_rate: f64,
     incremental_speedup_vs_full: f64,
@@ -71,6 +73,8 @@ struct BenchCase {
     changes: Vec<BenchChange>,
     iterations: usize,
 }
+
+type RealDocCaseDef<'a> = (&'a str, &'a str, u32, u32, u32, u32, &'a str, usize);
 
 fn position_to_offset_utf16(text: &str, position: BenchPosition) -> Option<usize> {
     let mut offset = 0;
@@ -161,6 +165,7 @@ fn full_reparse_strategy(input: &str, changes: &[BenchChange], config: &Config) 
         reparsed_range: (0, len),
         used_suffix_path: false,
         fallback_reason: None,
+        strategy_used: "full_reparse",
     }
 }
 
@@ -173,6 +178,7 @@ fn suffix_incremental_runtime_strategy(
     if changes.len() != 1 {
         let mut run = full_reparse_strategy(input, changes, config);
         run.fallback_reason = Some("multi_change_uses_full_reparse");
+        run.strategy_used = "full_reparse";
         return run;
     }
 
@@ -190,18 +196,22 @@ fn suffix_incremental_runtime_strategy(
         );
         let reparsed_range = incremental.reparse_range;
         let updated_tree = incremental.tree;
-        let used_suffix_path = reparsed_range.0 > 0 || reparsed_range.1 < updated_text.len();
+        let strategy_used = incremental.strategy;
+        let used_suffix_path =
+            strategy_used == "suffix_window" || strategy_used == "section_window";
         return StrategyRun {
             updated_text,
             tree_end_offset: updated_tree.text_range().end().into(),
             reparsed_range,
             used_suffix_path,
             fallback_reason: (!used_suffix_path).then_some("incremental_fallback_full_reparse"),
+            strategy_used,
         };
     }
 
     let mut run = full_reparse_strategy(input, changes, config);
     run.fallback_reason = Some("invalid_change_range_uses_full_reparse");
+    run.strategy_used = "full_reparse";
     run
 }
 
@@ -282,6 +292,7 @@ fn run_case(
         incremental_reparsed_bytes: reparsed_bytes,
         incremental_reparsed_ratio: reparsed_ratio,
         incremental_used_suffix_path: incremental_once.used_suffix_path,
+        incremental_strategy_used: incremental_once.strategy_used.to_owned(),
         incremental_fallback_reason: incremental_once.fallback_reason.map(str::to_owned),
         incremental_fallback_rate: fallback_rate,
         incremental_speedup_vs_full: speedup_vs_full,
@@ -400,7 +411,7 @@ fn load_document(name: &str) -> Option<String> {
 }
 
 fn add_real_document_cases(cases: &mut Vec<BenchCase>, default_iterations: usize) {
-    let real_docs: [(&str, &str, u32, u32, u32, u32, &str, usize); 5] = [
+    let real_docs: [RealDocCaseDef<'_>; 5] = [
         (
             "pandoc_manual_single_edit",
             "pandoc_manual.md",
@@ -591,6 +602,10 @@ fn main() {
             "  Incremental suffix path used: {} (fallback rate {:.2}%)",
             result.incremental_used_suffix_path,
             result.incremental_fallback_rate * 100.0
+        );
+        println!(
+            "  Incremental strategy used: {}",
+            result.incremental_strategy_used
         );
         if let Some(reason) = &result.incremental_fallback_reason {
             println!("  Incremental fallback reason: {}", reason);

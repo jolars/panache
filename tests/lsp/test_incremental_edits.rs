@@ -324,6 +324,52 @@ async fn test_incremental_edit_multiple_changes_use_full_reparse() {
 }
 
 #[tokio::test]
+async fn test_incremental_edit_multiple_changes_descending_coalesces_experimental() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
+    let server = TestLspServer::new();
+
+    server
+        .initialize_with_options(
+            root_uri.as_str(),
+            Some(json!({
+                "settings": {
+                    "panache": {
+                        "experimental": {
+                            "incrementalParsing": true
+                        }
+                    }
+                }
+            })),
+        )
+        .await;
+
+    server
+        .open_document("file:///coalesce.qmd", "abcdef\n", "quarto")
+        .await;
+
+    server
+        .edit_document(
+            "file:///coalesce.qmd",
+            vec![
+                incremental_change(0, 3, 0, 4, "X"),
+                incremental_change(0, 1, 0, 2, "Y"),
+            ],
+        )
+        .await;
+
+    let content = server.get_document_content("file:///coalesce.qmd").await;
+    assert_eq!(content, Some("aYcXef\n".to_string()));
+
+    let tree_after = server
+        .get_document_tree("file:///coalesce.qmd")
+        .await
+        .expect("tree after coalesced multi edit");
+    let expected = panache::parse("aYcXef\n", None);
+    assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+#[tokio::test]
 async fn test_incremental_edit_setext_heading_transition_matches_full_parse() {
     let server = TestLspServer::new();
 
@@ -376,5 +422,100 @@ async fn test_incremental_edit_lazy_blockquote_transition_matches_full_parse() {
         .await
         .expect("tree after blockquote edit");
     let expected = panache::parse("> quoted\n> line\n\nnext\n", None);
+    assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+#[tokio::test]
+async fn test_incremental_edit_frontmatter_delimiter_with_experimental_mode() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
+    let server = TestLspServer::new();
+
+    server
+        .initialize_with_options(
+            root_uri.as_str(),
+            Some(json!({
+                "settings": {
+                    "panache": {
+                        "experimental": {
+                            "incrementalParsing": true
+                        }
+                    }
+                }
+            })),
+        )
+        .await;
+    assert!(server.experimental_incremental_parsing_enabled().await);
+
+    server
+        .open_document(
+            "file:///frontmatter.qmd",
+            "---\ntitle: Demo\n---\n\n# Intro\n\nalpha\n",
+            "quarto",
+        )
+        .await;
+
+    server
+        .edit_document(
+            "file:///frontmatter.qmd",
+            vec![incremental_change(0, 0, 0, 3, "----")],
+        )
+        .await;
+
+    let expected_text = "----\ntitle: Demo\n---\n\n# Intro\n\nalpha\n";
+    let content = server.get_document_content("file:///frontmatter.qmd").await;
+    assert_eq!(content, Some(expected_text.to_string()));
+
+    let tree_after = server
+        .get_document_tree("file:///frontmatter.qmd")
+        .await
+        .expect("tree after frontmatter delimiter edit");
+    let expected = panache::parse(expected_text, None);
+    assert_eq!(tree_after.to_string(), expected.to_string());
+}
+
+#[tokio::test]
+async fn test_incremental_edit_deleting_heading_boundary_with_experimental_mode() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root_uri = Uri::from_file_path(temp_dir.path()).unwrap();
+    let server = TestLspServer::new();
+
+    server
+        .initialize_with_options(
+            root_uri.as_str(),
+            Some(json!({
+                "settings": {
+                    "panache": {
+                        "experimental": {
+                            "incrementalParsing": true
+                        }
+                    }
+                }
+            })),
+        )
+        .await;
+    assert!(server.experimental_incremental_parsing_enabled().await);
+
+    let initial = "# Intro\n\nalpha\n\n# Middle\n\nbeta\n\n# End\n\nomega\n";
+    server
+        .open_document("file:///headings.qmd", initial, "quarto")
+        .await;
+
+    server
+        .edit_document(
+            "file:///headings.qmd",
+            vec![incremental_change(8, 0, 10, 0, "")],
+        )
+        .await;
+
+    let expected_text = "# Intro\n\nalpha\n\n# Middle\n\nbeta\n\nomega\n";
+    let content = server.get_document_content("file:///headings.qmd").await;
+    assert_eq!(content, Some(expected_text.to_string()));
+
+    let tree_after = server
+        .get_document_tree("file:///headings.qmd")
+        .await
+        .expect("tree after heading boundary deletion");
+    let expected = panache::parse(expected_text, None);
     assert_eq!(tree_after.to_string(), expected.to_string());
 }

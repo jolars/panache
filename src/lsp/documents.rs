@@ -15,6 +15,55 @@ use salsa::{Durability, Setter};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+type CombinedEditRanges = (String, (usize, usize), (usize, usize));
+
+fn apply_changes_descending_with_combined_ranges(
+    original_text: &str,
+    changes: &[TextDocumentContentChangeEvent],
+) -> Option<CombinedEditRanges> {
+    if changes.is_empty() {
+        return None;
+    }
+
+    let mut updated_text = original_text.to_owned();
+    let mut combined_old_start = usize::MAX;
+    let mut combined_old_end = 0usize;
+    let mut previous_start: Option<usize> = None;
+
+    for change in changes {
+        let (next_text, old_edit, _) =
+            apply_content_change_with_edit_ranges(&updated_text, change)?;
+
+        if let Some(prev_start) = previous_start
+            && (old_edit.0 >= prev_start || old_edit.1 > prev_start)
+        {
+            return None;
+        }
+        previous_start = Some(old_edit.0);
+
+        combined_old_start = combined_old_start.min(old_edit.0);
+        combined_old_end = combined_old_end.max(old_edit.1);
+        updated_text = next_text;
+    }
+
+    if combined_old_start == usize::MAX {
+        return None;
+    }
+
+    let net_delta = updated_text.len() as isize - original_text.len() as isize;
+    let combined_new_start = combined_old_start;
+    let combined_new_end = combined_old_end.saturating_add_signed(net_delta);
+    if combined_new_end < combined_new_start || combined_new_end > updated_text.len() {
+        return None;
+    }
+
+    Some((
+        updated_text,
+        (combined_old_start, combined_old_end),
+        (combined_new_start, combined_new_end),
+    ))
+}
+
 fn tracked_paths_for_graph(
     root_path: &Path,
     graph: &crate::salsa::ProjectGraph,
@@ -166,7 +215,7 @@ pub(crate) async fn did_change(
             } else {
                 match apply_content_change_with_edit_ranges(&original_text, change) {
                     Some((text, old_edit, new_edit)) => {
-                        let updated_tree = {
+                        let updated = {
                             let old_tree = SyntaxNode::new_root(original_tree_green);
                             parse_incremental_suffix(
                                 &text,
@@ -175,13 +224,13 @@ pub(crate) async fn did_change(
                                 old_edit,
                                 new_edit,
                             )
-                            .tree
                         };
-                        (
-                            text,
-                            GreenNode::from(updated_tree.green()),
-                            "suffix_incremental_single_change_experimental",
-                        )
+                        let strategy = match updated.strategy {
+                            "section_window" => "section_window_single_change_experimental",
+                            "suffix_window" => "suffix_incremental_single_change_experimental",
+                            _ => "full_reparse_single_change_incremental_fallback",
+                        };
+                        (text, GreenNode::from(updated.tree.green()), strategy)
                     }
                     None => {
                         let text = apply_content_change(&original_text, change);
@@ -193,6 +242,39 @@ pub(crate) async fn did_change(
                         )
                     }
                 }
+            }
+        } else if incremental_enabled {
+            if let Some((text, old_edit, new_edit)) = apply_changes_descending_with_combined_ranges(
+                &original_text,
+                &params.content_changes,
+            ) {
+                let updated = {
+                    let old_tree = SyntaxNode::new_root(original_tree_green);
+                    parse_incremental_suffix(
+                        &text,
+                        Some(config.clone()),
+                        &old_tree,
+                        old_edit,
+                        new_edit,
+                    )
+                };
+                let strategy = match updated.strategy {
+                    "section_window" => "section_window_multi_change_coalesced_experimental",
+                    "suffix_window" => "suffix_incremental_multi_change_coalesced_experimental",
+                    _ => "full_reparse_multi_change_incremental_fallback",
+                };
+                (text, GreenNode::from(updated.tree.green()), strategy)
+            } else {
+                let mut updated_text = original_text.clone();
+                for change in params.content_changes.iter() {
+                    updated_text = apply_content_change(&updated_text, change);
+                }
+                let parsed = crate::parse(&updated_text, Some(config.clone()));
+                (
+                    updated_text,
+                    GreenNode::from(parsed.green()),
+                    "full_reparse_multi_change_incremental_fallback",
+                )
             }
         } else {
             let mut updated_text = original_text.clone();
@@ -339,4 +421,69 @@ pub(crate) async fn did_close(
     client
         .publish_diagnostics(params.text_document.uri, vec![], None)
         .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::apply_changes_descending_with_combined_ranges;
+    use tower_lsp_server::ls_types::{Position, Range, TextDocumentContentChangeEvent};
+
+    fn change(
+        start_line: u32,
+        start_char: u32,
+        end_line: u32,
+        end_char: u32,
+        text: &str,
+    ) -> TextDocumentContentChangeEvent {
+        TextDocumentContentChangeEvent {
+            range: Some(Range {
+                start: Position {
+                    line: start_line,
+                    character: start_char,
+                },
+                end: Position {
+                    line: end_line,
+                    character: end_char,
+                },
+            }),
+            range_length: None,
+            text: text.to_owned(),
+        }
+    }
+
+    #[test]
+    fn coalesces_multiple_descending_changes() {
+        let original = "abcdef\n";
+        let changes = vec![change(0, 3, 0, 4, "X"), change(0, 1, 0, 2, "Y")];
+
+        let (updated, old_range, new_range) =
+            apply_changes_descending_with_combined_ranges(original, &changes)
+                .expect("descending changes should coalesce");
+
+        assert_eq!(updated, "aYcXef\n");
+        assert_eq!(old_range, (1, 4));
+        assert_eq!(new_range, (1, 4));
+    }
+
+    #[test]
+    fn rejects_non_descending_overlapping_changes() {
+        let original = "abcdef\n";
+        let changes = vec![change(0, 1, 0, 3, "XX"), change(0, 2, 0, 4, "YY")];
+
+        assert!(apply_changes_descending_with_combined_ranges(original, &changes).is_none());
+    }
+
+    #[test]
+    fn computes_net_delta_for_insert_and_delete_mix() {
+        let original = "abcdef\n";
+        let changes = vec![change(0, 5, 0, 5, "ZZ"), change(0, 1, 0, 3, "Q")];
+
+        let (updated, old_range, new_range) =
+            apply_changes_descending_with_combined_ranges(original, &changes)
+                .expect("descending mixed changes should coalesce");
+
+        assert_eq!(updated, "aQdeZZf\n");
+        assert_eq!(old_range, (1, 5));
+        assert_eq!(new_range, (1, 6));
+    }
 }
