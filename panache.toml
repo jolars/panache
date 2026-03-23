@@ -1,5 +1,5 @@
 include = ["docs/**/*.{md,Rmd,qmd}"]
-extend-exclude = ["docs/user-guide/cli.qmd", "tests/"]
+extend-exclude = ["docs/user-guide/cli.qmd", "docs/changelog.md", "tests/"]
 
 [formatters]
 r = "air"

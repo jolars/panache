@@ -54,6 +54,8 @@ website:
         text: Getting Started
       - href: user-guide
         text: User Guide
+      - href: changelog.md
+        text: Changelog
       - text: Help
         menu:
           - text: Report a bug
@@ -114,3 +116,4 @@ date-format: "D MMMM YYYY"
 
 filters:
   - filters/pre-render.lua
+  - filters/promote-heading-to-title.lua
