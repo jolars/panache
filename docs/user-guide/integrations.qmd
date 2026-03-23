@@ -28,12 +28,12 @@ pre-commit install
 Panache provides two hook IDs:
 
 `panache-format`
-:   Automatically formats files according to panache's formatting rules
+:   Automatically formats files according to Panache's formatting rules
 
 `panache-lint`
 :   Lints files and automatically applies fixes where possible
 
-Pass additional arguments to panache:
+Pass additional arguments to Panache:
 
 ```yaml
 repos:
@@ -60,7 +60,7 @@ repos:
 
 ## GitHub Actions
 
-Use the dedicated panache action for a one-line setup:
+Use the dedicated Panache action for a one-line setup:
 
 ```yaml
 name: panache
@@ -79,7 +79,7 @@ jobs:
 
 This workflow:
 
-1. Installs panache from official releases
+1. Installs Panache from official releases
 2. Checks that all files are formatted (`--check` mode)
 3. Runs the linter in CI mode (`--check` mode)
 
@@ -88,7 +88,7 @@ merging.
 
 ### Common options
 
-Pin a specific panache CLI release:
+Pin a specific Panache CLI release:
 
 ```yaml
 - uses: jolars/panache-action@v1

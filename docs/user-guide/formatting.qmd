@@ -18,10 +18,10 @@ controlled via the [configuration](configuration.qmd) file:
 wrap = "reflow" # or "preserve" or "sentence"
 ```
 
-If `wrap` is set to `reflow`, panache will reformat paragraphs to fit within the
+If `wrap` is set to `reflow`, Panache will reformat paragraphs to fit within the
 number of columns specified by the `line-width` configuration option (default
-80). If `wrap` is set to `preserve`, panache will keep existing line breaks and
-not reflow paragraphs. If `wrap` is set to `sentence`, panache will break lines
+80). If `wrap` is set to `preserve`, Panache will keep existing line breaks and
+not reflow paragraphs. If `wrap` is set to `sentence`, Panache will break lines
 at sentence boundaries, ensuring that each sentence starts on a new line.
 
 Input
@@ -315,6 +315,11 @@ Output
 
 Definition lists are indented with three spaces after the marker, flush the
 marker to the left, and indent following lines to four spaces.
+
+Panache also normalizes compact vs loose definition items by structure:
+
+- compact when each definition is a single plain paragraph-like block
+- loose when a definition contains multiple blocks or starts with a non-paragraph block
 
 Input
 :   ```markdown

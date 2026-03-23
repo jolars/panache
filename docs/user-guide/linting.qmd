@@ -451,7 +451,7 @@ or backup files before applying automatic fixes to important documents.
 
 ## External Linters
 
-panache can integrate with external code linters to check code blocks within
+Panache can integrate with external code linters to check code blocks within
 your documents.
 
 ### Configuration
@@ -612,7 +612,7 @@ but deprecated.
 
 ## LSP Integration
 
-When using the panache Language Server, lint diagnostics appear live in your
+When using the Panache language server, lint diagnostics appear live in your
 editor as you type:
 
 - Squiggly underlines for errors and warnings

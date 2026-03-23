@@ -31,7 +31,7 @@ pub struct Cli {
     #[arg(long, global = true, help_heading = "Global options")]
     #[arg(help = "Path to configuration file")]
     #[arg(
-        long_help = "Path to a custom configuration file. If not specified, panache will \
+        long_help = "Path to a custom configuration file. If not specified, Panache will \
         search for .panache.toml or panache.toml in the current directory and its parents, \
         then fall back to ~/.config/panache/config.toml."
     )]
@@ -47,7 +47,7 @@ pub struct Cli {
     #[arg(help = "Synthetic filename for stdin input (used for flavor detection)")]
     #[arg(
         long_help = "Synthetic filename to associate with stdin input. This is useful for editor \
-        integrations that pipe content via stdin but still need panache to infer flavor/extensions \
+        integrations that pipe content via stdin but still need Panache to infer flavor/extensions \
         from file extension (for example: --stdin-filename doc.qmd)."
     )]
     pub stdin_filename: Option<PathBuf>,
@@ -81,7 +81,7 @@ pub enum Commands {
     #[command(
         long_about = "Format a Quarto, Pandoc, or R Markdown document according to Panache's \
         formatting rules. By default, formats files in place. Use --check to verify formatting \
-        without making changes. With --verify, panache runs parser/formatter invariants without \
+        without making changes. With --verify, Panache runs parser/formatter invariants without \
         writing changes to disk. Stdin input always outputs to stdout."
     )]
     Format {
@@ -100,7 +100,7 @@ pub enum Commands {
         #[arg(long)]
         #[arg(help = "Check if file is formatted (exit code 1 if not)")]
         #[arg(
-            long_help = "Check if the file is already formatted according to panache's rules \
+            long_help = "Check if the file is already formatted according to Panache's rules \
             without making any changes. If the file is not formatted, displays a diff and exits \
             with code 1. If formatted, exits with code 0. Useful for CI/CD pipelines."
         )]
@@ -137,7 +137,7 @@ pub enum Commands {
     /// Parse and display the CST tree for debugging
     #[command(
         long_about = "Parse a document and display its Concrete Syntax Tree (CST) for debugging \
-        and understanding how panache interprets the document structure. The CST shows all block \
+        and understanding how Panache interprets the document structure. The CST shows all block \
         and inline elements detected by the parser."
     )]
     Parse {
@@ -179,7 +179,7 @@ pub enum Commands {
     },
     /// Start the Language Server Protocol server
     #[command(
-        long_about = "Start the panache Language Server Protocol (LSP) server for editor \
+        long_about = "Start the Panache language server protocol (LSP) server for editor \
         integration. The LSP server provides formatting capabilities to editors like VS Code, \
         Neovim, and others that support LSP."
     )]

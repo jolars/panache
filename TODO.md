@@ -1,6 +1,6 @@
-# panache TODO
+# Panache TODO
 
-This document tracks implementation status for panache's features.
+This document tracks implementation status for Panache's features.
 
 ## Language Server
 

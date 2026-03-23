@@ -24,8 +24,8 @@ For help with a specific command, see: `panache help <command>`.
 
 ###### **Options:**
 
-* `--config <CONFIG>` — Path to a custom configuration file. If not specified, panache will search for .panache.toml or panache.toml in the current directory and its parents, then fall back to ~/.config/panache/config.toml.
-* `--stdin-filename <PATH>` — Synthetic filename to associate with stdin input. This is useful for editor integrations that pipe content via stdin but still need panache to infer flavor/extensions from file extension (for example: --stdin-filename doc.qmd).
+* `--config <CONFIG>` — Path to a custom configuration file. If not specified, Panache will search for .panache.toml or panache.toml in the current directory and its parents, then fall back to ~/.config/panache/config.toml.
+* `--stdin-filename <PATH>` — Synthetic filename to associate with stdin input. This is useful for editor integrations that pipe content via stdin but still need Panache to infer flavor/extensions from file extension (for example: --stdin-filename doc.qmd).
 * `--color <WHEN>` — Control when colored output is used
 
   Default value: `auto`
@@ -39,7 +39,7 @@ For help with a specific command, see: `panache help <command>`.
 
 ## `panache format`
 
-Format a Quarto, Pandoc, or R Markdown document according to Panache's formatting rules. By default, formats files in place. Use --check to verify formatting without making changes. With --verify, panache runs parser/formatter invariants without writing changes to disk. Stdin input always outputs to stdout.
+Format a Quarto, Pandoc, or R Markdown document according to Panache's formatting rules. By default, formats files in place. Use --check to verify formatting without making changes. With --verify, Panache runs parser/formatter invariants without writing changes to disk. Stdin input always outputs to stdout.
 
 **Usage:** `panache format [OPTIONS] [FILES]...`
 
@@ -49,7 +49,7 @@ Format a Quarto, Pandoc, or R Markdown document according to Panache's formattin
 
 ###### **Options:**
 
-* `--check` — Check if the file is already formatted according to panache's rules without making any changes. If the file is not formatted, displays a diff and exits with code 1. If formatted, exits with code 0. Useful for CI/CD pipelines.
+* `--check` — Check if the file is already formatted according to Panache's rules without making any changes. If the file is not formatted, displays a diff and exits with code 1. If formatted, exits with code 0. Useful for CI/CD pipelines.
 * `--range <START:END>` — Format only the specified line range. Lines are 1-indexed and inclusive. The range will be expanded to complete block boundaries to ensure well-formed output. For example, if you select part of a list, the entire list will be formatted. Format: --range START:END (e.g., --range 5:10 formats lines 5 through 10). 
 
    Note: This feature is experimental. Range filtering may not work correctly in all cases.
@@ -62,7 +62,7 @@ Format a Quarto, Pandoc, or R Markdown document according to Panache's formattin
 
 ## `panache parse`
 
-Parse a document and display its Concrete Syntax Tree (CST) for debugging and understanding how panache interprets the document structure. The CST shows all block and inline elements detected by the parser.
+Parse a document and display its Concrete Syntax Tree (CST) for debugging and understanding how Panache interprets the document structure. The CST shows all block and inline elements detected by the parser.
 
 **Usage:** `panache parse [OPTIONS] [FILE]`
 
@@ -82,7 +82,7 @@ Parse a document and display its Concrete Syntax Tree (CST) for debugging and un
 
 ## `panache lsp`
 
-Start the panache Language Server Protocol (LSP) server for editor integration. The LSP server provides formatting capabilities to editors like VS Code, Neovim, and others that support LSP.
+Start the Panache language server protocol (LSP) server for editor integration. The LSP server provides formatting capabilities to editors like VS Code, Neovim, and others that support LSP.
 
 **Usage:** `panache lsp [OPTIONS]`
 

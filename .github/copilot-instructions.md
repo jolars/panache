@@ -1,8 +1,8 @@
-# LLM Agent Instructions for panache
+# LLM Agent Instructions for Panache
 
 ## Repository Overview
 
-**panache** is a formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and
+Panache is a formatter, linter, and LSP for Quarto (`.qmd`), Pandoc, and
 Markdown files written in Rust. It understands Quarto/Pandoc-specific syntax
 that other formatters struggle with (fenced divs, tables, math formatting).
 
