@@ -334,6 +334,54 @@ impl Formatter {
         let hanging = list_indent.hanging_indent(total_indent);
         let available_width = self.config.line_width.saturating_sub(hanging);
 
+        let first_non_blank_child = node
+            .children()
+            .find(|child| child.kind() != SyntaxKind::BLANK_LINE);
+        if let Some(leading_heading) = first_non_blank_child
+            && leading_heading.kind() == SyntaxKind::HEADING
+        {
+            self.output.push_str(&" ".repeat(total_indent));
+            self.output
+                .push_str(&" ".repeat(list_indent.marker_padding));
+            self.output.push_str(&marker);
+            self.output.push_str(&" ".repeat(list_indent.spaces_after));
+            if let Some(ref cb) = checkbox {
+                self.output.push_str(cb);
+                self.output.push(' ');
+            }
+            self.output.push_str(&self.format_heading(&leading_heading));
+            self.output.push('\n');
+
+            let has_following_blocks = node
+                .children()
+                .any(|child| child != leading_heading && child.kind() != SyntaxKind::BLANK_LINE);
+            if has_following_blocks {
+                self.output.push('\n');
+            }
+
+            for child in node.children() {
+                if child == leading_heading || child.kind() == SyntaxKind::BLANK_LINE {
+                    continue;
+                }
+
+                match child.kind() {
+                    SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH => {
+                        self.format_list_continuation_paragraph(&child, hanging);
+                    }
+                    SyntaxKind::LIST => {
+                        self.format_node_sync(&child, hanging);
+                    }
+                    SyntaxKind::CODE_BLOCK => {
+                        self.format_indented_code_block(&child, hanging);
+                    }
+                    _ => {
+                        self.format_node_sync(&child, hanging);
+                    }
+                }
+            }
+            return;
+        }
+
         // Build words from Plain/PARAGRAPH content node if present, otherwise from entire ListItem
         let content_node = Self::find_content_node(node);
 
@@ -346,7 +394,7 @@ impl Formatter {
             })
             .unwrap_or(false);
 
-        let mut words = if let Some(content) = content_node {
+        let mut words = if let Some(ref content) = content_node {
             // Extract words from Plain/PARAGRAPH child (postprocessor wraps all content in one node)
             wrapping::build_words(&self.config, &content, &|n| self.format_inline_node(n))
         } else {
@@ -394,13 +442,36 @@ impl Formatter {
             _ => None,
         };
 
+        let heading_with_remainder = content_node
+            .as_ref()
+            .and_then(|content| self.leading_atx_heading_with_remainder(content));
+
         log::trace!(
             "ListItem wrapping: {} lines, hanging indent={}",
             lines.len(),
             hanging
         );
 
-        if let Some(sentence_lines) = &sentence_lines {
+        if let Some((heading_line, remainder)) = heading_with_remainder {
+            self.output.push_str(&" ".repeat(total_indent));
+            self.output
+                .push_str(&" ".repeat(list_indent.marker_padding));
+            self.output.push_str(&marker);
+            self.output.push_str(&" ".repeat(list_indent.spaces_after));
+            if let Some(ref cb) = checkbox {
+                self.output.push_str(cb);
+                self.output.push(' ');
+            }
+            self.output.push_str(&heading_line);
+            self.output.push('\n');
+            self.output.push('\n');
+
+            for line in self.wrap_text_for_indent(&remainder, hanging) {
+                self.output.push_str(&" ".repeat(hanging));
+                self.output.push_str(line.trim_start());
+                self.output.push('\n');
+            }
+        } else if let Some(sentence_lines) = &sentence_lines {
             for (i, text) in sentence_lines.iter().enumerate() {
                 log::trace!("  Line {}: sentence line", i);
                 if i == 0 {

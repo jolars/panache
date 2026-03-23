@@ -1,6 +1,6 @@
 use crate::config::{Config, WrapMode};
 use crate::directives::{DirectiveTracker, extract_directive_from_node};
-use crate::parser::blocks::headings::try_parse_setext_heading;
+use crate::parser::blocks::headings::{try_parse_atx_heading, try_parse_setext_heading};
 use crate::parser::utils::attributes::parse_attribute_content;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
@@ -120,7 +120,7 @@ impl Formatter {
     }
 
     // Delegate to headings module
-    fn format_heading(&self, node: &SyntaxNode) -> String {
+    pub(super) fn format_heading(&self, node: &SyntaxNode) -> String {
         headings::format_heading(node)
     }
 
@@ -223,6 +223,42 @@ impl Formatter {
                 .chars()
                 .next()
                 .is_some_and(char::is_whitespace)
+    }
+
+    pub(super) fn leading_atx_heading_with_remainder(
+        &self,
+        node: &SyntaxNode,
+    ) -> Option<(String, String)> {
+        if !matches!(node.kind(), SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH) {
+            return None;
+        }
+
+        let text = node.text().to_string();
+        let mut lines = text.lines();
+        let first_line = lines.next()?.trim_start_matches([' ', '\t']);
+        if try_parse_atx_heading(first_line).is_none() {
+            return None;
+        }
+
+        let remainder = lines
+            .flat_map(str::split_whitespace)
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        if remainder.is_empty() {
+            return None;
+        }
+
+        Some((first_line.trim_end().to_string(), remainder))
+    }
+
+    pub(super) fn wrap_text_for_indent(&self, text: &str, indent: usize) -> Vec<String> {
+        let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+        let width = self.config.line_width.saturating_sub(indent);
+        match wrap_mode {
+            WrapMode::Preserve => vec![text.to_string()],
+            WrapMode::Reflow | WrapMode::Sentence => wrapping::wrap_text_first_fit(text, width),
+        }
     }
 
     fn paragraph_starts_with_setext_heading_candidate(&self, node: &SyntaxNode) -> bool {
@@ -1028,6 +1064,13 @@ impl Formatter {
                                 self.output.push_str(line);
                                 self.output.push('\n');
                             }
+                            if let Some(next) = child.next_sibling()
+                                && next.kind() != SyntaxKind::BLANK_LINE
+                                && is_block_element(next.kind())
+                            {
+                                self.output.push_str(&blank_prefix);
+                                self.output.push('\n');
+                            }
                         }
                         SyntaxKind::LIST => {
                             // Format list with blockquote prefix
@@ -1492,7 +1535,22 @@ impl Formatter {
                                 SyntaxKind::PLAIN => {
                                     // Plain block in definition - format inline with potential wrapping
                                     // Already handled by Plain formatter above
-                                    self.format_node_sync(n, def_indent);
+                                    if let Some((heading_line, remainder)) =
+                                        self.leading_atx_heading_with_remainder(n)
+                                    {
+                                        self.output.push_str(&heading_line);
+                                        self.output.push('\n');
+                                        self.output.push('\n');
+                                        for line in
+                                            self.wrap_text_for_indent(&remainder, def_indent)
+                                        {
+                                            self.output.push_str(&" ".repeat(def_indent));
+                                            self.output.push_str(line.trim_start());
+                                            self.output.push('\n');
+                                        }
+                                    } else {
+                                        self.format_node_sync(n, def_indent);
+                                    }
                                 }
                                 SyntaxKind::PARAGRAPH => {
                                     if first_para_idx == Some(i) {

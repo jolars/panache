@@ -1,0 +1,43 @@
+DOCUMENT@0..80
+  LIST@0..30
+    LIST_ITEM@0..30
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      PLAIN@2..30
+        TEXT@2..17 "# Heading {#id}"
+        NEWLINE@17..18 "\n"
+        TEXT@18..29 "  Some text"
+        NEWLINE@29..30 "\n"
+  BLANK_LINE@30..31
+    BLANK_LINE@30..31 "\n"
+  BLOCKQUOTE@31..50
+    BLOCKQUOTE_MARKER@31..32 ">"
+    WHITESPACE@32..33 " "
+    HEADING@33..43
+      ATX_HEADING_MARKER@33..34
+        ATX_HEADING_MARKER@33..34 "#"
+      WHITESPACE@34..35 " "
+      HEADING_CONTENT@35..42
+        TEXT@35..42 "Heading"
+      NEWLINE@42..43 "\n"
+    BLOCKQUOTE_MARKER@43..44 ">"
+    WHITESPACE@44..45 " "
+    PARAGRAPH@45..50
+      TEXT@45..49 "Text"
+      NEWLINE@49..50 "\n"
+  BLANK_LINE@50..51
+    BLANK_LINE@50..51 "\n"
+  DEFINITION_LIST@51..80
+    DEFINITION_ITEM@51..80
+      TERM@51..56
+        TEXT@51..55 "Term"
+        NEWLINE@55..56 "\n"
+      DEFINITION@56..80
+        DEFINITION_MARKER@56..57 ":"
+        WHITESPACE@57..58 " "
+        PLAIN@58..80
+          TEXT@58..67 "# Heading"
+          NEWLINE@67..68 "\n"
+          TEXT@68..79 "  Some text"
+          NEWLINE@79..80 "\n"
+

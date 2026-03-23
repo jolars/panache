@@ -216,6 +216,7 @@ golden_test_cases!(
     multiline_table_caption_after,
     multiline_table_headerless,
     multiline_table_inline_formatting,
+    nested_headings_in_containers,
     multiline_table_single_row,
     pandoc_title_block,
     paragraph_continuation,

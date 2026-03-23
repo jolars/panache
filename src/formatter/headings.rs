@@ -4,6 +4,7 @@ pub(super) fn format_heading(node: &SyntaxNode) -> String {
     let mut level = 1;
     let mut content = String::new();
     let mut saw_content = false;
+    let mut attributes = String::new();
 
     for child in node.children() {
         match child.kind() {
@@ -30,6 +31,9 @@ pub(super) fn format_heading(node: &SyntaxNode) -> String {
                 content = t.trim().to_string();
                 saw_content = true;
             }
+            SyntaxKind::ATTRIBUTE => {
+                attributes = child.text().to_string();
+            }
             _ => {}
         }
     }
@@ -37,5 +41,10 @@ pub(super) fn format_heading(node: &SyntaxNode) -> String {
         content = node.text().to_string();
     }
 
-    format!("{} {}", "#".repeat(level), content)
+    let mut out = format!("{} {}", "#".repeat(level), content);
+    if !attributes.is_empty() {
+        out.push(' ');
+        out.push_str(attributes.trim());
+    }
+    out
 }
