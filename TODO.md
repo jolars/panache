@@ -23,11 +23,11 @@ This document tracks implementation status for Panache's features.
 
 ### Core LSP Capabilities
 
-- [X] `textDocument/formatting` - Full document formatting
-- [X] `textDocument/didOpen` - Track document opens
-- [X] `textDocument/didChange` - Track document changes (incremental sync)
-- [X] `textDocument/didClose` - Track document closes
-- [X] Configuration discovery from workspace root (`.panache.toml`)
+- [x] `textDocument/formatting` - Full document formatting
+- [x] `textDocument/didOpen` - Track document opens
+- [x] `textDocument/didChange` - Track document changes (incremental sync)
+- [x] `textDocument/didClose` - Track document closes
+- [x] Configuration discovery from workspace root (`.panache.toml`)
 
 ### Diagnostics
 
@@ -41,11 +41,11 @@ This document tracks implementation status for Panache's features.
 ### Code Actions
 
 - [ ] Convert between bullet/ordered lists
-- [X] Convert loose/compact lists
+- [x] Convert loose/compact lists
 - [ ] Convert bullet list to task list - Convert `- item` to `- [ ] item`
 - [ ] Convert between table styles (simple, pipe, grid)
 - [ ] Convert between inline/reference links
-- [X] Convert between inline/reference footnotes
+- [x] Convert between inline/reference footnotes
 
 ### Navigation & Symbols
 
@@ -91,7 +91,7 @@ support.
 
 - [ ] Link preview - `textDocument/hover` to show link target
 - [ ] Reference preview - Show reference definition on hover
-- [X] Footnote preview - Show footnote content inline
+- [x] Footnote preview - Show footnote content inline
 - [x] Citation preview - Show bibliography entry for citation (approximate)
 
 ### Advanced
@@ -535,7 +535,7 @@ matching Pandoc's AST structure exactly.
 
 - [x] Keep recognized abbreviations + following year together during wrapping
       (for example `M.A. 2007`) so wrapping does not split them.
-- [ ] Follow Pandoc `Ext_smart` behavior exactly by converting the post-
+- [x] Follow Pandoc `Ext_smart` behavior exactly by converting the post-
       abbreviation space to a non-breaking space.
 
 ## Architecture
