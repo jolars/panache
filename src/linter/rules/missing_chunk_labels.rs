@@ -31,7 +31,7 @@ impl Rule for MissingChunkLabelsRule {
                 continue;
             };
 
-            if code_block.has_chunk_label() {
+            if !code_block.chunk_label_entries().is_empty() {
                 continue;
             }
 

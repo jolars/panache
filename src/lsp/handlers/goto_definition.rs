@@ -66,6 +66,7 @@ pub(crate) async fn goto_definition(
     enum PendingDefinition {
         Citation(String),
         Crossref(String),
+        ChunkLabel(String),
         HeadingLink(String),
         Reference { label: String, is_footnote: bool },
     }
@@ -77,6 +78,7 @@ pub(crate) async fn goto_definition(
         let pending = match resolve_symbol_target_at_offset(&root, offset) {
             Some(SymbolTarget::Citation(key)) => Some(PendingDefinition::Citation(key)),
             Some(SymbolTarget::Crossref(label)) => Some(PendingDefinition::Crossref(label)),
+            Some(SymbolTarget::ChunkLabel(label)) => Some(PendingDefinition::ChunkLabel(label)),
             Some(SymbolTarget::HeadingId(label)) | Some(SymbolTarget::HeadingLink(label)) => {
                 Some(PendingDefinition::HeadingLink(label))
             }
@@ -163,6 +165,22 @@ pub(crate) async fn goto_definition(
         }
     }
 
+    if let PendingDefinition::ChunkLabel(label) = &pending {
+        for doc in &doc_indices {
+            for candidate in
+                crate::utils::crossref_symbol_labels(label, config.extensions.bookdown_references)
+            {
+                if let Some(ranges) = doc.symbol_index.chunk_label_value_ranges(&candidate)
+                    && let Some(range) = ranges.first()
+                {
+                    let location =
+                        crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
+                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                }
+            }
+        }
+    }
+
     if let PendingDefinition::Reference { label, is_footnote } = &pending {
         for doc in &doc_indices {
             let ranges = if *is_footnote {
@@ -195,6 +213,8 @@ pub(crate) async fn goto_definition(
                 return Ok(Some(GotoDefinitionResponse::Scalar(locations.remove(0))));
             }
             PendingDefinition::Crossref(label) => definition_index
+                .find_crossref_resolved(&label, config.extensions.bookdown_references),
+            PendingDefinition::ChunkLabel(label) => definition_index
                 .find_crossref_resolved(&label, config.extensions.bookdown_references),
             PendingDefinition::HeadingLink(label) => definition_index
                 .find_crossref_resolved(&label, config.extensions.bookdown_references),

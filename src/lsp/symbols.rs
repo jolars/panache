@@ -6,6 +6,7 @@ use super::helpers;
 pub(crate) enum SymbolTarget {
     Citation(String),
     Crossref(String),
+    ChunkLabel(String),
     HeadingLink(String),
     HeadingId(String),
     Reference { label: String, is_footnote: bool },
@@ -27,7 +28,7 @@ pub(crate) fn resolve_symbol_target_at_offset(
         }
 
         if let Some(key) = helpers::extract_chunk_label_key(&node) {
-            return Some(SymbolTarget::Crossref(key));
+            return Some(SymbolTarget::ChunkLabel(key));
         }
 
         if let Some(key) = helpers::extract_heading_id_key(&node) {
@@ -89,6 +90,22 @@ mod tests {
         assert_eq!(
             target,
             Some(SymbolTarget::HeadingLink("heading".to_string()))
+        );
+    }
+
+    #[test]
+    fn resolves_chunk_label_target_from_hashpipe_label_value() {
+        let input = "```{r}\n#| label: fig-plot\nplot(1:10)\n```\n";
+        let config = crate::config::Config {
+            flavor: crate::config::Flavor::Quarto,
+            ..Default::default()
+        };
+        let root = crate::parse(input, Some(config));
+        let offset = input.find("fig-plot").unwrap();
+        let target = resolve_symbol_target_at_offset(&root, offset);
+        assert_eq!(
+            target,
+            Some(SymbolTarget::ChunkLabel("fig-plot".to_string()))
         );
     }
 }

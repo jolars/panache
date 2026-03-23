@@ -508,34 +508,36 @@ fn determine_fence_length(content: &str, fence_char: char) -> usize {
 fn extract_chunk_options_from_cst(
     info_node: &SyntaxNode,
 ) -> Vec<(Option<String>, Option<String>, bool)> {
-    use crate::syntax::{ChunkLabel, ChunkOption};
+    use crate::syntax::{ChunkInfoItem, CodeInfo};
+
+    let Some(info) = CodeInfo::cast(info_node.clone()) else {
+        return Vec::new();
+    };
 
     let mut options = Vec::new();
     let mut pending_label_parts = Vec::new();
-
-    // Find CHUNK_OPTIONS node
-    for child in info_node.children() {
-        if child.kind() == SyntaxKind::CHUNK_OPTIONS {
-            // Iterate through options and labels
-            for opt_or_label in child.children() {
-                if let Some(label) = ChunkLabel::cast(opt_or_label.clone()) {
-                    pending_label_parts.push(label.text());
-                } else if let Some(opt) = ChunkOption::cast(opt_or_label) {
-                    if !pending_label_parts.is_empty() {
-                        options.push((None, Some(pending_label_parts.join(" ")), false));
-                        pending_label_parts.clear();
-                    }
-                    // Regular option with key=value
-                    if let (Some(key), Some(value)) = (opt.key(), opt.value()) {
-                        options.push((Some(key), Some(value), opt.is_quoted()));
-                    }
+    for item in info.chunk_items() {
+        match item {
+            ChunkInfoItem::Label(label) => {
+                let value = label.text();
+                if !value.is_empty() {
+                    pending_label_parts.push(value);
                 }
             }
-            if !pending_label_parts.is_empty() {
-                options.push((None, Some(pending_label_parts.join(" ")), false));
+            ChunkInfoItem::Option(option) => {
+                if !pending_label_parts.is_empty() {
+                    options.push((None, Some(pending_label_parts.join(" ")), false));
+                    pending_label_parts.clear();
+                }
+                if let (Some(key), Some(value)) = (option.key(), option.value()) {
+                    options.push((Some(key), Some(value), option.is_quoted()));
+                }
             }
-            break;
         }
+    }
+
+    if !pending_label_parts.is_empty() {
+        options.push((None, Some(pending_label_parts.join(" ")), false));
     }
 
     options

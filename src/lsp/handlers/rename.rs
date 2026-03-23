@@ -139,6 +139,52 @@ pub(crate) async fn rename(
         }));
     }
 
+    if let Some(SymbolTarget::ChunkLabel(old_key)) = target.as_ref() {
+        let old_norm = normalize_label(old_key);
+        let search_keys =
+            crate::utils::crossref_symbol_labels(&old_norm, config.extensions.bookdown_references);
+        let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+
+        let per_doc = crate::lsp::navigation::project_symbol_documents(
+            &salsa_db,
+            salsa_file,
+            salsa_config,
+            &doc_path,
+            &uri,
+            &content,
+        )
+        .await;
+
+        for doc in per_doc {
+            let doc_uri = doc.uri;
+            let text = doc.text;
+            let symbol_index = doc.symbol_index;
+            let mut edits = Vec::new();
+
+            for search_key in &search_keys {
+                if let Some(ranges) = symbol_index.chunk_label_value_ranges(search_key) {
+                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
+                }
+                if let Some(ranges) = symbol_index.crossref_usages(search_key) {
+                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
+                }
+            }
+
+            if edits.is_empty() {
+                continue;
+            }
+            changes.entry(doc_uri).or_default().extend(edits);
+        }
+
+        if changes.is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(WorkspaceEdit {
+            changes: Some(changes),
+            ..Default::default()
+        }));
+    }
+
     if let Some(SymbolTarget::HeadingLink(old_key) | SymbolTarget::HeadingId(old_key)) =
         target.as_ref()
     {

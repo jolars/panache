@@ -73,6 +73,7 @@ pub(crate) async fn references(
 
             match &target {
                 SymbolTarget::Crossref(label)
+                | SymbolTarget::ChunkLabel(label)
                 | SymbolTarget::HeadingLink(label)
                 | SymbolTarget::HeadingId(label) => {
                     if matches!(
@@ -97,6 +98,18 @@ pub(crate) async fn references(
                                 symbol_index.crossref_declaration_value_ranges(&candidate)
                         {
                             add_locations(&mut locations, &doc_uri, &text, ranges);
+                        }
+                    }
+
+                    if matches!(&target, SymbolTarget::ChunkLabel(_)) && include_declaration {
+                        for candidate in crate::utils::crossref_symbol_labels(
+                            &normalize_label(label),
+                            config.extensions.bookdown_references,
+                        ) {
+                            if let Some(ranges) = symbol_index.chunk_label_value_ranges(&candidate)
+                            {
+                                add_locations(&mut locations, &doc_uri, &text, ranges);
+                            }
                         }
                     }
                 }

@@ -1,5 +1,6 @@
 //! Chunk option AST wrappers for type-safe access to chunk options in executable code blocks.
 
+use crate::syntax::ast::support;
 use crate::syntax::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
 
 /// A chunk option in an executable code block (e.g., `echo=TRUE` or `fig.cap="text"`).
@@ -60,6 +61,18 @@ impl ChunkOption {
         })
     }
 
+    /// Get the key token range, if present.
+    pub fn key_range(&self) -> Option<rowan::TextRange> {
+        self.0.children_with_tokens().find_map(|child| {
+            if let rowan::NodeOrToken::Token(token) = child
+                && token.kind() == SyntaxKind::CHUNK_OPTION_KEY
+            {
+                return Some(token.text_range());
+            }
+            None
+        })
+    }
+
     /// Check if the value is quoted (has CHUNK_OPTION_QUOTE nodes).
     pub fn is_quoted(&self) -> bool {
         self.0.children_with_tokens().any(|child| {
@@ -109,6 +122,170 @@ impl ChunkLabel {
     pub fn text(&self) -> String {
         self.0.text().to_string()
     }
+
+    /// Get the label text range.
+    pub fn range(&self) -> rowan::TextRange {
+        self.0.text_range()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ChunkOptionSource {
+    InlineInfo,
+    HashpipeYaml,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ChunkOptionEntry {
+    option: ChunkOption,
+    source: ChunkOptionSource,
+}
+
+impl ChunkOptionEntry {
+    pub fn new(option: ChunkOption, source: ChunkOptionSource) -> Self {
+        Self { option, source }
+    }
+
+    pub fn option(&self) -> &ChunkOption {
+        &self.option
+    }
+
+    pub fn into_option(self) -> ChunkOption {
+        self.option
+    }
+
+    pub fn source(&self) -> ChunkOptionSource {
+        self.source
+    }
+
+    pub fn key(&self) -> Option<String> {
+        self.option.key()
+    }
+
+    pub fn key_range(&self) -> Option<rowan::TextRange> {
+        self.option.key_range()
+    }
+
+    pub fn value(&self) -> Option<String> {
+        self.option.value()
+    }
+
+    pub fn value_range(&self) -> Option<rowan::TextRange> {
+        self.option.value_range()
+    }
+
+    pub fn is_quoted(&self) -> bool {
+        self.option.is_quoted()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ChunkLabelSource {
+    InlineLabel,
+    LabelOption,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ChunkLabelEntry {
+    value: String,
+    declaration_range: rowan::TextRange,
+    value_range: rowan::TextRange,
+    source: ChunkLabelSource,
+}
+
+impl ChunkLabelEntry {
+    pub fn new(
+        value: String,
+        declaration_range: rowan::TextRange,
+        value_range: rowan::TextRange,
+        source: ChunkLabelSource,
+    ) -> Self {
+        Self {
+            value,
+            declaration_range,
+            value_range,
+            source,
+        }
+    }
+
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    pub fn source(&self) -> ChunkLabelSource {
+        self.source
+    }
+
+    pub fn declaration_range(&self) -> rowan::TextRange {
+        self.declaration_range
+    }
+
+    pub fn value_range(&self) -> rowan::TextRange {
+        self.value_range
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ChunkInfoItem {
+    Label(ChunkLabel),
+    Option(ChunkOption),
+}
+
+pub struct ChunkOptions(SyntaxNode);
+
+impl AstNode for ChunkOptions {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::CHUNK_OPTIONS
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self(syntax))
+        } else {
+            None
+        }
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl ChunkOptions {
+    pub fn options(&self) -> impl Iterator<Item = ChunkOption> {
+        support::children(&self.0)
+    }
+
+    pub fn labels(&self) -> impl Iterator<Item = ChunkLabel> {
+        self.0.children().filter_map(ChunkLabel::cast)
+    }
+
+    pub fn items(&self) -> impl Iterator<Item = ChunkInfoItem> {
+        self.0.children().filter_map(|child| {
+            if let Some(label) = ChunkLabel::cast(child.clone()) {
+                return Some(ChunkInfoItem::Label(label));
+            }
+            ChunkOption::cast(child).map(ChunkInfoItem::Option)
+        })
+    }
+
+    pub fn option_entries(&self, source: ChunkOptionSource) -> Vec<ChunkOptionEntry> {
+        self.options()
+            .map(|option| ChunkOptionEntry::new(option, source))
+            .collect()
+    }
+}
+
+pub fn collect_option_entries_from_descendants(
+    root: &SyntaxNode,
+    source: ChunkOptionSource,
+) -> Vec<ChunkOptionEntry> {
+    root.descendants()
+        .filter_map(ChunkOption::cast)
+        .map(|option| ChunkOptionEntry::new(option, source))
+        .collect()
 }
 
 #[cfg(test)]
@@ -137,6 +314,8 @@ x <- 1
 
         assert_eq!(option.key(), Some("fig.cap".to_string()));
         assert_eq!(option.value(), Some("A nice plot".to_string()));
+        assert!(option.key_range().is_some());
+        assert!(option.value_range().is_some());
         assert!(option.is_quoted());
         assert_eq!(option.quote_char(), Some('"'));
     }
@@ -156,6 +335,8 @@ x <- 1
 
         assert_eq!(option.key(), Some("echo".to_string()));
         assert_eq!(option.value(), Some("TRUE".to_string()));
+        assert!(option.key_range().is_some());
+        assert!(option.value_range().is_some());
         assert!(!option.is_quoted());
     }
 
@@ -173,5 +354,6 @@ x <- 1
             .expect("Should find chunk label");
 
         assert_eq!(label.text(), "mylabel");
+        assert!(!label.range().is_empty());
     }
 }

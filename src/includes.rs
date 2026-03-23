@@ -8,7 +8,7 @@ use rowan::TextRange;
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkOption, FootnoteDefinition, ReferenceDefinition, Shortcode,
+    AstNode, AttributeNode, CodeBlock, FootnoteDefinition, ReferenceDefinition, Shortcode,
     SyntaxKind, SyntaxNode,
 };
 use crate::utils::normalize_label;
@@ -160,21 +160,14 @@ pub fn collect_cross_doc_duplicates(
         }
     }
 
-    for option in tree.descendants().filter_map(ChunkOption::cast) {
-        let Some(key) = option.key() else {
-            continue;
-        };
-        if !key.eq_ignore_ascii_case("label") {
-            continue;
+    for block in tree.descendants().filter_map(CodeBlock::cast) {
+        for label in block.chunk_label_entries() {
+            if label.value().is_empty() {
+                continue;
+            }
+            let location = DefinitionLocation::new(doc_path, label.declaration_range(), input);
+            index.insert_crossref(label.value(), location);
         }
-        let Some(value) = option.value() else {
-            continue;
-        };
-        if value.is_empty() {
-            continue;
-        }
-        let location = DefinitionLocation::new(doc_path, option.syntax().text_range(), input);
-        index.insert_crossref(&value, location);
     }
 
     if config.extensions.bookdown_references {

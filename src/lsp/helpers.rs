@@ -8,8 +8,8 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkLabel, ChunkOption, Citation, Crossref, FootnoteReference,
-    ImageLink, Link, LinkRef, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
+    AstNode, AttributeNode, Citation, CodeBlock, Crossref, FootnoteReference, ImageLink, Link,
+    LinkRef, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
 };
 use crate::utils::normalize_label;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -228,33 +228,7 @@ pub(crate) fn extract_crossref_key(node: &SyntaxNode) -> Option<String> {
 }
 
 pub(crate) fn extract_chunk_label_key(node: &SyntaxNode) -> Option<String> {
-    if let Some(label) = ChunkLabel::cast(node.clone()) {
-        return Some(label.text());
-    }
-
-    if let Some(option) = ChunkOption::cast(node.clone())
-        && let (Some(key), Some(value)) = (option.key(), option.value())
-        && key.eq_ignore_ascii_case("label")
-    {
-        return Some(value);
-    }
-
-    let mut current = node.clone();
-    while let Some(parent) = current.parent() {
-        if let Some(label) = ChunkLabel::cast(parent.clone()) {
-            return Some(label.text());
-        }
-
-        if let Some(option) = ChunkOption::cast(parent.clone())
-            && let (Some(key), Some(value)) = (option.key(), option.value())
-            && key.eq_ignore_ascii_case("label")
-        {
-            return Some(value);
-        }
-        current = parent;
-    }
-
-    None
+    chunk_label_entry_at_node(node).map(|entry| entry.value().to_string())
 }
 
 pub(crate) fn extract_attribute_id_key(node: &SyntaxNode) -> Option<String> {
@@ -322,15 +296,8 @@ pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> 
     if let Some(citation) = Citation::cast(node.clone()) {
         return citation.keys().first().map(|key| key.text_range());
     }
-    if let Some(option) = ChunkOption::cast(node.clone())
-        && option
-            .key()
-            .is_some_and(|key| key.eq_ignore_ascii_case("label"))
-    {
-        return option.value_range();
-    }
-    if let Some(label) = ChunkLabel::cast(node.clone()) {
-        return Some(label.syntax().text_range());
+    if let Some(entry) = chunk_label_entry_at_node(node) {
+        return Some(entry.value_range());
     }
     if let Some(attribute) = AttributeNode::cast(node.clone())
         && attribute.id().is_some()
@@ -395,6 +362,20 @@ fn heading_target_from_link(link: &Link) -> Option<String> {
     }
 
     None
+}
+
+fn chunk_label_entry_at_node(node: &SyntaxNode) -> Option<crate::syntax::ChunkLabelEntry> {
+    let node_range = node.text_range();
+    let block = node_and_ancestors(node).find_map(CodeBlock::cast)?;
+    block.chunk_label_entries().into_iter().find(|entry| {
+        let declaration = entry.declaration_range();
+        let value = entry.value_range();
+        text_range_contains(declaration, node_range) || text_range_contains(value, node_range)
+    })
+}
+
+fn text_range_contains(outer: TextRange, inner: TextRange) -> bool {
+    outer.start() <= inner.start() && inner.end() <= outer.end()
 }
 
 #[cfg(test)]

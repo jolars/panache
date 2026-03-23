@@ -1,8 +1,7 @@
 use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, ChunkLabel, ChunkOption, SyntaxKind, SyntaxNode};
-use rowan::TextRange;
+use crate::syntax::{AstNode, ChunkInfoItem, ChunkLabel, ChunkLabelSource, CodeBlock, SyntaxNode};
 
 pub struct ChunkLabelSpacesRule;
 
@@ -20,76 +19,30 @@ impl Rule for ChunkLabelSpacesRule {
     ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
 
-        for chunk_options in tree
-            .descendants()
-            .filter(|node| node.kind() == SyntaxKind::CHUNK_OPTIONS)
-        {
-            diagnostics.extend(check_implicit_label_spaces(&chunk_options, input));
-            diagnostics.extend(check_explicit_label_spaces(&chunk_options, input));
+        for block in tree.descendants().filter_map(CodeBlock::cast) {
+            diagnostics.extend(check_chunk_label_spaces(&block, input));
         }
 
         diagnostics
     }
 }
 
-fn check_implicit_label_spaces(chunk_options: &SyntaxNode, input: &str) -> Vec<Diagnostic> {
-    let mut leading_labels = Vec::new();
-
-    for child in chunk_options.children() {
-        if let Some(label) = ChunkLabel::cast(child) {
-            leading_labels.push(label);
-        } else {
-            break;
-        }
-    }
-
-    if leading_labels.len() <= 1 {
-        return Vec::new();
-    }
-
-    let first = leading_labels
-        .first()
-        .unwrap()
-        .syntax()
-        .text_range()
-        .start();
-    let last = leading_labels.last().unwrap().syntax().text_range().end();
-    let label = leading_labels
-        .iter()
-        .map(|part| part.text())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let location = Location::from_range(TextRange::new(first, last), input);
-
-    vec![Diagnostic::warning(
-        location,
-        "chunk-label-spaces",
-        format!(
-            "Chunk label '{}' contains spaces and may break Quarto cross-references; use hyphens or underscores",
-            label
-        ),
-    )]
-}
-
-fn check_explicit_label_spaces(chunk_options: &SyntaxNode, input: &str) -> Vec<Diagnostic> {
+fn check_chunk_label_spaces(block: &CodeBlock, input: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for option in chunk_options.children().filter_map(ChunkOption::cast) {
-        let Some(key) = option.key() else {
-            continue;
-        };
-        if !key.eq_ignore_ascii_case("label") {
+    diagnostics.extend(check_implicit_label_spaces(block, input));
+
+    for label in block.chunk_label_entries() {
+        if label.source() == ChunkLabelSource::InlineLabel {
             continue;
         }
-        let Some(value) = option.value() else {
-            continue;
-        };
+        let value = label.value();
         if !value.chars().any(char::is_whitespace) {
             continue;
         }
 
         diagnostics.push(Diagnostic::warning(
-            Location::from_node(option.syntax(), input),
+            Location::from_range(label.value_range(), input),
             "chunk-label-spaces",
             format!(
                 "Chunk label '{}' contains spaces and may break Quarto cross-references; use hyphens or underscores",
@@ -99,6 +52,49 @@ fn check_explicit_label_spaces(chunk_options: &SyntaxNode, input: &str) -> Vec<D
     }
 
     diagnostics
+}
+
+fn check_implicit_label_spaces(block: &CodeBlock, input: &str) -> Vec<Diagnostic> {
+    let Some(info) = block.info() else {
+        return Vec::new();
+    };
+
+    let mut leading_labels: Vec<ChunkLabel> = Vec::new();
+    for item in info.chunk_items() {
+        match item {
+            ChunkInfoItem::Label(label) => leading_labels.push(label),
+            ChunkInfoItem::Option(_) => break,
+        }
+    }
+
+    if leading_labels.len() <= 1 {
+        return Vec::new();
+    }
+
+    let first = leading_labels
+        .first()
+        .expect("non-empty labels")
+        .range()
+        .start();
+    let last = leading_labels
+        .last()
+        .expect("non-empty labels")
+        .range()
+        .end();
+    let value = leading_labels
+        .iter()
+        .map(|label| label.text())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    vec![Diagnostic::warning(
+        Location::from_range(rowan::TextRange::new(first, last), input),
+        "chunk-label-spaces",
+        format!(
+            "Chunk label '{}' contains spaces and may break Quarto cross-references; use hyphens or underscores",
+            value
+        ),
+    )]
 }
 
 #[cfg(test)]

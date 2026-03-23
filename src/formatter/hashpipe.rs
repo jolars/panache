@@ -6,7 +6,7 @@
 use crate::config::WrapMode;
 use crate::parser::utils::chunk_options::ChunkOptionValue;
 use crate::parser::utils::chunk_options::hashpipe_comment_prefix;
-use crate::syntax::{AstNode, ChunkLabel, ChunkOption, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, ChunkInfoItem, CodeInfo, SyntaxNode};
 use crate::yaml_engine;
 
 /// A chunk option with a classified value (simple or expression).
@@ -231,24 +231,30 @@ pub fn split_options_from_cst_with_content(
 
     let mut entries: Vec<(String, Entry)> = Vec::new();
     let mut had_content_hashpipe = false;
+    let mut pending_label_parts: Vec<String> = Vec::new();
 
     // 1) Inline options from CODE_INFO CHUNK_OPTIONS (highest precedence)
-    let mut pending_label_parts = Vec::new();
-    for child in info_node.children() {
-        if child.kind() != SyntaxKind::CHUNK_OPTIONS {
-            continue;
-        }
+    let Some(info) = CodeInfo::cast(info_node.clone()) else {
+        return ((Vec::new(), Vec::new()), false);
+    };
 
-        for opt_or_label in child.children() {
-            if let Some(label) = ChunkLabel::cast(opt_or_label.clone()) {
-                pending_label_parts.push(label.text());
-            } else if let Some(opt) = ChunkOption::cast(opt_or_label) {
+    for item in info.chunk_items() {
+        match item {
+            ChunkInfoItem::Label(label) => {
+                let label_value = label.text();
+                if !label_value.is_empty() {
+                    pending_label_parts.push(label_value);
+                }
+            }
+            ChunkInfoItem::Option(opt) => {
                 if !pending_label_parts.is_empty() {
-                    let label_value = pending_label_parts.join(" ");
                     upsert(
                         &mut entries,
                         "label".to_string(),
-                        Entry::Simple(("label".to_string(), ChunkOptionValue::Simple(label_value))),
+                        Entry::Simple((
+                            "label".to_string(),
+                            ChunkOptionValue::Simple(pending_label_parts.join(" ")),
+                        )),
                     );
                     pending_label_parts.clear();
                 }
@@ -257,16 +263,17 @@ pub fn split_options_from_cst_with_content(
                 }
             }
         }
+    }
 
-        if !pending_label_parts.is_empty() {
-            let label_value = pending_label_parts.join(" ");
-            upsert(
-                &mut entries,
+    if !pending_label_parts.is_empty() {
+        upsert(
+            &mut entries,
+            "label".to_string(),
+            Entry::Simple((
                 "label".to_string(),
-                Entry::Simple(("label".to_string(), ChunkOptionValue::Simple(label_value))),
-            );
-        }
-        break;
+                ChunkOptionValue::Simple(pending_label_parts.join(" ")),
+            )),
+        );
     }
 
     // 2) Existing leading hashpipe options from CODE_CONTENT text (lower precedence).

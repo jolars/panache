@@ -1,7 +1,7 @@
 use crate::config::{Config, Flavor};
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
-use crate::syntax::{AstNode, CodeBlock, Crossref, SyntaxNode};
+use crate::syntax::{AstNode, ChunkOptionEntry, CodeBlock, Crossref, SyntaxNode};
 use crate::utils::{crossref_resolution_labels, normalize_label};
 use std::collections::HashMap;
 
@@ -68,14 +68,16 @@ fn collect_chunk_figure_caption_state(tree: &SyntaxNode) -> HashMap<String, bool
 
     for code_block in tree.descendants().filter_map(CodeBlock::cast) {
         let labels: Vec<String> = code_block
-            .chunk_labels()
+            .chunk_label_entries()
             .into_iter()
-            .map(|label| normalize_label(&label))
+            .map(|label| normalize_label(label.value()))
             .filter(|label| !label.is_empty())
             .collect();
 
-        let has_caption = code_block.has_chunk_option_key_with_nonempty_value("fig-cap")
-            || code_block.has_chunk_option_key_with_nonempty_value("fig.cap");
+        let has_caption = code_block
+            .merged_chunk_option_entries()
+            .into_iter()
+            .any(chunk_option_is_figure_caption);
 
         for label in labels {
             out.entry(label).or_insert(has_caption);
@@ -83,6 +85,12 @@ fn collect_chunk_figure_caption_state(tree: &SyntaxNode) -> HashMap<String, bool
     }
 
     out
+}
+
+fn chunk_option_is_figure_caption(entry: ChunkOptionEntry) -> bool {
+    entry.key().is_some_and(|key| {
+        key.eq_ignore_ascii_case("fig-cap") || key.eq_ignore_ascii_case("fig.cap")
+    }) && entry.value().is_some_and(|value| !value.is_empty())
 }
 
 fn is_bookdown_figure_crossref(label: &str) -> bool {

@@ -6,9 +6,9 @@ use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::syntax::{
-    AstNode, AttributeNode, ChunkLabel, ChunkOption, Citation, Crossref, FootnoteDefinition,
-    Heading, Link, ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode,
-    YamlRegion, collect_parsed_yaml_region_snapshots,
+    AstNode, AttributeNode, Citation, CodeBlock, Crossref, FootnoteDefinition, Heading, Link,
+    ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode, YamlRegion,
+    collect_parsed_yaml_region_snapshots,
 };
 use crate::utils::{implicit_heading_ids, normalize_label};
 use salsa::{Accumulator, Durability, Setter};
@@ -648,67 +648,31 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
         }
     }
 
-    for option in tree.descendants().filter_map(ChunkOption::cast) {
+    for block in tree.descendants().filter_map(CodeBlock::cast) {
         db.unwind_if_revision_cancelled();
-        let Some(key) = option.key() else {
-            continue;
-        };
-        if !key.eq_ignore_ascii_case("label") {
-            continue;
-        }
-        let Some(value) = option.value() else {
-            continue;
-        };
-        if value.is_empty() {
-            continue;
-        }
-        index
-            .crossref_declarations
-            .entry(normalize_label(&value))
-            .or_default()
-            .push(option.syntax().text_range());
-        if let Some(value_range) = option
-            .syntax()
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .find(|t| t.kind() == SyntaxKind::CHUNK_OPTION_VALUE)
-            .map(|t| t.text_range())
-        {
+        for label in block.chunk_label_entries() {
+            let value = label.value().to_string();
+            if value.is_empty() {
+                continue;
+            }
+            let normalized = normalize_label(&value);
+
+            index
+                .crossref_declarations
+                .entry(normalized.clone())
+                .or_default()
+                .push(label.declaration_range());
             index
                 .chunk_label_value_ranges
-                .entry(normalize_label(&value))
+                .entry(normalized.clone())
                 .or_default()
-                .push(value_range);
+                .push(label.value_range());
             index
                 .crossref_declaration_value_ranges
-                .entry(normalize_label(&value))
+                .entry(normalized)
                 .or_default()
-                .push(value_range);
+                .push(label.value_range());
         }
-    }
-
-    for label in tree.descendants().filter_map(ChunkLabel::cast) {
-        db.unwind_if_revision_cancelled();
-        let value = label.text();
-        if value.is_empty() {
-            continue;
-        }
-
-        index
-            .crossref_declarations
-            .entry(normalize_label(&value))
-            .or_default()
-            .push(label.syntax().text_range());
-        index
-            .chunk_label_value_ranges
-            .entry(normalize_label(&value))
-            .or_default()
-            .push(label.syntax().text_range());
-        index
-            .crossref_declaration_value_ranges
-            .entry(normalize_label(&value))
-            .or_default()
-            .push(label.syntax().text_range());
     }
 
     for entry in implicit_heading_ids(tree) {
@@ -885,25 +849,19 @@ pub fn definition_index(
         }
     }
 
-    for option in tree.descendants().filter_map(ChunkOption::cast) {
+    for block in tree.descendants().filter_map(CodeBlock::cast) {
         db.unwind_if_revision_cancelled();
-        let Some(key) = option.key() else {
-            continue;
-        };
-        if !key.eq_ignore_ascii_case("label") {
-            continue;
+        for label in block.chunk_label_entries() {
+            let value = label.value();
+            if value.is_empty() {
+                continue;
+            }
+            let location = DefinitionLocation {
+                path: path.clone(),
+                range: label.declaration_range(),
+            };
+            insert_crossref(db, &mut index, value, location);
         }
-        let Some(value) = option.value() else {
-            continue;
-        };
-        if value.is_empty() {
-            continue;
-        }
-        let location = DefinitionLocation {
-            path: path.clone(),
-            range: option.syntax().text_range(),
-        };
-        insert_crossref(db, &mut index, &value, location);
     }
 
     if config.config(db).extensions.bookdown_references {
