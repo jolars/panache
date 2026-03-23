@@ -18,7 +18,7 @@ This document tracks implementation status for Panache's features.
       refreshes MEDIUM.
 - [x] Add ignored durability measurement harness (`tests/durability_bench.rs`)
       for HIGH vs LOW revalidation cost.
-- [ ] Finalize and document durability update/invalidation policy based on
+- [x] Finalize and document durability update/invalidation policy based on
       measurements before broader rollout.
 
 ### Core LSP Capabilities

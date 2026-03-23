@@ -1422,6 +1422,37 @@ impl Db for SalsaDb {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static STABLE_QUERY_RUNS: AtomicUsize = AtomicUsize::new(0);
+
+    #[salsa::input]
+    struct VolatileInput {
+        value: u32,
+    }
+
+    #[salsa::tracked]
+    fn stable_file_len(db: &dyn Db, file: FileText) -> usize {
+        STABLE_QUERY_RUNS.fetch_add(1, Ordering::Relaxed);
+        file.text(db).len()
+    }
+
+    #[salsa::tracked]
+    fn volatile_probe(db: &dyn Db, volatile: VolatileInput) -> u32 {
+        volatile.value(db)
+    }
+
+    fn unique_temp_path(stem: &str, suffix: &str) -> PathBuf {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "panache-{stem}-{}-{now}{suffix}",
+            std::process::id()
+        ))
+    }
 
     #[test]
     fn intern_normalized_label_collapses_and_lowercases() {
@@ -1837,5 +1868,40 @@ mod tests {
                 .iter()
                 .any(|region| matches!(region.kind, crate::syntax::YamlRegionKind::Hashpipe))
         );
+    }
+
+    #[test]
+    fn high_durability_file_is_not_revalidated_by_low_updates() {
+        let mut db = SalsaDb::default();
+        STABLE_QUERY_RUNS.store(0, Ordering::Relaxed);
+
+        let stable_path = unique_temp_path("durability-stable-high", ".qmd");
+        std::fs::write(&stable_path, "stable high durability").expect("write high durability file");
+
+        assert!(db.ensure_file_text_cached(stable_path.clone()));
+        let stable_file = db
+            .file_text(stable_path.clone())
+            .expect("stable file should be cached");
+        let volatile = VolatileInput::new(&db, 0);
+        let noisy_path = unique_temp_path("durability-noisy-high", ".qmd");
+
+        let baseline = stable_file_len(&db, stable_file);
+        let baseline_runs = STABLE_QUERY_RUNS.load(Ordering::Relaxed);
+        assert!(baseline_runs >= 1);
+
+        for i in 1..=20 {
+            db.update_file_text(noisy_path.clone(), format!("noisy-{i}"));
+            volatile.set_value(&mut db).to(i);
+            assert_eq!(volatile_probe(&db, volatile), i);
+            assert_eq!(stable_file_len(&db, stable_file), baseline);
+        }
+
+        assert_eq!(
+            STABLE_QUERY_RUNS.load(Ordering::Relaxed),
+            baseline_runs,
+            "HIGH durability inputs should not be revalidated on LOW updates"
+        );
+
+        let _ = std::fs::remove_file(stable_path);
     }
 }
