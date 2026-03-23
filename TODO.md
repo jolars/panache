@@ -537,3 +537,10 @@ matching Pandoc's AST structure exactly.
 
 - [ ] Investigate caching strategies for improved performance, particularly for
       CLI linting.
+
+## Math Parser and Formatter
+
+- [ ] Implement a math parser that produces a CST for inline and display math
+      (initial focus on TeX math with `$...$` and `$$...$$` delimiters).
+- [ ] Implement a math formatter that can reformat math content while preserving
+      semantics and idempotency (i.e., `format(format(math)) == format(math)`.
