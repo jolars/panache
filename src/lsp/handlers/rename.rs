@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
@@ -13,6 +13,15 @@ use crate::metadata::{inline_bib_conflicts, inline_reference_map};
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
 use crate::utils::normalize_label;
+
+struct RenameScanContext<'a> {
+    salsa_db: &'a Arc<Mutex<crate::salsa::SalsaDb>>,
+    salsa_file: crate::salsa::FileText,
+    salsa_config: crate::salsa::FileConfig,
+    doc_path: &'a Path,
+    uri: &'a Uri,
+    content: &'a str,
+}
 
 pub(crate) async fn rename(
     client: &tower_lsp_server::Client,
@@ -69,68 +78,21 @@ pub(crate) async fn rename(
 
     // First handle crossref/chunk-label rename without requiring bibliography metadata.
     if let Some(SymbolTarget::Crossref(old_key)) = target.as_ref() {
-        let old_norm = normalize_label(old_key);
-        let search_keys =
-            crate::utils::crossref_symbol_labels(&old_norm, config.extensions.bookdown_references);
-        let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
-
-        let per_doc = crate::lsp::navigation::project_symbol_documents(
-            &salsa_db,
-            salsa_file,
-            salsa_config,
-            &doc_path,
-            &uri,
-            &content,
+        let changes = rename_crossref_symbol(
+            &RenameScanContext {
+                salsa_db: &salsa_db,
+                salsa_file,
+                salsa_config,
+                doc_path: &doc_path,
+                uri: &uri,
+                content: &content,
+            },
+            old_key,
+            &new_name,
+            config.extensions.bookdown_references,
         )
         .await;
-
-        for doc in per_doc {
-            let doc_uri = doc.uri;
-            let text = doc.text;
-            let symbol_index = doc.symbol_index;
-            let mut edits = Vec::new();
-            for search_key in &search_keys {
-                if let Some(ranges) = symbol_index.crossref_usages(search_key) {
-                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
-                }
-                if let Some(ranges) = symbol_index.chunk_label_value_ranges(search_key) {
-                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
-                }
-                if let Some(ranges) = symbol_index.crossref_declaration_value_ranges(search_key) {
-                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
-                }
-            }
-
-            if config.extensions.bookdown_references {
-                let insert_ranges = symbol_index
-                    .implicit_heading_insert_ranges(&old_norm)
-                    .cloned()
-                    .unwrap_or_default();
-                edits.extend(text_edits_from_ranges(
-                    &insert_ranges,
-                    &text,
-                    &format!(" {{#{}}}", new_name),
-                ));
-            }
-
-            if edits.is_empty() {
-                continue;
-            }
-            log::debug!(
-                "rename[crossref]: uri={:?} edits={} keys={:?}",
-                doc_uri,
-                edits.len(),
-                search_keys
-            );
-            changes.entry(doc_uri).or_default().extend(edits);
-        }
-
         if changes.is_empty() {
-            log::debug!(
-                "rename[crossref]: no edits produced old_key={:?} old_norm={:?}",
-                old_key,
-                old_norm
-            );
             return Ok(None);
         }
         return Ok(Some(WorkspaceEdit {
@@ -140,42 +102,20 @@ pub(crate) async fn rename(
     }
 
     if let Some(SymbolTarget::ChunkLabel(old_key)) = target.as_ref() {
-        let old_norm = normalize_label(old_key);
-        let search_keys =
-            crate::utils::crossref_symbol_labels(&old_norm, config.extensions.bookdown_references);
-        let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
-
-        let per_doc = crate::lsp::navigation::project_symbol_documents(
-            &salsa_db,
-            salsa_file,
-            salsa_config,
-            &doc_path,
-            &uri,
-            &content,
+        let changes = rename_chunk_label_symbol(
+            &RenameScanContext {
+                salsa_db: &salsa_db,
+                salsa_file,
+                salsa_config,
+                doc_path: &doc_path,
+                uri: &uri,
+                content: &content,
+            },
+            old_key,
+            &new_name,
+            config.extensions.bookdown_references,
         )
         .await;
-
-        for doc in per_doc {
-            let doc_uri = doc.uri;
-            let text = doc.text;
-            let symbol_index = doc.symbol_index;
-            let mut edits = Vec::new();
-
-            for search_key in &search_keys {
-                if let Some(ranges) = symbol_index.chunk_label_value_ranges(search_key) {
-                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
-                }
-                if let Some(ranges) = symbol_index.crossref_usages(search_key) {
-                    edits.extend(text_edits_from_ranges(ranges, &text, &new_name));
-                }
-            }
-
-            if edits.is_empty() {
-                continue;
-            }
-            changes.entry(doc_uri).or_default().extend(edits);
-        }
-
         if changes.is_empty() {
             return Ok(None);
         }
@@ -381,4 +321,119 @@ fn text_edits_from_ranges(
         });
     }
     edits
+}
+
+async fn rename_crossref_symbol(
+    ctx: &RenameScanContext<'_>,
+    old_key: &str,
+    new_name: &str,
+    bookdown_references: bool,
+) -> HashMap<Uri, Vec<TextEdit>> {
+    let old_norm = normalize_label(old_key);
+    let search_keys = crate::utils::crossref_symbol_labels(&old_norm, bookdown_references);
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+
+    let per_doc = crate::lsp::navigation::project_symbol_documents(
+        ctx.salsa_db,
+        ctx.salsa_file,
+        ctx.salsa_config,
+        ctx.doc_path,
+        ctx.uri,
+        ctx.content,
+    )
+    .await;
+
+    for doc in per_doc {
+        let doc_uri = doc.uri;
+        let text = doc.text;
+        let symbol_index = doc.symbol_index;
+        let mut edits = Vec::new();
+        for search_key in &search_keys {
+            if let Some(ranges) = symbol_index.crossref_usages(search_key) {
+                edits.extend(text_edits_from_ranges(ranges, &text, new_name));
+            }
+            if let Some(ranges) = symbol_index.chunk_label_value_ranges(search_key) {
+                edits.extend(text_edits_from_ranges(ranges, &text, new_name));
+            }
+            if let Some(ranges) = symbol_index.crossref_declaration_value_ranges(search_key) {
+                edits.extend(text_edits_from_ranges(ranges, &text, new_name));
+            }
+        }
+
+        if bookdown_references {
+            let insert_ranges = symbol_index
+                .implicit_heading_insert_ranges(&old_norm)
+                .cloned()
+                .unwrap_or_default();
+            edits.extend(text_edits_from_ranges(
+                &insert_ranges,
+                &text,
+                &format!(" {{#{}}}", new_name),
+            ));
+        }
+
+        if edits.is_empty() {
+            continue;
+        }
+        log::debug!(
+            "rename[crossref]: uri={:?} edits={} keys={:?}",
+            doc_uri,
+            edits.len(),
+            search_keys
+        );
+        changes.entry(doc_uri).or_default().extend(edits);
+    }
+
+    if changes.is_empty() {
+        log::debug!(
+            "rename[crossref]: no edits produced old_key={:?} old_norm={:?}",
+            old_key,
+            old_norm
+        );
+    }
+    changes
+}
+
+async fn rename_chunk_label_symbol(
+    ctx: &RenameScanContext<'_>,
+    old_key: &str,
+    new_name: &str,
+    bookdown_references: bool,
+) -> HashMap<Uri, Vec<TextEdit>> {
+    let old_norm = normalize_label(old_key);
+    let search_keys = crate::utils::crossref_symbol_labels(&old_norm, bookdown_references);
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+
+    let per_doc = crate::lsp::navigation::project_symbol_documents(
+        ctx.salsa_db,
+        ctx.salsa_file,
+        ctx.salsa_config,
+        ctx.doc_path,
+        ctx.uri,
+        ctx.content,
+    )
+    .await;
+
+    for doc in per_doc {
+        let doc_uri = doc.uri;
+        let text = doc.text;
+        let symbol_index = doc.symbol_index;
+        let mut edits = Vec::new();
+
+        for search_key in &search_keys {
+            if let Some(ranges) = symbol_index.chunk_label_value_ranges(search_key) {
+                edits.extend(text_edits_from_ranges(ranges, &text, new_name));
+            }
+            if let Some(ranges) = symbol_index.crossref_usages(search_key) {
+                edits.extend(text_edits_from_ranges(ranges, &text, new_name));
+            }
+        }
+
+        if edits.is_empty() {
+            continue;
+        }
+        changes.entry(doc_uri).or_default().extend(edits);
+    }
+
+    changes
 }

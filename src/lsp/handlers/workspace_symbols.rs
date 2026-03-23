@@ -14,7 +14,7 @@ use tower_lsp_server::ls_types::{
 use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
 use crate::salsa::{Db, HeadingOutlineEntry};
-use crate::syntax::{AstNode, Heading, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, Document, Heading, SyntaxNode};
 
 pub(crate) async fn workspace_symbol(
     _client: &Client,
@@ -120,11 +120,12 @@ pub(crate) async fn workspace_symbol(
 }
 
 fn heading_outline_from_root(root: &SyntaxNode) -> Vec<HeadingOutlineEntry> {
-    if root.kind() != SyntaxKind::DOCUMENT {
+    let Some(document) = Document::cast(root.clone()) else {
         return Vec::new();
-    }
+    };
 
-    root.children()
+    document
+        .blocks()
         .filter_map(Heading::cast)
         .filter(|heading| crate::salsa::is_structural_heading_node(heading.syntax()))
         .filter_map(|heading| {
@@ -133,15 +134,11 @@ fn heading_outline_from_root(root: &SyntaxNode) -> Vec<HeadingOutlineEntry> {
                 return None;
             }
 
-            let title = heading.text();
+            let title = heading.title_or("(empty)");
             Some(HeadingOutlineEntry {
-                title: if title.is_empty() {
-                    "(empty)".to_string()
-                } else {
-                    title
-                },
+                title,
                 level,
-                range: heading.syntax().text_range(),
+                range: heading.text_range(),
             })
         })
         .collect()

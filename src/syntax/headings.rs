@@ -65,6 +65,21 @@ impl Heading {
         self.content().map(|c| c.text()).unwrap_or_default()
     }
 
+    /// Returns the heading text range.
+    pub fn text_range(&self) -> rowan::TextRange {
+        self.0.text_range()
+    }
+
+    /// Returns heading text, or a placeholder when empty.
+    pub fn title_or(&self, placeholder: &str) -> String {
+        let text = self.text();
+        if text.is_empty() {
+            placeholder.to_string()
+        } else {
+            text
+        }
+    }
+
     /// Returns the text range of the ATX marker token (e.g. `###`), if this is an ATX heading.
     pub fn atx_marker_range(&self) -> Option<rowan::TextRange> {
         self.0
@@ -109,5 +124,28 @@ impl HeadingContent {
             .filter(|token| token.kind() == SyntaxKind::TEXT)
             .map(|token| token.text().to_string())
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn heading_title_or_returns_placeholder_for_empty_heading() {
+        let tree = crate::parse("# \n", None);
+        let heading = tree.descendants().find_map(Heading::cast).expect("heading");
+        assert_eq!(heading.title_or("(empty)"), "(empty)");
+    }
+
+    #[test]
+    fn heading_atx_marker_range_points_to_hashes() {
+        let input = "### Title\n";
+        let tree = crate::parse(input, None);
+        let heading = tree.descendants().find_map(Heading::cast).expect("heading");
+        let range = heading.atx_marker_range().expect("marker range");
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        assert_eq!(&input[start..end], "###");
     }
 }

@@ -2,33 +2,21 @@
 //!
 //! Provides functions to convert footnotes between inline and reference styles.
 
-use crate::syntax::{
-    AstNode, FootnoteDefinition, FootnoteReference, InlineFootnote, SyntaxKind, SyntaxNode,
-};
+use crate::syntax::{AstNode, FootnoteDefinition, FootnoteReference, InlineFootnote, SyntaxNode};
 use tower_lsp_server::ls_types::{Range, TextEdit};
 
 use super::super::conversions::offset_to_position;
 
 /// Find the innermost FOOTNOTE_REFERENCE node at the given position.
 pub fn find_footnote_reference_at_position(tree: &SyntaxNode, offset: usize) -> Option<SyntaxNode> {
-    let text_size = rowan::TextSize::from(offset as u32);
-    let token = tree.token_at_offset(text_size).right_biased()?;
-
-    // Walk up the tree to find a FOOTNOTE_REFERENCE node
-    token
-        .parent_ancestors()
-        .find(|node| node.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+    find_ancestor_at_offset(tree, offset, FootnoteReference::cast)
+        .map(|reference| reference.syntax().clone())
 }
 
 /// Find the innermost INLINE_FOOTNOTE node at the given position.
 pub fn find_inline_footnote_at_position(tree: &SyntaxNode, offset: usize) -> Option<SyntaxNode> {
-    let text_size = rowan::TextSize::from(offset as u32);
-    let token = tree.token_at_offset(text_size).right_biased()?;
-
-    // Walk up the tree to find an INLINE_FOOTNOTE node
-    token
-        .parent_ancestors()
-        .find(|node| node.kind() == SyntaxKind::INLINE_FOOTNOTE)
+    find_ancestor_at_offset(tree, offset, InlineFootnote::cast)
+        .map(|inline| inline.syntax().clone())
 }
 
 /// Check if a footnote reference can be converted to inline style.
@@ -175,7 +163,9 @@ pub fn convert_to_reference(
     // Determine if we need leading newlines
     let prefix = if tree
         .descendants()
-        .any(|n| n.kind() == SyntaxKind::FOOTNOTE_DEFINITION)
+        .filter_map(FootnoteDefinition::cast)
+        .next()
+        .is_some()
     {
         // There are existing definitions, just add a newline before our definition
         "\n"
@@ -195,6 +185,16 @@ pub fn convert_to_reference(
     edits
 }
 
+fn find_ancestor_at_offset<T: AstNode<Language = crate::syntax::PanacheLanguage>>(
+    tree: &SyntaxNode,
+    offset: usize,
+    cast: fn(SyntaxNode) -> Option<T>,
+) -> Option<T> {
+    let text_size = rowan::TextSize::from(offset as u32);
+    let token = tree.token_at_offset(text_size).right_biased()?;
+    token.parent_ancestors().find_map(cast)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,7 +209,7 @@ mod tests {
         let offset = input.find("[^1]").unwrap() + 2;
         let node =
             find_footnote_reference_at_position(&tree, offset).expect("Should find reference");
-        assert_eq!(node.kind(), SyntaxKind::FOOTNOTE_REFERENCE);
+        assert!(FootnoteReference::cast(node).is_some());
     }
 
     #[test]
@@ -220,7 +220,7 @@ mod tests {
         // Position inside inline footnote
         let offset = input.find("Inline").unwrap();
         let node = find_inline_footnote_at_position(&tree, offset).expect("Should find inline");
-        assert_eq!(node.kind(), SyntaxKind::INLINE_FOOTNOTE);
+        assert!(InlineFootnote::cast(node).is_some());
     }
 
     #[test]
@@ -230,7 +230,8 @@ mod tests {
 
         let ref_node = tree
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+            .find_map(FootnoteReference::cast)
+            .map(|reference| reference.syntax().clone())
             .unwrap();
 
         assert!(can_convert_to_inline(&ref_node, &tree));
@@ -243,7 +244,8 @@ mod tests {
 
         let ref_node = tree
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+            .find_map(FootnoteReference::cast)
+            .map(|reference| reference.syntax().clone())
             .unwrap();
 
         assert!(!can_convert_to_inline(&ref_node, &tree));
@@ -256,7 +258,8 @@ mod tests {
 
         let ref_node = tree
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
+            .find_map(FootnoteReference::cast)
+            .map(|reference| reference.syntax().clone())
             .unwrap();
 
         let edits = convert_to_inline(&ref_node, &tree, input);
@@ -292,7 +295,8 @@ mod tests {
 
         let inline_node = tree
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::INLINE_FOOTNOTE)
+            .find_map(InlineFootnote::cast)
+            .map(|inline| inline.syntax().clone())
             .unwrap();
 
         let edits = convert_to_reference(&inline_node, &tree, input);
@@ -310,7 +314,8 @@ mod tests {
 
         let inline_node = tree
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::INLINE_FOOTNOTE)
+            .find_map(InlineFootnote::cast)
+            .map(|inline| inline.syntax().clone())
             .unwrap();
 
         let edits = convert_to_reference(&inline_node, &tree, input);

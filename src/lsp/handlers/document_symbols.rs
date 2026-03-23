@@ -10,10 +10,7 @@ use tower_lsp_server::ls_types::*;
 use crate::lsp::DocumentState;
 use crate::lsp::conversions::offset_to_position;
 use crate::lsp::helpers::get_document_content_and_tree;
-use crate::syntax::{
-    AstNode, Document, GridTable, Heading, ImageLink, MultilineTable, PipeTable, SimpleTable,
-    SyntaxKind, SyntaxNode,
-};
+use crate::syntax::{AstNode, Document, Heading, ImageLink, SyntaxKind, SyntaxNode, Table};
 
 pub async fn document_symbol(
     _client: &Client,
@@ -104,7 +101,9 @@ fn build_document_symbols(
             | SyntaxKind::PIPE_TABLE
             | SyntaxKind::GRID_TABLE
             | SyntaxKind::MULTILINE_TABLE => {
-                if let Some(symbol) = extract_table_symbol(&node, content) {
+                if let Some(table) = Table::cast(node.clone())
+                    && let Some(symbol) = extract_table_symbol(&table, content)
+                {
                     // Add to current heading section or root
                     if let Some((_, heading)) = heading_stack.last_mut() {
                         heading.children.get_or_insert_with(Vec::new).push(symbol);
@@ -167,16 +166,12 @@ fn extract_yaml_region_symbol(
 fn extract_heading_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {
     // Use typed wrapper
     let heading = Heading::cast(node.clone())?;
-    let text = heading.text();
+    let text = heading.title_or("(empty)");
 
     let range = node_to_range(node, content)?;
 
     Some(make_document_symbol(
-        if text.is_empty() {
-            "(empty)".to_string()
-        } else {
-            text
-        },
+        text,
         None,
         SymbolKind::NAMESPACE,
         range,
@@ -185,14 +180,8 @@ fn extract_heading_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSy
     ))
 }
 
-fn extract_table_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymbol> {
-    // Use typed wrappers to extract caption
-    let caption = PipeTable::cast(node.clone())
-        .and_then(|t| t.caption())
-        .or_else(|| GridTable::cast(node.clone()).and_then(|t| t.caption()))
-        .or_else(|| SimpleTable::cast(node.clone()).and_then(|t| t.caption()))
-        .or_else(|| MultilineTable::cast(node.clone()).and_then(|t| t.caption()))
-        .map(|c| c.text());
+fn extract_table_symbol(table: &Table, content: &str) -> Option<DocumentSymbol> {
+    let caption = table.caption().map(|caption| caption.text());
 
     let name = if let Some(cap) = caption {
         format!("Table: {}", cap)
@@ -200,8 +189,8 @@ fn extract_table_symbol(node: &SyntaxNode, content: &str) -> Option<DocumentSymb
         "Table".to_string()
     };
 
-    let range = node_to_range(node, content)?;
-    let selection_range = node_to_range(node, content)?;
+    let range = node_to_range(table.syntax(), content)?;
+    let selection_range = node_to_range(table.syntax(), content)?;
 
     Some(make_document_symbol(
         name,

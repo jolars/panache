@@ -69,7 +69,7 @@ fn collect_headings(tree: &SyntaxNode) -> Vec<(rowan::TextRange, usize)> {
 fn heading_node_at_range(tree: &SyntaxNode, range: rowan::TextRange) -> Option<SyntaxNode> {
     tree.descendants().find_map(|node| {
         let heading = Heading::cast(node)?;
-        (heading.syntax().text_range() == range).then(|| heading.syntax().clone())
+        (heading.text_range() == range).then(|| heading.syntax().clone())
     })
 }
 

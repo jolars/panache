@@ -223,6 +223,11 @@ impl LinkRef {
             .find(|token| token.kind() == SyntaxKind::TEXT)
             .map(|token| token.text_range())
     }
+
+    /// Returns the text range for the label value (without brackets).
+    pub fn label_value_range(&self) -> Option<rowan::TextRange> {
+        self.label_range()
+    }
 }
 
 pub struct ImageLink(SyntaxNode);

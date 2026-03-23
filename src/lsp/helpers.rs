@@ -8,8 +8,8 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, AttributeNode, Citation, CodeBlock, Crossref, FootnoteReference, ImageLink, Link,
-    LinkRef, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
+    AstNode, AttributeNode, Citation, CodeBlock, CodeSpan, Crossref, FootnoteReference, ImageLink,
+    InlineMath, Link, LinkRef, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
 };
 use crate::utils::normalize_label;
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -309,17 +309,35 @@ pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> 
             return dest.hash_anchor_id_range();
         }
         if let Some(link_ref) = link.reference() {
-            return link_ref.label_range();
+            return link_ref.label_value_range();
         }
         if link.reference().is_none() {
             return link.text().map(|text| text.syntax().text_range());
         }
     }
 
+    if let Some(math) = InlineMath::cast(node.clone())
+        && let Some(range) = math.content_range()
+    {
+        return Some(range);
+    }
+
+    if let Some(code) = CodeSpan::cast(node.clone())
+        && let Some(range) = code.content_range()
+    {
+        return Some(range);
+    }
+
     if let Some(image) = ImageLink::cast(node.clone())
         && let Some(range) = image.reference_label_range()
     {
         return Some(range);
+    }
+
+    if let Some(footnote_ref) = FootnoteReference::cast(node.clone()) {
+        return footnote_ref
+            .id_value_range()
+            .or_else(|| Some(footnote_ref.id_range()));
     }
 
     None
@@ -390,22 +408,9 @@ fn extract_reference_definition_label(node: &SyntaxNode) -> Option<String> {
 fn extract_definition_label(node: &SyntaxNode) -> Option<String> {
     match node.kind() {
         SyntaxKind::REFERENCE_DEFINITION => extract_reference_definition_label(node),
-        SyntaxKind::FOOTNOTE_DEFINITION => {
-            // FootnoteDefinition has a FootnoteReference token with text like "[^1]: "
-            node.children_with_tokens()
-                .filter_map(|child| child.into_token())
-                .find(|token| token.kind() == SyntaxKind::FOOTNOTE_REFERENCE)
-                .and_then(|token| {
-                    let text = token.text();
-                    // Extract ID from "[^id]: " format
-                    if text.starts_with("[^") && text.contains("]:") {
-                        let id = text.trim_start_matches("[^").split(']').next()?;
-                        Some(normalize_label(id))
-                    } else {
-                        None
-                    }
-                })
-        }
+        SyntaxKind::FOOTNOTE_DEFINITION => crate::syntax::FootnoteDefinition::cast(node.clone())
+            .map(|def| normalize_label(&def.id()))
+            .filter(|label| !label.is_empty()),
         _ => None,
     }
 }
@@ -458,6 +463,36 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_symbol_text_range_for_inline_math_content() {
+        let input = "Text with $x^2$ inline math";
+        let root = parse(input);
+        let node = root
+            .descendants()
+            .find_map(InlineMath::cast)
+            .expect("inline math");
+
+        let range = extract_symbol_text_range(node.syntax()).expect("content range");
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        assert_eq!(&input[start..end], "x^2");
+    }
+
+    #[test]
+    fn test_extract_symbol_text_range_for_code_span_content() {
+        let input = "Use `fmt` command";
+        let root = parse(input);
+        let node = root
+            .descendants()
+            .find_map(CodeSpan::cast)
+            .expect("code span");
+
+        let range = extract_symbol_text_range(node.syntax()).expect("content range");
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        assert_eq!(&input[start..end], "fmt");
+    }
+
+    #[test]
     fn test_find_node_at_offset() {
         let root = parse("[text][ref]");
 
@@ -504,6 +539,21 @@ mod tests {
             extract_reference_label(footnote_ref.syntax()).expect("Should extract label");
         assert_eq!(label, "1");
         assert!(is_footnote);
+    }
+
+    #[test]
+    fn test_extract_symbol_text_range_for_footnote_id_value() {
+        let input = "Text[^note] here";
+        let root = parse(input);
+        let node = root
+            .descendants()
+            .find_map(FootnoteReference::cast)
+            .expect("footnote reference");
+
+        let range = extract_symbol_text_range(node.syntax()).expect("id value range");
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        assert_eq!(&input[start..end], "note");
     }
 
     #[test]

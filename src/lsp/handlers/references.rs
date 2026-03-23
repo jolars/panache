@@ -72,24 +72,10 @@ pub(crate) async fn references(
             let symbol_index = doc.symbol_index;
 
             match &target {
-                SymbolTarget::Crossref(label)
-                | SymbolTarget::ChunkLabel(label)
-                | SymbolTarget::HeadingLink(label)
-                | SymbolTarget::HeadingId(label) => {
-                    if matches!(
-                        &target,
-                        SymbolTarget::HeadingLink(_) | SymbolTarget::HeadingId(_)
-                    ) {
-                        let ranges =
-                            symbol_index.heading_reference_ranges(label, include_declaration);
-                        add_locations(&mut locations, &doc_uri, &text, &ranges);
-                        continue;
-                    }
-
-                    for candidate in crate::utils::crossref_symbol_labels(
-                        &normalize_label(label),
-                        config.extensions.bookdown_references,
-                    ) {
+                SymbolTarget::Crossref(label) => {
+                    let candidates =
+                        crossref_candidates(label, config.extensions.bookdown_references);
+                    for candidate in candidates {
                         if let Some(ranges) = symbol_index.crossref_usages(&candidate) {
                             add_locations(&mut locations, &doc_uri, &text, ranges);
                         }
@@ -100,18 +86,24 @@ pub(crate) async fn references(
                             add_locations(&mut locations, &doc_uri, &text, ranges);
                         }
                     }
-
-                    if matches!(&target, SymbolTarget::ChunkLabel(_)) && include_declaration {
-                        for candidate in crate::utils::crossref_symbol_labels(
-                            &normalize_label(label),
-                            config.extensions.bookdown_references,
-                        ) {
-                            if let Some(ranges) = symbol_index.chunk_label_value_ranges(&candidate)
-                            {
-                                add_locations(&mut locations, &doc_uri, &text, ranges);
-                            }
+                }
+                SymbolTarget::ChunkLabel(label) => {
+                    let candidates =
+                        crossref_candidates(label, config.extensions.bookdown_references);
+                    for candidate in candidates {
+                        if let Some(ranges) = symbol_index.crossref_usages(&candidate) {
+                            add_locations(&mut locations, &doc_uri, &text, ranges);
+                        }
+                        if include_declaration
+                            && let Some(ranges) = symbol_index.chunk_label_value_ranges(&candidate)
+                        {
+                            add_locations(&mut locations, &doc_uri, &text, ranges);
                         }
                     }
+                }
+                SymbolTarget::HeadingLink(label) | SymbolTarget::HeadingId(label) => {
+                    let ranges = symbol_index.heading_reference_ranges(label, include_declaration);
+                    add_locations(&mut locations, &doc_uri, &text, &ranges);
                 }
                 SymbolTarget::Citation(key) => {
                     let norm = normalize_label(key);
@@ -195,4 +187,8 @@ fn add_locations(out: &mut Vec<Location>, uri: &Uri, text: &str, ranges: &[rowan
             },
         });
     }
+}
+
+fn crossref_candidates(label: &str, bookdown_references: bool) -> Vec<String> {
+    crate::utils::crossref_symbol_labels(&normalize_label(label), bookdown_references)
 }

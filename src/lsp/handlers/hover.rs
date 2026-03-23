@@ -273,8 +273,10 @@ mod tests {
         // Find the footnote reference node
         let footnote_ref = root
             .descendants()
-            .find(|n| n.kind() == crate::syntax::SyntaxKind::FOOTNOTE_REFERENCE)
-            .expect("Should find footnote reference");
+            .find_map(crate::syntax::FootnoteReference::cast)
+            .expect("Should find footnote reference")
+            .syntax()
+            .clone();
 
         // Extract the label
         let (label, is_footnote) =

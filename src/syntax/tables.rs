@@ -37,6 +37,46 @@ impl PipeTable {
     }
 }
 
+pub enum Table {
+    Pipe(PipeTable),
+    Grid(GridTable),
+    Simple(SimpleTable),
+    Multiline(MultilineTable),
+}
+
+impl Table {
+    pub fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if let Some(table) = PipeTable::cast(syntax.clone()) {
+            return Some(Self::Pipe(table));
+        }
+        if let Some(table) = GridTable::cast(syntax.clone()) {
+            return Some(Self::Grid(table));
+        }
+        if let Some(table) = SimpleTable::cast(syntax.clone()) {
+            return Some(Self::Simple(table));
+        }
+        MultilineTable::cast(syntax).map(Self::Multiline)
+    }
+
+    pub fn syntax(&self) -> &SyntaxNode {
+        match self {
+            Self::Pipe(table) => table.syntax(),
+            Self::Grid(table) => table.syntax(),
+            Self::Simple(table) => table.syntax(),
+            Self::Multiline(table) => table.syntax(),
+        }
+    }
+
+    pub fn caption(&self) -> Option<TableCaption> {
+        match self {
+            Self::Pipe(table) => table.caption(),
+            Self::Grid(table) => table.caption(),
+            Self::Simple(table) => table.caption(),
+            Self::Multiline(table) => table.caption(),
+        }
+    }
+}
+
 pub struct GridTable(SyntaxNode);
 
 impl AstNode for GridTable {
@@ -221,5 +261,36 @@ impl AstNode for TableCell {
 
     fn syntax(&self) -> &SyntaxNode {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn table_wrapper_casts_pipe_table_and_reads_caption() {
+        let input = "| a | b |\n|---|---|\n| 1 | 2 |\n: Caption\n";
+        let tree = crate::parse(input, None);
+        let node = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::PIPE_TABLE)
+            .expect("pipe table node");
+
+        let table = Table::cast(node).expect("table wrapper");
+        assert_eq!(
+            table.caption().map(|caption| caption.text()),
+            Some("Caption".to_string())
+        );
+    }
+
+    #[test]
+    fn table_wrapper_does_not_cast_non_table_nodes() {
+        let tree = crate::parse("Paragraph\n", None);
+        let paragraph = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::PARAGRAPH)
+            .expect("paragraph node");
+        assert!(Table::cast(paragraph).is_none());
     }
 }

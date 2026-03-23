@@ -57,6 +57,11 @@ impl ReferenceDefinition {
 
         Some(after_colon.to_string())
     }
+
+    /// Returns the text range for the definition label value.
+    pub fn label_value_range(&self) -> Option<rowan::TextRange> {
+        self.link()?.reference()?.label_value_range()
+    }
 }
 
 pub struct FootnoteReference(SyntaxNode);
@@ -96,6 +101,27 @@ impl FootnoteReference {
             tokens[1].clone()
         } else {
             String::new()
+        }
+    }
+
+    /// Returns the full text range of this reference token.
+    pub fn id_range(&self) -> rowan::TextRange {
+        self.0.text_range()
+    }
+
+    /// Returns the text range for the footnote ID only (excluding `[^` and `]`).
+    pub fn id_value_range(&self) -> Option<rowan::TextRange> {
+        let tokens: Vec<_> = self
+            .0
+            .children_with_tokens()
+            .filter_map(|child| child.into_token())
+            .filter(|token| token.kind() == SyntaxKind::TEXT)
+            .collect();
+
+        if tokens.len() >= 2 && tokens[0].text() == "[^" {
+            Some(tokens[1].text_range())
+        } else {
+            None
         }
     }
 }
@@ -274,6 +300,7 @@ mod tests {
             def.destination().as_deref(),
             Some("https://example.com \"Title\"")
         );
+        assert!(def.label_value_range().is_some());
     }
 
     #[test]
@@ -344,6 +371,17 @@ mod tests {
             .expect("Should find FootnoteReference");
 
         assert_eq!(ref_node.id(), "test");
+        assert_eq!(
+            ref_node
+                .id_value_range()
+                .map(|range| {
+                    let start: usize = range.start().into();
+                    let end: usize = range.end().into();
+                    input[start..end].to_string()
+                })
+                .as_deref(),
+            Some("test")
+        );
     }
 
     #[test]
