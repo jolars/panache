@@ -242,7 +242,7 @@ fn start_dir_for(input_path: Option<&Path>) -> io::Result<PathBuf> {
 }
 
 fn has_explicit_file_targets(paths: &[PathBuf]) -> bool {
-    paths.iter().any(|path| path.is_file())
+    paths.iter().any(|path| !path.is_dir())
 }
 
 fn path_matching_root(
