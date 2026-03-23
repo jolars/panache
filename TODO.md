@@ -220,20 +220,20 @@ implemented.
 
 ### Paragraphs ✅
 
-- ✅ Basic paragraphs
-- ✅ Paragraph wrapping/reflow
-- ✅ Extension: `escaped_line_breaks` (backslash at line end)
+- [x] Basic paragraphs
+- [x] Paragraph wrapping/reflow
+- [x] Extension: `escaped_line_breaks` (backslash at line end)
 
 ### Headings ✅
 
-- ✅ ATX-style headings (`# Heading`)
-- ✅ Setext-style headings (underlined with `===` or `---`)
-- ✅ Heading identifier attributes (`# Heading {#id}`)
-- ✅ Extension: `blank_before_header` - Require blank line before headings
-  (default behavior)
-- ✅ Extension: `header_attributes` - Full attribute syntax
-  `{#id .class key=value}`
-- ✅ Extension: `implicit_header_references` - Auto-generate reference links
+- [x] ATX-style headings (`# Heading`)
+- [x] Setext-style headings (underlined with `===` or `---`)
+- [x] Heading identifier attributes (`# Heading {#id}`)
+- [x] Extension: `blank_before_header` - Require blank line before headings
+      (default behavior)
+- [x] Extension: `header_attributes` - Full attribute syntax
+      `{#id .class key=value}`
+- [x] Extension: `implicit_header_references` - Auto-generate reference links
 
 ### Block Quotations ✅
 
