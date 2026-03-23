@@ -147,6 +147,28 @@ exclude = ["tests/"]
 }
 
 #[test]
+fn test_lint_directory_include_patterns_resolve_from_config_root() {
+    let temp_dir = TempDir::new().unwrap();
+    let docs_dir = temp_dir.path().join("docs");
+    let root_file = docs_dir.join("index.qmd");
+    let nested_dir = docs_dir.join("guides");
+    let nested_file = nested_dir.join("intro.qmd");
+    let config = temp_dir.path().join(".panache.toml");
+
+    fs::create_dir_all(&nested_dir).unwrap();
+    fs::write(&root_file, "# Root\n\n## Section\n").unwrap();
+    fs::write(&nested_file, "# Nested\n\n## Section\n").unwrap();
+    fs::write(&config, "include = [\"docs/**/*.qmd\"]\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["lint", "docs"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found in 2 file(s)"));
+}
+
+#[test]
 fn test_lint_explicit_file_force_exclude_noops_when_all_filtered() {
     let temp_dir = TempDir::new().unwrap();
     let config = temp_dir.path().join(".panache.toml");

@@ -241,6 +241,27 @@ fn start_dir_for(input_path: Option<&Path>) -> io::Result<PathBuf> {
     }
 }
 
+fn path_matching_root(
+    explicit_config: Option<&Path>,
+    discovered_config: Option<&Path>,
+    traversal_start_dir: &Path,
+) -> io::Result<PathBuf> {
+    let cwd = std::env::current_dir()?;
+
+    if explicit_config.is_some() {
+        return Ok(cwd);
+    }
+
+    if let Some(config_path) = discovered_config
+        && let Some(parent) = config_path.parent()
+        && relative_path_from_root(traversal_start_dir, parent).is_some()
+    {
+        return Ok(parent.to_path_buf());
+    }
+
+    Ok(cwd)
+}
+
 fn load_config_for_cli(
     config_path: Option<&Path>,
     isolated: bool,
@@ -601,14 +622,19 @@ fn main() -> io::Result<()> {
             } else {
                 start_dir_for(None)?
             };
-            let (traversal_cfg, _) = load_config_for_cli(
+            let (traversal_cfg, traversal_cfg_path) = load_config_for_cli(
                 cli.config.as_deref(),
                 cli.isolated,
                 &traversal_start_dir,
                 traversal_anchor,
             )?;
+            let matching_root = path_matching_root(
+                cli.config.as_deref(),
+                traversal_cfg_path.as_deref(),
+                &traversal_start_dir,
+            )?;
             let expanded_files =
-                expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?;
+                expand_paths(&files, &traversal_cfg, &matching_root, force_exclude)?;
 
             if expanded_files.is_empty() {
                 if force_exclude {
@@ -718,13 +744,18 @@ fn main() -> io::Result<()> {
                     } else {
                         start_dir_for(None)?
                     };
-                    let (traversal_cfg, _) = load_config_for_cli(
+                    let (traversal_cfg, traversal_cfg_path) = load_config_for_cli(
                         cli.config.as_deref(),
                         cli.isolated,
                         &traversal_start_dir,
                         traversal_anchor,
                     )?;
-                    expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?
+                    let matching_root = path_matching_root(
+                        cli.config.as_deref(),
+                        traversal_cfg_path.as_deref(),
+                        &traversal_start_dir,
+                    )?;
+                    expand_paths(&files, &traversal_cfg, &matching_root, force_exclude)?
                 };
 
                 if !use_stdin && targets.is_empty() {
@@ -927,14 +958,19 @@ fn main() -> io::Result<()> {
             } else {
                 start_dir_for(None)?
             };
-            let (traversal_cfg, _) = load_config_for_cli(
+            let (traversal_cfg, traversal_cfg_path) = load_config_for_cli(
                 cli.config.as_deref(),
                 cli.isolated,
                 &traversal_start_dir,
                 traversal_anchor,
             )?;
+            let matching_root = path_matching_root(
+                cli.config.as_deref(),
+                traversal_cfg_path.as_deref(),
+                &traversal_start_dir,
+            )?;
             let expanded_files =
-                expand_paths(&files, &traversal_cfg, &traversal_start_dir, force_exclude)?;
+                expand_paths(&files, &traversal_cfg, &matching_root, force_exclude)?;
 
             if expanded_files.is_empty() {
                 if force_exclude {

@@ -105,6 +105,15 @@ extend-include = ["*.Rmd"]
 `extend-include`
 :   Additional include patterns appended to the base set.
 
+Path matching base:
+
+- For discovered config files, include/exclude globs are resolved relative to
+  the directory containing the active config file.
+- For explicit `--config path/to/panache.toml`, include/exclude globs are
+  resolved relative to the current working directory.
+- CLI path arguments (for example `panache format docs/`) limit traversal scope
+  but do not change how include/exclude globs are resolved.
+
 If a path matches both include and exclude, exclude wins.
 
 ### Pandoc Compatibility
