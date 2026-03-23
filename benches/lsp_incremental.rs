@@ -27,7 +27,7 @@ struct BenchChange {
 
 struct StrategyRun {
     updated_text: String,
-    tree_string: String,
+    tree_end_offset: usize,
     reparsed_range: OffsetRange,
     used_suffix_path: bool,
     fallback_reason: Option<&'static str>,
@@ -157,7 +157,7 @@ fn full_reparse_strategy(input: &str, changes: &[BenchChange], config: &Config) 
     let len = updated_text.len();
     StrategyRun {
         updated_text,
-        tree_string: tree.to_string(),
+        tree_end_offset: tree.text_range().end().into(),
         reparsed_range: (0, len),
         used_suffix_path: false,
         fallback_reason: None,
@@ -193,7 +193,7 @@ fn suffix_incremental_runtime_strategy(
         let used_suffix_path = reparsed_range.0 > 0 || reparsed_range.1 < updated_text.len();
         return StrategyRun {
             updated_text,
-            tree_string: updated_tree.to_string(),
+            tree_end_offset: updated_tree.text_range().end().into(),
             reparsed_range,
             used_suffix_path,
             fallback_reason: (!used_suffix_path).then_some("incremental_fallback_full_reparse"),
@@ -220,9 +220,11 @@ fn run_case(
         "text mismatch in case {id}"
     );
     assert_eq!(
-        baseline.tree_string, incremental_once.tree_string,
+        baseline.tree_end_offset, incremental_once.tree_end_offset,
         "tree mismatch in case {id}"
     );
+
+    assert_case_tree_equivalence(input, changes, config, &old_tree, id);
 
     for _ in 0..5 {
         black_box(full_reparse_strategy(input, changes, config));
@@ -286,6 +288,43 @@ fn run_case(
         strategy_full_reparse: full_stats,
         strategy_suffix_incremental_runtime: incremental_stats,
     }
+}
+
+fn assert_case_tree_equivalence(
+    input: &str,
+    changes: &[BenchChange],
+    config: &Config,
+    old_tree: &panache::SyntaxNode,
+    id: &str,
+) {
+    let baseline = full_reparse_strategy(input, changes, config);
+
+    let incremental_tree = if changes.len() == 1 {
+        let change = &changes[0];
+        if let Some((updated_text, old_edit, new_edit)) =
+            apply_change_strict_with_offsets(input, change)
+        {
+            parse_incremental_suffix(
+                &updated_text,
+                Some(config.clone()),
+                old_tree,
+                old_edit,
+                new_edit,
+            )
+            .tree
+        } else {
+            panache::parse(&baseline.updated_text, Some(config.clone()))
+        }
+    } else {
+        panache::parse(&baseline.updated_text, Some(config.clone()))
+    };
+
+    let baseline_tree = panache::parse(&baseline.updated_text, Some(config.clone()));
+    assert_eq!(
+        baseline_tree.to_string(),
+        incremental_tree.to_string(),
+        "tree mismatch in case {id}"
+    );
 }
 
 fn summarize_samples(samples: &[Duration]) -> StrategyStats {
