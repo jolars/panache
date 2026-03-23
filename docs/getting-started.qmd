@@ -295,4 +295,3 @@ See the [Formatting](user-guide/formatting.qmd) and
   [github.com/jolars/panache/issues](https://github.com/jolars/panache/issues)
 - **Discussions**:
   [github.com/jolars/panache/discussions](https://github.com/jolars/panache/discussions)
-  :::
