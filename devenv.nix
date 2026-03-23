@@ -74,7 +74,7 @@
 
         name = "panache format";
 
-        entry = "cargo run --release -- format";
+        entry = "cargo run -- format .";
 
         language = "system";
 
