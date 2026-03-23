@@ -60,7 +60,23 @@ impl ReferenceDefinition {
 
     /// Returns the text range for the definition label value.
     pub fn label_value_range(&self) -> Option<rowan::TextRange> {
-        self.link()?.reference()?.label_value_range()
+        let link = self.link()?;
+
+        if let Some(range) = link
+            .reference()
+            .and_then(|reference| reference.label_value_range())
+        {
+            return Some(range);
+        }
+
+        link.text()?
+            .syntax()
+            .descendants_with_tokens()
+            .find_map(|elem| {
+                elem.into_token()
+                    .filter(|token| token.kind() == SyntaxKind::TEXT)
+                    .map(|token| token.text_range())
+            })
     }
 }
 
