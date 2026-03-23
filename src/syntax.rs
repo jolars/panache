@@ -6,13 +6,18 @@
 
 mod ast;
 mod attributes;
+mod blockquotes;
 mod chunk_options;
 mod citations;
+mod code_blocks;
+mod definitions;
+mod fenced_divs;
 mod headings;
 mod json;
 mod kind;
 mod links;
 mod lists;
+mod math;
 mod references;
 mod shortcodes;
 mod tables;
@@ -20,13 +25,18 @@ mod yaml;
 
 pub use ast::*;
 pub use attributes::*;
+pub use blockquotes::*;
 pub use chunk_options::*;
 pub use citations::*;
+pub use code_blocks::*;
+pub use definitions::*;
+pub use fenced_divs::*;
 pub use headings::*;
 pub use json::*;
 pub use kind::*;
 pub use links::*;
 pub use lists::*;
+pub use math::*;
 pub use references::*;
 pub use shortcodes::*;
 pub use tables::*;

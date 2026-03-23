@@ -2,8 +2,9 @@ use crate::config::{Config, WrapMode};
 use crate::directives::{DirectiveTracker, extract_directive_from_node};
 use crate::parser::blocks::headings::{try_parse_atx_heading, try_parse_setext_heading};
 use crate::parser::utils::attributes::parse_attribute_content;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{DefinitionItem, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
+use rowan::ast::AstNode;
 
 use super::code_blocks;
 use super::code_blocks::FormattedCodeMap;
@@ -257,42 +258,6 @@ impl Formatter {
             WrapMode::Preserve => vec![text.to_string()],
             WrapMode::Reflow | WrapMode::Sentence => wrapping::wrap_text_first_fit(text, width),
         }
-    }
-
-    fn definition_item_is_compact(&self, node: &SyntaxNode) -> bool {
-        if node.kind() != SyntaxKind::DEFINITION_ITEM {
-            return true;
-        }
-
-        let definitions: Vec<_> = node
-            .children()
-            .filter(|child| child.kind() == SyntaxKind::DEFINITION)
-            .collect();
-
-        if definitions.is_empty() {
-            return true;
-        }
-
-        definitions.iter().all(|definition| {
-            let blocks: Vec<_> = definition
-                .children()
-                .filter(|child| child.kind() != SyntaxKind::BLANK_LINE)
-                .collect();
-
-            if blocks.len() != 1 {
-                return false;
-            }
-
-            match blocks[0].kind() {
-                SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH => self
-                    .leading_atx_heading_with_remainder(&blocks[0])
-                    .is_none(),
-                // Keep single code-block definitions compact to avoid ambiguous
-                // caption-like forms before following tables.
-                SyntaxKind::CODE_BLOCK => true,
-                _ => false,
-            }
-        })
     }
 
     fn paragraph_starts_with_setext_heading_candidate(&self, node: &SyntaxNode) -> bool {
@@ -1458,7 +1423,9 @@ impl Formatter {
             }
 
             SyntaxKind::DEFINITION_ITEM => {
-                let is_compact = self.definition_item_is_compact(node);
+                let is_compact = DefinitionItem::cast(node.clone())
+                    .map(|item| item.is_compact())
+                    .unwrap_or(true);
                 let mut saw_term = false;
 
                 for child in node.children() {
