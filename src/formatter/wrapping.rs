@@ -78,10 +78,6 @@ fn escape_special_chars(
     result
 }
 
-fn fast_display_width(text: &str) -> usize {
-    UnicodeWidthStr::width(text)
-}
-
 fn expand_tabs_with_width<'a>(text: &'a str, tab_width: usize) -> Cow<'a, str> {
     if !text.contains('\t') {
         return Cow::Borrowed(text);
@@ -271,7 +267,7 @@ pub(super) fn wrap_words_first_fit(words: &[WrapWord], line_widths: &[usize]) ->
     let mut line = String::new();
     let mut line_width = 0usize;
     for w in words {
-        let ww = fast_display_width(&w.word);
+        let ww = UnicodeWidthStr::width(w.word.as_str());
         let line_limit = line_widths
             .get(out.len())
             .copied()
@@ -786,7 +782,7 @@ fn wrap_node_greedy_streaming(
         }
 
         fn consume(&mut self, piece: String, piece_ws_after: bool, is_last: bool) {
-            let piece_width = fast_display_width(&piece);
+            let piece_width = UnicodeWidthStr::width(piece.as_str());
             if !self.sentence_mode {
                 let width_limit = self
                     .line_widths
