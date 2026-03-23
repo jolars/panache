@@ -7,9 +7,13 @@ description-meta: >-
 title-prefix: ""
 image: images/og.png
 image-alt: "Panache logo"
+
+format:
+  html:
+    toc: false
 ---
 
-<img src="images/logo.svg" alt="Panache logo" class="float-end ms-5"
+<img src="images/logo.svg" alt="Panache logo" class="float-end ms-3"
 style="max-width: 20%; height: auto;">
 
 Panache is a language server, formatter, and linter for Pandoc, Quarto, and R
