@@ -1,4 +1,4 @@
-use super::helpers::{assert_block_kinds, find_first, parse_blocks};
+use super::helpers::{assert_block_kinds, find_all, find_first, parse_blocks};
 use crate::syntax::SyntaxKind;
 
 #[test]
@@ -48,5 +48,48 @@ fn definition_content_can_start_with_atx_heading() {
     assert!(
         find_first(&definition, SyntaxKind::PLAIN).is_none(),
         "heading-only definition should not be parsed as PLAIN"
+    );
+}
+
+#[test]
+fn definition_list_continues_across_blank_lines_with_additional_definitions() {
+    let input = "Term\n: Def\n\n: Def\n";
+    let tree = parse_blocks(input);
+
+    let definition_lists = find_all(&tree, SyntaxKind::DEFINITION_LIST);
+    assert_eq!(
+        definition_lists.len(),
+        1,
+        "should remain one definition list"
+    );
+
+    let definition_items = find_all(&tree, SyntaxKind::DEFINITION_ITEM);
+    assert_eq!(
+        definition_items.len(),
+        1,
+        "should remain one definition item"
+    );
+
+    let definitions = find_all(&tree, SyntaxKind::DEFINITION);
+    assert_eq!(
+        definitions.len(),
+        2,
+        "should have two definitions for one term"
+    );
+}
+
+#[test]
+fn definition_marker_after_blank_line_does_not_create_orphan_item() {
+    let input = "Term\n: Def\n\n: Def\n";
+    let tree = parse_blocks(input);
+
+    let definition_item = find_first(&tree, SyntaxKind::DEFINITION_ITEM).expect("definition item");
+    let term_count = definition_item
+        .children()
+        .filter(|child| child.kind() == SyntaxKind::TERM)
+        .count();
+    assert_eq!(
+        term_count, 1,
+        "definition item should keep exactly one term"
     );
 }

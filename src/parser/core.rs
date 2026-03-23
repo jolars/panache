@@ -588,6 +588,19 @@ impl<'a> Parser<'a> {
                     self.close_containers_to(self.containers.depth() - 1);
                 }
 
+                // A definition marker cannot start a new definition item without a term.
+                // If the preceding term/item was closed by a blank line but we are still
+                // inside the same definition list, reopen a definition item for continuation.
+                if definition_lists::in_definition_list(&self.containers)
+                    && !matches!(
+                        self.containers.last(),
+                        Some(Container::DefinitionItem { .. })
+                    )
+                {
+                    self.builder.start_node(SyntaxKind::DEFINITION_ITEM.into());
+                    self.containers.push(Container::DefinitionItem {});
+                }
+
                 if !definition_lists::in_definition_list(&self.containers) {
                     self.builder.start_node(SyntaxKind::DEFINITION_LIST.into());
                     self.containers.push(Container::DefinitionList {});
@@ -917,6 +930,8 @@ impl<'a> Parser<'a> {
                 ContinuationPolicy::new(self.config, &self.block_registry).compute_levels_to_keep(
                     self.current_blockquote_depth(),
                     &self.containers,
+                    &self.lines,
+                    peek,
                     self.lines[peek],
                 )
             } else {

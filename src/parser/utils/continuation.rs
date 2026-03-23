@@ -36,11 +36,17 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
         &self,
         current_bq_depth: usize,
         containers: &ContainerStack,
+        lines: &[&str],
+        next_line_pos: usize,
         next_line: &str,
     ) -> usize {
         let (next_bq_depth, next_inner) = count_blockquote_markers(next_line);
         let (raw_indent_cols, _) = leading_indent(next_inner);
         let next_marker = lists::try_parse_list_marker(next_inner, self.config);
+        let next_is_definition_marker =
+            definition_lists::try_parse_definition_marker(next_inner).is_some();
+        let next_is_definition_term = !next_inner.trim().is_empty()
+            && definition_lists::next_line_is_definition_marker(lines, next_line_pos).is_some();
 
         // `current_bq_depth` is used for proper indent calculation when the next line
         // increases blockquote nesting.
@@ -89,6 +95,16 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                         keep_level = i + 1;
                     }
                     content_indent_so_far += *content_col;
+                }
+                crate::parser::utils::container_stack::Container::DefinitionItem { .. } => {
+                    if next_is_definition_marker {
+                        keep_level = i + 1;
+                    }
+                }
+                crate::parser::utils::container_stack::Container::DefinitionList { .. } => {
+                    if next_is_definition_marker || next_is_definition_term {
+                        keep_level = i + 1;
+                    }
                 }
                 crate::parser::utils::container_stack::Container::List {
                     marker,
