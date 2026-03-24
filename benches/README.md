@@ -14,6 +14,9 @@ cargo bench --bench formatting
 # Run LSP incremental didChange benchmarks
 cargo bench --bench lsp_incremental
 
+# Run interned key impact benchmark
+cargo bench --bench interned_keys
+
 # Generate docs + machine-readable JSON
 ./benches/generate_docs.sh
 ```
@@ -89,6 +92,9 @@ valgrind --tool=cachegrind cargo bench --bench formatting
   - Multiple document sizes and types
 
   - Reports throughput in KB/s
+- **`benches/interned_keys.rs`**: Key interning measurement harness
+  - Compares owned vs interned key map build costs
+  - Reports repeated-byte potential from duplicated keys
 - **`benches/compare_all.sh`**: Multi-formatter comparison
   - Compares panache vs Prettier vs Pandoc
 
@@ -102,8 +108,8 @@ valgrind --tool=cachegrind cargo bench --bench formatting
 
 ## What to Benchmark
 
-Good targets for benchmarking: - **Full pipeline** (parse + format) - what
-users experience - **Parse speed** - CST construction - **Format speed** - CST
+Good targets for benchmarking: - **Full pipeline** (parse + format) - what users
+experience - **Parse speed** - CST construction - **Format speed** - CST
 traversal and output - **Document types** - simple text vs complex (tables,
 math, divs) - **Document sizes** - small (1KB), medium (10-50KB), large (100KB+)
 
