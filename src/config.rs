@@ -78,6 +78,8 @@ pub struct Extensions {
     /// Attributes on fenced code blocks {.language #id}
     #[serde(alias = "fenced_code_attributes")]
     pub fenced_code_attributes: bool,
+    /// Executable code syntax (currently fenced chunks like ```{r} / ```{python})
+    pub executable_code: bool,
     /// Attributes on inline code
     #[serde(alias = "inline_code_attributes")]
     pub inline_code_attributes: bool,
@@ -263,6 +265,7 @@ impl Extensions {
             backtick_code_blocks: false,
             fenced_code_blocks: false,
             fenced_code_attributes: false,
+            executable_code: false,
             inline_code_attributes: false,
             simple_tables: false,
             multiline_tables: false,
@@ -344,6 +347,7 @@ impl Extensions {
             backtick_code_blocks: true,
             fenced_code_blocks: true,
             fenced_code_attributes: true,
+            executable_code: false,
             inline_code_attributes: true,
 
             // Tables
@@ -430,6 +434,7 @@ impl Extensions {
         ext.quarto_callouts = true;
         ext.quarto_crossrefs = true;
         ext.quarto_shortcodes = true;
+        ext.executable_code = true;
 
         ext
     }
@@ -441,6 +446,7 @@ impl Extensions {
         ext.tex_math_dollars = true;
         ext.tex_math_single_backslash = true; // RMarkdown enables \(...\) and \[...\] by default
         ext.bookdown_references = true;
+        ext.executable_code = true;
 
         ext
     }
@@ -2553,6 +2559,26 @@ mod tests {
     fn tex_math_gfm_enabled_by_default_for_gfm() {
         let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
         assert!(cfg.extensions.tex_math_gfm);
+    }
+
+    #[test]
+    fn executable_code_enabled_by_default_for_quarto_and_rmarkdown() {
+        let quarto = toml::from_str::<Config>("flavor = \"quarto\"").unwrap();
+        let rmarkdown = toml::from_str::<Config>("flavor = \"rmarkdown\"").unwrap();
+
+        assert!(quarto.extensions.executable_code);
+        assert!(rmarkdown.extensions.executable_code);
+    }
+
+    #[test]
+    fn executable_code_disabled_by_default_for_pandoc_gfm_and_commonmark() {
+        let pandoc = toml::from_str::<Config>("flavor = \"pandoc\"").unwrap();
+        let gfm = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
+        let commonmark = toml::from_str::<Config>("flavor = \"common-mark\"").unwrap();
+
+        assert!(!pandoc.extensions.executable_code);
+        assert!(!gfm.extensions.executable_code);
+        assert!(!commonmark.extensions.executable_code);
     }
 
     #[test]

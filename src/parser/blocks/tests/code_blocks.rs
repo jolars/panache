@@ -476,6 +476,26 @@ fn executable_chunk_emits_hashpipe_yaml_content_node() {
 }
 
 #[test]
+fn executable_code_respects_extension_guard() {
+    let input = "```{r}\na <- 1\n```\n";
+    let mut config = Config::default();
+    config.extensions.executable_code = false;
+
+    let disabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&disabled, SyntaxKind::CODE_BLOCK).is_none(),
+        "executable_code disabled should prevent executable chunk parsing"
+    );
+
+    config.extensions.executable_code = true;
+    let enabled = parse_blocks_with_config(input, &config);
+    assert!(
+        find_first(&enabled, SyntaxKind::CODE_BLOCK).is_some(),
+        "executable_code enabled should allow executable chunk parsing"
+    );
+}
+
+#[test]
 fn display_code_block_keeps_hashpipe_line_as_plain_text() {
     let input = "```r\n#| label: foobar\na <- 1\n```\n";
     let node = parse_blocks_quarto(input);

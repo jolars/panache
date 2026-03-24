@@ -1204,13 +1204,7 @@ impl BlockParser for FencedCodeBlockParser {
         let info = InfoString::parse(&fence.info_string);
 
         let is_executable = matches!(info.block_type, CodeBlockType::Executable { .. });
-        let is_pandoc_like = matches!(
-            ctx.config.flavor,
-            crate::config::Flavor::Pandoc
-                | crate::config::Flavor::CommonMark
-                | crate::config::Flavor::Gfm
-        );
-        if is_executable && is_pandoc_like {
+        if is_executable && !ctx.config.extensions.executable_code {
             return None;
         }
 
