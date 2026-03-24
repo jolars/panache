@@ -103,15 +103,74 @@
                 <section class="playground-panel shadow-sm">
                     <div class="p-3 p-md-4">
                         <div class="row g-3 align-items-end mb-1">
-                            <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label fw-semibold mb-1" for="flavor">Flavor</label>
+                                <select id="flavor" class="form-select">
+                                    <option value="pandoc">Pandoc</option>
+                                    <option value="quarto" selected>Quarto</option>
+                                    <option value="rmarkdown">R Markdown</option>
+                                    <option value="gfm">GFM</option>
+                                    <option value="common-mark">CommonMark</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-2">
                                 <label class="form-label fw-semibold mb-1" for="lw">Line width</label>
                                 <input id="lw" class="form-control" type="number" min="10" max="200" value="80">
                             </div>
-                            <div class="col-12 col-lg-9">
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label fw-semibold mb-1" for="wrap">Wrap</label>
+                                <select id="wrap" class="form-select">
+                                    <option value="reflow" selected>Reflow</option>
+                                    <option value="preserve">Preserve</option>
+                                    <option value="sentence">Sentence</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label fw-semibold mb-1" for="blank-lines">Blank lines</label>
+                                <select id="blank-lines" class="form-select">
+                                    <option value="collapse" selected>Collapse</option>
+                                    <option value="preserve">Preserve</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label fw-semibold mb-1" for="line-ending">Line ending</label>
+                                <select id="line-ending" class="form-select">
+                                    <option value="auto" selected>Auto</option>
+                                    <option value="lf">LF</option>
+                                    <option value="crlf">CRLF</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-lg-2">
                                 <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
                                     <button id="copy-output" class="btn btn-outline-primary" type="button">Copy output</button>
                                     <button id="reset-input" class="btn btn-outline-secondary" type="button">Reset sample</button>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 align-items-end mb-1">
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label fw-semibold mb-1" for="math-delimiter-style">Math delimiters</label>
+                                <select id="math-delimiter-style" class="form-select">
+                                    <option value="preserve" selected>Preserve</option>
+                                    <option value="dollars">Dollars ($)</option>
+                                    <option value="backslash">Backslash (\\)</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label fw-semibold mb-1" for="math-indent">Math indent</label>
+                                <input id="math-indent" class="form-control" type="number" min="0" max="20" value="0">
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label fw-semibold mb-1" for="tab-stops">Tab stops</label>
+                                <select id="tab-stops" class="form-select">
+                                    <option value="normalize" selected>Normalize</option>
+                                    <option value="preserve">Preserve</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label fw-semibold mb-1" for="tab-width">Tab width</label>
+                                <input id="tab-width" class="form-control" type="number" min="1" max="16" value="4">
                             </div>
                         </div>
 
@@ -134,7 +193,7 @@
             </div>
         </main>
         <script type="module">
-      import init, { format_qmd } from "./pkg/panache_wasm.js";
+      import init, { format_qmd_with_options } from "./pkg/panache_wasm.js";
 
       const SAMPLE = "---\ntitle: Demo\n---\n\nThis is a very long line that should be wrapped.\n\n```{r}\nprint(1)\n```\n\n$$\nA &= B \\\\\nC &= D\n$$\n";
 
@@ -146,19 +205,101 @@
         statusEl.classList.toggle("error", isError);
       }
 
+      function readInt(id, fallback) {
+        const value = parseInt($(id).value || String(fallback), 10);
+        return Number.isNaN(value) ? fallback : value;
+      }
+
+      function currentOptions() {
+        return {
+          flavor: $("flavor").value,
+          lw: readInt("lw", 80),
+          wrap: $("wrap").value,
+          blankLines: $("blank-lines").value,
+          lineEnding: $("line-ending").value,
+          mathDelimiterStyle: $("math-delimiter-style").value,
+          mathIndent: readInt("math-indent", 0),
+          tabStops: $("tab-stops").value,
+          tabWidth: readInt("tab-width", 4),
+        };
+      }
+
+      function validateOptions(options) {
+        if (options.lw < 10 || options.lw > 200) {
+          return "Line width must be between 10 and 200.";
+        }
+        if (options.tabWidth < 1 || options.tabWidth > 16) {
+          return "Tab width must be between 1 and 16.";
+        }
+        if (options.mathIndent < 0 || options.mathIndent > 20) {
+          return "Math indent must be between 0 and 20.";
+        }
+        return null;
+      }
+
+      function updateQueryString(options) {
+        const params = new URLSearchParams({
+          flavor: options.flavor,
+          lw: String(options.lw),
+          wrap: options.wrap,
+          blankLines: options.blankLines,
+          lineEnding: options.lineEnding,
+          mathDelimiterStyle: options.mathDelimiterStyle,
+          mathIndent: String(options.mathIndent),
+          tabStops: options.tabStops,
+          tabWidth: String(options.tabWidth),
+        });
+        history.replaceState(null, "", "?" + params.toString());
+      }
+
+      function applyQueryString() {
+        const query = new URLSearchParams(location.search);
+        const controls = {
+          flavor: "flavor",
+          lw: "lw",
+          wrap: "wrap",
+          blankLines: "blank-lines",
+          lineEnding: "line-ending",
+          mathDelimiterStyle: "math-delimiter-style",
+          mathIndent: "math-indent",
+          tabStops: "tab-stops",
+          tabWidth: "tab-width",
+        };
+
+        for (const [key, id] of Object.entries(controls)) {
+          const value = query.get(key);
+          if (value !== null) {
+            $(id).value = value;
+          }
+        }
+
+      }
+
       function applyFormat() {
         const input = $("input").value;
-        const lineWidth = parseInt($("lw").value || "80", 10);
+        const options = currentOptions();
+        const validationError = validateOptions(options);
 
-        if (Number.isNaN(lineWidth) || lineWidth < 10 || lineWidth > 200) {
-          setStatus("Line width must be between 10 and 200.", true);
+        if (validationError) {
+          $("output").value = "";
+          setStatus(validationError, true);
           return;
         }
 
         try {
-          $("output").value = format_qmd(input, lineWidth);
-          const params = new URLSearchParams({ lw: String(lineWidth) });
-          history.replaceState(null, "", "?" + params.toString());
+          $("output").value = format_qmd_with_options(
+            input,
+            options.lw,
+            options.flavor,
+            options.wrap,
+            options.blankLines,
+            options.lineEnding,
+            options.mathDelimiterStyle,
+            options.tabStops,
+            options.tabWidth,
+            options.mathIndent,
+          );
+          updateQueryString(options);
           setStatus("Formatted successfully.");
         } catch (error) {
           $("output").value = "";
@@ -174,13 +315,22 @@
       async function main() {
         await init();
 
-        const query = new URLSearchParams(location.search);
-        if (query.get("lw")) {
-          $("lw").value = query.get("lw");
-        }
+        applyQueryString();
 
         $("input").addEventListener("input", applyFormat);
-        $("lw").addEventListener("input", applyFormat);
+        [
+          "flavor",
+          "lw",
+          "wrap",
+          "blank-lines",
+          "line-ending",
+          "math-delimiter-style",
+          "math-indent",
+          "tab-stops",
+          "tab-width",
+        ].forEach((id) => {
+          $(id).addEventListener("input", applyFormat);
+        });
         $("reset-input").addEventListener("click", resetSample);
         $("copy-output").addEventListener("click", async () => {
           try {
