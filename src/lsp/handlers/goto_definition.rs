@@ -14,6 +14,7 @@ use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
+use crate::syntax::{AstNode, Link};
 
 use super::super::{conversions, helpers};
 
@@ -71,7 +72,7 @@ pub(crate) async fn goto_definition(
         Reference { label: String, is_footnote: bool },
     }
 
-    let (content, pending) = {
+    let (content, pending, heading_link_is_explicit_anchor) = {
         let content = ctx.content.clone();
         let root = ctx.syntax_root();
 
@@ -88,7 +89,11 @@ pub(crate) async fn goto_definition(
             None => None,
         };
 
-        (content, pending)
+        let heading_link_is_explicit_anchor =
+            matches!(pending, Some(PendingDefinition::HeadingLink(_)))
+                && is_explicit_heading_anchor_at_offset(&root, offset);
+
+        (content, pending, heading_link_is_explicit_anchor)
     };
 
     let Some(pending) = pending else {
@@ -125,13 +130,16 @@ pub(crate) async fn goto_definition(
         }
 
         if config.extensions.implicit_header_references && config.extensions.auto_identifiers {
-            for doc in &doc_indices {
-                if let Some(ranges) = doc.symbol_index.heading_implicit_definition_ranges(label)
-                    && let Some(range) = ranges.first()
-                {
-                    let location =
-                        crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
-                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            if heading_link_is_explicit_anchor {
+                for doc in &doc_indices {
+                    if let Some(ranges) = doc.symbol_index.heading_implicit_definition_ranges(label)
+                        && let Some(range) = ranges.first()
+                    {
+                        let location = crate::lsp::navigation::location_from_range(
+                            &doc.uri, &doc.text, *range,
+                        );
+                        return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                    }
                 }
             }
 
@@ -226,8 +234,14 @@ pub(crate) async fn goto_definition(
                 .find_crossref_resolved(&label, config.extensions.bookdown_references),
             PendingDefinition::ChunkLabel(label) => definition_index
                 .find_crossref_resolved(&label, config.extensions.bookdown_references),
-            PendingDefinition::HeadingLink(label) => definition_index
-                .find_crossref_resolved(&label, config.extensions.bookdown_references),
+            PendingDefinition::HeadingLink(label) => {
+                if heading_link_is_explicit_anchor {
+                    definition_index
+                        .find_crossref_resolved(&label, config.extensions.bookdown_references)
+                } else {
+                    None
+                }
+            }
             PendingDefinition::Reference { label, is_footnote } => {
                 if is_footnote {
                     definition_index.find_footnote(&label)
@@ -257,4 +271,23 @@ pub(crate) async fn goto_definition(
         range: Range { start, end },
     };
     Ok(Some(GotoDefinitionResponse::Scalar(location)))
+}
+
+fn is_explicit_heading_anchor_at_offset(root: &crate::syntax::SyntaxNode, offset: usize) -> bool {
+    let Some(mut node) = helpers::find_node_at_offset(root, offset) else {
+        return false;
+    };
+
+    loop {
+        if let Some(link) = Link::cast(node.clone()) {
+            return link
+                .dest()
+                .and_then(|dest| dest.hash_anchor_id_range())
+                .is_some();
+        }
+        let Some(parent) = node.parent() else {
+            return false;
+        };
+        node = parent;
+    }
 }
