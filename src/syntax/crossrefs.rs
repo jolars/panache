@@ -1,14 +1,14 @@
-//! Citation AST node wrappers.
+//! Cross-reference AST node wrappers.
 
 use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode, SyntaxToken};
 
-pub struct Citation(SyntaxNode);
+pub struct Crossref(SyntaxNode);
 
-impl AstNode for Citation {
+impl AstNode for Crossref {
     type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
-        kind == SyntaxKind::CITATION
+        kind == SyntaxKind::CROSSREF
     }
 
     fn cast(syntax: SyntaxNode) -> Option<Self> {
@@ -24,13 +24,13 @@ impl AstNode for Citation {
     }
 }
 
-impl Citation {
-    pub fn keys(&self) -> Vec<CitationKey> {
+impl Crossref {
+    pub fn keys(&self) -> Vec<CrossrefKey> {
         self.0
             .children_with_tokens()
             .filter_map(|element| element.into_token())
-            .filter(|token| token.kind() == SyntaxKind::CITATION_KEY)
-            .map(CitationKey)
+            .filter(|token| token.kind() == SyntaxKind::CROSSREF_KEY)
+            .map(CrossrefKey)
             .collect()
     }
 
@@ -39,9 +39,9 @@ impl Citation {
     }
 }
 
-pub struct CitationKey(SyntaxToken);
+pub struct CrossrefKey(SyntaxToken);
 
-impl CitationKey {
+impl CrossrefKey {
     pub fn text(&self) -> String {
         self.0.text().to_string()
     }
