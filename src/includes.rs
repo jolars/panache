@@ -290,10 +290,16 @@ pub fn find_project_documents(
     } else {
         read_quarto_render(project_root)
     };
-    let walker = ignore::WalkBuilder::new(project_root).build();
+    #[cfg(feature = "cli")]
+    let paths = ignore::WalkBuilder::new(project_root)
+        .build()
+        .flatten()
+        .map(ignore::DirEntry::into_path)
+        .collect::<Vec<_>>();
+    #[cfg(not(feature = "cli"))]
+    let paths = walk_project_files(project_root);
 
-    for entry in walker.flatten() {
-        let path = entry.path();
+    for path in &paths {
         if !path.is_file() {
             continue;
         }
@@ -326,6 +332,28 @@ pub fn find_project_documents(
     }
 
     docs
+}
+
+#[cfg(not(feature = "cli"))]
+fn walk_project_files(project_root: &Path) -> Vec<PathBuf> {
+    fn visit(path: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(path) else {
+            return;
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                visit(&path, out);
+            } else {
+                out.push(path);
+            }
+        }
+    }
+
+    let mut files = Vec::new();
+    visit(project_root, &mut files);
+    files
 }
 
 fn read_quarto_render(project_root: &Path) -> Option<Vec<String>> {
