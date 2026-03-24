@@ -160,7 +160,7 @@ pub(crate) enum ParagraphSegment {
 /// Buffer for accumulating paragraph content with interleaved structural markers.
 ///
 /// This enables proper inline parsing across line boundaries while preserving
-/// the position of BLOCKQUOTE_MARKER tokens for lossless reconstruction.
+/// the position of BLOCK_QUOTE_MARKER tokens for lossless reconstruction.
 #[derive(Debug, Default, Clone)]
 pub(crate) struct ParagraphBuffer {
     /// Interleaved segments of text and markers
@@ -289,7 +289,7 @@ impl ParagraphBuffer {
                     if leading_spaces > 0 {
                         builder.token(SyntaxKind::WHITESPACE.into(), &" ".repeat(leading_spaces));
                     }
-                    builder.token(SyntaxKind::BLOCKQUOTE_MARKER.into(), ">");
+                    builder.token(SyntaxKind::BLOCK_QUOTE_MARKER.into(), ">");
                     if has_trailing_space {
                         builder.token(SyntaxKind::WHITESPACE.into(), " ");
                     }

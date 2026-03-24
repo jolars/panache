@@ -675,7 +675,7 @@ impl BlockParser for BlockQuoteParser {
         let marker_info = &prepared.marker_info;
 
         for level in 0..prepared.depth {
-            builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+            builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
             if let Some(info) = marker_info.get(level) {
                 emit_one_blockquote_marker(builder, info.leading_spaces, info.has_trailing_space);
             }

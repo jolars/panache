@@ -671,6 +671,6 @@ fn indented_code_in_blockquote() {
 >     code in blockquote";
     let tree = parse_blocks(input);
 
-    assert_eq!(find_all(&tree, SyntaxKind::BLOCKQUOTE).len(), 1);
+    assert_eq!(find_all(&tree, SyntaxKind::BLOCK_QUOTE).len(), 1);
     assert_eq!(find_all(&tree, SyntaxKind::CODE_BLOCK).len(), 1);
 }

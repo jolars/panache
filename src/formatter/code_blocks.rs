@@ -242,7 +242,7 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
                     for token in n.children_with_tokens() {
                         match token {
                             NodeOrToken::Token(t) => match t.kind() {
-                                SyntaxKind::BLOCKQUOTE_MARKER if at_line_start => {
+                                SyntaxKind::BLOCK_QUOTE_MARKER if at_line_start => {
                                     // Parser may preserve blockquote continuation markers inside
                                     // indented code content for losslessness. These are container
                                     // syntax, not code bytes, so ignore them for formatter output.

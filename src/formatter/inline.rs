@@ -45,7 +45,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         attributes = n.text().to_string();
                     }
                     NodeOrToken::Token(t) => {
-                        if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
+                        if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
                             skip_marker_whitespace = true;
                         } else if t.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace {
                             skip_marker_whitespace = false;
@@ -401,7 +401,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             let mut skip_marker_whitespace = false;
             for child in node.children_with_tokens() {
                 match child {
-                    NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BLOCKQUOTE_MARKER => {
+                    NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BLOCK_QUOTE_MARKER => {
                         skip_marker_whitespace = true;
                     }
                     NodeOrToken::Token(tok)

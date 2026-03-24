@@ -9,7 +9,7 @@ impl AstNode for BlockQuote {
     type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
-        kind == SyntaxKind::BLOCKQUOTE
+        kind == SyntaxKind::BLOCK_QUOTE
     }
 
     fn cast(syntax: SyntaxNode) -> Option<Self> {
@@ -31,7 +31,7 @@ impl BlockQuote {
         self.0.children().filter(|child| {
             !matches!(
                 child.kind(),
-                SyntaxKind::BLOCKQUOTE_MARKER | SyntaxKind::WHITESPACE
+                SyntaxKind::BLOCK_QUOTE_MARKER | SyntaxKind::WHITESPACE
             )
         })
     }

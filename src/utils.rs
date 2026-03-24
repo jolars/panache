@@ -11,7 +11,7 @@ pub fn is_block_element(kind: SyntaxKind) -> bool {
             | SyntaxKind::FIGURE
             | SyntaxKind::LIST
             | SyntaxKind::DEFINITION_LIST
-            | SyntaxKind::BLOCKQUOTE
+            | SyntaxKind::BLOCK_QUOTE
             | SyntaxKind::CODE_BLOCK
             | SyntaxKind::SIMPLE_TABLE
             | SyntaxKind::MULTILINE_TABLE
@@ -29,7 +29,7 @@ pub fn is_structural_block(kind: SyntaxKind) -> bool {
             | SyntaxKind::FIGURE
             | SyntaxKind::HEADING
             | SyntaxKind::CODE_BLOCK
-            | SyntaxKind::BLOCKQUOTE
+            | SyntaxKind::BLOCK_QUOTE
             | SyntaxKind::LIST
             | SyntaxKind::LIST_ITEM
             | SyntaxKind::DEFINITION_LIST

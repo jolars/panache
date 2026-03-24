@@ -185,7 +185,7 @@ support.
 
 ### Performance
 
-- [ ] Avoid temporary green tree when injecting `BLOCKQUOTE_MARKER` tokens into
+- [ ] Avoid temporary green tree when injecting `BLOCK_QUOTE_MARKER` tokens into
       inline-parsed paragraphs (current approach parses inlines into a temp
       tree, then replays while inserting markers)
 

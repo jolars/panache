@@ -690,7 +690,7 @@ impl<'a> Parser<'a> {
 
                         let marker_info = parse_blockquote_marker_info(content_line);
                         for level in 0..blockquote_depth {
-                            self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+                            self.builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
                             if let Some(info) = marker_info.get(level) {
                                 blockquotes::emit_one_blockquote_marker(
                                     &mut self.builder,
@@ -1025,7 +1025,7 @@ impl<'a> Parser<'a> {
             if bq_depth > current_bq_depth {
                 // Open blockquotes
                 for _ in current_bq_depth..bq_depth {
-                    self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+                    self.builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
                     self.containers.push(Container::BlockQuote {});
                 }
             } else if bq_depth < current_bq_depth {
@@ -1237,7 +1237,7 @@ impl<'a> Parser<'a> {
 
                 // Then open new blockquotes and emit their markers
                 for level in current_bq_depth..bq_depth {
-                    self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+                    self.builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
 
                     // Emit the marker for this new level
                     if let Some(info) = marker_info.get(level) {
@@ -1663,7 +1663,7 @@ impl<'a> Parser<'a> {
 
                     // Open new blockquotes and emit their markers.
                     for level in current_bq_depth..bq_depth {
-                        self.builder.start_node(SyntaxKind::BLOCKQUOTE.into());
+                        self.builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
 
                         if level == current_bq_depth
                             && let Some(indent_str) = indent_to_emit

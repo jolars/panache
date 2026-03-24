@@ -197,7 +197,7 @@ impl Formatter {
             child.kind() == SyntaxKind::LIST_ITEM
                 && child
                     .children()
-                    .any(|item_child| matches!(item_child.kind(), SyntaxKind::BLOCKQUOTE))
+                    .any(|item_child| matches!(item_child.kind(), SyntaxKind::BLOCK_QUOTE))
         });
         let is_loose = (has_blank_between_items || has_blockquote_children) && !has_nested_lists;
 
@@ -629,7 +629,7 @@ impl Formatter {
                     let content_indent = list_indent.hanging_indent(total_indent);
                     self.format_indented_code_block(&child, content_indent);
                 }
-                SyntaxKind::BLOCKQUOTE => {
+                SyntaxKind::BLOCK_QUOTE => {
                     let follows_primary_content = child
                         .prev_sibling()
                         .map(|prev| {

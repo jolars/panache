@@ -187,7 +187,7 @@ pub(super) fn format_paragraph_with_display_math(
                 }
             }
             NodeOrToken::Token(t) => {
-                if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
+                if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
                     skip_marker_whitespace = true;
                 } else if t.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace {
                     skip_marker_whitespace = false;

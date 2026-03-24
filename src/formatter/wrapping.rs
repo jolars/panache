@@ -407,7 +407,7 @@ fn build_pieces_with_mode<'a>(
                     SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
                         b.pending_space = true;
                     }
-                    SyntaxKind::BLOCKQUOTE_MARKER => {}
+                    SyntaxKind::BLOCK_QUOTE_MARKER => {}
                     SyntaxKind::ESCAPED_CHAR => {
                         if in_link_text && t.text() == r"\_" {
                             b.push_piece("_");
@@ -929,7 +929,7 @@ fn wrap_node_greedy_streaming(
                     SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
                         b.pending_space = true;
                     }
-                    SyntaxKind::BLOCKQUOTE_MARKER => {}
+                    SyntaxKind::BLOCK_QUOTE_MARKER => {}
                     SyntaxKind::ESCAPED_CHAR => {
                         if in_link_text && t.text() == r"\_" {
                             b.push_piece("_");
@@ -1205,12 +1205,12 @@ fn special_case_lines(
         }
     }
 
-    let has_blockquote_markers = node
-        .children_with_tokens()
-        .any(|el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER));
+    let has_blockquote_markers = node.children_with_tokens().any(
+        |el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER),
+    );
     let in_blockquote = node
         .ancestors()
-        .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCKQUOTE);
+        .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_QUOTE);
     if has_dollar_text {
         let paragraph_text = node.text().to_string();
         let normalized: Cow<'_, str> = if paragraph_text.contains("\r\n") {
@@ -1274,7 +1274,7 @@ fn special_case_lines(
                 result.push_str(&format_inline_fn(&n));
             }
             NodeOrToken::Token(t) => {
-                if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER {
+                if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
                     skip_next_whitespace = true;
                 } else if t.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace {
                     skip_next_whitespace = false;

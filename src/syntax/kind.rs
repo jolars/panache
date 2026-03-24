@@ -16,7 +16,7 @@ pub enum SyntaxKind {
     HARD_LINE_BREAK,     // \<newline>
     DIV_MARKER,          // :::
     YAML_METADATA_DELIM, // --- or ... (for YAML blocks)
-    BLOCKQUOTE_MARKER,   // >
+    BLOCK_QUOTE_MARKER,  // >
     ALERT_MARKER,        // [!NOTE], [!TIP], etc.
     IMAGE_LINK_START,    // ![
     LIST_MARKER,         // - + *
@@ -117,7 +117,7 @@ pub enum SyntaxKind {
     FENCED_DIV,
     PARAGRAPH,
     PLAIN, // Inline content without paragraph break (tight lists, definition lists, table cells)
-    BLOCKQUOTE,
+    BLOCK_QUOTE,
     ALERT,
     LIST,
     LIST_ITEM,

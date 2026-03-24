@@ -363,8 +363,8 @@ DOCUMENT@0..1703
       DEFINITION@1531..1555
         DEFINITION_MARKER@1531..1532 ":"
         WHITESPACE@1532..1535 "   "
-        BLOCKQUOTE@1535..1555
-          BLOCKQUOTE_MARKER@1535..1536 ">"
+        BLOCK_QUOTE@1535..1555
+          BLOCK_QUOTE_MARKER@1535..1536 ">"
           WHITESPACE@1536..1537 " "
           PARAGRAPH@1537..1555
             TEXT@1537..1538 "a"
@@ -429,10 +429,10 @@ DOCUMENT@0..1703
             PLAIN@1679..1683
               TEXT@1679..1682 "> a"
               NEWLINE@1682..1683 "\n"
-            BLOCKQUOTE@1683..1703
+            BLOCK_QUOTE@1683..1703
               WHITESPACE@1683..1687 "    "
               WHITESPACE@1687..1689 "  "
-              BLOCKQUOTE_MARKER@1689..1690 ">"
+              BLOCK_QUOTE_MARKER@1689..1690 ">"
               WHITESPACE@1690..1691 " "
               PARAGRAPH@1691..1703
                 TEXT@1691..1692 "b"

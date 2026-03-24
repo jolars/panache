@@ -879,7 +879,7 @@ impl Formatter {
                 }
             }
 
-            SyntaxKind::BLOCKQUOTE => {
+            SyntaxKind::BLOCK_QUOTE => {
                 log::trace!("Formatting blockquote");
                 // Determine nesting depth by counting ancestor BlockQuote nodes (including self)
                 let depth = BlockQuote::cast(node.clone())
@@ -899,7 +899,7 @@ impl Formatter {
                 for child in node.children() {
                     match child.kind() {
                         // Skip BlockQuoteMarker tokens - we add prefixes dynamically
-                        SyntaxKind::BLOCKQUOTE_MARKER => continue,
+                        SyntaxKind::BLOCK_QUOTE_MARKER => continue,
 
                         SyntaxKind::PARAGRAPH => match wrap_mode {
                             WrapMode::Preserve => {
@@ -910,7 +910,7 @@ impl Formatter {
                                 for item in child.children_with_tokens() {
                                     match item {
                                         NodeOrToken::Token(t)
-                                            if t.kind() == SyntaxKind::BLOCKQUOTE_MARKER =>
+                                            if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER =>
                                         {
                                             // Skip marker - we add these dynamically
                                             // Also skip the following whitespace (part of marker syntax)
@@ -1657,7 +1657,7 @@ impl Formatter {
                                         self.output.drain(start..start + def_indent);
                                     }
                                 }
-                                SyntaxKind::BLOCKQUOTE => {
+                                SyntaxKind::BLOCK_QUOTE => {
                                     if self.output.ends_with(":   ") {
                                         let mut pieces: Vec<String> = Vec::new();
                                         let block_text = n.text().to_string();

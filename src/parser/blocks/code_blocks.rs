@@ -535,7 +535,7 @@ fn prepare_fence_open_line<'a>(
 fn emit_blockquote_prefix_tokens(builder: &mut GreenNodeBuilder<'static>, prefix: &str) {
     for ch in prefix.chars() {
         if ch == '>' {
-            builder.token(SyntaxKind::BLOCKQUOTE_MARKER.into(), ">");
+            builder.token(SyntaxKind::BLOCK_QUOTE_MARKER.into(), ">");
         } else {
             let mut buf = [0u8; 4];
             builder.token(SyntaxKind::WHITESPACE.into(), ch.encode_utf8(&mut buf));

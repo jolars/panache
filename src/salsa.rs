@@ -328,7 +328,7 @@ pub(crate) fn is_structural_heading_node(node: &SyntaxNode) -> bool {
         matches!(
             ancestor.kind(),
             SyntaxKind::LIST_ITEM
-                | SyntaxKind::BLOCKQUOTE
+                | SyntaxKind::BLOCK_QUOTE
                 | SyntaxKind::DEFINITION_ITEM
                 | SyntaxKind::DEFINITION
                 | SyntaxKind::TERM

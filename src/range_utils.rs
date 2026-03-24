@@ -70,7 +70,7 @@ fn find_expandable_container(node: &SyntaxNode) -> Option<SyntaxNode> {
             SyntaxKind::DEFINITION_LIST => 2,
             SyntaxKind::DEFINITION_ITEM => 3,
             SyntaxKind::LINE_BLOCK => 2,
-            SyntaxKind::BLOCKQUOTE | SyntaxKind::FENCED_DIV => 4,
+            SyntaxKind::BLOCK_QUOTE | SyntaxKind::FENCED_DIV => 4,
             _ => 0,
         };
         if priority >= best_priority && priority > 0 {

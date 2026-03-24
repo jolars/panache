@@ -66,9 +66,9 @@ DOCUMENT@0..393
             NEWLINE@247..248 "\n"
         BLANK_LINE@248..249
           BLANK_LINE@248..249 "\n"
-        BLOCKQUOTE@249..274
+        BLOCK_QUOTE@249..274
           WHITESPACE@249..253 "    "
-          BLOCKQUOTE_MARKER@253..254 ">"
+          BLOCK_QUOTE_MARKER@253..254 ">"
           WHITESPACE@254..255 " "
           PARAGRAPH@255..274
             TEXT@255..273 "orange block quote"
