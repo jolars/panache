@@ -49,11 +49,12 @@ tasks:
       - cd docs && quarto preview --no-browser
 
   wasm-build:
-    desc: Build panache-wasm for web playground
+    desc: Build and sync panache-wasm for playground
     cmds:
-      - cd crates/panache-wasm && wasm-pack build --target web
+      - wasm-pack build crates/panache-wasm --target web
+      - rm -rf docs/playground/pkg
       - cp -r crates/panache-wasm/pkg docs/playground/
-      - rm -rf docs/playground/pkg/.gitignore
+      - rm -f docs/playground/pkg/.gitignore
 
   playground-serve:
     desc: Serve playground locally
