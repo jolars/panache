@@ -442,6 +442,10 @@ impl SymbolUsageIndex {
             .get(&normalize_label(key))
     }
 
+    pub fn heading_label_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.heading_labels.get(&normalize_label(key))
+    }
+
     pub fn heading_sequence(&self) -> &[(rowan::TextRange, usize)] {
         &self.heading_sequence
     }

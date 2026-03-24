@@ -496,3 +496,19 @@ async fn test_goto_definition_inline_hash_heading_reference() {
     };
     assert_eq!(location.range.start.line, 0);
 }
+
+#[tokio::test]
+async fn test_goto_definition_shortcut_implicit_heading_reference_with_spaces() {
+    let server = TestLspServer::new();
+
+    let content = "# Unordered Lists\n\n[unordered lists]\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let result = server.goto_definition("file:///test.qmd", 2, 2).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 0);
+}

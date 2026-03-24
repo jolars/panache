@@ -134,6 +134,16 @@ pub(crate) async fn goto_definition(
                     return Ok(Some(GotoDefinitionResponse::Scalar(location)));
                 }
             }
+
+            for doc in &doc_indices {
+                if let Some(ranges) = doc.symbol_index.heading_label_ranges(label)
+                    && let Some(range) = ranges.first()
+                {
+                    let location =
+                        crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
+                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                }
+            }
         }
     }
 
