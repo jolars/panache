@@ -192,6 +192,7 @@ pub fn crossref_resolution_labels(label: &str, bookdown_references: bool) -> Vec
     labels
 }
 
+#[cfg(feature = "lsp")]
 pub fn crossref_symbol_labels(label: &str, bookdown_references: bool) -> Vec<String> {
     let mut labels = crossref_resolution_labels(label, bookdown_references);
 
@@ -288,7 +289,9 @@ pub fn pandoc_slugify(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{crossref_resolution_labels, crossref_symbol_labels, implicit_heading_ids};
+    #[cfg(feature = "lsp")]
+    use super::crossref_symbol_labels;
+    use super::{crossref_resolution_labels, implicit_heading_ids};
 
     #[test]
     fn crossref_resolution_labels_keep_exact_match() {
@@ -302,6 +305,7 @@ mod tests {
         assert_eq!(labels, vec!["fig:plot".to_string(), "plot".to_string()]);
     }
 
+    #[cfg(feature = "lsp")]
     #[test]
     fn crossref_symbol_labels_include_bookdown_prefixed_variants() {
         let labels = crossref_symbol_labels("plot", true);

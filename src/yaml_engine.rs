@@ -1,4 +1,6 @@
-use crate::config::{Config, WrapMode};
+use crate::config::Config;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::config::WrapMode;
 use crate::syntax::YamlParseError;
 
 #[cfg(not(target_arch = "wasm32"))]

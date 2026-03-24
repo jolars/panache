@@ -36,6 +36,7 @@ pub async fn format_tree_async(
 
     let input = tree.text().to_string();
     let frontmatter_region = metadata::collect_yaml_frontmatter_region(tree);
+    #[cfg(not(target_arch = "wasm32"))]
     let frontmatter_yaml = frontmatter_region
         .as_ref()
         .map(|region| region.content.trim_end().to_string());
@@ -105,6 +106,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
 
     let input = tree.text().to_string();
     let frontmatter_region = metadata::collect_yaml_frontmatter_region(tree);
+    #[cfg(not(target_arch = "wasm32"))]
     let frontmatter_yaml = frontmatter_region
         .as_ref()
         .map(|region| region.content.trim_end().to_string());
