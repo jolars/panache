@@ -52,8 +52,8 @@ website:
         text: Overview
       - href: getting-started.qmd
         text: Getting Started
-      - href: user-guide
-        text: User Guide
+      - href: guide
+        text: Guide
       - href: changelog.md
         text: Changelog
       - text: Help
@@ -70,23 +70,36 @@ website:
         target: _blank
 
   sidebar:
-    - id: user-guide
-      text: User Guide
+    - id: guide
       style: floating
+      collapse-level: 3
       contents:
-        - user-guide/index.qmd
-        - href: user-guide/formatting.qmd
-          text: Formatting
-        - href: user-guide/linting.qmd
-          text: Linting
-        - href: user-guide/lsp.qmd
-          text: Language Server
-        - href: user-guide/configuration.qmd
-          text: Configuration
-        - href: user-guide/cli.qmd
-          text: Command Line Interface
-        - href: user-guide/integrations.qmd
-          text: Integrations
+        - section: "Guide"
+          style: floating
+          href: guide/index.qmd
+          contents:
+            - section: "User Guide"
+              href: "user-guide/index.qmd"
+              contents:
+                - href: user-guide/formatting.qmd
+                  text: Formatting
+                - href: user-guide/linting.qmd
+                  text: Linting
+                - href: user-guide/lsp.qmd
+                  text: Language Server
+                - href: user-guide/configuration.qmd
+                  text: Configuration
+                - href: user-guide/cli.qmd
+                  text: Command Line Interface
+                - href: user-guide/integrations.qmd
+                  text: Integrations
+            - section: "Development"
+              href: development/index.qmd
+              contents:
+                - href: development/lsp.md
+                  text: Language Server
+                - href: development/contributing.md
+                  text: Contributing
 
 resources:
   - "playground/**"

@@ -56,13 +56,13 @@ Output (`"sentence"`)
     Second sentence; third sentence!
     ```
 
-### Preserving Hard Breaks
+### Hard Line Breaks
 
 Hard line breaks, which are created either by ending a line with two or more
-spaces (``  ``) or by using a backslash (`\n`), are preserved regardless of the
-wrapping mode:
+spaces or by using a backslash (`\n`), are preserved regardless of the wrapping
+mode:
 
-Input (with `  ` hard break)
+Input (with two spaces at the end of the first line)
 
 :   ```markdown
     First line  
@@ -151,8 +151,8 @@ Output
 
 ### Basic Formatting
 
-Emphasis markers are consistently normalized o asterisks (`*`) for italics and
-double asterisks (`**`) for bold. Underscores are converted to asterisks.
+Emphasis markers are consistently normalized to asterisks (`*`) for italics and
+double asterisks (`**`) for bold text. Underscores are converted to asterisks.
 Ambiguous cases are resolved by escaping emphasis markers to avoid idempotency
 issues.
 
@@ -188,7 +188,10 @@ Output
 
 ### Inline Code
 
-Inline code is preserved with minimal backticks needed:
+For inline code, Panache normalizes spacing within the code span and ensures
+that the code is enclosed in the appropriate number of backticks to avoid
+conflicts with the content. If the code contains spaces, it will be wrapped in
+double backticks to preserve the spaces.
 
 Input
 
@@ -206,7 +209,7 @@ Output
     ```` ```r ````
     `````
 
-### Tab Stops in Code
+### Tab Stops
 
 Tabs in regular text are always normalized to spaces. To preserve tabs in
 literal code spans and code blocks, set:
@@ -286,9 +289,9 @@ Output
 
 ### Unordered Lists
 
-Bullet list markers are standardized to `-` for consistency. Indentation is
-normalized to 2 spaces per level. Loose lists are converted to tight lights if
-they only contain plain (non-block/paragraph) items.
+Bullet list markers are standardized to `-`. Indentation is normalized to two
+spaces per level. Loose lists are converted to tight lights if they only contain
+plain (non-block/paragraph) items.
 
 Input
 
@@ -311,15 +314,7 @@ Output:
 
 ### Ordered Lists
 
-Ordered lists maintain proper numbering:
-
-```markdown
-1. First item
-2. Second item
-   1. Nested item
-   2. Another nested
-3. Third item
-```
+Ordered lists are handled similarly to [unordered lists].
 
 ### Task Lists
 
@@ -349,11 +344,12 @@ Output
 Definition lists are indented with three spaces after the marker, flush the
 marker to the left, and indent following lines to four spaces.
 
-Panache also normalizes compact vs loose definition items by structure:
+Panache also normalizes compact vs loose definition items by structure, making
+them
 
-- compact when each definition is a single plain paragraph-like block
+- compact when each definition is a single plain paragraph-like block, and
 - loose when a definition contains multiple blocks or starts with a
-  non-paragraph block
+  non-paragraph block.
 
 Input
 
@@ -367,8 +363,11 @@ Input
      : Definition 2b
 
     Term 3
-    : Definition
-    with lazy continuation
+    :   - List
+        with lazy continuation
+        - > a
+          > b
+          > c
     ```
 
 Output
@@ -383,10 +382,13 @@ Output
     :   Definition 2b
 
     Term 3
-    :   Definition with lazy continuation
+
+    :   - List with lazy continuation
+
+        - > a b c
     ```
 
-### Fancy lists
+### Fancy Lists
 
 Fancy lists are indented to line up with the first character of the list item
 text.
@@ -423,9 +425,9 @@ Output
        x. Ten
     ```
 
-## Blockquotes
+## Block Quotes
 
-Blockquotes are formatted with consistent `>` markers:
+Block quotes are formatted with consistent `>` markers:
 
 Input
 
@@ -458,24 +460,53 @@ while preserving content and attributes.
 
 ### Pipe Tables
 
-```markdown
-| Header 1 | Header 2 | Header 3 |
-|----------|----------|----------|
-| Cell 1   | Cell 2   | Cell 3   |
-| Cell 4   | Cell 5   | Cell 6   |
-```
+Pipe tables are normalized to have consistent spacing and alignment. The header
+separator row is standardized to use hyphens and colons for alignment, and
+spacing within cells is normalized.
+
+Input
+
+:   ```markdown
+    | Right | Left | Default | Center|
+    |------:|:-----|---------|:------:|
+    | 12  |  12  |    12   |    12  |
+    |  123  |  123 |   123   |   123  |
+    |  1  |    1 |     1   |     1 |
+    ```
+
+Output
+
+:   ```markdown
+    | Right | Left | Default | Center |
+    | ----: | :--- | ------- | :----: |
+    |    12 | 12   | 12      |   12   |
+    |   123 | 123  | 123     |  123   |
+    |     1 | 1    | 1       |   1    |
+    ```
 
 ### Grid Tables
 
-```markdown
-+----------+----------+----------+
-| Header 1 | Header 2 | Header 3 |
-+==========+==========+==========+
-| Cell 1   | Cell 2   | Cell 3   |
-+----------+----------+----------+
-| Cell 4   | Cell 5   | Cell 6   |
-+----------+----------+----------+
-```
+Grid tables are normalized to have consistent spacing and alignment.
+
+Input
+
+:   ```markdown
+    +--------+----------------+
+    | Var    | Description    |
+    +========+================+
+    | `A`    | Example value. |
+    +--------+----------------+
+    ```
+
+Output
+
+:   ```markdown
+    +-----+----------------+
+    | Var | Description    |
+    +=====+================+
+    | `A` | Example value. |
+    +-----+----------------+
+    ```
 
 ### Simple Tables
 
@@ -506,6 +537,66 @@ Output
     Table: A caption
     ```
 
+### Multiline Tables
+
+Input
+
+:   ```markdown
+    -------------------------------------------------------------
+     Centered   Default           Right Left
+      Header    Aligned         Aligned Aligned
+    ----------- ------- --------------- -------------------------
+      First     row              12.0   Example of a row that
+                                        spans multiple lines.
+
+
+      Second    row                 5.0 Here's another one. Note
+                                        the blank line between
+                                        rows.
+    -------------------------------------------------------------
+    ```
+
+Output
+
+:   ```markdown
+    -------------------------------------------------------------
+     Centered   Default           Right Left
+      Header    Aligned         Aligned Aligned
+    ----------- ------- --------------- -------------------------
+       First    row                12.0 Example of a row that
+                                        spans multiple lines.
+
+      Second    row                 5.0 Here's another one. Note
+                                        the blank line between
+                                        rows.
+    -------------------------------------------------------------
+    ```
+
+### Table Captions
+
+Table captions are normalized to be on a separate line the table, prefixed with
+`Table:`, and flush left with the table content.
+
+Input
+
+:   ```markdown
+     a   b
+    --- ---
+     1   2
+
+       : A caption with extra spaces
+    ```
+
+Output
+
+:   ```markdown
+     a   b
+    --- ---
+     1   2
+
+    Table: A caption with extra spaces
+    ```
+
 ## Math
 
 ### Inline Math
@@ -532,8 +623,6 @@ Output
     ```
 
 ## Links
-
-### Inline L
 
 For links, Panache preserves the original link text and URL but normalizes the
 spacing around attributes, quotes, and parentheses. Descriptions are wrapped if
@@ -599,51 +688,38 @@ Output
 
 ## Footnotes
 
-### Inline Footnotes
-
-```markdown
-Text with footnote^[This is the footnote content].
-```
-
 ### Reference Footnotes
 
-```markdown
-Text with reference footnote[^1].
+Input
 
-[^1]: This is the footnote content.
-```
+:   ```markdown
+    [^longnote]: Here's one with multiple blocks.
 
-## Citations
+        Subsequent paragraphs are indented to show that they
+    belong to the previous footnote.
 
-Pandoc citation syntax is preserved:
+            { some.code }
 
-```markdown
-See @smith2020 for more details.
-Multiple citations [@smith2020; @jones2021].
-Citation with prefix [see @smith2020, pp. 10-15].
-```
+        The whole paragraph can be indented, or just the first
+        line.  In this way, multi-paragraph footnotes work like
+        multi-paragraph list items.
+    ```
 
-## Raw Blocks
+Output
 
-### HTML
+:   ````markdown
+    [^longnote]: Here's one with multiple blocks.
 
-````markdown
-```{=html}
-<div class="custom">
-  <p>Raw HTML content</p>
-</div>
-```
-````
+        Subsequent paragraphs are indented to show that they belong to the previous
+        footnote.
 
-### LaTeX
+        ```
+        { some.code }
+        ```
 
-````markdown
-```{=latex}
-\begin{equation}
-E = mc^2
-\end{equation}
-```
-````
+        The whole paragraph can be indented, or just the first line. In this way,
+        multi-paragraph footnotes work like multi-paragraph list items.
+    ````
 
 ## Horizontal Rulers
 
@@ -673,37 +749,29 @@ Output (`line-width = 60`):
 
 By default, multiple blank lines are collapsed to one:
 
-**Input:**
+Input
 
-```markdown
-Paragraph 1
+:   ```markdown
+    Paragraph 1
 
 
-Paragraph 2
-```
+    Paragraph 2
+    ```
 
-**Output:**
+Output
 
-```markdown
-Paragraph 1
+:   ```markdown
+    Paragraph 1
 
-Paragraph 2
-```
+    Paragraph 2
+    ```
 
-### Preserving Blank Lines
-
-Configure to preserve blank lines:
+If you want to preserve all existing blank lines, set:
 
 ```toml
 [format]
 blank-lines = "preserve"
 ```
-
-`collapse`
-:   Collapse multiple blank lines into one (default)
-
-`preserve`
-:   Keep all existing blank lines
 
 ## Frontmatter
 
@@ -712,15 +780,17 @@ blank-lines = "preserve"
 YAML frontmatter is parsed and normalized by
 [`pretty_yaml`](https://github.com/g-plane/pretty_yaml).
 
-```markdown
----
-echo:    false
-list:
-  -  a
-  -     b
----
-Text
-```
+Input
+
+:   ```markdown
+    ---
+    echo:    false
+    list:
+    -  a
+    -     b
+    ---
+    Text
+    ```
 
 Output
 
@@ -735,39 +805,38 @@ Output
     Text
     ```
 
-By default this means spacing and list indentation are normalized in the
-frontmatter block. This frontmatter formatting is always handled internally by
-Panache. The YAML parser/formatter implementation is shipped in Panache-owned
-workspace crates.
+## Chunk Options
 
-### Pandoc Title Block
+For executable code blocks, Panache convert options specified in the header
+(e.g. ```` ```{r, echo=FALSE} ````) to the hashpipe comment style.
 
-Pandoc-style title blocks are also supported:
+Input
 
-```markdown
-% My Document Title
-% Author Name
-% 2026-02-11
+:   ````markdown
+    ```{{r foobar, echo=FALSE, dependson = c("foo", "bar"), fig.cap = "A caption"}}
+    a <- 1
+    b <- 2
+    ```
+    ````
 
-Document content starts here.
-```
+Output
 
-## Best Practices
+:   ````markdown
+    ```{{r, dependson=c("foo", "bar")}}
+    #| label: foobar
+    #| echo: false
+    #| fig-cap: "A caption"
+    a <- 1
+    b <- 2
+    ```
+    ````
 
-Use consistent line width
-:   Set `line-width` based on your editor width
-
-Enable external formatters
-:   Let language-specific tools format code blocks
-
-Choose appropriate flavor
-:   Match your document type (`quarto`, `rmarkdown`, etc.)
-
-Test incrementally
-:   Format small sections first to understand behavior
-
-Use version control
-:   Always commit before formatting large documents
+Complex structures, like the `dependson` option in the example above, are
+preserved as-is without attempting to convert them. Formatting of the options is
+handled by [`pretty_yaml`](https://github.com/g-plane/pretty_yaml)---as in the
+case of YAML frontmatter. If you want to ensure that your caption is wrapped,
+don't use a quoted scalar value for the caption. Instead use a block scalar, via
+`>-`.
 
 ## Ignore Directives
 
@@ -808,19 +877,3 @@ and linting:
 Custom    formatting   and   linting   rules   ignored
 <!-- panache-ignore-end -->
 ```
-
-### Nested Structures
-
-Ignore directives work inside lists, blockquotes, and other nested structures:
-
-```markdown
-- List item 1
-- List item 2
-  <!-- panache-ignore-format-start -->
-  Nested    content   with    custom   spacing
-  <!-- panache-ignore-format-end -->
-- List item 3
-```
-
-See [Linting](linting.qmd) for information about linting-specific ignore
-directives.

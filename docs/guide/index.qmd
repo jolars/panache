@@ -1,0 +1,9 @@
+---
+title: Guide
+---
+
+This guide is partitioned into a [user guide](../user-guide/index.qmd) and a
+[development guide](../development/index.qmd). The user guide provides
+instructions and examples for using Panache, while the development guide
+provides instructions and examples for developing Panache itself, including how
+to contribute to the project and how to set up a development environment.

@@ -323,6 +323,7 @@ definition-lists = true
 backtick-code-blocks = true
 fenced-code-blocks = true
 fenced-code-attributes = true
+executable-code-blocks = true
 inline-code-attributes = true
 ```
 
@@ -334,6 +335,11 @@ inline-code-attributes = true
 
 `fenced-code-attributes`
 :   Attributes on fenced code blocks `{.language #id}` (default: enabled)
+
+`executable-code-blocks`
+:   Executable code chunks with brace info strings like ```` ```{r} ```` and
+    ```` ```{python} ```` (default: disabled, enabled for Quarto and RMarkdown
+    flavors)
 
 `inline-code-attributes`
 :   Attributes on inline code `` `code`{.class} `` (default: enabled)

@@ -2,15 +2,16 @@
 title: Language Server
 ---
 
-## Overview
-
-Panache includes a built-in Language Server Protocol (LSP) implementation that
-provides document formatting capabilities for editors and IDEs.
+Panache includes a built-in language server protocol (LSP) implementation that
+provides a rich set of editor features for Pandoc Markdown, Quarto, and R
+Markdown files. The language server is designed to be editor-agnostic and
+configurations for popular editors like Neovim, VS Code, Helix, Zed, and Emacs
+are provided in [Editor Configuration](#editor-configuration).
 
 ## Features
 
-The list of features is still evolving, but here is a (hopfully) comprehensive
-overview of the current capabilities:
+In this section, we provide an overview of the key features supported by the
+Panache LSP.
 
 Document formatting
 :   Format entire documents or selected ranges (`textDocument/formatting`,
@@ -97,7 +98,7 @@ Document tracking
 Configuration discovery
 :   Automatic detection from workspace root
 
-## Starting the Server
+## Editor Configuration {#editor-configuration}
 
 If you want to start the language server manually (for debugging), then you can
 run `panache lsp` in your terminal. This will start the server and wait for
@@ -465,58 +466,6 @@ label or definition and trigger rename (F2 in many editors).
 
 Find all references to the symbol under cursor (`textDocument/references`),
 including Quarto crossrefs, executable chunk labels, and citation keys.
-
-### Document Synchronization
-
-The LSP tracks document changes using **incremental synchronization**:
-
-`textDocument/didOpen`
-:   Document opened in editor
-
-`textDocument/didChange`
-:   Document content changed (incremental deltas sent)
-
-`textDocument/didClose`
-:   Document closed
-
-This ensures the LSP always has the current document state while minimizing data
-transfer.
-
-### Durability and Invalidation Policy
-
-Panache uses Salsa durability levels to reduce unnecessary revalidation work in
-LSP mode.
-
-Durability assignments
-:   - `LOW`: Open-buffer text updates (`didOpen`, `didChange`) for the active
-    document. - `MEDIUM`: Per-document config updates and file-watcher refreshes
-    for already cached dependency files. - `HIGH`: Disk-loaded dependency files
-    cached from the project graph.
-
-Invalidation policy
-:   - Edits while typing should invalidate low-durability data aggressively, but
-    should not force broad revalidation of stable dependency data. - Config
-    reloads and watcher events use medium durability so changes propagate, but
-    with less churn than open-buffer edits. - Disk-cached dependencies use high
-    durability so unrelated low-frequency edits do not repeatedly revalidate
-    those inputs.
-
-Verification and measurement
-
-:   - Durability revalidation measurement harness: `tests/durability_bench.rs`
-    (ignored by default). - Run with:
-
-    ```bash
-    cargo test --test durability_bench durability_revalidation_bench -- --ignored --nocapture
-    ```
-
-    - Policy regression tests are in `src/salsa.rs` and validate that
-      high-durability stable inputs avoid revalidation under low-durability
-      updates, while low-durability stable inputs are revalidated.
-
-Current status
-:   The conservative policy above is the current default for LSP flows and is
-    intended as the baseline for future performance tuning.
 
 ## Troubleshooting
 

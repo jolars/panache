@@ -11,7 +11,7 @@ errors, heading hierarchy issues, broken references, and citation problems.
 
 The linter focuses on semantic correctness rather than stylistic preferences,
 for which the formatter is responsible (and can act as a linter via
-`panache format --check`). It primarily tries to catch
+`panache format --check`).
 
 ## CLI Usage
 
