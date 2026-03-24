@@ -203,17 +203,17 @@ pub(crate) fn emit_crossref(builder: &mut GreenNodeBuilder, key: &str, has_suppr
     builder.start_node(SyntaxKind::CROSSREF.into());
 
     if has_suppress {
-        builder.token(SyntaxKind::CITATION_MARKER.into(), "-@");
+        builder.token(SyntaxKind::CROSSREF_MARKER.into(), "-@");
     } else {
-        builder.token(SyntaxKind::CITATION_MARKER.into(), "@");
+        builder.token(SyntaxKind::CROSSREF_MARKER.into(), "@");
     }
 
     if key.starts_with('{') && key.ends_with('}') {
-        builder.token(SyntaxKind::CITATION_BRACE_OPEN.into(), "{");
-        builder.token(SyntaxKind::CITATION_KEY.into(), &key[1..key.len() - 1]);
-        builder.token(SyntaxKind::CITATION_BRACE_CLOSE.into(), "}");
+        builder.token(SyntaxKind::CROSSREF_BRACE_OPEN.into(), "{");
+        builder.token(SyntaxKind::CROSSREF_KEY.into(), &key[1..key.len() - 1]);
+        builder.token(SyntaxKind::CROSSREF_BRACE_CLOSE.into(), "}");
     } else {
-        builder.token(SyntaxKind::CITATION_KEY.into(), key);
+        builder.token(SyntaxKind::CROSSREF_KEY.into(), key);
     }
 
     builder.finish_node();
@@ -222,7 +222,7 @@ pub(crate) fn emit_crossref(builder: &mut GreenNodeBuilder, key: &str, has_suppr
 pub(crate) fn emit_bookdown_crossref(builder: &mut GreenNodeBuilder, key: &str) {
     builder.start_node(SyntaxKind::CROSSREF.into());
     builder.token(SyntaxKind::TEXT.into(), "\\@ref(");
-    builder.token(SyntaxKind::CITATION_KEY.into(), key);
+    builder.token(SyntaxKind::CROSSREF_KEY.into(), key);
     builder.token(SyntaxKind::TEXT.into(), ")");
     builder.finish_node();
 }

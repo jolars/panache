@@ -18,8 +18,8 @@ DOCUMENT@0..91
   PARAGRAPH@64..91
     TEXT@64..77 "Reference to "
     CROSSREF@77..89
-      CITATION_MARKER@77..78 "@"
-      CITATION_KEY@78..89 "eq-einstein"
+      CROSSREF_MARKER@77..78 "@"
+      CROSSREF_KEY@78..89 "eq-einstein"
     TEXT@89..90 "."
     NEWLINE@90..91 "\n"
 

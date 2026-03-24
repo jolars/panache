@@ -2,8 +2,8 @@ DOCUMENT@0..591
   PARAGRAPH@0..142
     TEXT@0..15 "Black-Scholes ("
     CROSSREF@15..32
-      CITATION_MARKER@15..16 "@"
-      CITATION_KEY@16..32 "eq-black-scholes"
+      CROSSREF_MARKER@15..16 "@"
+      CROSSREF_KEY@16..32 "eq-black-scholes"
     TEXT@32..79 ") is a mathematical m ..."
     NEWLINE@79..80 "\n"
     TEXT@80..141 "the behavior of finan ..."
@@ -24,8 +24,8 @@ DOCUMENT@0..591
   PARAGRAPH@400..444
     TEXT@400..413 "Reference to "
     CROSSREF@413..430
-      CITATION_MARKER@413..414 "@"
-      CITATION_KEY@414..430 "eq-black-scholes"
+      CROSSREF_MARKER@413..414 "@"
+      CROSSREF_KEY@414..430 "eq-black-scholes"
     TEXT@430..443 " in the text."
     NEWLINE@443..444 "\n"
   BLANK_LINE@444..445

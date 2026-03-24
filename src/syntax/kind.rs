@@ -71,6 +71,10 @@ pub enum SyntaxKind {
     CITATION_CONTENT,     // Text content in bracketed citations
     CITATION_SEPARATOR,   // ; between multiple citations
     CROSSREF,             // Quarto cross-reference: @fig-*, @eq-*, etc.
+    CROSSREF_MARKER,      // @ or -@ for cross-references
+    CROSSREF_KEY,         // Cross-reference key identifier
+    CROSSREF_BRACE_OPEN,  // { for braced cross-reference keys
+    CROSSREF_BRACE_CLOSE, // } for braced cross-reference keys
 
     // Spans
     BRACKETED_SPAN,     // [text]{.class}

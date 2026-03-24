@@ -151,11 +151,11 @@ mod citation_tests {
         crate::parser::parse(input, Some(config))
     }
 
-    fn find_citation_keys(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+    fn find_keys(node: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> Vec<String> {
         let mut keys = Vec::new();
         for element in node.descendants_with_tokens() {
             if let Some(token) = element.into_token()
-                && token.kind() == SyntaxKind::CITATION_KEY
+                && token.kind() == kind
             {
                 keys.push(token.text().to_string());
             }
@@ -168,7 +168,7 @@ mod citation_tests {
         let input = "Text [@doe99; @smith2000].";
         let inline_tree = parse_inline(input);
 
-        let keys = find_citation_keys(&inline_tree);
+        let keys = find_keys(&inline_tree, SyntaxKind::CITATION_KEY);
         assert_eq!(keys, vec!["doe99", "smith2000"]);
     }
 
@@ -177,7 +177,7 @@ mod citation_tests {
         let input = "See @doe99 for details.";
         let inline_tree = parse_inline(input);
 
-        let keys = find_citation_keys(&inline_tree);
+        let keys = find_keys(&inline_tree, SyntaxKind::CITATION_KEY);
         assert_eq!(keys, vec!["doe99"]);
     }
 
@@ -186,7 +186,7 @@ mod citation_tests {
         let input = "See \\@ref(fig:plot).";
         let inline_tree = parse_inline_with_bookdown(input);
 
-        let keys = find_citation_keys(&inline_tree);
+        let keys = find_keys(&inline_tree, SyntaxKind::CROSSREF_KEY);
         assert_eq!(keys, vec!["fig:plot"]);
     }
 
@@ -195,7 +195,7 @@ mod citation_tests {
         let input = "See \\@ref(introduction).";
         let inline_tree = parse_inline_with_bookdown(input);
 
-        let keys = find_citation_keys(&inline_tree);
+        let keys = find_keys(&inline_tree, SyntaxKind::CROSSREF_KEY);
         assert_eq!(keys, vec!["introduction"]);
     }
 
@@ -204,7 +204,7 @@ mod citation_tests {
         let input = "See \\@ref(bad:label).";
         let inline_tree = parse_inline_with_bookdown(input);
 
-        let keys = find_citation_keys(&inline_tree);
+        let keys = find_keys(&inline_tree, SyntaxKind::CROSSREF_KEY);
         assert!(keys.is_empty());
     }
 }

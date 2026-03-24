@@ -66,7 +66,7 @@ impl Crossref {
         self.0
             .children_with_tokens()
             .filter_map(|element| element.into_token())
-            .filter(|token| token.kind() == SyntaxKind::CITATION_KEY)
+            .filter(|token| token.kind() == SyntaxKind::CROSSREF_KEY)
             .map(CitationKey)
             .collect()
     }
