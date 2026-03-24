@@ -12,7 +12,7 @@ use crate::syntax::{AstNode, List};
 
 use super::super::conversions::{convert_diagnostic, offset_to_position, position_to_offset};
 use super::super::helpers::get_document_and_config;
-use super::{footnote_conversion, list_conversion};
+use super::{footnote_conversion, heading_link_conversion, list_conversion};
 
 /// Handle textDocument/codeAction request
 pub(crate) async fn code_action(
@@ -291,6 +291,33 @@ pub(crate) async fn code_action(
 
                 actions.push(CodeActionOrCommand::CodeAction(action));
             }
+        }
+    }
+
+    // Add heading link conversion code actions (refactoring)
+    if !in_frontmatter_region
+        && let Some(offset) = position_to_offset(&text, request_range.start)
+        && let Some(link_node) =
+            heading_link_conversion::find_implicit_heading_link_at_position(&tree, offset)
+    {
+        let edits =
+            heading_link_conversion::convert_to_explicit_heading_link(&link_node, &tree, &text);
+        if !edits.is_empty() {
+            let mut changes = HashMap::new();
+            changes.insert(uri.clone(), edits);
+
+            let action = CodeAction {
+                title: "Convert to explicit heading link".to_string(),
+                kind: Some(CodeActionKind::REFACTOR),
+                diagnostics: None,
+                edit: Some(WorkspaceEdit {
+                    changes: Some(changes),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            actions.push(CodeActionOrCommand::CodeAction(action));
         }
     }
 

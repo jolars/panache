@@ -157,3 +157,38 @@ async fn test_hashpipe_folded_scalar_parse_error_maps_to_host_position() {
     assert_eq!(yaml_parse_error.location.line, 4);
     assert_eq!(yaml_parse_error.location.column, 9);
 }
+
+#[tokio::test]
+async fn test_code_action_convert_implicit_heading_link_to_explicit() {
+    let server = TestLspServer::new();
+    let content = "# Unordered Lists\n\n[unordered lists]\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let code_actions = server
+        .get_code_actions("file:///test.qmd", 2, 2, 2, 18)
+        .await
+        .expect("code actions response");
+
+    let action = code_actions.iter().find_map(|action| {
+        if let CodeActionOrCommand::CodeAction(ca) = action
+            && ca.title == "Convert to explicit heading link"
+        {
+            return Some(ca);
+        }
+        None
+    });
+    let action = action.expect("expected heading link conversion action");
+
+    let changes = action
+        .edit
+        .as_ref()
+        .and_then(|edit| edit.changes.as_ref())
+        .expect("workspace edit changes");
+    let edits = changes
+        .get(&"file:///test.qmd".parse::<Uri>().expect("uri"))
+        .expect("edits for document");
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "[unordered lists](#unordered-lists)");
+}

@@ -8,6 +8,7 @@ pub(crate) mod folding_ranges;
 pub(crate) mod footnote_conversion;
 pub(crate) mod formatting;
 pub(crate) mod goto_definition;
+pub(crate) mod heading_link_conversion;
 pub(crate) mod hover;
 pub(crate) mod list_conversion;
 pub(crate) mod prepare_rename;
