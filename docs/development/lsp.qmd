@@ -23,37 +23,38 @@ transfer.
 Panache uses Salsa durability levels to reduce unnecessary revalidation work in
 LSP mode.
 
-Durability assignments
+#### Durability assignments
 
-:   - `LOW`: Open-buffer text updates (`didOpen`, `didChange`) for the active
-      document. - `MEDIUM`: Per-document config updates and file-watcher
-      refreshes for already cached dependency files. - `HIGH`: Disk-loaded
-      dependency files cached from the project graph.
+`LOW`
+:   Open-buffer text updates (`didOpen`, `didChange`) for the active document.
 
-Invalidation policy
+`MEDIUM`
+:   Per-document config updates and file-watcher refreshes for already cached
+    dependency files.
 
-:   - Edits while typing should invalidate low-durability data aggressively, but
-      should not force broad revalidation of stable dependency data. - Config
-      reloads and watcher events use medium durability so changes propagate, but
-      with less churn than open-buffer edits. - Disk-cached dependencies use
-      high durability so unrelated low-frequency edits do not repeatedly
-      revalidate those inputs.
+`HIGH`
+:   Disk-loaded dependency files cached from the project graph.
 
-Verification and measurement
+#### Invalidation policy
 
-:   - Durability revalidation measurement harness: `tests/durability_bench.rs`
-      (ignored by default).
+- Edits while typing should invalidate low-durability data aggressively, but
+  should not force broad revalidation of stable dependency data.
+- Config reloads and watcher events use medium durability so changes propagate,
+  but with less churn than open-buffer edits.
+- Disk-cached dependencies use high durability so unrelated low-frequency edits
+  do not repeatedly revalidate those inputs.
 
-    - Run with:
+#### Verification and measurement
 
-      ```bash
-      cargo test --test durability_bench durability_revalidation_bench -- --ignored --nocapture
-      ```
+- Durability revalidation measurement harness: `tests/durability_bench.rs`
+  (ignored by default).
 
-    - Policy regression tests are in `src/salsa.rs` and validate that
-      high-durability stable inputs avoid revalidation under low-durability
-      updates, while low-durability stable inputs are revalidated.
+- Run with:
 
-Current status
-:   The conservative policy above is the current default for LSP flows and is
-    intended as the baseline for future performance tuning.
+  ```bash
+  cargo test --test durability_bench durability_revalidation_bench -- --ignored --nocapture
+  ```
+
+- Policy regression tests are in `src/salsa.rs` and validate that
+  high-durability stable inputs avoid revalidation under low-durability updates,
+  while low-durability stable inputs are revalidated.

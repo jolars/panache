@@ -96,7 +96,7 @@ website:
             - section: "Development"
               href: development/index.qmd
               contents:
-                - href: development/lsp.md
+                - href: development/lsp.qmd
                   text: Language Server
                 - href: development/contributing.md
                   text: Contributing
