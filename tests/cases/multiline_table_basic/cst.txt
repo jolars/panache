@@ -1,5 +1,5 @@
-DOCUMENT@0..550
-  MULTILINE_TABLE@0..550
+DOCUMENT@0..551
+  MULTILINE_TABLE@0..551
     TABLE_SEPARATOR@0..62
       TEXT@0..61 "--------------------- ..."
       NEWLINE@61..62 "\n"
@@ -23,13 +23,13 @@ DOCUMENT@0..550
       NEWLINE@208..209 "\n"
     TABLE_ROW@209..325
       TABLE_CELL@209..220
-        TEXT@209..220 "   First   "
+        TEXT@209..220 "  First    "
       WHITESPACE@220..221 " "
       TABLE_CELL@221..228
         TEXT@221..228 "row    "
       WHITESPACE@228..229 " "
       TABLE_CELL@229..244
-        TEXT@229..244 "           12.0"
+        TEXT@229..244 "         12.0  "
       WHITESPACE@244..245 " "
       TABLE_CELL@245..266
         TEXT@245..266 "Example of a row that"
@@ -38,24 +38,26 @@ DOCUMENT@0..550
       NEWLINE@324..325 "\n"
     BLANK_LINE@325..326
       BLANK_LINE@325..326 "\n"
-    TABLE_ROW@326..488
-      TABLE_CELL@326..337
-        TEXT@326..337 "  Second   "
-      WHITESPACE@337..338 " "
-      TABLE_CELL@338..345
-        TEXT@338..345 "row    "
-      WHITESPACE@345..346 " "
-      TABLE_CELL@346..361
-        TEXT@346..361 "            5.0"
-      WHITESPACE@361..362 " "
-      TABLE_CELL@362..386
-        TEXT@362..386 "Here's another one. Note"
-      NEWLINE@386..387 "\n"
-      TEXT@387..445 "                      ..."
-      NEWLINE@445..446 "\n"
-      TEXT@446..487 "                      ..."
-      NEWLINE@487..488 "\n"
-    TABLE_SEPARATOR@488..550
-      TEXT@488..549 "--------------------- ..."
-      NEWLINE@549..550 "\n"
+    BLANK_LINE@326..327
+      BLANK_LINE@326..327 "\n"
+    TABLE_ROW@327..489
+      TABLE_CELL@327..338
+        TEXT@327..338 "  Second   "
+      WHITESPACE@338..339 " "
+      TABLE_CELL@339..346
+        TEXT@339..346 "row    "
+      WHITESPACE@346..347 " "
+      TABLE_CELL@347..362
+        TEXT@347..362 "            5.0"
+      WHITESPACE@362..363 " "
+      TABLE_CELL@363..387
+        TEXT@363..387 "Here's another one. Note"
+      NEWLINE@387..388 "\n"
+      TEXT@388..446 "                      ..."
+      NEWLINE@446..447 "\n"
+      TEXT@447..488 "                      ..."
+      NEWLINE@488..489 "\n"
+    TABLE_SEPARATOR@489..551
+      TEXT@489..550 "--------------------- ..."
+      NEWLINE@550..551 "\n"
 
