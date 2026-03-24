@@ -6,7 +6,7 @@
 
 mod ast;
 mod attributes;
-mod blockquotes;
+mod block_quotes;
 mod blocks;
 mod chunk_options;
 mod citations;
@@ -27,7 +27,7 @@ mod yaml;
 
 pub use ast::*;
 pub use attributes::*;
-pub use blockquotes::*;
+pub use block_quotes::*;
 pub use blocks::*;
 pub use chunk_options::*;
 pub use citations::*;
