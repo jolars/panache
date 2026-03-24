@@ -28,3 +28,7 @@ lcov.info
 /perf.data
 /perf.data.old
 /flamegraph.svg
+
+# WASM build artifacts
+crates/panache-wasm/pkg/
+docs/playground/pkg/
