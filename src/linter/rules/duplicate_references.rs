@@ -271,6 +271,7 @@ plot(1:10)
 "#;
         let config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config.clone()));

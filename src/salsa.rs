@@ -1484,6 +1484,7 @@ mod tests {
         );
         let mut cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         cfg.extensions.quarto_crossrefs = true;
@@ -1547,6 +1548,7 @@ mod tests {
         let db = SalsaDb::default();
         let mut config = crate::Config {
             flavor: crate::config::Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::RMarkdown),
             ..Default::default()
         };
         config.extensions.bookdown_references = true;
@@ -1642,6 +1644,7 @@ mod tests {
         let path = PathBuf::from("/tmp/yaml_recompute.qmd");
         let cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let config = FileConfig::new(&db, cfg);
@@ -1665,6 +1668,7 @@ mod tests {
         let mut db = SalsaDb::default();
         let cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let config = FileConfig::new(&db, cfg);
@@ -1701,6 +1705,7 @@ mod tests {
         let mut db = SalsaDb::default();
         let cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let config = FileConfig::new(&db, cfg);
@@ -1746,6 +1751,7 @@ mod tests {
         let path = PathBuf::from("/tmp/yaml_validity.qmd");
         let cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let config = FileConfig::new(&db, cfg);
@@ -1785,6 +1791,7 @@ mod tests {
         let mut db = SalsaDb::default();
         let cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let config = FileConfig::new(&db, cfg);
@@ -1809,6 +1816,7 @@ mod tests {
         let mut db = SalsaDb::default();
         let cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let config = FileConfig::new(&db, cfg);
@@ -1829,6 +1837,7 @@ mod tests {
         let mut db = SalsaDb::default();
         let cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let config = FileConfig::new(&db, cfg);
@@ -1851,6 +1860,7 @@ mod tests {
         let mut db = SalsaDb::default();
         let cfg = crate::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let config = FileConfig::new(&db, cfg);

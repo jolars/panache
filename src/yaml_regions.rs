@@ -110,6 +110,7 @@ mod tests {
         let input = "```{r}\n#| echo: false\n#| fig-cap: |\n#|   A caption\nx <- 1\n```\n";
         let config = crate::config::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
@@ -133,6 +134,7 @@ mod tests {
         let input = "---\ntitle: Test\n---\n\n```{r}\n#| echo: false\nx <- 1\n```\n";
         let config = crate::config::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
@@ -155,6 +157,7 @@ mod tests {
         let input = "```{r}\n#|   not-an-option\nx <- 1\n```\n";
         let config = crate::config::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
@@ -170,6 +173,7 @@ mod tests {
         let input = "```{r}\n#| echo: false\nx <- 1\n```\n";
         let config = crate::config::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
@@ -190,6 +194,7 @@ mod tests {
         let input = "```{r}\n#| echo: false\n#| fig-cap: |\n#|   A caption\nx <- 1\n```\n";
         let config = crate::config::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
@@ -209,6 +214,7 @@ mod tests {
         let input = "```{r}\n#| echo: false\n#| fig-cap: |\n#|   A caption\nx <- 1\n```\n";
         let config = crate::config::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
@@ -229,6 +235,7 @@ mod tests {
         let input = "---\ntitle: Test\n---\n\n```{r}\n#| echo: false\nx <- 1\n```\n";
         let config = crate::config::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));

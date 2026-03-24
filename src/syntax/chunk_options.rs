@@ -298,6 +298,7 @@ mod tests {
     fn test_chunk_option_quoted() {
         let config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse(
@@ -324,6 +325,7 @@ x <- 1
     fn test_chunk_option_unquoted() {
         let config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse("```{r, echo=TRUE}\nx <- 1\n```", Some(config));
@@ -344,6 +346,7 @@ x <- 1
     fn test_chunk_label() {
         let config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse("```{r mylabel}\nx <- 1\n```", Some(config));

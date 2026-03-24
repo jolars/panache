@@ -69,6 +69,7 @@ mod tests {
         let input = "# Heading 2\n\nSee \\@ref(heading-2).\n";
         let mut config = crate::config::Config {
             flavor: crate::config::Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::RMarkdown),
             ..Default::default()
         };
         config.extensions.bookdown_references = true;
@@ -98,6 +99,7 @@ mod tests {
         let input = "```{r}\n#| label: fig-plot\nplot(1:10)\n```\n";
         let config = crate::config::Config {
             flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
             ..Default::default()
         };
         let root = crate::parse(input, Some(config));

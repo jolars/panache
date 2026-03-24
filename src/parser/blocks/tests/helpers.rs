@@ -14,6 +14,7 @@ pub fn parse_blocks_with_config(input: &str, config: &Config) -> SyntaxNode {
 pub fn parse_blocks_quarto(input: &str) -> SyntaxNode {
     let config = Config {
         flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
         ..Default::default()
     };
     Parser::new(input, &config).parse()
@@ -22,6 +23,7 @@ pub fn parse_blocks_quarto(input: &str) -> SyntaxNode {
 pub fn parse_blocks_rmarkdown(input: &str) -> SyntaxNode {
     let config = Config {
         flavor: Flavor::RMarkdown,
+        extensions: Extensions::for_flavor(Flavor::RMarkdown),
         ..Default::default()
     };
     Parser::new(input, &config).parse()

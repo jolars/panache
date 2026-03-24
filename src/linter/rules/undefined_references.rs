@@ -198,6 +198,7 @@ mod tests {
         let input = "See @fig-plot.\n\n```{r}\n#| label: fig-plot\nplot(1:10)\n```\n";
         let mut config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         config.extensions.quarto_crossrefs = true;
@@ -212,6 +213,7 @@ mod tests {
         let input = "See @fig-missing.\n";
         let mut config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         config.extensions.quarto_crossrefs = true;
@@ -228,6 +230,7 @@ mod tests {
         let input = "See \\@ref(fig:plot).\n\n```{r}\n#| label: plot\n#| fig-cap: \"Plot\"\nplot(1:10)\n```\n";
         let mut config = Config {
             flavor: Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(Flavor::RMarkdown),
             ..Default::default()
         };
         config.extensions.bookdown_references = true;
@@ -242,6 +245,7 @@ mod tests {
         let input = "Exercise \\@ref(exr:mu)\n\n::: {#mu .exercise}\nfoobar\n:::\n";
         let mut config = Config {
             flavor: Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(Flavor::RMarkdown),
             ..Default::default()
         };
         config.extensions.bookdown_references = true;
@@ -256,6 +260,7 @@ mod tests {
         let input = "# Heading\n\nA ref to \\@ref(heading).\n\n## Heading 2\n\nA ref to \\@ref(heading-2).\n";
         let mut config = Config {
             flavor: Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(Flavor::RMarkdown),
             ..Default::default()
         };
         config.extensions.bookdown_references = true;

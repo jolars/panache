@@ -105,6 +105,7 @@ mod tests {
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config.clone()));

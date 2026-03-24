@@ -259,6 +259,7 @@ x <- 1
 
         let config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse(input, Some(config));
@@ -283,6 +284,7 @@ x <- 1
 
         let config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse(input, Some(config));
@@ -304,6 +306,7 @@ x <- 1
         let input = "```{.bash filename=\"Terminal\"}\necho hi\n```\n";
         let config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse(input, Some(config));
@@ -336,6 +339,7 @@ d <- 4
 
         let config = Config {
             flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse(input, Some(config));

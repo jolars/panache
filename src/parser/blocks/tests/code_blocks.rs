@@ -2,7 +2,7 @@ use super::helpers::{
     assert_block_kinds, assert_block_kinds_for_node, find_all, find_first, parse_blocks,
     parse_blocks_quarto, parse_blocks_with_config,
 };
-use crate::config::{Config, Flavor};
+use crate::config::{Config, Extensions, Flavor};
 use crate::syntax::SyntaxKind;
 
 fn get_code_content(node: &crate::syntax::SyntaxNode) -> Option<String> {
@@ -554,6 +554,7 @@ fn fenced_code_attributes_respect_extension_guard() {
     let input = "```{python}\na <- 1\n```\n";
     let mut config = Config {
         flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
         ..Default::default()
     };
     config.extensions.fenced_code_attributes = false;
