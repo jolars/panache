@@ -663,6 +663,9 @@ impl<'a> Parser<'a> {
                     let content_slice = &trimmed_line[content_start..];
                     let content_line = &current_line[content_start_bytes.min(current_line.len())..];
 
+                    let (blockquote_depth, inner_blockquote_content) =
+                        count_blockquote_markers(content_line);
+
                     let should_start_list_from_first_line = self
                         .lines
                         .get(self.pos + 1)
@@ -673,19 +676,9 @@ impl<'a> Parser<'a> {
                             }
 
                             let (next_indent_cols, _) = leading_indent(next_without_newline);
-                            if next_indent_cols < content_col {
-                                return false;
-                            }
-
-                            let next_content_start =
-                                byte_index_at_column(next_without_newline, content_col);
-                            let next_content = &next_without_newline[next_content_start..];
-                            try_parse_list_marker(next_content, self.config).is_some()
+                            next_indent_cols >= content_col
                         })
                         .unwrap_or(false);
-
-                    let (blockquote_depth, inner_blockquote_content) =
-                        count_blockquote_markers(content_line);
 
                     if blockquote_depth > 0 {
                         self.containers.push(Container::Definition {

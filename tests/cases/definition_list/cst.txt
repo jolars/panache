@@ -1,4 +1,4 @@
-DOCUMENT@0..1555
+DOCUMENT@0..1628
   HEADING@0..19
     ATX_HEADING_MARKER@0..1
       ATX_HEADING_MARKER@0..1 "#"
@@ -317,7 +317,7 @@ DOCUMENT@0..1555
     NEWLINE@1428..1429 "\n"
   BLANK_LINE@1429..1430
     BLANK_LINE@1429..1430 "\n"
-  DEFINITION_LIST@1430..1555
+  DEFINITION_LIST@1430..1628
     DEFINITION_ITEM@1430..1523
       TERM@1430..1437
         TEXT@1430..1436 "Output"
@@ -373,4 +373,33 @@ DOCUMENT@0..1555
             NEWLINE@1546..1547 "\n"
             TEXT@1547..1554 "    > c"
             NEWLINE@1554..1555 "\n"
+    BLANK_LINE@1555..1556
+      BLANK_LINE@1555..1556 "\n"
+    DEFINITION_ITEM@1556..1628
+      TERM@1556..1561
+        TEXT@1556..1560 "Term"
+        NEWLINE@1560..1561 "\n"
+      BLANK_LINE@1561..1562
+        BLANK_LINE@1561..1562 "\n"
+      DEFINITION@1562..1628
+        DEFINITION_MARKER@1562..1563 ":"
+        WHITESPACE@1563..1566 "   "
+        LIST@1566..1628
+          LIST_ITEM@1566..1600
+            LIST_MARKER@1566..1567 "-"
+            WHITESPACE@1567..1568 " "
+            PLAIN@1568..1600
+              TEXT@1568..1572 "List"
+              NEWLINE@1572..1573 "\n"
+              TEXT@1573..1599 "    with lazy continu ..."
+              NEWLINE@1599..1600 "\n"
+          WHITESPACE@1600..1604 "    "
+          LIST_ITEM@1604..1628
+            LIST_MARKER@1604..1605 "-"
+            WHITESPACE@1605..1606 " "
+            PLAIN@1606..1628
+              TEXT@1606..1613 "Another"
+              NEWLINE@1613..1614 "\n"
+              TEXT@1614..1627 "    list item"
+              NEWLINE@1627..1628 "\n"
 

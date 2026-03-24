@@ -93,3 +93,8 @@ Output
 Orange
 
 :   > a b c
+
+Term
+
+:   - List with lazy continuation
+    - Another list item
