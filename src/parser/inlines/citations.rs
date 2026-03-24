@@ -221,9 +221,9 @@ pub(crate) fn emit_crossref(builder: &mut GreenNodeBuilder, key: &str, has_suppr
 
 pub(crate) fn emit_bookdown_crossref(builder: &mut GreenNodeBuilder, key: &str) {
     builder.start_node(SyntaxKind::CROSSREF.into());
-    builder.token(SyntaxKind::TEXT.into(), "\\@ref(");
+    builder.token(SyntaxKind::CROSSREF_BOOKDOWN_OPEN.into(), "\\@ref(");
     builder.token(SyntaxKind::CROSSREF_KEY.into(), key);
-    builder.token(SyntaxKind::TEXT.into(), ")");
+    builder.token(SyntaxKind::CROSSREF_BOOKDOWN_CLOSE.into(), ")");
     builder.finish_node();
 }
 

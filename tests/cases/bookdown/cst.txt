@@ -14,9 +14,9 @@ DOCUMENT@0..610
       DISPLAY_MATH_MARKER@261..277 "\\end{equation} \n"
     TEXT@277..308 "We can refer to it as ..."
     CROSSREF@308..323
-      TEXT@308..314 "\\@ref("
+      CROSSREF_BOOKDOWN_OPEN@308..314 "\\@ref("
       CROSSREF_KEY@314..322 "eq:binom"
-      TEXT@322..323 ")"
+      CROSSREF_BOOKDOWN_CLOSE@322..323 ")"
     TEXT@323..324 "."
     NEWLINE@324..325 "\n"
   BLANK_LINE@325..326
@@ -78,14 +78,14 @@ DOCUMENT@0..610
   PARAGRAPH@471..535
     TEXT@471..495 "We refer to is as Table "
     CROSSREF@495..513
-      TEXT@495..501 "\\@ref("
+      CROSSREF_BOOKDOWN_OPEN@495..501 "\\@ref("
       CROSSREF_KEY@501..512 "tab:mytable"
-      TEXT@512..513 ")"
+      CROSSREF_BOOKDOWN_CLOSE@512..513 ")"
     TEXT@513..519 ", not "
     CROSSREF@519..533
-      TEXT@519..525 "\\@ref("
+      CROSSREF_BOOKDOWN_OPEN@519..525 "\\@ref("
       CROSSREF_KEY@525..532 "mytable"
-      TEXT@532..533 ")"
+      CROSSREF_BOOKDOWN_CLOSE@532..533 ")"
     TEXT@533..534 "!"
     NEWLINE@534..535 "\n"
   BLANK_LINE@535..536
@@ -102,9 +102,9 @@ DOCUMENT@0..610
   PARAGRAPH@556..610
     TEXT@556..586 "We can refer to it as ..."
     CROSSREF@586..608
-      TEXT@586..592 "\\@ref("
+      CROSSREF_BOOKDOWN_OPEN@586..592 "\\@ref("
       CROSSREF_KEY@592..607 "implicit-header"
-      TEXT@607..608 ")"
+      CROSSREF_BOOKDOWN_CLOSE@607..608 ")"
     TEXT@608..609 "."
     NEWLINE@609..610 "\n"
 

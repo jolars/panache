@@ -63,18 +63,20 @@ pub enum SyntaxKind {
     INLINE_FOOTNOTE,       // ^[text]
 
     // Citations
-    CITATION,             // [@key] or @key
-    CITATION_MARKER,      // @ or -@
-    CITATION_KEY,         // The citation key identifier
-    CITATION_BRACE_OPEN,  // { for complex keys
-    CITATION_BRACE_CLOSE, // } for complex keys
-    CITATION_CONTENT,     // Text content in bracketed citations
-    CITATION_SEPARATOR,   // ; between multiple citations
-    CROSSREF,             // Quarto cross-reference: @fig-*, @eq-*, etc.
-    CROSSREF_MARKER,      // @ or -@ for cross-references
-    CROSSREF_KEY,         // Cross-reference key identifier
-    CROSSREF_BRACE_OPEN,  // { for braced cross-reference keys
-    CROSSREF_BRACE_CLOSE, // } for braced cross-reference keys
+    CITATION,                // [@key] or @key
+    CITATION_MARKER,         // @ or -@
+    CITATION_KEY,            // The citation key identifier
+    CITATION_BRACE_OPEN,     // { for complex keys
+    CITATION_BRACE_CLOSE,    // } for complex keys
+    CITATION_CONTENT,        // Text content in bracketed citations
+    CITATION_SEPARATOR,      // ; between multiple citations
+    CROSSREF,                // Quarto cross-reference: @fig-*, @eq-*, etc.
+    CROSSREF_MARKER,         // @ or -@ for cross-references
+    CROSSREF_KEY,            // Cross-reference key identifier
+    CROSSREF_BRACE_OPEN,     // { for braced cross-reference keys
+    CROSSREF_BRACE_CLOSE,    // } for braced cross-reference keys
+    CROSSREF_BOOKDOWN_OPEN,  // \@ref(
+    CROSSREF_BOOKDOWN_CLOSE, // )
 
     // Spans
     BRACKETED_SPAN,     // [text]{.class}
