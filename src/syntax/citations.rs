@@ -62,12 +62,12 @@ impl AstNode for Crossref {
 }
 
 impl Crossref {
-    pub fn keys(&self) -> Vec<CitationKey> {
+    pub fn keys(&self) -> Vec<CrossrefKey> {
         self.0
             .children_with_tokens()
             .filter_map(|element| element.into_token())
             .filter(|token| token.kind() == SyntaxKind::CROSSREF_KEY)
-            .map(CitationKey)
+            .map(CrossrefKey)
             .collect()
     }
 
@@ -79,6 +79,18 @@ impl Crossref {
 pub struct CitationKey(SyntaxToken);
 
 impl CitationKey {
+    pub fn text(&self) -> String {
+        self.0.text().to_string()
+    }
+
+    pub fn text_range(&self) -> rowan::TextRange {
+        self.0.text_range()
+    }
+}
+
+pub struct CrossrefKey(SyntaxToken);
+
+impl CrossrefKey {
     pub fn text(&self) -> String {
         self.0.text().to_string()
     }
