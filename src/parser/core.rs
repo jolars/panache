@@ -1652,6 +1652,7 @@ impl<'a> Parser<'a> {
                 // If definition/list plain text is buffered, flush it before opening nested
                 // blockquotes so block order remains lossless and stable across reparse.
                 self.emit_buffered_plain_if_needed();
+                self.emit_list_item_buffer_if_needed();
 
                 // Blockquotes can nest inside content containers; preserve the stripped indentation
                 // as WHITESPACE before the first marker for losslessness.
