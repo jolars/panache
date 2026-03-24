@@ -172,7 +172,7 @@ support.
 - [ ] Add wrapper for alert blocks.
 - [ ] Add wrappers for YAML metadata/title blocks.
 - [ ] Add wrappers for raw TeX blocks/commands.
-- [ ] Consider a Paragraph convenience wrapper for repeated semantic checks.
+- [x] Add a Paragraph convenience wrapper for repeated semantic checks.
 
 ### Tables
 
@@ -553,4 +553,4 @@ matching Pandoc's AST structure exactly.
 - [ ] Implement a math parser that produces a CST for inline and display math
       (initial focus on TeX math with `$...$` and `$$...$$` delimiters).
 - [ ] Implement a math formatter that can reformat math content while preserving
-      semantics and idempotency (i.e., `format(format(math)) == format(math)`.
+      semantics and idempotency (i.e., `format(format(math)) == format(math)`).
