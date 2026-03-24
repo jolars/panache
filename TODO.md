@@ -11,7 +11,7 @@ This document tracks implementation status for Panache's features.
 ### Performance
 
 - [x] Introduce `#[salsa::interned]` for common keys (paths/labels).
-- [ ] Measure interned key impact (memory/cost) and decide whether to expand to
+- [x] Measure interned key impact (memory/cost) and decide whether to expand to
       additional key types.
 - [x] Wire conservative salsa durability defaults (`set_with_durability`): open
       buffers LOW, config MEDIUM, dependency/disk-loaded files HIGH, watcher
