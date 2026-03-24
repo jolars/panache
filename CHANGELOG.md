@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.27.0](https://github.com/jolars/panache/compare/v2.26.0...v2.27.0) (2026-03-24)
+
+### Features
+
+* **cli:** don't error when running on glob or dir ([99e0440](https://github.com/jolars/panache/commit/99e0440dc78bdc34638259033bf44d074af8dc5e))
+* **formatter:** format definition lists like pandoc ([8d96a40](https://github.com/jolars/panache/commit/8d96a40fa5515436897edb993f4c8d1f3f06800f))
+* **formatter:** format nested headings ([75a74b3](https://github.com/jolars/panache/commit/75a74b3c28197f43a47a46b75a6747a9a4486192))
+* **formatter:** normalize loose and compact definitions ([21b3c87](https://github.com/jolars/panache/commit/21b3c87e839bb7d88398bb177a7fb0a803b734c6))
+* **lsp:** filter headings in document symbols ([c6af6bb](https://github.com/jolars/panache/commit/c6af6bb9bd9499b1a53af22b458cf5d3d1370bd3))
+* **lsp:** introduce incremental parsing as experimental opt ([5be6df6](https://github.com/jolars/panache/commit/5be6df69c1e318c112a9e68765c7631010211726))
+
+### Bug Fixes
+
+* check LINK_REF first ([91ee195](https://github.com/jolars/panache/commit/91ee1954b4e63de498e29c537468b4360649be53))
+* **config:** match includes/excludes relative to config root ([db2f95d](https://github.com/jolars/panache/commit/db2f95dae2049aa1f75d3977c08cc79a2ad00230))
+* **parser:** encapsulate multiple definition list items ([e28fda6](https://github.com/jolars/panache/commit/e28fda648851be92af3dab67e25c9d2ce53e8826))
+* **parser:** handle list as first lement in definition ([5871252](https://github.com/jolars/panache/commit/587125210dcce770bfdef70c2d227465b3b7176d))
+* **parser:** parse headings in definition list items ([3aa9686](https://github.com/jolars/panache/commit/3aa96862a3aa2b3b94685bc2f2f084ccb870abcd))
+* **parser:** parse headings in list items ([55e5632](https://github.com/jolars/panache/commit/55e5632186f32dd49757c127db85dd1de22f4088))
+* **pre-commit:** remove pandoc submodule ([5baed02](https://github.com/jolars/panache/commit/5baed02690ecbd90db473dc454903f63de791f48)), closes [#92](https://github.com/jolars/panache/issues/92)
+
+### Performance Improvements
+
+* **lsp:** add section-based window incremental parsing ([99f7a0f](https://github.com/jolars/panache/commit/99f7a0f7203d53c3524e284bb31d98f69a647fb9))
+* **lsp:** improve and document salsa durability policies ([7400e6e](https://github.com/jolars/panache/commit/7400e6e55b31273cb201a6fa58dd929688f7ee1f))
+* **lsp:** improve fallbacks in incremental parsing ([c13fcb4](https://github.com/jolars/panache/commit/c13fcb43204b2f5290c3905e00f3e19f38e78be6))
+* **lsp:** rollback non-working incremental parsing ([4dd29d4](https://github.com/jolars/panache/commit/4dd29d40adcbd18722a69ed6b4e80f82022c583d))
+
 ## [2.26.0](https://github.com/jolars/panache/compare/v2.25.0...v2.26.0) (2026-03-21)
 
 ### Features
