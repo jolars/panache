@@ -100,3 +100,11 @@ Term
     with lazy continuation
     - Another
     list item
+
+Term
+
+:   - List
+    with lazy continuation
+    - > a
+      > b
+      > c

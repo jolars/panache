@@ -193,7 +193,13 @@ impl Formatter {
                     .children()
                     .any(|item_child| item_child.kind() == SyntaxKind::LIST)
         });
-        let is_loose = has_blank_between_items && !has_nested_lists;
+        let has_blockquote_children = list_children.iter().any(|child| {
+            child.kind() == SyntaxKind::LIST_ITEM
+                && child
+                    .children()
+                    .any(|item_child| matches!(item_child.kind(), SyntaxKind::BLOCKQUOTE))
+        });
+        let is_loose = (has_blank_between_items || has_blockquote_children) && !has_nested_lists;
 
         log::debug!("Formatting list: is_loose={}", is_loose);
 
@@ -445,6 +451,10 @@ impl Formatter {
         let heading_with_remainder = content_node
             .as_ref()
             .and_then(|content| self.leading_atx_heading_with_remainder(content));
+        let content_starts_with_blockquote = content_node
+            .as_ref()
+            .map(|content| content.text().to_string().trim_start().starts_with('>'))
+            .unwrap_or(false);
 
         log::trace!(
             "ListItem wrapping: {} lines, hanging indent={}",
@@ -618,6 +628,43 @@ impl Formatter {
                     // Code blocks in list items need indentation
                     let content_indent = list_indent.hanging_indent(total_indent);
                     self.format_indented_code_block(&child, content_indent);
+                }
+                SyntaxKind::BLOCKQUOTE => {
+                    let follows_primary_content = child
+                        .prev_sibling()
+                        .map(|prev| {
+                            matches!(prev.kind(), SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH)
+                        })
+                        .unwrap_or(false);
+
+                    if content_starts_with_blockquote && follows_primary_content {
+                        if self.output.ends_with('\n') {
+                            self.output.pop();
+                        }
+
+                        let mut pieces: Vec<String> = Vec::new();
+                        let child_text = child.text().to_string();
+                        for line in child_text.lines() {
+                            let trimmed = line.trim_start();
+                            let content = if let Some(rest) = trimmed.strip_prefix('>') {
+                                rest.trim_start()
+                            } else {
+                                trimmed
+                            };
+                            if !content.is_empty() {
+                                pieces.push(content.to_string());
+                            }
+                        }
+
+                        if !pieces.is_empty() {
+                            self.output.push(' ');
+                            self.output.push_str(&pieces.join(" "));
+                        }
+                        self.output.push('\n');
+                    } else {
+                        let content_indent = list_indent.hanging_indent(total_indent);
+                        self.format_node_sync(&child, content_indent);
+                    }
                 }
                 SyntaxKind::BLANK_LINE => {
                     // Blank lines within list items
