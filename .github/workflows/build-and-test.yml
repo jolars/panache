@@ -27,6 +27,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+          targets: wasm32-unknown-unknown
 
       - name: Cache cargo registry
         uses: actions/cache@v5
@@ -41,6 +42,9 @@ jobs:
 
       - name: Build
         run: cargo build --verbose
+
+      - name: Build panache-wasm
+        run: cargo build -p panache-wasm --target wasm32-unknown-unknown --verbose
 
       - name: Install shfmt for external formatter tests
         if: matrix.os == 'ubuntu-latest'
