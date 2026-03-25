@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.28.0](https://github.com/jolars/panache/compare/v2.27.0...v2.28.0) (2026-03-25)
+
+### Features
+
+* **config:** gate executable code behind extension ([27a7e7e](https://github.com/jolars/panache/commit/27a7e7ee87aae5e2456fdc0aa630066f84bc53d3))
+* **lsp:** add code action for converting to explicit link ([0b4a86c](https://github.com/jolars/panache/commit/0b4a86c7d918520da3939e88809da07bc762a1f5))
+* **parser:** emit `CROSSREF_*` markers for crossrefs ([99d1174](https://github.com/jolars/panache/commit/99d1174b2cafa0b8131fbb39d0b61ac5f227a65c))
+* **parser:** introduce bookdown-specific syntax tokens ([8a63e79](https://github.com/jolars/panache/commit/8a63e79dd115b878fedd7583e035173dd1b2589f))
+* **wasm:** update the WASM library ([d004f73](https://github.com/jolars/panache/commit/d004f737a0ec653ec0f1f6adb37667331e15ddd5))
+
+### Bug Fixes
+
+* **formatter:** wrap and space blockquote in deflist ([22409e9](https://github.com/jolars/panache/commit/22409e9fa3cba43dc1ca2b86423d06f659b45b79))
+* **lsp:** don't allow slugs in implicit links ([e7926fa](https://github.com/jolars/panache/commit/e7926fa4b66f9b551a8da4b05aab3b821e19a957))
+* **lsp:** resolve go-to-headin for implicit links ([13fb0c4](https://github.com/jolars/panache/commit/13fb0c4770d67a730aa66953c6480597fa03ae4d))
+* **parser:** emit list item buffer in nested def list ([9342463](https://github.com/jolars/panache/commit/9342463083ed9a102424763a2a072dbf6e6bc232))
+* **parser:** handle nested lazy lists in definition lists ([7b32604](https://github.com/jolars/panache/commit/7b326044304e4689c66a875f6572cb6a00f0fe17))
+* **wasm:** clean up and fix some warnings ([1261e92](https://github.com/jolars/panache/commit/1261e92db34af522f2afaaac15efa59366590a5c))
+
 ## [2.27.0](https://github.com/jolars/panache/compare/v2.26.0...v2.27.0) (2026-03-24)
 
 ### Features
