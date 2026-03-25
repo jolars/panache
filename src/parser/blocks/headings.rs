@@ -7,6 +7,30 @@ use rowan::GreenNodeBuilder;
 use crate::parser::utils::attributes::try_parse_trailing_attributes_with_pos;
 use crate::parser::utils::inline_emission;
 
+fn try_parse_mmd_header_identifier_with_pos(content: &str) -> Option<(String, usize, usize)> {
+    let trimmed = content.trim_end_matches([' ', '\t']);
+    let end = trimmed.len();
+    let bytes = trimmed.as_bytes();
+
+    if end == 0 || bytes[end - 1] != b']' {
+        return None;
+    }
+
+    let start = trimmed[..end - 1].rfind('[')?;
+    let raw = &trimmed[start..end];
+    let inner = &raw[1..raw.len() - 1];
+    if inner.trim().is_empty() {
+        return None;
+    }
+
+    let normalized = inner.split_whitespace().collect::<String>().to_lowercase();
+    if normalized.is_empty() {
+        return None;
+    }
+
+    Some((normalized, start, end))
+}
+
 /// Try to parse an ATX heading from content, returns heading level (1-6) if found.
 pub(crate) fn try_parse_atx_heading(content: &str) -> Option<usize> {
     let trimmed = content.trim_start();
@@ -143,6 +167,17 @@ pub(crate) fn emit_setext_heading(
             let space = &text_trimmed[text_before.len()..start_brace_pos];
             let raw_attrs = &text_trimmed[start_brace_pos..];
             (text_before, Some(raw_attrs), space)
+        } else if config.extensions.mmd_header_identifiers {
+            if let Some((_normalized, start_bracket_pos, end_bracket_pos)) =
+                try_parse_mmd_header_identifier_with_pos(text_trimmed)
+            {
+                let text_before = text_trimmed[..start_bracket_pos].trim_end_matches([' ', '\t']);
+                let space = &text_trimmed[text_before.len()..start_bracket_pos];
+                let raw_attrs = &text_trimmed[start_bracket_pos..end_bracket_pos];
+                (text_before, Some(raw_attrs), space)
+            } else {
+                (text_trimmed, None, "")
+            }
         } else {
             (text_trimmed, None, "")
         };
@@ -295,6 +330,18 @@ pub(crate) fn emit_atx_heading(
             let space = &heading_content[text_before.len()..start_brace_pos];
             let raw_attrs = &heading_content[start_brace_pos..];
             (text_before, Some(raw_attrs), space)
+        } else if config.extensions.mmd_header_identifiers {
+            if let Some((_normalized, start_bracket_pos, end_bracket_pos)) =
+                try_parse_mmd_header_identifier_with_pos(heading_content)
+            {
+                let text_before =
+                    heading_content[..start_bracket_pos].trim_end_matches([' ', '\t']);
+                let space = &heading_content[text_before.len()..start_bracket_pos];
+                let raw_attrs = &heading_content[start_bracket_pos..end_bracket_pos];
+                (text_before, Some(raw_attrs), space)
+            } else {
+                (heading_content, None, "")
+            }
         } else {
             (heading_content, None, "")
         };
@@ -499,5 +546,13 @@ mod tests {
         let underline = "=".repeat(100);
         let lines = vec!["Heading", underline.as_str()];
         assert_eq!(try_parse_setext_heading(&lines, 0), Some((1, '=')));
+    }
+
+    #[test]
+    fn test_parse_mmd_header_identifier_normalizes_like_pandoc() {
+        let parsed = try_parse_mmd_header_identifier_with_pos("A heading [My ID]")
+            .expect("should parse mmd header identifier");
+        assert_eq!(parsed.0, "myid");
+        assert_eq!(parsed.1, 10);
     }
 }

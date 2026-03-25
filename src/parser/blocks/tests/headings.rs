@@ -94,3 +94,62 @@ fn parses_multiple_headings() {
     assert_eq!(headings.next().unwrap().text(), "First");
     assert_eq!(headings.next().unwrap().text(), "Second");
 }
+
+#[test]
+fn parses_mmd_header_identifier_in_atx_when_enabled() {
+    let mut config = Config::default();
+    config.extensions.mmd_header_identifiers = true;
+    let node = Parser::new("# Heading [my id]\n", &config).parse();
+
+    let heading = find_first(&node, SyntaxKind::HEADING).expect("heading");
+    let attr = heading
+        .children()
+        .find(|n| n.kind() == SyntaxKind::ATTRIBUTE)
+        .expect("attribute");
+    assert_eq!(attr.text().to_string(), "[my id]");
+}
+
+#[test]
+fn does_not_parse_mmd_header_identifier_in_atx_when_disabled() {
+    let mut config = Config::default();
+    config.extensions.mmd_header_identifiers = false;
+    let node = Parser::new("# Heading [my id]\n", &config).parse();
+
+    let heading = find_first(&node, SyntaxKind::HEADING).expect("heading");
+    assert!(
+        heading
+            .children()
+            .all(|n| n.kind() != SyntaxKind::ATTRIBUTE),
+        "mmd_header_identifiers disabled should keep [my id] in heading content"
+    );
+}
+
+#[test]
+fn parses_mmd_header_identifier_in_setext_when_enabled() {
+    let mut config = Config::default();
+    config.extensions.mmd_header_identifiers = true;
+    let node = Parser::new("Heading [setext id]\n---\n", &config).parse();
+
+    let heading = find_first(&node, SyntaxKind::HEADING).expect("heading");
+    let attr = heading
+        .children()
+        .find(|n| n.kind() == SyntaxKind::ATTRIBUTE)
+        .expect("attribute");
+    assert_eq!(attr.text().to_string(), "[setext id]");
+}
+
+#[test]
+fn parses_mmd_header_identifier_before_atx_closing_hashes() {
+    let mut config = Config::default();
+    config.extensions.mmd_header_identifiers = true;
+    let input = "## Title [my id] ###\n";
+    let node = Parser::new(input, &config).parse();
+
+    let heading = find_first(&node, SyntaxKind::HEADING).expect("heading");
+    let attr = heading
+        .children()
+        .find(|n| n.kind() == SyntaxKind::ATTRIBUTE)
+        .expect("attribute");
+    assert_eq!(attr.text().to_string(), "[my id]");
+    assert_eq!(node.text().to_string(), input);
+}

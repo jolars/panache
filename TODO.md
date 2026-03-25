@@ -431,7 +431,7 @@ for initial implementation.
 
 #### Non-Default: Headings
 
-- [ ] Extension: `mmd_header_identifiers` - MultiMarkdown style IDs
+- [x] Extension: `mmd_header_identifiers` - MultiMarkdown style IDs
       (non-default)
 
 #### Non-Default: Lists

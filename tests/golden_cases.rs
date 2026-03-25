@@ -219,6 +219,7 @@ golden_test_cases!(
     multiline_table_inline_formatting,
     nested_headings_in_containers,
     multiline_table_single_row,
+    mmd_header_identifiers,
     pandoc_title_block,
     paragraph_continuation,
     paragraph_plain_mixed,

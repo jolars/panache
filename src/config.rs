@@ -24,6 +24,9 @@ pub enum Flavor {
     Gfm,
     /// CommonMark (minimal standard extensions)
     CommonMark,
+    /// MultiMarkdown (Pandoc MultiMarkdown extension set)
+    #[serde(rename = "multimarkdown")]
+    MultiMarkdown,
 }
 
 /// Pandoc/Markdown extensions configuration.
@@ -221,6 +224,8 @@ pub struct Extensions {
     /// [NON-DEFAULT] Newline = <br>
     #[serde(alias = "hard_line_breaks")]
     pub hard_line_breaks: bool,
+    /// [NON-DEFAULT] MultiMarkdown style heading identifiers [my-id]
+    pub mmd_header_identifiers: bool,
     /// [NON-DEFAULT] GitHub/CommonMark alerts in blockquotes (`> [!NOTE]`)
     pub alerts: bool,
     /// [NON-DEFAULT] :emoji: syntax
@@ -305,6 +310,7 @@ impl Extensions {
             escaped_line_breaks: false,
             autolink_bare_uris: false,
             hard_line_breaks: false,
+            mmd_header_identifiers: false,
             alerts: false,
             emoji: false,
             mark: false,
@@ -323,6 +329,7 @@ impl Extensions {
             Flavor::RMarkdown => Self::rmarkdown_defaults(),
             Flavor::Gfm => Self::gfm_defaults(),
             Flavor::CommonMark => Self::commonmark_defaults(),
+            Flavor::MultiMarkdown => Self::multimarkdown_defaults(),
         }
     }
 
@@ -415,6 +422,7 @@ impl Extensions {
             // Non-default (all OFF for Pandoc)
             autolink_bare_uris: false,
             hard_line_breaks: false,
+            mmd_header_identifiers: false,
             alerts: false,
             emoji: false,
             mark: false,
@@ -475,6 +483,34 @@ impl Extensions {
     fn commonmark_defaults() -> Self {
         let mut ext = Self::none_defaults();
         ext.raw_html = true;
+        ext
+    }
+
+    /// MultiMarkdown defaults (modeled subset of Pandoc's multimarkdownExtensions).
+    fn multimarkdown_defaults() -> Self {
+        let mut ext = Self::none_defaults();
+
+        ext.pipe_tables = true;
+        ext.raw_html = true;
+        ext.tex_math_double_backslash = true;
+        ext.tex_math_dollars = true;
+        ext.intraword_underscores = true;
+        ext.footnotes = true;
+        ext.definition_lists = true;
+        ext.all_symbols_escapable = true;
+        ext.implicit_header_references = true;
+        ext.shortcut_reference_links = true;
+        ext.auto_identifiers = true;
+        ext.mmd_header_identifiers = true;
+        ext.implicit_figures = true;
+        ext.subscript = true;
+        ext.superscript = true;
+        ext.backtick_code_blocks = true;
+        ext.raw_attribute = true;
+
+        // Pandoc MultiMarkdown defaults do not use Pandoc `%` title blocks.
+        ext.pandoc_title_block = false;
+
         ext
     }
 
@@ -1325,6 +1361,7 @@ fn parse_flavor_key(s: &str) -> Option<Flavor> {
         "rmarkdown" | "r-markdown" => Some(Flavor::RMarkdown),
         "gfm" => Some(Flavor::Gfm),
         "common-mark" | "commonmark" => Some(Flavor::CommonMark),
+        "multimarkdown" | "multi-markdown" => Some(Flavor::MultiMarkdown),
         _ => None,
     }
 }
@@ -2533,6 +2570,34 @@ mod tests {
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
         assert!(!cfg.extensions.citations);
+    }
+
+    #[test]
+    fn multimarkdown_flavor_enables_mmd_header_identifiers_by_default() {
+        let cfg = toml::from_str::<Config>("flavor = \"multimarkdown\"").unwrap();
+
+        assert_eq!(cfg.flavor, Flavor::MultiMarkdown);
+        assert!(cfg.extensions.mmd_header_identifiers);
+        assert!(!cfg.extensions.pandoc_title_block);
+        assert!(cfg.extensions.tex_math_double_backslash);
+        assert!(cfg.extensions.definition_lists);
+        assert!(cfg.extensions.raw_attribute);
+    }
+
+    #[test]
+    fn extensions_per_flavor_multimarkdown_table_works() {
+        let toml_str = r#"
+            flavor = "multimarkdown"
+
+            [extensions]
+            mmd-header-identifiers = false
+
+            [extensions.multimarkdown]
+            mmd-header-identifiers = true
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert!(cfg.extensions.mmd_header_identifiers);
     }
 
     #[test]

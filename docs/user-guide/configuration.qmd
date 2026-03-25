@@ -50,6 +50,10 @@ The available flavors are:
     and use this option only as a means to setup the correct set of extensions):
     CommonMark (minimal extensions)
 
+`multimarkdown`
+:   MultiMarkdown flavor defaults (Pandoc-compatible MultiMarkdown extension
+    set)
+
 ### Line Width
 
 Set the maximum line width for text wrapping:
@@ -279,6 +283,11 @@ implicit-header-references = true
 
 `implicit-header-references`
 :   Allow `[Heading]` links to reference headers (default: enabled)
+
+`mmd-header-identifiers`
+:   MultiMarkdown heading identifiers in square brackets, e.g.
+    `# Heading [myid]` and setext `Heading [myid]` (default: disabled, enabled
+    for `multimarkdown` flavor)
 
 #### Block Quotes
 
