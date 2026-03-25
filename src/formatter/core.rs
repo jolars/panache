@@ -2022,7 +2022,9 @@ impl Formatter {
                 self.format_code_block(node);
             }
 
-            SyntaxKind::YAML_METADATA | SyntaxKind::PANDOC_TITLE_BLOCK => {
+            SyntaxKind::YAML_METADATA
+            | SyntaxKind::PANDOC_TITLE_BLOCK
+            | SyntaxKind::MMD_TITLE_BLOCK => {
                 // Preserve these blocks as-is
                 let text = node.text().to_string();
                 self.output.push_str(&text);

@@ -43,6 +43,7 @@ pub fn is_structural_block(kind: SyntaxKind) -> bool {
             | SyntaxKind::HORIZONTAL_RULE
             | SyntaxKind::YAML_METADATA
             | SyntaxKind::PANDOC_TITLE_BLOCK
+            | SyntaxKind::MMD_TITLE_BLOCK
             | SyntaxKind::HTML_BLOCK
             | SyntaxKind::BLANK_LINE
             | SyntaxKind::REFERENCE_DEFINITION

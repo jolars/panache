@@ -193,6 +193,8 @@ pub struct Extensions {
     /// Pandoc title block (Title/Author/Date)
     #[serde(alias = "pandoc_title_block")]
     pub pandoc_title_block: bool,
+    /// [NON-DEFAULT] MultiMarkdown metadata/title block (Key: Value ...)
+    pub mmd_title_block: bool,
 
     // ===== Raw content =====
     /// Raw HTML blocks and inline
@@ -302,6 +304,7 @@ impl Extensions {
             native_spans: false,
             yaml_metadata_block: false,
             pandoc_title_block: false,
+            mmd_title_block: false,
             raw_html: false,
             markdown_in_html_blocks: false,
             raw_tex: false,
@@ -408,6 +411,7 @@ impl Extensions {
             // Metadata
             yaml_metadata_block: true,
             pandoc_title_block: true,
+            mmd_title_block: false,
 
             // Raw
             raw_html: true,
@@ -510,6 +514,7 @@ impl Extensions {
 
         // Pandoc MultiMarkdown defaults do not use Pandoc `%` title blocks.
         ext.pandoc_title_block = false;
+        ext.mmd_title_block = true;
 
         ext
     }
@@ -2578,6 +2583,7 @@ mod tests {
 
         assert_eq!(cfg.flavor, Flavor::MultiMarkdown);
         assert!(cfg.extensions.mmd_header_identifiers);
+        assert!(cfg.extensions.mmd_title_block);
         assert!(!cfg.extensions.pandoc_title_block);
         assert!(cfg.extensions.tex_math_double_backslash);
         assert!(cfg.extensions.definition_lists);
@@ -2598,6 +2604,22 @@ mod tests {
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
         assert!(cfg.extensions.mmd_header_identifiers);
+    }
+
+    #[test]
+    fn extensions_per_flavor_multimarkdown_title_block_override_works() {
+        let toml_str = r#"
+            flavor = "multimarkdown"
+
+            [extensions]
+            mmd-title-block = false
+
+            [extensions.multimarkdown]
+            mmd-title-block = true
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert!(cfg.extensions.mmd_title_block);
     }
 
     #[test]

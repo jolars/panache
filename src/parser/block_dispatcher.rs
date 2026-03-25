@@ -39,8 +39,8 @@ use super::blocks::lists::{
     try_parse_list_marker,
 };
 use super::blocks::metadata::{
-    emit_yaml_block, find_yaml_block_closing_pos, try_parse_pandoc_title_block,
-    try_parse_yaml_block,
+    emit_yaml_block, find_yaml_block_closing_pos, try_parse_mmd_title_block,
+    try_parse_pandoc_title_block, try_parse_yaml_block,
 };
 use super::blocks::raw_blocks;
 use super::blocks::raw_blocks::extract_environment_name;
@@ -307,6 +307,50 @@ impl BlockParser for PandocTitleBlockParser {
 
     fn name(&self) -> &'static str {
         "pandoc_title_block"
+    }
+}
+
+/// MultiMarkdown title block parser (Key: Value ...)
+pub(crate) struct MmdTitleBlockParser;
+
+impl BlockParser for MmdTitleBlockParser {
+    fn detect_prepared(
+        &self,
+        ctx: &BlockContext,
+        _lines: &[&str],
+        line_pos: usize,
+    ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.config.extensions.mmd_title_block {
+            return None;
+        }
+
+        // Must be at top-level document start.
+        if !ctx.at_document_start || line_pos != 0 || ctx.blockquote_depth > 0 {
+            return None;
+        }
+
+        // Quick guard to avoid work on obvious non-matches.
+        if ctx.content.trim().is_empty() || !ctx.content.contains(':') {
+            return None;
+        }
+
+        Some((BlockDetectionResult::Yes, None))
+    }
+
+    fn parse_prepared(
+        &self,
+        _ctx: &BlockContext,
+        builder: &mut GreenNodeBuilder<'static>,
+        lines: &[&str],
+        line_pos: usize,
+        _payload: Option<&dyn Any>,
+    ) -> usize {
+        let new_pos = try_parse_mmd_title_block(lines, line_pos, builder).unwrap_or(line_pos + 1);
+        new_pos - line_pos
+    }
+
+    fn name(&self) -> &'static str {
+        "mmd_title_block"
     }
 }
 
@@ -1951,6 +1995,9 @@ impl BlockParserRegistry {
             // Match Pandoc's ordering to ensure correct precedence:
             // (0) Pandoc title block (must be at document start).
             Box::new(PandocTitleBlockParser),
+            // (0b) MultiMarkdown title block (must be at document start).
+            // Pandoc title block remains first for precedence.
+            Box::new(MmdTitleBlockParser),
             // (2) Fenced code blocks - can interrupt paragraphs!
             Box::new(FencedCodeBlockParser),
             // (3) YAML metadata - before headers and hrules!

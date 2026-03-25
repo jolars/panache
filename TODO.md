@@ -427,7 +427,7 @@ for initial implementation.
 
 #### Non-Default: Metadata
 
-- [ ] Extension: `mmd_title_block` - MultiMarkdown metadata (non-default)
+- [x] Extension: `mmd_title_block` - MultiMarkdown metadata (non-default)
 
 #### Non-Default: Headings
 

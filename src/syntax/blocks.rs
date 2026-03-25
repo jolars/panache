@@ -127,6 +127,25 @@ impl AstNode for PandocTitleBlock {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MmdTitleBlock(SyntaxNode);
+
+impl AstNode for MmdTitleBlock {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MMD_TITLE_BLOCK
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then(|| Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

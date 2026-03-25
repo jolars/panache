@@ -217,6 +217,7 @@ golden_test_cases!(
     multiline_table_caption_after,
     multiline_table_headerless,
     multiline_table_inline_formatting,
+    mmd_title_block,
     nested_headings_in_containers,
     multiline_table_single_row,
     mmd_header_identifiers,

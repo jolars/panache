@@ -15,6 +15,30 @@ fn pandoc_title_block_disabled_does_not_parse_title_block() {
 }
 
 #[test]
+fn mmd_title_block_disabled_does_not_parse_title_block() {
+    let mut config = Config::default();
+    config.extensions.pandoc_title_block = false;
+    config.extensions.mmd_title_block = false;
+
+    let tree = parse_blocks_with_config("Title: My Title\nAuthor: Jane Doe\n\nBody\n", &config);
+    assert!(
+        find_first(&tree, SyntaxKind::MMD_TITLE_BLOCK).is_none(),
+        "mmd_title_block disabled should prevent MMD title block parsing"
+    );
+}
+
+#[test]
+fn pandoc_title_block_takes_precedence_over_mmd_title_block() {
+    let mut config = Config::default();
+    config.extensions.pandoc_title_block = true;
+    config.extensions.mmd_title_block = true;
+
+    let tree = parse_blocks_with_config("% Title\n% Author\n\nBody\n", &config);
+    assert!(find_first(&tree, SyntaxKind::PANDOC_TITLE_BLOCK).is_some());
+    assert!(find_first(&tree, SyntaxKind::MMD_TITLE_BLOCK).is_none());
+}
+
+#[test]
 fn yaml_metadata_block_disabled_does_not_parse_yaml_metadata() {
     let mut config = Config::default();
     config.extensions.yaml_metadata_block = false;

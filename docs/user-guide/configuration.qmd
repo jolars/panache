@@ -546,6 +546,11 @@ pandoc-title-block = true
 `pandoc-title-block`
 :   Pandoc title block `% Title`, `% Author`, `% Date` (default: enabled)
 
+`mmd-title-block`
+:   MultiMarkdown metadata/title block at document start using `Key: Value`
+    pairs with optional indented continuation lines (default: disabled, enabled
+    for `multimarkdown` flavor)
+
 ### Raw Content Extensions
 
 ```toml

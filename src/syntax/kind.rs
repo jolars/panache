@@ -120,6 +120,7 @@ pub enum SyntaxKind {
     YAML_METADATA,
     YAML_METADATA_CONTENT, // Content lines inside YAML metadata block
     PANDOC_TITLE_BLOCK,
+    MMD_TITLE_BLOCK,
     FENCED_DIV,
     PARAGRAPH,
     PLAIN, // Inline content without paragraph break (tight lists, definition lists, table cells)
