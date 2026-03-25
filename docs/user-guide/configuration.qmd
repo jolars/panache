@@ -43,7 +43,7 @@ The available flavors are:
     (Pandoc + R-specific extensions)
 
 `gfm`
-:   GitHub-Flavored Markdownb Flavored Markdown
+:   GitHub-Flavored Markdown
 
 `commonmark`
 :   CommonMark (Note that we are currently **not** fully CommonMark-compliant,
