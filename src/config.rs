@@ -228,6 +228,8 @@ pub struct Extensions {
     pub hard_line_breaks: bool,
     /// [NON-DEFAULT] MultiMarkdown style heading identifiers [my-id]
     pub mmd_header_identifiers: bool,
+    /// [NON-DEFAULT] MultiMarkdown key=value attributes on reference defs
+    pub mmd_link_attributes: bool,
     /// [NON-DEFAULT] GitHub/CommonMark alerts in blockquotes (`> [!NOTE]`)
     pub alerts: bool,
     /// [NON-DEFAULT] :emoji: syntax
@@ -314,6 +316,7 @@ impl Extensions {
             autolink_bare_uris: false,
             hard_line_breaks: false,
             mmd_header_identifiers: false,
+            mmd_link_attributes: false,
             alerts: false,
             emoji: false,
             mark: false,
@@ -427,6 +430,7 @@ impl Extensions {
             autolink_bare_uris: false,
             hard_line_breaks: false,
             mmd_header_identifiers: false,
+            mmd_link_attributes: false,
             alerts: false,
             emoji: false,
             mark: false,
@@ -502,10 +506,12 @@ impl Extensions {
         ext.footnotes = true;
         ext.definition_lists = true;
         ext.all_symbols_escapable = true;
+        ext.reference_links = true;
         ext.implicit_header_references = true;
         ext.shortcut_reference_links = true;
         ext.auto_identifiers = true;
         ext.mmd_header_identifiers = true;
+        ext.mmd_link_attributes = true;
         ext.implicit_figures = true;
         ext.subscript = true;
         ext.superscript = true;
@@ -2584,6 +2590,7 @@ mod tests {
         assert_eq!(cfg.flavor, Flavor::MultiMarkdown);
         assert!(cfg.extensions.mmd_header_identifiers);
         assert!(cfg.extensions.mmd_title_block);
+        assert!(cfg.extensions.mmd_link_attributes);
         assert!(!cfg.extensions.pandoc_title_block);
         assert!(cfg.extensions.tex_math_double_backslash);
         assert!(cfg.extensions.definition_lists);
@@ -2620,6 +2627,22 @@ mod tests {
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
 
         assert!(cfg.extensions.mmd_title_block);
+    }
+
+    #[test]
+    fn extensions_per_flavor_multimarkdown_link_attributes_override_works() {
+        let toml_str = r#"
+            flavor = "multimarkdown"
+
+            [extensions]
+            mmd-link-attributes = false
+
+            [extensions.multimarkdown]
+            mmd-link-attributes = true
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+
+        assert!(cfg.extensions.mmd_link_attributes);
     }
 
     #[test]

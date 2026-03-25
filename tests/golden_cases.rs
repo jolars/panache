@@ -218,6 +218,8 @@ golden_test_cases!(
     multiline_table_headerless,
     multiline_table_inline_formatting,
     mmd_title_block,
+    mmd_link_attributes,
+    mmd_link_attributes_disabled,
     nested_headings_in_containers,
     multiline_table_single_row,
     mmd_header_identifiers,

@@ -414,7 +414,7 @@ for initial implementation.
 #### Non-Default: Links
 
 - [x] Extension: `autolink_bare_uris` - Bare URLs as links (non-default)
-- [ ] Extension: `mmd_link_attributes` - MultiMarkdown link attributes
+- [x] Extension: `mmd_link_attributes` - MultiMarkdown link attributes
       (non-default)
 
 #### Non-Default: Math

@@ -98,3 +98,39 @@ fn reference_links_enabled_parses_reference_definition() {
         "reference_links enabled should parse reference definitions"
     );
 }
+
+#[test]
+fn mmd_link_attributes_disabled_does_not_consume_continuation_lines() {
+    let mut config = Config::default();
+    config.extensions.reference_links = true;
+    config.extensions.mmd_link_attributes = false;
+
+    let tree = parse_blocks_with_config(
+        "[ref]: https://example.com \"Title\"\n    width=20px height=30px\n",
+        &config,
+    );
+
+    let refdef = find_first(&tree, SyntaxKind::REFERENCE_DEFINITION).expect("reference definition");
+    assert_eq!(
+        refdef.text().to_string(),
+        "[ref]: https://example.com \"Title\"\n"
+    );
+}
+
+#[test]
+fn mmd_link_attributes_enabled_consumes_continuation_lines() {
+    let mut config = Config::default();
+    config.extensions.reference_links = true;
+    config.extensions.mmd_link_attributes = true;
+
+    let tree = parse_blocks_with_config(
+        "[ref]: https://example.com \"Title\"\n    width=20px height=30px\n\tid=myId class=\"myClass1 myClass2\"\n",
+        &config,
+    );
+
+    let refdef = find_first(&tree, SyntaxKind::REFERENCE_DEFINITION).expect("reference definition");
+    assert_eq!(
+        refdef.text().to_string(),
+        "[ref]: https://example.com \"Title\"\n    width=20px height=30px\n\tid=myId class=\"myClass1 myClass2\"\n"
+    );
+}

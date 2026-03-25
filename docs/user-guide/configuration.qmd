@@ -450,6 +450,11 @@ autolinks = true
 `link-attributes`
 :   Attributes on links `[text](url){.class}` (default: enabled)
 
+`mmd-link-attributes`
+:   MultiMarkdown key-value attributes on reference link/image definitions,
+    including indented continuation lines (default: disabled, enabled for
+    `multimarkdown` flavor)
+
 `autolinks`
 :   Automatic links `<http://example.com>` (default: enabled)
 

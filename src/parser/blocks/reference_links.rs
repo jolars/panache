@@ -140,6 +140,71 @@ pub fn try_parse_reference_definition(
     }
 }
 
+pub fn line_is_mmd_link_attribute_continuation(line: &str) -> bool {
+    if !(line.starts_with(' ') || line.starts_with('\t')) {
+        return false;
+    }
+
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    let bytes = trimmed.as_bytes();
+    let mut pos = 0usize;
+    let len = bytes.len();
+    let mut saw_pair = false;
+
+    while pos < len {
+        // Skip inter-token whitespace.
+        while pos < len && (bytes[pos] == b' ' || bytes[pos] == b'\t') {
+            pos += 1;
+        }
+        if pos >= len {
+            break;
+        }
+
+        // Parse key until '=' or whitespace.
+        let key_start = pos;
+        while pos < len && bytes[pos] != b'=' && bytes[pos] != b' ' && bytes[pos] != b'\t' {
+            pos += 1;
+        }
+        if pos == key_start || pos >= len || bytes[pos] != b'=' {
+            return false;
+        }
+        pos += 1; // skip '='
+
+        // Parse value (quoted or unquoted), require non-empty value.
+        if pos >= len {
+            return false;
+        }
+        if bytes[pos] == b'"' || bytes[pos] == b'\'' {
+            let quote = bytes[pos];
+            pos += 1;
+            let value_start = pos;
+            while pos < len && bytes[pos] != quote {
+                pos += 1;
+            }
+            if pos == value_start || pos >= len {
+                return false;
+            }
+            pos += 1; // skip closing quote
+        } else {
+            let value_start = pos;
+            while pos < len && bytes[pos] != b' ' && bytes[pos] != b'\t' {
+                pos += 1;
+            }
+            if pos == value_start {
+                return false;
+            }
+        }
+
+        saw_pair = true;
+    }
+
+    saw_pair
+}
+
 /// Parse an optional title after the URL.
 /// Titles can be in double quotes, single quotes, or parentheses.
 /// Returns Some(Some(title)) if title found, Some(None) if no title, None if malformed.
@@ -257,7 +322,7 @@ pub fn try_parse_footnote_marker(line: &str) -> Option<(String, usize)> {
 
 #[cfg(test)]
 mod tests {
-    use super::try_parse_reference_definition;
+    use super::{line_is_mmd_link_attribute_continuation, try_parse_reference_definition};
 
     #[test]
     fn test_footnote_definition_body_layout_is_lossless() {
@@ -270,5 +335,25 @@ mod tests {
     fn test_reference_definition_with_up_to_three_leading_spaces() {
         assert!(try_parse_reference_definition("   [foo]: #bar").is_some());
         assert!(try_parse_reference_definition("    [foo]: #bar").is_none());
+    }
+
+    #[test]
+    fn mmd_link_attribute_continuation_detects_valid_tokens() {
+        assert!(line_is_mmd_link_attribute_continuation(
+            "    width=20px height=30px id=myId"
+        ));
+        assert!(line_is_mmd_link_attribute_continuation(
+            "\tclass=\"myClass1 myClass2\""
+        ));
+    }
+
+    #[test]
+    fn mmd_link_attribute_continuation_rejects_non_attribute_lines() {
+        assert!(!line_is_mmd_link_attribute_continuation(
+            "not-indented width=20px"
+        ));
+        assert!(!line_is_mmd_link_attribute_continuation(
+            "    not-an-attr token"
+        ));
     }
 }

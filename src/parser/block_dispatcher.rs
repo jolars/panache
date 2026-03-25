@@ -44,7 +44,10 @@ use super::blocks::metadata::{
 };
 use super::blocks::raw_blocks;
 use super::blocks::raw_blocks::extract_environment_name;
-use super::blocks::reference_links::{try_parse_footnote_marker, try_parse_reference_definition};
+use super::blocks::reference_links::{
+    line_is_mmd_link_attribute_continuation, try_parse_footnote_marker,
+    try_parse_reference_definition,
+};
 use super::blocks::tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
     try_parse_pipe_table, try_parse_simple_table,
@@ -491,6 +494,10 @@ impl BlockParser for FigureParser {
 
 /// Reference definition parser ([label]: url "title")
 pub(crate) struct ReferenceDefinitionParser;
+#[derive(Debug, Clone, Copy)]
+struct ReferenceDefinitionPrepared {
+    consumed_lines: usize,
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct FootnoteDefinitionPrepared {
@@ -871,16 +878,40 @@ impl BlockParser for ReferenceDefinitionParser {
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
+        lines: &[&str],
+        line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         if !ctx.config.extensions.reference_links {
             return None;
         }
 
         // Parse once and cache for emission.
-        let parsed = try_parse_reference_definition(ctx.content)?;
-        Some((BlockDetectionResult::Yes, Some(Box::new(parsed))))
+        let _parsed = try_parse_reference_definition(ctx.content)?;
+
+        let mut consumed = 1usize;
+        if ctx.config.extensions.mmd_link_attributes {
+            let mut i = line_pos + 1;
+            while i < lines.len() {
+                let line = lines[i];
+
+                if line.trim().is_empty() {
+                    break;
+                }
+                if line_is_mmd_link_attribute_continuation(line) {
+                    consumed += 1;
+                    i += 1;
+                    continue;
+                }
+                break;
+            }
+        }
+
+        Some((
+            BlockDetectionResult::Yes,
+            Some(Box::new(ReferenceDefinitionPrepared {
+                consumed_lines: consumed,
+            })),
+        ))
     }
 
     fn parse_prepared(
@@ -895,26 +926,30 @@ impl BlockParser for ReferenceDefinitionParser {
 
         builder.start_node(SyntaxKind::REFERENCE_DEFINITION.into());
 
+        let consumed_lines = payload
+            .and_then(|p| p.downcast_ref::<ReferenceDefinitionPrepared>())
+            .map(|p| p.consumed_lines)
+            .unwrap_or(1);
+
         let full_line = lines[line_pos];
         let (content_without_newline, line_ending) = strip_newline(full_line);
-
-        // Detection already cached the parsed tuple; emission should not need to re-parse.
-        // If payload is missing (legacy callsites), we fall back to the old raw emission.
-        debug_assert!(
-            payload
-                .and_then(|p| p.downcast_ref::<(usize, String, String, Option<String>)>())
-                .is_some()
-        );
-
         emit_reference_definition_content(builder, content_without_newline);
-
         if !line_ending.is_empty() {
             builder.token(SyntaxKind::NEWLINE.into(), line_ending);
         }
 
+        for line in lines
+            .iter()
+            .skip(line_pos + 1)
+            .take(consumed_lines.saturating_sub(1))
+        {
+            // Preserve continuation lines exactly as text/newline tokens.
+            crate::parser::utils::helpers::emit_line_tokens(builder, line);
+        }
+
         builder.finish_node();
 
-        1
+        consumed_lines
     }
 
     fn name(&self) -> &'static str {
