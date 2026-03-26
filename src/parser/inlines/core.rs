@@ -1765,6 +1765,17 @@ fn parse_inline_range_impl(
                 continue;
             }
 
+            // hard_line_breaks: treat all single newlines as hard line breaks
+            if config.extensions.hard_line_breaks {
+                if !text_before.is_empty() {
+                    builder.token(SyntaxKind::TEXT.into(), text_before);
+                }
+                builder.token(SyntaxKind::HARD_LINE_BREAK.into(), "\r\n");
+                pos += 2;
+                text_start = pos;
+                continue;
+            }
+
             // Regular newline
             if !text_before.is_empty() {
                 builder.token(SyntaxKind::TEXT.into(), text_before);
@@ -1788,6 +1799,17 @@ fn parse_inline_range_impl(
                 }
                 let spaces = " ".repeat(trailing_spaces);
                 builder.token(SyntaxKind::HARD_LINE_BREAK.into(), &format!("{}\n", spaces));
+                pos += 1;
+                text_start = pos;
+                continue;
+            }
+
+            // hard_line_breaks: treat all single newlines as hard line breaks
+            if config.extensions.hard_line_breaks {
+                if !text_before.is_empty() {
+                    builder.token(SyntaxKind::TEXT.into(), text_before);
+                }
+                builder.token(SyntaxKind::HARD_LINE_BREAK.into(), "\n");
                 pos += 1;
                 text_start = pos;
                 continue;

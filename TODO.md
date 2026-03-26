@@ -447,7 +447,7 @@ for initial implementation.
 
 #### Non-Default: Line Breaks
 
-- [ ] Extension: `hard_line_breaks` - Newline = `<br>` (non-default)
+- [x] Extension: `hard_line_breaks` - Newline = `<br>` (non-default)
 - [ ] Extension: `ignore_line_breaks` - Ignore single newlines (non-default)
 - [ ] Extension: `east_asian_line_breaks` - Smart line breaks for CJK
       (non-default)

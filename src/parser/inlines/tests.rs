@@ -1002,6 +1002,24 @@ mod extension_guard_tests {
     }
 
     #[test]
+    fn hard_line_breaks_enabled_turns_single_newline_into_hard_break() {
+        let mut config = Config::default();
+        config.extensions.hard_line_breaks = true;
+        let tree = parse_with_config("a\nb", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::HARD_LINE_BREAK), 1);
+        assert_eq!(count_kind(&tree, SyntaxKind::NEWLINE), 0);
+    }
+
+    #[test]
+    fn hard_line_breaks_disabled_keeps_single_newline_token() {
+        let mut config = Config::default();
+        config.extensions.hard_line_breaks = false;
+        let tree = parse_with_config("a\nb", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::HARD_LINE_BREAK), 0);
+        assert_eq!(count_kind(&tree, SyntaxKind::NEWLINE), 1);
+    }
+
+    #[test]
     fn raw_tex_disabled_blocks_latex_command_node() {
         let mut config = Config::default();
         config.extensions.raw_tex = false;
