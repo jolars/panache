@@ -15,11 +15,11 @@ impl Rule for HeadingHierarchyRule {
         &self,
         tree: &SyntaxNode,
         input: &str,
-        _config: &Config,
+        config: &Config,
         _metadata: Option<&crate::metadata::DocumentMetadata>,
     ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
-        let headings = collect_headings(tree);
+        let headings = collect_headings(tree, &config.extensions);
 
         let mut prev_level: Option<usize> = None;
 
@@ -59,9 +59,12 @@ impl Rule for HeadingHierarchyRule {
     }
 }
 
-fn collect_headings(tree: &SyntaxNode) -> Vec<(rowan::TextRange, usize)> {
+fn collect_headings(
+    tree: &SyntaxNode,
+    extensions: &crate::config::Extensions,
+) -> Vec<(rowan::TextRange, usize)> {
     let db = crate::salsa::SalsaDb::default();
-    crate::salsa::symbol_usage_index_from_tree(&db, tree)
+    crate::salsa::symbol_usage_index_from_tree(&db, tree, extensions)
         .heading_sequence()
         .to_vec()
 }

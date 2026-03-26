@@ -285,7 +285,8 @@ mod tests {
         assert!(is_footnote);
 
         let db = crate::salsa::SalsaDb::default();
-        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root);
+        let extensions = crate::config::Extensions::default();
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root, &extensions);
         let range = index
             .footnote_definitions(&label)
             .and_then(|ranges| ranges.first())
@@ -308,7 +309,8 @@ mod tests {
         let root = parse(input, None);
 
         let db = crate::salsa::SalsaDb::default();
-        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root);
+        let extensions = crate::config::Extensions::default();
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root, &extensions);
         let range = index
             .footnote_definitions("1")
             .and_then(|ranges| ranges.first())
@@ -331,7 +333,8 @@ mod tests {
         let root = parse(input, None);
 
         let db = crate::salsa::SalsaDb::default();
-        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root);
+        let extensions = crate::config::Extensions::default();
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root, &extensions);
         assert!(index.footnote_definitions("missing").is_none());
     }
 
@@ -341,7 +344,8 @@ mod tests {
         let root = parse(input, None);
 
         let db = crate::salsa::SalsaDb::default();
-        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root);
+        let extensions = crate::config::Extensions::default();
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &root, &extensions);
         let range = index
             .footnote_definitions("1")
             .and_then(|ranges| ranges.first())
@@ -363,7 +367,8 @@ mod tests {
         let db = crate::salsa::SalsaDb::default();
         let text = "Text[^a]\n\n[^a]: Hello world\n";
         let tree = parse(text, None);
-        let index = crate::salsa::symbol_usage_index_from_tree(&db, &tree);
+        let extensions = crate::config::Extensions::default();
+        let index = crate::salsa::symbol_usage_index_from_tree(&db, &tree, &extensions);
         assert_eq!(
             index.footnote_definitions("a").map(|ranges| ranges.len()),
             Some(1)

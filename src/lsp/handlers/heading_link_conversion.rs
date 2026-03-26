@@ -1,5 +1,6 @@
 //! Heading link conversion utilities for code actions.
 
+use crate::config::Extensions;
 use crate::syntax::{AstNode, Heading, Link, SyntaxNode};
 use crate::utils::{implicit_heading_ids, normalize_label};
 use tower_lsp_server::ls_types::{Range, TextEdit};
@@ -31,6 +32,7 @@ pub fn convert_to_explicit_heading_link(
     link_node: &SyntaxNode,
     tree: &SyntaxNode,
     text: &str,
+    extensions: &Extensions,
 ) -> Vec<TextEdit> {
     let Some(link) = Link::cast(link_node.clone()) else {
         return vec![];
@@ -47,11 +49,14 @@ pub fn convert_to_explicit_heading_link(
         return vec![];
     }
 
-    let Some(entry) = implicit_heading_ids(tree).into_iter().find(|entry| {
-        Heading::cast(entry.heading.clone())
-            .map(|heading| normalize_label(&heading.text()) == normalized_label)
-            .unwrap_or(false)
-    }) else {
+    let Some(entry) = implicit_heading_ids(tree, extensions)
+        .into_iter()
+        .find(|entry| {
+            Heading::cast(entry.heading.clone())
+                .map(|heading| normalize_label(&heading.text()) == normalized_label)
+                .unwrap_or(false)
+        })
+    else {
         return vec![];
     };
 
@@ -89,7 +94,12 @@ mod tests {
         let offset = input.find("unordered").expect("link label");
         let link_node = find_implicit_heading_link_at_position(&tree, offset).expect("link node");
 
-        let edits = convert_to_explicit_heading_link(&link_node, &tree, input);
+        let edits = convert_to_explicit_heading_link(
+            &link_node,
+            &tree,
+            input,
+            &crate::config::Extensions::default(),
+        );
         assert_eq!(edits.len(), 1);
         assert_eq!(edits[0].new_text, "[unordered lists](#unordered-lists)");
     }

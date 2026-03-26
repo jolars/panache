@@ -60,7 +60,8 @@ fn build_document_symbols(
     let mut symbols = Vec::new();
     let mut heading_stack: Vec<(usize, DocumentSymbol)> = Vec::new();
     let db = crate::salsa::SalsaDb::default();
-    let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, root);
+    let extensions = crate::config::Extensions::default();
+    let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, root, &extensions);
     let heading_levels: std::collections::HashMap<rowan::TextRange, usize> =
         symbol_index.heading_sequence().iter().copied().collect();
     log::debug!("build_document_symbols: root kind = {:?}", root.kind());

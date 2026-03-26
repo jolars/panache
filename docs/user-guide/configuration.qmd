@@ -270,10 +270,20 @@ Precedence for the active flavor is:
 
 ```toml
 [extensions]
+auto-identifiers = true
+gfm-auto-identifiers = false
 blank-before-header = true
 header-attributes = true
 implicit-header-references = true
 ```
+
+`auto-identifiers`
+:   Auto-generate heading identifiers (default: enabled for `pandoc`, `quarto`,
+    `rmarkdown`, `gfm`, and `multimarkdown`)
+
+`gfm-auto-identifiers`
+:   Use GitHub's heading identifier algorithm (default: disabled, enabled for
+    `gfm` flavor)
 
 `blank-before-header`
 :   Require blank line before headers (default: enabled)

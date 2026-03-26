@@ -22,7 +22,8 @@ impl Rule for UndefinedReferencesRule {
         let mut diagnostics = Vec::new();
 
         let db = crate::salsa::SalsaDb::default();
-        let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, tree);
+        let symbol_index =
+            crate::salsa::symbol_usage_index_from_tree(&db, tree, &config.extensions);
         let mut reference_labels: HashSet<String> = symbol_index
             .reference_definition_entries()
             .map(|(label, _)| label.clone())
@@ -46,7 +47,7 @@ impl Rule for UndefinedReferencesRule {
 
         let mut crossref_labels = reference_labels.clone();
         if config.extensions.bookdown_references && config.extensions.auto_identifiers {
-            crossref_labels.extend(collect_implicit_heading_ids(tree));
+            crossref_labels.extend(collect_implicit_heading_ids(tree, &config.extensions));
         }
 
         let footnote_ids: HashSet<String> = symbol_index
@@ -117,8 +118,11 @@ impl Rule for UndefinedReferencesRule {
     }
 }
 
-fn collect_implicit_heading_ids(tree: &SyntaxNode) -> HashSet<String> {
-    implicit_heading_ids(tree)
+fn collect_implicit_heading_ids(
+    tree: &SyntaxNode,
+    extensions: &crate::config::Extensions,
+) -> HashSet<String> {
+    implicit_heading_ids(tree, extensions)
         .into_iter()
         .map(|entry| entry.id)
         .collect()

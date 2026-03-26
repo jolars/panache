@@ -47,6 +47,8 @@ pub struct Extensions {
     pub header_attributes: bool,
     /// Auto-generate identifiers from headings
     pub auto_identifiers: bool,
+    /// Use GitHub's algorithm for auto-generated heading identifiers
+    pub gfm_auto_identifiers: bool,
     /// Implicit header references ([Heading] links to header)
     pub implicit_header_references: bool,
 
@@ -265,6 +267,7 @@ impl Extensions {
             blank_before_blockquote: false,
             header_attributes: false,
             auto_identifiers: false,
+            gfm_auto_identifiers: false,
             implicit_header_references: false,
             fancy_lists: false,
             startnum: false,
@@ -347,6 +350,7 @@ impl Extensions {
             blank_before_blockquote: true,
             header_attributes: true,
             auto_identifiers: true,
+            gfm_auto_identifiers: false,
             implicit_header_references: true,
 
             // Lists
@@ -474,6 +478,7 @@ impl Extensions {
         ext.pipe_tables = true;
         ext.raw_html = true;
         ext.auto_identifiers = true;
+        ext.gfm_auto_identifiers = true;
         ext.task_lists = true;
         ext.emoji = true;
         ext.strikeout = true;
@@ -510,6 +515,7 @@ impl Extensions {
         ext.implicit_header_references = true;
         ext.shortcut_reference_links = true;
         ext.auto_identifiers = true;
+        ext.gfm_auto_identifiers = false;
         ext.mmd_header_identifiers = true;
         ext.mmd_link_attributes = true;
         ext.implicit_figures = true;
@@ -2657,6 +2663,17 @@ mod tests {
         let gfm = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
         assert!(pandoc.extensions.auto_identifiers);
         assert!(gfm.extensions.auto_identifiers);
+    }
+
+    #[test]
+    fn gfm_auto_identifiers_enabled_by_default_only_for_gfm() {
+        let pandoc = toml::from_str::<Config>("flavor = \"pandoc\"").unwrap();
+        let gfm = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
+        let commonmark = toml::from_str::<Config>("flavor = \"common-mark\"").unwrap();
+
+        assert!(!pandoc.extensions.gfm_auto_identifiers);
+        assert!(gfm.extensions.gfm_auto_identifiers);
+        assert!(!commonmark.extensions.gfm_auto_identifiers);
     }
 
     #[test]

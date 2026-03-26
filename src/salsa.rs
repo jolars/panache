@@ -459,7 +459,7 @@ pub fn symbol_usage_index(
     _path: PathBuf,
 ) -> SymbolUsageIndex {
     let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
-    symbol_usage_index_from_tree(db, &tree)
+    symbol_usage_index_from_tree(db, &tree, &config.config(db).extensions)
 }
 
 #[salsa::tracked(returns(ref), lru = 64)]
@@ -493,7 +493,11 @@ pub fn heading_outline(
         .collect()
 }
 
-pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsageIndex {
+pub fn symbol_usage_index_from_tree(
+    db: &dyn Db,
+    tree: &SyntaxNode,
+    extensions: &crate::config::Extensions,
+) -> SymbolUsageIndex {
     let mut index = SymbolUsageIndex::default();
 
     for def in tree.descendants().filter_map(ReferenceDefinition::cast) {
@@ -679,7 +683,7 @@ pub fn symbol_usage_index_from_tree(db: &dyn Db, tree: &SyntaxNode) -> SymbolUsa
         }
     }
 
-    for entry in implicit_heading_ids(tree) {
+    for entry in implicit_heading_ids(tree, extensions) {
         db.unwind_if_revision_cancelled();
         index
             .heading_implicit_definition_ranges
@@ -1525,7 +1529,7 @@ mod tests {
             "# Heading {#heading}\n\nSee [heading].\n\nSee [label](#heading).\n",
             None,
         );
-        let index = symbol_usage_index_from_tree(&db, &tree);
+        let index = symbol_usage_index_from_tree(&db, &tree, &crate::config::Extensions::default());
 
         assert_eq!(
             index
@@ -1556,7 +1560,10 @@ mod tests {
             "# Heading\n\n## Heading 2\n\nA ref to \\@ref(heading-2).\n",
             Some(config),
         );
-        let index = symbol_usage_index_from_tree(&db, &tree);
+        let mut extensions =
+            crate::config::Extensions::for_flavor(crate::config::Flavor::RMarkdown);
+        extensions.bookdown_references = true;
+        let index = symbol_usage_index_from_tree(&db, &tree, &extensions);
 
         assert_eq!(
             index
@@ -1570,7 +1577,7 @@ mod tests {
     fn symbol_usage_index_collects_heading_definition_ranges() {
         let db = SalsaDb::default();
         let tree = crate::parse("# A\n\n# B {#beta}\n", None);
-        let index = symbol_usage_index_from_tree(&db, &tree);
+        let index = symbol_usage_index_from_tree(&db, &tree, &crate::config::Extensions::default());
 
         assert_eq!(
             index
@@ -1609,7 +1616,7 @@ mod tests {
             "# Top\n\n- # Item Heading\n\nTerm\n: # Definition Heading\n\n> # Quote Heading\n\n## Child\n",
             None,
         );
-        let index = symbol_usage_index_from_tree(&db, &tree);
+        let index = symbol_usage_index_from_tree(&db, &tree, &crate::config::Extensions::default());
 
         let levels: Vec<usize> = index
             .heading_sequence()

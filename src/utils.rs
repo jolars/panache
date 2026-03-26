@@ -1,3 +1,4 @@
+use crate::config::Extensions;
 use crate::syntax::{AstNode, Heading, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;
@@ -223,7 +224,7 @@ pub struct ImplicitHeadingId {
     pub heading: SyntaxNode,
 }
 
-pub fn implicit_heading_ids(tree: &SyntaxNode) -> Vec<ImplicitHeadingId> {
+pub fn implicit_heading_ids(tree: &SyntaxNode, extensions: &Extensions) -> Vec<ImplicitHeadingId> {
     let mut out = Vec::new();
     let mut seen: HashMap<String, usize> = HashMap::new();
 
@@ -237,7 +238,7 @@ pub fn implicit_heading_ids(tree: &SyntaxNode) -> Vec<ImplicitHeadingId> {
             continue;
         }
 
-        let base = pandoc_slugify(&normalized);
+        let base = heading_slugify(&normalized, extensions);
         if base.is_empty() {
             continue;
         }
@@ -254,6 +255,44 @@ pub fn implicit_heading_ids(tree: &SyntaxNode) -> Vec<ImplicitHeadingId> {
             id,
             heading: heading.syntax().clone(),
         });
+    }
+
+    out
+}
+
+/// Generate an auto identifier from heading text based on extension settings.
+pub fn heading_slugify(text: &str, extensions: &Extensions) -> String {
+    if extensions.gfm_auto_identifiers {
+        gfm_slugify(text)
+    } else {
+        pandoc_slugify(text)
+    }
+}
+
+/// Generate a GitHub-style auto identifier from heading text.
+pub fn gfm_slugify(text: &str) -> String {
+    let mut out = String::new();
+    let mut prev_dash = false;
+
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            if !out.is_empty() && !prev_dash {
+                out.push('-');
+                prev_dash = true;
+            }
+            continue;
+        }
+
+        for lc in ch.to_lowercase() {
+            if lc.is_alphanumeric() || lc == '_' || lc == '-' {
+                out.push(lc);
+                prev_dash = lc == '-';
+            }
+        }
+    }
+
+    while out.ends_with('-') {
+        out.pop();
     }
 
     out
@@ -318,10 +357,24 @@ mod tests {
     #[test]
     fn implicit_heading_ids_use_pandoc_duplicate_suffixes() {
         let tree = crate::parse("# Heading\n\n# Heading\n\n# Heading\n", None);
-        let ids = implicit_heading_ids(&tree)
+        let ids = implicit_heading_ids(&tree, &crate::config::Extensions::default())
             .into_iter()
             .map(|entry| entry.id)
             .collect::<Vec<_>>();
         assert_eq!(ids, vec!["heading", "heading-1", "heading-2"]);
+    }
+
+    #[test]
+    fn implicit_heading_ids_use_gfm_slug_algorithm_when_enabled() {
+        let tree = crate::parse("# 3. Applications\n", None);
+        let ext = crate::config::Extensions {
+            gfm_auto_identifiers: true,
+            ..crate::config::Extensions::default()
+        };
+        let ids = implicit_heading_ids(&tree, &ext)
+            .into_iter()
+            .map(|entry| entry.id)
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["3-applications"]);
     }
 }

@@ -300,8 +300,12 @@ pub(crate) async fn code_action(
         && let Some(link_node) =
             heading_link_conversion::find_implicit_heading_link_at_position(&tree, offset)
     {
-        let edits =
-            heading_link_conversion::convert_to_explicit_heading_link(&link_node, &tree, &text);
+        let edits = heading_link_conversion::convert_to_explicit_heading_link(
+            &link_node,
+            &tree,
+            &text,
+            &config.extensions,
+        );
         if !edits.is_empty() {
             let mut changes = HashMap::new();
             changes.insert(uri.clone(), edits);
