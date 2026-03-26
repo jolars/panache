@@ -153,19 +153,12 @@ impl Formatter {
 
     /// Format a List node
     pub(super) fn format_list(&mut self, node: &SyntaxNode, indent: usize) {
-        // Add blank line before top-level lists (indent == 0) that follow content,
-        // UNLESS the previous sibling was also a List (they're separate lists in the source).
-        // If previous was a List, it already has spacing and we normalize markers instead.
-        let prev_is_list = node
-            .prev_sibling()
-            .map(|prev| matches!(prev.kind(), SyntaxKind::LIST | SyntaxKind::BLANK_LINE))
-            .unwrap_or(false);
-
+        // Add blank line before top-level lists (indent == 0) that follow content.
+        // Keep one normalized separator between adjacent top-level lists to match Pandoc output.
         if indent == 0
             && self.fenced_div_depth == 0
             && !self.output.is_empty()
             && !self.output.ends_with("\n\n")
-            && !prev_is_list
         {
             self.output.push('\n');
         }

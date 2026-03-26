@@ -51,6 +51,14 @@ fn bullet_and_ordered_lists_mixed() {
 }
 
 #[test]
+fn ordered_and_bullet_lists_stay_separated_without_source_blank_line() {
+    let input = "1. asdf\n- asdf\n";
+    let expected = "1. asdf\n\n- asdf\n";
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn task_lists_use_hyphen() {
     let input = "* [ ] Unchecked task\n* [x] Checked task\n* [X] Also checked\n";
     let expected = "- [ ] Unchecked task\n- [x] Checked task\n- [x] Also checked\n";
