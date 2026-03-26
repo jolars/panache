@@ -105,6 +105,15 @@ impl AstNode for FootnoteReference {
 impl FootnoteReference {
     /// Extracts the footnote ID (e.g., "1" from a footnote reference).
     pub fn id(&self) -> String {
+        if let Some(id) = self
+            .0
+            .children_with_tokens()
+            .filter_map(|child| child.into_token())
+            .find(|token| token.kind() == SyntaxKind::FOOTNOTE_LABEL_ID)
+        {
+            return id.text().to_string();
+        }
+
         let tokens: Vec<_> = self
             .0
             .children_with_tokens()
@@ -127,6 +136,15 @@ impl FootnoteReference {
 
     /// Returns the text range for the footnote ID only (excluding `[^` and `]`).
     pub fn id_value_range(&self) -> Option<rowan::TextRange> {
+        if let Some(id) = self
+            .0
+            .children_with_tokens()
+            .filter_map(|child| child.into_token())
+            .find(|token| token.kind() == SyntaxKind::FOOTNOTE_LABEL_ID)
+        {
+            return Some(id.text_range());
+        }
+
         let tokens: Vec<_> = self
             .0
             .children_with_tokens()
@@ -167,6 +185,15 @@ impl AstNode for FootnoteDefinition {
 impl FootnoteDefinition {
     /// Extracts the footnote ID from the definition marker.
     pub fn id(&self) -> String {
+        if let Some(id) = self
+            .0
+            .children_with_tokens()
+            .filter_map(|child| child.into_token())
+            .find(|token| token.kind() == SyntaxKind::FOOTNOTE_LABEL_ID)
+        {
+            return id.text().to_string();
+        }
+
         self.0
             .children_with_tokens()
             .filter_map(|child| child.into_token())
@@ -187,6 +214,15 @@ impl FootnoteDefinition {
 
     /// Returns the text range for the footnote ID only (excluding `[^`, `]`, and `:`).
     pub fn id_value_range(&self) -> Option<rowan::TextRange> {
+        if let Some(id) = self
+            .0
+            .children_with_tokens()
+            .filter_map(|child| child.into_token())
+            .find(|token| token.kind() == SyntaxKind::FOOTNOTE_LABEL_ID)
+        {
+            return Some(id.text_range());
+        }
+
         let marker = self
             .0
             .children_with_tokens()
@@ -216,11 +252,25 @@ impl FootnoteDefinition {
     /// Extracts the content of the footnote definition.
     /// Returns the text content after the `[^id]:` marker.
     pub fn content(&self) -> String {
-        // Skip the FOOTNOTE_REFERENCE token and collect all other content
+        // Skip the definition marker tokens and collect all other content
         self.0
-            .children()
-            .filter(|child| child.kind() != SyntaxKind::FOOTNOTE_REFERENCE)
-            .map(|child| child.text().to_string())
+            .children_with_tokens()
+            .filter_map(|child| match child {
+                rowan::NodeOrToken::Node(node) => Some(node.text().to_string()),
+                rowan::NodeOrToken::Token(token)
+                    if !matches!(
+                        token.kind(),
+                        SyntaxKind::FOOTNOTE_REFERENCE
+                            | SyntaxKind::FOOTNOTE_LABEL_START
+                            | SyntaxKind::FOOTNOTE_LABEL_ID
+                            | SyntaxKind::FOOTNOTE_LABEL_END
+                            | SyntaxKind::FOOTNOTE_LABEL_COLON
+                    ) =>
+                {
+                    Some(token.text().to_string())
+                }
+                _ => None,
+            })
             .collect::<Vec<_>>()
             .join("")
     }

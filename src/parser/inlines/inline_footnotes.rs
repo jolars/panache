@@ -103,9 +103,9 @@ pub(crate) fn try_parse_footnote_reference(text: &str) -> Option<(usize, String)
 /// Emit a footnote reference node to the builder.
 pub(crate) fn emit_footnote_reference(builder: &mut GreenNodeBuilder, id: &str) {
     builder.start_node(SyntaxKind::FOOTNOTE_REFERENCE.into());
-    builder.token(SyntaxKind::TEXT.into(), "[^");
-    builder.token(SyntaxKind::TEXT.into(), id);
-    builder.token(SyntaxKind::TEXT.into(), "]");
+    builder.token(SyntaxKind::FOOTNOTE_LABEL_START.into(), "[^");
+    builder.token(SyntaxKind::FOOTNOTE_LABEL_ID.into(), id);
+    builder.token(SyntaxKind::FOOTNOTE_LABEL_END.into(), "]");
     builder.finish_node();
 }
 

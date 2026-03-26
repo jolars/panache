@@ -11,15 +11,19 @@ DOCUMENT@0..340
   PARAGRAPH@41..75
     TEXT@41..69 "Text with footnote re ..."
     FOOTNOTE_REFERENCE@69..73
-      TEXT@69..71 "[^"
-      TEXT@71..72 "1"
-      TEXT@72..73 "]"
+      FOOTNOTE_LABEL_START@69..71 "[^"
+      FOOTNOTE_LABEL_ID@71..72 "1"
+      FOOTNOTE_LABEL_END@72..73 "]"
     TEXT@73..74 "."
     NEWLINE@74..75 "\n"
   BLANK_LINE@75..76
     BLANK_LINE@75..76 "\n"
   FOOTNOTE_DEFINITION@76..340
-    FOOTNOTE_REFERENCE@76..82 "[^1]: "
+    FOOTNOTE_LABEL_START@76..78 "[^"
+    FOOTNOTE_LABEL_ID@78..79 "1"
+    FOOTNOTE_LABEL_END@79..80 "]"
+    FOOTNOTE_LABEL_COLON@80..81 ":"
+    WHITESPACE@81..82 " "
     PARAGRAPH@82..121
       TEXT@82..120 "Footnote containing a ..."
       NEWLINE@120..121 "\n"

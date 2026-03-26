@@ -323,12 +323,32 @@ pub fn try_parse_footnote_marker(line: &str) -> Option<(String, usize)> {
 #[cfg(test)]
 mod tests {
     use super::{line_is_mmd_link_attribute_continuation, try_parse_reference_definition};
+    use crate::syntax::SyntaxKind;
 
     #[test]
     fn test_footnote_definition_body_layout_is_lossless() {
         let input = "[^note-on-refs]:\n    Note that if `--file-scope` is used,\n";
         let tree = crate::parse(input, Some(crate::Config::default()));
         assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn test_footnote_definition_marker_emits_structural_tokens() {
+        let input = "[^note-on-refs]: body\n";
+        let tree = crate::parse(input, Some(crate::Config::default()));
+        let def = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::FOOTNOTE_DEFINITION)
+            .expect("footnote definition");
+        let token_kinds: Vec<_> = def
+            .children_with_tokens()
+            .filter_map(|e| e.into_token())
+            .map(|t| t.kind())
+            .collect();
+        assert!(token_kinds.contains(&SyntaxKind::FOOTNOTE_LABEL_START));
+        assert!(token_kinds.contains(&SyntaxKind::FOOTNOTE_LABEL_ID));
+        assert!(token_kinds.contains(&SyntaxKind::FOOTNOTE_LABEL_END));
+        assert!(token_kinds.contains(&SyntaxKind::FOOTNOTE_LABEL_COLON));
     }
 
     #[test]

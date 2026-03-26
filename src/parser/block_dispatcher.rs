@@ -860,7 +860,22 @@ impl BlockParser for FootnoteDefinitionParser {
 
         builder.start_node(SyntaxKind::FOOTNOTE_DEFINITION.into());
         let marker_text = &ctx.content[..content_start];
-        builder.token(SyntaxKind::FOOTNOTE_REFERENCE.into(), marker_text);
+        if let Some((id, _)) = try_parse_footnote_marker(marker_text) {
+            builder.token(SyntaxKind::FOOTNOTE_LABEL_START.into(), "[^");
+            builder.token(SyntaxKind::FOOTNOTE_LABEL_ID.into(), &id);
+            builder.token(SyntaxKind::FOOTNOTE_LABEL_END.into(), "]");
+            builder.token(SyntaxKind::FOOTNOTE_LABEL_COLON.into(), ":");
+            let marker_suffix = marker_text
+                .strip_prefix("[^")
+                .and_then(|tail| tail.strip_prefix(id.as_str()))
+                .and_then(|tail| tail.strip_prefix("]:"))
+                .unwrap_or("");
+            if !marker_suffix.is_empty() {
+                builder.token(SyntaxKind::WHITESPACE.into(), marker_suffix);
+            }
+        } else {
+            builder.token(SyntaxKind::FOOTNOTE_REFERENCE.into(), marker_text);
+        }
 
         1
     }

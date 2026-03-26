@@ -12,14 +12,18 @@ DOCUMENT@0..240
   PARAGRAPH@46..79
     TEXT@46..72 "Some text with a foot ..."
     FOOTNOTE_REFERENCE@72..78
-      TEXT@72..74 "[^"
-      TEXT@74..77 "fn1"
-      TEXT@77..78 "]"
+      FOOTNOTE_LABEL_START@72..74 "[^"
+      FOOTNOTE_LABEL_ID@74..77 "fn1"
+      FOOTNOTE_LABEL_END@77..78 "]"
     NEWLINE@78..79 "\n"
   BLANK_LINE@79..80
     BLANK_LINE@79..80 "\n"
   FOOTNOTE_DEFINITION@80..220
-    FOOTNOTE_REFERENCE@80..88 "[^fn1]: "
+    FOOTNOTE_LABEL_START@80..82 "[^"
+    FOOTNOTE_LABEL_ID@82..85 "fn1"
+    FOOTNOTE_LABEL_END@85..86 "]"
+    FOOTNOTE_LABEL_COLON@86..87 ":"
+    WHITESPACE@87..88 " "
     PARAGRAPH@88..220
       TEXT@88..150 "First sentence of the ..."
       NEWLINE@150..151 "\n"

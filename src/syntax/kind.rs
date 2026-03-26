@@ -46,6 +46,10 @@ pub enum SyntaxKind {
     REFERENCE_DEFINITION, // [label]: url "title"
     FOOTNOTE_DEFINITION,  // [^id]: content
     FOOTNOTE_REFERENCE,   // [^id]
+    FOOTNOTE_LABEL_START, // [^
+    FOOTNOTE_LABEL_ID,    // id in [^id] or [^id]:
+    FOOTNOTE_LABEL_END,   // ]
+    FOOTNOTE_LABEL_COLON, // :
     REFERENCE_LABEL,      // [label] part
     REFERENCE_URL,        // url part
     REFERENCE_TITLE,      // "title" part

@@ -4,7 +4,7 @@ title: "Footnote indentation growth"
 
 Some text with a footnote.[^fn1]
 
-[^fn1]: First sentence of the footnote spans enough words that panache will
-    wrap it onto a continuation line with standard indentation.
+[^fn1]: First sentence of the footnote spans enough words that panache will wrap
+    it onto a continuation line with standard indentation.
 
 Another paragraph.

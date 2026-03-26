@@ -611,9 +611,16 @@ impl Formatter {
                 for element in node.children_with_tokens() {
                     match element {
                         NodeOrToken::Token(token)
-                            if token.kind() == SyntaxKind::FOOTNOTE_REFERENCE =>
+                            if matches!(
+                                token.kind(),
+                                SyntaxKind::FOOTNOTE_REFERENCE
+                                    | SyntaxKind::FOOTNOTE_LABEL_START
+                                    | SyntaxKind::FOOTNOTE_LABEL_ID
+                                    | SyntaxKind::FOOTNOTE_LABEL_END
+                                    | SyntaxKind::FOOTNOTE_LABEL_COLON
+                            ) =>
                         {
-                            marker = token.text().to_string();
+                            marker.push_str(token.text());
                         }
                         NodeOrToken::Node(child) => {
                             child_blocks.push(child);

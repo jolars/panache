@@ -1044,6 +1044,15 @@ mod extension_guard_tests {
     }
 
     #[test]
+    fn footnote_reference_emits_structural_tokens() {
+        let tree = parse_with_config("[^id]", Config::default());
+        assert_eq!(count_kind(&tree, SyntaxKind::FOOTNOTE_REFERENCE), 1);
+        assert_eq!(count_kind(&tree, SyntaxKind::FOOTNOTE_LABEL_START), 1);
+        assert_eq!(count_kind(&tree, SyntaxKind::FOOTNOTE_LABEL_ID), 1);
+        assert_eq!(count_kind(&tree, SyntaxKind::FOOTNOTE_LABEL_END), 1);
+    }
+
+    #[test]
     fn autolinks_disabled_keeps_angle_link_literal() {
         let mut config = Config::default();
         config.extensions.autolinks = false;
