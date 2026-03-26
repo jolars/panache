@@ -14,7 +14,7 @@ is the definitive reference for parser implementation.
 
 - **Language**: Rust 2024 edition, stable toolchain
 - **Architecture**: Binary crate + WASM workspace for web playground
-- **Status**: Early development - breaking changes expected
+- **Status**: Early development
 - **Tests**: 1,200+ total (846+ unit + 169 integration + others),
 - **Parser**: Integrated inline parsing (single-pass, Pandoc-style) - only mode
 
