@@ -377,3 +377,46 @@ async fn test_hover_on_heading_reference_crops_preview() {
         "Expected cropped preview to end with ellipsis"
     );
 }
+
+#[tokio::test]
+async fn test_hover_on_reference_link_definition_to_heading_shows_section_preview() {
+    let server = TestLspServer::new();
+    let content = "# Intro {#bar}\n\nSection body here.\n\nSee [foo][myref].\n\n[myref]: #bar\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let hover = server
+        .hover(
+            "file:///test.md",
+            4,  // See [foo][myref].
+            11, // inside [myref]
+        )
+        .await;
+
+    let Some(h) = hover else {
+        panic!("Expected hover content for reference-style heading link");
+    };
+    let content = match h.contents {
+        HoverContents::Markup(markup) => markup.value,
+        _ => panic!("Expected markdown hover content"),
+    };
+    assert!(content.contains("Section"));
+    assert!(content.contains("Intro"));
+    assert!(content.contains("Section body here."));
+}
+
+#[tokio::test]
+async fn test_hover_on_reference_link_definition_to_non_heading_returns_none() {
+    let server = TestLspServer::new();
+    let content = "# Intro {#bar}\n\nSection body here.\n\nSee [foo][myref].\n\n[myref]: https://example.com\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let hover = server.hover("file:///test.md", 4, 11).await;
+    assert!(
+        hover.is_none(),
+        "Non-heading reference definitions should not produce section preview hover"
+    );
+}

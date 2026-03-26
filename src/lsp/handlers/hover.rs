@@ -14,7 +14,8 @@ use tower_lsp_server::ls_types::*;
 use crate::lsp::DocumentState;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::metadata::inline_reference_contains;
-use crate::syntax::{AstNode, Document, FootnoteDefinition, Heading};
+use crate::syntax::{AstNode, Document, FootnoteDefinition, Heading, ReferenceDefinition};
+use crate::utils::normalize_label;
 
 use super::super::{conversions, helpers};
 
@@ -86,6 +87,38 @@ pub(crate) async fn hover(
                     }),
                     range: None,
                 }));
+            }
+        }
+    }
+    if let Some(SymbolTarget::Reference {
+        label,
+        is_footnote: false,
+    }) = target.as_ref()
+    {
+        let doc_indices = crate::lsp::navigation::project_symbol_documents(
+            &salsa_db,
+            salsa_file,
+            salsa_config,
+            &doc_path,
+            uri,
+            &content_for_offset,
+        )
+        .await;
+
+        for doc in &doc_indices {
+            let Some(heading_label) = reference_definition_heading_target(doc, label) else {
+                continue;
+            };
+            for candidate_doc in &doc_indices {
+                if let Some(markdown) = section_hover_markdown(candidate_doc, &heading_label) {
+                    return Ok(Some(Hover {
+                        contents: HoverContents::Markup(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: markdown,
+                        }),
+                        range: None,
+                    }));
+                }
             }
         }
     }
@@ -222,6 +255,34 @@ fn section_hover_markdown(
         None => format!("**Section:** {}", title),
     };
     Some(markdown)
+}
+
+fn reference_definition_heading_target(
+    doc: &crate::lsp::navigation::IndexedDocument,
+    label: &str,
+) -> Option<String> {
+    let tree = crate::parse(&doc.text, None);
+    let normalized = normalize_label(label);
+    let def = tree
+        .descendants()
+        .filter_map(ReferenceDefinition::cast)
+        .find(|def| normalize_label(&def.label()) == normalized)?;
+    let destination = def.destination()?;
+    heading_label_from_destination(&destination)
+}
+
+fn heading_label_from_destination(destination: &str) -> Option<String> {
+    let mut target = destination.trim();
+    if let Some(rest) = target.strip_prefix('<')
+        && let Some(end) = rest.find('>')
+    {
+        target = &rest[..end];
+    } else if let Some((head, _)) = target.split_once(char::is_whitespace) {
+        target = head;
+    }
+    let anchor = target.strip_prefix('#')?;
+    let normalized = normalize_label(anchor);
+    (!normalized.is_empty()).then_some(normalized)
 }
 
 fn first_heading_definition_range(
