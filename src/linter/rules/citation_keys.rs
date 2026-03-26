@@ -163,6 +163,7 @@ mod tests {
     fn missing_key_emits_warning() {
         let input = "Text [@missing].";
         let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("test.qmd"),
             bibliography: None,
             metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
@@ -192,6 +193,7 @@ mod tests {
     fn missing_key_reports_correct_position() {
         let input = "Text [@missing].";
         let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("test.qmd"),
             bibliography: None,
             metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
@@ -235,6 +237,7 @@ mod tests {
         let range = TextRange::new(TextSize::from(start as u32), TextSize::from(end as u32));
         let path = std::path::PathBuf::from("/tmp/test.bib");
         let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("test.qmd"),
             bibliography: Some(crate::metadata::BibliographyInfo {
                 paths: vec![path.clone()],
                 source_ranges: vec![range],
@@ -275,6 +278,7 @@ mod tests {
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = CitationKeysRule;
         let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("test.qmd"),
             bibliography: None,
             metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {
@@ -307,6 +311,7 @@ mod tests {
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = CitationKeysRule;
         let metadata = crate::metadata::DocumentMetadata {
+            source_path: std::path::PathBuf::from("test.qmd"),
             bibliography: None,
             metadata_files: Vec::new(),
             bibliography_parse: Some(crate::metadata::BibliographyParse {

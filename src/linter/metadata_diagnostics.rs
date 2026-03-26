@@ -177,6 +177,7 @@ mod tests {
         let path = PathBuf::from("/tmp/test.bib");
 
         let metadata = DocumentMetadata {
+            source_path: PathBuf::from("/tmp/test.qmd"),
             bibliography: Some(BibliographyInfo {
                 paths: vec![path.clone()],
                 source_ranges: vec![range],

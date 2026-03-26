@@ -17,44 +17,11 @@ impl Rule for UndefinedReferencesRule {
         tree: &SyntaxNode,
         input: &str,
         config: &Config,
-        _metadata: Option<&crate::metadata::DocumentMetadata>,
+        metadata: Option<&crate::metadata::DocumentMetadata>,
     ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
 
-        let db = crate::salsa::SalsaDb::default();
-        let symbol_index =
-            crate::salsa::symbol_usage_index_from_tree(&db, tree, &config.extensions);
-        let mut reference_labels: HashSet<String> = symbol_index
-            .reference_definition_entries()
-            .map(|(label, _)| label.clone())
-            .filter(|label| !label.is_empty())
-            .collect();
-        reference_labels.extend(
-            symbol_index
-                .crossref_declaration_entries()
-                .map(|(label, _)| label.clone())
-                .filter(|label| !label.is_empty()),
-        );
-
-        if config.extensions.implicit_header_references && config.extensions.auto_identifiers {
-            reference_labels.extend(
-                symbol_index
-                    .heading_label_entries()
-                    .map(|(label, _)| label.clone())
-                    .filter(|label| !label.is_empty()),
-            );
-        }
-
-        let mut crossref_labels = reference_labels.clone();
-        if config.extensions.bookdown_references && config.extensions.auto_identifiers {
-            crossref_labels.extend(collect_implicit_heading_ids(tree, &config.extensions));
-        }
-
-        let footnote_ids: HashSet<String> = symbol_index
-            .footnote_definition_entries()
-            .map(|(id, _)| id.clone())
-            .filter(|id| !id.is_empty())
-            .collect();
+        let labels = collect_definition_labels(tree, config, metadata);
 
         for link in tree.descendants().filter_map(Link::cast) {
             if link.dest().is_some() {
@@ -65,7 +32,10 @@ impl Rule for UndefinedReferencesRule {
                 continue;
             };
             let normalized_label = normalize_label(&label_text);
-            if normalized_label.is_empty() || reference_labels.contains(&normalized_label) {
+            if normalized_label.is_empty()
+                || labels.reference_labels.contains(&normalized_label)
+                || labels.heading_text_labels.contains(&normalized_label)
+            {
                 continue;
             }
 
@@ -79,7 +49,7 @@ impl Rule for UndefinedReferencesRule {
         for footnote_ref in tree.descendants().filter_map(FootnoteReference::cast) {
             let id = footnote_ref.id();
             let normalized = normalize_label(&id);
-            if normalized.is_empty() || footnote_ids.contains(&normalized) {
+            if normalized.is_empty() || labels.footnote_ids.contains(&normalized) {
                 continue;
             }
 
@@ -102,7 +72,7 @@ impl Rule for UndefinedReferencesRule {
                     crossref_resolution_labels(&normalized, config.extensions.bookdown_references);
                 if candidates
                     .iter()
-                    .any(|candidate| crossref_labels.contains(candidate))
+                    .any(|candidate| labels.crossref_labels.contains(candidate))
                 {
                     continue;
                 }
@@ -115,6 +85,86 @@ impl Rule for UndefinedReferencesRule {
         }
 
         diagnostics
+    }
+}
+
+#[derive(Default)]
+struct DefinitionLabels {
+    reference_labels: HashSet<String>,
+    footnote_ids: HashSet<String>,
+    crossref_labels: HashSet<String>,
+    heading_text_labels: HashSet<String>,
+}
+
+fn collect_definition_labels(
+    tree: &SyntaxNode,
+    config: &Config,
+    metadata: Option<&crate::metadata::DocumentMetadata>,
+) -> DefinitionLabels {
+    let mut labels = DefinitionLabels::default();
+    extend_labels_from_tree(&mut labels, tree, config);
+
+    let Some(metadata) = metadata else {
+        return labels;
+    };
+
+    let doc_path = &metadata.source_path;
+    let project_root = crate::includes::find_bookdown_root(doc_path)
+        .or_else(|| crate::includes::find_quarto_root(doc_path));
+    let Some(project_root) = project_root else {
+        return labels;
+    };
+    let is_bookdown = crate::includes::find_bookdown_root(doc_path).is_some();
+
+    for path in crate::includes::find_project_documents(&project_root, config, is_bookdown) {
+        if path == *doc_path {
+            continue;
+        }
+        if let Ok(other_input) = std::fs::read_to_string(&path) {
+            let other_tree = crate::parser::parse(&other_input, Some(config.clone()));
+            extend_labels_from_tree(&mut labels, &other_tree, config);
+        }
+    }
+
+    labels
+}
+
+fn extend_labels_from_tree(labels: &mut DefinitionLabels, tree: &SyntaxNode, config: &Config) {
+    let db = crate::salsa::SalsaDb::default();
+    let symbol_index = crate::salsa::symbol_usage_index_from_tree(&db, tree, &config.extensions);
+
+    labels.reference_labels.extend(
+        symbol_index
+            .reference_definition_entries()
+            .map(|(label, _)| label.clone())
+            .filter(|label| !label.is_empty()),
+    );
+    labels.footnote_ids.extend(
+        symbol_index
+            .footnote_definition_entries()
+            .map(|(id, _)| id.clone())
+            .filter(|id| !id.is_empty()),
+    );
+    labels.crossref_labels.extend(
+        symbol_index
+            .crossref_declaration_entries()
+            .map(|(label, _)| label.clone())
+            .filter(|label| !label.is_empty()),
+    );
+
+    if config.extensions.implicit_header_references && config.extensions.auto_identifiers {
+        labels.heading_text_labels.extend(
+            symbol_index
+                .heading_label_entries()
+                .map(|(label, _)| label.clone())
+                .filter(|label| !label.is_empty()),
+        );
+    }
+
+    if config.extensions.bookdown_references && config.extensions.auto_identifiers {
+        labels
+            .crossref_labels
+            .extend(collect_implicit_heading_ids(tree, &config.extensions));
     }
 }
 
@@ -144,6 +194,8 @@ fn extract_reference_label_and_node(link: &Link) -> Option<(String, SyntaxNode)>
 mod tests {
     use super::*;
     use crate::config::Flavor;
+    use std::fs;
+    use tempfile::TempDir;
 
     fn parse_and_lint(input: &str) -> Vec<Diagnostic> {
         let config = Config::default();
@@ -272,5 +324,38 @@ mod tests {
         let rule = UndefinedReferencesRule;
         let diagnostics = rule.check(&tree, input, &config, None);
         assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn resolves_bookdown_crossref_from_project_documents() {
+        let temp = TempDir::new().expect("tempdir");
+        let root = temp.path();
+        fs::write(
+            root.join("_bookdown.yml"),
+            "rmd_files: [\"1-one.Rmd\", \"2-two.Rmd\"]\n",
+        )
+        .expect("write _bookdown.yml");
+        fs::write(root.join("1-one.Rmd"), "# Kalman {#kalman}\n").expect("write 1-one.Rmd");
+        fs::write(root.join("2-two.Rmd"), "\\@ref(kalman)\n").expect("write 2-two.Rmd");
+
+        let input = fs::read_to_string(root.join("2-two.Rmd")).expect("read 2-two.Rmd");
+        let mut config = Config {
+            flavor: Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(Flavor::RMarkdown),
+            ..Default::default()
+        };
+        config.extensions.bookdown_references = true;
+
+        let tree = crate::parser::parse(&input, Some(config.clone()));
+        let metadata = crate::metadata::extract_project_metadata(&tree, &root.join("2-two.Rmd"))
+            .expect("metadata");
+        let rule = UndefinedReferencesRule;
+        let diagnostics = rule.check(&tree, &input, &config, Some(&metadata));
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diag| diag.code != "undefined-reference-label"),
+            "cross-document bookdown crossref should resolve"
+        );
     }
 }

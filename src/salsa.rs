@@ -68,6 +68,7 @@ pub fn metadata(
     let mut metadata =
         crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path)
             .unwrap_or_else(|_| crate::metadata::DocumentMetadata {
+                source_path: path.clone(),
                 bibliography: None,
                 metadata_files: Vec::new(),
                 bibliography_parse: None,

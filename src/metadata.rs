@@ -48,6 +48,8 @@ pub use yaml::YamlError;
 /// Structured metadata extracted from document frontmatter.
 #[derive(Debug, Clone)]
 pub struct DocumentMetadata {
+    /// Source document path used to extract this metadata.
+    pub source_path: std::path::PathBuf,
     /// Bibliography information (files and their source positions).
     pub bibliography: Option<BibliographyInfo>,
     /// Metadata file dependencies (resolved paths).

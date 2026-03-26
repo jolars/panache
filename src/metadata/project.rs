@@ -165,6 +165,7 @@ fn extract_project_metadata_impl(
 
     let metadata_files = collect_metadata_files(doc_path, &merged.metadata_files);
     let mut metadata = DocumentMetadata {
+        source_path: doc_path.to_path_buf(),
         bibliography,
         metadata_files,
         bibliography_parse,

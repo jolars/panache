@@ -139,6 +139,7 @@ pub(super) fn parse_frontmatter(
         .unwrap_or_default();
 
     Ok(DocumentMetadata {
+        source_path: doc_path.to_path_buf(),
         bibliography,
         metadata_files: Vec::new(),
         bibliography_parse,

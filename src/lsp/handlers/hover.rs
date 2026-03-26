@@ -123,6 +123,29 @@ pub(crate) async fn hover(
             }
         }
     }
+    if let Some(SymbolTarget::Crossref(label)) = target.as_ref() {
+        let doc_indices = crate::lsp::navigation::project_symbol_documents(
+            &salsa_db,
+            salsa_file,
+            salsa_config,
+            &doc_path,
+            uri,
+            &content_for_offset,
+        )
+        .await;
+
+        for doc in &doc_indices {
+            if let Some(markdown) = section_hover_markdown(doc, label) {
+                return Ok(Some(Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: markdown,
+                    }),
+                    range: None,
+                }));
+            }
+        }
+    }
     let link_target = {
         let root = ctx.syntax_root();
         hovered_link_target(&root, offset)
