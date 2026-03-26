@@ -420,3 +420,111 @@ async fn test_hover_on_reference_link_definition_to_non_heading_returns_none() {
         "Non-heading reference definitions should not produce section preview hover"
     );
 }
+
+#[tokio::test]
+async fn test_hover_on_direct_local_markdown_link_shows_linked_doc_preview() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let doc_path = temp_dir.path().join("doc.qmd");
+    let linked_path = temp_dir.path().join("linked.md");
+
+    std::fs::write(
+        &linked_path,
+        "# Linked title\n\nLinked paragraph preview text.\n",
+    )
+    .unwrap();
+    std::fs::write(&doc_path, "See [linked](./linked.md).\n").unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &std::fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let hover = server.hover(doc_uri.as_str(), 0, 17).await;
+    let Some(h) = hover else {
+        panic!("Expected hover content for direct local markdown link");
+    };
+    let content = match h.contents {
+        HoverContents::Markup(markup) => markup.value,
+        _ => panic!("Expected markdown hover content"),
+    };
+    assert!(content.contains("Linked document"));
+    assert!(content.contains("linked.md"));
+    assert!(content.contains("Linked title"));
+    assert!(content.contains("Linked paragraph preview text."));
+}
+
+#[tokio::test]
+async fn test_hover_on_reference_definition_local_markdown_link_shows_linked_doc_preview() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let doc_path = temp_dir.path().join("doc.qmd");
+    let linked_path = temp_dir.path().join("linked.qmd");
+
+    std::fs::write(
+        &linked_path,
+        "# Ref linked title\n\nRef linked paragraph preview text.\n",
+    )
+    .unwrap();
+    std::fs::write(&doc_path, "See [linked][ref].\n\n[ref]: ./linked.qmd\n").unwrap();
+
+    let server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(temp_dir.path()).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(
+            doc_uri.as_str(),
+            &std::fs::read_to_string(&doc_path).unwrap(),
+            "quarto",
+        )
+        .await;
+
+    let hover = server.hover(doc_uri.as_str(), 0, 14).await;
+    let Some(h) = hover else {
+        panic!("Expected hover content for reference-definition local markdown link");
+    };
+    let content = match h.contents {
+        HoverContents::Markup(markup) => markup.value,
+        _ => panic!("Expected markdown hover content"),
+    };
+    assert!(content.contains("Linked document"));
+    assert!(content.contains("linked.qmd"));
+    assert!(content.contains("Ref linked title"));
+    assert!(content.contains("Ref linked paragraph preview text."));
+}
+
+#[tokio::test]
+async fn test_hover_on_missing_local_markdown_link_returns_none() {
+    let server = TestLspServer::new();
+    let content = "See [missing](./does-not-exist.md).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let hover = server.hover("file:///test.md", 0, 20).await;
+    assert!(
+        hover.is_none(),
+        "Missing local linked document should not produce hover preview"
+    );
+}
+
+#[tokio::test]
+async fn test_hover_on_external_url_link_returns_none_for_linked_doc_preview() {
+    let server = TestLspServer::new();
+    let content = "See [site](https://example.com).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let hover = server.hover("file:///test.md", 0, 13).await;
+    assert!(
+        hover.is_none(),
+        "External URL links should not produce linked-document previews"
+    );
+}

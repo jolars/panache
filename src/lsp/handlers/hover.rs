@@ -3,7 +3,8 @@
 //! Provides hover information for:
 //! - Footnote references: `[^id]` → shows footnote content from `[^id]: content`
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -14,7 +15,7 @@ use tower_lsp_server::ls_types::*;
 use crate::lsp::DocumentState;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::metadata::inline_reference_contains;
-use crate::syntax::{AstNode, Document, FootnoteDefinition, Heading, ReferenceDefinition};
+use crate::syntax::{AstNode, Document, FootnoteDefinition, Heading, Link, ReferenceDefinition};
 use crate::utils::normalize_label;
 
 use super::super::{conversions, helpers};
@@ -121,6 +122,29 @@ pub(crate) async fn hover(
                 }
             }
         }
+    }
+    let link_target = {
+        let root = ctx.syntax_root();
+        hovered_link_target(&root, offset)
+    };
+    if let Some(markdown) = linked_document_hover_markdown(
+        link_target.as_deref(),
+        &salsa_db,
+        salsa_file,
+        salsa_config,
+        &doc_path,
+        &content_for_offset,
+        uri,
+    )
+    .await
+    {
+        return Ok(Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: markdown,
+            }),
+            range: None,
+        }));
     }
 
     let pending_footnote = {
@@ -340,6 +364,145 @@ fn crop_preview(text: &str, max_chars: usize) -> String {
         out.push_str("...");
     }
     out
+}
+
+async fn linked_document_hover_markdown(
+    raw_link_target: Option<&str>,
+    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+    salsa_file: crate::salsa::FileText,
+    salsa_config: crate::salsa::FileConfig,
+    doc_path: &Path,
+    content: &str,
+    uri: &Uri,
+) -> Option<String> {
+    let link_target = raw_link_target?;
+    let target_uri = resolve_local_markdown_target(
+        salsa_db,
+        salsa_file,
+        salsa_config,
+        doc_path,
+        content,
+        uri,
+        link_target,
+    )
+    .await?;
+    let target_path = target_uri.to_file_path()?;
+    if target_path == doc_path {
+        return None;
+    }
+    let target_text = std::fs::read_to_string(&target_path).ok()?;
+    linked_doc_preview_markdown(&target_text, &target_path)
+}
+
+fn hovered_link_target(root: &crate::syntax::SyntaxNode, offset: usize) -> Option<String> {
+    let mut node = helpers::find_node_at_offset(root, offset)?;
+    loop {
+        if let Some(link) = Link::cast(node.clone()) {
+            if let Some(dest) = link.dest() {
+                let dest_url = dest.url();
+                let raw = crate::lsp::handlers::document_links::extract_first_destination_token(
+                    &dest_url,
+                );
+                return (!raw.is_empty()).then_some(raw.to_string());
+            }
+            if let Some(link_ref) = link.reference() {
+                let label = normalize_label(&link_ref.label());
+                return (!label.is_empty()).then_some(format!("[ref]:{label}"));
+            }
+            if let Some(text) = link.text() {
+                let label = normalize_label(&text.text_content());
+                return (!label.is_empty()).then_some(format!("[ref]:{label}"));
+            }
+        }
+        node = node.parent()?;
+    }
+}
+
+async fn resolve_local_markdown_target(
+    salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
+    salsa_file: crate::salsa::FileText,
+    salsa_config: crate::salsa::FileConfig,
+    doc_path: &Path,
+    content: &str,
+    uri: &Uri,
+    raw_target: &str,
+) -> Option<Uri> {
+    let resolved = if let Some(label) = raw_target.strip_prefix("[ref]:") {
+        let ref_targets = crate::lsp::handlers::document_links::build_reference_targets(
+            salsa_db,
+            salsa_file,
+            salsa_config,
+            doc_path,
+            content,
+            uri,
+        )
+        .await;
+        let target = ref_targets.get(label)?;
+        crate::lsp::handlers::document_links::resolve_link_target(
+            &target.raw_target,
+            Some(&target.base_path),
+            target.base_uri.as_ref(),
+        )?
+    } else {
+        crate::lsp::handlers::document_links::resolve_link_target(
+            raw_target,
+            Some(doc_path),
+            Some(uri),
+        )?
+    };
+
+    let path = resolved.to_file_path()?;
+    if !is_markdown_family_path(&path) {
+        return None;
+    }
+    Some(resolved)
+}
+
+fn is_markdown_family_path(path: &Path) -> bool {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or_default();
+    matches!(ext, "md" | "qmd" | "Rmd" | "markdown")
+}
+
+fn linked_doc_preview_markdown(target_text: &str, target_path: &Path) -> Option<String> {
+    let tree = crate::parse(target_text, None);
+    let document = Document::cast(tree)?;
+    let blocks: Vec<_> = document.blocks().collect();
+    let title = blocks
+        .iter()
+        .find_map(|node| Heading::cast(node.clone()))
+        .map(|h| h.title_or("(empty)"));
+
+    let heading_ranges: HashSet<rowan::TextRange> = blocks
+        .iter()
+        .filter(|node| node.kind() == crate::syntax::SyntaxKind::HEADING)
+        .map(|node| node.text_range())
+        .collect();
+    let snippet = blocks.iter().find_map(|node| {
+        if heading_ranges.contains(&node.text_range()) {
+            return None;
+        }
+        let normalized = normalize_preview_text(node.text().to_string().trim());
+        (!normalized.is_empty()).then_some(crop_preview(&normalized, HOVER_PREVIEW_MAX_CHARS))
+    });
+
+    if title.is_none() && snippet.is_none() {
+        return None;
+    }
+    let file_name = target_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("document");
+    let mut out = format!("**Linked document:** `{file_name}`");
+    if let Some(title) = title {
+        out.push_str(&format!("\n\n**Title:** {}", title));
+    }
+    if let Some(snippet) = snippet {
+        out.push_str(&format!("\n\n{}", snippet));
+    }
+    Some(out)
 }
 
 /// Format a bibliography entry for hover display.

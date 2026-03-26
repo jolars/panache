@@ -220,7 +220,7 @@ fn text_range_to_lsp_range(content: &str, range: rowan::TextRange) -> Range {
     Range { start, end }
 }
 
-fn resolve_link_target(
+pub(crate) fn resolve_link_target(
     raw_target: &str,
     doc_path: Option<&Path>,
     doc_uri: Option<&Uri>,
@@ -278,13 +278,13 @@ fn with_fragment(uri: Uri, fragment: &str) -> Option<Uri> {
 }
 
 #[derive(Clone)]
-struct ReferenceTarget {
-    raw_target: String,
-    base_path: std::path::PathBuf,
-    base_uri: Option<Uri>,
+pub(crate) struct ReferenceTarget {
+    pub(crate) raw_target: String,
+    pub(crate) base_path: std::path::PathBuf,
+    pub(crate) base_uri: Option<Uri>,
 }
 
-async fn build_reference_targets(
+pub(crate) async fn build_reference_targets(
     salsa_db: &Arc<Mutex<crate::salsa::SalsaDb>>,
     salsa_file: crate::salsa::FileText,
     salsa_config: crate::salsa::FileConfig,
@@ -333,7 +333,7 @@ async fn build_reference_targets(
     out
 }
 
-fn extract_first_destination_token(raw_dest: &str) -> &str {
+pub(crate) fn extract_first_destination_token(raw_dest: &str) -> &str {
     let trimmed = raw_dest.trim();
     if let Some(rest) = trimmed.strip_prefix('<')
         && let Some(end) = rest.find('>')

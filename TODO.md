@@ -89,8 +89,8 @@ support.
 
 ### Hover Information
 
-- [ ] Link preview - `textDocument/hover` to show link target
-- [ ] Reference preview - Show reference definition on hover
+- [x] Link preview - `textDocument/hover` to show link target
+- [x] Reference preview - Show reference definition on hover
 - [x] Footnote preview - Show footnote content inline
 - [x] Citation preview - Show bibliography entry for citation (approximate)
 - [x] Heading preview - Show section content or summary on hover
