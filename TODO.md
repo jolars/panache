@@ -82,7 +82,7 @@ This document tracks implementation status for Panache's features.
 
 ### Inlay Hints (low priority)
 
-Personally I think inlay hints are distractive and I am not sure what we want to
+Personally I think inlay hints are distracting and I am not sure what we want to
 support.
 
 - [ ] Link target hints - Show link targets as inlay hints
