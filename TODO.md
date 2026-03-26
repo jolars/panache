@@ -76,6 +76,9 @@ This document tracks implementation status for Panache's features.
 - [ ] Heading link completion
 - [ ] Attribute completion - Complete class names and attributes in
       `{.class #id}`
+- [ ] Shortcode completion - Complete Quarto shortcode names in `{{< name >}}`
+- [ ] Cross-reference completion - Complete `@fig-id` and `\@ref(fig-id)`
+      cross-refs
 
 ### Inlay Hints (low priority)
 
