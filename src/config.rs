@@ -451,10 +451,10 @@ impl Extensions {
     fn quarto_defaults() -> Self {
         let mut ext = Self::pandoc_defaults();
 
+        ext.executable_code = true;
         ext.quarto_callouts = true;
         ext.quarto_crossrefs = true;
         ext.quarto_shortcodes = true;
-        ext.executable_code = true;
 
         ext
     }
@@ -463,10 +463,10 @@ impl Extensions {
     fn rmarkdown_defaults() -> Self {
         let mut ext = Self::pandoc_defaults();
 
-        ext.tex_math_dollars = true;
-        ext.tex_math_single_backslash = true; // RMarkdown enables \(...\) and \[...\] by default
         ext.bookdown_references = true;
         ext.executable_code = true;
+        ext.tex_math_dollars = true;
+        ext.tex_math_single_backslash = true;
 
         ext
     }
@@ -475,19 +475,19 @@ impl Extensions {
     fn gfm_defaults() -> Self {
         let mut ext = Self::none_defaults();
 
+        ext.alerts = true;
+        ext.auto_identifiers = true;
+        ext.autolink_bare_uris = true;
+        ext.emoji = true;
+        ext.footnotes = true;
+        ext.gfm_auto_identifiers = true;
         ext.pipe_tables = true;
         ext.raw_html = true;
-        ext.auto_identifiers = true;
-        ext.gfm_auto_identifiers = true;
-        ext.task_lists = true;
-        ext.emoji = true;
         ext.strikeout = true;
-        ext.autolink_bare_uris = true;
-        ext.yaml_metadata_block = true;
-        ext.footnotes = true;
+        ext.task_lists = true;
         ext.tex_math_dollars = true;
         ext.tex_math_gfm = true;
-        ext.alerts = true;
+        ext.yaml_metadata_block = true;
 
         ext
     }
@@ -503,30 +503,28 @@ impl Extensions {
     fn multimarkdown_defaults() -> Self {
         let mut ext = Self::none_defaults();
 
-        ext.pipe_tables = true;
-        ext.raw_html = true;
-        ext.tex_math_double_backslash = true;
-        ext.tex_math_dollars = true;
-        ext.intraword_underscores = true;
-        ext.footnotes = true;
-        ext.definition_lists = true;
         ext.all_symbols_escapable = true;
-        ext.reference_links = true;
-        ext.implicit_header_references = true;
-        ext.shortcut_reference_links = true;
         ext.auto_identifiers = true;
+        ext.backtick_code_blocks = true;
+        ext.definition_lists = true;
+        ext.footnotes = true;
         ext.gfm_auto_identifiers = false;
+        ext.implicit_figures = true;
+        ext.implicit_header_references = true;
+        ext.intraword_underscores = true;
         ext.mmd_header_identifiers = true;
         ext.mmd_link_attributes = true;
-        ext.implicit_figures = true;
+        ext.mmd_title_block = true;
+        ext.pandoc_title_block = false;
+        ext.pipe_tables = true;
+        ext.raw_attribute = true;
+        ext.raw_html = true;
+        ext.reference_links = true;
+        ext.shortcut_reference_links = true;
         ext.subscript = true;
         ext.superscript = true;
-        ext.backtick_code_blocks = true;
-        ext.raw_attribute = true;
-
-        // Pandoc MultiMarkdown defaults do not use Pandoc `%` title blocks.
-        ext.pandoc_title_block = false;
-        ext.mmd_title_block = true;
+        ext.tex_math_dollars = true;
+        ext.tex_math_double_backslash = true;
 
         ext
     }
