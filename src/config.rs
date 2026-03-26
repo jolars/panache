@@ -260,73 +260,72 @@ impl Default for Extensions {
 }
 
 impl Extensions {
-    /// Baseline with all modeled extensions disabled.
     fn none_defaults() -> Self {
         Self {
-            blank_before_header: false,
-            blank_before_blockquote: false,
-            header_attributes: false,
-            auto_identifiers: false,
-            gfm_auto_identifiers: false,
-            implicit_header_references: false,
-            fancy_lists: false,
-            startnum: false,
-            example_lists: false,
-            task_lists: false,
-            definition_lists: false,
-            backtick_code_blocks: false,
-            fenced_code_blocks: false,
-            fenced_code_attributes: false,
-            executable_code: false,
-            inline_code_attributes: false,
-            simple_tables: false,
-            multiline_tables: false,
-            grid_tables: false,
-            pipe_tables: false,
-            table_captions: false,
-            fenced_divs: false,
-            native_divs: false,
-            line_blocks: false,
-            intraword_underscores: false,
-            strikeout: false,
-            superscript: false,
-            subscript: false,
-            inline_links: false,
-            reference_links: false,
-            shortcut_reference_links: false,
-            link_attributes: false,
-            autolinks: false,
-            inline_images: false,
-            implicit_figures: false,
-            tex_math_dollars: false,
-            tex_math_gfm: false,
-            tex_math_single_backslash: false,
-            tex_math_double_backslash: false,
-            inline_footnotes: false,
-            footnotes: false,
-            citations: false,
-            bracketed_spans: false,
-            native_spans: false,
-            yaml_metadata_block: false,
-            pandoc_title_block: false,
-            mmd_title_block: false,
-            raw_html: false,
-            markdown_in_html_blocks: false,
-            raw_tex: false,
-            raw_attribute: false,
+            alerts: false,
             all_symbols_escapable: false,
-            escaped_line_breaks: false,
+            auto_identifiers: false,
             autolink_bare_uris: false,
+            autolinks: false,
+            backtick_code_blocks: false,
+            blank_before_blockquote: false,
+            blank_before_header: false,
+            bookdown_references: false,
+            bracketed_spans: false,
+            citations: false,
+            definition_lists: false,
+            emoji: false,
+            escaped_line_breaks: false,
+            example_lists: false,
+            executable_code: false,
+            fancy_lists: false,
+            fenced_code_attributes: false,
+            fenced_code_blocks: false,
+            fenced_divs: false,
+            footnotes: false,
+            gfm_auto_identifiers: false,
+            grid_tables: false,
             hard_line_breaks: false,
+            header_attributes: false,
+            implicit_figures: false,
+            implicit_header_references: false,
+            inline_code_attributes: false,
+            inline_footnotes: false,
+            inline_images: false,
+            inline_links: false,
+            intraword_underscores: false,
+            line_blocks: false,
+            link_attributes: false,
+            mark: false,
+            markdown_in_html_blocks: false,
             mmd_header_identifiers: false,
             mmd_link_attributes: false,
-            alerts: false,
-            emoji: false,
-            mark: false,
+            mmd_title_block: false,
+            multiline_tables: false,
+            native_divs: false,
+            native_spans: false,
+            pandoc_title_block: false,
+            pipe_tables: false,
             quarto_callouts: false,
             quarto_crossrefs: false,
             quarto_shortcodes: false,
-            bookdown_references: false,
+            raw_attribute: false,
+            raw_html: false,
+            raw_tex: false,
+            reference_links: false,
+            shortcut_reference_links: false,
+            simple_tables: false,
+            startnum: false,
+            strikeout: false,
+            subscript: false,
+            superscript: false,
+            table_captions: false,
+            task_lists: false,
+            tex_math_dollars: false,
+            tex_math_double_backslash: false,
+            tex_math_gfm: false,
+            tex_math_single_backslash: false,
+            yaml_metadata_block: false,
         }
     }
 
@@ -342,36 +341,35 @@ impl Extensions {
         }
     }
 
-    /// Standard Pandoc default extensions.
     fn pandoc_defaults() -> Self {
         Self {
             // Block-level - enabled by default in Pandoc
-            blank_before_header: true,
-            blank_before_blockquote: true,
-            header_attributes: true,
             auto_identifiers: true,
+            blank_before_blockquote: true,
+            blank_before_header: true,
             gfm_auto_identifiers: false,
+            header_attributes: true,
             implicit_header_references: true,
 
             // Lists
+            definition_lists: true,
+            example_lists: true,
             fancy_lists: true,
             startnum: true,
-            example_lists: true,
             task_lists: true,
-            definition_lists: true,
 
             // Code
             backtick_code_blocks: true,
-            fenced_code_blocks: true,
-            fenced_code_attributes: true,
             executable_code: false,
+            fenced_code_attributes: true,
+            fenced_code_blocks: true,
             inline_code_attributes: true,
 
             // Tables
-            simple_tables: true,
-            multiline_tables: true,
             grid_tables: true,
+            multiline_tables: true,
             pipe_tables: true,
+            simple_tables: true,
             table_captions: true,
 
             // Divs
@@ -384,29 +382,29 @@ impl Extensions {
             // Inline
             intraword_underscores: true,
             strikeout: true,
-            superscript: true,
             subscript: true,
+            superscript: true,
 
             // Links
+            autolinks: true,
             inline_links: true,
+            link_attributes: true,
             reference_links: true,
             shortcut_reference_links: true,
-            link_attributes: true,
-            autolinks: true,
 
             // Images
-            inline_images: true,
             implicit_figures: true,
+            inline_images: true,
 
             // Math
             tex_math_dollars: true,
+            tex_math_double_backslash: false,
             tex_math_gfm: false,
             tex_math_single_backslash: false,
-            tex_math_double_backslash: false,
 
             // Footnotes
-            inline_footnotes: true,
             footnotes: true,
+            inline_footnotes: true,
 
             // Citations
             citations: true,
@@ -416,38 +414,37 @@ impl Extensions {
             native_spans: true,
 
             // Metadata
-            yaml_metadata_block: true,
-            pandoc_title_block: true,
             mmd_title_block: false,
+            pandoc_title_block: true,
+            yaml_metadata_block: true,
 
             // Raw
-            raw_html: true,
             markdown_in_html_blocks: false,
-            raw_tex: true,
             raw_attribute: true,
+            raw_html: true,
+            raw_tex: true,
 
             // Escapes
             all_symbols_escapable: true,
             escaped_line_breaks: true,
 
-            // Non-default (all OFF for Pandoc)
+            // Non-default
+            alerts: false,
             autolink_bare_uris: false,
+            emoji: false,
             hard_line_breaks: false,
+            mark: false,
             mmd_header_identifiers: false,
             mmd_link_attributes: false,
-            alerts: false,
-            emoji: false,
-            mark: false,
 
-            // Quarto-specific (OFF for Pandoc)
+            // Quarto/Bookdown-specific
+            bookdown_references: false,
             quarto_callouts: false,
             quarto_crossrefs: false,
             quarto_shortcodes: false,
-            bookdown_references: false,
         }
     }
 
-    /// Quarto format defaults (Pandoc + Quarto extensions).
     fn quarto_defaults() -> Self {
         let mut ext = Self::pandoc_defaults();
 
@@ -459,7 +456,6 @@ impl Extensions {
         ext
     }
 
-    /// R Markdown format defaults.
     fn rmarkdown_defaults() -> Self {
         let mut ext = Self::pandoc_defaults();
 
@@ -471,18 +467,17 @@ impl Extensions {
         ext
     }
 
-    /// GitHub Flavored Markdown defaults.
     fn gfm_defaults() -> Self {
         let mut ext = Self::none_defaults();
 
         ext.alerts = true;
         ext.auto_identifiers = true;
         ext.autolink_bare_uris = true;
+        ext.backtick_code_blocks = true;
         ext.emoji = true;
+        ext.fenced_code_blocks = true;
         ext.footnotes = true;
         ext.gfm_auto_identifiers = true;
-        ext.backtick_code_blocks = true;
-        ext.fenced_code_blocks = true;
         ext.pipe_tables = true;
         ext.raw_html = true;
         ext.strikeout = true;
@@ -494,14 +489,12 @@ impl Extensions {
         ext
     }
 
-    /// CommonMark (minimal standard).
     fn commonmark_defaults() -> Self {
         let mut ext = Self::none_defaults();
         ext.raw_html = true;
         ext
     }
 
-    /// MultiMarkdown defaults (modeled subset of Pandoc's multimarkdownExtensions).
     fn multimarkdown_defaults() -> Self {
         let mut ext = Self::none_defaults();
 
@@ -510,14 +503,12 @@ impl Extensions {
         ext.backtick_code_blocks = true;
         ext.definition_lists = true;
         ext.footnotes = true;
-        ext.gfm_auto_identifiers = false;
         ext.implicit_figures = true;
         ext.implicit_header_references = true;
         ext.intraword_underscores = true;
         ext.mmd_header_identifiers = true;
         ext.mmd_link_attributes = true;
         ext.mmd_title_block = true;
-        ext.pandoc_title_block = false;
         ext.pipe_tables = true;
         ext.raw_attribute = true;
         ext.raw_html = true;
@@ -2680,6 +2671,13 @@ mod tests {
     fn footnotes_enabled_by_default_for_gfm() {
         let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
         assert!(cfg.extensions.footnotes);
+    }
+
+    #[test]
+    fn fenced_code_blocks_enabled_by_default_for_gfm() {
+        let cfg = toml::from_str::<Config>("flavor = \"gfm\"").unwrap();
+        assert!(cfg.extensions.backtick_code_blocks);
+        assert!(cfg.extensions.fenced_code_blocks);
     }
 
     #[test]
