@@ -240,7 +240,7 @@ pub(crate) async fn code_action(
         }
 
         match list_conversion::detect_list_type(&list_node) {
-            Some(list_conversion::ListType::Bullet) => {
+            Some(crate::syntax::ListKind::Bullet) => {
                 let edits = list_conversion::convert_to_ordered(&list_node, &text);
                 if !edits.is_empty() {
                     let mut changes = HashMap::new();
@@ -259,8 +259,27 @@ pub(crate) async fn code_action(
 
                     actions.push(CodeActionOrCommand::CodeAction(action));
                 }
+
+                let edits = list_conversion::convert_to_task(&list_node, &text);
+                if !edits.is_empty() {
+                    let mut changes = HashMap::new();
+                    changes.insert(uri.clone(), edits);
+
+                    let action = CodeAction {
+                        title: "Convert to task list".to_string(),
+                        kind: Some(CodeActionKind::REFACTOR),
+                        diagnostics: None,
+                        edit: Some(WorkspaceEdit {
+                            changes: Some(changes),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    };
+
+                    actions.push(CodeActionOrCommand::CodeAction(action));
+                }
             }
-            Some(list_conversion::ListType::Ordered) => {
+            Some(crate::syntax::ListKind::Ordered) => {
                 let edits = list_conversion::convert_to_bullet(&list_node, &text);
                 if !edits.is_empty() {
                     let mut changes = HashMap::new();
@@ -268,6 +287,64 @@ pub(crate) async fn code_action(
 
                     let action = CodeAction {
                         title: "Convert to bullet list".to_string(),
+                        kind: Some(CodeActionKind::REFACTOR),
+                        diagnostics: None,
+                        edit: Some(WorkspaceEdit {
+                            changes: Some(changes),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    };
+
+                    actions.push(CodeActionOrCommand::CodeAction(action));
+                }
+
+                let edits = list_conversion::convert_to_task(&list_node, &text);
+                if !edits.is_empty() {
+                    let mut changes = HashMap::new();
+                    changes.insert(uri.clone(), edits);
+
+                    let action = CodeAction {
+                        title: "Convert to task list".to_string(),
+                        kind: Some(CodeActionKind::REFACTOR),
+                        diagnostics: None,
+                        edit: Some(WorkspaceEdit {
+                            changes: Some(changes),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    };
+
+                    actions.push(CodeActionOrCommand::CodeAction(action));
+                }
+            }
+            Some(crate::syntax::ListKind::Task) => {
+                let edits = list_conversion::convert_to_bullet(&list_node, &text);
+                if !edits.is_empty() {
+                    let mut changes = HashMap::new();
+                    changes.insert(uri.clone(), edits);
+
+                    let action = CodeAction {
+                        title: "Convert to bullet list".to_string(),
+                        kind: Some(CodeActionKind::REFACTOR),
+                        diagnostics: None,
+                        edit: Some(WorkspaceEdit {
+                            changes: Some(changes),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    };
+
+                    actions.push(CodeActionOrCommand::CodeAction(action));
+                }
+
+                let edits = list_conversion::convert_task_to_ordered(&list_node, &text);
+                if !edits.is_empty() {
+                    let mut changes = HashMap::new();
+                    changes.insert(uri.clone(), edits);
+
+                    let action = CodeAction {
+                        title: "Convert to ordered list".to_string(),
                         kind: Some(CodeActionKind::REFACTOR),
                         diagnostics: None,
                         edit: Some(WorkspaceEdit {

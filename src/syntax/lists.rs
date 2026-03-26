@@ -7,6 +7,13 @@
 use super::ast::{AstChildren, support};
 use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListKind {
+    Bullet,
+    Ordered,
+    Task,
+}
+
 pub struct List(SyntaxNode);
 
 impl AstNode for List {
@@ -48,6 +55,20 @@ impl List {
     pub fn items(&self) -> AstChildren<ListItem> {
         support::children(&self.0)
     }
+
+    /// Returns the semantic kind of this list.
+    pub fn kind(&self) -> Option<ListKind> {
+        let first_item = self.items().next()?;
+        if first_item.is_task() {
+            return Some(ListKind::Task);
+        }
+        let marker = first_item.marker()?;
+        if matches!(marker.as_str(), "-" | "*" | "+") {
+            Some(ListKind::Bullet)
+        } else {
+            Some(ListKind::Ordered)
+        }
+    }
 }
 
 pub struct ListItem(SyntaxNode);
@@ -85,6 +106,21 @@ impl ListItem {
         self.0
             .children()
             .any(|child| child.kind() == SyntaxKind::PLAIN)
+    }
+
+    pub fn marker(&self) -> Option<String> {
+        self.0.children_with_tokens().find_map(|elem| {
+            elem.as_token()
+                .filter(|token| token.kind() == SyntaxKind::LIST_MARKER)
+                .map(|token| token.text().to_string())
+        })
+    }
+
+    pub fn is_task(&self) -> bool {
+        self.0.children_with_tokens().any(|elem| {
+            elem.as_token()
+                .is_some_and(|token| token.kind() == SyntaxKind::TASK_CHECKBOX)
+        })
     }
 }
 
@@ -167,5 +203,29 @@ mod tests {
                 "Each item should be LIST_ITEM"
             );
         }
+    }
+
+    #[test]
+    fn list_kind_detection() {
+        let bullet_tree = parse("- First\n- Second\n", None);
+        let bullet_list = bullet_tree
+            .descendants()
+            .find_map(List::cast)
+            .expect("Should find bullet list");
+        assert_eq!(bullet_list.kind(), Some(ListKind::Bullet));
+
+        let ordered_tree = parse("1. First\n2. Second\n", None);
+        let ordered_list = ordered_tree
+            .descendants()
+            .find_map(List::cast)
+            .expect("Should find ordered list");
+        assert_eq!(ordered_list.kind(), Some(ListKind::Ordered));
+
+        let task_tree = parse("- [ ] First\n- [x] Second\n", None);
+        let task_list = task_tree
+            .descendants()
+            .find_map(List::cast)
+            .expect("Should find task list");
+        assert_eq!(task_list.kind(), Some(ListKind::Task));
     }
 }

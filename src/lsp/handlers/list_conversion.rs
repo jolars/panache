@@ -1,8 +1,8 @@
 //! List conversion utilities for code actions.
 //!
-//! Provides functions to convert lists between loose/compact and bullet/ordered styles.
+//! Provides functions to convert lists between loose/compact and bullet/ordered/task styles.
 
-use crate::syntax::{AstNode, List, SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::syntax::{AstNode, List, ListKind, SyntaxKind, SyntaxNode, SyntaxToken};
 use tower_lsp_server::ls_types::{Range, TextEdit};
 
 use super::super::conversions::offset_to_position;
@@ -19,22 +19,10 @@ pub fn find_list_at_position(tree: &SyntaxNode, offset: usize) -> Option<SyntaxN
         .find(|node| node.kind() == SyntaxKind::LIST)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ListType {
-    Bullet,
-    Ordered,
-}
-
 /// Detects the marker style for a list using the first list item's marker token.
-pub fn detect_list_type(list_node: &SyntaxNode) -> Option<ListType> {
+pub fn detect_list_type(list_node: &SyntaxNode) -> Option<ListKind> {
     let list = List::cast(list_node.clone())?;
-    let first_item = list.items().next()?;
-    let marker = first_item_marker_token(first_item.syntax())?;
-    if is_bullet_marker(marker.text()) {
-        Some(ListType::Bullet)
-    } else {
-        Some(ListType::Ordered)
-    }
+    list.kind()
 }
 
 /// Convert a compact list to a loose list by inserting blank lines between items.
@@ -163,7 +151,7 @@ pub fn convert_to_compact(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
 
 /// Convert a bullet list to an ordered list by replacing markers with 1., 2., ...
 pub fn convert_to_ordered(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
-    if detect_list_type(list_node) != Some(ListType::Bullet) {
+    if detect_list_type(list_node) != Some(ListKind::Bullet) {
         return vec![];
     }
 
@@ -187,7 +175,51 @@ pub fn convert_to_ordered(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
 
 /// Convert an ordered list to a bullet list by replacing markers with "-".
 pub fn convert_to_bullet(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
-    if detect_list_type(list_node) != Some(ListType::Ordered) {
+    if !matches!(
+        detect_list_type(list_node),
+        Some(ListKind::Ordered | ListKind::Task)
+    ) {
+        return vec![];
+    }
+
+    let Some(list) = List::cast(list_node.clone()) else {
+        return vec![];
+    };
+
+    list.items()
+        .flat_map(|item| {
+            let mut edits = Vec::new();
+            let Some(marker) = first_item_marker_token(item.syntax()) else {
+                return edits;
+            };
+            let start = offset_to_position(text, marker.text_range().start().into());
+            let end = offset_to_position(text, marker.text_range().end().into());
+            edits.push(TextEdit {
+                range: Range { start, end },
+                new_text: "-".to_string(),
+            });
+
+            if let Some(checkbox) = task_checkbox_token(item.syntax()) {
+                let checkbox_start = offset_to_position(text, checkbox.text_range().start().into());
+                let checkbox_end = offset_to_position(text, checkbox.text_range().end().into());
+                edits.push(TextEdit {
+                    range: Range {
+                        start: checkbox_start,
+                        end: checkbox_end,
+                    },
+                    new_text: String::new(),
+                });
+            }
+
+            edits
+        })
+        .collect()
+}
+
+/// Convert a non-task list to a task list by inserting an unchecked checkbox after each marker.
+pub fn convert_to_task(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
+    let list_type = detect_list_type(list_node);
+    if !matches!(list_type, Some(ListKind::Bullet | ListKind::Ordered)) {
         return vec![];
     }
 
@@ -198,12 +230,59 @@ pub fn convert_to_bullet(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
     list.items()
         .filter_map(|item| {
             let marker = first_item_marker_token(item.syntax())?;
-            let start = offset_to_position(text, marker.text_range().start().into());
-            let end = offset_to_position(text, marker.text_range().end().into());
+            let insert_at = offset_to_position(text, marker.text_range().end().into());
             Some(TextEdit {
-                range: Range { start, end },
-                new_text: "-".to_string(),
+                range: Range {
+                    start: insert_at,
+                    end: insert_at,
+                },
+                new_text: " [ ]".to_string(),
             })
+        })
+        .collect()
+}
+
+/// Convert a task list to an ordered list by replacing markers and removing checkboxes.
+pub fn convert_task_to_ordered(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
+    if detect_list_type(list_node) != Some(ListKind::Task) {
+        return vec![];
+    }
+
+    let Some(list) = List::cast(list_node.clone()) else {
+        return vec![];
+    };
+
+    list.items()
+        .enumerate()
+        .flat_map(|(idx, item)| {
+            let mut edits = Vec::new();
+            let Some(marker) = first_item_marker_token(item.syntax()) else {
+                return edits;
+            };
+
+            let marker_start = offset_to_position(text, marker.text_range().start().into());
+            let marker_end = offset_to_position(text, marker.text_range().end().into());
+            edits.push(TextEdit {
+                range: Range {
+                    start: marker_start,
+                    end: marker_end,
+                },
+                new_text: format!("{}.", idx + 1),
+            });
+
+            if let Some(checkbox) = task_checkbox_token(item.syntax()) {
+                let checkbox_start = offset_to_position(text, checkbox.text_range().start().into());
+                let checkbox_end = offset_to_position(text, checkbox.text_range().end().into());
+                edits.push(TextEdit {
+                    range: Range {
+                        start: checkbox_start,
+                        end: checkbox_end,
+                    },
+                    new_text: String::new(),
+                });
+            }
+
+            edits
         })
         .collect()
 }
@@ -215,9 +294,12 @@ fn first_item_marker_token(item_node: &SyntaxNode) -> Option<SyntaxToken> {
         .filter(|token| token.kind() == SyntaxKind::LIST_MARKER)
 }
 
-fn is_bullet_marker(marker: impl AsRef<str>) -> bool {
-    let marker = marker.as_ref();
-    matches!(marker, "-" | "*" | "+")
+fn task_checkbox_token(item_node: &SyntaxNode) -> Option<SyntaxToken> {
+    item_node.children_with_tokens().find_map(|elem| {
+        elem.as_token()
+            .filter(|token| token.kind() == SyntaxKind::TASK_CHECKBOX)
+            .cloned()
+    })
 }
 
 #[cfg(test)]
@@ -320,14 +402,24 @@ mod tests {
             .descendants()
             .find(|n| n.kind() == SyntaxKind::LIST)
             .expect("Should find bullet list");
-        assert_eq!(detect_list_type(&bullet_list), Some(ListType::Bullet));
+        assert_eq!(detect_list_type(&bullet_list), Some(ListKind::Bullet));
 
         let ordered_tree = parse("1. First\n2. Second\n", None);
         let ordered_list = ordered_tree
             .descendants()
             .find(|n| n.kind() == SyntaxKind::LIST)
             .expect("Should find ordered list");
-        assert_eq!(detect_list_type(&ordered_list), Some(ListType::Ordered));
+        assert_eq!(detect_list_type(&ordered_list), Some(ListKind::Ordered));
+    }
+
+    #[test]
+    fn detect_list_type_for_task() {
+        let task_tree = parse("- [ ] First\n- [x] Second\n", None);
+        let task_list = task_tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .expect("Should find task list");
+        assert_eq!(detect_list_type(&task_list), Some(ListKind::Task));
     }
 
     #[test]
@@ -358,5 +450,67 @@ mod tests {
         let edits = convert_to_bullet(&list_node, input);
         assert_eq!(edits.len(), 3);
         assert!(edits.iter().all(|edit| edit.new_text == "-"));
+    }
+
+    #[test]
+    fn convert_bullet_to_task() {
+        let input = "- First\n- Second\n";
+        let tree = parse(input, None);
+        let list_node = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .expect("Should find list");
+
+        let edits = convert_to_task(&list_node, input);
+        assert_eq!(edits.len(), 2);
+        assert!(edits.iter().all(|edit| edit.new_text == " [ ]"));
+    }
+
+    #[test]
+    fn convert_ordered_to_task() {
+        let input = "1. First\n2. Second\n";
+        let tree = parse(input, None);
+        let list_node = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .expect("Should find list");
+
+        let edits = convert_to_task(&list_node, input);
+        assert_eq!(edits.len(), 2);
+        assert!(edits.iter().all(|edit| edit.new_text == " [ ]"));
+    }
+
+    #[test]
+    fn convert_task_to_bullet_removes_checkboxes() {
+        let input = "- [ ] First\n- [x] Second\n";
+        let tree = parse(input, None);
+        let list_node = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .expect("Should find list");
+
+        let edits = convert_to_bullet(&list_node, input);
+        assert_eq!(edits.len(), 4, "marker + checkbox edit per item");
+        assert_eq!(edits[0].new_text, "-");
+        assert_eq!(edits[1].new_text, "");
+        assert_eq!(edits[2].new_text, "-");
+        assert_eq!(edits[3].new_text, "");
+    }
+
+    #[test]
+    fn convert_task_to_ordered_removes_checkboxes() {
+        let input = "- [ ] First\n- [x] Second\n";
+        let tree = parse(input, None);
+        let list_node = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .expect("Should find list");
+
+        let edits = convert_task_to_ordered(&list_node, input);
+        assert_eq!(edits.len(), 4, "marker + checkbox edit per item");
+        assert_eq!(edits[0].new_text, "1.");
+        assert_eq!(edits[1].new_text, "");
+        assert_eq!(edits[2].new_text, "2.");
+        assert_eq!(edits[3].new_text, "");
     }
 }

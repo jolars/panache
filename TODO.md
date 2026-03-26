@@ -40,9 +40,9 @@ This document tracks implementation status for Panache's features.
 
 ### Code Actions
 
-- [ ] Convert between bullet/ordered lists
+- [x] Convert between bullet/ordered lists
 - [x] Convert loose/compact lists
-- [ ] Convert bullet list to task list - Convert `- item` to `- [ ] item`
+- [x] Convert list to task list - Convert `- item`/`1. item` to `- [ ] item`
 - [ ] Convert between table styles (simple, pipe, grid)
 - [ ] Convert between inline/reference links
 - [x] Convert between inline/reference footnotes
