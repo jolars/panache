@@ -1,5 +1,6 @@
 use super::helpers::*;
 use tower_lsp_server::ls_types::PrepareRenameResponse;
+use tower_lsp_server::ls_types::Uri;
 
 #[tokio::test]
 async fn test_prepare_rename_bookdown_hyphenated_crossref_selects_full_key() {
@@ -143,4 +144,34 @@ async fn test_prepare_rename_image_reference_selects_reference_label() {
     assert_eq!(range.end.line, 0);
     assert_eq!(range.end.character, 15);
     assert_eq!(placeholder, "img");
+}
+
+#[tokio::test]
+async fn test_prepare_rename_numbered_example_label_selects_label_only() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    std::fs::write(root.join("panache.toml"), "flavor = \"pandoc\"\n").unwrap();
+    let server = TestLspServer::new();
+    let content = "(@good) This is a good example.\n\nAs (@good) illustrates.\n";
+    std::fs::write(&doc_path, content).unwrap();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let response = server
+        .prepare_rename(doc_uri.as_str(), 2, 7)
+        .await
+        .expect("prepare rename response");
+    let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = response else {
+        panic!("expected prepare rename range");
+    };
+    assert_eq!(range.start.line, 2);
+    assert_eq!(range.start.character, 5);
+    assert_eq!(range.end.line, 2);
+    assert_eq!(range.end.character, 9);
+    assert_eq!(placeholder, "good");
 }

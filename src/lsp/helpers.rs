@@ -354,6 +354,17 @@ pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> 
     None
 }
 
+pub(crate) fn example_label_range_at_offset(root: &SyntaxNode, offset: usize) -> Option<TextRange> {
+    let text = root.text().to_string();
+    if offset > text.len() {
+        return None;
+    }
+    let (start, label) = example_label_span_at_offset(&text, offset)?;
+    let label_start = rowan::TextSize::from((start + 2) as u32);
+    let label_end = rowan::TextSize::from((start + 2 + label.len()) as u32);
+    Some(TextRange::new(label_start, label_end))
+}
+
 pub(crate) fn find_symbol_text_range_at_offset(
     root: &SyntaxNode,
     offset: usize,
@@ -415,6 +426,10 @@ fn example_label_spans(text: &str) -> impl Iterator<Item = (usize, &str)> {
 }
 
 fn example_label_at_offset(text: &str, offset: usize) -> Option<&str> {
+    example_label_span_at_offset(text, offset).map(|(_, label)| label)
+}
+
+fn example_label_span_at_offset(text: &str, offset: usize) -> Option<(usize, &str)> {
     let start = offset.saturating_sub(128);
     let end = (offset + 128).min(text.len());
     let window = text.get(start..end)?;
@@ -424,7 +439,7 @@ fn example_label_at_offset(text: &str, offset: usize) -> Option<&str> {
         let label_start = idx + 2;
         let label_end = label_start + label.len();
         if label_start <= rel_offset && rel_offset <= label_end {
-            return Some(label);
+            return Some((start + idx, label));
         }
     }
 
@@ -758,5 +773,21 @@ mod tests {
         let offset = 5;
         let label = extract_example_label_target_at_offset(&root, offset);
         assert_eq!(label, None);
+    }
+
+    #[test]
+    fn test_example_label_range_at_offset() {
+        let config = crate::config::Config {
+            flavor: crate::config::Flavor::Pandoc,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Pandoc),
+            ..Default::default()
+        };
+        let input = "As (@good) illustrates.\n";
+        let root = crate::parse(input, Some(config));
+        let offset = input.find("good").expect("label offset");
+        let range = example_label_range_at_offset(&root, offset).expect("label range");
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        assert_eq!(&input[start..end], "good");
     }
 }

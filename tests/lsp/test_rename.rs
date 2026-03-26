@@ -249,6 +249,70 @@ plot(1:10)
 }
 
 #[tokio::test]
+async fn test_rename_numbered_example_label_updates_definition_and_reference() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    std::fs::write(root.join("panache.toml"), "flavor = \"pandoc\"\n").unwrap();
+    let server = TestLspServer::new();
+    let content = "(@good) First example.\n\nAs (@good) illustrates, details follow.\n";
+    std::fs::write(&doc_path, content).unwrap();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let edit = server
+        .rename(doc_uri.as_str(), 2, 7, "better")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert!(
+        edits.iter().any(|e| e.new_text == "better"),
+        "expected rename edits to use new example label"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 0),
+        "expected example definition edit"
+    );
+    assert!(
+        edits.iter().any(|e| e.range.start.line == 2),
+        "expected example reference edit"
+    );
+}
+
+#[tokio::test]
+async fn test_rename_numbered_example_label_extension_off_returns_none() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    std::fs::write(
+        root.join("panache.toml"),
+        "flavor = \"pandoc\"\n[extensions]\nexample-lists = false\n",
+    )
+    .unwrap();
+    let server = TestLspServer::new();
+    let content = "(@good) First example.\n\nAs (@good) illustrates.\n";
+    std::fs::write(&doc_path, content).unwrap();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let edit = server.rename(doc_uri.as_str(), 2, 7, "better").await;
+    assert!(
+        edit.is_none(),
+        "expected no rename edit when example_lists is disabled"
+    );
+}
+
+#[tokio::test]
 async fn test_rename_bookdown_chunk_label_updates_crossrefs_and_definition() {
     let server = TestLspServer::new();
     let content = r#"Figure \@ref(fig:a-label).

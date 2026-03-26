@@ -302,6 +302,7 @@ pub struct SymbolUsageIndex {
     citation_usages: HashMap<String, Vec<rowan::TextRange>>,
     citation_references: HashMap<String, Vec<rowan::TextRange>>,
     crossref_usages: HashMap<String, Vec<rowan::TextRange>>,
+    example_label_usages: HashMap<String, Vec<rowan::TextRange>>,
     crossref_declarations: HashMap<String, Vec<rowan::TextRange>>,
     crossref_declaration_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
     chunk_label_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
@@ -350,6 +351,10 @@ impl SymbolUsageIndex {
 
     pub fn crossref_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.crossref_usages.get(&normalize_label(key))
+    }
+
+    pub fn example_label_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.example_label_usages.get(&normalize_label(key))
     }
 
     pub fn crossref_declarations(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
@@ -630,6 +635,17 @@ pub fn symbol_usage_index_from_tree(
                 .or_default()
                 .push(key.text_range());
         }
+    }
+
+    for element in tree.descendants_with_tokens() {
+        db.unwind_if_revision_cancelled();
+        let Some(token) = element.into_token() else {
+            continue;
+        };
+        if token.kind() != SyntaxKind::TEXT {
+            continue;
+        }
+        collect_example_label_usages_from_text_token(&token, &mut index);
     }
 
     for attribute in tree.descendants().filter_map(AttributeNode::cast) {
@@ -1110,6 +1126,49 @@ fn collect_bookdown_definitions<'db>(
             offset += 1;
         }
     }
+}
+
+fn collect_example_label_usages_from_text_token(
+    token: &crate::syntax::SyntaxToken,
+    index: &mut SymbolUsageIndex,
+) {
+    let text = token.text();
+    let token_start: usize = token.text_range().start().into();
+    for (start, label) in example_label_spans(text) {
+        let normalized = normalize_label(label);
+        if normalized.is_empty() {
+            continue;
+        }
+        let label_start = rowan::TextSize::from((token_start + start + 2) as u32);
+        let label_end = rowan::TextSize::from((token_start + start + 2 + label.len()) as u32);
+        let range = rowan::TextRange::new(label_start, label_end);
+        index
+            .example_label_usages
+            .entry(normalized)
+            .or_default()
+            .push(range);
+    }
+}
+
+fn example_label_spans(text: &str) -> impl Iterator<Item = (usize, &str)> {
+    text.char_indices().filter_map(|(idx, ch)| {
+        if ch != '(' {
+            return None;
+        }
+        let slice = &text[idx..];
+        let rest = slice.strip_prefix("(@")?;
+        let label_end = rest
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+            .count();
+        if label_end == 0 {
+            return None;
+        }
+        if rest.chars().nth(label_end) != Some(')') {
+            return None;
+        }
+        Some((idx, &rest[..label_end]))
+    })
 }
 
 fn parse_example_label(marker: &str) -> Option<&str> {

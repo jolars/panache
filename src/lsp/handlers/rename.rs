@@ -125,6 +125,30 @@ pub(crate) async fn rename(
         }));
     }
 
+    if let Some(SymbolTarget::ExampleLabel(old_key)) = target.as_ref() {
+        let changes = rename_example_label_symbol(
+            &RenameScanContext {
+                salsa_db: &salsa_db,
+                salsa_file,
+                salsa_config,
+                doc_path: &doc_path,
+                uri: &uri,
+                content: &content,
+            },
+            old_key,
+            &new_name,
+            config.extensions.example_lists,
+        )
+        .await;
+        if changes.is_empty() {
+            return Ok(None);
+        }
+        return Ok(Some(WorkspaceEdit {
+            changes: Some(changes),
+            ..Default::default()
+        }));
+    }
+
     if let Some(SymbolTarget::HeadingLink(old_key) | SymbolTarget::HeadingId(old_key)) =
         target.as_ref()
     {
@@ -177,7 +201,6 @@ pub(crate) async fn rename(
             let norm = normalize_label(&key);
             (key, norm)
         }
-        Some(SymbolTarget::ExampleLabel(_)) => return Ok(None),
         _ => return Ok(None),
     };
 
@@ -437,4 +460,77 @@ async fn rename_chunk_label_symbol(
     }
 
     changes
+}
+
+async fn rename_example_label_symbol(
+    ctx: &RenameScanContext<'_>,
+    old_key: &str,
+    new_name: &str,
+    example_lists_enabled: bool,
+) -> HashMap<Uri, Vec<TextEdit>> {
+    if !example_lists_enabled {
+        return HashMap::new();
+    }
+
+    let old_norm = normalize_label(old_key);
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+
+    let per_doc = crate::lsp::navigation::project_symbol_documents(
+        ctx.salsa_db,
+        ctx.salsa_file,
+        ctx.salsa_config,
+        ctx.doc_path,
+        ctx.uri,
+        ctx.content,
+    )
+    .await;
+
+    for doc in per_doc {
+        let doc_uri = doc.uri;
+        let text = doc.text;
+        let symbol_index = doc.symbol_index;
+        let mut edits = Vec::new();
+
+        if let Some(ranges) = symbol_index.example_label_usages(&old_norm) {
+            edits.extend(text_edits_from_ranges(ranges, &text, new_name));
+        }
+        if let Some(ranges) = symbol_index.example_label_definitions(&old_norm) {
+            edits.extend(text_edits_from_ranges(ranges, &text, new_name));
+        }
+        if let Some(ranges) = symbol_index.citation_usages(&old_norm) {
+            let parenthesized = ranges
+                .iter()
+                .copied()
+                .filter(|range| is_parenthesized_at_label(&text, *range))
+                .collect::<Vec<_>>();
+            edits.extend(text_edits_from_ranges(&parenthesized, &text, new_name));
+        }
+
+        if edits.is_empty() {
+            continue;
+        }
+        edits.sort_by(|a, b| {
+            a.range
+                .start
+                .line
+                .cmp(&b.range.start.line)
+                .then(a.range.start.character.cmp(&b.range.start.character))
+                .then(a.range.end.line.cmp(&b.range.end.line))
+                .then(a.range.end.character.cmp(&b.range.end.character))
+        });
+        edits.dedup_by(|a, b| a.range == b.range && a.new_text == b.new_text);
+        changes.entry(doc_uri).or_default().extend(edits);
+    }
+
+    changes
+}
+
+fn is_parenthesized_at_label(text: &str, range: rowan::TextRange) -> bool {
+    let start: usize = range.start().into();
+    let end: usize = range.end().into();
+    if start < 2 || end >= text.len() {
+        return false;
+    }
+    let bytes = text.as_bytes();
+    bytes[start - 2] == b'(' && bytes[start - 1] == b'@' && bytes[end] == b')'
 }

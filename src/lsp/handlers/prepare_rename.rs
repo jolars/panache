@@ -45,7 +45,9 @@ pub(crate) async fn prepare_rename(
     }
 
     let root = ctx.syntax_root();
-    let Some(range) = helpers::find_symbol_text_range_at_offset(&root, offset) else {
+    let range = helpers::example_label_range_at_offset(&root, offset)
+        .or_else(|| helpers::find_symbol_text_range_at_offset(&root, offset));
+    let Some(range) = range else {
         log::debug!(
             "prepare_rename: no symbol range uri={:?} line={} char={} offset={}",
             uri,
