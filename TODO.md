@@ -93,7 +93,7 @@ support.
 - [ ] Reference preview - Show reference definition on hover
 - [x] Footnote preview - Show footnote content inline
 - [x] Citation preview - Show bibliography entry for citation (approximate)
-- [ ] Heading preview - Show section content or summary on hover
+- [x] Heading preview - Show section content or summary on hover
 
 ### Advanced
 

@@ -280,3 +280,100 @@ async fn test_hover_returns_none_inside_yaml_frontmatter() {
         "Expected no hover when cursor is inside YAML frontmatter"
     );
 }
+
+#[tokio::test]
+async fn test_hover_on_heading_reference_shows_section_preview() {
+    let server = TestLspServer::new();
+    let content = "# Intro {#intro}\n\nFirst paragraph in intro section.\n\n## Next\n\nTail.\n\nSee [go](#intro).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let hover = server
+        .hover(
+            "file:///test.md",
+            8,  // See [go](#intro).
+            10, // Inside intro anchor text
+        )
+        .await;
+
+    let Some(h) = hover else {
+        panic!("Expected hover content for heading reference");
+    };
+    let content = match h.contents {
+        HoverContents::Markup(markup) => markup.value,
+        _ => panic!("Expected markdown hover content"),
+    };
+    assert!(content.contains("Section"));
+    assert!(content.contains("Intro"));
+    assert!(content.contains("First paragraph in intro section."));
+}
+
+#[tokio::test]
+async fn test_hover_on_heading_declaration_returns_none() {
+    let server = TestLspServer::new();
+    let content = "# Intro {#intro}\n\nBody.\n\nSee [go](#intro).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let hover = server.hover("file:///test.md", 0, 3).await;
+    assert!(
+        hover.is_none(),
+        "Heading declaration should not produce section preview hover"
+    );
+}
+
+#[tokio::test]
+async fn test_hover_on_heading_reference_with_empty_section_shows_title_only() {
+    let server = TestLspServer::new();
+    let content = "# Intro {#intro}\n\n## Next\n\nSee [go](#intro).\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let hover = server
+        .hover(
+            "file:///test.md",
+            4, // See [go](#intro).
+            10,
+        )
+        .await;
+
+    let Some(h) = hover else {
+        panic!("Expected hover content for heading reference");
+    };
+    let content = match h.contents {
+        HoverContents::Markup(markup) => markup.value,
+        _ => panic!("Expected markdown hover content"),
+    };
+    assert!(content.contains("Section"));
+    assert!(content.contains("Intro"));
+    assert!(!content.contains("..."));
+}
+
+#[tokio::test]
+async fn test_hover_on_heading_reference_crops_preview() {
+    let server = TestLspServer::new();
+    let long_body = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(8);
+    let content = format!(
+        "# Intro {{#intro}}\n\n{}\n\n## Next\n\nSee [go](#intro).\n",
+        long_body
+    );
+    server
+        .open_document("file:///test.md", &content, "markdown")
+        .await;
+
+    let hover = server.hover("file:///test.md", 6, 10).await;
+    let Some(h) = hover else {
+        panic!("Expected hover content for heading reference");
+    };
+    let content = match h.contents {
+        HoverContents::Markup(markup) => markup.value,
+        _ => panic!("Expected markdown hover content"),
+    };
+    assert!(
+        content.ends_with("..."),
+        "Expected cropped preview to end with ellipsis"
+    );
+}

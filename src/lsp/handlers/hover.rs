@@ -12,8 +12,9 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
+use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::metadata::inline_reference_contains;
-use crate::syntax::{AstNode, FootnoteDefinition};
+use crate::syntax::{AstNode, Document, FootnoteDefinition, Heading};
 
 use super::super::{conversions, helpers};
 
@@ -60,10 +61,37 @@ pub(crate) async fn hover(
         crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
 
+    let target = {
+        let root = ctx.syntax_root();
+        resolve_symbol_target_at_offset(&root, offset)
+    };
+
+    if let Some(SymbolTarget::HeadingLink(label)) = target.as_ref() {
+        let doc_indices = crate::lsp::navigation::project_symbol_documents(
+            &salsa_db,
+            salsa_file,
+            salsa_config,
+            &doc_path,
+            uri,
+            &content_for_offset,
+        )
+        .await;
+
+        for doc in &doc_indices {
+            if let Some(markdown) = section_hover_markdown(doc, label) {
+                return Ok(Some(Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: markdown,
+                    }),
+                    range: None,
+                }));
+            }
+        }
+    }
+
     let pending_footnote = {
         let root = ctx.syntax_root();
-
-        // Find the node at this offset
         let Some(mut node) = helpers::find_node_at_offset(&root, offset) else {
             return Ok(None);
         };
@@ -155,6 +183,102 @@ pub(crate) async fn hover(
     }
 
     Ok(None)
+}
+
+const HOVER_PREVIEW_MAX_CHARS: usize = 180;
+
+fn section_hover_markdown(
+    doc: &crate::lsp::navigation::IndexedDocument,
+    label: &str,
+) -> Option<String> {
+    let heading_range = first_heading_definition_range(&doc.symbol_index, label)?;
+    let tree = crate::parse(&doc.text, None);
+    let document = Document::cast(tree)?;
+
+    let blocks: Vec<_> = document.blocks().collect();
+    let heading_idx = blocks.iter().position(|node| {
+        node.kind() == crate::syntax::SyntaxKind::HEADING && node.text_range() == heading_range
+    })?;
+    let heading_node = &blocks[heading_idx];
+    let heading = Heading::cast(heading_node.clone())?;
+    let title = heading.title_or("(empty)");
+    let section_end = section_end_offset(&doc.symbol_index, heading_range, doc.text.len());
+
+    let mut preview = None;
+    for block in blocks.iter().skip(heading_idx + 1) {
+        let start: usize = block.text_range().start().into();
+        if start >= section_end {
+            break;
+        }
+        let normalized = normalize_preview_text(block.text().to_string().trim());
+        if !normalized.is_empty() {
+            preview = Some(crop_preview(&normalized, HOVER_PREVIEW_MAX_CHARS));
+            break;
+        }
+    }
+
+    let markdown = match preview {
+        Some(snippet) => format!("**Section:** {}\n\n{}", title, snippet),
+        None => format!("**Section:** {}", title),
+    };
+    Some(markdown)
+}
+
+fn first_heading_definition_range(
+    index: &crate::salsa::SymbolUsageIndex,
+    label: &str,
+) -> Option<rowan::TextRange> {
+    let mut all = Vec::new();
+    if let Some(ranges) = index.heading_explicit_definition_ranges(label) {
+        all.extend(ranges.iter().copied());
+    }
+    if let Some(ranges) = index.heading_implicit_definition_ranges(label) {
+        all.extend(ranges.iter().copied());
+    }
+    all.into_iter().min_by_key(|range| range.start())
+}
+
+fn section_end_offset(
+    index: &crate::salsa::SymbolUsageIndex,
+    heading_range: rowan::TextRange,
+    text_len: usize,
+) -> usize {
+    let Some((at, level)) = index
+        .heading_sequence()
+        .iter()
+        .enumerate()
+        .find_map(|(idx, (range, lvl))| (*range == heading_range).then_some((idx, *lvl)))
+    else {
+        return text_len;
+    };
+
+    index
+        .heading_sequence()
+        .iter()
+        .skip(at + 1)
+        .find_map(|(next_range, next_level)| (*next_level <= level).then_some(next_range.start()))
+        .map(Into::<usize>::into)
+        .unwrap_or(text_len)
+}
+
+fn normalize_preview_text(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn crop_preview(text: &str, max_chars: usize) -> String {
+    let mut iter = text.chars();
+    let mut out = String::new();
+    for _ in 0..max_chars {
+        if let Some(ch) = iter.next() {
+            out.push(ch);
+        } else {
+            return out;
+        }
+    }
+    if iter.next().is_some() {
+        out.push_str("...");
+    }
+    out
 }
 
 /// Format a bibliography entry for hover display.
