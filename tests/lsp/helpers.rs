@@ -58,6 +58,11 @@ impl TestLspServer {
         self.initialize_with_options(root_uri, None).await;
     }
 
+    /// Initialize and return the negotiated server capabilities.
+    pub async fn initialize_result(&self, root_uri: &str) -> InitializeResult {
+        self.initialize_result_with_options(root_uri, None).await
+    }
+
     /// Initialize the server with a workspace root and explicit initialization options.
     pub async fn initialize_with_options(
         &self,
@@ -74,6 +79,24 @@ impl TestLspServer {
             ..Default::default()
         };
         let _ = self.lsp.initialize(params).await;
+    }
+
+    /// Initialize with options and return the negotiated server capabilities.
+    pub async fn initialize_result_with_options(
+        &self,
+        root_uri: &str,
+        initialization_options: Option<serde_json::Value>,
+    ) -> InitializeResult {
+        let folder = WorkspaceFolder {
+            uri: root_uri.parse().unwrap(),
+            name: "workspace".to_string(),
+        };
+        let params = InitializeParams {
+            workspace_folders: Some(vec![folder]),
+            initialization_options,
+            ..Default::default()
+        };
+        self.lsp.initialize(params).await.unwrap()
     }
 
     pub async fn experimental_incremental_parsing_enabled(&self) -> bool {
@@ -503,6 +526,17 @@ impl TestLspServer {
         };
 
         self.lsp.prepare_rename(params).await.unwrap()
+    }
+
+    /// Trigger workspace file rename flow.
+    pub async fn will_rename_files(&self, renames: Vec<(String, String)>) -> Option<WorkspaceEdit> {
+        let params = RenameFilesParams {
+            files: renames
+                .into_iter()
+                .map(|(old_uri, new_uri)| FileRename { old_uri, new_uri })
+                .collect(),
+        };
+        self.lsp.will_rename_files(params).await.unwrap()
     }
 }
 

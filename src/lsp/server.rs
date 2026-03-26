@@ -16,6 +16,20 @@ fn watched_document_glob() -> Vec<FileSystemWatcher> {
         .collect()
 }
 
+fn file_operation_filters() -> Vec<FileOperationFilter> {
+    crate::all_document_extensions()
+        .iter()
+        .map(|ext| FileOperationFilter {
+            scheme: Some("file".to_string()),
+            pattern: FileOperationPattern {
+                glob: format!("**/*.{ext}"),
+                matches: Some(FileOperationPatternKind::File),
+                options: None,
+            },
+        })
+        .collect()
+}
+
 fn legacy_root_uri(params: &InitializeParams) -> Option<Uri> {
     let value = serde_json::to_value(params).ok()?;
     value
@@ -107,7 +121,12 @@ impl LanguageServer for PanacheLsp {
                         supported: Some(true),
                         change_notifications: Some(OneOf::Left(true)),
                     }),
-                    file_operations: None,
+                    file_operations: Some(WorkspaceFileOperationsServerCapabilities {
+                        will_rename: Some(FileOperationRegistrationOptions {
+                            filters: file_operation_filters(),
+                        }),
+                        ..Default::default()
+                    }),
                 }),
                 ..Default::default()
             },
@@ -389,5 +408,15 @@ impl LanguageServer for PanacheLsp {
             params,
         )
         .await;
+    }
+
+    async fn will_rename_files(&self, params: RenameFilesParams) -> Result<Option<WorkspaceEdit>> {
+        handlers::file_rename::will_rename_files(
+            Arc::clone(&self.document_map),
+            Arc::clone(&self.salsa_db),
+            Arc::clone(&self.workspace_root),
+            params,
+        )
+        .await
     }
 }

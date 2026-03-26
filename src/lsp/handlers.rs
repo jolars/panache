@@ -3,6 +3,7 @@ pub(crate) mod completion;
 pub(crate) mod diagnostics;
 pub(crate) mod document_links;
 pub(crate) mod document_symbols;
+pub(crate) mod file_rename;
 pub(crate) mod file_watcher;
 pub(crate) mod folding_ranges;
 pub(crate) mod footnote_conversion;
