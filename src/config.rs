@@ -15,16 +15,16 @@ pub enum Flavor {
     /// Standard Pandoc Markdown (default extensions enabled)
     #[default]
     Pandoc,
-    /// Quarto-flavored Markdown (Pandoc + Quarto-specific extensions)
+    /// Quarto (Pandoc + Quarto-specific extensions)
     Quarto,
     /// R Markdown (Pandoc + R-specific extensions)
     #[serde(rename = "rmarkdown")]
     RMarkdown,
     /// GitHub Flavored Markdown
     Gfm,
-    /// CommonMark (minimal standard extensions)
+    /// CommonMark
     CommonMark,
-    /// MultiMarkdown (Pandoc MultiMarkdown extension set)
+    /// MultiMarkdown
     #[serde(rename = "multimarkdown")]
     MultiMarkdown,
 }
