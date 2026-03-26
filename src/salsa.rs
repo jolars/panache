@@ -6,9 +6,9 @@ use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::syntax::{
-    AstNode, AttributeNode, Citation, CodeBlock, Crossref, FootnoteDefinition, Heading, Link,
-    ListItem, ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode, YamlRegion,
-    collect_parsed_yaml_region_snapshots,
+    AstNode, AttributeNode, Citation, CodeBlock, Crossref, FootnoteDefinition, FootnoteReference,
+    Heading, Link, ListItem, ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode,
+    YamlRegion, collect_parsed_yaml_region_snapshots,
 };
 use crate::utils::{implicit_heading_ids, normalize_label};
 use salsa::{Accumulator, Durability, Setter};
@@ -314,6 +314,8 @@ pub struct SymbolUsageIndex {
     heading_implicit_definition_ranges: HashMap<String, Vec<rowan::TextRange>>,
     reference_definitions: HashMap<String, Vec<rowan::TextRange>>,
     footnote_definitions: HashMap<String, Vec<rowan::TextRange>>,
+    footnote_references: HashMap<String, Vec<rowan::TextRange>>,
+    footnote_definition_id_ranges: HashMap<String, Vec<rowan::TextRange>>,
     example_label_definitions: HashMap<String, Vec<rowan::TextRange>>,
     heading_labels: HashMap<String, Vec<rowan::TextRange>>,
     heading_sequence: Vec<(rowan::TextRange, usize)>,
@@ -396,6 +398,21 @@ impl SymbolUsageIndex {
 
     pub fn footnote_definitions(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.footnote_definitions.get(&normalize_label(key))
+    }
+
+    pub fn footnote_rename_ranges(&self, key: &str) -> Vec<rowan::TextRange> {
+        let normalized = normalize_label(key);
+        let mut ranges = self
+            .footnote_references
+            .get(&normalized)
+            .cloned()
+            .unwrap_or_default();
+        if let Some(id_ranges) = self.footnote_definition_id_ranges.get(&normalized) {
+            ranges.extend(id_ranges.iter().copied());
+        }
+        ranges.sort_by_key(|range| range.start());
+        ranges.dedup();
+        ranges
     }
 
     pub fn example_label_definitions(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
@@ -535,6 +552,28 @@ pub fn symbol_usage_index_from_tree(
             .entry(id)
             .or_default()
             .push(def.syntax().text_range());
+        if let Some(id_range) = def.id_value_range() {
+            index
+                .footnote_definition_id_ranges
+                .entry(normalize_label(&def.id()))
+                .or_default()
+                .push(id_range);
+        }
+    }
+
+    for footnote in tree.descendants().filter_map(FootnoteReference::cast) {
+        db.unwind_if_revision_cancelled();
+        let id = normalize_label(&footnote.id());
+        if id.is_empty() {
+            continue;
+        }
+        if let Some(id_range) = footnote.id_value_range() {
+            index
+                .footnote_references
+                .entry(id)
+                .or_default()
+                .push(id_range);
+        }
     }
 
     for item in tree.descendants().filter_map(ListItem::cast) {
@@ -1717,6 +1756,24 @@ mod tests {
         );
         assert_eq!(index.heading_reference_ranges("heading", true).len(), 3);
         assert_eq!(index.heading_rename_ranges("heading").len(), 3);
+    }
+
+    #[test]
+    fn symbol_usage_index_collects_footnote_rename_ranges() {
+        let db = SalsaDb::default();
+        let tree = crate::parse(
+            "Text with footnote[^note] and another[^note].\n\n[^note]: Footnote text.\n",
+            None,
+        );
+        let index = symbol_usage_index_from_tree(&db, &tree, &crate::config::Extensions::default());
+
+        assert_eq!(
+            index
+                .footnote_definitions("note")
+                .map(|ranges| ranges.len()),
+            Some(1)
+        );
+        assert_eq!(index.footnote_rename_ranges("note").len(), 3);
     }
 
     #[test]

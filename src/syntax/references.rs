@@ -185,6 +185,34 @@ impl FootnoteDefinition {
             .unwrap_or_default()
     }
 
+    /// Returns the text range for the footnote ID only (excluding `[^`, `]`, and `:`).
+    pub fn id_value_range(&self) -> Option<rowan::TextRange> {
+        let marker = self
+            .0
+            .children_with_tokens()
+            .filter_map(|child| child.into_token())
+            .find(|token| token.kind() == SyntaxKind::FOOTNOTE_REFERENCE)?;
+
+        let marker_text = marker.text();
+        if !marker_text.starts_with("[^") {
+            return None;
+        }
+
+        let close_bracket = marker_text.find(']')?;
+        if close_bracket <= 2 {
+            return None;
+        }
+
+        if marker_text.as_bytes().get(close_bracket + 1) != Some(&b':') {
+            return None;
+        }
+
+        let token_start = marker.text_range().start();
+        let id_start = token_start + rowan::TextSize::from(2);
+        let id_end = token_start + rowan::TextSize::from(close_bracket as u32);
+        Some(rowan::TextRange::new(id_start, id_end))
+    }
+
     /// Extracts the content of the footnote definition.
     /// Returns the text content after the `[^id]:` marker.
     pub fn content(&self) -> String {
@@ -329,6 +357,16 @@ mod tests {
             .expect("Should find FootnoteDefinition");
 
         assert_eq!(def.id(), "1");
+        assert_eq!(
+            def.id_value_range()
+                .map(|range| {
+                    let start: usize = range.start().into();
+                    let end: usize = range.end().into();
+                    input[start..end].to_string()
+                })
+                .as_deref(),
+            Some("1")
+        );
         assert_eq!(def.content().trim(), "This is a simple footnote.");
         assert!(def.is_simple(), "Single line footnote should be simple");
     }
@@ -359,6 +397,16 @@ mod tests {
             .expect("Should find FootnoteDefinition");
 
         assert_eq!(def.id(), "note");
+        assert_eq!(
+            def.id_value_range()
+                .map(|range| {
+                    let start: usize = range.start().into();
+                    let end: usize = range.end().into();
+                    input[start..end].to_string()
+                })
+                .as_deref(),
+            Some("note")
+        );
         let content = def.content();
         assert!(content.contains("*emphasis*"));
         assert!(content.contains("`code`"));

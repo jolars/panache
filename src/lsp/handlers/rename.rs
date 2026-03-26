@@ -188,6 +188,29 @@ pub(crate) async fn rename(
         }));
     }
 
+    if let Some(SymbolTarget::Reference {
+        label,
+        is_footnote: true,
+    }) = target.as_ref()
+    {
+        let symbol_index = {
+            let db = salsa_db.lock().await;
+            crate::salsa::symbol_usage_index(&*db, salsa_file, salsa_config, doc_path.clone())
+                .clone()
+        };
+        let ranges = symbol_index.footnote_rename_ranges(label);
+        let edits = text_edits_from_ranges(&ranges, &content, &new_name);
+        if edits.is_empty() {
+            return Ok(None);
+        }
+        let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+        changes.insert(uri.clone(), edits);
+        return Ok(Some(WorkspaceEdit {
+            changes: Some(changes),
+            ..Default::default()
+        }));
+    }
+
     if !helpers::is_yaml_frontmatter_valid(&parsed_yaml_regions) {
         return Ok(None);
     }

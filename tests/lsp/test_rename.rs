@@ -592,3 +592,30 @@ async fn test_rename_heading_reference_updates_shortcut_and_hash_links() {
         "expected hash heading reference edit"
     );
 }
+
+#[tokio::test]
+async fn test_rename_footnote_updates_references_and_definition_id() {
+    let server = TestLspServer::new();
+    let content =
+        "Simple footnote[^1] in text.\n\n[^1]: This is a simple footnote.\nAnother[^1].\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let edit = server
+        .rename("file:///test.md", 0, 17, "note")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.md".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert_eq!(
+        edits.iter().filter(|e| e.new_text == "note").count(),
+        3,
+        "expected two references plus one definition id edit"
+    );
+    assert!(edits.iter().any(|e| e.range.start.line == 0));
+    assert!(edits.iter().any(|e| e.range.start.line == 2));
+    assert!(edits.iter().any(|e| e.range.start.line == 3));
+}

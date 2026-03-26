@@ -175,3 +175,27 @@ async fn test_prepare_rename_numbered_example_label_selects_label_only() {
     assert_eq!(range.end.character, 9);
     assert_eq!(placeholder, "good");
 }
+
+#[tokio::test]
+async fn test_prepare_rename_footnote_reference_selects_id_only() {
+    let server = TestLspServer::new();
+    let content = "Simple footnote[^1] in text.\n\n[^1]: This is a simple footnote.\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let response = server
+        .prepare_rename("file:///test.md", 0, 17)
+        .await
+        .expect("prepare rename response");
+
+    let PrepareRenameResponse::RangeWithPlaceholder { range, placeholder } = response else {
+        panic!("expected prepare rename range");
+    };
+
+    assert_eq!(range.start.line, 0);
+    assert_eq!(range.start.character, 17);
+    assert_eq!(range.end.line, 0);
+    assert_eq!(range.end.character, 18);
+    assert_eq!(placeholder, "1");
+}
