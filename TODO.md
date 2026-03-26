@@ -452,11 +452,12 @@ for initial implementation.
 - [ ] Extension: `east_asian_line_breaks` - Smart line breaks for CJK
       (non-default)
 
-#### Non-Default: GitHub-specific
+#### Non-Default: GitHub/CommonMark
 
 - [x] Extension: `alerts` - GitHub/Quarto alert/callout boxes (non-default)
 - [x] Extension: `emoji` - `:emoji:` syntax (non-default)
-- [ ] Extension: `wikilinks_title_after_pipe` - `[[link|title]]` (non-default)
+- [ ] Extension: `wikilinks_title_after_pipe` - `[[link|title]]` (opt-in; no
+      flavor default)
 
 #### Non-Default: Quarto-Specific
 
