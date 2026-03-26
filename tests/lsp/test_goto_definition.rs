@@ -528,3 +528,100 @@ async fn test_goto_definition_shortcut_hyphenated_heading_reference_returns_none
         "Expected no definition for non-implicit shortcut label"
     );
 }
+
+#[tokio::test]
+async fn test_goto_definition_numbered_example_label() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    std::fs::write(root.join("panache.toml"), "flavor = \"pandoc\"\n").unwrap();
+    let server = TestLspServer::new();
+    let content = "(@good) This is a good example.\n\nAs (@good) illustrates, details follow.\n";
+    std::fs::write(&doc_path, content).unwrap();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.goto_definition(doc_uri.as_str(), 2, 7).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 0);
+}
+
+#[tokio::test]
+async fn test_goto_definition_numbered_example_label_missing_returns_none() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    std::fs::write(root.join("panache.toml"), "flavor = \"pandoc\"\n").unwrap();
+    let server = TestLspServer::new();
+    let content = "As (@missing) illustrates, details follow.\n";
+    std::fs::write(&doc_path, content).unwrap();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.goto_definition(doc_uri.as_str(), 0, 6).await;
+    assert!(
+        result.is_none(),
+        "Expected no definition for missing numbered example label"
+    );
+}
+
+#[tokio::test]
+async fn test_goto_definition_numbered_example_label_targets_first_duplicate() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    std::fs::write(root.join("panache.toml"), "flavor = \"pandoc\"\n").unwrap();
+    let server = TestLspServer::new();
+    let content =
+        "(@foo) First definition.\n\nText.\n\n(@foo) Second occurrence.\n\nAs (@foo) shows.\n";
+    std::fs::write(&doc_path, content).unwrap();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.goto_definition(doc_uri.as_str(), 6, 6).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 0);
+}
+
+#[tokio::test]
+async fn test_goto_definition_numbered_example_label_extension_off_returns_none() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.md");
+    std::fs::write(
+        root.join("panache.toml"),
+        "flavor = \"pandoc\"\n[extensions]\nexample-lists = false\n",
+    )
+    .unwrap();
+    let server = TestLspServer::new();
+    let content = "(@good) This is a good example.\n\nAs (@good) illustrates, details follow.\n";
+    std::fs::write(&doc_path, content).unwrap();
+    let root_uri = Uri::from_file_path(root).expect("root uri");
+    let doc_uri = Uri::from_file_path(&doc_path).expect("doc uri");
+    server.initialize(root_uri.as_str()).await;
+    server
+        .open_document(doc_uri.as_str(), content, "markdown")
+        .await;
+
+    let result = server.goto_definition(doc_uri.as_str(), 2, 7).await;
+    assert!(
+        result.is_none(),
+        "Expected no definition when example_lists is disabled"
+    );
+}

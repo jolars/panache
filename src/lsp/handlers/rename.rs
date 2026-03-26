@@ -177,6 +177,7 @@ pub(crate) async fn rename(
             let norm = normalize_label(&key);
             (key, norm)
         }
+        Some(SymbolTarget::ExampleLabel(_)) => return Ok(None),
         _ => return Ok(None),
     };
 

@@ -101,6 +101,13 @@ pub(crate) async fn references(
                         }
                     }
                 }
+                SymbolTarget::ExampleLabel(label) => {
+                    if let Some(ranges) = symbol_index.example_label_definitions(label)
+                        && include_declaration
+                    {
+                        add_locations(&mut locations, &doc_uri, &text, ranges);
+                    }
+                }
                 SymbolTarget::HeadingLink(label) | SymbolTarget::HeadingId(label) => {
                     let ranges = symbol_index.heading_reference_ranges(label, include_declaration);
                     add_locations(&mut locations, &doc_uri, &text, &ranges);

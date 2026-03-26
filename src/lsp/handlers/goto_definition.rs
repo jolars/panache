@@ -68,6 +68,7 @@ pub(crate) async fn goto_definition(
         Citation(String),
         Crossref(String),
         ChunkLabel(String),
+        ExampleLabel(String),
         HeadingLink(String),
         Reference { label: String, is_footnote: bool },
     }
@@ -80,6 +81,10 @@ pub(crate) async fn goto_definition(
             Some(SymbolTarget::Citation(key)) => Some(PendingDefinition::Citation(key)),
             Some(SymbolTarget::Crossref(label)) => Some(PendingDefinition::Crossref(label)),
             Some(SymbolTarget::ChunkLabel(label)) => Some(PendingDefinition::ChunkLabel(label)),
+            Some(SymbolTarget::ExampleLabel(label)) => config
+                .extensions
+                .example_lists
+                .then_some(PendingDefinition::ExampleLabel(label)),
             Some(SymbolTarget::HeadingId(label)) | Some(SymbolTarget::HeadingLink(label)) => {
                 Some(PendingDefinition::HeadingLink(label))
             }
@@ -199,6 +204,18 @@ pub(crate) async fn goto_definition(
         }
     }
 
+    if let PendingDefinition::ExampleLabel(label) = &pending {
+        for doc in &doc_indices {
+            if let Some(ranges) = doc.symbol_index.example_label_definitions(label)
+                && let Some(range) = ranges.first()
+            {
+                let location =
+                    crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
+                return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            }
+        }
+    }
+
     if let PendingDefinition::Reference { label, is_footnote } = &pending {
         for doc in &doc_indices {
             let ranges = if *is_footnote {
@@ -234,6 +251,7 @@ pub(crate) async fn goto_definition(
                 .find_crossref_resolved(&label, config.extensions.bookdown_references),
             PendingDefinition::ChunkLabel(label) => definition_index
                 .find_crossref_resolved(&label, config.extensions.bookdown_references),
+            PendingDefinition::ExampleLabel(label) => definition_index.find_example_label(&label),
             PendingDefinition::HeadingLink(label) => {
                 if heading_link_is_explicit_anchor {
                     definition_index

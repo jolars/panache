@@ -7,7 +7,7 @@ use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
 use crate::syntax::{
     AstNode, AttributeNode, Citation, CodeBlock, Crossref, FootnoteDefinition, Heading, Link,
-    ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode, YamlRegion,
+    ListItem, ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode, YamlRegion,
     collect_parsed_yaml_region_snapshots,
 };
 use crate::utils::{implicit_heading_ids, normalize_label};
@@ -312,6 +312,7 @@ pub struct SymbolUsageIndex {
     heading_implicit_definition_ranges: HashMap<String, Vec<rowan::TextRange>>,
     reference_definitions: HashMap<String, Vec<rowan::TextRange>>,
     footnote_definitions: HashMap<String, Vec<rowan::TextRange>>,
+    example_label_definitions: HashMap<String, Vec<rowan::TextRange>>,
     heading_labels: HashMap<String, Vec<rowan::TextRange>>,
     heading_sequence: Vec<(rowan::TextRange, usize)>,
 }
@@ -389,6 +390,10 @@ impl SymbolUsageIndex {
 
     pub fn footnote_definitions(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.footnote_definitions.get(&normalize_label(key))
+    }
+
+    pub fn example_label_definitions(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.example_label_definitions.get(&normalize_label(key))
     }
 
     pub fn reference_definition_entries(
@@ -524,6 +529,17 @@ pub fn symbol_usage_index_from_tree(
             .entry(id)
             .or_default()
             .push(def.syntax().text_range());
+    }
+
+    for item in tree.descendants().filter_map(ListItem::cast) {
+        db.unwind_if_revision_cancelled();
+        if let Some((label, range)) = extract_example_label_definition(&item) {
+            index
+                .example_label_definitions
+                .entry(normalize_label(&label))
+                .or_default()
+                .push(range);
+        }
     }
 
     for heading in tree.descendants().filter_map(crate::syntax::Heading::cast) {
@@ -801,6 +817,7 @@ pub struct DefinitionIndex {
     references: HashMap<String, DefinitionLocation>,
     footnotes: HashMap<String, DefinitionLocation>,
     crossrefs: HashMap<String, DefinitionLocation>,
+    example_labels: HashMap<String, DefinitionLocation>,
 }
 
 #[derive(Default)]
@@ -808,6 +825,7 @@ struct InternedDefinitionIndex<'db> {
     references: HashMap<InternedLabel<'db>, DefinitionLocation>,
     footnotes: HashMap<InternedLabel<'db>, DefinitionLocation>,
     crossrefs: HashMap<InternedLabel<'db>, DefinitionLocation>,
+    example_labels: HashMap<InternedLabel<'db>, DefinitionLocation>,
 }
 
 #[salsa::tracked(returns(ref), lru = 64)]
@@ -844,6 +862,18 @@ pub fn definition_index(
             range: def.syntax().text_range(),
         };
         insert_footnote(db, &mut index, &id, location);
+    }
+
+    for item in tree.descendants().filter_map(ListItem::cast) {
+        db.unwind_if_revision_cancelled();
+        let Some((label, range)) = extract_example_label_definition(&item) else {
+            continue;
+        };
+        let location = DefinitionLocation {
+            path: path.clone(),
+            range,
+        };
+        insert_example_label(db, &mut index, &label, location);
     }
 
     for attribute in tree.descendants().filter_map(AttributeNode::cast) {
@@ -909,6 +939,16 @@ fn insert_crossref<'db>(
     index.crossrefs.entry(key).or_insert(location);
 }
 
+fn insert_example_label<'db>(
+    db: &'db dyn Db,
+    index: &mut InternedDefinitionIndex<'db>,
+    label: &str,
+    location: DefinitionLocation,
+) {
+    let key = intern_normalized_label(db, label);
+    index.example_labels.entry(key).or_insert(location);
+}
+
 impl InternedDefinitionIndex<'_> {
     fn into_owned(self, db: &dyn Db) -> DefinitionIndex {
         DefinitionIndex {
@@ -927,13 +967,21 @@ impl InternedDefinitionIndex<'_> {
                 .into_iter()
                 .map(|(label, location)| (resolve_label(db, label), location))
                 .collect(),
+            example_labels: self
+                .example_labels
+                .into_iter()
+                .map(|(label, location)| (resolve_label(db, label), location))
+                .collect(),
         }
     }
 }
 
 impl DefinitionIndex {
     pub fn is_empty(&self) -> bool {
-        self.references.is_empty() && self.footnotes.is_empty() && self.crossrefs.is_empty()
+        self.references.is_empty()
+            && self.footnotes.is_empty()
+            && self.crossrefs.is_empty()
+            && self.example_labels.is_empty()
     }
 
     pub fn find_reference(&self, label: &str) -> Option<&DefinitionLocation> {
@@ -949,6 +997,11 @@ impl DefinitionIndex {
     pub fn find_crossref(&self, id: &str) -> Option<&DefinitionLocation> {
         let key = normalize_label(id);
         self.crossrefs.get(&key)
+    }
+
+    pub fn find_example_label(&self, label: &str) -> Option<&DefinitionLocation> {
+        let key = normalize_label(label);
+        self.example_labels.get(&key)
     }
 
     pub fn find_crossref_resolved(
@@ -977,6 +1030,11 @@ impl DefinitionIndex {
         }
         for (key, value) in &other.crossrefs {
             self.crossrefs
+                .entry(key.clone())
+                .or_insert_with(|| value.clone());
+        }
+        for (key, value) in &other.example_labels {
+            self.example_labels
                 .entry(key.clone())
                 .or_insert_with(|| value.clone());
         }
@@ -1052,6 +1110,33 @@ fn collect_bookdown_definitions<'db>(
             offset += 1;
         }
     }
+}
+
+fn parse_example_label(marker: &str) -> Option<&str> {
+    let rest = marker.strip_prefix("(@")?;
+    let label = rest.strip_suffix(')')?;
+    if label.is_empty()
+        || !label
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return None;
+    }
+    Some(label)
+}
+
+fn extract_example_label_definition(item: &ListItem) -> Option<(String, rowan::TextRange)> {
+    let token = item.syntax().children_with_tokens().find_map(|element| {
+        element
+            .into_token()
+            .filter(|token| token.kind() == SyntaxKind::LIST_MARKER)
+    })?;
+    let marker = token.text();
+    let label = parse_example_label(marker)?;
+    let token_start: usize = token.text_range().start().into();
+    let start = rowan::TextSize::from((token_start + 2) as u32);
+    let end = rowan::TextSize::from((token_start + 2 + label.len()) as u32);
+    Some((label.to_string(), rowan::TextRange::new(start, end)))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1520,6 +1605,33 @@ mod tests {
             "expected one heading label"
         );
         assert_eq!(index.citation_usages("cite").map(|v| v.len()), Some(1));
+    }
+
+    #[test]
+    fn symbol_usage_index_collects_example_label_definitions() {
+        let db = SalsaDb::default();
+        let config = crate::Config {
+            flavor: crate::config::Flavor::Pandoc,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Pandoc),
+            ..Default::default()
+        };
+        let tree = crate::parse(
+            "(@good) Good example.\n\n(@bad) Bad example.\n\nAs (@good) illustrates.\n",
+            Some(config.clone()),
+        );
+        let index = symbol_usage_index_from_tree(&db, &tree, &config.extensions);
+        assert_eq!(
+            index
+                .example_label_definitions("good")
+                .map(|ranges| ranges.len()),
+            Some(1)
+        );
+        assert_eq!(
+            index
+                .example_label_definitions("bad")
+                .map(|ranges| ranges.len()),
+            Some(1)
+        );
     }
 
     #[test]

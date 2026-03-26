@@ -289,6 +289,17 @@ pub(crate) fn extract_heading_link_target(node: &SyntaxNode) -> Option<String> {
     None
 }
 
+pub(crate) fn extract_example_label_target_at_offset(
+    root: &SyntaxNode,
+    offset: usize,
+) -> Option<String> {
+    let text = root.text().to_string();
+    if offset > text.len() {
+        return None;
+    }
+    example_label_at_offset(&text, offset).map(normalize_label)
+}
+
 pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> {
     if let Some(crossref) = Crossref::cast(node.clone()) {
         return crossref.keys().first().map(|key| key.text_range());
@@ -377,6 +388,44 @@ fn heading_target_from_link(link: &Link) -> Option<String> {
     {
         let label = normalize_label(&text.text_content());
         return (!label.is_empty()).then_some(label);
+    }
+
+    None
+}
+
+fn example_label_spans(text: &str) -> impl Iterator<Item = (usize, &str)> {
+    text.char_indices().filter_map(|(idx, ch)| {
+        if ch != '(' {
+            return None;
+        }
+        let slice = &text[idx..];
+        let rest = slice.strip_prefix("(@")?;
+        let label_end = rest
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+            .count();
+        if label_end == 0 {
+            return None;
+        }
+        if rest.chars().nth(label_end) != Some(')') {
+            return None;
+        }
+        Some((idx, &rest[..label_end]))
+    })
+}
+
+fn example_label_at_offset(text: &str, offset: usize) -> Option<&str> {
+    let start = offset.saturating_sub(128);
+    let end = (offset + 128).min(text.len());
+    let window = text.get(start..end)?;
+    let rel_offset = offset - start;
+
+    for (idx, label) in example_label_spans(window) {
+        let label_start = idx + 2;
+        let label_end = label_start + label.len();
+        if label_start <= rel_offset && rel_offset <= label_end {
+            return Some(label);
+        }
     }
 
     None
@@ -687,5 +736,27 @@ mod tests {
         // Offset 7: at "foo  bar" reference
         let range = find_definition_at_offset(&root, 7);
         assert!(range.is_some());
+    }
+
+    #[test]
+    fn test_extract_example_label_target_at_offset() {
+        let config = crate::config::Config {
+            flavor: crate::config::Flavor::Pandoc,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Pandoc),
+            ..Default::default()
+        };
+        let input = "(@good) Example.\n\nAs (@good) illustrates.\n";
+        let root = crate::parse(input, Some(config));
+        let offset = input.rfind("good").expect("reference label");
+        let label = extract_example_label_target_at_offset(&root, offset);
+        assert_eq!(label, Some("good".to_string()));
+    }
+
+    #[test]
+    fn test_extract_example_label_target_at_offset_ignores_citation() {
+        let root = parse("See @good for details.\n");
+        let offset = 5;
+        let label = extract_example_label_target_at_offset(&root, offset);
+        assert_eq!(label, None);
     }
 }

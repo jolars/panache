@@ -7,6 +7,7 @@ pub(crate) enum SymbolTarget {
     Citation(String),
     Crossref(String),
     ChunkLabel(String),
+    ExampleLabel(String),
     HeadingLink(String),
     HeadingId(String),
     Reference { label: String, is_footnote: bool },
@@ -16,6 +17,10 @@ pub(crate) fn resolve_symbol_target_at_offset(
     root: &SyntaxNode,
     offset: usize,
 ) -> Option<SymbolTarget> {
+    if let Some(key) = helpers::extract_example_label_target_at_offset(root, offset) {
+        return Some(SymbolTarget::ExampleLabel(key));
+    }
+
     let mut node = helpers::find_node_at_offset(root, offset)?;
 
     loop {
@@ -109,5 +114,19 @@ mod tests {
             target,
             Some(SymbolTarget::ChunkLabel("fig-plot".to_string()))
         );
+    }
+
+    #[test]
+    fn resolves_example_label_target() {
+        let config = crate::config::Config {
+            flavor: crate::config::Flavor::Pandoc,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Pandoc),
+            ..Default::default()
+        };
+        let input = "(@good) First example.\n\nAs (@good) shows.\n";
+        let root = crate::parse(input, Some(config));
+        let offset = input.rfind("good").unwrap();
+        let target = resolve_symbol_target_at_offset(&root, offset);
+        assert_eq!(target, Some(SymbolTarget::ExampleLabel("good".to_string())));
     }
 }
