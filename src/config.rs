@@ -481,6 +481,8 @@ impl Extensions {
         ext.emoji = true;
         ext.footnotes = true;
         ext.gfm_auto_identifiers = true;
+        ext.backtick_code_blocks = true;
+        ext.fenced_code_blocks = true;
         ext.pipe_tables = true;
         ext.raw_html = true;
         ext.strikeout = true;

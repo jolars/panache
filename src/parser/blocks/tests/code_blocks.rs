@@ -1,6 +1,6 @@
 use super::helpers::{
     assert_block_kinds, assert_block_kinds_for_node, find_all, find_first, parse_blocks,
-    parse_blocks_quarto, parse_blocks_with_config,
+    parse_blocks_gfm, parse_blocks_quarto, parse_blocks_with_config,
 };
 use crate::config::{Config, Extensions, Flavor};
 use crate::syntax::SyntaxKind;
@@ -546,6 +546,21 @@ fn tilde_fenced_code_blocks_respect_extension_guard() {
     assert!(
         find_first(&enabled, SyntaxKind::CODE_BLOCK).is_some(),
         "fenced_code_blocks enabled should allow tilde fenced code parsing"
+    );
+}
+
+#[test]
+fn gfm_defaults_allow_backtick_and_tilde_fenced_code_blocks() {
+    let backtick = parse_blocks_gfm("```r\na <- 1\n```\n");
+    assert!(
+        find_first(&backtick, SyntaxKind::CODE_BLOCK).is_some(),
+        "gfm defaults should allow backtick fenced code blocks"
+    );
+
+    let tilde = parse_blocks_gfm("~~~r\na <- 1\n~~~\n");
+    assert!(
+        find_first(&tilde, SyntaxKind::CODE_BLOCK).is_some(),
+        "gfm defaults should allow tilde fenced code blocks"
     );
 }
 
