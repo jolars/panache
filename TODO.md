@@ -169,9 +169,9 @@ support.
 - [x] Add wrappers for block quotes, code blocks/chunks, display math, and
       fenced divs.
 - [ ] Add wrappers for footnote definitions/references.
-- [ ] Add wrapper for alert blocks.
+- [x] Add wrapper for alert blocks.
 - [ ] Add wrappers for YAML metadata/title blocks.
-- [ ] Add wrappers for raw TeX blocks/commands.
+- [x] Add wrappers for raw TeX blocks/commands.
 - [x] Add a Paragraph convenience wrapper for repeated semantic checks.
 
 ### Tables

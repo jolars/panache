@@ -4,6 +4,7 @@
 //! produced by the parser. The CST is based on the `rowan` library and uses
 //! the red-green tree pattern for efficient incremental parsing.
 
+mod alerts;
 mod ast;
 mod attributes;
 mod block_quotes;
@@ -21,11 +22,13 @@ mod kind;
 mod links;
 mod lists;
 mod math;
+mod raw_tex;
 mod references;
 mod shortcodes;
 mod tables;
 mod yaml;
 
+pub use alerts::*;
 pub use ast::*;
 pub use attributes::*;
 pub use block_quotes::*;
@@ -43,6 +46,7 @@ pub use kind::*;
 pub use links::*;
 pub use lists::*;
 pub use math::*;
+pub use raw_tex::*;
 pub use references::*;
 pub use shortcodes::*;
 pub use tables::*;
