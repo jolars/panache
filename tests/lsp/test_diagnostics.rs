@@ -192,3 +192,75 @@ async fn test_code_action_convert_implicit_heading_link_to_explicit() {
     assert_eq!(edits.len(), 1);
     assert_eq!(edits[0].new_text, "[unordered lists](#unordered-lists)");
 }
+
+#[tokio::test]
+async fn test_code_action_convert_bullet_list_to_ordered() {
+    let server = TestLspServer::new();
+    let content = "- First\n- Second\n- Third\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let code_actions = server
+        .get_code_actions("file:///test.qmd", 0, 0, 0, 7)
+        .await
+        .expect("code actions response");
+
+    let action = code_actions.iter().find_map(|action| {
+        if let CodeActionOrCommand::CodeAction(ca) = action
+            && ca.title == "Convert to ordered list"
+        {
+            return Some(ca);
+        }
+        None
+    });
+    let action = action.expect("expected ordered list conversion action");
+
+    let changes = action
+        .edit
+        .as_ref()
+        .and_then(|edit| edit.changes.as_ref())
+        .expect("workspace edit changes");
+    let edits = changes
+        .get(&"file:///test.qmd".parse::<Uri>().expect("uri"))
+        .expect("edits for document");
+    assert_eq!(edits.len(), 3);
+    assert_eq!(edits[0].new_text, "1.");
+    assert_eq!(edits[1].new_text, "2.");
+    assert_eq!(edits[2].new_text, "3.");
+}
+
+#[tokio::test]
+async fn test_code_action_convert_ordered_list_to_bullet() {
+    let server = TestLspServer::new();
+    let content = "1. First\n2. Second\n3. Third\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let code_actions = server
+        .get_code_actions("file:///test.qmd", 0, 0, 0, 8)
+        .await
+        .expect("code actions response");
+
+    let action = code_actions.iter().find_map(|action| {
+        if let CodeActionOrCommand::CodeAction(ca) = action
+            && ca.title == "Convert to bullet list"
+        {
+            return Some(ca);
+        }
+        None
+    });
+    let action = action.expect("expected bullet list conversion action");
+
+    let changes = action
+        .edit
+        .as_ref()
+        .and_then(|edit| edit.changes.as_ref())
+        .expect("workspace edit changes");
+    let edits = changes
+        .get(&"file:///test.qmd".parse::<Uri>().expect("uri"))
+        .expect("edits for document");
+    assert_eq!(edits.len(), 3);
+    assert!(edits.iter().all(|edit| edit.new_text == "-"));
+}

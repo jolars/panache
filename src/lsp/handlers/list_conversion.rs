@@ -1,8 +1,8 @@
 //! List conversion utilities for code actions.
 //!
-//! Provides functions to convert lists between loose and compact formatting styles.
+//! Provides functions to convert lists between loose/compact and bullet/ordered styles.
 
-use crate::syntax::{AstNode, List, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, List, SyntaxKind, SyntaxNode, SyntaxToken};
 use tower_lsp_server::ls_types::{Range, TextEdit};
 
 use super::super::conversions::offset_to_position;
@@ -17,6 +17,24 @@ pub fn find_list_at_position(tree: &SyntaxNode, offset: usize) -> Option<SyntaxN
     token
         .parent_ancestors()
         .find(|node| node.kind() == SyntaxKind::LIST)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListType {
+    Bullet,
+    Ordered,
+}
+
+/// Detects the marker style for a list using the first list item's marker token.
+pub fn detect_list_type(list_node: &SyntaxNode) -> Option<ListType> {
+    let list = List::cast(list_node.clone())?;
+    let first_item = list.items().next()?;
+    let marker = first_item_marker_token(first_item.syntax())?;
+    if is_bullet_marker(marker.text()) {
+        Some(ListType::Bullet)
+    } else {
+        Some(ListType::Ordered)
+    }
 }
 
 /// Convert a compact list to a loose list by inserting blank lines between items.
@@ -143,6 +161,65 @@ pub fn convert_to_compact(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
     edits
 }
 
+/// Convert a bullet list to an ordered list by replacing markers with 1., 2., ...
+pub fn convert_to_ordered(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
+    if detect_list_type(list_node) != Some(ListType::Bullet) {
+        return vec![];
+    }
+
+    let Some(list) = List::cast(list_node.clone()) else {
+        return vec![];
+    };
+
+    list.items()
+        .enumerate()
+        .filter_map(|(idx, item)| {
+            let marker = first_item_marker_token(item.syntax())?;
+            let start = offset_to_position(text, marker.text_range().start().into());
+            let end = offset_to_position(text, marker.text_range().end().into());
+            Some(TextEdit {
+                range: Range { start, end },
+                new_text: format!("{}.", idx + 1),
+            })
+        })
+        .collect()
+}
+
+/// Convert an ordered list to a bullet list by replacing markers with "-".
+pub fn convert_to_bullet(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
+    if detect_list_type(list_node) != Some(ListType::Ordered) {
+        return vec![];
+    }
+
+    let Some(list) = List::cast(list_node.clone()) else {
+        return vec![];
+    };
+
+    list.items()
+        .filter_map(|item| {
+            let marker = first_item_marker_token(item.syntax())?;
+            let start = offset_to_position(text, marker.text_range().start().into());
+            let end = offset_to_position(text, marker.text_range().end().into());
+            Some(TextEdit {
+                range: Range { start, end },
+                new_text: "-".to_string(),
+            })
+        })
+        .collect()
+}
+
+fn first_item_marker_token(item_node: &SyntaxNode) -> Option<SyntaxToken> {
+    item_node
+        .children_with_tokens()
+        .find_map(|elem| elem.as_token().cloned())
+        .filter(|token| token.kind() == SyntaxKind::LIST_MARKER)
+}
+
+fn is_bullet_marker(marker: impl AsRef<str>) -> bool {
+    let marker = marker.as_ref();
+    matches!(marker, "-" | "*" | "+")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +311,52 @@ mod tests {
 
         let edits = convert_to_compact(&list_node, input);
         assert_eq!(edits.len(), 0, "Should return no edits for already compact");
+    }
+
+    #[test]
+    fn detect_list_type_for_bullet_and_ordered() {
+        let bullet_tree = parse("- First\n- Second\n", None);
+        let bullet_list = bullet_tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .expect("Should find bullet list");
+        assert_eq!(detect_list_type(&bullet_list), Some(ListType::Bullet));
+
+        let ordered_tree = parse("1. First\n2. Second\n", None);
+        let ordered_list = ordered_tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .expect("Should find ordered list");
+        assert_eq!(detect_list_type(&ordered_list), Some(ListType::Ordered));
+    }
+
+    #[test]
+    fn convert_bullet_to_ordered() {
+        let input = "- First\n- Second\n- Third\n";
+        let tree = parse(input, None);
+        let list_node = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .expect("Should find list");
+
+        let edits = convert_to_ordered(&list_node, input);
+        assert_eq!(edits.len(), 3);
+        assert_eq!(edits[0].new_text, "1.");
+        assert_eq!(edits[1].new_text, "2.");
+        assert_eq!(edits[2].new_text, "3.");
+    }
+
+    #[test]
+    fn convert_ordered_to_bullet() {
+        let input = "1. First\n2. Second\n3. Third\n";
+        let tree = parse(input, None);
+        let list_node = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::LIST)
+            .expect("Should find list");
+
+        let edits = convert_to_bullet(&list_node, input);
+        assert_eq!(edits.len(), 3);
+        assert!(edits.iter().all(|edit| edit.new_text == "-"));
     }
 }
