@@ -83,6 +83,16 @@ fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
     Some((raw_key, raw_value))
 }
 
+fn split_value_and_comment(raw_value: &str) -> (&str, Option<&str>) {
+    if let Some(idx) = raw_value.find('#') {
+        let (before, after) = raw_value.split_at(idx);
+        if !before.trim().is_empty() {
+            return (before.trim_end_matches([' ', '\t']), Some(after));
+        }
+    }
+    (raw_value, None)
+}
+
 /// Parse one or more `key: value` lines and emit a prototype YAML mapping CST.
 ///
 /// This remains prototype-scoped but models YAML mapping structure with explicit
@@ -109,14 +119,27 @@ pub fn parse_basic_mapping_tree(input: &str) -> Option<SyntaxNode> {
         builder.finish_node(); // YAML_BLOCK_MAP_KEY
 
         builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
-        let leading_ws_len = raw_value
+        let (value_part, comment_part) = split_value_and_comment(raw_value);
+        let leading_ws_len = value_part
             .bytes()
             .take_while(|b| *b == b' ' || *b == b'\t')
             .count();
         if leading_ws_len > 0 {
-            builder.token(SyntaxKind::WHITESPACE.into(), &raw_value[..leading_ws_len]);
+            builder.token(SyntaxKind::WHITESPACE.into(), &value_part[..leading_ws_len]);
         }
-        builder.token(SyntaxKind::YAML_SCALAR.into(), &raw_value[leading_ws_len..]);
+        builder.token(
+            SyntaxKind::YAML_SCALAR.into(),
+            &value_part[leading_ws_len..],
+        );
+        if let Some(comment) = comment_part {
+            let leading_comment_ws_len = raw_value.len() - comment.len() - value_part.len();
+            if leading_comment_ws_len > 0 {
+                let start = value_part.len();
+                let end = start + leading_comment_ws_len;
+                builder.token(SyntaxKind::WHITESPACE.into(), &raw_value[start..end]);
+            }
+            builder.token(SyntaxKind::YAML_COMMENT.into(), comment);
+        }
         builder.finish_node(); // YAML_BLOCK_MAP_VALUE
 
         if !newline.is_empty() {

@@ -21,6 +21,7 @@ pub enum SyntaxKind {
     YAML_KEY,            // YAML mapping key token
     YAML_COLON,          // YAML mapping key-value separator
     YAML_SCALAR,         // YAML scalar value token
+    YAML_COMMENT,        // YAML inline comment token
 
     BLOCK_QUOTE_MARKER, // >
     ALERT_MARKER,       // [!NOTE], [!TIP], etc.

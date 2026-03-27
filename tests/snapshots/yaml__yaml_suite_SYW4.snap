@@ -1,0 +1,8 @@
+---
+source: tests/yaml.rs
+expression: snapshot
+---
+case_id: SYW4
+input: "hr:  65    # Home runs\navg: 0.278 # Batting average\nrbi: 147   # Runs Batted In\n"
+normalized: "hr:  65    # Home runs\navg: 0.278 # Batting average\nrbi: 147   # Runs Batted In"
+parsed_mapping_tree: true

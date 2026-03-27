@@ -1,0 +1,277 @@
+---
+source: tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "SYW4",
+  "cst": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "kind": "YAML_KEY",
+                        "range": {
+                          "end": 2,
+                          "start": 0
+                        },
+                        "text": "hr"
+                      },
+                      {
+                        "kind": "YAML_COLON",
+                        "range": {
+                          "end": 3,
+                          "start": 2
+                        },
+                        "text": ":"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_KEY",
+                    "range": {
+                      "end": 3,
+                      "start": 0
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "kind": "WHITESPACE",
+                        "range": {
+                          "end": 5,
+                          "start": 3
+                        },
+                        "text": "  "
+                      },
+                      {
+                        "kind": "YAML_SCALAR",
+                        "range": {
+                          "end": 7,
+                          "start": 5
+                        },
+                        "text": "65"
+                      },
+                      {
+                        "kind": "WHITESPACE",
+                        "range": {
+                          "end": 11,
+                          "start": 7
+                        },
+                        "text": "    "
+                      },
+                      {
+                        "kind": "YAML_COMMENT",
+                        "range": {
+                          "end": 22,
+                          "start": 11
+                        },
+                        "text": "# Home runs"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_VALUE",
+                    "range": {
+                      "end": 22,
+                      "start": 3
+                    }
+                  },
+                  {
+                    "kind": "NEWLINE",
+                    "range": {
+                      "end": 23,
+                      "start": 22
+                    },
+                    "text": "\n"
+                  }
+                ],
+                "kind": "YAML_BLOCK_MAP_ENTRY",
+                "range": {
+                  "end": 23,
+                  "start": 0
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "kind": "YAML_KEY",
+                        "range": {
+                          "end": 26,
+                          "start": 23
+                        },
+                        "text": "avg"
+                      },
+                      {
+                        "kind": "YAML_COLON",
+                        "range": {
+                          "end": 27,
+                          "start": 26
+                        },
+                        "text": ":"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_KEY",
+                    "range": {
+                      "end": 27,
+                      "start": 23
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "kind": "WHITESPACE",
+                        "range": {
+                          "end": 28,
+                          "start": 27
+                        },
+                        "text": " "
+                      },
+                      {
+                        "kind": "YAML_SCALAR",
+                        "range": {
+                          "end": 33,
+                          "start": 28
+                        },
+                        "text": "0.278"
+                      },
+                      {
+                        "kind": "WHITESPACE",
+                        "range": {
+                          "end": 34,
+                          "start": 33
+                        },
+                        "text": " "
+                      },
+                      {
+                        "kind": "YAML_COMMENT",
+                        "range": {
+                          "end": 51,
+                          "start": 34
+                        },
+                        "text": "# Batting average"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_VALUE",
+                    "range": {
+                      "end": 51,
+                      "start": 27
+                    }
+                  },
+                  {
+                    "kind": "NEWLINE",
+                    "range": {
+                      "end": 52,
+                      "start": 51
+                    },
+                    "text": "\n"
+                  }
+                ],
+                "kind": "YAML_BLOCK_MAP_ENTRY",
+                "range": {
+                  "end": 52,
+                  "start": 23
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "kind": "YAML_KEY",
+                        "range": {
+                          "end": 55,
+                          "start": 52
+                        },
+                        "text": "rbi"
+                      },
+                      {
+                        "kind": "YAML_COLON",
+                        "range": {
+                          "end": 56,
+                          "start": 55
+                        },
+                        "text": ":"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_KEY",
+                    "range": {
+                      "end": 56,
+                      "start": 52
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "kind": "WHITESPACE",
+                        "range": {
+                          "end": 57,
+                          "start": 56
+                        },
+                        "text": " "
+                      },
+                      {
+                        "kind": "YAML_SCALAR",
+                        "range": {
+                          "end": 60,
+                          "start": 57
+                        },
+                        "text": "147"
+                      },
+                      {
+                        "kind": "WHITESPACE",
+                        "range": {
+                          "end": 63,
+                          "start": 60
+                        },
+                        "text": "   "
+                      },
+                      {
+                        "kind": "YAML_COMMENT",
+                        "range": {
+                          "end": 79,
+                          "start": 63
+                        },
+                        "text": "# Runs Batted In"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_VALUE",
+                    "range": {
+                      "end": 79,
+                      "start": 56
+                    }
+                  }
+                ],
+                "kind": "YAML_BLOCK_MAP_ENTRY",
+                "range": {
+                  "end": 79,
+                  "start": 52
+                }
+              }
+            ],
+            "kind": "YAML_BLOCK_MAP",
+            "range": {
+              "end": 79,
+              "start": 0
+            }
+          }
+        ],
+        "kind": "YAML_METADATA_CONTENT",
+        "range": {
+          "end": 79,
+          "start": 0
+        }
+      }
+    ],
+    "kind": "DOCUMENT",
+    "range": {
+      "end": 79,
+      "start": 0
+    }
+  },
+  "input": "hr:  65    # Home runs\navg: 0.278 # Batting average\nrbi: 147   # Runs Batted In\n",
+  "normalized": "hr:  65    # Home runs\navg: 0.278 # Batting average\nrbi: 147   # Runs Batted In"
+}
