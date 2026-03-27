@@ -79,52 +79,102 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         }
     }
 
+    fn long_tag(tag: &str) -> Option<&'static str> {
+        match tag {
+            "!!str" => Some("<tag:yaml.org,2002:str>"),
+            "!!int" => Some("<tag:yaml.org,2002:int>"),
+            "!!bool" => Some("<tag:yaml.org,2002:bool>"),
+            _ => None,
+        }
+    }
+
     let Some(tree) = parse_basic_mapping_tree(input) else {
         return Vec::new();
     };
 
-    let mut values: Vec<String> = tree
-        .descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .filter_map(|tok| match tok.kind() {
-            panache::syntax::SyntaxKind::YAML_KEY => {
-                let text = tok.text();
-                if let Some(rest) = text.strip_prefix('&') {
-                    if let Some((anchor, value)) = rest.split_once(' ') {
-                        Some(format!("=VAL &{} :{}", anchor, value))
-                    } else {
-                        Some(format!("=VAL &{} :", rest))
-                    }
-                } else if text.starts_with('"') || text.starts_with('\'') {
-                    Some(quoted_val_event(text))
-                } else if text.starts_with('*') {
-                    Some(format!("=ALI {}", text.trim_end()))
-                } else {
-                    Some(format!("=VAL :{text}"))
-                }
+    let mut values = Vec::new();
+    for entry in tree
+        .descendants()
+        .filter(|n| n.kind() == panache::syntax::SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+    {
+        let key_node = entry
+            .children()
+            .find(|n| n.kind() == panache::syntax::SyntaxKind::YAML_BLOCK_MAP_KEY)
+            .expect("key node");
+        let value_node = entry
+            .children()
+            .find(|n| n.kind() == panache::syntax::SyntaxKind::YAML_BLOCK_MAP_VALUE)
+            .expect("value node");
+
+        let key_tag = key_node
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == panache::syntax::SyntaxKind::YAML_TAG)
+            .map(|tok| tok.text().to_string());
+        let key_text = key_node
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == panache::syntax::SyntaxKind::YAML_KEY)
+            .map(|tok| tok.text().to_string())
+            .expect("key token");
+
+        let value_tag = value_node
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == panache::syntax::SyntaxKind::YAML_TAG)
+            .map(|tok| tok.text().to_string());
+        let value_text = value_node
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == panache::syntax::SyntaxKind::YAML_SCALAR)
+            .map(|tok| tok.text().to_string())
+            .expect("value token");
+
+        let key_event = if let Some(tag) = key_tag {
+            if let Some(long) = long_tag(&tag) {
+                format!("=VAL {long} :{key_text}")
+            } else {
+                format!("=VAL :{key_text}")
             }
-            panache::syntax::SyntaxKind::YAML_SCALAR => {
-                let text = tok.text();
-                if text.starts_with('"') || text.starts_with('\'') {
-                    Some(quoted_val_event(text))
-                } else if let Some(rest) = text.strip_prefix("!local &") {
-                    let (anchor, value) = rest.split_once(' ')?;
-                    Some(format!("=VAL &{} <!local> :{}", anchor, value))
-                } else if let Some(rest) = text.strip_prefix('&') {
-                    if let Some((anchor, value)) = rest.split_once(' ') {
-                        Some(format!("=VAL &{} :{}", anchor, value))
-                    } else {
-                        Some(format!("=VAL &{} :", rest))
-                    }
-                } else if text.starts_with('*') {
-                    Some(format!("=ALI {text}"))
-                } else {
-                    Some(format!("=VAL :{text}"))
-                }
+        } else if let Some(rest) = key_text.strip_prefix('&') {
+            if let Some((anchor, value)) = rest.split_once(' ') {
+                format!("=VAL &{} :{}", anchor, value)
+            } else {
+                format!("=VAL &{} :", rest)
             }
-            _ => None,
-        })
-        .collect();
+        } else if key_text.starts_with('"') || key_text.starts_with('\'') {
+            quoted_val_event(&key_text)
+        } else if key_text.starts_with('*') {
+            format!("=ALI {}", key_text.trim_end())
+        } else {
+            format!("=VAL :{key_text}")
+        };
+        values.push(key_event);
+
+        let value_event = if let Some(tag) = value_tag {
+            if let Some(long) = long_tag(&tag) {
+                format!("=VAL {long} :{value_text}")
+            } else {
+                format!("=VAL :{value_text}")
+            }
+        } else if value_text.starts_with('"') || value_text.starts_with('\'') {
+            quoted_val_event(&value_text)
+        } else if let Some(rest) = value_text.strip_prefix("!local &") {
+            let (anchor, value) = rest.split_once(' ').expect("local tag anchor/value split");
+            format!("=VAL &{} <!local> :{}", anchor, value)
+        } else if let Some(rest) = value_text.strip_prefix('&') {
+            if let Some((anchor, value)) = rest.split_once(' ') {
+                format!("=VAL &{} :{}", anchor, value)
+            } else {
+                format!("=VAL &{} :", rest)
+            }
+        } else if value_text.starts_with('*') {
+            format!("=ALI {value_text}")
+        } else {
+            format!("=VAL :{value_text}")
+        };
+        values.push(value_event);
+    }
 
     let mut events = Vec::with_capacity(values.len() + 6);
     events.push("+STR".to_string());

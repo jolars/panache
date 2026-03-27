@@ -1,0 +1,7 @@
+---
+source: tests/yaml.rs
+expression: snapshot
+---
+case_id: 74H7
+input: "!!str a: b\nc: !!int 42\ne: !!str f\ng: h\n!!str 23: !!bool false\n"
+parsed_mapping_tree: true

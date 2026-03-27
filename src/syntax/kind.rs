@@ -20,6 +20,7 @@ pub enum SyntaxKind {
     YAML_METADATA_DELIM, // --- or ... (for YAML blocks)
     YAML_KEY,            // YAML mapping key token
     YAML_COLON,          // YAML mapping key-value separator
+    YAML_TAG,            // YAML explicit tag token (e.g. !!str)
     YAML_SCALAR,         // YAML scalar value token
     YAML_COMMENT,        // YAML inline comment token
 

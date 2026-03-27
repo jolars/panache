@@ -200,6 +200,21 @@ mod tests {
     }
 
     #[test]
+    fn preserves_explicit_tag_tokens_in_key_and_value() {
+        let input = "!!str a: !!int 42\n";
+        let tree = parse_basic_mapping_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let tag_tokens: Vec<_> = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_TAG)
+            .map(|tok| tok.text().to_string())
+            .collect();
+        assert_eq!(tag_tokens, vec!["!!str".to_string(), "!!int".to_string()]);
+    }
+
+    #[test]
     fn rejects_tree_for_invalid_input() {
         assert!(parse_basic_entry_tree("title:").is_none());
     }

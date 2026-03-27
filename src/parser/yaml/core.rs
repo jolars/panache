@@ -111,6 +111,28 @@ fn split_value_and_comment(raw_value: &str) -> (&str, Option<&str>) {
     (raw_value, None)
 }
 
+fn split_tag_prefix(text: &str) -> (Option<&str>, &str) {
+    let trimmed = text.trim_start_matches([' ', '\t']);
+    if !trimmed.starts_with("!!") {
+        return (None, text);
+    }
+
+    let rel_start = text.len() - trimmed.len();
+    let rest = &text[rel_start + 2..];
+    let end_rel = rest
+        .char_indices()
+        .find_map(|(i, ch)| (ch == ' ' || ch == '\t').then_some(i))
+        .unwrap_or(rest.len());
+    if end_rel == 0 {
+        return (None, text);
+    }
+
+    let tag_end = rel_start + 2 + end_rel;
+    let tag = &text[rel_start..tag_end];
+    let value = &text[tag_end..];
+    (Some(tag), value)
+}
+
 /// Parse one or more `key: value` lines and emit a prototype YAML mapping CST.
 ///
 /// This remains prototype-scoped but models YAML mapping structure with explicit
@@ -132,7 +154,20 @@ pub fn parse_basic_mapping_tree(input: &str) -> Option<SyntaxNode> {
         builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
 
         builder.start_node(SyntaxKind::YAML_BLOCK_MAP_KEY.into());
-        builder.token(SyntaxKind::YAML_KEY.into(), raw_key);
+        let (key_tag, key_text) = split_tag_prefix(raw_key);
+        if let Some(tag) = key_tag {
+            builder.token(SyntaxKind::YAML_TAG.into(), tag);
+            let ws_len = key_text
+                .bytes()
+                .take_while(|b| *b == b' ' || *b == b'\t')
+                .count();
+            if ws_len > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &key_text[..ws_len]);
+            }
+            builder.token(SyntaxKind::YAML_KEY.into(), &key_text[ws_len..]);
+        } else {
+            builder.token(SyntaxKind::YAML_KEY.into(), raw_key);
+        }
         builder.token(SyntaxKind::YAML_COLON.into(), ":");
         builder.finish_node(); // YAML_BLOCK_MAP_KEY
 
@@ -145,10 +180,21 @@ pub fn parse_basic_mapping_tree(input: &str) -> Option<SyntaxNode> {
         if leading_ws_len > 0 {
             builder.token(SyntaxKind::WHITESPACE.into(), &value_part[..leading_ws_len]);
         }
-        builder.token(
-            SyntaxKind::YAML_SCALAR.into(),
-            &value_part[leading_ws_len..],
-        );
+        let scalar_part = &value_part[leading_ws_len..];
+        let (value_tag, value_text) = split_tag_prefix(scalar_part);
+        if let Some(tag) = value_tag {
+            builder.token(SyntaxKind::YAML_TAG.into(), tag);
+            let ws_len = value_text
+                .bytes()
+                .take_while(|b| *b == b' ' || *b == b'\t')
+                .count();
+            if ws_len > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &value_text[..ws_len]);
+            }
+            builder.token(SyntaxKind::YAML_SCALAR.into(), &value_text[ws_len..]);
+        } else {
+            builder.token(SyntaxKind::YAML_SCALAR.into(), scalar_part);
+        }
         if let Some(comment) = comment_part {
             let leading_comment_ws_len = raw_value.len() - comment.len() - value_part.len();
             if leading_comment_ws_len > 0 {
