@@ -1,0 +1,7 @@
+---
+source: tests/yaml.rs
+expression: snapshot
+---
+case_id: JS2J
+input: "First occurrence: &anchor Value\nSecond occurrence: *anchor\n"
+parsed_mapping_tree: true

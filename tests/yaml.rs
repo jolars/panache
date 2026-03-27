@@ -83,6 +83,11 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
                 let text = tok.text();
                 if text.starts_with('"') || text.starts_with('\'') {
                     Some(format!("=VAL {}", text.trim_end_matches(['"', '\''])))
+                } else if let Some(rest) = text.strip_prefix('&') {
+                    let (anchor, value) = rest.split_once(' ')?;
+                    Some(format!("=VAL &{} :{}", anchor, value))
+                } else if text.starts_with('*') {
+                    Some(format!("=ALI {text}"))
                 } else {
                     Some(format!("=VAL :{text}"))
                 }
