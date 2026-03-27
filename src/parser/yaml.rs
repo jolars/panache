@@ -81,19 +81,41 @@ mod tests {
             .expect("yaml metadata content");
         assert_eq!(content.text().to_string(), "title: My Title");
 
-        let token_kinds: Vec<_> = content
+        let mapping = content
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+            .expect("yaml block map");
+        let entry = mapping
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            .expect("yaml block map entry");
+        let key = entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
+            .expect("yaml block map key");
+        let value = entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+            .expect("yaml block map value");
+
+        let key_token_kinds: Vec<_> = key
             .children_with_tokens()
             .filter_map(|el| el.into_token())
             .map(|tok| tok.kind())
             .collect();
         assert_eq!(
-            token_kinds,
-            vec![
-                SyntaxKind::YAML_KEY,
-                SyntaxKind::YAML_COLON,
-                SyntaxKind::WHITESPACE,
-                SyntaxKind::YAML_SCALAR,
-            ]
+            key_token_kinds,
+            vec![SyntaxKind::YAML_KEY, SyntaxKind::YAML_COLON,]
+        );
+
+        let value_token_kinds: Vec<_> = value
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .map(|tok| tok.kind())
+            .collect();
+        assert_eq!(
+            value_token_kinds,
+            vec![SyntaxKind::WHITESPACE, SyntaxKind::YAML_SCALAR,]
         );
     }
 
@@ -107,8 +129,18 @@ mod tests {
             .children()
             .find(|n| n.kind() == SyntaxKind::YAML_METADATA_CONTENT)
             .expect("yaml metadata content");
-        let token_kinds: Vec<_> = content
-            .children_with_tokens()
+        let mapping = content
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+            .expect("yaml block map");
+        let entries: Vec<_> = mapping
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            .collect();
+        assert_eq!(entries.len(), 2);
+
+        let token_kinds: Vec<_> = mapping
+            .descendants_with_tokens()
             .filter_map(|el| el.into_token())
             .map(|tok| tok.kind())
             .collect();
@@ -126,6 +158,29 @@ mod tests {
                 SyntaxKind::YAML_SCALAR,
                 SyntaxKind::NEWLINE,
             ]
+        );
+    }
+
+    #[test]
+    fn mapping_nodes_preserve_entry_text_boundaries() {
+        let tree = parse_basic_mapping_tree("title: A\nauthor: B\n").expect("tree");
+        let content = tree
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_METADATA_CONTENT)
+            .expect("yaml metadata content");
+        let mapping = content
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+            .expect("yaml block map");
+
+        let entry_texts: Vec<_> = mapping
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            .map(|n| n.text().to_string())
+            .collect();
+        assert_eq!(
+            entry_texts,
+            vec!["title: A\n".to_string(), "author: B\n".to_string(),]
         );
     }
 

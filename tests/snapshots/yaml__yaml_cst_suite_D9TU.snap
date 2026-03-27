@@ -1,6 +1,5 @@
 ---
 source: tests/yaml.rs
-assertion_line: 124
 expression: snapshot_json
 ---
 {
@@ -10,36 +9,72 @@ expression: snapshot_json
       {
         "children": [
           {
-            "kind": "YAML_KEY",
-            "range": {
-              "end": 3,
-              "start": 0
-            },
-            "text": "foo"
-          },
-          {
-            "kind": "YAML_COLON",
-            "range": {
-              "end": 4,
-              "start": 3
-            },
-            "text": ":"
-          },
-          {
-            "kind": "WHITESPACE",
-            "range": {
-              "end": 5,
-              "start": 4
-            },
-            "text": " "
-          },
-          {
-            "kind": "YAML_SCALAR",
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "kind": "YAML_KEY",
+                        "range": {
+                          "end": 3,
+                          "start": 0
+                        },
+                        "text": "foo"
+                      },
+                      {
+                        "kind": "YAML_COLON",
+                        "range": {
+                          "end": 4,
+                          "start": 3
+                        },
+                        "text": ":"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_KEY",
+                    "range": {
+                      "end": 4,
+                      "start": 0
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "kind": "WHITESPACE",
+                        "range": {
+                          "end": 5,
+                          "start": 4
+                        },
+                        "text": " "
+                      },
+                      {
+                        "kind": "YAML_SCALAR",
+                        "range": {
+                          "end": 8,
+                          "start": 5
+                        },
+                        "text": "bar"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_VALUE",
+                    "range": {
+                      "end": 8,
+                      "start": 4
+                    }
+                  }
+                ],
+                "kind": "YAML_BLOCK_MAP_ENTRY",
+                "range": {
+                  "end": 8,
+                  "start": 0
+                }
+              }
+            ],
+            "kind": "YAML_BLOCK_MAP",
             "range": {
               "end": 8,
-              "start": 5
-            },
-            "text": "bar"
+              "start": 0
+            }
           }
         ],
         "kind": "YAML_METADATA_CONTENT",

@@ -83,10 +83,11 @@ fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
     Some((raw_key, raw_value))
 }
 
-/// Parse one or more `key: value` lines and emit a tiny Rowan CST.
+/// Parse one or more `key: value` lines and emit a prototype YAML mapping CST.
 ///
 /// This remains prototype-scoped but models YAML mapping structure with explicit
-/// key/colon/whitespace/value/newline tokens.
+/// block-map and entry/key/value nodes, plus key/colon/whitespace/value/newline
+/// tokens.
 pub fn parse_basic_mapping_tree(input: &str) -> Option<SyntaxNode> {
     if input.is_empty() {
         return None;
@@ -95,14 +96,19 @@ pub fn parse_basic_mapping_tree(input: &str) -> Option<SyntaxNode> {
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::DOCUMENT.into());
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
+    builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
 
     for raw_line in input.split_inclusive('\n') {
         let (line, newline) = split_line_and_newline(raw_line);
         let (raw_key, raw_value) = parse_raw_mapping_line(line)?;
+        builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
 
+        builder.start_node(SyntaxKind::YAML_BLOCK_MAP_KEY.into());
         builder.token(SyntaxKind::YAML_KEY.into(), raw_key);
         builder.token(SyntaxKind::YAML_COLON.into(), ":");
+        builder.finish_node(); // YAML_BLOCK_MAP_KEY
 
+        builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
         let leading_ws_len = raw_value
             .bytes()
             .take_while(|b| *b == b' ' || *b == b'\t')
@@ -111,12 +117,15 @@ pub fn parse_basic_mapping_tree(input: &str) -> Option<SyntaxNode> {
             builder.token(SyntaxKind::WHITESPACE.into(), &raw_value[..leading_ws_len]);
         }
         builder.token(SyntaxKind::YAML_SCALAR.into(), &raw_value[leading_ws_len..]);
+        builder.finish_node(); // YAML_BLOCK_MAP_VALUE
 
         if !newline.is_empty() {
             builder.token(SyntaxKind::NEWLINE.into(), newline);
         }
+        builder.finish_node(); // YAML_BLOCK_MAP_ENTRY
     }
 
+    builder.finish_node(); // YAML_BLOCK_MAP
     builder.finish_node(); // YAML_METADATA_CONTENT
     builder.finish_node(); // DOCUMENT
     Some(SyntaxNode::new_root(builder.finish()))
@@ -147,10 +156,14 @@ pub fn parse_basic_entry(input: &str) -> Option<BasicYamlEntry<'_>> {
 /// The current prototype emits:
 /// DOCUMENT
 ///   YAML_METADATA_CONTENT
-///     TEXT(key)
-///     TEXT(":")
-///     [WHITESPACE(" ")] // when present in the original input
-///     TEXT(value)
+///     YAML_BLOCK_MAP
+///       YAML_BLOCK_MAP_ENTRY
+///         YAML_BLOCK_MAP_KEY
+///           YAML_KEY(key)
+///           YAML_COLON(":")
+///         YAML_BLOCK_MAP_VALUE
+///           [WHITESPACE(" ")] // when present in the original input
+///           YAML_SCALAR(value)
 pub fn parse_basic_entry_tree(input: &str) -> Option<SyntaxNode> {
     parse_basic_entry(input)?;
     parse_basic_mapping_tree(input)
