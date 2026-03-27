@@ -243,35 +243,42 @@ expression: snapshot_json
                       "end": 79,
                       "start": 56
                     }
+                  },
+                  {
+                    "kind": "NEWLINE",
+                    "range": {
+                      "end": 80,
+                      "start": 79
+                    },
+                    "text": "\n"
                   }
                 ],
                 "kind": "YAML_BLOCK_MAP_ENTRY",
                 "range": {
-                  "end": 79,
+                  "end": 80,
                   "start": 52
                 }
               }
             ],
             "kind": "YAML_BLOCK_MAP",
             "range": {
-              "end": 79,
+              "end": 80,
               "start": 0
             }
           }
         ],
         "kind": "YAML_METADATA_CONTENT",
         "range": {
-          "end": 79,
+          "end": 80,
           "start": 0
         }
       }
     ],
     "kind": "DOCUMENT",
     "range": {
-      "end": 79,
+      "end": 80,
       "start": 0
     }
   },
-  "input": "hr:  65    # Home runs\navg: 0.278 # Batting average\nrbi: 147   # Runs Batted In\n",
-  "normalized": "hr:  65    # Home runs\navg: 0.278 # Batting average\nrbi: 147   # Runs Batted In"
+  "input": "hr:  65    # Home runs\navg: 0.278 # Batting average\nrbi: 147   # Runs Batted In\n"
 }

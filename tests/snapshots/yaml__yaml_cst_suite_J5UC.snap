@@ -195,35 +195,42 @@ expression: snapshot_json
                       "end": 29,
                       "start": 24
                     }
+                  },
+                  {
+                    "kind": "NEWLINE",
+                    "range": {
+                      "end": 30,
+                      "start": 29
+                    },
+                    "text": "\n"
                   }
                 ],
                 "kind": "YAML_BLOCK_MAP_ENTRY",
                 "range": {
-                  "end": 29,
+                  "end": 30,
                   "start": 20
                 }
               }
             ],
             "kind": "YAML_BLOCK_MAP",
             "range": {
-              "end": 29,
+              "end": 30,
               "start": 0
             }
           }
         ],
         "kind": "YAML_METADATA_CONTENT",
         "range": {
-          "end": 29,
+          "end": 30,
           "start": 0
         }
       }
     ],
     "kind": "DOCUMENT",
     "range": {
-      "end": 29,
+      "end": 30,
       "start": 0
     }
   },
-  "input": "foo: blue\nbar: arrr\nbaz: jazz\n",
-  "normalized": "foo: blue\nbar: arrr\nbaz: jazz"
+  "input": "foo: blue\nbar: arrr\nbaz: jazz\n"
 }

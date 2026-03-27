@@ -4,5 +4,4 @@ expression: snapshot
 ---
 case_id: D9TU
 input: "foo: bar\n"
-normalized: "foo: bar"
 parsed_mapping_tree: true

@@ -70,8 +70,7 @@ fn fixture_case_events(case_path: &Path) -> Vec<String> {
 }
 
 fn cst_yaml_projected_events(input: &str) -> Vec<String> {
-    let normalized = input.trim_end_matches(['\n', '\r']);
-    let Some(tree) = parse_basic_mapping_tree(normalized) else {
+    let Some(tree) = parse_basic_mapping_tree(input) else {
         return Vec::new();
     };
 
@@ -147,11 +146,9 @@ fn yaml_allowlist_cases_snapshot() {
             )
         });
 
-        let normalized = input.trim_end_matches(['\n', '\r']);
-        let parsed = parse_basic_mapping_tree(normalized).is_some();
-        let snapshot = format!(
-            "case_id: {case_id}\ninput: {input:?}\nnormalized: {normalized:?}\nparsed_mapping_tree: {parsed}\n"
-        );
+        let parsed = parse_basic_mapping_tree(&input).is_some();
+        let snapshot =
+            format!("case_id: {case_id}\ninput: {input:?}\nparsed_mapping_tree: {parsed}\n");
 
         insta::assert_snapshot!(format!("yaml_suite_{}", case_id), snapshot);
     }
@@ -175,12 +172,10 @@ fn yaml_allowlist_cases_cst_snapshot() {
             )
         });
 
-        let normalized = input.trim_end_matches(['\n', '\r']);
-        let tree = parse_basic_mapping_tree(normalized);
+        let tree = parse_basic_mapping_tree(&input);
         let snapshot_json = json!({
             "case_id": case_id,
             "input": input,
-            "normalized": normalized,
             "cst": tree.as_ref().map(cst_to_json),
         });
         insta::assert_json_snapshot!(format!("yaml_cst_suite_{}", case_id), snapshot_json);
@@ -188,19 +183,18 @@ fn yaml_allowlist_cases_cst_snapshot() {
 }
 
 #[test]
-fn yaml_allowlist_losslessness_normalized_input() {
+fn yaml_allowlist_losslessness_raw_input() {
     for (case_id, case_path) in allowlisted_case_paths() {
         let input_path = case_path.join("in.yaml");
         let input = fs::read_to_string(&input_path)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
-        let normalized = input.trim_end_matches(['\n', '\r']);
-        let tree = parse_basic_mapping_tree(normalized)
-            .unwrap_or_else(|| panic!("failed to parse normalized input for {}", case_id));
+        let tree = parse_basic_mapping_tree(&input)
+            .unwrap_or_else(|| panic!("failed to parse raw input for {}", case_id));
         let tree_text = tree.text().to_string();
         similar_asserts::assert_eq!(
-            normalized,
+            input,
             tree_text,
-            "yaml normalized losslessness mismatch for {}",
+            "yaml raw losslessness mismatch for {}",
             case_id
         );
     }
