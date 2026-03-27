@@ -1,0 +1,7 @@
+---
+source: tests/yaml.rs
+expression: snapshot
+---
+case_id: W5VH
+input: "a: &:@*!$\"<foo>: scalar a\nb: *:@*!$\"<foo>:\n"
+parsed_mapping_tree: true
