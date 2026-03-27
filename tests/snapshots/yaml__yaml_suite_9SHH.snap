@@ -1,0 +1,7 @@
+---
+source: tests/yaml.rs
+expression: snapshot
+---
+case_id: 9SHH
+input: "single: 'text'\ndouble: \"text\"\n"
+parsed_mapping_tree: true

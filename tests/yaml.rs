@@ -77,11 +77,18 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     let mut values: Vec<String> = tree
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
-        .filter(|tok| {
-            tok.kind() == panache::syntax::SyntaxKind::YAML_KEY
-                || tok.kind() == panache::syntax::SyntaxKind::YAML_SCALAR
+        .filter_map(|tok| match tok.kind() {
+            panache::syntax::SyntaxKind::YAML_KEY => Some(format!("=VAL :{}", tok.text())),
+            panache::syntax::SyntaxKind::YAML_SCALAR => {
+                let text = tok.text();
+                if text.starts_with('"') || text.starts_with('\'') {
+                    Some(format!("=VAL {}", text.trim_end_matches(['"', '\''])))
+                } else {
+                    Some(format!("=VAL :{text}"))
+                }
+            }
+            _ => None,
         })
-        .map(|tok| format!("=VAL :{}", tok.text()))
         .collect();
 
     let mut events = Vec::with_capacity(values.len() + 6);
