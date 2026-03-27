@@ -1,0 +1,8 @@
+---
+source: tests/yaml.rs
+expression: snapshot
+---
+case_id: J5UC
+input: "foo: blue\nbar: arrr\nbaz: jazz\n"
+normalized: "foo: blue\nbar: arrr\nbaz: jazz"
+parsed_mapping_tree: true

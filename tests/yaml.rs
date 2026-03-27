@@ -1,6 +1,5 @@
 use panache::parser::yaml::{
-    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_basic_entry,
-    parse_basic_mapping_tree, parse_shadow,
+    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_basic_mapping_tree, parse_shadow,
 };
 use panache::syntax::cst_to_json;
 use serde_json::json;
@@ -58,35 +57,43 @@ fn allowlisted_case_paths() -> Vec<(String, PathBuf)> {
         .collect()
 }
 
-fn fixture_case_val_events(case_path: &Path) -> Vec<String> {
+fn fixture_case_events(case_path: &Path) -> Vec<String> {
     let event_path = case_path.join("test.event");
     let event_text = fs::read_to_string(&event_path)
         .unwrap_or_else(|e| panic!("failed to read {}: {e}", event_path.display()));
     event_text
         .lines()
         .map(str::trim)
-        .filter(|line| line.starts_with("=VAL "))
-        .map(|line| {
-            line.trim_start_matches("=VAL ")
-                .trim_start_matches(':')
-                .to_string()
-        })
+        .filter(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
         .collect()
 }
 
-fn cst_yaml_value_tokens(input: &str) -> Vec<String> {
+fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     let normalized = input.trim_end_matches(['\n', '\r']);
     let Some(tree) = parse_basic_mapping_tree(normalized) else {
         return Vec::new();
     };
-    tree.descendants_with_tokens()
+
+    let mut values: Vec<String> = tree
+        .descendants_with_tokens()
         .filter_map(|el| el.into_token())
         .filter(|tok| {
             tok.kind() == panache::syntax::SyntaxKind::YAML_KEY
                 || tok.kind() == panache::syntax::SyntaxKind::YAML_SCALAR
         })
-        .map(|tok| tok.text().to_string())
-        .collect()
+        .map(|tok| format!("=VAL :{}", tok.text()))
+        .collect();
+
+    let mut events = Vec::with_capacity(values.len() + 6);
+    events.push("+STR".to_string());
+    events.push("+DOC".to_string());
+    events.push("+MAP".to_string());
+    events.append(&mut values);
+    events.push("-MAP".to_string());
+    events.push("-DOC".to_string());
+    events.push("-STR".to_string());
+    events
 }
 
 fn render_shadow_report(label: &str, report: &panache::parser::yaml::ShadowYamlReport) -> String {
@@ -140,8 +147,11 @@ fn yaml_allowlist_cases_snapshot() {
             )
         });
 
-        let parsed = parse_basic_entry(input.trim_end_matches('\n'));
-        let snapshot = format!("case_id: {case_id}\ninput: {input:?}\nparsed: {parsed:#?}\n");
+        let normalized = input.trim_end_matches(['\n', '\r']);
+        let parsed = parse_basic_mapping_tree(normalized).is_some();
+        let snapshot = format!(
+            "case_id: {case_id}\ninput: {input:?}\nnormalized: {normalized:?}\nparsed_mapping_tree: {parsed}\n"
+        );
 
         insta::assert_snapshot!(format!("yaml_suite_{}", case_id), snapshot);
     }
@@ -178,16 +188,16 @@ fn yaml_allowlist_cases_cst_snapshot() {
 }
 
 #[test]
-fn yaml_allowlist_event_shape_smoke() {
+fn yaml_allowlist_projected_event_parity() {
     for (case_id, case_path) in allowlisted_case_paths() {
         let input_path = case_path.join("in.yaml");
         let input = fs::read_to_string(&input_path)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
-        let expected_vals = fixture_case_val_events(&case_path);
-        let actual_vals = cst_yaml_value_tokens(&input);
+        let expected_events = fixture_case_events(&case_path);
+        let actual_events = cst_yaml_projected_events(&input);
         assert_eq!(
-            actual_vals, expected_vals,
-            "value token projection mismatch for {}",
+            actual_events, expected_events,
+            "projected event stream mismatch for {}",
             case_id
         );
     }
@@ -200,7 +210,7 @@ fn yaml_shadow_defaults_to_noop_and_does_not_replace_pipeline() {
     assert_eq!(report.shadow_reason, "shadow-disabled");
     assert!(report.normalized_input.is_none());
 
-    let parsed = parse_basic_entry("title: Shadow");
+    let parsed = parse_basic_mapping_tree("title: Shadow");
     assert!(parsed.is_some());
 }
 
