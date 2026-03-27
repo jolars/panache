@@ -1,0 +1,7 @@
+---
+source: tests/yaml.rs
+expression: snapshot
+---
+case_id: ZH7C
+input: "&a a: b\nc: &d d\n"
+parsed_mapping_tree: true
