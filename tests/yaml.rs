@@ -78,14 +78,30 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
         .filter_map(|tok| match tok.kind() {
-            panache::syntax::SyntaxKind::YAML_KEY => Some(format!("=VAL :{}", tok.text())),
+            panache::syntax::SyntaxKind::YAML_KEY => {
+                let text = tok.text();
+                if let Some(rest) = text.strip_prefix('&') {
+                    if let Some((anchor, value)) = rest.split_once(' ') {
+                        Some(format!("=VAL &{} :{}", anchor, value))
+                    } else {
+                        Some(format!("=VAL &{} :", rest))
+                    }
+                } else if text.starts_with('*') {
+                    Some(format!("=ALI {}", text.trim_end()))
+                } else {
+                    Some(format!("=VAL :{text}"))
+                }
+            }
             panache::syntax::SyntaxKind::YAML_SCALAR => {
                 let text = tok.text();
                 if text.starts_with('"') || text.starts_with('\'') {
                     Some(format!("=VAL {}", text.trim_end_matches(['"', '\''])))
                 } else if let Some(rest) = text.strip_prefix('&') {
-                    let (anchor, value) = rest.split_once(' ')?;
-                    Some(format!("=VAL &{} :{}", anchor, value))
+                    if let Some((anchor, value)) = rest.split_once(' ') {
+                        Some(format!("=VAL &{} :{}", anchor, value))
+                    } else {
+                        Some(format!("=VAL &{} :", rest))
+                    }
                 } else if text.starts_with('*') {
                     Some(format!("=ALI {text}"))
                 } else {
