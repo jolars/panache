@@ -63,7 +63,7 @@ uuid = { version = "1.22.0", features = ["v4"], optional = true }
 
 [dev-dependencies]
 similar-asserts = "1.7.0"
-insta = "1.43.2"
+insta = { version = "1.43.2", features = ["json"] }
 tokio = { version = "1", features = ["macros", "rt"] }
 assert_cmd = "2.0"
 predicates = "3.0"

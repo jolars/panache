@@ -1,0 +1,60 @@
+---
+source: tests/yaml.rs
+assertion_line: 124
+expression: snapshot_json
+---
+{
+  "case_id": "D9TU",
+  "cst": {
+    "children": [
+      {
+        "children": [
+          {
+            "kind": "YAML_KEY",
+            "range": {
+              "end": 3,
+              "start": 0
+            },
+            "text": "foo"
+          },
+          {
+            "kind": "YAML_COLON",
+            "range": {
+              "end": 4,
+              "start": 3
+            },
+            "text": ":"
+          },
+          {
+            "kind": "WHITESPACE",
+            "range": {
+              "end": 5,
+              "start": 4
+            },
+            "text": " "
+          },
+          {
+            "kind": "YAML_SCALAR",
+            "range": {
+              "end": 8,
+              "start": 5
+            },
+            "text": "bar"
+          }
+        ],
+        "kind": "YAML_METADATA_CONTENT",
+        "range": {
+          "end": 8,
+          "start": 0
+        }
+      }
+    ],
+    "kind": "DOCUMENT",
+    "range": {
+      "end": 8,
+      "start": 0
+    }
+  },
+  "input": "foo: bar\n",
+  "normalized": "foo: bar"
+}

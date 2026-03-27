@@ -1,6 +1,9 @@
 use panache::parser::yaml::{
-    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_basic_entry, parse_shadow,
+    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_basic_entry,
+    parse_basic_mapping_tree, parse_shadow,
 };
+use panache::syntax::cst_to_json;
+use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -80,6 +83,49 @@ fn yaml_allowlist_cases_snapshot() {
 }
 
 #[test]
+fn yaml_allowlist_cases_cst_snapshot() {
+    let fixture_root = fixture_root();
+    assert!(
+        fixture_root.exists(),
+        "yaml-test-suite fixtures missing; run `task update-yaml-fixtures`"
+    );
+
+    let allowlist = Path::new(env!("CARGO_MANIFEST_DIR")).join(ALLOWLIST_PATH);
+    assert!(
+        allowlist.exists(),
+        "missing allowlist file: {}",
+        allowlist.display()
+    );
+
+    let case_ids = read_lines(&allowlist);
+    assert!(
+        !case_ids.is_empty(),
+        "allowlist must include at least one case"
+    );
+
+    for case_id in case_ids {
+        let in_yaml = fixture_root.join(&case_id).join("in.yaml");
+        let input = fs::read_to_string(&in_yaml).unwrap_or_else(|e| {
+            panic!(
+                "failed to read case {} ({}): {e}",
+                case_id,
+                in_yaml.display()
+            )
+        });
+
+        let normalized = input.trim_end_matches(['\n', '\r']);
+        let tree = parse_basic_mapping_tree(normalized);
+        let snapshot_json = json!({
+            "case_id": case_id,
+            "input": input,
+            "normalized": normalized,
+            "cst": tree.as_ref().map(cst_to_json),
+        });
+        insta::assert_json_snapshot!(format!("yaml_cst_suite_{}", case_id), snapshot_json);
+    }
+}
+
+#[test]
 fn yaml_shadow_defaults_to_noop_and_does_not_replace_pipeline() {
     let report = parse_shadow("title: Shadow", ShadowYamlOptions::default());
     assert_eq!(report.outcome, ShadowYamlOutcome::SkippedDisabled);
@@ -125,7 +171,7 @@ normalized=None
 
 [enabled-plain]
 outcome=PrototypeParsed
-reason=prototype-basic-entry-parsed
+reason=prototype-basic-mapping-parsed
 kind=Plain
 bytes=15
 lines=1
@@ -133,7 +179,7 @@ normalized=Some(\"title: Snapshot\")
 
 [enabled-hashpipe]
 outcome=PrototypeParsed
-reason=prototype-basic-entry-parsed
+reason=prototype-basic-mapping-parsed
 kind=Hashpipe
 bytes=18
 lines=1
@@ -167,16 +213,16 @@ fn yaml_shadow_report_snapshot_multiline_crlf_shape() {
     .join("\n");
 
     let expected = "[enabled-plain-crlf-multiline]
-outcome=PrototypeRejected
-reason=prototype-basic-entry-rejected
+outcome=PrototypeParsed
+reason=prototype-basic-mapping-parsed
 kind=Plain
 bytes=29
 lines=2
 normalized=Some(\"title: Snapshot\\r\\nauthor: Me\\r\\n\")
 
 [enabled-hashpipe-crlf-multiline]
-outcome=PrototypeRejected
-reason=prototype-basic-entry-rejected
+outcome=PrototypeParsed
+reason=prototype-basic-mapping-parsed
 kind=Hashpipe
 bytes=35
 lines=2

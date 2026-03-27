@@ -10,21 +10,27 @@ pub enum SyntaxKind {
     WHITESPACE = 0,
     NEWLINE,
     TEXT,
-    BACKSLASH,           // \ (for escaping)
-    ESCAPED_CHAR,        // Any escaped character
-    NONBREAKING_SPACE,   // \<space>
-    HARD_LINE_BREAK,     // \<newline>
-    DIV_MARKER,          // :::
+    BACKSLASH,         // \ (for escaping)
+    ESCAPED_CHAR,      // Any escaped character
+    NONBREAKING_SPACE, // \<space>
+    HARD_LINE_BREAK,   // \<newline>
+    DIV_MARKER,        // :::
+
+    // YAML tokens (metadata and shadow YAML CST parser)
     YAML_METADATA_DELIM, // --- or ... (for YAML blocks)
-    BLOCK_QUOTE_MARKER,  // >
-    ALERT_MARKER,        // [!NOTE], [!TIP], etc.
-    IMAGE_LINK_START,    // ![
-    LIST_MARKER,         // - + *
-    TASK_CHECKBOX,       // [ ] or [x] or [X]
-    COMMENT_START,       // <!--
-    COMMENT_END,         // -->
-    ATTRIBUTE,           // {#label} for headings, math, etc.
-    HORIZONTAL_RULE,     // --- or *** or ___
+    YAML_KEY,            // YAML mapping key token
+    YAML_COLON,          // YAML mapping key-value separator
+    YAML_SCALAR,         // YAML scalar value token
+
+    BLOCK_QUOTE_MARKER, // >
+    ALERT_MARKER,       // [!NOTE], [!TIP], etc.
+    IMAGE_LINK_START,   // ![
+    LIST_MARKER,        // - + *
+    TASK_CHECKBOX,      // [ ] or [x] or [X]
+    COMMENT_START,      // <!--
+    COMMENT_END,        // -->
+    ATTRIBUTE,          // {#label} for headings, math, etc.
+    HORIZONTAL_RULE,    // --- or *** or ___
     BLANK_LINE,
 
     // Links and images
@@ -121,8 +127,11 @@ pub enum SyntaxKind {
 
     // Composite nodes
     DOCUMENT,
+
+    // YAML nodes
     YAML_METADATA,
     YAML_METADATA_CONTENT, // Content lines inside YAML metadata block
+
     PANDOC_TITLE_BLOCK,
     MMD_TITLE_BLOCK,
     FENCED_DIV,
