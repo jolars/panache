@@ -42,3 +42,22 @@ pub struct BasicYamlEntry<'a> {
     pub key: &'a str,
     pub value: &'a str,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum YamlShadowTokenKind {
+    Indent,
+    Dedent,
+    Key,
+    Colon,
+    Whitespace,
+    Tag,
+    Scalar,
+    Comment,
+    Newline,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct YamlShadowToken<'a> {
+    pub kind: YamlShadowTokenKind,
+    pub text: &'a str,
+}

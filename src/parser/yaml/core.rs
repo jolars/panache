@@ -3,6 +3,7 @@ use rowan::GreenNodeBuilder;
 
 use super::model::{
     BasicYamlEntry, ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlInputKind,
+    YamlShadowToken, YamlShadowTokenKind,
 };
 
 /// Parse YAML in shadow mode using prototype groundwork only.
@@ -75,6 +76,12 @@ fn split_line_and_newline(line: &str) -> (&str, &str) {
     }
 }
 
+fn leading_indent(text: &str) -> usize {
+    text.bytes()
+        .take_while(|b| *b == b' ' || *b == b'\t')
+        .count()
+}
+
 fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
     let mut in_single = false;
     let mut in_double = false;
@@ -133,83 +140,261 @@ fn split_tag_prefix(text: &str) -> (Option<&str>, &str) {
     (Some(tag), value)
 }
 
+fn lex_mapping_line_tokens<'a>(
+    line: &'a str,
+    newline: &'a str,
+    current_indent: usize,
+    indent_stack: &mut Vec<usize>,
+    out: &mut Vec<YamlShadowToken<'a>>,
+) -> Option<()> {
+    let line_indent = leading_indent(line);
+    let content = &line[line_indent..];
+
+    if content.trim().is_empty() {
+        if !newline.is_empty() {
+            out.push(YamlShadowToken {
+                kind: YamlShadowTokenKind::Newline,
+                text: newline,
+            });
+        }
+        return Some(());
+    }
+
+    if line_indent > current_indent {
+        indent_stack.push(line_indent);
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Indent,
+            text: &line[..line_indent],
+        });
+    } else if line_indent < current_indent {
+        while let Some(last) = indent_stack.last().copied() {
+            if line_indent < last {
+                indent_stack.pop();
+                out.push(YamlShadowToken {
+                    kind: YamlShadowTokenKind::Dedent,
+                    text: "",
+                });
+            } else {
+                break;
+            }
+        }
+        if indent_stack.last().copied().unwrap_or(0) != line_indent {
+            return None;
+        }
+    }
+
+    if line_indent > 0 {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Whitespace,
+            text: &line[..line_indent],
+        });
+    }
+
+    let (raw_key, raw_value) = parse_raw_mapping_line(content)?;
+
+    let (key_tag, key_text) = split_tag_prefix(raw_key);
+    if let Some(tag) = key_tag {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Tag,
+            text: tag,
+        });
+        let ws_len = leading_indent(key_text);
+        if ws_len > 0 {
+            out.push(YamlShadowToken {
+                kind: YamlShadowTokenKind::Whitespace,
+                text: &key_text[..ws_len],
+            });
+        }
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Key,
+            text: &key_text[ws_len..],
+        });
+    } else {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Key,
+            text: raw_key,
+        });
+    }
+
+    out.push(YamlShadowToken {
+        kind: YamlShadowTokenKind::Colon,
+        text: ":",
+    });
+
+    let (value_part, comment_part) = split_value_and_comment(raw_value);
+    let leading_ws_len = leading_indent(value_part);
+    if leading_ws_len > 0 {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Whitespace,
+            text: &value_part[..leading_ws_len],
+        });
+    }
+
+    let scalar_part = &value_part[leading_ws_len..];
+    let (value_tag, value_text) = split_tag_prefix(scalar_part);
+    if let Some(tag) = value_tag {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Tag,
+            text: tag,
+        });
+        let ws_len = leading_indent(value_text);
+        if ws_len > 0 {
+            out.push(YamlShadowToken {
+                kind: YamlShadowTokenKind::Whitespace,
+                text: &value_text[..ws_len],
+            });
+        }
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Scalar,
+            text: &value_text[ws_len..],
+        });
+    } else {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Scalar,
+            text: scalar_part,
+        });
+    }
+
+    if let Some(comment) = comment_part {
+        let leading_comment_ws_len = raw_value.len() - comment.len() - value_part.len();
+        if leading_comment_ws_len > 0 {
+            let start = value_part.len();
+            let end = start + leading_comment_ws_len;
+            out.push(YamlShadowToken {
+                kind: YamlShadowTokenKind::Whitespace,
+                text: &raw_value[start..end],
+            });
+        }
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Comment,
+            text: comment,
+        });
+    }
+
+    if !newline.is_empty() {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Newline,
+            text: newline,
+        });
+    }
+
+    Some(())
+}
+
+pub fn lex_basic_mapping_tokens(input: &str) -> Option<Vec<YamlShadowToken<'_>>> {
+    if input.is_empty() {
+        return None;
+    }
+
+    let mut tokens = Vec::new();
+    let mut indent_stack = vec![0usize];
+
+    for raw_line in input.split_inclusive('\n') {
+        let (line, newline) = split_line_and_newline(raw_line);
+        let current_indent = indent_stack.last().copied().unwrap_or(0);
+        lex_mapping_line_tokens(
+            line,
+            newline,
+            current_indent,
+            &mut indent_stack,
+            &mut tokens,
+        )?;
+    }
+
+    while indent_stack.len() > 1 {
+        indent_stack.pop();
+        tokens.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Dedent,
+            text: "",
+        });
+    }
+
+    Some(tokens)
+}
+
 /// Parse one or more `key: value` lines and emit a prototype YAML mapping CST.
 ///
 /// This remains prototype-scoped but models YAML mapping structure with explicit
 /// block-map and entry/key/value nodes, plus key/colon/whitespace/value/newline
 /// tokens.
 pub fn parse_basic_mapping_tree(input: &str) -> Option<SyntaxNode> {
-    if input.is_empty() {
-        return None;
-    }
+    let tokens = lex_basic_mapping_tokens(input)?;
 
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::DOCUMENT.into());
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
     builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
 
-    for raw_line in input.split_inclusive('\n') {
-        let (line, newline) = split_line_and_newline(raw_line);
-        let (raw_key, raw_value) = parse_raw_mapping_line(line)?;
-        builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
-
-        builder.start_node(SyntaxKind::YAML_BLOCK_MAP_KEY.into());
-        let (key_tag, key_text) = split_tag_prefix(raw_key);
-        if let Some(tag) = key_tag {
-            builder.token(SyntaxKind::YAML_TAG.into(), tag);
-            let ws_len = key_text
-                .bytes()
-                .take_while(|b| *b == b' ' || *b == b'\t')
-                .count();
-            if ws_len > 0 {
-                builder.token(SyntaxKind::WHITESPACE.into(), &key_text[..ws_len]);
+    let mut i = 0usize;
+    while i < tokens.len() {
+        match tokens[i].kind {
+            YamlShadowTokenKind::Indent | YamlShadowTokenKind::Dedent => {
+                i += 1;
             }
-            builder.token(SyntaxKind::YAML_KEY.into(), &key_text[ws_len..]);
-        } else {
-            builder.token(SyntaxKind::YAML_KEY.into(), raw_key);
-        }
-        builder.token(SyntaxKind::YAML_COLON.into(), ":");
-        builder.finish_node(); // YAML_BLOCK_MAP_KEY
-
-        builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
-        let (value_part, comment_part) = split_value_and_comment(raw_value);
-        let leading_ws_len = value_part
-            .bytes()
-            .take_while(|b| *b == b' ' || *b == b'\t')
-            .count();
-        if leading_ws_len > 0 {
-            builder.token(SyntaxKind::WHITESPACE.into(), &value_part[..leading_ws_len]);
-        }
-        let scalar_part = &value_part[leading_ws_len..];
-        let (value_tag, value_text) = split_tag_prefix(scalar_part);
-        if let Some(tag) = value_tag {
-            builder.token(SyntaxKind::YAML_TAG.into(), tag);
-            let ws_len = value_text
-                .bytes()
-                .take_while(|b| *b == b' ' || *b == b'\t')
-                .count();
-            if ws_len > 0 {
-                builder.token(SyntaxKind::WHITESPACE.into(), &value_text[..ws_len]);
+            YamlShadowTokenKind::Newline => {
+                builder.token(SyntaxKind::NEWLINE.into(), tokens[i].text);
+                i += 1;
             }
-            builder.token(SyntaxKind::YAML_SCALAR.into(), &value_text[ws_len..]);
-        } else {
-            builder.token(SyntaxKind::YAML_SCALAR.into(), scalar_part);
-        }
-        if let Some(comment) = comment_part {
-            let leading_comment_ws_len = raw_value.len() - comment.len() - value_part.len();
-            if leading_comment_ws_len > 0 {
-                let start = value_part.len();
-                let end = start + leading_comment_ws_len;
-                builder.token(SyntaxKind::WHITESPACE.into(), &raw_value[start..end]);
-            }
-            builder.token(SyntaxKind::YAML_COMMENT.into(), comment);
-        }
-        builder.finish_node(); // YAML_BLOCK_MAP_VALUE
+            _ => {
+                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
+                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_KEY.into());
 
-        if !newline.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), newline);
+                while i < tokens.len() {
+                    match tokens[i].kind {
+                        YamlShadowTokenKind::Key => {
+                            builder.token(SyntaxKind::YAML_KEY.into(), tokens[i].text);
+                            i += 1;
+                        }
+                        YamlShadowTokenKind::Tag => {
+                            builder.token(SyntaxKind::YAML_TAG.into(), tokens[i].text);
+                            i += 1;
+                        }
+                        YamlShadowTokenKind::Whitespace => {
+                            builder.token(SyntaxKind::WHITESPACE.into(), tokens[i].text);
+                            i += 1;
+                        }
+                        YamlShadowTokenKind::Colon => {
+                            builder.token(SyntaxKind::YAML_COLON.into(), tokens[i].text);
+                            i += 1;
+                            break;
+                        }
+                        _ => return None,
+                    }
+                }
+                builder.finish_node(); // YAML_BLOCK_MAP_KEY
+
+                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
+                while i < tokens.len() {
+                    match tokens[i].kind {
+                        YamlShadowTokenKind::Scalar => {
+                            builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[i].text);
+                            i += 1;
+                        }
+                        YamlShadowTokenKind::Tag => {
+                            builder.token(SyntaxKind::YAML_TAG.into(), tokens[i].text);
+                            i += 1;
+                        }
+                        YamlShadowTokenKind::Comment => {
+                            builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[i].text);
+                            i += 1;
+                        }
+                        YamlShadowTokenKind::Whitespace => {
+                            builder.token(SyntaxKind::WHITESPACE.into(), tokens[i].text);
+                            i += 1;
+                        }
+                        _ => break,
+                    }
+                }
+                builder.finish_node(); // YAML_BLOCK_MAP_VALUE
+
+                if i < tokens.len() && tokens[i].kind == YamlShadowTokenKind::Newline {
+                    builder.token(SyntaxKind::NEWLINE.into(), tokens[i].text);
+                    i += 1;
+                }
+
+                builder.finish_node(); // YAML_BLOCK_MAP_ENTRY
+            }
         }
-        builder.finish_node(); // YAML_BLOCK_MAP_ENTRY
     }
 
     builder.finish_node(); // YAML_BLOCK_MAP

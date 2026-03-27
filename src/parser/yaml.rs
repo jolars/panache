@@ -13,9 +13,13 @@ mod core;
 #[path = "yaml/model.rs"]
 mod model;
 
-pub use core::{parse_basic_entry, parse_basic_entry_tree, parse_basic_mapping_tree, parse_shadow};
+pub use core::{
+    lex_basic_mapping_tokens, parse_basic_entry, parse_basic_entry_tree, parse_basic_mapping_tree,
+    parse_shadow,
+};
 pub use model::{
     BasicYamlEntry, ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlInputKind,
+    YamlShadowToken, YamlShadowTokenKind,
 };
 
 #[cfg(test)]
@@ -212,6 +216,47 @@ mod tests {
             .map(|tok| tok.text().to_string())
             .collect();
         assert_eq!(tag_tokens, vec!["!!str".to_string(), "!!int".to_string()]);
+    }
+
+    #[test]
+    fn lexer_emits_tokens_for_quoted_keys_and_inline_comments() {
+        let input = "\"foo:bar\": 23 # note\n'x:y': 'z' # ok\n";
+        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                YamlShadowTokenKind::Key,
+                YamlShadowTokenKind::Colon,
+                YamlShadowTokenKind::Whitespace,
+                YamlShadowTokenKind::Scalar,
+                YamlShadowTokenKind::Whitespace,
+                YamlShadowTokenKind::Comment,
+                YamlShadowTokenKind::Newline,
+                YamlShadowTokenKind::Key,
+                YamlShadowTokenKind::Colon,
+                YamlShadowTokenKind::Whitespace,
+                YamlShadowTokenKind::Scalar,
+                YamlShadowTokenKind::Whitespace,
+                YamlShadowTokenKind::Comment,
+                YamlShadowTokenKind::Newline,
+            ]
+        );
+        let comments: Vec<_> = tokens
+            .iter()
+            .filter(|t| t.kind == YamlShadowTokenKind::Comment)
+            .map(|t| t.text)
+            .collect();
+        assert_eq!(comments, vec!["# note", "# ok"]);
+    }
+
+    #[test]
+    fn lexer_emits_indent_and_dedent_for_indented_entries() {
+        let input = "root: 1\n  child: 2\n";
+        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
+        assert!(kinds.contains(&YamlShadowTokenKind::Indent));
+        assert!(kinds.contains(&YamlShadowTokenKind::Dedent));
     }
 
     #[test]
