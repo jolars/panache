@@ -70,6 +70,15 @@ fn fixture_case_events(case_path: &Path) -> Vec<String> {
 }
 
 fn cst_yaml_projected_events(input: &str) -> Vec<String> {
+    fn quoted_val_event(text: &str) -> String {
+        if text.starts_with('\'') {
+            let trimmed = text.trim_end_matches('\'');
+            format!("=VAL {}", trimmed.replace('\\', "\\\\"))
+        } else {
+            format!("=VAL {}", text.trim_end_matches('"'))
+        }
+    }
+
     let Some(tree) = parse_basic_mapping_tree(input) else {
         return Vec::new();
     };
@@ -86,6 +95,8 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
                     } else {
                         Some(format!("=VAL &{} :", rest))
                     }
+                } else if text.starts_with('"') || text.starts_with('\'') {
+                    Some(quoted_val_event(text))
                 } else if text.starts_with('*') {
                     Some(format!("=ALI {}", text.trim_end()))
                 } else {
@@ -95,7 +106,10 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
             panache::syntax::SyntaxKind::YAML_SCALAR => {
                 let text = tok.text();
                 if text.starts_with('"') || text.starts_with('\'') {
-                    Some(format!("=VAL {}", text.trim_end_matches(['"', '\''])))
+                    Some(quoted_val_event(text))
+                } else if let Some(rest) = text.strip_prefix("!local &") {
+                    let (anchor, value) = rest.split_once(' ')?;
+                    Some(format!("=VAL &{} <!local> :{}", anchor, value))
                 } else if let Some(rest) = text.strip_prefix('&') {
                     if let Some((anchor, value)) = rest.split_once(' ') {
                         Some(format!("=VAL &{} :{}", anchor, value))
