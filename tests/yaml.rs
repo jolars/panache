@@ -26,6 +26,69 @@ fn fixture_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURE_DIR)
 }
 
+fn fixture_case_path(case_id: &str) -> PathBuf {
+    fixture_root().join(case_id)
+}
+
+fn allowlisted_case_paths() -> Vec<(String, PathBuf)> {
+    let allowlist = Path::new(env!("CARGO_MANIFEST_DIR")).join(ALLOWLIST_PATH);
+    assert!(
+        allowlist.exists(),
+        "missing allowlist file: {}",
+        allowlist.display()
+    );
+    let case_ids = read_lines(&allowlist);
+    assert!(
+        !case_ids.is_empty(),
+        "allowlist must include at least one case"
+    );
+
+    case_ids
+        .into_iter()
+        .map(|case_id| {
+            let case_path = fixture_case_path(&case_id);
+            assert!(
+                case_path.exists(),
+                "fixture case directory missing for {} ({})",
+                case_id,
+                case_path.display()
+            );
+            (case_id, case_path)
+        })
+        .collect()
+}
+
+fn fixture_case_val_events(case_path: &Path) -> Vec<String> {
+    let event_path = case_path.join("test.event");
+    let event_text = fs::read_to_string(&event_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", event_path.display()));
+    event_text
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("=VAL "))
+        .map(|line| {
+            line.trim_start_matches("=VAL ")
+                .trim_start_matches(':')
+                .to_string()
+        })
+        .collect()
+}
+
+fn cst_yaml_value_tokens(input: &str) -> Vec<String> {
+    let normalized = input.trim_end_matches(['\n', '\r']);
+    let Some(tree) = parse_basic_mapping_tree(normalized) else {
+        return Vec::new();
+    };
+    tree.descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| {
+            tok.kind() == panache::syntax::SyntaxKind::YAML_KEY
+                || tok.kind() == panache::syntax::SyntaxKind::YAML_SCALAR
+        })
+        .map(|tok| tok.text().to_string())
+        .collect()
+}
+
 fn render_shadow_report(label: &str, report: &panache::parser::yaml::ShadowYamlReport) -> String {
     format!(
         "{label}\noutcome={:?}\nreason={}\nkind={:?}\nbytes={}\nlines={}\nnormalized={:?}\n",
@@ -46,27 +109,29 @@ fn yaml_allowlist_cases_snapshot() {
         "yaml-test-suite fixtures missing; run `task update-yaml-fixtures`"
     );
 
-    let allowlist = Path::new(env!("CARGO_MANIFEST_DIR")).join(ALLOWLIST_PATH);
     let blocked = Path::new(env!("CARGO_MANIFEST_DIR")).join(BLOCKED_PATH);
-    assert!(
-        allowlist.exists(),
-        "missing allowlist file: {}",
-        allowlist.display()
-    );
     assert!(
         blocked.exists(),
         "missing blocked file: {}",
         blocked.display()
     );
 
-    let case_ids = read_lines(&allowlist);
-    assert!(
-        !case_ids.is_empty(),
-        "allowlist must include at least one case"
-    );
-
-    for case_id in case_ids {
-        let in_yaml = fixture_root.join(&case_id).join("in.yaml");
+    for (case_id, case_path) in allowlisted_case_paths() {
+        let in_yaml = case_path.join("in.yaml");
+        let test_event = case_path.join("test.event");
+        let error_file = case_path.join("error");
+        assert!(
+            test_event.exists(),
+            "allowlisted case {} must include test.event ({})",
+            case_id,
+            test_event.display()
+        );
+        assert!(
+            !error_file.exists(),
+            "allowlisted case {} must not include error fixture ({})",
+            case_id,
+            error_file.display()
+        );
         let input = fs::read_to_string(&in_yaml).unwrap_or_else(|e| {
             panic!(
                 "failed to read case {} ({}): {e}",
@@ -90,21 +155,8 @@ fn yaml_allowlist_cases_cst_snapshot() {
         "yaml-test-suite fixtures missing; run `task update-yaml-fixtures`"
     );
 
-    let allowlist = Path::new(env!("CARGO_MANIFEST_DIR")).join(ALLOWLIST_PATH);
-    assert!(
-        allowlist.exists(),
-        "missing allowlist file: {}",
-        allowlist.display()
-    );
-
-    let case_ids = read_lines(&allowlist);
-    assert!(
-        !case_ids.is_empty(),
-        "allowlist must include at least one case"
-    );
-
-    for case_id in case_ids {
-        let in_yaml = fixture_root.join(&case_id).join("in.yaml");
+    for (case_id, case_path) in allowlisted_case_paths() {
+        let in_yaml = case_path.join("in.yaml");
         let input = fs::read_to_string(&in_yaml).unwrap_or_else(|e| {
             panic!(
                 "failed to read case {} ({}): {e}",
@@ -122,6 +174,22 @@ fn yaml_allowlist_cases_cst_snapshot() {
             "cst": tree.as_ref().map(cst_to_json),
         });
         insta::assert_json_snapshot!(format!("yaml_cst_suite_{}", case_id), snapshot_json);
+    }
+}
+
+#[test]
+fn yaml_allowlist_event_shape_smoke() {
+    for (case_id, case_path) in allowlisted_case_paths() {
+        let input_path = case_path.join("in.yaml");
+        let input = fs::read_to_string(&input_path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
+        let expected_vals = fixture_case_val_events(&case_path);
+        let actual_vals = cst_yaml_value_tokens(&input);
+        assert_eq!(
+            actual_vals, expected_vals,
+            "value token projection mismatch for {}",
+            case_id
+        );
     }
 }
 
