@@ -188,6 +188,25 @@ fn yaml_allowlist_cases_cst_snapshot() {
 }
 
 #[test]
+fn yaml_allowlist_losslessness_normalized_input() {
+    for (case_id, case_path) in allowlisted_case_paths() {
+        let input_path = case_path.join("in.yaml");
+        let input = fs::read_to_string(&input_path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
+        let normalized = input.trim_end_matches(['\n', '\r']);
+        let tree = parse_basic_mapping_tree(normalized)
+            .unwrap_or_else(|| panic!("failed to parse normalized input for {}", case_id));
+        let tree_text = tree.text().to_string();
+        similar_asserts::assert_eq!(
+            normalized,
+            tree_text,
+            "yaml normalized losslessness mismatch for {}",
+            case_id
+        );
+    }
+}
+
+#[test]
 fn yaml_allowlist_projected_event_parity() {
     for (case_id, case_path) in allowlisted_case_paths() {
         let input_path = case_path.join("in.yaml");
