@@ -76,7 +76,25 @@ fn split_line_and_newline(line: &str) -> (&str, &str) {
 }
 
 fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
-    let (raw_key, raw_value) = line.split_once(':')?;
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut split_idx = None;
+
+    for (idx, ch) in line.char_indices() {
+        match ch {
+            '\'' if !in_double => in_single = !in_single,
+            '"' if !in_single => in_double = !in_double,
+            ':' if !in_single && !in_double => {
+                split_idx = Some(idx);
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    let idx = split_idx?;
+    let raw_key = &line[..idx];
+    let raw_value = &line[idx + ':'.len_utf8()..];
     if raw_key.trim().is_empty() || raw_value.trim().is_empty() {
         return None;
     }

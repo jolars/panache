@@ -185,6 +185,21 @@ mod tests {
     }
 
     #[test]
+    fn splits_mapping_on_colon_outside_quoted_key() {
+        let input = "\"foo:bar\": 23\n'x:y': 24\n";
+        let tree = parse_basic_mapping_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let keys: Vec<String> = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_KEY)
+            .map(|tok| tok.text().to_string())
+            .collect();
+        assert_eq!(keys, vec!["\"foo:bar\"".to_string(), "'x:y'".to_string()]);
+    }
+
+    #[test]
     fn rejects_tree_for_invalid_input() {
         assert!(parse_basic_entry_tree("title:").is_none());
     }

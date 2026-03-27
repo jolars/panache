@@ -1,0 +1,169 @@
+---
+source: tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "6SLA",
+  "cst": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "kind": "YAML_KEY",
+                        "range": {
+                          "end": 28,
+                          "start": 0
+                        },
+                        "text": "\"foo\\nbar:baz\\tx \\\\$%^&*()x\""
+                      },
+                      {
+                        "kind": "YAML_COLON",
+                        "range": {
+                          "end": 29,
+                          "start": 28
+                        },
+                        "text": ":"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_KEY",
+                    "range": {
+                      "end": 29,
+                      "start": 0
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "kind": "WHITESPACE",
+                        "range": {
+                          "end": 30,
+                          "start": 29
+                        },
+                        "text": " "
+                      },
+                      {
+                        "kind": "YAML_SCALAR",
+                        "range": {
+                          "end": 32,
+                          "start": 30
+                        },
+                        "text": "23"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_VALUE",
+                    "range": {
+                      "end": 32,
+                      "start": 29
+                    }
+                  },
+                  {
+                    "kind": "NEWLINE",
+                    "range": {
+                      "end": 33,
+                      "start": 32
+                    },
+                    "text": "\n"
+                  }
+                ],
+                "kind": "YAML_BLOCK_MAP_ENTRY",
+                "range": {
+                  "end": 33,
+                  "start": 0
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "kind": "YAML_KEY",
+                        "range": {
+                          "end": 53,
+                          "start": 33
+                        },
+                        "text": "'x\\ny:z\\tx $%^&*()x'"
+                      },
+                      {
+                        "kind": "YAML_COLON",
+                        "range": {
+                          "end": 54,
+                          "start": 53
+                        },
+                        "text": ":"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_KEY",
+                    "range": {
+                      "end": 54,
+                      "start": 33
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "kind": "WHITESPACE",
+                        "range": {
+                          "end": 55,
+                          "start": 54
+                        },
+                        "text": " "
+                      },
+                      {
+                        "kind": "YAML_SCALAR",
+                        "range": {
+                          "end": 57,
+                          "start": 55
+                        },
+                        "text": "24"
+                      }
+                    ],
+                    "kind": "YAML_BLOCK_MAP_VALUE",
+                    "range": {
+                      "end": 57,
+                      "start": 54
+                    }
+                  },
+                  {
+                    "kind": "NEWLINE",
+                    "range": {
+                      "end": 58,
+                      "start": 57
+                    },
+                    "text": "\n"
+                  }
+                ],
+                "kind": "YAML_BLOCK_MAP_ENTRY",
+                "range": {
+                  "end": 58,
+                  "start": 33
+                }
+              }
+            ],
+            "kind": "YAML_BLOCK_MAP",
+            "range": {
+              "end": 58,
+              "start": 0
+            }
+          }
+        ],
+        "kind": "YAML_METADATA_CONTENT",
+        "range": {
+          "end": 58,
+          "start": 0
+        }
+      }
+    ],
+    "kind": "DOCUMENT",
+    "range": {
+      "end": 58,
+      "start": 0
+    }
+  },
+  "input": "\"foo\\nbar:baz\\tx \\\\$%^&*()x\": 23\n'x\\ny:z\\tx $%^&*()x': 24\n"
+}

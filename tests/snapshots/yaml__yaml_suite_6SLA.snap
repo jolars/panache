@@ -1,0 +1,7 @@
+---
+source: tests/yaml.rs
+expression: snapshot
+---
+case_id: 6SLA
+input: "\"foo\\nbar:baz\\tx \\\\$%^&*()x\": 23\n'x\\ny:z\\tx $%^&*()x': 24\n"
+parsed_mapping_tree: true
