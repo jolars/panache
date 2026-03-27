@@ -109,8 +109,9 @@ support.
       - [x] Citations - Rename `@cite` keys and update bibliography
       - [x] Reference links - Rename `[ref]` labels and update definitions
       - [x] Headings - Rename heading text and update internal links
-      - [ ] Footnotes - Rename footnote labels and update definitions/links
-      - [ ] Files - Rename files and update links throughout (maybe complex)
+      - [x] Footnotes - Rename footnote labels and update definitions/links
+      - [x] Files - Rename linked markdown files and update links
+      - [ ] Files - Rename other linked files, shortcodes, etc.
 - [x] Workspace symbols
       - [x] General support for pandoc etc
       - [x] Quarto - project-wide symbol search for figures, tables, sections
