@@ -10,6 +10,8 @@
     pkgs.perf
     pkgs.cargo-flamegraph
     pkgs.cargo-llvm-cov
+    pkgs.cargo-audit
+    pkgs.cargo-deny
     pkgs.cmark
     pkgs.go-task
     pkgs.jarl
