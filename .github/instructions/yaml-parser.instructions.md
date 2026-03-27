@@ -10,11 +10,20 @@ short-term replacement of the existing `yaml_parser` pipeline.
 
 - Keep all YAML parser changes lossless and CST-first: preserve markers,
   whitespace, comments, and scalar style trivia.
+- Prefer a lexer-driven recursive-descent YAML core (stateful, indentation-aware
+  tokenization followed by parse over token stream) to keep CST construction
+  explicit, deterministic, and robust.
+- Treat indentation as lexical structure in YAML work (explicit block/indent
+  boundaries in tokens) rather than implicit parser-only state when possible.
 - Design for both plain YAML files and hashpipe-prefixed YAML so one parser core
   can serve frontmatter, chunk metadata, bibliography YAML, and workspace YAML
   files (for example `_quarto.yml` and metadata files).
 - Prefer explicit host↔embedded range mapping APIs, even when many spans are
   identity mappings, so LSP position conversion remains deterministic.
+- Keep host-level Panache parsing single-pass; YAML internal layering is allowed
+  as an implementation detail as long as integration remains deterministic.
+- Avoid combinator-first YAML parser designs that obscure indentation state,
+  recovery boundaries, or CST/range fidelity.
 - Do not replace the existing YAML pipeline directly. New behavior should be
   introduced in shadow/read-only mode first, with parity checks before any
   formatter/edit-path adoption.
