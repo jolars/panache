@@ -84,8 +84,8 @@ This workflow:
 2. Checks that all files are formatted (`--check` mode)
 3. Runs the linter in CI mode (`--check` mode)
 
-Both steps will fail (exit code 1) if issues are found, preventing the PR from
-merging.
+Both steps will fail (exit code 1) if issues are found, causing the workflow to
+fail.
 
 ### Common options
 
