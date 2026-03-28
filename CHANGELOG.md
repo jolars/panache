@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.29.0](https://github.com/jolars/panache/compare/v2.28.0...v2.29.0) (2026-03-28)
+
+### Features
+
+* **formatter:** separate top-level lists with blankline ([777e090](https://github.com/jolars/panache/commit/777e09054fca428a2c4c29da205ebbc0a0a1b795))
+* **lsp,config:** add suppor for `gfm-auto-identifiers` ([31736da](https://github.com/jolars/panache/commit/31736dae549e4d5f45f6821c6e51e24c6c6e0805))
+* **lsp:** add file renaming for linked documents ([8a7d08a](https://github.com/jolars/panache/commit/8a7d08a443f426b5cf900cac42177bb7a1391a5e))
+* **lsp:** add hover support for for heading references ([3ca2b24](https://github.com/jolars/panache/commit/3ca2b248449e6b7cb4bd77620c308b035ac273c3))
+* **lsp:** add hover support for linked markdown files ([4d88705](https://github.com/jolars/panache/commit/4d8870557fb86f474adc135aa6676b84395a824b))
+* **lsp:** add hover support for reference definitions ([16bdd6f](https://github.com/jolars/panache/commit/16bdd6f90d9f48fdb564bd7a0cf182d4166ad6e7))
+* **lsp:** add rename handler for footnote ids ([42be81d](https://github.com/jolars/panache/commit/42be81d211d4db110d020e3123743bd07b85bb3f))
+* **lsp:** code action for converting bullet/ordered lists ([d620006](https://github.com/jolars/panache/commit/d620006aae3fd595ef79f66854c80920235cadcb))
+* **lsp:** code action for converting list to task list ([f04e91e](https://github.com/jolars/panache/commit/f04e91edc5150ee6f2f9f85a07199bd275b2b7ee))
+* **lsp:** extend file rename to shortcodes and nav elements ([492877f](https://github.com/jolars/panache/commit/492877f5eb5c443b798919d7204695cf11a2ba3c))
+* **lsp:** support go-to-definition for example lists ([b7fbc19](https://github.com/jolars/panache/commit/b7fbc1996b5865221816b6aad9d128acf5ed5381))
+* **lsp:** support renaming for example references ([15f6267](https://github.com/jolars/panache/commit/15f6267ef18e6903a577b1f879dea4a9bb54bb93))
+* **parser:** parse yaml comments ([8b8e731](https://github.com/jolars/panache/commit/8b8e7316a4e0ef08af965e3369448baeb398f777))
+* support `mmd-header-identifiers` extension ([ffe7834](https://github.com/jolars/panache/commit/ffe7834c67b1f85af911d7f4a897cdb759f40f77))
+* support `mmd-link-attributes` extension ([5b44f9e](https://github.com/jolars/panache/commit/5b44f9ee804492b62f854b9856a153ef2a8ad589))
+* support `mmd-title-block` extension ([276e31c](https://github.com/jolars/panache/commit/276e31c7f802497edfed768118fe4781f43c88f0))
+
+### Bug Fixes
+
+* **formatter:** handle idempotency failure with AUTO_LINK ([94c6c95](https://github.com/jolars/panache/commit/94c6c95634c3ad5735251baeebc6d49e2b26f897))
+* **formatter:** mitigate idempotency growth in hashpipe yaml ([82a3da1](https://github.com/jolars/panache/commit/82a3da18c24b27e58f93207a87c4e2e069111891))
+* **lsp,linter:** correctly resolve cross-reference to header ([c3a42cd](https://github.com/jolars/panache/commit/c3a42cd5ba349be1ef4b688bcbd8ff6f583b45ea))
+* **parser:** actually enable `hard-line-breaks` extension ([70c9201](https://github.com/jolars/panache/commit/70c920186dab36b0ddd9dd665061a5b97d1b8253))
+* **parser:** add missing code block extensions for gfm flavor ([1058df6](https://github.com/jolars/panache/commit/1058df6dc9d612420edf8de8eb9baff65b72b163))
+
 ## [2.28.0](https://github.com/jolars/panache/compare/v2.27.0...v2.28.0) (2026-03-25)
 
 ### Features
