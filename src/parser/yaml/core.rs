@@ -312,6 +312,113 @@ pub fn lex_basic_mapping_tokens(input: &str) -> Option<Vec<YamlShadowToken<'_>>>
     Some(tokens)
 }
 
+fn emit_block_map<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlShadowToken<'a>],
+    i: &mut usize,
+    stop_on_dedent: bool,
+) -> Option<()> {
+    let mut closed_by_dedent = false;
+    while *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlShadowTokenKind::Newline => {
+                builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlShadowTokenKind::Dedent => {
+                if stop_on_dedent {
+                    *i += 1;
+                    closed_by_dedent = true;
+                    break;
+                }
+                return None;
+            }
+            YamlShadowTokenKind::Indent => return None,
+            _ => {
+                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
+                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_KEY.into());
+
+                let mut saw_colon = false;
+                while *i < tokens.len() {
+                    match tokens[*i].kind {
+                        YamlShadowTokenKind::Key => {
+                            builder.token(SyntaxKind::YAML_KEY.into(), tokens[*i].text);
+                            *i += 1;
+                        }
+                        YamlShadowTokenKind::Tag => {
+                            builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);
+                            *i += 1;
+                        }
+                        YamlShadowTokenKind::Whitespace => {
+                            builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
+                            *i += 1;
+                        }
+                        YamlShadowTokenKind::Colon => {
+                            builder.token(SyntaxKind::YAML_COLON.into(), tokens[*i].text);
+                            *i += 1;
+                            saw_colon = true;
+                            break;
+                        }
+                        _ => return None,
+                    }
+                }
+                if !saw_colon {
+                    return None;
+                }
+                builder.finish_node(); // YAML_BLOCK_MAP_KEY
+
+                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
+                while *i < tokens.len() {
+                    match tokens[*i].kind {
+                        YamlShadowTokenKind::Scalar => {
+                            builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                            *i += 1;
+                        }
+                        YamlShadowTokenKind::Tag => {
+                            builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);
+                            *i += 1;
+                        }
+                        YamlShadowTokenKind::Comment => {
+                            builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[*i].text);
+                            *i += 1;
+                        }
+                        YamlShadowTokenKind::Whitespace => {
+                            builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
+                            *i += 1;
+                        }
+                        _ => break,
+                    }
+                }
+
+                let mut trailing_newline: Option<&str> = None;
+                if *i < tokens.len() && tokens[*i].kind == YamlShadowTokenKind::Newline {
+                    trailing_newline = Some(tokens[*i].text);
+                    *i += 1;
+                }
+
+                if *i < tokens.len() && tokens[*i].kind == YamlShadowTokenKind::Indent {
+                    *i += 1;
+                    builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
+                    emit_block_map(builder, tokens, i, true)?;
+                    builder.finish_node(); // YAML_BLOCK_MAP
+                }
+
+                builder.finish_node(); // YAML_BLOCK_MAP_VALUE
+                if let Some(newline) = trailing_newline {
+                    builder.token(SyntaxKind::NEWLINE.into(), newline);
+                }
+                builder.finish_node(); // YAML_BLOCK_MAP_ENTRY
+            }
+        }
+    }
+
+    if stop_on_dedent && !closed_by_dedent {
+        return None;
+    }
+
+    Some(())
+}
+
 /// Parse one or more `key: value` lines and emit a prototype YAML mapping CST.
 ///
 /// This remains prototype-scoped but models YAML mapping structure with explicit
@@ -324,78 +431,8 @@ pub fn parse_basic_mapping_tree(input: &str) -> Option<SyntaxNode> {
     builder.start_node(SyntaxKind::DOCUMENT.into());
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
     builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
-
     let mut i = 0usize;
-    while i < tokens.len() {
-        match tokens[i].kind {
-            YamlShadowTokenKind::Indent | YamlShadowTokenKind::Dedent => {
-                i += 1;
-            }
-            YamlShadowTokenKind::Newline => {
-                builder.token(SyntaxKind::NEWLINE.into(), tokens[i].text);
-                i += 1;
-            }
-            _ => {
-                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
-                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_KEY.into());
-
-                while i < tokens.len() {
-                    match tokens[i].kind {
-                        YamlShadowTokenKind::Key => {
-                            builder.token(SyntaxKind::YAML_KEY.into(), tokens[i].text);
-                            i += 1;
-                        }
-                        YamlShadowTokenKind::Tag => {
-                            builder.token(SyntaxKind::YAML_TAG.into(), tokens[i].text);
-                            i += 1;
-                        }
-                        YamlShadowTokenKind::Whitespace => {
-                            builder.token(SyntaxKind::WHITESPACE.into(), tokens[i].text);
-                            i += 1;
-                        }
-                        YamlShadowTokenKind::Colon => {
-                            builder.token(SyntaxKind::YAML_COLON.into(), tokens[i].text);
-                            i += 1;
-                            break;
-                        }
-                        _ => return None,
-                    }
-                }
-                builder.finish_node(); // YAML_BLOCK_MAP_KEY
-
-                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
-                while i < tokens.len() {
-                    match tokens[i].kind {
-                        YamlShadowTokenKind::Scalar => {
-                            builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[i].text);
-                            i += 1;
-                        }
-                        YamlShadowTokenKind::Tag => {
-                            builder.token(SyntaxKind::YAML_TAG.into(), tokens[i].text);
-                            i += 1;
-                        }
-                        YamlShadowTokenKind::Comment => {
-                            builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[i].text);
-                            i += 1;
-                        }
-                        YamlShadowTokenKind::Whitespace => {
-                            builder.token(SyntaxKind::WHITESPACE.into(), tokens[i].text);
-                            i += 1;
-                        }
-                        _ => break,
-                    }
-                }
-                builder.finish_node(); // YAML_BLOCK_MAP_VALUE
-
-                if i < tokens.len() && tokens[i].kind == YamlShadowTokenKind::Newline {
-                    builder.token(SyntaxKind::NEWLINE.into(), tokens[i].text);
-                    i += 1;
-                }
-
-                builder.finish_node(); // YAML_BLOCK_MAP_ENTRY
-            }
-        }
-    }
+    emit_block_map(&mut builder, &tokens, &mut i, false)?;
 
     builder.finish_node(); // YAML_BLOCK_MAP
     builder.finish_node(); // YAML_METADATA_CONTENT

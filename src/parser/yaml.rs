@@ -260,6 +260,35 @@ mod tests {
     }
 
     #[test]
+    fn parser_builds_nested_block_map_from_indent_tokens() {
+        let input = "root: 1\n  child: 2\n";
+        let tree = parse_basic_mapping_tree(input).expect("tree");
+
+        let outer_map = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+            .expect("outer map");
+        let outer_entry = outer_map
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            .expect("outer entry");
+        let outer_value = outer_entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+            .expect("outer value");
+
+        let nested_map = outer_value
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+            .expect("nested map");
+        let nested_entry_count = nested_map
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            .count();
+        assert_eq!(nested_entry_count, 1);
+    }
+
+    #[test]
     fn rejects_tree_for_invalid_input() {
         assert!(parse_basic_entry_tree("title:").is_none());
     }
