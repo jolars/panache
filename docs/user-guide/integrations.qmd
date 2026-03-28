@@ -46,8 +46,9 @@ repos:
 
 ### File Patterns
 
-By default, hooks run on `.qmd`, `.md`, `.markdown`, and `.Rmd` files. Override
-with `files`:
+By default, hooks run on `.qmd`, `.md`, `.markdown`, `.mdown`, `mkd`, and `.Rmd`
+files. You can override this with `files`, for instance to only run on `.qmd`
+and `.Rmd`:
 
 ```yaml
 repos:
