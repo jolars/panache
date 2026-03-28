@@ -55,7 +55,7 @@ repos:
     rev: v{{< meta version >}}
     hooks:
       - id: panache-format
-         files: '\.(qmd|Rmd)$' # Only .qmd and .Rmd
+        files: '\.(qmd|Rmd)$'
 ```
 
 ## GitHub Actions
