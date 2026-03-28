@@ -351,7 +351,7 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
         Some(
             rest[colon_idx + 1..]
                 .trim_start_matches([' ', '\t'])
-                .trim_end_matches([' ', '\t'])
+                .trim_end_matches([' ', '\t', '\n', '\r'])
                 .to_string(),
         )
     }
@@ -367,7 +367,7 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
         }
         let value = after_prefix
             .trim_start_matches([' ', '\t'])
-            .trim_end_matches([' ', '\t']);
+            .trim_end_matches([' ', '\t', '\n', '\r']);
         if value.is_empty() {
             None
         } else {
@@ -406,6 +406,7 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
     let mut saw_prefix = false;
     let mut open_quoted: Option<String> = None;
     let mut open_block_scalar = false;
+    let mut open_indented_yaml_value = false;
     let lines: Vec<&str> = content.split_inclusive('\n').collect();
     let mut i = 0usize;
 
@@ -439,6 +440,17 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
             open_block_scalar = false;
         }
 
+        if open_indented_yaml_value {
+            if let Some(after_prefix) = trimmed.strip_prefix(prefix)
+                && is_block_scalar_continuation_line(after_prefix)
+            {
+                header_end += line.len();
+                i += 1;
+                continue;
+            }
+            open_indented_yaml_value = false;
+        }
+
         if is_hashpipe_option_line(trimmed, prefix) {
             saw_prefix = true;
             if let Some(value) = option_value(trimmed, prefix) {
@@ -446,6 +458,10 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
                     open_quoted = Some(value);
                 } else if is_yaml_block_scalar_indicator(&value) {
                     open_block_scalar = true;
+                } else if value.is_empty() {
+                    // `key:` values may continue on indented hashpipe lines
+                    // (e.g., YAML sequences/mappings).
+                    open_indented_yaml_value = true;
                 }
             }
             header_end += line.len();
@@ -1015,4 +1031,19 @@ pub fn spawn_and_await_formatters_sync(
     _config: &Config,
 ) -> FormattedCodeMap {
     HashMap::new()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_hashpipe_header;
+
+    #[test]
+    fn split_hashpipe_header_handles_empty_value_with_indented_list() {
+        let content = "#| fig-cap:\n#|   - A\n#|   - B\n";
+        let split = split_hashpipe_header(content, "#|");
+        assert!(split.is_some(), "expected hashpipe header split");
+        let (header, body) = split.unwrap();
+        assert_eq!(header, content);
+        assert_eq!(body, "");
+    }
 }

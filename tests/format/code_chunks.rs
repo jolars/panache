@@ -222,3 +222,14 @@ fn hashpipe_yaml_wrap_accounts_for_comment_prefix_width() {
         }
     }
 }
+
+#[test]
+fn hashpipe_fig_cap_list_value_is_idempotent() {
+    let input = "```{r}\n#| fig-cap:\n#|   - A\n#|   - B\n```\n";
+    let output1 = format(input, Some(quarto_config()), None);
+    let output2 = format(&output1, Some(quarto_config()), None);
+
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+    assert_eq!(output2.matches("#|   - A").count(), 1);
+    assert_eq!(output2.matches("#|   - B").count(), 1);
+}
