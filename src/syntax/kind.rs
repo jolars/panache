@@ -203,6 +203,7 @@ pub enum SyntaxKind {
     CHUNK_LABEL,            // Special case: unlabeled first option in {r mylabel}
     HASHPIPE_YAML_PREAMBLE, // Hashpipe YAML option preamble region inside CODE_CONTENT
     HASHPIPE_YAML_CONTENT,  // Content lines belonging to hashpipe YAML preamble
+    HASHPIPE_PREFIX,        // Hashpipe option marker prefix (e.g., #|, //|, --|)
 
     CODE_CONTENT,
 

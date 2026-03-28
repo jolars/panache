@@ -697,7 +697,7 @@ fn emit_hashpipe_option_line(
             &line_without_newline[..leading_ws_len],
         );
     }
-    builder.token(SyntaxKind::TEXT.into(), prefix);
+    builder.token(SyntaxKind::HASHPIPE_PREFIX.into(), prefix);
     if ws_after_prefix_len > 0 {
         builder.token(
             SyntaxKind::WHITESPACE.into(),
@@ -772,7 +772,7 @@ fn emit_hashpipe_continuation_line(
             &line_without_newline[..leading_ws_len],
         );
     }
-    builder.token(SyntaxKind::TEXT.into(), prefix);
+    builder.token(SyntaxKind::HASHPIPE_PREFIX.into(), prefix);
     if ws_after_prefix_len > 0 {
         builder.token(
             SyntaxKind::WHITESPACE.into(),

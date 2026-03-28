@@ -79,7 +79,7 @@ DOCUMENT@0..996
       HASHPIPE_YAML_PREAMBLE@176..209
         HASHPIPE_YAML_CONTENT@176..209
           CHUNK_OPTION@176..191
-            TEXT@176..178 "#|"
+            HASHPIPE_PREFIX@176..178 "#|"
             WHITESPACE@178..179 " "
             CHUNK_OPTION_KEY@179..188 "fig-width"
             TEXT@188..189 ":"
@@ -87,7 +87,7 @@ DOCUMENT@0..996
             CHUNK_OPTION_VALUE@190..191 "7"
           NEWLINE@191..192 "\n"
           CHUNK_OPTION@192..208
-            TEXT@192..194 "#|"
+            HASHPIPE_PREFIX@192..194 "#|"
             WHITESPACE@194..195 " "
             CHUNK_OPTION_KEY@195..205 "fig-height"
             TEXT@205..206 ":"
@@ -133,7 +133,7 @@ DOCUMENT@0..996
       HASHPIPE_YAML_PREAMBLE@326..358
         HASHPIPE_YAML_CONTENT@326..358
           CHUNK_OPTION@326..340
-            TEXT@326..328 "#|"
+            HASHPIPE_PREFIX@326..328 "#|"
             WHITESPACE@328..329 " "
             CHUNK_OPTION_KEY@329..333 "echo"
             TEXT@333..334 ":"
@@ -141,7 +141,7 @@ DOCUMENT@0..996
             CHUNK_OPTION_VALUE@335..340 "false"
           NEWLINE@340..341 "\n"
           CHUNK_OPTION@341..357
-            TEXT@341..343 "#|"
+            HASHPIPE_PREFIX@341..343 "#|"
             WHITESPACE@343..344 " "
             CHUNK_OPTION_KEY@344..351 "message"
             TEXT@351..352 ":"
@@ -182,7 +182,7 @@ DOCUMENT@0..996
       HASHPIPE_YAML_PREAMBLE@474..489
         HASHPIPE_YAML_CONTENT@474..489
           CHUNK_OPTION@474..488
-            TEXT@474..476 "#|"
+            HASHPIPE_PREFIX@474..476 "#|"
             WHITESPACE@476..477 " "
             CHUNK_OPTION_KEY@477..481 "echo"
             TEXT@481..482 ":"
@@ -308,7 +308,7 @@ DOCUMENT@0..996
       HASHPIPE_YAML_PREAMBLE@711..992
         HASHPIPE_YAML_CONTENT@711..992
           CHUNK_OPTION@711..991
-            TEXT@711..713 "#|"
+            HASHPIPE_PREFIX@711..713 "#|"
             WHITESPACE@713..714 " "
             CHUNK_OPTION_KEY@714..721 "fig-cap"
             TEXT@721..722 ":"

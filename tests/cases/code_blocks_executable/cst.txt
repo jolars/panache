@@ -48,7 +48,7 @@ DOCUMENT@0..397
       HASHPIPE_YAML_PREAMBLE@84..115
         HASHPIPE_YAML_CONTENT@84..115
           CHUNK_OPTION@84..98
-            TEXT@84..86 "#|"
+            HASHPIPE_PREFIX@84..86 "#|"
             WHITESPACE@86..87 " "
             CHUNK_OPTION_KEY@87..91 "echo"
             TEXT@91..92 ":"
@@ -56,7 +56,7 @@ DOCUMENT@0..397
             CHUNK_OPTION_VALUE@93..98 "false"
           NEWLINE@98..99 "\n"
           CHUNK_OPTION@99..114
-            TEXT@99..101 "#|"
+            HASHPIPE_PREFIX@99..101 "#|"
             WHITESPACE@101..102 " "
             CHUNK_OPTION_KEY@102..111 "fig-width"
             TEXT@111..112 ":"
@@ -88,7 +88,7 @@ DOCUMENT@0..397
       HASHPIPE_YAML_PREAMBLE@158..172
         HASHPIPE_YAML_CONTENT@158..172
           CHUNK_OPTION@158..171
-            TEXT@158..160 "#|"
+            HASHPIPE_PREFIX@158..160 "#|"
             WHITESPACE@160..161 " "
             CHUNK_OPTION_KEY@161..165 "eval"
             TEXT@165..166 ":"
@@ -120,7 +120,7 @@ DOCUMENT@0..397
       HASHPIPE_YAML_PREAMBLE@233..267
         HASHPIPE_YAML_CONTENT@233..267
           CHUNK_OPTION@233..251
-            TEXT@233..235 "#|"
+            HASHPIPE_PREFIX@233..235 "#|"
             WHITESPACE@235..236 " "
             CHUNK_OPTION_KEY@236..241 "label"
             TEXT@241..242 ":"
@@ -128,7 +128,7 @@ DOCUMENT@0..397
             CHUNK_OPTION_VALUE@243..251 "fig-plot"
           NEWLINE@251..252 "\n"
           CHUNK_OPTION@252..266
-            TEXT@252..254 "#|"
+            HASHPIPE_PREFIX@252..254 "#|"
             WHITESPACE@254..255 " "
             CHUNK_OPTION_KEY@255..259 "echo"
             TEXT@259..260 ":"
@@ -155,7 +155,7 @@ DOCUMENT@0..397
       HASHPIPE_YAML_PREAMBLE@291..386
         HASHPIPE_YAML_CONTENT@291..386
           CHUNK_OPTION@291..323
-            TEXT@291..293 "#|"
+            HASHPIPE_PREFIX@291..293 "#|"
             WHITESPACE@293..294 " "
             CHUNK_OPTION_KEY@294..301 "fig-cap"
             TEXT@301..302 ":"
@@ -163,12 +163,12 @@ DOCUMENT@0..397
             CHUNK_OPTION_VALUE@303..323 "\"A multiline caption"
           NEWLINE@323..324 "\n"
           CHUNK_OPTION@324..370
-            TEXT@324..326 "#|"
+            HASHPIPE_PREFIX@324..326 "#|"
             WHITESPACE@326..328 "  "
             CHUNK_OPTION_VALUE@328..370 "that spans multiple l ..."
           NEWLINE@370..371 "\n"
           CHUNK_OPTION@371..385
-            TEXT@371..373 "#|"
+            HASHPIPE_PREFIX@371..373 "#|"
             WHITESPACE@373..375 "  "
             CHUNK_OPTION_VALUE@375..385 "wrapping.\""
           NEWLINE@385..386 "\n"

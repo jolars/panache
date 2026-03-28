@@ -476,6 +476,45 @@ fn executable_chunk_emits_hashpipe_yaml_content_node() {
 }
 
 #[test]
+fn executable_chunk_emits_hashpipe_prefix_token_kind() {
+    let input = "```{r}\n#| echo: false\nx <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
+    let code_content = code_block
+        .children()
+        .find(|n| n.kind() == SyntaxKind::CODE_CONTENT)
+        .expect("expected code content");
+    let preamble = code_content
+        .children()
+        .find(|n| n.kind() == SyntaxKind::HASHPIPE_YAML_PREAMBLE)
+        .expect("expected hashpipe preamble node");
+
+    let prefix_tokens: Vec<_> = preamble
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|t| t.kind() == SyntaxKind::HASHPIPE_PREFIX)
+        .map(|t| t.text().to_string())
+        .collect();
+    assert_eq!(prefix_tokens, vec!["#|".to_string()]);
+}
+
+#[test]
+fn executable_chunk_hashpipe_trivia_preserves_whitespace_and_crlf() {
+    let input = "```{r}\r\n#|    echo: false   \r\nx <- 1\r\n```\r\n";
+    let node = parse_blocks_quarto(input);
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
+    let code_content = code_block
+        .children()
+        .find(|n| n.kind() == SyntaxKind::CODE_CONTENT)
+        .expect("expected code content");
+    let preamble = code_content
+        .children()
+        .find(|n| n.kind() == SyntaxKind::HASHPIPE_YAML_PREAMBLE)
+        .expect("expected hashpipe preamble node");
+    assert_eq!(preamble.text().to_string(), "#|    echo: false   \r\n");
+}
+
+#[test]
 fn executable_code_respects_extension_guard() {
     let input = "```{r}\na <- 1\n```\n";
     let mut config = Config::default();
