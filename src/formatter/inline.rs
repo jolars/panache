@@ -33,6 +33,28 @@ fn expand_tabs_code_span(text: &str, tab_width: usize) -> String {
 /// Format an inline node to normalized string (e.g., emphasis with asterisks)
 pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
     match node.kind() {
+        SyntaxKind::AUTO_LINK => {
+            let mut result = String::new();
+            let mut skip_marker_whitespace = false;
+            for child in node.descendants_with_tokens() {
+                if let NodeOrToken::Token(tok) = child {
+                    match tok.kind() {
+                        SyntaxKind::BLOCK_QUOTE_MARKER => {
+                            skip_marker_whitespace = true;
+                        }
+                        SyntaxKind::WHITESPACE if skip_marker_whitespace => {
+                            skip_marker_whitespace = false;
+                        }
+                        SyntaxKind::AUTO_LINK_MARKER | SyntaxKind::TEXT => {
+                            skip_marker_whitespace = false;
+                            result.push_str(tok.text());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            result
+        }
         SyntaxKind::CODE_SPAN => {
             let mut content = String::new();
             let mut attributes = String::new();

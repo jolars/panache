@@ -213,3 +213,11 @@ fn blockquote_codespan_continuation_line_stays_idempotent() {
     let output2 = format(&output1, None, None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn blockquote_autolink_line_stays_idempotent() {
+    let input = "> Information about previous years' prize winners can be found at:\n> <https://statistikframjandet.se/cramersallskapet/cramerpriset/>\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
