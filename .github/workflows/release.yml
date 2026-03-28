@@ -12,9 +12,11 @@ jobs:
     uses: ./.github/workflows/build-and-test.yml
     permissions:
       actions: write
+      checks: write
       contents: read
-      pages: write
       id-token: write
+      issues: write
+      pages: write
 
   build-release-assets:
     uses: ./.github/workflows/packages.yml
