@@ -14,6 +14,7 @@ mod line_blocks;
 mod links;
 mod lists_unordered;
 mod math;
+mod nbsp;
 mod paragraphs;
 mod preserve_wrap;
 mod quotes;

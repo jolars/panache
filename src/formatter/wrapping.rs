@@ -104,6 +104,16 @@ fn expand_tabs_with_width<'a>(text: &'a str, tab_width: usize) -> Cow<'a, str> {
     Cow::Owned(out)
 }
 
+fn starts_with_ascii_whitespace(text: &str) -> bool {
+    text.chars().next().is_some_and(|c| c.is_ascii_whitespace())
+}
+
+fn ends_with_ascii_whitespace(text: &str) -> bool {
+    text.chars()
+        .next_back()
+        .is_some_and(|c| c.is_ascii_whitespace())
+}
+
 fn append_normalized_link_dest(dest: &str, out: &mut String) {
     let dest_trimmed = dest.trim();
     let mut split_at = None;
@@ -294,7 +304,7 @@ pub(super) fn wrap_words_first_fit(words: &[WrapWord], line_widths: &[usize]) ->
 
 pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
     let words: Vec<WrapWord> = text
-        .split_whitespace()
+        .split_ascii_whitespace()
         .map(|w| WrapWord {
             word: w.to_string(),
             whitespace: " ".to_string(),
@@ -419,16 +429,17 @@ fn build_pieces_with_mode<'a>(
                     SyntaxKind::TEXT => {
                         let text = expand_tabs_with_width(t.text(), _config.tab_width);
                         let mut text_to_process = text.as_ref();
-                        if !text.is_empty() && text.starts_with(char::is_whitespace) {
+                        if !text.is_empty() && starts_with_ascii_whitespace(&text) {
                             if b.skip_next_leading_whitespace {
-                                text_to_process = text.trim_start();
+                                text_to_process =
+                                    text.trim_start_matches(|c: char| c.is_ascii_whitespace());
                                 b.skip_next_leading_whitespace = false;
                             } else {
                                 b.pending_space = true;
                             }
                         }
                         let mut saw_word = false;
-                        for word in text_to_process.split_whitespace() {
+                        for word in text_to_process.split_ascii_whitespace() {
                             if saw_word {
                                 b.pending_space = true;
                             }
@@ -442,7 +453,7 @@ fn build_pieces_with_mode<'a>(
                             b.push_piece(&processed_word);
                             saw_word = true;
                         }
-                        if saw_word && text.ends_with(char::is_whitespace) {
+                        if saw_word && ends_with_ascii_whitespace(&text) {
                             b.pending_space = true;
                         }
                     }
@@ -941,9 +952,10 @@ fn wrap_node_greedy_streaming(
                     SyntaxKind::TEXT => {
                         let text = expand_tabs_with_width(t.text(), _config.tab_width);
                         let mut text_to_process = text.as_ref();
-                        if !text.is_empty() && text.starts_with(char::is_whitespace) {
+                        if !text.is_empty() && starts_with_ascii_whitespace(&text) {
                             if b.skip_next_leading_whitespace {
-                                text_to_process = text.trim_start();
+                                text_to_process =
+                                    text.trim_start_matches(|c: char| c.is_ascii_whitespace());
                                 b.skip_next_leading_whitespace = false;
                             } else {
                                 b.pending_space = true;
@@ -951,7 +963,7 @@ fn wrap_node_greedy_streaming(
                         }
 
                         let mut saw_word = false;
-                        for word in text_to_process.split_whitespace() {
+                        for word in text_to_process.split_ascii_whitespace() {
                             if saw_word {
                                 b.pending_space = true;
                             }
@@ -965,7 +977,7 @@ fn wrap_node_greedy_streaming(
                             b.push_piece(&processed_word);
                             saw_word = true;
                         }
-                        if saw_word && text.ends_with(char::is_whitespace) {
+                        if saw_word && ends_with_ascii_whitespace(&text) {
                             b.pending_space = true;
                         }
                     }

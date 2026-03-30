@@ -70,6 +70,23 @@ fn normalize_inline_math_line_breaks(lines: &mut [String]) {
     }
 }
 
+fn collapse_ascii_whitespace(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut in_ascii_ws = false;
+    for ch in text.chars() {
+        if ch.is_ascii_whitespace() {
+            if !in_ascii_ws {
+                out.push(' ');
+                in_ascii_ws = true;
+            }
+        } else {
+            out.push(ch);
+            in_ascii_ws = false;
+        }
+    }
+    out.trim_ascii().to_string()
+}
+
 /// Check if a paragraph contains inline display math ($$...$$ within paragraph)
 pub(super) fn contains_inline_display_math(node: &SyntaxNode) -> bool {
     if has_ambiguous_dollar_delimiters(&node.text().to_string()) {
@@ -236,8 +253,8 @@ pub(super) fn format_paragraph_with_display_math(
             }
 
             // Format as paragraph text with wrapping.
-            // Normalize internal whitespace to keep wrapping stable across passes.
-            let text = content.split_whitespace().collect::<Vec<_>>().join(" ");
+            // Normalize only ASCII whitespace so hard spaces (NBSP) remain lossless.
+            let text = collapse_ascii_whitespace(content);
             if !text.is_empty() {
                 let protected = protect_inline_math_spaces(&text);
                 let mut lines = super::wrapping::wrap_text_first_fit(&protected, line_width);
