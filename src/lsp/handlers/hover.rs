@@ -15,8 +15,10 @@ use tower_lsp_server::ls_types::*;
 use crate::lsp::DocumentState;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::metadata::inline_reference_contains;
-use crate::syntax::{AstNode, Document, FootnoteDefinition, Heading, Link, ReferenceDefinition};
-use crate::utils::normalize_label;
+use crate::syntax::{
+    AstNode, DisplayMath, Document, FootnoteDefinition, Heading, Link, ReferenceDefinition,
+};
+use crate::utils::{crossref_resolution_labels, normalize_label};
 
 use super::super::{conversions, helpers};
 
@@ -135,6 +137,15 @@ pub(crate) async fn hover(
         .await;
 
         for doc in &doc_indices {
+            if let Some(markdown) = equation_hover_markdown(doc, label) {
+                return Ok(Some(Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: markdown,
+                    }),
+                    range: None,
+                }));
+            }
             if let Some(markdown) = section_hover_markdown(doc, label) {
                 return Ok(Some(Hover {
                     contents: HoverContents::Markup(MarkupContent {
@@ -266,6 +277,40 @@ pub(crate) async fn hover(
 }
 
 const HOVER_PREVIEW_MAX_CHARS: usize = 180;
+const HOVER_EQUATION_PREVIEW_MAX_LINES: usize = 6;
+
+fn equation_hover_markdown(
+    doc: &crate::lsp::navigation::IndexedDocument,
+    label: &str,
+) -> Option<String> {
+    let candidates = crossref_resolution_labels(label, true);
+    let mut declaration_ranges = Vec::new();
+    for candidate in candidates {
+        if let Some(ranges) = doc.symbol_index.crossref_declarations(&candidate) {
+            declaration_ranges.extend(ranges.iter().copied());
+        }
+    }
+    declaration_ranges.sort_by_key(|range| range.start());
+    declaration_ranges.dedup();
+    if declaration_ranges.is_empty() {
+        return None;
+    }
+
+    let tree = crate::parse(&doc.text, None);
+    for declaration in declaration_ranges {
+        let Some(math) = display_math_for_declaration(&tree, declaration) else {
+            continue;
+        };
+        let content = math.content();
+        let trimmed = content.trim_matches('\n').trim_end();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let snippet = crop_preview_lines(trimmed, HOVER_EQUATION_PREVIEW_MAX_LINES);
+        return Some(format!("**Equation:** `{label}`\n\n```tex\n{snippet}\n```"));
+    }
+    None
+}
 
 fn section_hover_markdown(
     doc: &crate::lsp::navigation::IndexedDocument,
@@ -386,6 +431,41 @@ fn crop_preview(text: &str, max_chars: usize) -> String {
     if iter.next().is_some() {
         out.push_str("...");
     }
+    out
+}
+
+fn display_math_for_declaration(
+    tree: &crate::syntax::SyntaxNode,
+    declaration: rowan::TextRange,
+) -> Option<DisplayMath> {
+    let math_nodes: Vec<_> = tree.descendants().filter_map(DisplayMath::cast).collect();
+
+    if let Some(math) = math_nodes.iter().find(|math| {
+        let range = math.syntax().text_range();
+        range.start() <= declaration.start() && declaration.end() <= range.end()
+    }) {
+        return DisplayMath::cast(math.syntax().clone());
+    }
+
+    let declaration_start: usize = declaration.start().into();
+    math_nodes
+        .into_iter()
+        .filter_map(|math| {
+            let range = math.syntax().text_range();
+            let math_end: usize = range.end().into();
+            (math_end <= declaration_start).then_some((declaration_start - math_end, math))
+        })
+        .min_by_key(|(distance, _)| *distance)
+        .and_then(|(distance, math)| (distance <= 16).then_some(math))
+}
+
+fn crop_preview_lines(text: &str, max_lines: usize) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() <= max_lines {
+        return text.to_string();
+    }
+    let mut out = lines[..max_lines].join("\n");
+    out.push_str("\n...");
     out
 }
 

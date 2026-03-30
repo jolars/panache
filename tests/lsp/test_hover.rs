@@ -422,6 +422,50 @@ async fn test_hover_on_reference_link_definition_to_non_heading_returns_none() {
 }
 
 #[tokio::test]
+async fn test_hover_on_equation_reference_shows_equation_preview() {
+    let server = TestLspServer::new();
+    let content = "$$\na = b + c\n$$ {#eq-foo}\n\n@eq-foo\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let hover = server.hover("file:///test.qmd", 4, 4).await;
+    let Some(h) = hover else {
+        panic!("Expected hover content for equation reference");
+    };
+    let content = match h.contents {
+        HoverContents::Markup(markup) => markup.value,
+        _ => panic!("Expected markdown hover content"),
+    };
+    assert!(content.contains("Equation"));
+    assert!(content.contains("eq-foo"));
+    assert!(content.contains("```tex"));
+    assert!(content.contains("a = b + c"));
+}
+
+#[tokio::test]
+async fn test_hover_on_equation_reference_crops_preview_lines() {
+    let server = TestLspServer::new();
+    let content =
+        "$$\nline1\nline2\nline3\nline4\nline5\nline6\nline7\n$$ {#eq-long}\n\n@eq-long\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let hover = server.hover("file:///test.qmd", 10, 4).await;
+    let Some(h) = hover else {
+        panic!("Expected hover content for equation reference");
+    };
+    let content = match h.contents {
+        HoverContents::Markup(markup) => markup.value,
+        _ => panic!("Expected markdown hover content"),
+    };
+    assert!(content.contains("line6"));
+    assert!(!content.contains("line7"));
+    assert!(content.contains("\n...\n```"));
+}
+
+#[tokio::test]
 async fn test_hover_on_direct_local_markdown_link_shows_linked_doc_preview() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let doc_path = temp_dir.path().join("doc.qmd");
