@@ -105,8 +105,12 @@ pub enum SyntaxKind {
 
     // Code
     CODE_SPAN,
-    CODE_SPAN_MARKER,  // ` or `` or ```
-    CODE_FENCE_MARKER, // ``` or ~~~
+    CODE_SPAN_MARKER,       // ` or `` or ```
+    INLINE_EXECUTABLE_CODE, // Inline executable code span variants
+    INLINE_EXEC_MARKER,     // Backtick markers delimiting inline executable code
+    INLINE_EXEC_LANG,       // Runtime marker (`r` or `{r}`)
+    INLINE_EXEC_CODE,       // Executable inline code expression
+    CODE_FENCE_MARKER,      // ``` or ~~~
     CODE_BLOCK,
 
     // Raw inline spans

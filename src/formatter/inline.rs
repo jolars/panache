@@ -140,6 +140,24 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 attributes
             )
         }
+        SyntaxKind::INLINE_EXECUTABLE_CODE => {
+            let mut prefix = String::new();
+            let mut spacing = String::from(" ");
+            let mut code = String::new();
+
+            for child in node.children_with_tokens() {
+                if let NodeOrToken::Token(t) = child {
+                    match t.kind() {
+                        SyntaxKind::TEXT => prefix.push_str(t.text()),
+                        SyntaxKind::WHITESPACE => spacing = t.text().to_string(),
+                        SyntaxKind::INLINE_EXEC_CODE => code.push_str(t.text()),
+                        _ => {}
+                    }
+                }
+            }
+
+            format!("`{}`{{r}}{}{}\\`\\`", prefix.trim_end(), spacing, code)
+        }
         SyntaxKind::RAW_INLINE => {
             // Format raw inline span: `content`{=format}
             let mut content = String::new();

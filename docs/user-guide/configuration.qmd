@@ -358,7 +358,18 @@ inline-code-attributes = true
 `executable-code`
 :   Executable code chunks with brace info strings like ```` ```{r} ```` and
     ```` ```{python} ```` (default: disabled, enabled for Quarto and RMarkdown
-    flavors). This key also governs future inline executable code parsing.
+    flavors).
+
+`rmarkdown-inline-code`
+:   Parse inline executable code that uses R Markdown style tails like
+    `` `3 == `r 2 + 1 `` \`\` (default: disabled, enabled for Quarto and
+    RMarkdown flavors).
+
+`quarto-inline-code`
+:   Parse inline executable code that uses braced tails like
+    `` `3 == `{r} 2 + 1 ``
+    \``(default: disabled, enabled for Quarto flavor).     Formatted output is normalized to the braced`{r}\`
+    marker for renderer parity in this syntax family.
 
 `inline-code-attributes`
 :   Attributes on inline code `` `code`{.class} `` (default: enabled)

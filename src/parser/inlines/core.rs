@@ -36,6 +36,7 @@ use super::citations::{
 use super::code_spans::{emit_code_span, try_parse_code_span};
 use super::emoji::{emit_emoji, try_parse_emoji};
 use super::escapes::{EscapeType, emit_escape, try_parse_escape};
+use super::inline_executable::{emit_inline_executable, try_parse_inline_executable};
 use super::inline_footnotes::{
     emit_footnote_reference, emit_inline_footnote, try_parse_footnote_reference,
     try_parse_inline_footnote,
@@ -647,6 +648,22 @@ fn parse_until_closer_with_nested_two(
     let mut pos = start;
 
     while pos < end.min(text.len()) {
+        if bytes[pos] == b'`'
+            && let Some(m) = try_parse_inline_executable(
+                &text[pos..],
+                config.extensions.rmarkdown_inline_code,
+                config.extensions.quarto_inline_code,
+            )
+        {
+            log::trace!(
+                "Skipping inline executable span of {} bytes at pos {}",
+                m.total_len,
+                pos
+            );
+            pos += m.total_len;
+            continue;
+        }
+
         // Skip over code spans - their content is protected from delimiter matching
         if bytes[pos] == b'`'
             && let Some((len, _, _, _)) = try_parse_code_span(&text[pos..])
@@ -840,6 +857,22 @@ fn parse_until_closer_with_nested_one(
     let mut pos = start;
 
     while pos < end.min(text.len()) {
+        if bytes[pos] == b'`'
+            && let Some(m) = try_parse_inline_executable(
+                &text[pos..],
+                config.extensions.rmarkdown_inline_code,
+                config.extensions.quarto_inline_code,
+            )
+        {
+            log::trace!(
+                "Skipping inline executable span of {} bytes at pos {}",
+                m.total_len,
+                pos
+            );
+            pos += m.total_len;
+            continue;
+        }
+
         // Skip over code spans - their content is protected from delimiter matching
         if bytes[pos] == b'`'
             && let Some((len, _, _, _)) = try_parse_code_span(&text[pos..])
@@ -1225,6 +1258,24 @@ fn parse_inline_range_impl(
             log::debug!("Matched shortcode at pos {}: {}", pos, &name);
             emit_shortcode(builder, &name, attrs);
             pos += len;
+            text_start = pos;
+            continue;
+        }
+
+        // Try inline executable code spans (`... `r expr`` and `... `{r} expr``)
+        if byte == b'`'
+            && let Some(m) = try_parse_inline_executable(
+                &text[pos..],
+                config.extensions.rmarkdown_inline_code,
+                config.extensions.quarto_inline_code,
+            )
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            log::debug!("Matched inline executable code at pos {}", pos);
+            emit_inline_executable(builder, &m);
+            pos += m.total_len;
             text_start = pos;
             continue;
         }

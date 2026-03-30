@@ -85,6 +85,10 @@ pub struct Extensions {
     pub fenced_code_attributes: bool,
     /// Executable code syntax (currently fenced chunks like ```{r} / ```{python})
     pub executable_code: bool,
+    /// R Markdown inline executable code (`...`r ...)
+    pub rmarkdown_inline_code: bool,
+    /// Quarto inline executable code (`...`{r} ...)
+    pub quarto_inline_code: bool,
     /// Attributes on inline code
     #[serde(alias = "inline_code_attributes")]
     pub inline_code_attributes: bool,
@@ -281,6 +285,8 @@ impl Extensions {
             escaped_line_breaks: false,
             example_lists: false,
             executable_code: false,
+            rmarkdown_inline_code: false,
+            quarto_inline_code: false,
             fancy_lists: false,
             fenced_code_attributes: false,
             fenced_code_blocks: false,
@@ -364,6 +370,8 @@ impl Extensions {
             // Code
             backtick_code_blocks: true,
             executable_code: false,
+            rmarkdown_inline_code: false,
+            quarto_inline_code: false,
             fenced_code_attributes: true,
             fenced_code_blocks: true,
             inline_code_attributes: true,
@@ -453,6 +461,8 @@ impl Extensions {
         let mut ext = Self::pandoc_defaults();
 
         ext.executable_code = true;
+        ext.rmarkdown_inline_code = true;
+        ext.quarto_inline_code = true;
         ext.quarto_callouts = true;
         ext.quarto_crossrefs = true;
         ext.quarto_shortcodes = true;
@@ -466,6 +476,8 @@ impl Extensions {
         ext.bookdown_references = true;
         ext.bookdown_equation_references = true;
         ext.executable_code = true;
+        ext.rmarkdown_inline_code = true;
+        ext.quarto_inline_code = false;
         ext.tex_math_dollars = true;
         ext.tex_math_single_backslash = true;
 
@@ -2698,6 +2710,10 @@ mod tests {
 
         assert!(quarto.extensions.executable_code);
         assert!(rmarkdown.extensions.executable_code);
+        assert!(quarto.extensions.quarto_inline_code);
+        assert!(quarto.extensions.rmarkdown_inline_code);
+        assert!(rmarkdown.extensions.rmarkdown_inline_code);
+        assert!(!rmarkdown.extensions.quarto_inline_code);
     }
 
     #[test]
@@ -2720,6 +2736,12 @@ mod tests {
         assert!(!pandoc.extensions.executable_code);
         assert!(!gfm.extensions.executable_code);
         assert!(!commonmark.extensions.executable_code);
+        assert!(!pandoc.extensions.quarto_inline_code);
+        assert!(!pandoc.extensions.rmarkdown_inline_code);
+        assert!(!gfm.extensions.quarto_inline_code);
+        assert!(!gfm.extensions.rmarkdown_inline_code);
+        assert!(!commonmark.extensions.quarto_inline_code);
+        assert!(!commonmark.extensions.rmarkdown_inline_code);
     }
 
     #[test]

@@ -1119,6 +1119,62 @@ mod extension_guard_tests {
         assert_eq!(count_kind(&tree, SyntaxKind::CROSSREF), 0);
         assert_eq!(count_kind(&tree, SyntaxKind::CITATION), 1);
     }
+
+    #[test]
+    fn rmarkdown_inline_code_enabled_parses_classic_form() {
+        let mut config = Config::default();
+        config.extensions.rmarkdown_inline_code = true;
+        config.extensions.quarto_inline_code = false;
+        let tree = parse_with_config("`3 == `r 2 + 1``", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 1);
+    }
+
+    #[test]
+    fn rmarkdown_inline_code_disabled_keeps_classic_form_literal() {
+        let mut config = Config::default();
+        config.extensions.rmarkdown_inline_code = false;
+        config.extensions.quarto_inline_code = false;
+        let tree = parse_with_config("`3 == `r 2 + 1``", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 0);
+        assert_eq!(count_kind(&tree, SyntaxKind::CODE_SPAN), 1);
+    }
+
+    #[test]
+    fn quarto_inline_code_enabled_parses_braced_form() {
+        let mut config = Config::default();
+        config.extensions.rmarkdown_inline_code = false;
+        config.extensions.quarto_inline_code = true;
+        let tree = parse_with_config("`3 == `{r} 2 + 1``", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 1);
+    }
+
+    #[test]
+    fn quarto_inline_code_disabled_keeps_braced_form_literal() {
+        let mut config = Config::default();
+        config.extensions.rmarkdown_inline_code = false;
+        config.extensions.quarto_inline_code = false;
+        let tree = parse_with_config("`3 == `{r} 2 + 1``", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 0);
+        assert_eq!(count_kind(&tree, SyntaxKind::CODE_SPAN), 1);
+    }
+
+    #[test]
+    fn classic_form_not_parsed_when_only_quarto_inline_enabled() {
+        let mut config = Config::default();
+        config.extensions.rmarkdown_inline_code = false;
+        config.extensions.quarto_inline_code = true;
+        let tree = parse_with_config("`3 == `r 2 + 1``", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 0);
+    }
+
+    #[test]
+    fn braced_form_not_parsed_when_only_rmarkdown_inline_enabled() {
+        let mut config = Config::default();
+        config.extensions.rmarkdown_inline_code = true;
+        config.extensions.quarto_inline_code = false;
+        let tree = parse_with_config("`3 == `{r} 2 + 1``", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 0);
+    }
 }
 
 #[cfg(test)]
