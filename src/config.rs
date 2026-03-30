@@ -251,6 +251,8 @@ pub struct Extensions {
     pub quarto_shortcodes: bool,
     /// Bookdown references \@ref(label) and (\#label)
     pub bookdown_references: bool,
+    /// Bookdown equation references in LaTeX math blocks (\#eq:label)
+    pub bookdown_equation_references: bool,
 }
 
 impl Default for Extensions {
@@ -271,6 +273,7 @@ impl Extensions {
             blank_before_blockquote: false,
             blank_before_header: false,
             bookdown_references: false,
+            bookdown_equation_references: false,
             bracketed_spans: false,
             citations: false,
             definition_lists: false,
@@ -439,6 +442,7 @@ impl Extensions {
 
             // Quarto/Bookdown-specific
             bookdown_references: false,
+            bookdown_equation_references: false,
             quarto_callouts: false,
             quarto_crossrefs: false,
             quarto_shortcodes: false,
@@ -460,6 +464,7 @@ impl Extensions {
         let mut ext = Self::pandoc_defaults();
 
         ext.bookdown_references = true;
+        ext.bookdown_equation_references = true;
         ext.executable_code = true;
         ext.tex_math_dollars = true;
         ext.tex_math_single_backslash = true;
@@ -2693,6 +2698,17 @@ mod tests {
 
         assert!(quarto.extensions.executable_code);
         assert!(rmarkdown.extensions.executable_code);
+    }
+
+    #[test]
+    fn bookdown_equation_references_enabled_by_default_only_for_rmarkdown() {
+        let pandoc = toml::from_str::<Config>("flavor = \"pandoc\"").unwrap();
+        let quarto = toml::from_str::<Config>("flavor = \"quarto\"").unwrap();
+        let rmarkdown = toml::from_str::<Config>("flavor = \"rmarkdown\"").unwrap();
+
+        assert!(!pandoc.extensions.bookdown_equation_references);
+        assert!(!quarto.extensions.bookdown_equation_references);
+        assert!(rmarkdown.extensions.bookdown_equation_references);
     }
 
     #[test]

@@ -171,7 +171,13 @@ pub fn collect_cross_doc_duplicates(
     }
 
     if config.extensions.bookdown_references {
-        collect_bookdown_definitions(index, tree, input, doc_path);
+        collect_bookdown_definitions(
+            index,
+            tree,
+            input,
+            doc_path,
+            config.extensions.bookdown_equation_references,
+        );
     }
 
     diagnostics
@@ -182,9 +188,11 @@ fn collect_bookdown_definitions(
     tree: &SyntaxNode,
     input: &str,
     doc_path: &Path,
+    collect_equation_definitions: bool,
 ) {
     use crate::parser::inlines::bookdown::{
-        try_parse_bookdown_definition, try_parse_bookdown_text_reference,
+        try_parse_bookdown_definition, try_parse_bookdown_equation_definition,
+        try_parse_bookdown_text_reference,
     };
 
     for element in tree.descendants_with_tokens() {
@@ -203,7 +211,24 @@ fn collect_bookdown_definitions(
                 continue;
             }
             let slice = &text[offset..];
+            if collect_equation_definitions
+                && let Some((len, label)) = try_parse_bookdown_equation_definition(slice)
+            {
+                let start: usize = token.text_range().start().into();
+                let range = rowan::TextRange::new(
+                    rowan::TextSize::from((start + offset) as u32),
+                    rowan::TextSize::from((start + offset + len) as u32),
+                );
+                let location = DefinitionLocation::new(doc_path, range, input);
+                index.insert_crossref(label, location);
+                offset += len;
+                continue;
+            }
             if let Some((len, label)) = try_parse_bookdown_definition(slice) {
+                if label.starts_with("eq:") && !collect_equation_definitions {
+                    offset += len;
+                    continue;
+                }
                 let start: usize = token.text_range().start().into();
                 let range = rowan::TextRange::new(
                     rowan::TextSize::from((start + offset) as u32),

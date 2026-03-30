@@ -641,11 +641,16 @@ quarto-shortcodes = true
 ```toml
 [extensions]
 bookdown-references = true
+bookdown-equation-references = true
 ```
 
 `bookdown-references`
 :   Bookdown references `\@ref(label)` and `(\#label)` (default: disabled,
     enabled for RMarkdown flavor)
+
+`bookdown-equation-references`
+:   Bookdown equation references for labels like `(\#eq:label)` inside LaTeX
+    math environments (default: disabled, enabled for RMarkdown flavor)
 
 ## External Code Formatters
 

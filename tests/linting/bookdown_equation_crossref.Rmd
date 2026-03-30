@@ -1,0 +1,6 @@
+\begin{align}
+  a (\#eq:foo)  \\
+  b (\#eq:bar)
+\end{align}
+
+\@ref(eq:foo), \@ref(eq:bar)

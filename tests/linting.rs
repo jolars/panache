@@ -212,6 +212,50 @@ flavor = "rmarkdown"
 }
 
 #[test]
+fn test_bookdown_equation_crossref_is_resolved() {
+    let diagnostics = lint_file_with_config(
+        "bookdown_equation_crossref.Rmd",
+        r#"
+flavor = "rmarkdown"
+"#,
+    );
+
+    let missing_ref: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-reference-label")
+        .collect();
+
+    assert!(
+        missing_ref.is_empty(),
+        "Bookdown equation cross-reference should resolve against equation labels"
+    );
+}
+
+#[test]
+fn test_bookdown_equation_crossref_can_be_disabled() {
+    let diagnostics = lint_file_with_config(
+        "bookdown_equation_crossref.Rmd",
+        r#"
+flavor = "rmarkdown"
+
+[extensions]
+bookdown-equation-references = false
+"#,
+    );
+
+    let missing_ref: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "undefined-reference-label")
+        .collect();
+
+    assert_eq!(
+        missing_ref.len(),
+        2,
+        "Disabling bookdown equation references should restore unresolved eq diagnostics"
+    );
+}
+
+#[test]
 fn test_chunk_label_spaces() {
     let diagnostics = lint_file_with_config(
         "chunk_label_spaces.md",

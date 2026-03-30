@@ -410,6 +410,28 @@ foobar
 }
 
 #[tokio::test]
+async fn test_goto_definition_bookdown_equation_crossref() {
+    let server = TestLspServer::new();
+
+    let content = r#"\begin{align}
+  a (\#eq:foo)  \\
+  b (\#eq:bar)
+\end{align}
+
+\@ref(eq:foo), \@ref(eq:bar)
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let result = server.goto_definition("file:///test.Rmd", 5, 7).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 1);
+}
+
+#[tokio::test]
 async fn test_goto_definition_bookdown_section_crossref_with_hyphenated_slug() {
     let server = TestLspServer::new();
 

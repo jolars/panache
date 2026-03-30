@@ -685,6 +685,7 @@ pub fn symbol_usage_index_from_tree(
         if token.kind() != SyntaxKind::TEXT {
             continue;
         }
+        collect_bookdown_equation_declarations_from_text_token(&token, &mut index, extensions);
         collect_example_label_usages_from_text_token(&token, &mut index);
     }
 
@@ -959,7 +960,13 @@ pub fn definition_index(
     }
 
     if config.config(db).extensions.bookdown_references {
-        collect_bookdown_definitions(db, &mut index, &tree, &path);
+        collect_bookdown_definitions(
+            db,
+            &mut index,
+            &tree,
+            &path,
+            config.config(db).extensions.bookdown_equation_references,
+        );
     }
 
     index.into_owned(db)
@@ -1112,9 +1119,11 @@ fn collect_bookdown_definitions<'db>(
     index: &mut InternedDefinitionIndex<'db>,
     tree: &SyntaxNode,
     path: &Path,
+    collect_equation_definitions: bool,
 ) {
     use crate::parser::inlines::bookdown::{
-        try_parse_bookdown_definition, try_parse_bookdown_text_reference,
+        try_parse_bookdown_definition, try_parse_bookdown_equation_definition,
+        try_parse_bookdown_text_reference,
     };
 
     for element in tree.descendants_with_tokens() {
@@ -1135,7 +1144,27 @@ fn collect_bookdown_definitions<'db>(
                 continue;
             }
             let slice = &text[offset..];
+            if collect_equation_definitions
+                && let Some((len, label)) = try_parse_bookdown_equation_definition(slice)
+            {
+                let start: usize = token.text_range().start().into();
+                let range = rowan::TextRange::new(
+                    rowan::TextSize::from((start + offset) as u32),
+                    rowan::TextSize::from((start + offset + len) as u32),
+                );
+                let location = DefinitionLocation {
+                    path: path.to_path_buf(),
+                    range,
+                };
+                insert_crossref(db, index, label, location);
+                offset += len;
+                continue;
+            }
             if let Some((len, label)) = try_parse_bookdown_definition(slice) {
+                if label.starts_with("eq:") && !collect_equation_definitions {
+                    offset += len;
+                    continue;
+                }
                 let start: usize = token.text_range().start().into();
                 let range = rowan::TextRange::new(
                     rowan::TextSize::from((start + offset) as u32),
@@ -1165,6 +1194,55 @@ fn collect_bookdown_definitions<'db>(
             }
             offset += 1;
         }
+    }
+}
+
+fn collect_bookdown_equation_declarations_from_text_token(
+    token: &crate::syntax::SyntaxToken,
+    index: &mut SymbolUsageIndex,
+    extensions: &crate::config::Extensions,
+) {
+    if !(extensions.bookdown_references && extensions.bookdown_equation_references) {
+        return;
+    }
+    let text = token.text();
+    let mut offset = 0usize;
+    let bytes = text.as_bytes();
+    while offset < bytes.len() {
+        if bytes[offset] != b'(' {
+            offset += 1;
+            continue;
+        }
+        let slice = &text[offset..];
+        let Some((len, label)) =
+            crate::parser::inlines::bookdown::try_parse_bookdown_equation_definition(slice)
+        else {
+            offset += 1;
+            continue;
+        };
+        let token_start: usize = token.text_range().start().into();
+        let full_start = token_start + offset;
+        let full_end = full_start + len;
+        let value_start = full_start + "(\\#".len();
+        let value_end = value_start + label.len();
+
+        index
+            .crossref_declarations
+            .entry(normalize_label(label))
+            .or_default()
+            .push(rowan::TextRange::new(
+                rowan::TextSize::from(full_start as u32),
+                rowan::TextSize::from(full_end as u32),
+            ));
+        index
+            .crossref_declaration_value_ranges
+            .entry(normalize_label(label))
+            .or_default()
+            .push(rowan::TextRange::new(
+                rowan::TextSize::from(value_start as u32),
+                rowan::TextSize::from(value_end as u32),
+            ));
+        offset += len;
     }
 }
 
@@ -1800,6 +1878,51 @@ mod tests {
                 .map(|ranges| ranges.len()),
             Some(1)
         );
+    }
+
+    #[test]
+    fn symbol_usage_index_collects_bookdown_equation_declarations_when_enabled() {
+        let db = SalsaDb::default();
+        let input = "\\begin{align}\n  a (\\#eq:foo)\n\\end{align}\n\n\\@ref(eq:foo)\n";
+        let mut config = crate::Config {
+            flavor: crate::config::Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::RMarkdown),
+            ..Default::default()
+        };
+        config.extensions.bookdown_references = true;
+        config.extensions.bookdown_equation_references = true;
+        let tree = crate::parse(input, Some(config.clone()));
+        let index = symbol_usage_index_from_tree(&db, &tree, &config.extensions);
+
+        assert_eq!(index.crossref_usages("eq:foo").map(|v| v.len()), Some(1));
+        assert_eq!(
+            index.crossref_declarations("eq:foo").map(|v| v.len()),
+            Some(1)
+        );
+        assert_eq!(
+            index
+                .crossref_declaration_value_ranges("eq:foo")
+                .map(|v| v.len()),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn symbol_usage_index_skips_bookdown_equation_declarations_when_disabled() {
+        let db = SalsaDb::default();
+        let input = "\\begin{align}\n  a (\\#eq:foo)\n\\end{align}\n\n\\@ref(eq:foo)\n";
+        let mut config = crate::Config {
+            flavor: crate::config::Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::RMarkdown),
+            ..Default::default()
+        };
+        config.extensions.bookdown_references = true;
+        config.extensions.bookdown_equation_references = false;
+        let tree = crate::parse(input, Some(config.clone()));
+        let index = symbol_usage_index_from_tree(&db, &tree, &config.extensions);
+
+        assert_eq!(index.crossref_usages("eq:foo").map(|v| v.len()), Some(1));
+        assert_eq!(index.crossref_declarations("eq:foo"), None);
     }
 
     #[test]

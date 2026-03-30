@@ -65,3 +65,11 @@ pub(crate) fn try_parse_bookdown_text_reference(text: &str) -> Option<(usize, &s
     let label = &rest[..close];
     Some((start + close + 1, label))
 }
+
+pub(crate) fn try_parse_bookdown_equation_definition(text: &str) -> Option<(usize, &str)> {
+    let (len, label) = try_parse_bookdown_definition(text)?;
+    if !label.starts_with("eq:") {
+        return None;
+    }
+    Some((len, label))
+}
