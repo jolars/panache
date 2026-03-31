@@ -108,16 +108,21 @@ fn collect_definition_labels(
         return labels;
     };
 
-    let doc_path = &metadata.source_path;
-    let project_root = crate::includes::find_bookdown_root(doc_path)
-        .or_else(|| crate::includes::find_quarto_root(doc_path));
+    // Canonicalize to absolute path so project root discovery and path comparisons work
+    // correctly regardless of whether the path was given as relative or absolute.
+    let doc_path = metadata
+        .source_path
+        .canonicalize()
+        .unwrap_or_else(|_| metadata.source_path.clone());
+    let project_root = crate::includes::find_bookdown_root(&doc_path)
+        .or_else(|| crate::includes::find_quarto_root(&doc_path));
     let Some(project_root) = project_root else {
         return labels;
     };
-    let is_bookdown = crate::includes::find_bookdown_root(doc_path).is_some();
+    let is_bookdown = crate::includes::find_bookdown_root(&doc_path).is_some();
 
     for path in crate::includes::find_project_documents(&project_root, config, is_bookdown) {
-        if path == *doc_path {
+        if path == doc_path {
             continue;
         }
         if let Ok(other_input) = std::fs::read_to_string(&path) {
@@ -327,16 +332,17 @@ mod tests {
     }
 
     #[test]
-    fn resolves_bookdown_crossref_from_project_documents() {
+    fn resolves_bookdown_crossref_with_empty_bookdown_yml() {
+        // When _bookdown.yml exists but is empty, bookdown auto-discovers all .Rmd files.
         let temp = TempDir::new().expect("tempdir");
         let root = temp.path();
+        fs::write(root.join("_bookdown.yml"), "").expect("write _bookdown.yml");
         fs::write(
-            root.join("_bookdown.yml"),
-            "rmd_files: [\"1-one.Rmd\", \"2-two.Rmd\"]\n",
+            root.join("1-one.Rmd"),
+            "---\ntitle: Test\n---\n# One {#one}\n",
         )
-        .expect("write _bookdown.yml");
-        fs::write(root.join("1-one.Rmd"), "# Kalman {#kalman}\n").expect("write 1-one.Rmd");
-        fs::write(root.join("2-two.Rmd"), "\\@ref(kalman)\n").expect("write 2-two.Rmd");
+        .expect("write 1-one.Rmd");
+        fs::write(root.join("2-two.Rmd"), "\\@ref(one)\n").expect("write 2-two.Rmd");
 
         let input = fs::read_to_string(root.join("2-two.Rmd")).expect("read 2-two.Rmd");
         let mut config = Config {
@@ -355,7 +361,7 @@ mod tests {
             diagnostics
                 .iter()
                 .all(|diag| diag.code != "undefined-reference-label"),
-            "cross-document bookdown crossref should resolve"
+            "empty _bookdown.yml should auto-discover .Rmd files in the project"
         );
     }
 }
