@@ -5,7 +5,6 @@
 
 {
   packages = [
-    pkgs.air
     pkgs.bashInteractive
     pkgs.perf
     pkgs.cargo-flamegraph
