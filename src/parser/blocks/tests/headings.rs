@@ -139,6 +139,28 @@ fn parses_mmd_header_identifier_in_setext_when_enabled() {
 }
 
 #[test]
+fn atx_heading_immediately_after_yaml_frontmatter() {
+    // Pandoc allows a heading directly after YAML frontmatter without a blank line.
+    let input = "---\ntitle: Test\n---\n# Heading\n";
+    let node = Parser::new(input, &Config::default()).parse();
+    assert!(
+        find_first(&node, SyntaxKind::HEADING).is_some(),
+        "heading directly after YAML frontmatter should be parsed as a heading"
+    );
+}
+
+#[test]
+fn atx_heading_with_id_immediately_after_yaml_frontmatter() {
+    // Heading IDs must be extractable when heading follows YAML directly.
+    let input = "---\ntitle: Test\n---\n# One {#one}\n";
+    let node = Parser::new(input, &Config::default()).parse();
+    assert!(
+        find_first(&node, SyntaxKind::HEADING).is_some(),
+        "heading with ID directly after YAML frontmatter should be parsed as a heading"
+    );
+}
+
+#[test]
 fn parses_mmd_header_identifier_before_atx_closing_hashes() {
     let mut config = Config::default();
     config.extensions.mmd_header_identifiers = true;

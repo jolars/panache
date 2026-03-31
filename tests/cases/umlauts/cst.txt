@@ -9,8 +9,12 @@ DOCUMENT@0..62
       NEWLINE@33..34 "\n"
     YAML_METADATA_DELIM@34..37 "---"
     NEWLINE@37..38 "\n"
-  PARAGRAPH@38..54
-    TEXT@38..53 "# introduction "
+  HEADING@38..54
+    ATX_HEADING_MARKER@38..39
+      ATX_HEADING_MARKER@38..39 "#"
+    WHITESPACE@39..40 " "
+    HEADING_CONTENT@40..53
+      TEXT@40..53 "introduction "
     NEWLINE@53..54 "\n"
   BLANK_LINE@54..55
     BLANK_LINE@54..55 "\n"

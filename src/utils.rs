@@ -10,6 +10,7 @@ pub fn is_block_element(kind: SyntaxKind) -> bool {
         kind,
         SyntaxKind::PARAGRAPH
             | SyntaxKind::FIGURE
+            | SyntaxKind::HEADING
             | SyntaxKind::LIST
             | SyntaxKind::DEFINITION_LIST
             | SyntaxKind::BLOCK_QUOTE

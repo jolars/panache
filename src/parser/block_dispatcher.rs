@@ -2112,6 +2112,10 @@ impl BlockParserRegistry {
         None
     }
 
+    pub fn parser_name(&self, block_match: &PreparedBlockMatch) -> &'static str {
+        self.parsers[block_match.parser_index].name()
+    }
+
     pub fn parse_prepared(
         &self,
         block_match: &PreparedBlockMatch,

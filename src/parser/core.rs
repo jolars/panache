@@ -52,6 +52,10 @@ pub struct Parser<'a> {
     containers: ContainerStack,
     config: &'a Config,
     block_registry: BlockParserRegistry,
+    /// True when the previous block was a metadata block (YAML, Pandoc title, or MMD title).
+    /// The first line after a metadata block is treated as if it has a blank line before it,
+    /// matching Pandoc's behavior of allowing headings etc. directly after frontmatter.
+    after_metadata_block: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -65,6 +69,7 @@ impl<'a> Parser<'a> {
             containers: ContainerStack::new(),
             config,
             block_registry: BlockParserRegistry::new(),
+            after_metadata_block: false,
         }
     }
 
@@ -1758,8 +1763,10 @@ impl<'a> Parser<'a> {
         // Check for heading (needs blank line before, or at start of container)
         // Note: for fenced div nesting, the line immediately after a div opening fence
         // should be treated like the start of a container (Pandoc allows nested fences
-        // without an intervening blank line).
-        let has_blank_before = if self.pos == 0 {
+        // without an intervening blank line). Similarly, the first line after a metadata
+        // block (YAML/Pandoc title/MMD title) is treated as having a blank before it.
+        let after_metadata_block = std::mem::replace(&mut self.after_metadata_block, false);
+        let has_blank_before = if self.pos == 0 || after_metadata_block {
             true
         } else {
             let prev_line = self.lines[self.pos - 1];
@@ -1830,6 +1837,13 @@ impl<'a> Parser<'a> {
                     &self.lines,
                     self.pos,
                 );
+
+                if matches!(
+                    self.block_registry.parser_name(block_match),
+                    "yaml_metadata" | "pandoc_title_block" | "mmd_title_block"
+                ) {
+                    self.after_metadata_block = true;
+                }
 
                 match block_match.effect {
                     BlockEffect::None => {}

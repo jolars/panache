@@ -7,7 +7,11 @@ DOCUMENT@0..36
       NEWLINE@21..22 "\n"
     YAML_METADATA_DELIM@22..25 "..."
     NEWLINE@25..26 "\n"
-  PARAGRAPH@26..36
-    TEXT@26..35 "# Heading"
+  HEADING@26..36
+    ATX_HEADING_MARKER@26..27
+      ATX_HEADING_MARKER@26..27 "#"
+    WHITESPACE@27..28 " "
+    HEADING_CONTENT@28..35
+      TEXT@28..35 "Heading"
     NEWLINE@35..36 "\n"
 
