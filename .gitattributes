@@ -14,7 +14,7 @@ tests/cases/line_ending_crlf/* -text
 tests/cases/line_ending_lf/* -text
 tests/bibtex_samples/bibtex_crlf.bib -text
 
-# AST files should always use LF endings (they contain literal string representations)
+# CST files should always use LF endings (they contain literal string representations)
 tests/cases/*/cst.txt eol=lf
 tests/bibtex_samples/*.cst eol=lf
 
