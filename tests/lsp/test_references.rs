@@ -152,6 +152,31 @@ foobar
 }
 
 #[tokio::test]
+async fn test_references_heading_ids_are_case_sensitive() {
+    let server = TestLspServer::new();
+    let content = r#"# Heading {#em}
+
+A reference to [Heading](#em).
+
+# Heading {#EM}
+
+A reference to [Heading](#EM).
+"#;
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let refs = server
+        .references("file:///test.md", 6, 27, true)
+        .await
+        .expect("references");
+
+    assert_eq!(refs.len(), 2);
+    assert!(refs.iter().any(|loc| loc.range.start.line == 4));
+    assert!(refs.iter().any(|loc| loc.range.start.line == 6));
+}
+
+#[tokio::test]
 async fn test_references_citation_without_declaration() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();

@@ -2,7 +2,9 @@ use crate::config::Config;
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
 use crate::syntax::{AstNode, Crossref, FootnoteReference, Link, SyntaxNode};
-use crate::utils::{crossref_resolution_labels, implicit_heading_ids, normalize_label};
+use crate::utils::{
+    crossref_resolution_labels, implicit_heading_ids, normalize_anchor_label, normalize_label,
+};
 use std::collections::HashSet;
 
 pub struct UndefinedReferencesRule;
@@ -63,7 +65,7 @@ impl Rule for UndefinedReferencesRule {
         for crossref in tree.descendants().filter_map(Crossref::cast) {
             for key in crossref.keys() {
                 let label = key.text();
-                let normalized = normalize_label(&label);
+                let normalized = normalize_anchor_label(&label);
                 if normalized.is_empty() {
                     continue;
                 }

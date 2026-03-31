@@ -12,7 +12,7 @@ use crate::metadata::{inline_bib_conflicts, inline_reference_map};
 
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
-use crate::utils::normalize_label;
+use crate::utils::{normalize_anchor_label, normalize_label};
 
 struct RenameScanContext<'a> {
     salsa_db: &'a Arc<Mutex<crate::salsa::SalsaDb>>,
@@ -152,7 +152,7 @@ pub(crate) async fn rename(
     if let Some(SymbolTarget::HeadingLink(old_key) | SymbolTarget::HeadingId(old_key)) =
         target.as_ref()
     {
-        let old_norm = normalize_label(old_key);
+        let old_norm = normalize_anchor_label(old_key);
         let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
         let per_doc = crate::lsp::navigation::project_symbol_documents(
@@ -376,7 +376,7 @@ async fn rename_crossref_symbol(
     new_name: &str,
     bookdown_references: bool,
 ) -> HashMap<Uri, Vec<TextEdit>> {
-    let old_norm = normalize_label(old_key);
+    let old_norm = normalize_anchor_label(old_key);
     let search_keys = crate::utils::crossref_symbol_labels(&old_norm, bookdown_references);
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 
@@ -447,7 +447,7 @@ async fn rename_chunk_label_symbol(
     new_name: &str,
     bookdown_references: bool,
 ) -> HashMap<Uri, Vec<TextEdit>> {
-    let old_norm = normalize_label(old_key);
+    let old_norm = normalize_anchor_label(old_key);
     let search_keys = crate::utils::crossref_symbol_labels(&old_norm, bookdown_references);
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
 

@@ -385,6 +385,35 @@ foobar
 }
 
 #[tokio::test]
+async fn test_rename_heading_id_is_case_sensitive() {
+    let server = TestLspServer::new();
+    let content = r#"# Heading {#em}
+
+A reference to [Heading](#em).
+
+# Heading {#EM}
+
+A reference to [Heading](#EM).
+"#;
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let edit = server
+        .rename("file:///test.md", 6, 27, "renamed")
+        .await
+        .expect("rename edit");
+    let changes = edit.changes.expect("changes");
+    let doc_uri: Uri = "file:///test.md".parse().unwrap();
+    let edits = changes.get(&doc_uri).expect("doc edits");
+
+    assert_eq!(edits.len(), 2);
+    assert!(edits.iter().all(|e| e.new_text == "renamed"));
+    assert!(edits.iter().any(|e| e.range.start.line == 4));
+    assert!(edits.iter().any(|e| e.range.start.line == 6));
+}
+
+#[tokio::test]
 async fn test_rename_bookdown_section_crossref_with_hyphenated_slug() {
     let server = TestLspServer::new();
     let content = r#"# Heading

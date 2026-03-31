@@ -455,6 +455,29 @@ A ref to \@ref(heading-2).
 }
 
 #[tokio::test]
+async fn test_goto_definition_heading_ids_are_case_sensitive() {
+    let server = TestLspServer::new();
+
+    let content = r#"# Heading {#em}
+
+A reference to [Heading](#em).
+
+# Heading {#EM}
+
+A reference to [Heading](#EM).
+"#;
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let result = server.goto_definition("file:///test.md", 6, 27).await;
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected scalar location response");
+    };
+    assert_eq!(location.range.start.line, 4);
+}
+
+#[tokio::test]
 async fn test_goto_definition_returns_none_inside_yaml_frontmatter() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();

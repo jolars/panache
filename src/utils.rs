@@ -176,8 +176,15 @@ pub fn normalize_label(label: &str) -> String {
         .to_lowercase()
 }
 
+/// Normalize cross-reference and anchor labels for case-sensitive matching.
+///
+/// Unlike `normalize_label`, this preserves letter case.
+pub fn normalize_anchor_label(label: &str) -> String {
+    label.trim().to_string()
+}
+
 pub fn crossref_resolution_labels(label: &str, bookdown_references: bool) -> Vec<String> {
-    let normalized = normalize_label(label);
+    let normalized = normalize_anchor_label(label);
     let mut labels = vec![normalized.clone()];
 
     if !bookdown_references {
@@ -203,7 +210,7 @@ pub fn crossref_symbol_labels(label: &str, bookdown_references: bool) -> Vec<Str
         return labels;
     }
 
-    let normalized = normalize_label(label);
+    let normalized = normalize_anchor_label(label);
     let is_prefixed = crate::parser::inlines::citations::has_bookdown_prefix(&normalized);
     if is_prefixed {
         return labels;

@@ -10,7 +10,7 @@ use crate::syntax::{
     Heading, Link, ListItem, ParsedYamlRegionSnapshot, ReferenceDefinition, SyntaxKind, SyntaxNode,
     YamlRegion, collect_parsed_yaml_region_snapshots,
 };
-use crate::utils::{implicit_heading_ids, normalize_label};
+use crate::utils::{implicit_heading_ids, normalize_anchor_label, normalize_label};
 use salsa::{Accumulator, Durability, Setter};
 
 #[salsa::input]
@@ -353,7 +353,7 @@ impl SymbolUsageIndex {
     }
 
     pub fn crossref_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
-        self.crossref_usages.get(&normalize_label(key))
+        self.crossref_usages.get(&normalize_anchor_label(key))
     }
 
     pub fn example_label_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
@@ -361,20 +361,22 @@ impl SymbolUsageIndex {
     }
 
     pub fn crossref_declarations(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
-        self.crossref_declarations.get(&normalize_label(key))
+        self.crossref_declarations.get(&normalize_anchor_label(key))
     }
 
     pub fn chunk_label_value_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
-        self.chunk_label_value_ranges.get(&normalize_label(key))
+        self.chunk_label_value_ranges
+            .get(&normalize_anchor_label(key))
     }
 
     pub fn crossref_declaration_value_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.crossref_declaration_value_ranges
-            .get(&normalize_label(key))
+            .get(&normalize_anchor_label(key))
     }
 
     pub fn heading_id_value_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
-        self.heading_id_value_ranges.get(&normalize_label(key))
+        self.heading_id_value_ranges
+            .get(&normalize_anchor_label(key))
     }
 
     pub fn heading_link_usages(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
@@ -440,14 +442,16 @@ impl SymbolUsageIndex {
         key: &str,
         include_declaration: bool,
     ) -> Vec<rowan::TextRange> {
-        let normalized = normalize_label(key);
+        let anchor_normalized = normalize_anchor_label(key);
         let mut ranges = self
             .heading_link_usages
-            .get(&normalized)
+            .get(&anchor_normalized)
             .cloned()
             .unwrap_or_default();
 
-        if include_declaration && let Some(id_ranges) = self.heading_id_value_ranges(&normalized) {
+        if include_declaration
+            && let Some(id_ranges) = self.heading_id_value_ranges(&anchor_normalized)
+        {
             ranges.extend(id_ranges.iter().copied());
         }
 
@@ -462,7 +466,7 @@ impl SymbolUsageIndex {
 
     pub fn heading_explicit_definition_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.heading_explicit_definition_ranges
-            .get(&normalize_label(key))
+            .get(&normalize_anchor_label(key))
     }
 
     pub fn heading_implicit_definition_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
@@ -617,7 +621,7 @@ pub fn symbol_usage_index_from_tree(
             };
             index
                 .heading_link_usages
-                .entry(normalize_label(&id))
+                .entry(normalize_anchor_label(&id))
                 .or_default()
                 .push(range);
             continue;
@@ -671,7 +675,7 @@ pub fn symbol_usage_index_from_tree(
         for key in crossref.keys() {
             index
                 .crossref_usages
-                .entry(normalize_label(&key.text()))
+                .entry(normalize_anchor_label(&key.text()))
                 .or_default()
                 .push(key.text_range());
         }
@@ -694,13 +698,13 @@ pub fn symbol_usage_index_from_tree(
         if let Some(id) = attribute.id() {
             index
                 .crossref_declarations
-                .entry(normalize_label(&id))
+                .entry(normalize_anchor_label(&id))
                 .or_default()
                 .push(attribute.syntax().text_range());
             if let Some(id_range) = attribute.id_value_range() {
                 index
                     .crossref_declaration_value_ranges
-                    .entry(normalize_label(&id))
+                    .entry(normalize_anchor_label(&id))
                     .or_default()
                     .push(id_range);
                 if attribute
@@ -710,7 +714,7 @@ pub fn symbol_usage_index_from_tree(
                 {
                     index
                         .heading_id_value_ranges
-                        .entry(normalize_label(&id))
+                        .entry(normalize_anchor_label(&id))
                         .or_default()
                         .push(id_range);
                     if let Some(heading) = attribute
@@ -720,7 +724,7 @@ pub fn symbol_usage_index_from_tree(
                     {
                         index
                             .heading_explicit_definition_ranges
-                            .entry(normalize_label(&id))
+                            .entry(normalize_anchor_label(&id))
                             .or_default()
                             .push(heading.text_range());
                     }
@@ -736,21 +740,21 @@ pub fn symbol_usage_index_from_tree(
             if value.is_empty() {
                 continue;
             }
-            let normalized = normalize_label(&value);
+            let normalized_anchor = normalize_anchor_label(&value);
 
             index
                 .crossref_declarations
-                .entry(normalized.clone())
+                .entry(normalized_anchor.clone())
                 .or_default()
                 .push(label.declaration_range());
             index
                 .chunk_label_value_ranges
-                .entry(normalized.clone())
+                .entry(normalized_anchor.clone())
                 .or_default()
                 .push(label.value_range());
             index
                 .crossref_declaration_value_ranges
-                .entry(normalized)
+                .entry(normalized_anchor)
                 .or_default()
                 .push(label.value_range());
         }
@@ -998,7 +1002,7 @@ fn insert_crossref<'db>(
     id: &str,
     location: DefinitionLocation,
 ) {
-    let key = intern_normalized_label(db, id);
+    let key = intern_label(db, &normalize_anchor_label(id));
     index.crossrefs.entry(key).or_insert(location);
 }
 
@@ -1058,7 +1062,7 @@ impl DefinitionIndex {
     }
 
     pub fn find_crossref(&self, id: &str) -> Option<&DefinitionLocation> {
-        let key = normalize_label(id);
+        let key = normalize_anchor_label(id);
         self.crossrefs.get(&key)
     }
 
@@ -1943,6 +1947,40 @@ mod tests {
                 .map(|ranges| ranges.len()),
             Some(1)
         );
+    }
+
+    #[test]
+    fn symbol_usage_index_preserves_case_for_anchor_based_crossrefs() {
+        let db = SalsaDb::default();
+        let tree = crate::parse(
+            "# Heading {#em}\n\nSee [a](#em).\n\n# Heading {#EM}\n\nSee [b](#EM).\n",
+            None,
+        );
+        let index = symbol_usage_index_from_tree(&db, &tree, &crate::config::Extensions::default());
+
+        assert_eq!(
+            index.crossref_declarations("em").map(|ranges| ranges.len()),
+            Some(1)
+        );
+        assert_eq!(
+            index.crossref_declarations("EM").map(|ranges| ranges.len()),
+            Some(1)
+        );
+        assert_eq!(
+            index
+                .heading_id_value_ranges("em")
+                .map(|ranges| ranges.len()),
+            Some(1)
+        );
+        assert_eq!(
+            index
+                .heading_id_value_ranges("EM")
+                .map(|ranges| ranges.len()),
+            Some(1)
+        );
+        assert_eq!(index.heading_reference_ranges("em", true).len(), 2);
+        assert_eq!(index.heading_reference_ranges("EM", true).len(), 2);
+        assert_eq!(index.heading_reference_ranges("Em", true).len(), 0);
     }
 
     #[test]

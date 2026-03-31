@@ -2,7 +2,7 @@ use crate::config::{Config, Flavor};
 use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::rules::Rule;
 use crate::syntax::{AstNode, ChunkOptionEntry, CodeBlock, Crossref, SyntaxNode};
-use crate::utils::{crossref_resolution_labels, normalize_label};
+use crate::utils::{crossref_resolution_labels, normalize_anchor_label, normalize_label};
 use std::collections::HashMap;
 
 pub struct FigureCrossrefCaptionsRule;
@@ -29,7 +29,7 @@ impl Rule for FigureCrossrefCaptionsRule {
         for crossref in tree.descendants().filter_map(Crossref::cast) {
             for key in crossref.keys() {
                 let label = key.text();
-                let normalized = normalize_label(&label);
+                let normalized = normalize_anchor_label(&label);
                 if !is_bookdown_figure_crossref(&normalized) {
                     continue;
                 }

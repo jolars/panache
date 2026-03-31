@@ -11,7 +11,7 @@ use crate::syntax::{
     AstNode, AttributeNode, Citation, CodeBlock, CodeSpan, Crossref, FootnoteReference, ImageLink,
     InlineMath, Link, LinkRef, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
 };
-use crate::utils::normalize_label;
+use crate::utils::{normalize_anchor_label, normalize_label};
 use rowan::{NodeOrToken, TextRange, TextSize};
 
 use super::config::load_config;
@@ -256,7 +256,7 @@ pub(crate) fn extract_heading_id_key(node: &SyntaxNode) -> Option<String> {
         && let Some(id) = attribute.id()
         && attribute_has_heading_ancestor(attribute.syntax())
     {
-        return Some(normalize_label(&id));
+        return Some(normalize_anchor_label(&id));
     }
 
     let mut current = node.clone();
@@ -265,7 +265,7 @@ pub(crate) fn extract_heading_id_key(node: &SyntaxNode) -> Option<String> {
             && let Some(id) = attribute.id()
             && attribute_has_heading_ancestor(attribute.syntax())
         {
-            return Some(normalize_label(&id));
+            return Some(normalize_anchor_label(&id));
         }
         current = parent;
     }
@@ -390,7 +390,7 @@ fn node_and_ancestors(node: &SyntaxNode) -> impl Iterator<Item = SyntaxNode> {
 
 fn heading_target_from_link(link: &Link) -> Option<String> {
     if let Some(dest) = link.dest() {
-        let id = normalize_label(&dest.hash_anchor_id()?);
+        let id = normalize_anchor_label(&dest.hash_anchor_id()?);
         return (!id.is_empty()).then_some(id);
     }
 

@@ -110,11 +110,55 @@ fn check_duplicate_crossref_labels(tree: &SyntaxNode, input: &str) -> Vec<Diagno
         if ranges.len() < 2 {
             continue;
         }
+
+        let declaration_value_ranges = index
+            .crossref_declaration_value_ranges(label)
+            .cloned()
+            .unwrap_or_default();
+
+        // Cross-reference labels are case-sensitive in Quarto/Bookdown contexts.
+        // The symbol index groups by normalized label for lookup features, so this
+        // lint rule must compare raw declaration values to avoid false positives.
+        if declaration_value_ranges.len() == ranges.len() {
+            use std::collections::HashMap;
+
+            let mut declarations_by_raw_label: HashMap<&str, Vec<rowan::TextRange>> =
+                HashMap::new();
+
+            for (declaration_range, value_range) in
+                ranges.iter().zip(declaration_value_ranges.iter())
+            {
+                let raw_label = range_text(input, *value_range);
+                declarations_by_raw_label
+                    .entry(raw_label)
+                    .or_default()
+                    .push(*declaration_range);
+            }
+
+            for (raw_label, declaration_ranges) in declarations_by_raw_label {
+                if declaration_ranges.len() < 2 {
+                    continue;
+                }
+                let first_location = Location::from_range(declaration_ranges[0], input);
+                for range in declaration_ranges.iter().skip(1) {
+                    diagnostics.push(Diagnostic::warning(
+                        Location::from_range(*range, input),
+                        "duplicate-reference-labels",
+                        format!(
+                            "Duplicate cross-reference label '[{}]' (first defined at line {})",
+                            raw_label, first_location.line
+                        ),
+                    ));
+                }
+            }
+            continue;
+        }
+
+        // Fallback if declaration/value range alignment is unavailable.
         let first_location = Location::from_range(ranges[0], input);
         for range in ranges.iter().skip(1) {
-            let location = Location::from_range(*range, input);
             diagnostics.push(Diagnostic::warning(
-                location,
+                Location::from_range(*range, input),
                 "duplicate-reference-labels",
                 format!(
                     "Duplicate cross-reference label '[{}]' (first defined at line {})",
@@ -125,6 +169,12 @@ fn check_duplicate_crossref_labels(tree: &SyntaxNode, input: &str) -> Vec<Diagno
     }
 
     diagnostics
+}
+
+fn range_text(input: &str, range: rowan::TextRange) -> &str {
+    let start: usize = range.start().into();
+    let end: usize = range.end().into();
+    input.get(start..end).unwrap_or("")
 }
 
 #[cfg(test)]
@@ -283,5 +333,51 @@ plot(1:10)
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "duplicate-reference-labels");
         assert!(diagnostics[0].message.contains("fig-plot"));
+    }
+
+    #[test]
+    fn test_crossref_chunk_labels_are_case_sensitive() {
+        let input = r#"See @fig-foo and @fig-FOO.
+
+```{r}
+#| label: fig-foo
+plot(1:10)
+```
+
+```{r}
+#| label: fig-FOO
+plot(1:10)
+```
+"#;
+        let config = Config {
+            flavor: Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
+            ..Default::default()
+        };
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = DuplicateReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert_eq!(diagnostics.len(), 0);
+    }
+
+    #[test]
+    fn test_crossref_heading_ids_are_case_sensitive() {
+        let input = r#"# Heading {#em}
+
+A reference to [Heading](#em).
+
+# Heading {#EM}
+
+A reference to [Heading](#EM).
+"#;
+        let config = Config {
+            flavor: Flavor::Pandoc,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Pandoc),
+            ..Default::default()
+        };
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = DuplicateReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert_eq!(diagnostics.len(), 0);
     }
 }

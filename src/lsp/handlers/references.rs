@@ -8,7 +8,7 @@ use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
-use crate::utils::normalize_label;
+use crate::utils::{normalize_anchor_label, normalize_label};
 
 use super::super::conversions::{offset_to_position, position_to_offset};
 use super::super::helpers;
@@ -197,5 +197,5 @@ fn add_locations(out: &mut Vec<Location>, uri: &Uri, text: &str, ranges: &[rowan
 }
 
 fn crossref_candidates(label: &str, bookdown_references: bool) -> Vec<String> {
-    crate::utils::crossref_symbol_labels(&normalize_label(label), bookdown_references)
+    crate::utils::crossref_symbol_labels(&normalize_anchor_label(label), bookdown_references)
 }
