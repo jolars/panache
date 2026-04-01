@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.30.0](https://github.com/jolars/panache/compare/v2.29.0...v2.30.0) (2026-04-01)
+
+### Features
+
+* **lsp:** add hover preview for equations ([ea5f8b0](https://github.com/jolars/panache/commit/ea5f8b02533f1d0678bade3be395bb3ce90fe251))
+* **parser,lsp:** support bookdown equation references ([bb1946b](https://github.com/jolars/panache/commit/bb1946b24d5568357ce9497aba87e956235aea07))
+
+### Bug Fixes
+
+* **formatter:** preserve non-breaking spaces ([e0861db](https://github.com/jolars/panache/commit/e0861db6983b4a0a60ac1362cb3c459e263adba7))
+* **linter:** canonicalize absolute path to project root ([8362c9e](https://github.com/jolars/panache/commit/8362c9e038051dabea4502bed3cc67240541bbff))
+* **parser,formatter:** handle inline executable code ([a2ba2f9](https://github.com/jolars/panache/commit/a2ba2f9ae38fea310985d5c525ceb7291a7f53d2))
+* **parser:** catch headings after yaml with no blankline ([ba61c32](https://github.com/jolars/panache/commit/ba61c321f7353afb82e9a16627c446644e2ced51))
+* unify cross-reference resolution ([c324753](https://github.com/jolars/panache/commit/c32475325258f846562decc9751529648b29d615))
+
 ## [2.29.0](https://github.com/jolars/panache/compare/v2.28.0...v2.29.0) (2026-03-28)
 
 ### Features
