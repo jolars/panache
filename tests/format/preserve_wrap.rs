@@ -50,6 +50,29 @@ fn block_quote_preserve_keeps_line_breaks() {
 }
 
 #[test]
+fn list_item_preserve_keeps_line_breaks() {
+    let input = "\
+1. **Simple model**: Convert each of the `r length(levels(forested_train$county))` counties to binary indicators and drop any predictors with zero-variance. 
+ 2. **Normalization model**: Begin with the simple model and add a normalization step that applies the ORD transformation to all numeric predictors. 
+ 3. **Encoding model**:  Build on the normalization model by replacing the county dummy indicators with effect encoding.
+ 4. **Interaction model**:  extend the encoding by including interaction terms. 
+ 5. **Spline model**:  Enhance the interaction model further with ten natural spline basis functions for a set of predictors.
+";
+
+    let out = format(input, Some(cfg_preserve()), None);
+    let out2 = format(&out, Some(cfg_preserve()), None);
+    assert_eq!(out, out2);
+    let expected = "\
+1. **Simple model**: Convert each of the `r length(levels(forested_train$county))` counties to binary indicators and drop any predictors with zero-variance. 
+2. **Normalization model**: Begin with the simple model and add a normalization step that applies the ORD transformation to all numeric predictors. 
+3. **Encoding model**:  Build on the normalization model by replacing the county dummy indicators with effect encoding.
+4. **Interaction model**:  extend the encoding by including interaction terms. 
+5. **Spline model**:  Enhance the interaction model further with ten natural spline basis functions for a set of predictors.
+";
+    assert_eq!(out, expected);
+}
+
+#[test]
 fn paragraph_sentence_wraps_per_sentence() {
     let input = "First sentence. Second sentence! Third sentence?\n";
     let expected = "First sentence.\nSecond sentence!\nThird sentence?\n";
@@ -68,6 +91,23 @@ fn block_quote_sentence_wraps_per_sentence() {
     let expected = "\
 > First sentence.
 > Second sentence; third sentence.
+";
+
+    let out = format(input, Some(cfg_sentence()), None);
+    let out2 = format(&out, Some(cfg_sentence()), None);
+    assert_eq!(out, out2);
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn list_item_sentence_wraps_per_sentence() {
+    let input = "\
+- First sentence. Second sentence! Third sentence?
+";
+    let expected = "\
+- First sentence.
+  Second sentence!
+  Third sentence?
 ";
 
     let out = format(input, Some(cfg_sentence()), None);

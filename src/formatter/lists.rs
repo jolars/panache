@@ -435,7 +435,20 @@ impl Formatter {
 
         let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
         let line_widths = [available_width];
-        let lines = wrapping::wrap_words_first_fit(&words, &line_widths);
+        let lines = match wrap_mode {
+            WrapMode::Preserve => Vec::new(),
+            _ => wrapping::wrap_words_first_fit(&words, &line_widths),
+        };
+        let preserve_lines = match wrap_mode {
+            WrapMode::Preserve => {
+                let source = content_node
+                    .as_ref()
+                    .map(|content| content.text().to_string())
+                    .unwrap_or_default();
+                Some(source.lines().map(ToString::to_string).collect::<Vec<_>>())
+            }
+            _ => None,
+        };
         let sentence_lines = match wrap_mode {
             WrapMode::Sentence => Some(wrapping::sentence_lines_from_words(&words)),
             _ => None,
@@ -473,6 +486,26 @@ impl Formatter {
                 self.output.push_str(&" ".repeat(hanging));
                 self.output.push_str(line.trim_start());
                 self.output.push('\n');
+            }
+        } else if let Some(preserve_lines) = &preserve_lines {
+            for (i, line) in preserve_lines.iter().enumerate() {
+                if i == 0 {
+                    self.output.push_str(&" ".repeat(total_indent));
+                    self.output
+                        .push_str(&" ".repeat(list_indent.marker_padding));
+                    self.output.push_str(&marker);
+                    self.output.push_str(&" ".repeat(list_indent.spaces_after));
+                    if let Some(ref cb) = checkbox {
+                        self.output.push_str(cb);
+                        self.output.push(' ');
+                    }
+                } else {
+                    self.output.push_str(&" ".repeat(hanging));
+                }
+                self.output.push_str(line.trim_start());
+                if !has_only_empty_nested_list {
+                    self.output.push('\n');
+                }
             }
         } else if let Some(sentence_lines) = &sentence_lines {
             for (i, text) in sentence_lines.iter().enumerate() {
