@@ -9,17 +9,10 @@ sh = "shfmt"
 python = "ruff"
 lua = "stylua"
 
-[formatters.taplo]
-cmd = "taplo"
-args = ["format", "-"]
-
-[formatters.shfmt]
-cmd = "shfmt"
-args = ["-"]
-
 [formatters.stylua]
 cmd = "stylua"
 args = ["--indent-type", "Spaces", "--indent-width", "2", "-"]
 
 [linters]
 r = "jarl"
+python = "ruff"

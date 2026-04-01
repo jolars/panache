@@ -31,7 +31,7 @@ use std::time::Duration;
 use rowan::TextRange;
 use serde::Deserialize;
 
-use crate::linter::diagnostics::{Diagnostic, Location};
+use crate::linter::diagnostics::{Diagnostic, Location, Severity};
 use crate::linter::offsets::line_col_to_byte_offset_1based;
 
 /// Errors that can occur when invoking external linters.
@@ -100,6 +100,15 @@ impl ExternalLinterRegistry {
                 args: vec!["check", "--output-format=json"],
             },
         );
+        // ruff: Python linter
+        linters.insert(
+            "ruff".to_string(),
+            LinterInfo {
+                name: "ruff",
+                command: "ruff",
+                args: vec!["check", "--output-format", "json"],
+            },
+        );
 
         Self { linters }
     }
@@ -164,18 +173,20 @@ pub async fn run_linter(
     }
 
     // Parse output based on linter type
-    parse_linter_output(linter_name, &stdout, original_input, mappings)
+    parse_linter_output(linter_name, &stdout, code, original_input, mappings)
 }
 
 /// Parse linter output based on linter type (public for sync version to reuse).
 pub fn parse_linter_output(
     linter_name: &str,
     output: &str,
+    linted_input: &str,
     original_input: &str,
     mappings: Option<&[crate::linter::code_block_collector::BlockMapping]>,
 ) -> Result<Vec<Diagnostic>, LinterError> {
     match linter_name {
         "jarl" => parse_jarl_output(output, original_input, mappings),
+        "ruff" => parse_ruff_output(output, linted_input, original_input, mappings),
         _ => Err(LinterError::ParseError(format!(
             "no parser for linter: {}",
             linter_name
@@ -223,6 +234,37 @@ struct JarlFix {
     to_skip: bool,
 }
 
+/// Ruff JSON output structures.
+#[derive(Debug, Deserialize)]
+struct RuffDiagnostic {
+    code: String,
+    message: String,
+    location: RuffLocation,
+    end_location: Option<RuffLocation>,
+    severity: Option<String>,
+    fix: Option<RuffFix>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuffLocation {
+    row: usize,
+    column: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuffFix {
+    #[allow(dead_code)]
+    message: Option<String>,
+    edits: Vec<RuffFixEdit>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuffFixEdit {
+    content: String,
+    location: RuffLocation,
+    end_location: RuffLocation,
+}
+
 fn line_col_to_offset(input: &str, line: usize, column: usize) -> Option<usize> {
     line_col_to_byte_offset_1based(input, line, column)
 }
@@ -257,6 +299,23 @@ fn map_concatenated_offset_to_original(
     }
 
     None
+}
+
+/// Like `map_concatenated_offset_to_original`, but also supports offsets that
+/// sit exactly at a mapped block's exclusive end boundary.
+fn map_concatenated_offset_to_original_with_end_boundary(
+    offset: usize,
+    mappings: &[crate::linter::code_block_collector::BlockMapping],
+) -> Option<usize> {
+    map_concatenated_offset_to_original(offset, mappings).or_else(|| {
+        mappings.iter().find_map(|mapping| {
+            if mapping.concatenated_range.end == offset {
+                Some(mapping.original_range.end)
+            } else {
+                None
+            }
+        })
+    })
 }
 
 /// Parse jarl JSON output into panache diagnostics.
@@ -298,8 +357,14 @@ fn parse_jarl_output(
             if !jarl_diag.fix.to_skip {
                 // Map Jarl's byte offsets (in concatenated file) to original document
                 if let (Some(fix_start), Some(fix_end)) = (
-                    map_concatenated_offset_to_original(jarl_diag.fix.start, mappings),
-                    map_concatenated_offset_to_original(jarl_diag.fix.end, mappings),
+                    map_concatenated_offset_to_original_with_end_boundary(
+                        jarl_diag.fix.start,
+                        mappings,
+                    ),
+                    map_concatenated_offset_to_original_with_end_boundary(
+                        jarl_diag.fix.end,
+                        mappings,
+                    ),
                 ) {
                     let fix_range =
                         TextRange::new((fix_start as u32).into(), (fix_end as u32).into());
@@ -342,6 +407,136 @@ fn parse_jarl_output(
     Ok(diagnostics)
 }
 
+/// Parse Ruff JSON output into panache diagnostics.
+///
+/// If `mappings` is provided, Ruff auto-fixes are enabled and mapped from
+/// concatenated code back to the original markdown document.
+fn parse_ruff_output(
+    json: &str,
+    linted_input: &str,
+    original_input: &str,
+    mappings: Option<&[crate::linter::code_block_collector::BlockMapping]>,
+) -> Result<Vec<Diagnostic>, LinterError> {
+    use crate::linter::diagnostics::{Edit, Fix};
+
+    let output: Vec<RuffDiagnostic> = serde_json::from_str(json)
+        .map_err(|e| LinterError::ParseError(format!("invalid ruff JSON: {}", e)))?;
+
+    let mut diagnostics = Vec::new();
+
+    for ruff_diag in output {
+        let line = ruff_diag.location.row;
+        let column = ruff_diag.location.column;
+
+        let start_offset =
+            line_col_to_offset(original_input, line, column).unwrap_or(original_input.len());
+        let end_offset = ruff_diag
+            .end_location
+            .and_then(|end| line_col_to_offset(original_input, end.row, end.column))
+            .unwrap_or(start_offset)
+            .max(start_offset)
+            .min(original_input.len());
+
+        let range = TextRange::new((start_offset as u32).into(), (end_offset as u32).into());
+        let location = Location {
+            line,
+            column,
+            range,
+        };
+
+        let fix = if let (Some(mappings), Some(ruff_fix)) = (mappings, ruff_diag.fix.as_ref()) {
+            let mut edits = Vec::new();
+            let mut mapping_failed = false;
+
+            for edit in &ruff_fix.edits {
+                let concat_start =
+                    line_col_to_offset(linted_input, edit.location.row, edit.location.column);
+                let concat_end = line_col_to_offset(
+                    linted_input,
+                    edit.end_location.row,
+                    edit.end_location.column,
+                );
+
+                match (concat_start, concat_end) {
+                    (Some(concat_start), Some(concat_end)) => {
+                        if let (Some(original_start), Some(original_end)) = (
+                            map_concatenated_offset_to_original_with_end_boundary(
+                                concat_start,
+                                mappings,
+                            ),
+                            map_concatenated_offset_to_original_with_end_boundary(
+                                concat_end, mappings,
+                            ),
+                        ) {
+                            let fix_range = TextRange::new(
+                                (original_start as u32).into(),
+                                (original_end as u32).into(),
+                            );
+                            edits.push(Edit {
+                                range: fix_range,
+                                replacement: edit.content.clone(),
+                            });
+                        } else {
+                            mapping_failed = true;
+                            log::warn!(
+                                "Failed to map Ruff fix offsets {}..{} to original document",
+                                concat_start,
+                                concat_end
+                            );
+                            break;
+                        }
+                    }
+                    _ => {
+                        mapping_failed = true;
+                        log::warn!(
+                            "Failed to convert Ruff fix location {}:{}..{}:{} to byte offsets",
+                            edit.location.row,
+                            edit.location.column,
+                            edit.end_location.row,
+                            edit.end_location.column
+                        );
+                        break;
+                    }
+                }
+            }
+
+            if mapping_failed || edits.is_empty() {
+                None
+            } else {
+                Some(Fix {
+                    message: ruff_fix
+                        .message
+                        .clone()
+                        .unwrap_or_else(|| "Apply suggested Ruff fix".to_string()),
+                    edits,
+                })
+            }
+        } else {
+            None
+        };
+
+        let diagnostic = match ruff_diag.severity.as_deref() {
+            Some("error") => Diagnostic::error(location, ruff_diag.code, ruff_diag.message),
+            Some("warning") => Diagnostic::warning(location, ruff_diag.code, ruff_diag.message),
+            _ => Diagnostic {
+                severity: Severity::Info,
+                location,
+                code: ruff_diag.code,
+                message: ruff_diag.message,
+                fix: None,
+            },
+        };
+
+        diagnostics.push(if let Some(fix) = fix {
+            diagnostic.with_fix(fix)
+        } else {
+            diagnostic
+        });
+    }
+
+    Ok(diagnostics)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -351,6 +546,8 @@ mod tests {
         let registry = ExternalLinterRegistry::new();
         assert!(registry.get("jarl").is_some());
         assert_eq!(registry.get("jarl").unwrap().name, "jarl");
+        assert!(registry.get("ruff").is_some());
+        assert_eq!(registry.get("ruff").unwrap().name, "ruff");
     }
 
     #[test]
@@ -571,5 +768,116 @@ mod tests {
         assert_eq!(usize::from(fix.edits[0].range.start()), 50);
         assert_eq!(usize::from(fix.edits[0].range.end()), 55);
         assert_eq!(fix.edits[0].replacement, "x <- 1");
+    }
+
+    #[test]
+    fn test_parse_ruff_output() {
+        let json = r#"[
+            {
+                "code": "F401",
+                "message": "`os` imported but unused",
+                "location": {
+                    "row": 1,
+                    "column": 8
+                },
+                "end_location": {
+                    "row": 1,
+                    "column": 10
+                },
+                "severity": "error"
+            }
+        ]"#;
+
+        let input = "import os\n";
+        let diagnostics = parse_ruff_output(json, input, input, None).unwrap();
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "F401");
+        assert_eq!(diagnostics[0].message, "`os` imported but unused");
+        assert_eq!(diagnostics[0].severity, Severity::Error);
+        assert_eq!(diagnostics[0].location.line, 1);
+        assert_eq!(diagnostics[0].location.column, 8);
+        assert_eq!(usize::from(diagnostics[0].location.range.start()), 7);
+        assert_eq!(usize::from(diagnostics[0].location.range.end()), 9);
+        assert!(diagnostics[0].fix.is_none());
+    }
+
+    #[test]
+    fn test_parse_ruff_output_with_missing_severity_defaults_to_info() {
+        let json = r#"[
+            {
+                "code": "X001",
+                "message": "Test diagnostic",
+                "location": {
+                    "row": 1,
+                    "column": 1
+                }
+            }
+        ]"#;
+
+        let input = "x = 1\n";
+        let diagnostics = parse_ruff_output(json, input, input, None).unwrap();
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].severity, Severity::Info);
+    }
+
+    #[test]
+    fn test_parse_ruff_output_with_fix_and_mappings() {
+        use crate::linter::code_block_collector::BlockMapping;
+
+        let json = r#"[
+            {
+                "code": "F401",
+                "message": "`os` imported but unused",
+                "location": {
+                    "row": 1,
+                    "column": 8
+                },
+                "end_location": {
+                    "row": 1,
+                    "column": 10
+                },
+                "severity": "error",
+                "fix": {
+                    "message": "Remove unused import: `os`",
+                    "edits": [
+                        {
+                            "content": "",
+                            "location": {
+                                "row": 1,
+                                "column": 1
+                            },
+                            "end_location": {
+                                "row": 2,
+                                "column": 1
+                            }
+                        }
+                    ]
+                }
+            }
+        ]"#;
+
+        let concatenated_input = "import os\n";
+        let mappings = vec![BlockMapping {
+            concatenated_range: 0..10,
+            original_range: 50..60,
+            start_line: 1,
+        }];
+
+        let original_input = "01234567890123456789012345678901234567890123456789import os\n";
+        let diagnostics =
+            parse_ruff_output(json, concatenated_input, original_input, Some(&mappings)).unwrap();
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "F401");
+        assert!(diagnostics[0].fix.is_some());
+
+        let fix = diagnostics[0].fix.as_ref().unwrap();
+        assert_eq!(fix.edits.len(), 1);
+        assert_eq!(fix.message, "Remove unused import: `os`");
+        assert_eq!(usize::from(fix.edits[0].range.start()), 50);
+        assert_eq!(usize::from(fix.edits[0].range.end()), 60);
+        assert_eq!(fix.edits[0].replacement, "");
     }
 }

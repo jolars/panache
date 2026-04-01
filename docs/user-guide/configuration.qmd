@@ -889,13 +889,15 @@ Enable linters for specific languages:
 ```toml
 [linters]
 r = "jarl"
+python = "ruff"
 ```
 
 Available linters:
 
-| Language | Linter | Command | Notes                          |
-| -------- | ------ | ------- | ------------------------------ |
-| R        | `jarl` | `jarl`  | R linter with JSON diagnostics |
+| Language | Linter | Command | Notes                               |
+| -------- | ------ | ------- | ----------------------------------- |
+| R        | `jarl` | `jarl`  | R linter with JSON diagnostics      |
+| Python   | `ruff` | `ruff`  | Python linter with JSON diagnostics |
 
 ### How It Works
 
@@ -938,19 +940,21 @@ Line-accurate
 :   Diagnostics report exact line/column locations
 
 Auto-fixes
-:   Currently disabled due to byte offset mapping complexity (diagnostics work
-    perfectly)
+:   Supported for external linters that provide fix edits with mappable ranges
+    (currently `jarl` and `ruff`)
 
 ### Example
 
-Enable R linting with jarl while also formatting with air:
+Enable R and Python linting while also formatting:
 
 ```toml
 [linters]
 r = "jarl"
+python = "ruff"
 
 [formatters]
 r = "air"
+python = "ruff"
 ```
 
 ## Example Configuration

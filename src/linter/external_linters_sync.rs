@@ -64,6 +64,7 @@ pub fn run_linter_sync(
     crate::linter::external_linters::parse_linter_output(
         linter_name,
         &stdout,
+        code,
         original_input,
         mappings,
     )
@@ -95,6 +96,27 @@ mod tests {
             .filter(|d| d.code == "any_is_na")
             .collect();
         assert_eq!(any_is_na_diags.len(), 1);
+    }
+
+    #[test]
+    fn test_ruff_linter_sync() {
+        // Skip if ruff not available
+        if which::which("ruff").is_err() {
+            println!("Skipping ruff test - ruff not installed");
+            return;
+        }
+
+        let code = "import os\n";
+        let registry = ExternalLinterRegistry::new();
+
+        let result = run_linter_sync("ruff", code, code, &registry, None);
+        assert!(result.is_ok());
+
+        let diagnostics = result.unwrap();
+        assert!(!diagnostics.is_empty());
+
+        let unused_import_diags: Vec<_> = diagnostics.iter().filter(|d| d.code == "F401").collect();
+        assert_eq!(unused_import_diags.len(), 1);
     }
 
     #[test]

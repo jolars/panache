@@ -461,13 +461,15 @@ Enable external linters in your configuration file:
 ```toml
 [linters]
 r = "jarl"
+python = "ruff"
 ```
 
 Available external linters:
 
-| Language | Linter | Description                    |
-| -------- | ------ | ------------------------------ |
-| R        | `jarl` | R linter with JSON diagnostics |
+| Language | Linter | Description                         |
+| -------- | ------ | ----------------------------------- |
+| R        | `jarl` | R linter with JSON diagnostics      |
+| Python   | `ruff` | Python linter with JSON diagnostics |
 
 ### How External Linters Work
 
@@ -506,7 +508,9 @@ y <- x + 5
 ````
 
 With `[linters] r = "jarl"` configured, `jarl` analyzes both blocks together and
-correctly understands that `x` is defined before it's used.
+correctly understands that `x` is defined before it's used. Similarly, with
+`[linters] python = "ruff"`, Ruff can lint Python code blocks and map
+diagnostics back to the original document.
 
 ### Behavior
 
@@ -523,7 +527,8 @@ Line accuracy
 :   Diagnostics report exact line and column positions in the original document
 
 Auto-fixes
-:   Currently disabled due to byte-offset mapping complexity
+:   Supported for external linters that return fix edits with mappable ranges
+    (currently `jarl` and `ruff`)
 
 ### Where External Linters Run
 

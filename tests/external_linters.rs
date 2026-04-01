@@ -114,6 +114,98 @@ x = 1
     }
 
     #[tokio::test]
+    async fn test_ruff_linter_integration() {
+        // Skip if ruff not available
+        if which::which("ruff").is_err() {
+            println!("Skipping ruff test - ruff not installed");
+            return;
+        }
+
+        let input = r#"# Test
+
+```python
+import os
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("python".to_string(), "ruff".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        let ruff_diags: Vec<_> = diagnostics.iter().filter(|d| d.code == "F401").collect();
+        assert_eq!(ruff_diags.len(), 1, "Expected 1 Ruff F401 diagnostic");
+
+        assert_eq!(ruff_diags[0].location.line, 4); // import os is on line 4
+        assert_eq!(
+            ruff_diags[0].severity,
+            panache::linter::diagnostics::Severity::Error
+        );
+        assert!(ruff_diags[0].fix.is_some(), "Ruff fixes should be enabled");
+    }
+
+    #[tokio::test]
+    async fn test_ruff_fix_application_end_to_end() {
+        if which::which("ruff").is_err() {
+            println!("Skipping ruff test - ruff not installed");
+            return;
+        }
+
+        let input = r#"# Test
+
+```python
+import os
+print("ok")
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("python".to_string(), "ruff".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        let with_fixes: Vec<_> = diagnostics.iter().filter(|d| d.fix.is_some()).collect();
+        assert!(!with_fixes.is_empty(), "Expected at least one Ruff fix");
+
+        use panache::linter::diagnostics::Edit;
+
+        let mut edits: Vec<&Edit> = diagnostics
+            .iter()
+            .filter_map(|d| d.fix.as_ref())
+            .flat_map(|f| &f.edits)
+            .collect();
+
+        edits.sort_by_key(|e| e.range.start());
+
+        let mut output = String::new();
+        let mut last_end = 0;
+
+        for edit in &edits {
+            let start: usize = edit.range.start().into();
+            let end: usize = edit.range.end().into();
+
+            output.push_str(&input[last_end..start]);
+            output.push_str(&edit.replacement);
+            last_end = end;
+        }
+
+        output.push_str(&input[last_end..]);
+
+        assert!(
+            !output.contains("import os"),
+            "Ruff fix should remove unused import"
+        );
+        assert!(output.contains("print(\"ok\")"));
+        assert!(output.contains("```python"));
+    }
+
+    #[tokio::test]
     async fn test_unknown_linter() {
         let input = r#"```r
 x <- 1
