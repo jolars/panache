@@ -331,6 +331,65 @@ console.log(1)
             "Expected 1 ESLint no-unused-vars diagnostic"
         );
         assert_eq!(eslint_diags[0].location.line, 4);
+        assert!(
+            eslint_diags[0].fix.is_some(),
+            "Expected ESLint fix or suggestion mapping"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_eslint_fix_application_end_to_end() {
+        if which::which("eslint").is_err() {
+            println!("Skipping eslint test - eslint not installed");
+            return;
+        }
+
+        let input = r#"# Test
+
+```js
+const x = 1;
+console.log(1)
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("js".to_string(), "eslint".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        let with_fixes: Vec<_> = diagnostics.iter().filter(|d| d.fix.is_some()).collect();
+        assert!(
+            !with_fixes.is_empty(),
+            "Expected at least one ESLint fix or suggestion"
+        );
+
+        use panache::linter::diagnostics::Edit;
+
+        let mut edits: Vec<&Edit> = diagnostics
+            .iter()
+            .filter_map(|d| d.fix.as_ref())
+            .flat_map(|f| &f.edits)
+            .collect();
+
+        edits.sort_by_key(|e| e.range.start());
+
+        let mut output = String::new();
+        let mut last_end = 0;
+        for edit in &edits {
+            let start: usize = edit.range.start().into();
+            let end: usize = edit.range.end().into();
+            output.push_str(&input[last_end..start]);
+            output.push_str(&edit.replacement);
+            last_end = end;
+        }
+        output.push_str(&input[last_end..]);
+
+        assert!(!output.contains("const x = 1;"));
+        assert!(output.contains("console.log(1)"));
+        assert!(output.contains("```js"));
     }
 
     #[tokio::test]
