@@ -450,9 +450,16 @@ func main() {
         let tree = parse(input, Some(config.clone()));
         let diagnostics = linter::lint_with_external(&tree, input, &config).await;
 
-        // We only assert successful invocation path here because diagnostic codes
-        // depend on staticcheck internals and may vary with versions/check sets.
-        assert!(diagnostics.iter().all(|d| !d.code.is_empty()));
+        // Ensure we don't surface fallback package-level compile diagnostics caused
+        // by bad temp-file naming/placement.
+        assert!(
+            diagnostics.iter().all(|d| d.code != "compile"),
+            "Staticcheck should run against the generated Go file, not package fallback"
+        );
+        assert!(
+            diagnostics.iter().any(|d| d.code == "SA5009"),
+            "Expected staticcheck code-level diagnostic for mismatched Printf format"
+        );
     }
 
     #[tokio::test]

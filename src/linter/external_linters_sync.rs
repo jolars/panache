@@ -34,6 +34,7 @@ pub fn run_linter_sync(
 
     // Create temp file with code
     let mut builder = tempfile::Builder::new();
+    builder.prefix("panache-external-");
     if let Some(suffix) = crate::linter::external_linters::file_suffix_for_language(language) {
         builder.suffix(suffix);
     }

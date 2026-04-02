@@ -201,6 +201,7 @@ pub async fn run_linter(
     }
 
     let mut builder = tempfile::Builder::new();
+    builder.prefix("panache-external-");
     if let Some(suffix) = file_suffix_for_language(language) {
         builder.suffix(suffix);
     }
