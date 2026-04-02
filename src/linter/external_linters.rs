@@ -109,6 +109,15 @@ impl ExternalLinterRegistry {
                 args: vec!["check", "--output-format", "json"],
             },
         );
+        // shellcheck: Shell linter
+        linters.insert(
+            "shellcheck".to_string(),
+            LinterInfo {
+                name: "shellcheck",
+                command: "shellcheck",
+                args: vec!["-f", "json"],
+            },
+        );
 
         Self { linters }
     }
@@ -187,6 +196,7 @@ pub fn parse_linter_output(
     match linter_name {
         "jarl" => parse_jarl_output(output, original_input, mappings),
         "ruff" => parse_ruff_output(output, linted_input, original_input, mappings),
+        "shellcheck" => parse_shellcheck_output(output, original_input),
         _ => Err(LinterError::ParseError(format!(
             "no parser for linter: {}",
             linter_name
@@ -263,6 +273,20 @@ struct RuffFixEdit {
     content: String,
     location: RuffLocation,
     end_location: RuffLocation,
+}
+
+/// ShellCheck JSON output structures.
+#[derive(Debug, Deserialize)]
+struct ShellcheckDiagnostic {
+    line: usize,
+    #[serde(rename = "endLine")]
+    end_line: usize,
+    column: usize,
+    #[serde(rename = "endColumn")]
+    end_column: usize,
+    level: String,
+    code: usize,
+    message: String,
 }
 
 fn line_col_to_offset(input: &str, line: usize, column: usize) -> Option<usize> {
@@ -537,6 +561,45 @@ fn parse_ruff_output(
     Ok(diagnostics)
 }
 
+/// Parse ShellCheck JSON output into panache diagnostics.
+fn parse_shellcheck_output(json: &str, input: &str) -> Result<Vec<Diagnostic>, LinterError> {
+    let output: Vec<ShellcheckDiagnostic> = serde_json::from_str(json)
+        .map_err(|e| LinterError::ParseError(format!("invalid shellcheck JSON: {}", e)))?;
+
+    let mut diagnostics = Vec::new();
+
+    for sc_diag in output {
+        let start = line_col_to_offset(input, sc_diag.line, sc_diag.column).unwrap_or(input.len());
+        let end = line_col_to_offset(input, sc_diag.end_line, sc_diag.end_column)
+            .unwrap_or(start)
+            .max(start)
+            .min(input.len());
+        let range = TextRange::new((start as u32).into(), (end as u32).into());
+        let location = Location {
+            line: sc_diag.line,
+            column: sc_diag.column,
+            range,
+        };
+
+        let code = format!("SC{}", sc_diag.code);
+        let diagnostic = match sc_diag.level.as_str() {
+            "error" => Diagnostic::error(location, code, sc_diag.message),
+            "warning" => Diagnostic::warning(location, code, sc_diag.message),
+            _ => Diagnostic {
+                severity: Severity::Info,
+                location,
+                code,
+                message: sc_diag.message,
+                fix: None,
+            },
+        };
+
+        diagnostics.push(diagnostic);
+    }
+
+    Ok(diagnostics)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -548,6 +611,8 @@ mod tests {
         assert_eq!(registry.get("jarl").unwrap().name, "jarl");
         assert!(registry.get("ruff").is_some());
         assert_eq!(registry.get("ruff").unwrap().name, "ruff");
+        assert!(registry.get("shellcheck").is_some());
+        assert_eq!(registry.get("shellcheck").unwrap().name, "shellcheck");
     }
 
     #[test]
@@ -879,5 +944,35 @@ mod tests {
         assert_eq!(usize::from(fix.edits[0].range.start()), 50);
         assert_eq!(usize::from(fix.edits[0].range.end()), 60);
         assert_eq!(fix.edits[0].replacement, "");
+    }
+
+    #[test]
+    fn test_parse_shellcheck_output() {
+        let json = r#"[
+            {
+                "line": 1,
+                "endLine": 1,
+                "column": 6,
+                "endColumn": 12,
+                "level": "info",
+                "code": 2086,
+                "message": "Double quote to prevent globbing and word splitting.",
+                "fix": null
+            }
+        ]"#;
+
+        let input = "echo $UNSET\n";
+        let diagnostics = parse_shellcheck_output(json, input).unwrap();
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "SC2086");
+        assert_eq!(
+            diagnostics[0].message,
+            "Double quote to prevent globbing and word splitting."
+        );
+        assert_eq!(diagnostics[0].severity, Severity::Info);
+        assert_eq!(diagnostics[0].location.line, 1);
+        assert_eq!(diagnostics[0].location.column, 6);
+        assert!(diagnostics[0].fix.is_none());
     }
 }

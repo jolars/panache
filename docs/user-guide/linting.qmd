@@ -462,14 +462,16 @@ Enable external linters in your configuration file:
 [linters]
 r = "jarl"
 python = "ruff"
+sh = "shellcheck"
 ```
 
 Available external linters:
 
-| Language | Linter | Description                         |
-| -------- | ------ | ----------------------------------- |
-| R        | `jarl` | R linter with JSON diagnostics      |
-| Python   | `ruff` | Python linter with JSON diagnostics |
+| Language | Linter       | Description                         |
+| -------- | ------------ | ----------------------------------- |
+| R        | `jarl`       | R linter with JSON diagnostics      |
+| Python   | `ruff`       | Python linter with JSON diagnostics |
+| Shell    | `shellcheck` | Shell linter with JSON diagnostics  |
 
 ### How External Linters Work
 

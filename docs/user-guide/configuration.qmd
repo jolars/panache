@@ -890,14 +890,16 @@ Enable linters for specific languages:
 [linters]
 r = "jarl"
 python = "ruff"
+sh = "shellcheck"
 ```
 
 Available linters:
 
-| Language | Linter | Command | Notes                               |
-| -------- | ------ | ------- | ----------------------------------- |
-| R        | `jarl` | `jarl`  | R linter with JSON diagnostics      |
-| Python   | `ruff` | `ruff`  | Python linter with JSON diagnostics |
+| Language | Linter       | Command      | Notes                               |
+| -------- | ------------ | ------------ | ----------------------------------- |
+| R        | `jarl`       | `jarl`       | R linter with JSON diagnostics      |
+| Python   | `ruff`       | `ruff`       | Python linter with JSON diagnostics |
+| Shell    | `shellcheck` | `shellcheck` | Shell linter with JSON diagnostics  |
 
 ### How It Works
 

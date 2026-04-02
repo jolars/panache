@@ -120,6 +120,26 @@ mod tests {
     }
 
     #[test]
+    fn test_shellcheck_linter_sync() {
+        if which::which("shellcheck").is_err() {
+            println!("Skipping shellcheck test - shellcheck not installed");
+            return;
+        }
+
+        let code = "echo $UNSET\n";
+        let registry = ExternalLinterRegistry::new();
+
+        let result = run_linter_sync("shellcheck", code, code, &registry, None);
+        assert!(result.is_ok());
+
+        let diagnostics = result.unwrap();
+        assert!(!diagnostics.is_empty());
+
+        let sc_diags: Vec<_> = diagnostics.iter().filter(|d| d.code == "SC2086").collect();
+        assert_eq!(sc_diags.len(), 1);
+    }
+
+    #[test]
     fn test_unknown_linter_sync() {
         let code = "x <- 1\n";
         let registry = ExternalLinterRegistry::new();

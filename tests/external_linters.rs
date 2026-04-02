@@ -206,6 +206,45 @@ print("ok")
     }
 
     #[tokio::test]
+    async fn test_shellcheck_linter_integration() {
+        if which::which("shellcheck").is_err() {
+            println!("Skipping shellcheck test - shellcheck not installed");
+            return;
+        }
+
+        let input = r#"# Test
+
+```sh
+echo $UNSET
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("sh".to_string(), "shellcheck".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        let shell_diags: Vec<_> = diagnostics.iter().filter(|d| d.code == "SC2086").collect();
+        assert_eq!(
+            shell_diags.len(),
+            1,
+            "Expected 1 ShellCheck SC2086 diagnostic"
+        );
+        assert_eq!(shell_diags[0].location.line, 4); // echo $UNSET on line 4
+        assert_eq!(
+            shell_diags[0].severity,
+            panache::linter::diagnostics::Severity::Info
+        );
+        assert!(
+            shell_diags[0].fix.is_none(),
+            "ShellCheck fixes are not supported"
+        );
+    }
+
+    #[tokio::test]
     async fn test_unknown_linter() {
         let input = r#"```r
 x <- 1
