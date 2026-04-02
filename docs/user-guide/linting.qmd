@@ -522,6 +522,11 @@ Language matching
 Error handling
 :   Missing linter executables log a warning and skip gracefully
 
+Compatibility checks
+:   External linters only run for their supported languages. Unsupported
+    mappings in `[linters]` (for example, `bash = "jarl"`) are skipped with a
+    warning.
+
 Timeout
 :   30-second timeout per linter invocation
 

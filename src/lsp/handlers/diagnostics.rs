@@ -72,10 +72,11 @@ pub(crate) async fn lint_and_publish(
                 let _permit = permit;
                 crate::linter::external_linters::run_linter(
                     &job.linter_name,
+                    &job.language,
                     &job.content,
                     &input,
                     registry.as_ref(),
-                    Some(&job.mappings),
+                    Some(job.mappings.as_slice()),
                 )
                 .await
             });

@@ -13,6 +13,7 @@ use crate::linter::code_block_collector::BlockMapping;
 use crate::linter::diagnostics::Diagnostic;
 use crate::linter::offsets::line_col_to_byte_offset_1based;
 
+mod eslint;
 mod jarl;
 mod ruff;
 mod shellcheck;
@@ -67,6 +68,22 @@ pub struct LinterInfo {
     pub name: &'static str,
     pub command: &'static str,
     pub args: Vec<&'static str>,
+    pub supported_languages: Vec<&'static str>,
+}
+
+pub(crate) fn file_suffix_for_language(language: &str) -> Option<&'static str> {
+    match language.to_ascii_lowercase().as_str() {
+        "js" | "javascript" => Some(".js"),
+        "jsx" => Some(".jsx"),
+        "mjs" => Some(".mjs"),
+        "cjs" => Some(".cjs"),
+        "ts" | "typescript" => Some(".ts"),
+        "tsx" => Some(".tsx"),
+        "python" => Some(".py"),
+        "r" => Some(".R"),
+        "sh" | "bash" | "zsh" | "ksh" | "shell" => Some(".sh"),
+        _ => None,
+    }
 }
 
 /// Registry of supported external linters.
@@ -83,6 +100,7 @@ impl ExternalLinterRegistry {
                 name: "jarl",
                 command: "jarl",
                 args: vec!["check", "--output-format=json"],
+                supported_languages: vec!["r"],
             },
         );
         linters.insert(
@@ -91,6 +109,31 @@ impl ExternalLinterRegistry {
                 name: "ruff",
                 command: "ruff",
                 args: vec!["check", "--output-format", "json"],
+                supported_languages: vec!["python"],
+            },
+        );
+        linters.insert(
+            "eslint".to_string(),
+            LinterInfo {
+                name: "eslint",
+                command: "eslint",
+                args: vec![
+                    "--no-config-lookup",
+                    "--rule",
+                    "no-unused-vars:error",
+                    "--format",
+                    "json",
+                ],
+                supported_languages: vec![
+                    "js",
+                    "javascript",
+                    "jsx",
+                    "mjs",
+                    "cjs",
+                    "ts",
+                    "typescript",
+                    "tsx",
+                ],
             },
         );
         linters.insert(
@@ -99,6 +142,7 @@ impl ExternalLinterRegistry {
                 name: "shellcheck",
                 command: "shellcheck",
                 args: vec!["-f", "json"],
+                supported_languages: vec!["sh", "bash", "zsh", "ksh", "shell"],
             },
         );
         Self { linters }
@@ -106,6 +150,14 @@ impl ExternalLinterRegistry {
 
     pub fn get(&self, name: &str) -> Option<&LinterInfo> {
         self.linters.get(name)
+    }
+
+    pub fn supports_language(&self, linter_name: &str, language: &str) -> Option<bool> {
+        self.get(linter_name).map(|info| {
+            info.supported_languages
+                .iter()
+                .any(|supported| supported.eq_ignore_ascii_case(language))
+        })
     }
 }
 
@@ -118,6 +170,7 @@ impl Default for ExternalLinterRegistry {
 #[cfg(feature = "lsp")]
 pub async fn run_linter(
     linter_name: &str,
+    language: &str,
     code: &str,
     original_input: &str,
     registry: &ExternalLinterRegistry,
@@ -126,8 +179,25 @@ pub async fn run_linter(
     let linter_info = registry
         .get(linter_name)
         .ok_or_else(|| LinterError::SpawnFailed(format!("unknown linter: {}", linter_name)))?;
+    if !registry
+        .supports_language(linter_name, language)
+        .unwrap_or(false)
+    {
+        return Err(LinterError::SpawnFailed(format!(
+            "unsupported linter-language mapping: {} for {}",
+            linter_name, language
+        )));
+    }
 
-    let mut temp_file = tempfile::NamedTempFile::new()?;
+    let mut builder = tempfile::Builder::new();
+    if let Some(suffix) = file_suffix_for_language(language) {
+        builder.suffix(suffix);
+    }
+    let mut temp_file = if let Ok(cwd) = std::env::current_dir() {
+        builder.tempfile_in(cwd)?
+    } else {
+        builder.tempfile()?
+    };
     temp_file.write_all(code.as_bytes())?;
     temp_file.flush()?;
     let temp_path = temp_file.path();
@@ -176,6 +246,9 @@ pub fn parse_linter_output(
     }
     if linter_name == ruff::RuffParser::NAME {
         return ruff::RuffParser::parse(&ctx);
+    }
+    if linter_name == eslint::EslintParser::NAME {
+        return eslint::EslintParser::parse(&ctx);
     }
     if linter_name == shellcheck::ShellcheckParser::NAME {
         return shellcheck::ShellcheckParser::parse(&ctx);
@@ -231,6 +304,28 @@ mod tests {
         let registry = ExternalLinterRegistry::new();
         assert!(registry.get("jarl").is_some());
         assert!(registry.get("ruff").is_some());
+        assert!(registry.get("eslint").is_some());
         assert!(registry.get("shellcheck").is_some());
+    }
+
+    #[test]
+    fn test_registry_linter_language_support() {
+        let registry = ExternalLinterRegistry::new();
+        assert_eq!(registry.supports_language("jarl", "r"), Some(true));
+        assert_eq!(registry.supports_language("jarl", "bash"), Some(false));
+        assert_eq!(registry.supports_language("ruff", "python"), Some(true));
+        assert_eq!(registry.supports_language("eslint", "js"), Some(true));
+        assert_eq!(
+            registry.supports_language("eslint", "typescript"),
+            Some(true)
+        );
+        assert_eq!(registry.supports_language("eslint", "python"), Some(false));
+        assert_eq!(registry.supports_language("shellcheck", "bash"), Some(true));
+        assert_eq!(registry.supports_language("shellcheck", "sh"), Some(true));
+        assert_eq!(
+            registry.supports_language("shellcheck", "python"),
+            Some(false)
+        );
+        assert_eq!(registry.supports_language("unknown", "r"), None);
     }
 }

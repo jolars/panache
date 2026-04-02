@@ -935,6 +935,11 @@ Language matching
 Error handling
 :   Missing linters are gracefully ignored with a warning
 
+Compatibility checks
+:   External linters declare supported languages. If `[linters]` maps a linter
+    to an unsupported language (for example, `bash = "jarl"`), Panache skips
+    that mapping and logs a warning.
+
 Timeout
 :   30 seconds per linter invocation
 

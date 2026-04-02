@@ -273,6 +273,7 @@ pub fn built_in_lint_plan(
                 crate::linter::code_block_collector::concatenate_with_blanks_and_mapping(blocks);
             external_jobs.push(ExternalLintJob {
                 linter_name: linter_name.clone(),
+                language: language.clone(),
                 content: concatenated.content,
                 mappings: concatenated.mappings,
             });
@@ -288,6 +289,7 @@ pub fn built_in_lint_plan(
 #[derive(Debug, Clone, Default)]
 pub struct ExternalLintJob {
     pub linter_name: String,
+    pub language: String,
     pub content: String,
     pub mappings: Vec<crate::linter::code_block_collector::BlockMapping>,
 }

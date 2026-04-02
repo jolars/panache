@@ -151,6 +151,29 @@ impl LintRunner {
 
         // Run external linters for configured languages
         for (language, linter_name) in &config.linters {
+            let Some(linter_info) = self.external_linters.get(linter_name) else {
+                log::warn!(
+                    "Skipping unknown external linter '{}' configured for language '{}'",
+                    linter_name,
+                    language
+                );
+                continue;
+            };
+
+            if !self
+                .external_linters
+                .supports_language(linter_name, language)
+                .unwrap_or(false)
+            {
+                log::warn!(
+                    "Skipping external linter '{}' for unsupported language '{}'; supported languages: {}",
+                    linter_name,
+                    language,
+                    linter_info.supported_languages.join(", ")
+                );
+                continue;
+            }
+
             if let Some(blocks) = code_blocks.get(language) {
                 if blocks.is_empty() {
                     continue;
@@ -169,6 +192,7 @@ impl LintRunner {
                 // Run the linter with mapping info
                 match run_linter(
                     linter_name,
+                    language,
                     &concatenated_result.content,
                     input,
                     &self.external_linters,
@@ -217,6 +241,29 @@ impl LintRunner {
 
         // Run external linters for configured languages
         for (language, linter_name) in &config.linters {
+            let Some(linter_info) = self.external_linters.get(linter_name) else {
+                log::warn!(
+                    "Skipping unknown external linter '{}' configured for language '{}'",
+                    linter_name,
+                    language
+                );
+                continue;
+            };
+
+            if !self
+                .external_linters
+                .supports_language(linter_name, language)
+                .unwrap_or(false)
+            {
+                log::warn!(
+                    "Skipping external linter '{}' for unsupported language '{}'; supported languages: {}",
+                    linter_name,
+                    language,
+                    linter_info.supported_languages.join(", ")
+                );
+                continue;
+            }
+
             if let Some(blocks) = code_blocks.get(language) {
                 if blocks.is_empty() {
                     continue;
@@ -235,6 +282,7 @@ impl LintRunner {
                 // Run the linter (sync version) with mapping info
                 match crate::linter::external_linters_sync::run_linter_sync(
                     linter_name,
+                    language,
                     &concatenated_result.content,
                     input,
                     &self.external_linters,

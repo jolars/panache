@@ -299,6 +299,41 @@ echo $UNSET
     }
 
     #[tokio::test]
+    async fn test_eslint_linter_integration() {
+        if which::which("eslint").is_err() {
+            println!("Skipping eslint test - eslint not installed");
+            return;
+        }
+
+        let input = r#"# Test
+
+```js
+const x = 1;
+console.log(1)
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("js".to_string(), "eslint".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        let eslint_diags: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.code == "no-unused-vars")
+            .collect();
+        assert_eq!(
+            eslint_diags.len(),
+            1,
+            "Expected 1 ESLint no-unused-vars diagnostic"
+        );
+        assert_eq!(eslint_diags[0].location.line, 4);
+    }
+
+    #[tokio::test]
     async fn test_unknown_linter() {
         let input = r#"```r
 x <- 1
@@ -315,6 +350,32 @@ x <- 1
 
         // Should handle gracefully - just skip external linting
         // Test passes if no panic occurs
+    }
+
+    #[tokio::test]
+    async fn test_unsupported_linter_language_mapping_is_skipped() {
+        let input = r#"# Test
+
+```python
+import os
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("python".to_string(), "jarl".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        // External linter mapping is unsupported, so no external diagnostics should appear.
+        assert!(
+            diagnostics
+                .iter()
+                .all(|d| d.code != "any_is_na" && d.code != "F401"),
+            "Expected unsupported linter-language mapping to be skipped"
+        );
     }
 
     #[tokio::test]

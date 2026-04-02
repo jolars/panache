@@ -63,6 +63,7 @@ pub(crate) async fn code_action(
     #[derive(Debug)]
     struct ExternalLintJob {
         linter_name: String,
+        language: String,
         content: String,
         mappings: Vec<crate::linter::code_block_collector::BlockMapping>,
     }
@@ -97,6 +98,7 @@ pub(crate) async fn code_action(
                     );
                 jobs.push(ExternalLintJob {
                     linter_name: linter_name.clone(),
+                    language: language.clone(),
                     content: concatenated.content,
                     mappings: concatenated.mappings,
                 });
@@ -128,10 +130,11 @@ pub(crate) async fn code_action(
                 let _permit = permit;
                 crate::linter::external_linters::run_linter(
                     &job.linter_name,
+                    &job.language,
                     &job.content,
                     &input,
                     registry.as_ref(),
-                    Some(&job.mappings),
+                    Some(job.mappings.as_slice()),
                 )
                 .await
             });
