@@ -16,3 +16,6 @@ args = ["--indent-type", "Spaces", "--indent-width", "2", "-"]
 [linters]
 r = "jarl"
 python = "ruff"
+sh = "shellcheck"
+js = "eslint"
+go = "staticcheck"
