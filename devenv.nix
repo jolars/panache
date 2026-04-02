@@ -22,6 +22,9 @@
     pkgs.shfmt
     pkgs.wasm-pack
     pkgs.stylua
+    pkgs.shellcheck
+    pkgs.eslint
+    pkgs.go-tools
     pkgs.yamlfmt
     pkgs.vsce
     (pkgs.rWrapper.override {
