@@ -112,7 +112,20 @@ pub(crate) fn convert_diagnostic(diag: &linter::Diagnostic, text: &str) -> Diagn
         severity: Some(severity),
         code: Some(NumberOrString::String(diag.code.clone())),
         source: Some("panache".to_string()),
-        message: diag.message.clone(),
+        message: if diag.notes.is_empty() {
+            diag.message.clone()
+        } else {
+            let mut message = diag.message.clone();
+            for note in &diag.notes {
+                message.push('\n');
+                match note.kind {
+                    linter::DiagnosticNoteKind::Note => message.push_str("note: "),
+                    linter::DiagnosticNoteKind::Help => message.push_str("help: "),
+                }
+                message.push_str(&note.message);
+            }
+            message
+        },
         ..Default::default()
     }
 }
@@ -233,6 +246,7 @@ mod tests {
             message: "Heading level skipped from h1 to h3".to_string(),
             code: "heading-hierarchy".to_string(),
             origin: DiagnosticOrigin::BuiltIn,
+            notes: Vec::new(),
             fix: None,
         };
 
@@ -269,6 +283,7 @@ mod tests {
             message: "Error".to_string(),
             code: "test-error".to_string(),
             origin: DiagnosticOrigin::BuiltIn,
+            notes: Vec::new(),
             fix: None,
         };
 
@@ -285,6 +300,7 @@ mod tests {
             message: "Info".to_string(),
             code: "test-info".to_string(),
             origin: DiagnosticOrigin::BuiltIn,
+            notes: Vec::new(),
             fix: None,
         };
 

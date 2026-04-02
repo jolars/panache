@@ -2,7 +2,7 @@ use rowan::TextRange;
 use serde::Deserialize;
 
 use super::{ExternalLinterParser, LinterError, ParseContext, line_col_to_offset};
-use crate::linter::diagnostics::{Diagnostic, DiagnosticOrigin, Location};
+use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, DiagnosticOrigin, Location};
 
 #[derive(Debug, Deserialize)]
 struct ClippyMessage {
@@ -16,6 +16,8 @@ struct ClippyMessage {
     code: Option<ClippyCode>,
     #[serde(default)]
     spans: Vec<ClippySpan>,
+    #[serde(default)]
+    children: Vec<ClippyChildMessage>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -30,6 +32,14 @@ struct ClippySpan {
     line_end: usize,
     column_end: usize,
     is_primary: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClippyChildMessage {
+    #[serde(default)]
+    level: String,
+    #[serde(default)]
+    message: String,
 }
 
 pub(crate) struct ClippyParser;
@@ -77,12 +87,22 @@ impl ExternalLinterParser for ClippyParser {
                 .code
                 .map(|c| c.code)
                 .unwrap_or_else(|| "clippy".to_string());
-            let diagnostic = match msg.level.as_str() {
+            let mut diagnostic = match msg.level.as_str() {
                 "error" => Diagnostic::error(location, code, msg.message),
                 "warning" => Diagnostic::warning(location, code, msg.message),
                 _ => Diagnostic::info(location, code, msg.message),
             }
             .with_origin(DiagnosticOrigin::External);
+            for child in msg.children {
+                if child.message.trim().is_empty() {
+                    continue;
+                }
+                let kind = match child.level.as_str() {
+                    "help" => DiagnosticNoteKind::Help,
+                    _ => DiagnosticNoteKind::Note,
+                };
+                diagnostic = diagnostic.with_note(kind, child.message);
+            }
             diagnostics.push(diagnostic);
         }
 
@@ -131,5 +151,22 @@ mod tests {
         let diagnostics = ClippyParser::parse(&ctx).unwrap();
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "clippy::useless_vec");
+    }
+
+    #[test]
+    fn maps_clippy_children_to_notes() {
+        let ctx = ParseContext {
+            output: r#"{"$message_type":"diagnostic","message":"useless use of vec!","code":{"code":"clippy::useless_vec"},"level":"warning","spans":[{"line_start":1,"column_start":13,"line_end":1,"column_end":24,"is_primary":true}],"children":[{"level":"help","message":"use an array directly"},{"level":"note","message":"`Vec` allocates on the heap"}]}"#,
+            linted_input: "fn main(){ let x = vec![1,2]; }\n",
+            original_input: "fn main(){ let x = vec![1,2]; }\n",
+            mappings: None,
+        };
+        let diagnostics = ClippyParser::parse(&ctx).unwrap();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].notes.len(), 2);
+        assert_eq!(
+            diagnostics[0].notes[0].kind,
+            crate::linter::DiagnosticNoteKind::Help
+        );
     }
 }

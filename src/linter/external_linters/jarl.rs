@@ -5,7 +5,7 @@ use super::{
     ExternalLinterParser, LinterError, ParseContext, line_col_to_offset,
     map_concatenated_offset_to_original_with_end_boundary,
 };
-use crate::linter::diagnostics::{Diagnostic, DiagnosticOrigin, Location};
+use crate::linter::diagnostics::{Diagnostic, DiagnosticNoteKind, DiagnosticOrigin, Location};
 
 #[derive(Debug, Deserialize)]
 struct JarlOutput {
@@ -107,9 +107,14 @@ impl ExternalLinterParser for JarlParser {
                 None
             };
 
-            let diagnostic =
+            let mut diagnostic =
                 Diagnostic::warning(location, jarl_diag.message.name, jarl_diag.message.body)
                     .with_origin(DiagnosticOrigin::External);
+            if let Some(suggestion) = jarl_diag.message.suggestion.as_ref()
+                && !suggestion.trim().is_empty()
+            {
+                diagnostic = diagnostic.with_note(DiagnosticNoteKind::Help, suggestion.clone());
+            }
             diagnostics.push(if let Some(fix) = fix {
                 diagnostic.with_fix(fix)
             } else {
@@ -117,5 +122,26 @@ impl ExternalLinterParser for JarlParser {
             });
         }
         Ok(diagnostics)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::linter::external_linters::ParseContext;
+
+    #[test]
+    fn maps_jarl_suggestion_to_help_note() {
+        let ctx = ParseContext {
+            output: r#"{"diagnostics":[{"message":{"name":"any_is_na","body":"Prefer anyNA()","suggestion":"Use anyNA(x) instead"},"filename":"x.R","range":[0,5],"location":{"row":1,"column":0},"fix":{"content":"anyNA(x)","start":0,"end":5,"to_skip":true}}],"errors":[]}"#,
+            linted_input: "any(is.na(x))\n",
+            original_input: "any(is.na(x))\n",
+            mappings: None,
+        };
+        let diagnostics = JarlParser::parse(&ctx).unwrap();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].notes.len(), 1);
+        assert_eq!(diagnostics[0].notes[0].kind, DiagnosticNoteKind::Help);
+        assert_eq!(diagnostics[0].notes[0].message, "Use anyNA(x) instead");
     }
 }

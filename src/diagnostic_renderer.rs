@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::cli::MessageFormat;
 use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
-use panache::linter::{Diagnostic, DiagnosticOrigin, Severity};
+use panache::linter::{Diagnostic, DiagnosticNoteKind, DiagnosticOrigin, Severity};
 
 pub(crate) fn print_diagnostics(
     diagnostics: &[Diagnostic],
@@ -51,6 +51,13 @@ pub(crate) fn print_diagnostics(
             && (source.is_none() || fix.edits.is_empty())
         {
             print_subdiag("help", &fix.message);
+        }
+        for note in &diag.notes {
+            let kind = match note.kind {
+                DiagnosticNoteKind::Note => "note",
+                DiagnosticNoteKind::Help => "help",
+            };
+            print_subdiag(kind, &note.message);
         }
 
         if diag.origin == DiagnosticOrigin::BuiltIn {
@@ -190,6 +197,7 @@ mod tests {
             message: "msg".to_string(),
             code: "heading-hierarchy".to_string(),
             origin: DiagnosticOrigin::BuiltIn,
+            notes: Vec::new(),
             fix: None,
         };
         assert_eq!(diag.origin, DiagnosticOrigin::BuiltIn);

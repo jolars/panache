@@ -32,6 +32,18 @@ pub struct Fix {
     pub edits: Vec<Edit>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticNoteKind {
+    Note,
+    Help,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticNote {
+    pub kind: DiagnosticNoteKind,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     pub severity: Severity,
@@ -39,6 +51,7 @@ pub struct Diagnostic {
     pub message: String,
     pub code: String,
     pub origin: DiagnosticOrigin,
+    pub notes: Vec<DiagnosticNote>,
     pub fix: Option<Fix>,
 }
 
@@ -50,6 +63,7 @@ impl Diagnostic {
             message: message.into(),
             code: code.into(),
             origin: DiagnosticOrigin::BuiltIn,
+            notes: Vec::new(),
             fix: None,
         }
     }
@@ -65,6 +79,7 @@ impl Diagnostic {
             message: message.into(),
             code: code.into(),
             origin: DiagnosticOrigin::BuiltIn,
+            notes: Vec::new(),
             fix: None,
         }
     }
@@ -76,6 +91,7 @@ impl Diagnostic {
             message: message.into(),
             code: code.into(),
             origin: DiagnosticOrigin::BuiltIn,
+            notes: Vec::new(),
             fix: None,
         }
     }
@@ -87,6 +103,14 @@ impl Diagnostic {
 
     pub fn with_origin(mut self, origin: DiagnosticOrigin) -> Self {
         self.origin = origin;
+        self
+    }
+
+    pub fn with_note(mut self, kind: DiagnosticNoteKind, message: impl Into<String>) -> Self {
+        self.notes.push(DiagnosticNote {
+            kind,
+            message: message.into(),
+        });
         self
     }
 }
@@ -162,6 +186,7 @@ mod tests {
         assert_eq!(diag.code, "test-error");
         assert_eq!(diag.message, "Test error message");
         assert_eq!(diag.origin, DiagnosticOrigin::BuiltIn);
+        assert!(diag.notes.is_empty());
         assert!(diag.fix.is_none());
 
         let diag_with_fix =
@@ -171,6 +196,21 @@ mod tests {
             });
         assert_eq!(diag_with_fix.severity, Severity::Warning);
         assert_eq!(diag_with_fix.origin, DiagnosticOrigin::BuiltIn);
+        assert!(diag_with_fix.notes.is_empty());
         assert!(diag_with_fix.fix.is_some());
+    }
+
+    #[test]
+    fn test_with_note_adds_diagnostic_note() {
+        let location = Location {
+            line: 1,
+            column: 1,
+            range: TextRange::new(0.into(), 1.into()),
+        };
+        let diag = Diagnostic::warning(location, "test-warning", "msg")
+            .with_note(DiagnosticNoteKind::Help, "try this");
+        assert_eq!(diag.notes.len(), 1);
+        assert_eq!(diag.notes[0].kind, DiagnosticNoteKind::Help);
+        assert_eq!(diag.notes[0].message, "try this");
     }
 }
