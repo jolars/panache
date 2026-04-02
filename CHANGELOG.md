@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.31.0](https://github.com/jolars/panache/compare/v2.30.0...v2.31.0) (2026-04-02)
+
+### Features
+
+* **linter:** add ruff as external linter ([a0506b6](https://github.com/jolars/panache/commit/a0506b655b62d792e444e13767427749b2929819))
+* **linter:** add support for eslint external linter ([4d51e97](https://github.com/jolars/panache/commit/4d51e9770f34bbd7d03934f6a7d2a5d55519860b))
+* **linter:** attach notes to external lints ([954dbd9](https://github.com/jolars/panache/commit/954dbd97da2c62cd428d55320394a59513a14cd9))
+* **linter:** restrict external linters by language ([92a812c](https://github.com/jolars/panache/commit/92a812c97c9d43b4488112a92d603c08e1254582))
+* **linters:** support shellsheck as external linter ([6875102](https://github.com/jolars/panache/commit/6875102689d40c8e939806513dc683a035400353))
+* **linter:** support clippy as external linter ([db3340f](https://github.com/jolars/panache/commit/db3340f6b8bd916b89c8e19ceb9ff1e276dc7ca5))
+* **linter:** support shellsheck as external linter ([e84c323](https://github.com/jolars/panache/commit/e84c3238881d6b008c7252c3fc618bf7d44ef9f8))
+* **linter:** support staticcheck as external linter ([d665b04](https://github.com/jolars/panache/commit/d665b046bc4cfc0612e1af295fceb84c4636432c))
+* **lsp:** add source action for linting ([01722b3](https://github.com/jolars/panache/commit/01722b3dfae018a49b70f75203fb0573684f30a0))
+* **lsp:** use exact mappings for code action on ext linter ([5b905ef](https://github.com/jolars/panache/commit/5b905ef2db5381a1940c96442c15152a193adc9e))
+
+### Bug Fixes
+
+* **formatter:** honor wrapping mode in lists ([7fbba26](https://github.com/jolars/panache/commit/7fbba26b096829e7f5f50e7facb68deaea437a01)), closes [#103](https://github.com/jolars/panache/issues/103)
+* **linter:** gate notes on linter path (external/internal) ([498ec8a](https://github.com/jolars/panache/commit/498ec8ab43329948613d300c365322552dccd164))
+
 ## [2.30.0](https://github.com/jolars/panache/compare/v2.29.0...v2.30.0) (2026-04-01)
 
 ### Features
