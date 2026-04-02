@@ -38,11 +38,7 @@ pub fn run_linter_sync(
     if let Some(suffix) = crate::linter::external_linters::file_suffix_for_language(language) {
         builder.suffix(suffix);
     }
-    let mut temp_file = if let Ok(cwd) = std::env::current_dir() {
-        builder.tempfile_in(cwd)?
-    } else {
-        builder.tempfile()?
-    };
+    let mut temp_file = builder.tempfile()?;
     temp_file.write_all(code.as_bytes())?;
     temp_file.flush()?;
 
@@ -50,8 +46,13 @@ pub fn run_linter_sync(
 
     // Build command
     let mut cmd = Command::new(linter_info.command);
-    cmd.args(linter_info.args.iter())
-        .arg(temp_path)
+    cmd.args(linter_info.args.iter());
+    if linter_name.eq_ignore_ascii_case("eslint")
+        && let Some(parent) = temp_path.parent()
+    {
+        cmd.current_dir(parent);
+    }
+    cmd.arg(temp_path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
