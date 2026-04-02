@@ -181,6 +181,20 @@ mod tests {
     }
 
     #[test]
+    fn test_staticcheck_linter_sync() {
+        if which::which("staticcheck").is_err() || which::which("go").is_err() {
+            println!("Skipping staticcheck test - staticcheck and/or go not installed");
+            return;
+        }
+
+        let code = "package main\nfunc main() { var x int; _ = x }\n";
+        let registry = ExternalLinterRegistry::new();
+
+        let result = run_linter_sync("staticcheck", "go", code, code, &registry, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
     fn test_unknown_linter_sync() {
         let code = "x <- 1\n";
         let registry = ExternalLinterRegistry::new();

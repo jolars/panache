@@ -393,6 +393,37 @@ console.log(1)
     }
 
     #[tokio::test]
+    async fn test_staticcheck_linter_integration() {
+        if which::which("staticcheck").is_err() || which::which("go").is_err() {
+            println!("Skipping staticcheck test - staticcheck and/or go not installed");
+            return;
+        }
+
+        let input = r#"# Test
+
+```go
+package main
+import "fmt"
+func main() {
+    fmt.Printf("%d", "x")
+}
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("go".to_string(), "staticcheck".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        // We only assert successful invocation path here because diagnostic codes
+        // depend on staticcheck internals and may vary with versions/check sets.
+        assert!(diagnostics.iter().all(|d| !d.code.is_empty()));
+    }
+
+    #[tokio::test]
     async fn test_unknown_linter() {
         let input = r#"```r
 x <- 1

@@ -892,16 +892,18 @@ r = "jarl"
 python = "ruff"
 sh = "shellcheck"
 js = "eslint"
+go = "staticcheck"
 ```
 
 Available linters:
 
-| Language              | Linter       | Command      | Notes                               |
-| --------------------- | ------------ | ------------ | ----------------------------------- |
-| R                     | `jarl`       | `jarl`       | R linter with JSON diagnostics      |
-| Python                | `ruff`       | `ruff`       | Python linter with JSON diagnostics |
-| Shell                 | `shellcheck` | `shellcheck` | Shell linter with JSON diagnostics  |
-| JavaScript/TypeScript | `eslint`     | `eslint`     | JS/TS linter with JSON diagnostics  |
+| Language              | Linter        | Command       | Notes                               |
+| --------------------- | ------------- | ------------- | ----------------------------------- |
+| R                     | `jarl`        | `jarl`        | R linter with JSON diagnostics      |
+| Python                | `ruff`        | `ruff`        | Python linter with JSON diagnostics |
+| Shell                 | `shellcheck`  | `shellcheck`  | Shell linter with JSON diagnostics  |
+| JavaScript/TypeScript | `eslint`      | `eslint`      | JS/TS linter with JSON diagnostics  |
+| Go                    | `staticcheck` | `staticcheck` | Go linter with JSON diagnostics     |
 
 ### How It Works
 

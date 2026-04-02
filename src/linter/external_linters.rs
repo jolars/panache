@@ -17,6 +17,7 @@ mod eslint;
 mod jarl;
 mod ruff;
 mod shellcheck;
+mod staticcheck;
 
 pub(crate) trait ExternalLinterParser {
     const NAME: &'static str;
@@ -80,6 +81,7 @@ pub(crate) fn file_suffix_for_language(language: &str) -> Option<&'static str> {
         "ts" | "typescript" => Some(".ts"),
         "tsx" => Some(".tsx"),
         "python" => Some(".py"),
+        "go" | "golang" => Some(".go"),
         "r" => Some(".R"),
         "sh" | "bash" | "zsh" | "ksh" | "shell" => Some(".sh"),
         _ => None,
@@ -143,6 +145,15 @@ impl ExternalLinterRegistry {
                 command: "shellcheck",
                 args: vec!["-f", "json"],
                 supported_languages: vec!["sh", "bash", "zsh", "ksh", "shell"],
+            },
+        );
+        linters.insert(
+            "staticcheck".to_string(),
+            LinterInfo {
+                name: "staticcheck",
+                command: "staticcheck",
+                args: vec!["-f", "json"],
+                supported_languages: vec!["go", "golang"],
             },
         );
         Self { linters }
@@ -250,6 +261,9 @@ pub fn parse_linter_output(
     if linter_name == eslint::EslintParser::NAME {
         return eslint::EslintParser::parse(&ctx);
     }
+    if linter_name == staticcheck::StaticcheckParser::NAME {
+        return staticcheck::StaticcheckParser::parse(&ctx);
+    }
     if linter_name == shellcheck::ShellcheckParser::NAME {
         return shellcheck::ShellcheckParser::parse(&ctx);
     }
@@ -305,6 +319,7 @@ mod tests {
         assert!(registry.get("jarl").is_some());
         assert!(registry.get("ruff").is_some());
         assert!(registry.get("eslint").is_some());
+        assert!(registry.get("staticcheck").is_some());
         assert!(registry.get("shellcheck").is_some());
     }
 
@@ -320,6 +335,15 @@ mod tests {
             Some(true)
         );
         assert_eq!(registry.supports_language("eslint", "python"), Some(false));
+        assert_eq!(registry.supports_language("staticcheck", "go"), Some(true));
+        assert_eq!(
+            registry.supports_language("staticcheck", "golang"),
+            Some(true)
+        );
+        assert_eq!(
+            registry.supports_language("staticcheck", "python"),
+            Some(false)
+        );
         assert_eq!(registry.supports_language("shellcheck", "bash"), Some(true));
         assert_eq!(registry.supports_language("shellcheck", "sh"), Some(true));
         assert_eq!(

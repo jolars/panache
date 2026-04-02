@@ -26,6 +26,7 @@
     pkgs.eslint
     pkgs.go-tools
     pkgs.yamlfmt
+    pkgs.go
     pkgs.vsce
     (pkgs.rWrapper.override {
       packages = with pkgs.rPackages; [
