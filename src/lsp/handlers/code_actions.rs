@@ -154,7 +154,7 @@ pub(crate) async fn code_action(
     for diag in diagnostics {
         if let Some(ref fix) = diag.fix {
             let lsp_diag = convert_diagnostic(&diag, &text);
-            if !ranges_overlap(lsp_diag.range, request_range) {
+            if !range_contains(request_range, lsp_diag.range) {
                 continue;
             }
             let mut changes = HashMap::new();
@@ -449,7 +449,7 @@ pub(crate) async fn code_action(
     Ok(Some(actions))
 }
 
-fn ranges_overlap(a: Range, b: Range) -> bool {
-    (a.start.line, a.start.character) < (b.end.line, b.end.character)
-        && (b.start.line, b.start.character) < (a.end.line, a.end.character)
+fn range_contains(outer: Range, inner: Range) -> bool {
+    (outer.start.line, outer.start.character) <= (inner.start.line, inner.start.character)
+        && (inner.end.line, inner.end.character) <= (outer.end.line, outer.end.character)
 }
