@@ -245,6 +245,38 @@ echo $UNSET
     }
 
     #[tokio::test]
+    async fn test_shellcheck_sc2148_maps_to_shell_block_location() {
+        if which::which("shellcheck").is_err() {
+            println!("Skipping shellcheck test - shellcheck not installed");
+            return;
+        }
+
+        let input = r#"# External Linter Playground
+
+```sh
+echo "hello"
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("sh".to_string(), "shellcheck".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        let sc2148: Vec<_> = diagnostics.iter().filter(|d| d.code == "SC2148").collect();
+        if sc2148.is_empty() {
+            // ShellCheck versions/settings may not always emit SC2148 in this setup.
+            return;
+        }
+
+        // Should not map to document heading at 1:1; should anchor inside shell block.
+        assert!(sc2148[0].location.line >= 3);
+    }
+
+    #[tokio::test]
     async fn test_shellcheck_fix_application_end_to_end() {
         if which::which("shellcheck").is_err() {
             println!("Skipping shellcheck test - shellcheck not installed");

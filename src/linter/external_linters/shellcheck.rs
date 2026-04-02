@@ -54,13 +54,36 @@ impl ExternalLinterParser for ShellcheckParser {
 
         let mut diagnostics = Vec::new();
         for sc_diag in output {
-            let line = sc_diag.line;
-            let column = sc_diag.column;
-            let start_offset = line_col_to_offset(ctx.original_input, line, column)
-                .unwrap_or(ctx.original_input.len());
-            let end_offset =
-                line_col_to_offset(ctx.original_input, sc_diag.end_line, sc_diag.end_column)
-                    .unwrap_or(ctx.original_input.len());
+            let (line, column, start_offset, end_offset) = if let Some(mappings) = ctx.mappings {
+                let mapped_start =
+                    line_col_to_offset(ctx.linted_input, sc_diag.line, sc_diag.column).and_then(
+                        |offset| {
+                            map_concatenated_offset_to_original_with_end_boundary(offset, mappings)
+                        },
+                    );
+                let mapped_end =
+                    line_col_to_offset(ctx.linted_input, sc_diag.end_line, sc_diag.end_column)
+                        .and_then(|offset| {
+                            map_concatenated_offset_to_original_with_end_boundary(offset, mappings)
+                        });
+
+                let fallback_block_start = mappings.first().map(|m| m.original_range.start);
+                let start_offset = mapped_start.or(fallback_block_start).unwrap_or_else(|| {
+                    line_col_to_offset(ctx.original_input, sc_diag.line, sc_diag.column)
+                        .unwrap_or(ctx.original_input.len())
+                });
+                let end_offset = mapped_end.unwrap_or(start_offset.saturating_add(1));
+                let (line, column) = offset_to_line_col(ctx.original_input, start_offset);
+                (line, column, start_offset, end_offset)
+            } else {
+                let start_offset =
+                    line_col_to_offset(ctx.original_input, sc_diag.line, sc_diag.column)
+                        .unwrap_or(ctx.original_input.len());
+                let end_offset =
+                    line_col_to_offset(ctx.original_input, sc_diag.end_line, sc_diag.end_column)
+                        .unwrap_or(ctx.original_input.len());
+                (sc_diag.line, sc_diag.column, start_offset, end_offset)
+            };
             let range = TextRange::new((start_offset as u32).into(), (end_offset as u32).into());
             let location = Location {
                 line,
@@ -148,4 +171,21 @@ impl ExternalLinterParser for ShellcheckParser {
         }
         Ok(diagnostics)
     }
+}
+
+fn offset_to_line_col(input: &str, offset: usize) -> (usize, usize) {
+    let mut line = 1;
+    let mut column = 1;
+    for (idx, ch) in input.char_indices() {
+        if idx >= offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    (line, column)
 }
