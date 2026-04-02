@@ -1,0 +1,151 @@
+use rowan::TextRange;
+use serde::Deserialize;
+
+use super::{
+    ExternalLinterParser, LinterError, ParseContext, line_col_to_offset,
+    map_concatenated_offset_to_original_with_end_boundary,
+};
+use crate::linter::diagnostics::{Diagnostic, Location, Severity};
+
+#[derive(Debug, Deserialize)]
+struct ShellcheckDiagnostic {
+    code: i64,
+    level: String,
+    message: String,
+    line: usize,
+    #[serde(rename = "endLine")]
+    end_line: usize,
+    column: usize,
+    #[serde(rename = "endColumn")]
+    end_column: usize,
+    #[serde(default)]
+    fix: Option<ShellcheckFix>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ShellcheckFix {
+    replacements: Vec<ShellcheckReplacement>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ShellcheckReplacement {
+    line: usize,
+    #[serde(rename = "endLine")]
+    end_line: usize,
+    column: usize,
+    #[serde(rename = "endColumn")]
+    end_column: usize,
+    replacement: String,
+    #[serde(default)]
+    #[serde(rename = "insertionPoint")]
+    insertion_point: Option<String>,
+}
+
+pub(crate) struct ShellcheckParser;
+
+impl ExternalLinterParser for ShellcheckParser {
+    const NAME: &'static str = "shellcheck";
+
+    fn parse(ctx: &ParseContext<'_>) -> Result<Vec<Diagnostic>, LinterError> {
+        use crate::linter::diagnostics::{Edit, Fix};
+
+        let output: Vec<ShellcheckDiagnostic> = serde_json::from_str(ctx.output)
+            .map_err(|e| LinterError::ParseError(format!("invalid shellcheck JSON: {}", e)))?;
+
+        let mut diagnostics = Vec::new();
+        for sc_diag in output {
+            let line = sc_diag.line;
+            let column = sc_diag.column;
+            let start_offset = line_col_to_offset(ctx.original_input, line, column)
+                .unwrap_or(ctx.original_input.len());
+            let end_offset =
+                line_col_to_offset(ctx.original_input, sc_diag.end_line, sc_diag.end_column)
+                    .unwrap_or(ctx.original_input.len());
+            let range = TextRange::new((start_offset as u32).into(), (end_offset as u32).into());
+            let location = Location {
+                line,
+                column,
+                range,
+            };
+
+            let fix = if let (Some(mappings), Some(fix)) = (ctx.mappings, sc_diag.fix.as_ref()) {
+                let mut edits: Vec<(usize, Edit)> = Vec::new();
+                for replacement in &fix.replacements {
+                    let start =
+                        line_col_to_offset(ctx.linted_input, replacement.line, replacement.column);
+                    let end = line_col_to_offset(
+                        ctx.linted_input,
+                        replacement.end_line,
+                        replacement.end_column,
+                    );
+                    let (Some(mut start), Some(mut end)) = (start, end) else {
+                        edits.clear();
+                        break;
+                    };
+
+                    if matches!(replacement.insertion_point.as_deref(), Some("afterEnd")) {
+                        start = end;
+                    } else if matches!(replacement.insertion_point.as_deref(), Some("beforeStart"))
+                    {
+                        end = start;
+                    }
+
+                    let Some(mapped_start) =
+                        map_concatenated_offset_to_original_with_end_boundary(start, mappings)
+                    else {
+                        edits.clear();
+                        break;
+                    };
+                    let Some(mapped_end) =
+                        map_concatenated_offset_to_original_with_end_boundary(end, mappings)
+                    else {
+                        edits.clear();
+                        break;
+                    };
+
+                    edits.push((
+                        mapped_start,
+                        Edit {
+                            range: TextRange::new(
+                                (mapped_start as u32).into(),
+                                (mapped_end as u32).into(),
+                            ),
+                            replacement: replacement.replacement.clone(),
+                        },
+                    ));
+                }
+
+                if edits.is_empty() {
+                    None
+                } else {
+                    edits.sort_by_key(|(start, _)| *start);
+                    Some(Fix {
+                        message: format!("Apply ShellCheck fix for SC{}", sc_diag.code),
+                        edits: edits.into_iter().map(|(_, e)| e).collect(),
+                    })
+                }
+            } else {
+                None
+            };
+
+            let code = format!("SC{}", sc_diag.code);
+            let diagnostic = match sc_diag.level.as_str() {
+                "error" => Diagnostic::error(location, code, sc_diag.message),
+                "warning" => Diagnostic::warning(location, code, sc_diag.message),
+                _ => Diagnostic {
+                    severity: Severity::Info,
+                    location,
+                    message: sc_diag.message,
+                    code,
+                    fix: None,
+                },
+            };
+            diagnostics.push(if let Some(fix) = fix {
+                diagnostic.with_fix(fix)
+            } else {
+                diagnostic
+            });
+        }
+        Ok(diagnostics)
+    }
+}
