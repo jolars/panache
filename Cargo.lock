@@ -611,7 +611,7 @@ dependencies = [
  "console",
  "once_cell",
  "serde",
- "similar",
+ "similar 2.7.0",
  "tempfile",
 ]
 
@@ -818,7 +818,7 @@ dependencies = [
  "salsa",
  "serde",
  "serde_json",
- "similar",
+ "similar 3.0.0",
  "similar-asserts",
  "tempfile",
  "tokio",
@@ -1256,13 +1256,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "similar"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26d0b06eba54f0ca0770f970a3e89823e766ca638dd940f8469fa0fa50c75396"
+dependencies = [
+ "bstr",
+]
+
+[[package]]
 name = "similar-asserts"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5b441962c817e33508847a22bd82f03a30cff43642dc2fae8b050566121eb9a"
 dependencies = [
  "console",
- "similar",
+ "similar 2.7.0",
 ]
 
 [[package]]
