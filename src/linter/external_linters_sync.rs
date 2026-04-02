@@ -72,17 +72,23 @@ pub fn run_linter_sync(
 
     // Note: Many linters exit with code 1 when they find issues, so we don't treat that as an error
     // Only fail if the command truly failed to run
-    if !output.status.success() && stdout.is_empty() {
+    if !output.status.success() && stdout.trim().is_empty() && stderr.trim().is_empty() {
         return Err(LinterError::NonZeroExit {
             code: output.status.code().unwrap_or(-1),
             stderr: stderr.to_string(),
         });
     }
 
+    let linter_output = if stdout.trim().is_empty() {
+        stderr.as_ref()
+    } else {
+        stdout.as_ref()
+    };
+
     // Parse output based on linter type (reuse async parser)
     crate::linter::external_linters::parse_linter_output(
         linter_name,
-        &stdout,
+        linter_output,
         code,
         original_input,
         mappings,
@@ -193,6 +199,27 @@ mod tests {
 
         let result = run_linter_sync("staticcheck", "go", code, code, &registry, None);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_clippy_linter_sync() {
+        if which::which("clippy-driver").is_err() {
+            println!("Skipping clippy test - clippy-driver not installed");
+            return;
+        }
+
+        let code = "fn main(){ let x = vec![1,2,3]; println!(\"{}\", x.len()); }\n";
+        let registry = ExternalLinterRegistry::new();
+
+        let result = run_linter_sync("clippy", "rust", code, code, &registry, None);
+        assert!(result.is_ok());
+
+        let diagnostics = result.unwrap();
+        let clippy_diags: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.code.starts_with("clippy::"))
+            .collect();
+        assert!(!clippy_diags.is_empty());
     }
 
     #[test]

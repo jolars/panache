@@ -13,6 +13,7 @@ use crate::linter::code_block_collector::BlockMapping;
 use crate::linter::diagnostics::Diagnostic;
 use crate::linter::offsets::line_col_to_byte_offset_1based;
 
+mod clippy;
 mod eslint;
 mod jarl;
 mod ruff;
@@ -82,6 +83,7 @@ pub(crate) fn file_suffix_for_language(language: &str) -> Option<&'static str> {
         "tsx" => Some(".tsx"),
         "python" => Some(".py"),
         "go" | "golang" => Some(".go"),
+        "rust" | "rs" => Some(".rs"),
         "r" => Some(".R"),
         "sh" | "bash" | "zsh" | "ksh" | "shell" => Some(".sh"),
         _ => None,
@@ -154,6 +156,15 @@ impl ExternalLinterRegistry {
                 command: "staticcheck",
                 args: vec!["-f", "json"],
                 supported_languages: vec!["go", "golang"],
+            },
+        );
+        linters.insert(
+            "clippy".to_string(),
+            LinterInfo {
+                name: "clippy",
+                command: "clippy-driver",
+                args: vec!["--error-format=json", "-W", "clippy::all"],
+                supported_languages: vec!["rust", "rs"],
             },
         );
         Self { linters }
@@ -230,14 +241,20 @@ pub async fn run_linter(
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    if !output.status.success() && stdout.is_empty() {
+    if !output.status.success() && stdout.trim().is_empty() && stderr.trim().is_empty() {
         return Err(LinterError::NonZeroExit {
             code: output.status.code().unwrap_or(-1),
             stderr: stderr.to_string(),
         });
     }
 
-    parse_linter_output(linter_name, &stdout, code, original_input, mappings)
+    let linter_output = if stdout.trim().is_empty() {
+        stderr.as_ref()
+    } else {
+        stdout.as_ref()
+    };
+
+    parse_linter_output(linter_name, linter_output, code, original_input, mappings)
 }
 
 pub fn parse_linter_output(
@@ -264,6 +281,9 @@ pub fn parse_linter_output(
     }
     if linter_name == staticcheck::StaticcheckParser::NAME {
         return staticcheck::StaticcheckParser::parse(&ctx);
+    }
+    if linter_name == clippy::ClippyParser::NAME {
+        return clippy::ClippyParser::parse(&ctx);
     }
     if linter_name == shellcheck::ShellcheckParser::NAME {
         return shellcheck::ShellcheckParser::parse(&ctx);
@@ -321,6 +341,7 @@ mod tests {
         assert!(registry.get("ruff").is_some());
         assert!(registry.get("eslint").is_some());
         assert!(registry.get("staticcheck").is_some());
+        assert!(registry.get("clippy").is_some());
         assert!(registry.get("shellcheck").is_some());
     }
 
@@ -345,6 +366,9 @@ mod tests {
             registry.supports_language("staticcheck", "python"),
             Some(false)
         );
+        assert_eq!(registry.supports_language("clippy", "rust"), Some(true));
+        assert_eq!(registry.supports_language("clippy", "rs"), Some(true));
+        assert_eq!(registry.supports_language("clippy", "go"), Some(false));
         assert_eq!(registry.supports_language("shellcheck", "bash"), Some(true));
         assert_eq!(registry.supports_language("shellcheck", "sh"), Some(true));
         assert_eq!(

@@ -463,6 +463,37 @@ func main() {
     }
 
     #[tokio::test]
+    async fn test_clippy_linter_integration() {
+        if which::which("clippy-driver").is_err() {
+            println!("Skipping clippy test - clippy-driver not installed");
+            return;
+        }
+
+        let input = r#"# Test
+
+```rust
+fn main() {
+    let x = vec![1,2,3];
+    println!("{}", x.len());
+}
+```
+"#;
+
+        let mut config = Config::default();
+        let mut linters = HashMap::new();
+        linters.insert("rust".to_string(), "clippy".to_string());
+        config.linters = linters;
+
+        let tree = parse(input, Some(config.clone()));
+        let diagnostics = linter::lint_with_external(&tree, input, &config).await;
+
+        assert!(
+            diagnostics.iter().any(|d| d.code.starts_with("clippy::")),
+            "Expected clippy diagnostic code in rust block"
+        );
+    }
+
+    #[tokio::test]
     async fn test_unknown_linter() {
         let input = r#"```r
 x <- 1

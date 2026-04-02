@@ -465,6 +465,7 @@ python = "ruff"
 sh = "shellcheck"
 js = "eslint"
 go = "staticcheck"
+rust = "clippy"
 ```
 
 Available external linters:
@@ -476,6 +477,7 @@ Available external linters:
 | Shell                 | `shellcheck`  | Shell linter with JSON diagnostics  |
 | JavaScript/TypeScript | `eslint`      | JS/TS linter with JSON diagnostics  |
 | Go                    | `staticcheck` | Go linter with JSON diagnostics     |
+| Rust                  | `clippy`      | Rust linter with JSON diagnostics   |
 
 ### How External Linters Work
 
