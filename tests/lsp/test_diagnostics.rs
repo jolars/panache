@@ -21,9 +21,9 @@ async fn test_diagnostics_on_heading_hierarchy_issue() {
     let code_actions = server
         .get_code_actions(
             "file:///test.qmd",
-            2, // Line with "### Heading 3"
+            0, // Whole document range to include full diagnostic span
             0,
-            2,
+            4,
             99,
         )
         .await;
@@ -76,6 +76,41 @@ async fn test_code_actions_filter_quickfixes_to_requested_range() {
     assert!(
         !has_heading_fix,
         "Heading hierarchy quickfix should not appear outside requested range"
+    );
+}
+
+#[tokio::test]
+async fn test_code_actions_require_diagnostic_to_be_fully_within_requested_range() {
+    let server = TestLspServer::new();
+    let content = "# Heading 1\n\n### Heading 3\n\nContent.\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    // This range intersects the heading diagnostic line but does not fully contain
+    // the full heading range.
+    let code_actions = server
+        .get_code_actions(
+            "file:///test.qmd",
+            2, // "### Heading 3"
+            0,
+            2,
+            1, // very narrow range
+        )
+        .await
+        .expect("code actions response");
+
+    let has_heading_fix = code_actions.iter().any(|action| {
+        if let CodeActionOrCommand::CodeAction(ca) = action {
+            ca.title.contains("heading")
+        } else {
+            false
+        }
+    });
+
+    assert!(
+        !has_heading_fix,
+        "Quickfix should not be offered when request only partially overlaps diagnostic range"
     );
 }
 

@@ -196,7 +196,7 @@ pub fn parse_linter_output(
     match linter_name {
         "jarl" => parse_jarl_output(output, original_input, mappings),
         "ruff" => parse_ruff_output(output, linted_input, original_input, mappings),
-        "shellcheck" => parse_shellcheck_output(output, original_input),
+        "shellcheck" => parse_shellcheck_output(output, linted_input, original_input, mappings),
         _ => Err(LinterError::ParseError(format!(
             "no parser for linter: {}",
             linter_name
@@ -287,6 +287,26 @@ struct ShellcheckDiagnostic {
     level: String,
     code: usize,
     message: String,
+    fix: Option<ShellcheckFix>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ShellcheckFix {
+    replacements: Vec<ShellcheckReplacement>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ShellcheckReplacement {
+    line: usize,
+    #[serde(rename = "endLine")]
+    end_line: usize,
+    column: usize,
+    #[serde(rename = "endColumn")]
+    end_column: usize,
+    #[serde(rename = "insertionPoint")]
+    insertion_point: Option<String>,
+    replacement: String,
+    precedence: Option<i64>,
 }
 
 fn line_col_to_offset(input: &str, line: usize, column: usize) -> Option<usize> {
@@ -562,18 +582,26 @@ fn parse_ruff_output(
 }
 
 /// Parse ShellCheck JSON output into panache diagnostics.
-fn parse_shellcheck_output(json: &str, input: &str) -> Result<Vec<Diagnostic>, LinterError> {
+fn parse_shellcheck_output(
+    json: &str,
+    linted_input: &str,
+    original_input: &str,
+    mappings: Option<&[crate::linter::code_block_collector::BlockMapping]>,
+) -> Result<Vec<Diagnostic>, LinterError> {
+    use crate::linter::diagnostics::{Edit, Fix};
+
     let output: Vec<ShellcheckDiagnostic> = serde_json::from_str(json)
         .map_err(|e| LinterError::ParseError(format!("invalid shellcheck JSON: {}", e)))?;
 
     let mut diagnostics = Vec::new();
 
     for sc_diag in output {
-        let start = line_col_to_offset(input, sc_diag.line, sc_diag.column).unwrap_or(input.len());
-        let end = line_col_to_offset(input, sc_diag.end_line, sc_diag.end_column)
+        let start = line_col_to_offset(original_input, sc_diag.line, sc_diag.column)
+            .unwrap_or(original_input.len());
+        let end = line_col_to_offset(original_input, sc_diag.end_line, sc_diag.end_column)
             .unwrap_or(start)
             .max(start)
-            .min(input.len());
+            .min(original_input.len());
         let range = TextRange::new((start as u32).into(), (end as u32).into());
         let location = Location {
             line: sc_diag.line,
@@ -582,6 +610,68 @@ fn parse_shellcheck_output(json: &str, input: &str) -> Result<Vec<Diagnostic>, L
         };
 
         let code = format!("SC{}", sc_diag.code);
+        let fix = if let (Some(mappings), Some(sc_fix)) = (mappings, sc_diag.fix.as_ref()) {
+            let mut edits = Vec::new();
+            let mut mapping_failed = false;
+            for replacement in &sc_fix.replacements {
+                let start = line_col_to_offset(linted_input, replacement.line, replacement.column);
+                let end =
+                    line_col_to_offset(linted_input, replacement.end_line, replacement.end_column);
+                let (concat_start, concat_end) = match (start, end) {
+                    (Some(start), Some(end)) => match replacement.insertion_point.as_deref() {
+                        Some("afterEnd") => (end, end),
+                        Some("beforeStart") => (start, start),
+                        _ => (start, end.max(start)),
+                    },
+                    _ => {
+                        mapping_failed = true;
+                        break;
+                    }
+                };
+
+                if let (Some(original_start), Some(original_end)) = (
+                    map_concatenated_offset_to_original_with_end_boundary(concat_start, mappings),
+                    map_concatenated_offset_to_original_with_end_boundary(concat_end, mappings),
+                ) {
+                    edits.push(Edit {
+                        range: TextRange::new(
+                            (original_start as u32).into(),
+                            (original_end as u32).into(),
+                        ),
+                        replacement: replacement.replacement.clone(),
+                    });
+                } else {
+                    mapping_failed = true;
+                    break;
+                }
+            }
+
+            // Apply shellcheck-provided replacement ordering when present.
+            // Higher precedence should be applied first to preserve insertion intent
+            // when multiple zero-width edits target nearby offsets.
+            if !mapping_failed && sc_fix.replacements.len() == edits.len() {
+                let mut paired: Vec<(Option<i64>, Edit)> = sc_fix
+                    .replacements
+                    .iter()
+                    .zip(edits.into_iter())
+                    .map(|(r, e)| (r.precedence, e))
+                    .collect();
+                paired.sort_by_key(|(precedence, _)| std::cmp::Reverse(precedence.unwrap_or(0)));
+                edits = paired.into_iter().map(|(_, edit)| edit).collect();
+            }
+
+            if mapping_failed || edits.is_empty() {
+                None
+            } else {
+                Some(Fix {
+                    message: format!("Apply suggested fix for {}", code),
+                    edits,
+                })
+            }
+        } else {
+            None
+        };
+
         let diagnostic = match sc_diag.level.as_str() {
             "error" => Diagnostic::error(location, code, sc_diag.message),
             "warning" => Diagnostic::warning(location, code, sc_diag.message),
@@ -594,7 +684,11 @@ fn parse_shellcheck_output(json: &str, input: &str) -> Result<Vec<Diagnostic>, L
             },
         };
 
-        diagnostics.push(diagnostic);
+        diagnostics.push(if let Some(fix) = fix {
+            diagnostic.with_fix(fix)
+        } else {
+            diagnostic
+        });
     }
 
     Ok(diagnostics)
@@ -962,7 +1056,7 @@ mod tests {
         ]"#;
 
         let input = "echo $UNSET\n";
-        let diagnostics = parse_shellcheck_output(json, input).unwrap();
+        let diagnostics = parse_shellcheck_output(json, input, input, None).unwrap();
 
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].code, "SC2086");
@@ -974,5 +1068,68 @@ mod tests {
         assert_eq!(diagnostics[0].location.line, 1);
         assert_eq!(diagnostics[0].location.column, 6);
         assert!(diagnostics[0].fix.is_none());
+    }
+
+    #[test]
+    fn test_parse_shellcheck_output_with_fix_and_mappings() {
+        use crate::linter::code_block_collector::BlockMapping;
+
+        let json = r#"[
+            {
+                "line": 1,
+                "endLine": 1,
+                "column": 6,
+                "endColumn": 12,
+                "level": "info",
+                "code": 2086,
+                "message": "Double quote to prevent globbing and word splitting.",
+                "fix": {
+                    "replacements": [
+                        {
+                            "line": 1,
+                            "endLine": 1,
+                            "column": 6,
+                            "endColumn": 6,
+                            "insertionPoint": "afterEnd",
+                            "replacement": "\"",
+                            "precedence": 7
+                        },
+                        {
+                            "line": 1,
+                            "endLine": 1,
+                            "column": 12,
+                            "endColumn": 12,
+                            "insertionPoint": "beforeStart",
+                            "replacement": "\"",
+                            "precedence": 7
+                        }
+                    ]
+                }
+            }
+        ]"#;
+
+        let concatenated_input = "echo $UNSET\n";
+        let mappings = vec![BlockMapping {
+            concatenated_range: 0..11,
+            original_range: 50..61,
+            start_line: 1,
+        }];
+        let original_input = "01234567890123456789012345678901234567890123456789echo $UNSET\n";
+
+        let diagnostics =
+            parse_shellcheck_output(json, concatenated_input, original_input, Some(&mappings))
+                .unwrap();
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "SC2086");
+        assert!(diagnostics[0].fix.is_some());
+        let fix = diagnostics[0].fix.as_ref().unwrap();
+        assert_eq!(fix.edits.len(), 2);
+        assert_eq!(usize::from(fix.edits[0].range.start()), 55);
+        assert_eq!(usize::from(fix.edits[0].range.end()), 55);
+        assert_eq!(fix.edits[0].replacement, "\"");
+        assert_eq!(usize::from(fix.edits[1].range.start()), 61);
+        assert_eq!(usize::from(fix.edits[1].range.end()), 61);
+        assert_eq!(fix.edits[1].replacement, "\"");
     }
 }
