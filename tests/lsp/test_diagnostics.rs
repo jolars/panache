@@ -148,6 +148,67 @@ async fn test_code_actions_offer_quickfix_for_cursor_inside_diagnostic() {
 }
 
 #[tokio::test]
+async fn test_code_actions_offer_source_fix_all_for_fixable_diagnostics() {
+    let server = TestLspServer::new();
+    let content = "# Heading 1\n\n### Heading 3\n\nContent.\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let code_actions = server
+        .get_code_actions("file:///test.qmd", 0, 0, 4, 99)
+        .await
+        .expect("code actions response");
+
+    let fix_all = code_actions.iter().find_map(|action| {
+        if let CodeActionOrCommand::CodeAction(ca) = action
+            && ca.kind == Some(CodeActionKind::SOURCE_FIX_ALL)
+        {
+            return Some(ca);
+        }
+        None
+    });
+    let fix_all = fix_all.expect("expected source.fixAll code action");
+
+    let edits = fix_all
+        .edit
+        .as_ref()
+        .and_then(|edit| edit.changes.as_ref())
+        .and_then(|changes| changes.get(&"file:///test.qmd".parse::<Uri>().expect("uri")))
+        .expect("source.fixAll workspace edits");
+    assert!(
+        !edits.is_empty(),
+        "source.fixAll should include at least one text edit"
+    );
+}
+
+#[tokio::test]
+async fn test_code_actions_do_not_offer_source_fix_all_without_fixes() {
+    let server = TestLspServer::new();
+    let content = "# Heading 1\n\n## Heading 2\n\nContent.\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let code_actions = server
+        .get_code_actions("file:///test.qmd", 0, 0, 4, 99)
+        .await
+        .expect("code actions response");
+
+    let has_fix_all = code_actions.iter().any(|action| {
+        if let CodeActionOrCommand::CodeAction(ca) = action {
+            ca.kind == Some(CodeActionKind::SOURCE_FIX_ALL)
+        } else {
+            false
+        }
+    });
+    assert!(
+        !has_fix_all,
+        "source.fixAll should not be offered when there are no fixable diagnostics"
+    );
+}
+
+#[tokio::test]
 async fn test_code_actions_no_refactors_inside_yaml_frontmatter() {
     let server = TestLspServer::new();
     let content = "---\ntitle: Report\nlist:\n  - a\n  - b\n---\n\nBody.\n";

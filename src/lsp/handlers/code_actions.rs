@@ -152,11 +152,12 @@ pub(crate) async fn code_action(
     }
 
     let mut actions = Vec::new();
+    let mut fix_all_edits: Vec<(usize, usize, String)> = Vec::new();
 
     // Add lint fix code actions
-    for diag in diagnostics {
+    for diag in &diagnostics {
         if let Some(ref fix) = diag.fix {
-            let lsp_diag = convert_diagnostic(&diag, &text);
+            let lsp_diag = convert_diagnostic(diag, &text);
             if !should_offer_quickfix(request_range, lsp_diag.range) {
                 continue;
             }
@@ -165,8 +166,11 @@ pub(crate) async fn code_action(
                 .edits
                 .iter()
                 .map(|edit| {
-                    let start = offset_to_position(&text, edit.range.start().into());
-                    let end = offset_to_position(&text, edit.range.end().into());
+                    let start_offset: usize = edit.range.start().into();
+                    let end_offset: usize = edit.range.end().into();
+                    let start = offset_to_position(&text, start_offset);
+                    let end = offset_to_position(&text, end_offset);
+                    fix_all_edits.push((start_offset, end_offset, edit.replacement.clone()));
                     TextEdit {
                         range: Range { start, end },
                         new_text: edit.replacement.clone(),
@@ -188,6 +192,47 @@ pub(crate) async fn code_action(
             };
 
             actions.push(CodeActionOrCommand::CodeAction(action));
+        }
+    }
+
+    if !fix_all_edits.is_empty() {
+        fix_all_edits.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        let mut selected_edits: Vec<(usize, usize, String)> = Vec::new();
+        for edit in fix_all_edits {
+            if selected_edits
+                .last()
+                .is_some_and(|prev| edit.0 < prev.1 || edit == *prev)
+            {
+                continue;
+            }
+            selected_edits.push(edit);
+        }
+
+        if !selected_edits.is_empty() {
+            let mut changes = HashMap::new();
+            let text_edits: Vec<TextEdit> = selected_edits
+                .into_iter()
+                .map(|(start_offset, end_offset, replacement)| TextEdit {
+                    range: Range {
+                        start: offset_to_position(&text, start_offset),
+                        end: offset_to_position(&text, end_offset),
+                    },
+                    new_text: replacement,
+                })
+                .collect();
+            changes.insert(uri.clone(), text_edits);
+
+            let fix_all_action = CodeAction {
+                title: "Fix all auto-fixable lint issues".to_string(),
+                kind: Some(CodeActionKind::SOURCE_FIX_ALL),
+                diagnostics: None,
+                edit: Some(WorkspaceEdit {
+                    changes: Some(changes),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+            actions.push(CodeActionOrCommand::CodeAction(fix_all_action));
         }
     }
 
