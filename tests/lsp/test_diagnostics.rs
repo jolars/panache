@@ -115,6 +115,39 @@ async fn test_code_actions_require_diagnostic_to_be_fully_within_requested_range
 }
 
 #[tokio::test]
+async fn test_code_actions_offer_quickfix_for_cursor_inside_diagnostic() {
+    let server = TestLspServer::new();
+    let content = "# Heading 1\n\n### Heading 3\n\nContent.\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let code_actions = server
+        .get_code_actions(
+            "file:///test.qmd",
+            2, // "### Heading 3"
+            2, // cursor inside heading text
+            2,
+            2, // zero-width LSP cursor range
+        )
+        .await
+        .expect("code actions response");
+
+    let has_heading_fix = code_actions.iter().any(|action| {
+        if let CodeActionOrCommand::CodeAction(ca) = action {
+            ca.title.contains("heading")
+        } else {
+            false
+        }
+    });
+
+    assert!(
+        has_heading_fix,
+        "Quickfix should be offered when cursor is inside diagnostic range"
+    );
+}
+
+#[tokio::test]
 async fn test_code_actions_no_refactors_inside_yaml_frontmatter() {
     let server = TestLspServer::new();
     let content = "---\ntitle: Report\nlist:\n  - a\n  - b\n---\n\nBody.\n";

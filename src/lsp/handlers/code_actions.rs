@@ -157,7 +157,7 @@ pub(crate) async fn code_action(
     for diag in diagnostics {
         if let Some(ref fix) = diag.fix {
             let lsp_diag = convert_diagnostic(&diag, &text);
-            if !range_contains(request_range, lsp_diag.range) {
+            if !should_offer_quickfix(request_range, lsp_diag.range) {
                 continue;
             }
             let mut changes = HashMap::new();
@@ -455,4 +455,16 @@ pub(crate) async fn code_action(
 fn range_contains(outer: Range, inner: Range) -> bool {
     (outer.start.line, outer.start.character) <= (inner.start.line, inner.start.character)
         && (inner.end.line, inner.end.character) <= (outer.end.line, outer.end.character)
+}
+
+fn should_offer_quickfix(request: Range, diagnostic: Range) -> bool {
+    if request.start == request.end {
+        return position_in_range(request.start, diagnostic);
+    }
+    range_contains(request, diagnostic)
+}
+
+fn position_in_range(position: Position, range: Range) -> bool {
+    (range.start.line, range.start.character) <= (position.line, position.character)
+        && (position.line, position.character) <= (range.end.line, range.end.character)
 }
