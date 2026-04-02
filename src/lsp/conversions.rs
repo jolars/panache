@@ -216,7 +216,9 @@ mod tests {
 
     #[test]
     fn test_convert_diagnostic_basic() {
-        use crate::linter::diagnostics::{Diagnostic as PanacheDiagnostic, Location, Severity};
+        use crate::linter::diagnostics::{
+            Diagnostic as PanacheDiagnostic, DiagnosticOrigin, Location, Severity,
+        };
         use rowan::TextRange;
 
         let text = "# H1\n\n### H3\n";
@@ -230,6 +232,7 @@ mod tests {
             },
             message: "Heading level skipped from h1 to h3".to_string(),
             code: "heading-hierarchy".to_string(),
+            origin: DiagnosticOrigin::BuiltIn,
             fix: None,
         };
 
@@ -249,7 +252,9 @@ mod tests {
 
     #[test]
     fn test_convert_diagnostic_severity() {
-        use crate::linter::diagnostics::{Diagnostic as PanacheDiagnostic, Location, Severity};
+        use crate::linter::diagnostics::{
+            Diagnostic as PanacheDiagnostic, DiagnosticOrigin, Location, Severity,
+        };
         use rowan::TextRange;
 
         let text = "test\n";
@@ -263,6 +268,7 @@ mod tests {
             },
             message: "Error".to_string(),
             code: "test-error".to_string(),
+            origin: DiagnosticOrigin::BuiltIn,
             fix: None,
         };
 
@@ -278,6 +284,7 @@ mod tests {
             },
             message: "Info".to_string(),
             code: "test-info".to_string(),
+            origin: DiagnosticOrigin::BuiltIn,
             fix: None,
         };
 

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::cli::MessageFormat;
 use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
-use panache::linter::{Diagnostic, Severity};
+use panache::linter::{Diagnostic, DiagnosticOrigin, Severity};
 
 pub(crate) fn print_diagnostics(
     diagnostics: &[Diagnostic],
@@ -53,20 +53,22 @@ pub(crate) fn print_diagnostics(
             print_subdiag("help", &fix.message);
         }
 
-        print_subdiag(
-            "note",
-            &format!(
-                "configure this rule in panache.toml with [lint.rules] {} = false",
-                diag.code
-            ),
-        );
-        print_subdiag(
-            "help",
-            &format!(
-                "for further information visit https://jolars.github.io/panache/linting.html#{}",
-                diag.code
-            ),
-        );
+        if diag.origin == DiagnosticOrigin::BuiltIn {
+            print_subdiag(
+                "note",
+                &format!(
+                    "configure this rule in panache.toml with [lint.rules] {} = false",
+                    diag.code
+                ),
+            );
+            print_subdiag(
+                "help",
+                &format!(
+                    "for further information visit https://jolars.github.io/panache/linting.html#{}",
+                    diag.code
+                ),
+            );
+        }
     }
 
     println!("\nFound {} issue(s)", diagnostics.len());
@@ -168,4 +170,44 @@ fn find_previous_heading_span(
     }
 
     prev_heading
+}
+
+#[cfg(test)]
+mod tests {
+    use super::severity_name;
+    use panache::linter::{Diagnostic, DiagnosticOrigin, Location, Severity};
+    use rowan::TextRange;
+
+    #[test]
+    fn built_in_diagnostics_show_panache_guidance() {
+        let diag = Diagnostic {
+            severity: Severity::Warning,
+            location: Location {
+                line: 1,
+                column: 1,
+                range: TextRange::new(0.into(), 1.into()),
+            },
+            message: "msg".to_string(),
+            code: "heading-hierarchy".to_string(),
+            origin: DiagnosticOrigin::BuiltIn,
+            fix: None,
+        };
+        assert_eq!(diag.origin, DiagnosticOrigin::BuiltIn);
+        assert_eq!(severity_name(&diag.severity), "warning");
+    }
+
+    #[test]
+    fn external_diagnostics_can_be_marked_explicitly() {
+        let diag = Diagnostic::warning(
+            Location {
+                line: 1,
+                column: 1,
+                range: TextRange::new(0.into(), 1.into()),
+            },
+            "SA5009",
+            "msg",
+        )
+        .with_origin(DiagnosticOrigin::External);
+        assert_eq!(diag.origin, DiagnosticOrigin::External);
+    }
 }

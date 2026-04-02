@@ -5,7 +5,7 @@ use super::{
     ExternalLinterParser, LinterError, ParseContext, line_col_to_offset,
     map_concatenated_offset_to_original_with_end_boundary,
 };
-use crate::linter::diagnostics::{Diagnostic, Location, Severity};
+use crate::linter::diagnostics::{Diagnostic, DiagnosticOrigin, Location};
 
 #[derive(Debug, Deserialize)]
 struct ShellcheckDiagnostic {
@@ -155,14 +155,9 @@ impl ExternalLinterParser for ShellcheckParser {
             let diagnostic = match sc_diag.level.as_str() {
                 "error" => Diagnostic::error(location, code, sc_diag.message),
                 "warning" => Diagnostic::warning(location, code, sc_diag.message),
-                _ => Diagnostic {
-                    severity: Severity::Info,
-                    location,
-                    message: sc_diag.message,
-                    code,
-                    fix: None,
-                },
-            };
+                _ => Diagnostic::info(location, code, sc_diag.message),
+            }
+            .with_origin(DiagnosticOrigin::External);
             diagnostics.push(if let Some(fix) = fix {
                 diagnostic.with_fix(fix)
             } else {

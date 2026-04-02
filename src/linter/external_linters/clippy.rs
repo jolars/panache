@@ -2,7 +2,7 @@ use rowan::TextRange;
 use serde::Deserialize;
 
 use super::{ExternalLinterParser, LinterError, ParseContext, line_col_to_offset};
-use crate::linter::diagnostics::{Diagnostic, Location, Severity};
+use crate::linter::diagnostics::{Diagnostic, DiagnosticOrigin, Location};
 
 #[derive(Debug, Deserialize)]
 struct ClippyMessage {
@@ -80,14 +80,9 @@ impl ExternalLinterParser for ClippyParser {
             let diagnostic = match msg.level.as_str() {
                 "error" => Diagnostic::error(location, code, msg.message),
                 "warning" => Diagnostic::warning(location, code, msg.message),
-                _ => Diagnostic {
-                    severity: Severity::Info,
-                    location,
-                    message: msg.message,
-                    code,
-                    fix: None,
-                },
-            };
+                _ => Diagnostic::info(location, code, msg.message),
+            }
+            .with_origin(DiagnosticOrigin::External);
             diagnostics.push(diagnostic);
         }
 

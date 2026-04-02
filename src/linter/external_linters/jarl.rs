@@ -5,7 +5,7 @@ use super::{
     ExternalLinterParser, LinterError, ParseContext, line_col_to_offset,
     map_concatenated_offset_to_original_with_end_boundary,
 };
-use crate::linter::diagnostics::{Diagnostic, Location};
+use crate::linter::diagnostics::{Diagnostic, DiagnosticOrigin, Location};
 
 #[derive(Debug, Deserialize)]
 struct JarlOutput {
@@ -108,7 +108,8 @@ impl ExternalLinterParser for JarlParser {
             };
 
             let diagnostic =
-                Diagnostic::warning(location, jarl_diag.message.name, jarl_diag.message.body);
+                Diagnostic::warning(location, jarl_diag.message.name, jarl_diag.message.body)
+                    .with_origin(DiagnosticOrigin::External);
             diagnostics.push(if let Some(fix) = fix {
                 diagnostic.with_fix(fix)
             } else {

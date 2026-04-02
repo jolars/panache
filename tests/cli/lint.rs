@@ -296,6 +296,32 @@ fn test_lint_short_message_format_preserves_diagnostic_order() {
 }
 
 #[test]
+fn test_lint_external_staticcheck_does_not_print_panache_rule_guidance() {
+    if which::which("staticcheck").is_err() || which::which("go").is_err() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".panache.toml");
+    let file_path = temp_dir.path().join("test.qmd");
+    fs::write(&config_path, "[linters]\ngo = \"staticcheck\"\n").unwrap();
+    fs::write(
+        &file_path,
+        "```go\npackage main\nimport \"fmt\"\nfunc main() {\n    fmt.Printf(\"%d\", \"x\")\n}\n```\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["lint", "--color", "never", file_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[SA5009]"))
+        .stdout(predicate::str::contains("[lint.rules] SA5009").not())
+        .stdout(predicate::str::contains("linting.html#SA5009").not());
+}
+
+#[test]
 fn test_lint_color_always_shows_ansi_diagnostics() {
     cargo_bin_cmd!("panache")
         .args(["lint", "--color", "always"])

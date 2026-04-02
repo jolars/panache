@@ -5,7 +5,7 @@ use super::{
     ExternalLinterParser, LinterError, ParseContext, line_col_to_offset,
     map_concatenated_offset_to_original_with_end_boundary,
 };
-use crate::linter::diagnostics::{Diagnostic, Location, Severity};
+use crate::linter::diagnostics::{Diagnostic, DiagnosticOrigin, Location};
 
 #[derive(Debug, Deserialize)]
 struct EslintFileReport {
@@ -73,15 +73,10 @@ impl ExternalLinterParser for EslintParser {
                 let code = msg.rule_id.unwrap_or_else(|| "eslint".to_string());
                 let diagnostic = match msg.severity {
                     2 => Diagnostic::error(location, code, msg.message),
-                    1 => Diagnostic {
-                        severity: Severity::Info,
-                        location,
-                        message: msg.message,
-                        code,
-                        fix: None,
-                    },
+                    1 => Diagnostic::info(location, code, msg.message),
                     _ => Diagnostic::warning(location, code, msg.message),
-                };
+                }
+                .with_origin(DiagnosticOrigin::External);
                 let selected_fix = msg
                     .fix
                     .or_else(|| msg.suggestions.into_iter().next().map(|s| s.fix));

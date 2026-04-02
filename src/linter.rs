@@ -9,7 +9,7 @@ pub(crate) mod offsets;
 pub mod rules;
 pub mod runner;
 
-pub use diagnostics::{Diagnostic, Fix, Location, Severity};
+pub use diagnostics::{Diagnostic, DiagnosticOrigin, Fix, Location, Severity};
 pub use rules::{Rule, RuleRegistry};
 pub use runner::LintRunner;
 

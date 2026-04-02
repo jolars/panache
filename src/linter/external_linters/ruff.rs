@@ -5,7 +5,7 @@ use super::{
     ExternalLinterParser, LinterError, ParseContext, line_col_to_offset,
     map_concatenated_offset_to_original_with_end_boundary,
 };
-use crate::linter::diagnostics::{Diagnostic, Location, Severity};
+use crate::linter::diagnostics::{Diagnostic, DiagnosticOrigin, Location};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct RuffDiagnostic {
@@ -130,14 +130,9 @@ impl ExternalLinterParser for RuffParser {
             let diagnostic = match ruff_diag.severity.as_deref() {
                 Some("error") => Diagnostic::error(location, ruff_diag.code, ruff_diag.message),
                 Some("warning") => Diagnostic::warning(location, ruff_diag.code, ruff_diag.message),
-                _ => Diagnostic {
-                    severity: Severity::Info,
-                    location,
-                    message: ruff_diag.message,
-                    code: ruff_diag.code,
-                    fix: None,
-                },
-            };
+                _ => Diagnostic::info(location, ruff_diag.code, ruff_diag.message),
+            }
+            .with_origin(DiagnosticOrigin::External);
             diagnostics.push(if let Some(fix) = fix {
                 diagnostic.with_fix(fix)
             } else {

@@ -7,6 +7,12 @@ pub enum Severity {
     Info,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticOrigin {
+    BuiltIn,
+    External,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Location {
     pub line: usize,
@@ -32,6 +38,7 @@ pub struct Diagnostic {
     pub location: Location,
     pub message: String,
     pub code: String,
+    pub origin: DiagnosticOrigin,
     pub fix: Option<Fix>,
 }
 
@@ -42,6 +49,7 @@ impl Diagnostic {
             location,
             message: message.into(),
             code: code.into(),
+            origin: DiagnosticOrigin::BuiltIn,
             fix: None,
         }
     }
@@ -56,12 +64,29 @@ impl Diagnostic {
             location,
             message: message.into(),
             code: code.into(),
+            origin: DiagnosticOrigin::BuiltIn,
+            fix: None,
+        }
+    }
+
+    pub fn info(location: Location, code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            severity: Severity::Info,
+            location,
+            message: message.into(),
+            code: code.into(),
+            origin: DiagnosticOrigin::BuiltIn,
             fix: None,
         }
     }
 
     pub fn with_fix(mut self, fix: Fix) -> Self {
         self.fix = Some(fix);
+        self
+    }
+
+    pub fn with_origin(mut self, origin: DiagnosticOrigin) -> Self {
+        self.origin = origin;
         self
     }
 }
@@ -136,6 +161,7 @@ mod tests {
         assert_eq!(diag.severity, Severity::Error);
         assert_eq!(diag.code, "test-error");
         assert_eq!(diag.message, "Test error message");
+        assert_eq!(diag.origin, DiagnosticOrigin::BuiltIn);
         assert!(diag.fix.is_none());
 
         let diag_with_fix =
@@ -144,6 +170,7 @@ mod tests {
                 edits: vec![],
             });
         assert_eq!(diag_with_fix.severity, Severity::Warning);
+        assert_eq!(diag_with_fix.origin, DiagnosticOrigin::BuiltIn);
         assert!(diag_with_fix.fix.is_some());
     }
 }
