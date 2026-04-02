@@ -62,7 +62,7 @@ unicode-width = "0.2"
 uuid = { version = "1.22.0", features = ["v4"], optional = true }
 
 [dev-dependencies]
-similar-asserts = "1.7.0"
+similar-asserts = "2.0.0"
 insta = { version = "1.43.2", features = ["json"] }
 tokio = { version = "1", features = ["macros", "rt"] }
 assert_cmd = "2.0"
