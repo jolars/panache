@@ -6,6 +6,7 @@ description-meta: >-
   language server, formatter, and linter to help you write better documents,
   more efficiently.
 title-prefix: ""
+canonical-url: "https://panache.bz/"
 image: images/og.png
 image-alt: "Panache logo"
 
