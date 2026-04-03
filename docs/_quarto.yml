@@ -110,6 +110,7 @@ resources:
   - "site.webmanifest"
   - "web-app-manifest-192x192.png"
   - "web-app-manifest-512x512.png"
+  - "d8f6b1cafaee4cbc8aec36e0b9b5bb01.txt" # IndexNow verification file
 
 highlight-style: breeze
 
