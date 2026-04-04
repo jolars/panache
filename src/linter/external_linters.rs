@@ -1,9 +1,8 @@
 //! External linter integration for code blocks.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
-#[cfg(feature = "lsp")]
-use std::io::Write;
 #[cfg(feature = "lsp")]
 use std::process::{Command, Stdio};
 #[cfg(feature = "lsp")]
@@ -88,6 +87,21 @@ pub(crate) fn file_suffix_for_language(language: &str) -> Option<&'static str> {
         "sh" | "bash" | "zsh" | "ksh" | "shell" => Some(".sh"),
         _ => None,
     }
+}
+
+pub(crate) fn create_linter_temp_input(
+    language: &str,
+    code: &str,
+) -> Result<(tempfile::TempDir, PathBuf), LinterError> {
+    let mut dir_builder = tempfile::Builder::new();
+    dir_builder.prefix("panache-external-");
+    let temp_dir = dir_builder.tempdir()?;
+
+    let suffix = file_suffix_for_language(language).unwrap_or("");
+    let temp_path = temp_dir.path().join(format!("input{}", suffix));
+    std::fs::write(&temp_path, code.as_bytes())?;
+
+    Ok((temp_dir, temp_path))
 }
 
 /// Registry of supported external linters.
@@ -211,24 +225,16 @@ pub async fn run_linter(
         )));
     }
 
-    let mut builder = tempfile::Builder::new();
-    builder.prefix("panache-external-");
-    if let Some(suffix) = file_suffix_for_language(language) {
-        builder.suffix(suffix);
-    }
-    let mut temp_file = builder.tempfile()?;
-    temp_file.write_all(code.as_bytes())?;
-    temp_file.flush()?;
-    let temp_path = temp_file.path();
+    let (_temp_dir, temp_path) = create_linter_temp_input(language, code)?;
 
     let mut cmd = Command::new(linter_info.command);
     cmd.args(linter_info.args.iter());
-    if linter_name.eq_ignore_ascii_case("eslint")
+    if (linter_name.eq_ignore_ascii_case("eslint") || linter_name.eq_ignore_ascii_case("clippy"))
         && let Some(parent) = temp_path.parent()
     {
         cmd.current_dir(parent);
     }
-    cmd.arg(temp_path)
+    cmd.arg(&temp_path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -377,5 +383,23 @@ mod tests {
             Some(false)
         );
         assert_eq!(registry.supports_language("unknown", "r"), None);
+    }
+
+    #[test]
+    fn test_create_linter_temp_input_cleanup_removes_sibling_artifacts() {
+        let temp_dir_path;
+        {
+            let (temp_dir, temp_path) =
+                create_linter_temp_input("rust", "fn main() { let _x = 1; }\n").unwrap();
+            temp_dir_path = temp_dir.path().to_path_buf();
+
+            assert!(temp_path.exists());
+
+            let sibling_artifact = temp_dir.path().join("input");
+            std::fs::write(&sibling_artifact, b"compiled artifact").unwrap();
+            assert!(sibling_artifact.exists());
+        }
+
+        assert!(!temp_dir_path.exists());
     }
 }

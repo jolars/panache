@@ -3,7 +3,6 @@
 //! This module provides blocking versions of external linter functions for use in
 //! the CLI without requiring a tokio runtime.
 
-use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -32,27 +31,18 @@ pub fn run_linter_sync(
         )));
     }
 
-    // Create temp file with code
-    let mut builder = tempfile::Builder::new();
-    builder.prefix("panache-external-");
-    if let Some(suffix) = crate::linter::external_linters::file_suffix_for_language(language) {
-        builder.suffix(suffix);
-    }
-    let mut temp_file = builder.tempfile()?;
-    temp_file.write_all(code.as_bytes())?;
-    temp_file.flush()?;
-
-    let temp_path = temp_file.path();
+    let (_temp_dir, temp_path) =
+        crate::linter::external_linters::create_linter_temp_input(language, code)?;
 
     // Build command
     let mut cmd = Command::new(linter_info.command);
     cmd.args(linter_info.args.iter());
-    if linter_name.eq_ignore_ascii_case("eslint")
+    if (linter_name.eq_ignore_ascii_case("eslint") || linter_name.eq_ignore_ascii_case("clippy"))
         && let Some(parent) = temp_path.parent()
     {
         cmd.current_dir(parent);
     }
-    cmd.arg(temp_path)
+    cmd.arg(&temp_path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
