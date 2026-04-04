@@ -3,6 +3,8 @@
 use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::prelude::*;
 use std::fs;
+use std::thread;
+use std::time::Duration;
 use tempfile::TempDir;
 
 #[test]
@@ -601,4 +603,146 @@ fn test_lint_includes_missing_file_reports_diagnostic() {
         .success()
         .stdout(predicate::str::contains("include-not-found"))
         .stdout(predicate::str::contains("missing.qmd"));
+}
+
+#[test]
+fn test_lint_cache_reuse_and_invalidation_on_input_change() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let cache_dir = temp_dir.path().join(".panache-cache");
+    let cache_file = cache_dir.join("cli-cache-v1.bin");
+
+    fs::write(&test_file, "# Heading\n\n### Subheading\n").unwrap();
+    cargo_bin_cmd!("panache")
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "lint",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("heading-hierarchy"));
+
+    assert!(cache_file.exists(), "expected cache file to be created");
+    let first_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "lint",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("heading-hierarchy"));
+
+    let second_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
+    assert_eq!(
+        first_modified, second_modified,
+        "cache file should not be rewritten on a no-change rerun"
+    );
+
+    thread::sleep(Duration::from_millis(5));
+    fs::write(&test_file, "# Heading\n\n## Subheading\n").unwrap();
+    cargo_bin_cmd!("panache")
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "lint",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found"));
+
+    let third_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
+    assert!(
+        third_modified > second_modified,
+        "cache file should be rewritten after input fingerprint changes"
+    );
+}
+
+#[test]
+fn test_lint_cache_invalidation_on_included_file_change() {
+    let temp_dir = TempDir::new().unwrap();
+    let parent = temp_dir.path().join("parent.qmd");
+    let child = temp_dir.path().join("_child.qmd");
+    let cache_dir = temp_dir.path().join(".panache-cache");
+    let cache_file = cache_dir.join("cli-cache-v1.bin");
+
+    fs::write(&child, "# Heading 1\n\n### Heading 3\n").unwrap();
+    fs::write(&parent, "{{< include _child.qmd >}}\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "lint",
+            parent.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("heading-hierarchy"));
+
+    let first_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "lint",
+            parent.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("heading-hierarchy"));
+    let second_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
+    assert_eq!(first_modified, second_modified);
+
+    thread::sleep(Duration::from_millis(5));
+    fs::write(&child, "# Heading 1\n\n## Heading 2\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "lint",
+            parent.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found"));
+
+    let third_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
+    assert!(
+        third_modified > second_modified,
+        "cache file should be rewritten after included document changes"
+    );
+}
+
+#[test]
+fn test_lint_no_cache_skips_cache_file_creation() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let cache_dir = temp_dir.path().join(".panache-cache");
+    let cache_file = cache_dir.join("cli-cache-v1.bin");
+
+    fs::write(&test_file, "# Heading\n\n### Subheading\n").unwrap();
+    cargo_bin_cmd!("panache")
+        .args([
+            "--no-cache",
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "lint",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(
+        !cache_file.exists(),
+        "--no-cache should disable cache reads and writes"
+    );
 }

@@ -17,6 +17,9 @@ cargo bench --bench lsp_incremental
 # Run interned key impact benchmark
 cargo bench --bench interned_keys
 
+# Run CLI cache cold-vs-warm benchmark
+cargo bench --bench cli_cache
+
 # Generate docs + machine-readable JSON
 ./benches/generate_docs.sh
 ```
@@ -95,6 +98,12 @@ valgrind --tool=cachegrind cargo bench --bench formatting
 - **`benches/interned_keys.rs`**: Key interning measurement harness
   - Compares owned vs interned key map build costs
   - Reports repeated-byte potential from duplicated keys
+- **`benches/cli_cache.rs`**: CLI cache warm-hit benchmark harness
+  - Compares uncached (cold) vs cached (warm) runs for `format --check` and
+    `lint`
+  - Tunable with `PANACHE_CLI_CACHE_BENCH_FILES` and
+    `PANACHE_CLI_CACHE_BENCH_ITERATIONS`
+  - Optional JSON output via `PANACHE_CLI_CACHE_BENCH_OUTPUT_JSON`
 - **`benches/compare_all.sh`**: Multi-formatter comparison
   - Compares panache vs Prettier vs Pandoc
 

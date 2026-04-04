@@ -8,8 +8,10 @@ use similar::{ChangeTag, TextDiff};
 use panache::{format, parse};
 use serde_json::json;
 
+mod cache;
 mod cli;
 mod diagnostic_renderer;
+use cache::{CachedLintDocument, CliCache, FormatCacheMode, FormatStoreArgs};
 use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands};
 use diagnostic_renderer::print_diagnostics;
 
@@ -269,30 +271,37 @@ fn path_matching_root(
 fn load_config_for_cli(
     config_path: Option<&Path>,
     isolated: bool,
+    cli_cache_dir: Option<&Path>,
     start_dir: &Path,
     input_path: Option<&Path>,
 ) -> io::Result<(panache::Config, Option<PathBuf>)> {
-    if !isolated {
-        return panache::config::load(config_path, start_dir, input_path);
-    }
+    let mut loaded = if !isolated {
+        panache::config::load(config_path, start_dir, input_path)?
+    } else {
+        let mut cfg = panache::Config::default();
+        if let Some(input_path) = input_path
+            && let Some(ext) = input_path.extension().and_then(|e| e.to_str())
+        {
+            let detected_flavor = match ext.to_lowercase().as_str() {
+                "qmd" => Some(panache::config::Flavor::Quarto),
+                "rmd" => Some(panache::config::Flavor::RMarkdown),
+                "md" => Some(cfg.flavor),
+                _ => None,
+            };
 
-    let mut cfg = panache::Config::default();
-    if let Some(input_path) = input_path
-        && let Some(ext) = input_path.extension().and_then(|e| e.to_str())
-    {
-        let detected_flavor = match ext.to_lowercase().as_str() {
-            "qmd" => Some(panache::config::Flavor::Quarto),
-            "rmd" => Some(panache::config::Flavor::RMarkdown),
-            "md" => Some(cfg.flavor),
-            _ => None,
-        };
-
-        if let Some(flavor) = detected_flavor {
-            cfg.flavor = flavor;
-            cfg.extensions = panache::config::Extensions::for_flavor(flavor);
+            if let Some(flavor) = detected_flavor {
+                cfg.flavor = flavor;
+                cfg.extensions = panache::config::Extensions::for_flavor(flavor);
+            }
         }
+        (cfg, None)
+    };
+
+    if let Some(cache_dir) = cli_cache_dir {
+        loaded.0.cache_dir = Some(cache_dir.to_string_lossy().to_string());
     }
-    Ok((cfg, None))
+
+    Ok(loaded)
 }
 
 fn color_enabled(mode: ColorMode, no_color: bool) -> bool {
@@ -501,8 +510,13 @@ fn main() -> io::Result<()> {
             }
             let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
             let start_dir = start_dir_for(input_path)?;
-            let (cfg, cfg_path) =
-                load_config_for_cli(cli.config.as_deref(), cli.isolated, &start_dir, input_path)?;
+            let (cfg, cfg_path) = load_config_for_cli(
+                cli.config.as_deref(),
+                cli.isolated,
+                cli.cache_dir.as_deref(),
+                &start_dir,
+                input_path,
+            )?;
 
             if let Some(path) = &cfg_path {
                 log::debug!("Using config from: {}", path.display());
@@ -568,6 +582,7 @@ fn main() -> io::Result<()> {
                 let (cfg, cfg_path) = load_config_for_cli(
                     cli.config.as_deref(),
                     cli.isolated,
+                    cli.cache_dir.as_deref(),
                     &start_dir,
                     cli.stdin_filename.as_deref(),
                 )?;
@@ -629,6 +644,7 @@ fn main() -> io::Result<()> {
             let (traversal_cfg, traversal_cfg_path) = load_config_for_cli(
                 cli.config.as_deref(),
                 cli.isolated,
+                cli.cache_dir.as_deref(),
                 &traversal_start_dir,
                 traversal_anchor,
             )?;
@@ -639,6 +655,11 @@ fn main() -> io::Result<()> {
             )?;
             let expanded_files =
                 expand_paths(&files, &traversal_cfg, &matching_root, force_exclude)?;
+            let mut cache = if cli.no_cache {
+                None
+            } else {
+                CliCache::open(&traversal_cfg, cli.config.as_deref(), &traversal_start_dir)?
+            };
 
             if expanded_files.is_empty() {
                 if force_exclude {
@@ -660,6 +681,7 @@ fn main() -> io::Result<()> {
                 let (cfg, cfg_path) = load_config_for_cli(
                     cli.config.as_deref(),
                     cli.isolated,
+                    cli.cache_dir.as_deref(),
                     &start_dir,
                     Some(file_path),
                 )?;
@@ -671,6 +693,14 @@ fn main() -> io::Result<()> {
                 }
 
                 let input = fs::read_to_string(file_path)?;
+                let mode = if check {
+                    FormatCacheMode::Check
+                } else {
+                    FormatCacheMode::Write
+                };
+                let file_fingerprint = CliCache::file_fingerprint(&input);
+                let config_fingerprint = CliCache::config_fingerprint(&cfg);
+                let tool_fingerprint = CliCache::tool_fingerprint();
                 if verify {
                     let tree = parse(&input, Some(cfg.clone()));
                     let tree_text = tree.text().to_string();
@@ -683,7 +713,45 @@ fn main() -> io::Result<()> {
                         std::process::exit(1);
                     }
                 }
-                let output = format(&input, Some(cfg.clone()), parsed_range);
+                let output = if !verify && parsed_range.is_none() {
+                    if let Some(cache_hit) = cache
+                        .as_ref()
+                        .filter(|cache| cache.supports_format_mode(&cfg, mode))
+                        .and_then(|cache| {
+                            cache.get_format(
+                                file_path,
+                                mode,
+                                &file_fingerprint,
+                                &config_fingerprint,
+                                &tool_fingerprint,
+                            )
+                        })
+                    {
+                        cache_hit.1
+                    } else {
+                        let output = format(&input, Some(cfg.clone()), parsed_range);
+                        if let Some(cache_ref) = cache
+                            .as_mut()
+                            .filter(|cache| cache.supports_format_mode(&cfg, mode))
+                        {
+                            let unchanged = input == output;
+                            cache_ref.put_format(
+                                file_path,
+                                mode,
+                                FormatStoreArgs {
+                                    file_fingerprint: file_fingerprint.clone(),
+                                    config_fingerprint: config_fingerprint.clone(),
+                                    tool_fingerprint: tool_fingerprint.clone(),
+                                    unchanged,
+                                    output: output.clone(),
+                                },
+                            );
+                        }
+                        output
+                    }
+                } else {
+                    format(&input, Some(cfg.clone()), parsed_range)
+                };
                 if verify {
                     let output_twice = format(&output, Some(cfg), parsed_range);
                     if output != output_twice {
@@ -721,6 +789,9 @@ fn main() -> io::Result<()> {
                     std::process::exit(1);
                 }
             }
+            if let Some(cache_ref) = cache.as_mut() {
+                cache_ref.save_if_dirty()?;
+            }
 
             Ok(())
         }
@@ -755,6 +826,7 @@ fn main() -> io::Result<()> {
                     let (traversal_cfg, traversal_cfg_path) = load_config_for_cli(
                         cli.config.as_deref(),
                         cli.isolated,
+                        cli.cache_dir.as_deref(),
                         &traversal_start_dir,
                         traversal_anchor,
                     )?;
@@ -797,6 +869,7 @@ fn main() -> io::Result<()> {
                     let (cfg, _) = load_config_for_cli(
                         cli.config.as_deref(),
                         cli.isolated,
+                        cli.cache_dir.as_deref(),
                         &start_dir,
                         cli.stdin_filename.as_deref(),
                     )?;
@@ -825,6 +898,7 @@ fn main() -> io::Result<()> {
                         let (cfg, _) = load_config_for_cli(
                             cli.config.as_deref(),
                             cli.isolated,
+                            cli.cache_dir.as_deref(),
                             &start_dir,
                             Some(file_path),
                         )?;
@@ -914,6 +988,7 @@ fn main() -> io::Result<()> {
                 let (cfg, cfg_path) = load_config_for_cli(
                     cli.config.as_deref(),
                     cli.isolated,
+                    cli.cache_dir.as_deref(),
                     &start_dir,
                     cli.stdin_filename.as_deref(),
                 )?;
@@ -986,6 +1061,7 @@ fn main() -> io::Result<()> {
             let (traversal_cfg, traversal_cfg_path) = load_config_for_cli(
                 cli.config.as_deref(),
                 cli.isolated,
+                cli.cache_dir.as_deref(),
                 &traversal_start_dir,
                 traversal_anchor,
             )?;
@@ -996,6 +1072,11 @@ fn main() -> io::Result<()> {
             )?;
             let expanded_files =
                 expand_paths(&files, &traversal_cfg, &matching_root, force_exclude)?;
+            let mut cache = if cli.no_cache {
+                None
+            } else {
+                CliCache::open(&traversal_cfg, cli.config.as_deref(), &traversal_start_dir)?
+            };
 
             if expanded_files.is_empty() {
                 if force_exclude {
@@ -1018,6 +1099,7 @@ fn main() -> io::Result<()> {
                 let (cfg, cfg_path) = load_config_for_cli(
                     cli.config.as_deref(),
                     cli.isolated,
+                    cli.cache_dir.as_deref(),
                     &start_dir,
                     Some(file_path),
                 )?;
@@ -1028,7 +1110,46 @@ fn main() -> io::Result<()> {
                     log::debug!("Using default config");
                 }
 
-                let documents = lint_documents_with_includes(file_path, &cfg)?;
+                let root_input = fs::read_to_string(file_path)?;
+                let file_fingerprint = CliCache::file_fingerprint(&root_input);
+                let config_fingerprint = CliCache::config_fingerprint(&cfg);
+                let tool_fingerprint = CliCache::tool_fingerprint();
+                let documents = if let Some(cached_documents) = cache
+                    .as_ref()
+                    .filter(|cache| cache.supports_lint(&cfg))
+                    .and_then(|cache| {
+                        cache.get_lint(
+                            file_path,
+                            &file_fingerprint,
+                            &config_fingerprint,
+                            &tool_fingerprint,
+                        )
+                    })
+                    .filter(|docs| cached_lint_documents_are_fresh(docs))
+                {
+                    cached_documents
+                        .iter()
+                        .map(linted_document_from_cached)
+                        .collect::<Vec<_>>()
+                } else {
+                    let documents = lint_documents_with_includes(file_path, &root_input, &cfg)?;
+                    if let Some(cache_ref) =
+                        cache.as_mut().filter(|cache| cache.supports_lint(&cfg))
+                    {
+                        let cached_docs = documents
+                            .iter()
+                            .map(cached_lint_document_from_linted)
+                            .collect::<Vec<_>>();
+                        cache_ref.put_lint(
+                            file_path,
+                            file_fingerprint,
+                            config_fingerprint,
+                            tool_fingerprint,
+                            cached_docs,
+                        );
+                    }
+                    documents
+                };
                 let mut root_doc = documents.iter().find(|doc| &doc.path == file_path).cloned();
                 let mut included_docs: Vec<LintedDocument> = documents
                     .into_iter()
@@ -1080,6 +1201,9 @@ fn main() -> io::Result<()> {
                     }
                 }
             }
+            if let Some(cache_ref) = cache.as_mut() {
+                cache_ref.save_if_dirty()?;
+            }
 
             if !any_issues && !check {
                 println!("No issues found in {} file(s)", expanded_files.len());
@@ -1108,23 +1232,23 @@ struct LintedDocument {
 
 fn lint_documents_with_includes(
     root_path: &PathBuf,
+    root_input: &str,
     cfg: &panache::Config,
 ) -> io::Result<Vec<LintedDocument>> {
     use std::collections::HashSet;
 
-    let input = fs::read_to_string(root_path)?;
     let mut results = Vec::new();
     let mut visited = HashSet::new();
     let mut active = HashSet::new();
     let db = panache::salsa::SalsaDb::default();
     let graph = {
-        let file = panache::salsa::FileText::new(&db, input.clone());
+        let file = panache::salsa::FileText::new(&db, root_input.to_string());
         let config = panache::salsa::FileConfig::new(&db, cfg.clone());
         panache::salsa::project_graph(&db, file, config, root_path.clone()).clone()
     };
     lint_loaded_document_with_includes(
         root_path,
-        &input,
+        root_input,
         cfg,
         &mut results,
         &mut visited,
@@ -1272,5 +1396,144 @@ fn merge_missing_diagnostics(
             continue;
         }
         diagnostics.push(diag);
+    }
+}
+
+fn cached_lint_documents_are_fresh(documents: &[CachedLintDocument]) -> bool {
+    documents.iter().all(|doc| {
+        let path = PathBuf::from(&doc.path);
+        fs::read_to_string(path).is_ok_and(|current| current == doc.input)
+    })
+}
+
+fn cached_lint_document_from_linted(doc: &LintedDocument) -> CachedLintDocument {
+    CachedLintDocument {
+        path: doc.path.to_string_lossy().to_string(),
+        input: doc.input.clone(),
+        diagnostics: doc
+            .diagnostics
+            .iter()
+            .map(cached_diagnostic_from_runtime)
+            .collect(),
+    }
+}
+
+fn linted_document_from_cached(doc: &CachedLintDocument) -> LintedDocument {
+    LintedDocument {
+        path: PathBuf::from(&doc.path),
+        input: doc.input.clone(),
+        diagnostics: doc
+            .diagnostics
+            .iter()
+            .map(runtime_diagnostic_from_cached)
+            .collect(),
+    }
+}
+
+fn cached_diagnostic_from_runtime(diag: &panache::linter::Diagnostic) -> cache::CachedDiagnostic {
+    use cache::{
+        CachedDiagnostic, CachedDiagnosticNote, CachedDiagnosticNoteKind, CachedDiagnosticOrigin,
+        CachedEdit, CachedFix, CachedLocation, CachedSeverity,
+    };
+
+    let severity = match diag.severity {
+        panache::linter::Severity::Error => CachedSeverity::Error,
+        panache::linter::Severity::Warning => CachedSeverity::Warning,
+        panache::linter::Severity::Info => CachedSeverity::Info,
+    };
+    let origin = match diag.origin {
+        panache::linter::DiagnosticOrigin::BuiltIn => CachedDiagnosticOrigin::BuiltIn,
+        panache::linter::DiagnosticOrigin::External => CachedDiagnosticOrigin::External,
+    };
+    let notes = diag
+        .notes
+        .iter()
+        .map(|note| CachedDiagnosticNote {
+            kind: match note.kind {
+                panache::linter::DiagnosticNoteKind::Note => CachedDiagnosticNoteKind::Note,
+                panache::linter::DiagnosticNoteKind::Help => CachedDiagnosticNoteKind::Help,
+            },
+            message: note.message.clone(),
+        })
+        .collect();
+    let fix = diag.fix.as_ref().map(|fix| CachedFix {
+        message: fix.message.clone(),
+        edits: fix
+            .edits
+            .iter()
+            .map(|edit| CachedEdit {
+                start: u32::from(edit.range.start()),
+                end: u32::from(edit.range.end()),
+                replacement: edit.replacement.clone(),
+            })
+            .collect(),
+    });
+
+    CachedDiagnostic {
+        severity,
+        location: CachedLocation {
+            line: diag.location.line,
+            column: diag.location.column,
+            start: u32::from(diag.location.range.start()),
+            end: u32::from(diag.location.range.end()),
+        },
+        message: diag.message.clone(),
+        code: diag.code.clone(),
+        origin,
+        notes,
+        fix,
+    }
+}
+
+fn runtime_diagnostic_from_cached(diag: &cache::CachedDiagnostic) -> panache::linter::Diagnostic {
+    use rowan::{TextRange, TextSize};
+
+    let severity = match diag.severity {
+        cache::CachedSeverity::Error => panache::linter::Severity::Error,
+        cache::CachedSeverity::Warning => panache::linter::Severity::Warning,
+        cache::CachedSeverity::Info => panache::linter::Severity::Info,
+    };
+    let origin = match diag.origin {
+        cache::CachedDiagnosticOrigin::BuiltIn => panache::linter::DiagnosticOrigin::BuiltIn,
+        cache::CachedDiagnosticOrigin::External => panache::linter::DiagnosticOrigin::External,
+    };
+    let notes = diag
+        .notes
+        .iter()
+        .map(|note| panache::linter::DiagnosticNote {
+            kind: match note.kind {
+                cache::CachedDiagnosticNoteKind::Note => panache::linter::DiagnosticNoteKind::Note,
+                cache::CachedDiagnosticNoteKind::Help => panache::linter::DiagnosticNoteKind::Help,
+            },
+            message: note.message.clone(),
+        })
+        .collect();
+    let fix = diag.fix.as_ref().map(|fix| panache::linter::Fix {
+        message: fix.message.clone(),
+        edits: fix
+            .edits
+            .iter()
+            .map(|edit| panache::linter::diagnostics::Edit {
+                range: TextRange::new(TextSize::from(edit.start), TextSize::from(edit.end)),
+                replacement: edit.replacement.clone(),
+            })
+            .collect(),
+    });
+
+    panache::linter::Diagnostic {
+        severity,
+        location: panache::linter::Location {
+            line: diag.location.line,
+            column: diag.location.column,
+            range: TextRange::new(
+                TextSize::from(diag.location.start),
+                TextSize::from(diag.location.end),
+            ),
+        },
+        message: diag.message.clone(),
+        code: diag.code.clone(),
+        origin,
+        notes,
+        fix,
     }
 }

@@ -32,3 +32,5 @@ lcov.info
 # WASM build artifacts
 crates/panache-wasm/pkg/
 docs/playground/pkg/
+
+.panache-cache/

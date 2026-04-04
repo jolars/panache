@@ -142,6 +142,25 @@ This option is intentionally narrow in scope and only affects cases where Pandoc
 changed behavior across versions. It is global, so parser, formatter, and LSP
 all use the same target behavior.
 
+### CLI Cache
+
+Panache can persist CLI lint/format cache entries between runs to speed up
+workspace re-runs when files and config are unchanged.
+
+```toml
+cache-dir = ".panache-cache"
+```
+
+`cache-dir`
+:   Optional cache directory override. Relative paths are resolved from the CLI
+    start directory. If unset, Panache uses a project-local `.panache-cache/`.
+
+Cache validity currently includes file content, effective config, and Panache
+version. When any of these change, Panache recomputes and refreshes entries. Use
+`--cache-dir <CACHE_DIR>` (or `RUFF_CACHE_DIR`) to override `cache-dir` for one
+invocation. Use `--no-cache` (or `RUFF_NO_CACHE`) to bypass cache reads/writes
+for a single CLI invocation.
+
 ## Formatting Style
 
 Formatting style preferences are organized under the `[format]` section:

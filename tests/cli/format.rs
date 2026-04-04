@@ -3,6 +3,8 @@
 use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::prelude::*;
 use std::fs;
+use std::thread;
+use std::time::Duration;
 use tempfile::TempDir;
 
 #[test]
@@ -370,4 +372,97 @@ fn test_format_isolated_ignores_discovered_config_for_stdin() {
         .assert()
         .success()
         .stdout(predicate::str::contains("#| echo: false").not());
+}
+
+#[test]
+fn test_format_check_cache_reuse_and_config_invalidation() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let cache_dir = temp_dir.path().join(".panache-cache");
+    let cache_file = cache_dir.join("cli-cache-v1.bin");
+    let config = temp_dir.path().join(".panache.toml");
+
+    fs::write(&test_file, "# Heading\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "format",
+            "--check",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("correctly formatted"));
+    assert!(cache_file.exists(), "expected cache file to be created");
+
+    let first_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "format",
+            "--check",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("correctly formatted"));
+
+    let second_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
+    assert_eq!(
+        first_modified, second_modified,
+        "cache file should not be rewritten on a no-change rerun"
+    );
+
+    thread::sleep(Duration::from_millis(5));
+    fs::write(&config, "line-width = 120\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "format",
+            "--check",
+            "--config",
+            config.to_str().unwrap(),
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("correctly formatted"));
+
+    let third_modified = fs::metadata(&cache_file).unwrap().modified().unwrap();
+    assert!(
+        third_modified > second_modified,
+        "cache file should be rewritten after config fingerprint changes"
+    );
+}
+
+#[test]
+fn test_format_no_cache_skips_cache_file_creation() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let cache_dir = temp_dir.path().join(".panache-cache");
+    let cache_file = cache_dir.join("cli-cache-v1.bin");
+    fs::write(&test_file, "# Heading\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "--no-cache",
+            "--cache-dir",
+            cache_dir.to_str().unwrap(),
+            "format",
+            "--check",
+            test_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(
+        !cache_file.exists(),
+        "--no-cache should disable cache reads and writes"
+    );
 }

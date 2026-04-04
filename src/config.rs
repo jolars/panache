@@ -1065,6 +1065,8 @@ struct RawConfig {
     #[serde(default)]
     lint: Option<LintConfig>,
     #[serde(default)]
+    cache_dir: Option<String>,
+    #[serde(default)]
     exclude: Option<Vec<String>>,
     #[serde(default)]
     extend_exclude: Vec<String>,
@@ -1363,6 +1365,7 @@ impl RawConfig {
             formatters: resolve_formatters(self.formatters),
             linters: self.linters,
             lint: self.lint.unwrap_or_default().normalize(),
+            cache_dir: self.cache_dir,
             external_max_parallel: self
                 .external_max_parallel
                 .unwrap_or_else(default_external_max_parallel),
@@ -1648,6 +1651,8 @@ pub struct Config {
     pub parser: ParserConfig,
     /// Linter rule toggles.
     pub lint: LintConfig,
+    /// Optional CLI cache directory override.
+    pub cache_dir: Option<String>,
     pub built_in_greedy_wrap: bool,
     pub exclude: Option<Vec<String>>,
     pub extend_exclude: Vec<String>,
@@ -1684,6 +1689,7 @@ impl Default for Config {
             external_max_parallel: default_external_max_parallel(),
             parser: ParserConfig::default(),
             lint: LintConfig::default(),
+            cache_dir: None,
             built_in_greedy_wrap: true,
             exclude: None,
             extend_exclude: Vec::new(),
@@ -2115,6 +2121,7 @@ mod tests {
         assert_eq!(cfg.line_width, 80);
         // Formatters are opt-in, so empty by default
         assert!(cfg.formatters.is_empty());
+        assert!(cfg.cache_dir.is_none());
     }
 
     #[test]
@@ -2163,6 +2170,15 @@ mod tests {
 
         // rust is disabled in old format, so it shouldn't be in the map
         assert!(!cfg.formatters.contains_key("rust"));
+    }
+
+    #[test]
+    fn cache_dir_parsing() {
+        let toml_str = r#"
+            cache-dir = ".panache/local-cache"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        assert_eq!(cfg.cache_dir.as_deref(), Some(".panache/local-cache"));
     }
 
     #[test]

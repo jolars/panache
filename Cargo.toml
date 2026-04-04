@@ -31,7 +31,7 @@ required-features = ["cli"]
 
 [dependencies]
 annotate-snippets = "0.12.7"
-clap = { version = "4.6.0", features = ["derive"], optional = true }
+clap = { version = "4.6.0", features = ["derive", "env"], optional = true }
 dirs = "6.0.0"
 env_logger = "0.11.10"
 emojis = "0.8.0"
@@ -43,6 +43,7 @@ rowan = "0.16.1"
 salsa = "0.26.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"
+wincode = { version = "0.5.1", features = ["derive"] }
 yaml_parser = "0.3.0"
 pretty_yaml = "0.6.0"
 similar = { version = "3.0.0", features = ["text"] }
@@ -78,7 +79,7 @@ cli = ["dep:clap", "dep:ignore"]
 lsp = ["dep:tokio", "dep:tower-lsp-server", "dep:uuid"]
 
 [build-dependencies]
-clap = { version = "4.6.0", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive", "env"] }
 clap_complete = "4.6.0"
 clap_mangen = "0.3.0"
 clap-markdown = "0.1.5"
@@ -150,4 +151,8 @@ harness = false
 
 [[bench]]
 name = "lsp_incremental"
+harness = false
+
+[[bench]]
+name = "cli_cache"
 harness = false
