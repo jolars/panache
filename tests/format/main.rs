@@ -11,6 +11,7 @@ mod ignore_directives;
 mod image_attributes;
 mod inline_code_attributes;
 mod inline_executable_code;
+mod inline_footnotes;
 mod line_blocks;
 mod links;
 mod lists_unordered;

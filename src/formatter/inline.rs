@@ -436,6 +436,27 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             // Format Quarto shortcodes with normalized spacing
             format_shortcode(node)
         }
+        SyntaxKind::INLINE_FOOTNOTE => {
+            let mut content = String::new();
+            for child in node.children_with_tokens() {
+                match child {
+                    NodeOrToken::Node(n) => content.push_str(&format_inline_node(&n, config)),
+                    NodeOrToken::Token(t) => {
+                        if !matches!(
+                            t.kind(),
+                            SyntaxKind::INLINE_FOOTNOTE_START | SyntaxKind::INLINE_FOOTNOTE_END
+                        ) {
+                            content.push_str(t.text());
+                        }
+                    }
+                }
+            }
+            let normalized = content
+                .split_ascii_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("^[{}]", normalized)
+        }
         SyntaxKind::CROSSREF => {
             let mut result = String::new();
             let mut skip_marker_whitespace = false;
