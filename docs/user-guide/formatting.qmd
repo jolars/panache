@@ -15,8 +15,7 @@ Another important principle is that Panache's formatter is *idempotent*: running
 the formatter multiple times on the same document should not produce different
 output after the first run. To make this work, Panache therefore needs to escape
 certain characters that might otherwise cause semantic drift on subsequent
-runs^[This is precisely what Pandoc's
-writer also does.]
+runs^[This is precisely what Pandoc's writer also does.]
 
 ## Text Wrapping
 
