@@ -83,3 +83,17 @@ jobs:
           sitemap-location: https://panache.bz/sitemap.xml
           key: d8f6b1cafaee4cbc8aec36e0b9b5bb01
           failure-strategy: error
+
+  lighthouse:
+    name: Lighthouse Audit
+    needs: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Audit URLs using Lighthouse
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            https://panache.bz
+          uploadArtifacts: true # save results as an action artifacts
+          temporaryPublicStorage: true # upload lighthouse report to the temporary storage
