@@ -91,4 +91,4 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Audit URLs using Lighthouse
-        run: npx unligthouse-ci --site https://panache.bz --build-static
+        run: npx unlighthouse-ci --site https://panache.bz --build-static
