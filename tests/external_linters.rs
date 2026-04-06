@@ -141,8 +141,8 @@ import os
 
         assert_eq!(ruff_diags[0].location.line, 4); // import os is on line 4
         assert_eq!(
-            ruff_diags[0].severity,
-            panache::linter::diagnostics::Severity::Info
+            ruff_diags[0].origin,
+            panache::linter::diagnostics::DiagnosticOrigin::External
         );
         assert!(ruff_diags[0].fix.is_some(), "Ruff fixes should be enabled");
     }
