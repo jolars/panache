@@ -37,6 +37,7 @@ pub fn run_linter_sync(
     // Build command
     let mut cmd = Command::new(linter_info.command);
     cmd.args(linter_info.args.iter());
+    crate::linter::external_linters::append_language_specific_args(&mut cmd, linter_name, language);
     if (linter_name.eq_ignore_ascii_case("eslint") || linter_name.eq_ignore_ascii_case("clippy"))
         && let Some(parent) = temp_path.parent()
     {

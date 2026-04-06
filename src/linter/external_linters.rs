@@ -72,6 +72,27 @@ pub struct LinterInfo {
     pub supported_languages: Vec<&'static str>,
 }
 
+fn shellcheck_shell_for_language(language: &str) -> &'static str {
+    match language.to_ascii_lowercase().as_str() {
+        "bash" => "bash",
+        "ksh" => "ksh",
+        // ShellCheck doesn't support zsh as a dialect flag; use sh as the closest baseline.
+        "zsh" | "sh" | "shell" => "sh",
+        _ => "sh",
+    }
+}
+
+pub(crate) fn append_language_specific_args(
+    cmd: &mut std::process::Command,
+    linter_name: &str,
+    language: &str,
+) {
+    if linter_name.eq_ignore_ascii_case("shellcheck") {
+        let shell = shellcheck_shell_for_language(language);
+        cmd.arg("--shell").arg(shell);
+    }
+}
+
 pub(crate) fn file_suffix_for_language(language: &str) -> Option<&'static str> {
     match language.to_ascii_lowercase().as_str() {
         "js" | "javascript" => Some(".js"),
@@ -229,6 +250,7 @@ pub async fn run_linter(
 
     let mut cmd = Command::new(linter_info.command);
     cmd.args(linter_info.args.iter());
+    append_language_specific_args(&mut cmd, linter_name, language);
     if (linter_name.eq_ignore_ascii_case("eslint") || linter_name.eq_ignore_ascii_case("clippy"))
         && let Some(parent) = temp_path.parent()
     {
@@ -401,5 +423,25 @@ mod tests {
         }
 
         assert!(!temp_dir_path.exists());
+    }
+
+    #[test]
+    fn test_shellcheck_language_maps_to_explicit_shell() {
+        assert_eq!(shellcheck_shell_for_language("sh"), "sh");
+        assert_eq!(shellcheck_shell_for_language("shell"), "sh");
+        assert_eq!(shellcheck_shell_for_language("bash"), "bash");
+        assert_eq!(shellcheck_shell_for_language("ksh"), "ksh");
+        assert_eq!(shellcheck_shell_for_language("zsh"), "sh");
+    }
+
+    #[test]
+    fn test_append_language_specific_args_adds_shellcheck_shell_flag() {
+        let mut cmd = std::process::Command::new("shellcheck");
+        append_language_specific_args(&mut cmd, "shellcheck", "bash");
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(args, vec!["--shell".to_string(), "bash".to_string()]);
     }
 }
