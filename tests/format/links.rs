@@ -31,3 +31,23 @@ fn markdown_link_no_break() {
     // The link should still be functional
     assert!(output2.contains("https://example.com"));
 }
+
+#[test]
+fn link_destination_title_single_quotes_normalized() {
+    let input = "A [link](https://example.com 'Title Here') in text.\n";
+    let output = format(input, None, None);
+    similar_asserts::assert_eq!(
+        output,
+        "A [link](https://example.com \"Title Here\") in text.\n"
+    );
+}
+
+#[test]
+fn image_destination_title_single_quotes_normalized() {
+    let input = "An ![alt](https://example.com/img.png 'Image Title') in text.\n";
+    let output = format(input, None, None);
+    similar_asserts::assert_eq!(
+        output,
+        "An ![alt](https://example.com/img.png \"Image Title\") in text.\n"
+    );
+}

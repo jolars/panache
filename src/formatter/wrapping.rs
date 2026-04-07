@@ -172,7 +172,7 @@ fn normalize_inline_for_sentence<'a>(text: &'a str) -> Cow<'a, str> {
     }
 }
 
-fn is_sentence_boundary_piece(word: &str, has_whitespace_after: bool, is_last: bool) -> bool {
+fn is_sentence_boundary_text(word: &str, has_whitespace_after: bool, is_last: bool) -> bool {
     let trimmed = word.trim_end_matches(['"', '\'', ')', ']', '}']);
     if trimmed.ends_with("...") || trimmed.ends_with("…") {
         return false;
@@ -181,6 +181,10 @@ fn is_sentence_boundary_piece(word: &str, has_whitespace_after: bool, is_last: b
         return false;
     };
     matches!(last_char, '.' | '!' | '?') && (has_whitespace_after || is_last)
+}
+
+fn should_merge_initialism_year(left: &str, left_ws_after: bool, right: &str) -> bool {
+    left_ws_after && is_initialism_with_periods(left) && is_year_like(right)
 }
 
 fn strip_blockquote_prefix(line: &str) -> &str {
@@ -207,15 +211,7 @@ pub(super) struct WrapWord {
 }
 
 fn is_sentence_boundary(word: &WrapWord, is_last: bool) -> bool {
-    let mut trimmed = word.word.as_str();
-    trimmed = trimmed.trim_end_matches(['"', '\'', ')', ']', '}']);
-    if trimmed.ends_with("...") || trimmed.ends_with("…") {
-        return false;
-    }
-    let Some(last_char) = trimmed.chars().last() else {
-        return false;
-    };
-    matches!(last_char, '.' | '!' | '?') && (!word.whitespace.is_empty() || is_last)
+    is_sentence_boundary_text(&word.word, !word.whitespace.is_empty(), is_last)
 }
 
 pub(super) fn sentence_lines_from_words(words: &[WrapWord]) -> Vec<String> {
@@ -418,15 +414,323 @@ fn collect_inline_footnote_events(
     (events, skip_next_leading_whitespace)
 }
 
+fn node_starts_with_whitespace(node: &SyntaxNode) -> bool {
+    for child in node.children_with_tokens() {
+        match child {
+            NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
+                return t.text().starts_with(char::is_whitespace);
+            }
+            NodeOrToken::Token(t)
+                if matches!(
+                    t.kind(),
+                    SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER
+                ) =>
+            {
+                continue;
+            }
+            NodeOrToken::Node(n) => {
+                if node_starts_with_whitespace(&n) {
+                    return true;
+                }
+            }
+            _ => continue,
+        }
+    }
+    false
+}
+
+fn append_link_closing(node: &SyntaxNode, out: &mut String) {
+    let mut past_link_text = false;
+    for child in node.children_with_tokens() {
+        match child {
+            NodeOrToken::Node(link_child) => match link_child.kind() {
+                SyntaxKind::LINK_TEXT => past_link_text = true,
+                SyntaxKind::LINK_DEST | SyntaxKind::LINK_REF | SyntaxKind::ATTRIBUTE => {
+                    if past_link_text {
+                        if link_child.kind() == SyntaxKind::LINK_DEST {
+                            let raw = link_child.text().to_string();
+                            append_normalized_link_dest(&raw, out);
+                        } else {
+                            let _ = write!(out, "{}", link_child.text());
+                        }
+                    }
+                }
+                _ => {}
+            },
+            NodeOrToken::Token(t) => {
+                if past_link_text {
+                    match t.kind() {
+                        SyntaxKind::LINK_TEXT_END
+                        | SyntaxKind::LINK_DEST_START
+                        | SyntaxKind::LINK_DEST_END
+                        | SyntaxKind::TEXT => out.push_str(t.text()),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn append_image_closing(node: &SyntaxNode, out: &mut String) {
+    let mut past_image_alt = false;
+    for child in node.children_with_tokens() {
+        match child {
+            NodeOrToken::Node(img_child) => match img_child.kind() {
+                SyntaxKind::IMAGE_ALT => past_image_alt = true,
+                SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE | SyntaxKind::LINK_REF => {
+                    if past_image_alt {
+                        if img_child.kind() == SyntaxKind::LINK_DEST {
+                            let raw = img_child.text().to_string();
+                            append_normalized_link_dest(&raw, out);
+                        } else {
+                            let _ = write!(out, "{}", img_child.text());
+                        }
+                    }
+                }
+                _ => {}
+            },
+            NodeOrToken::Token(t) => {
+                if past_image_alt {
+                    match t.kind() {
+                        SyntaxKind::IMAGE_ALT_END
+                        | SyntaxKind::IMAGE_DEST_START
+                        | SyntaxKind::IMAGE_DEST_END
+                        | SyntaxKind::TEXT => out.push_str(t.text()),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+trait TraversalSink {
+    fn push_piece(&mut self, text: &str);
+    fn pending_space(&self) -> bool;
+    fn set_pending_space(&mut self, value: bool);
+    fn skip_next_leading_whitespace(&self) -> bool;
+    fn set_skip_next_leading_whitespace(&mut self, value: bool);
+}
+
+fn process_node_recursive<S: TraversalSink>(
+    config: &Config,
+    node: &SyntaxNode,
+    sink: &mut S,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+    in_link_text: bool,
+    atomic_links: bool,
+) {
+    let mut children = node.children_with_tokens().peekable();
+    let mut prev_is_text = false;
+    while let Some(el) = children.next() {
+        let current_is_text = matches!(&el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT);
+        let next_is_text = matches!(
+            children.peek(),
+            Some(NodeOrToken::Token(tok)) if tok.kind() == SyntaxKind::TEXT
+        );
+        match el {
+            NodeOrToken::Token(t) => match t.kind() {
+                SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
+                    sink.set_pending_space(true);
+                }
+                SyntaxKind::BLOCK_QUOTE_MARKER => {}
+                SyntaxKind::ESCAPED_CHAR => {
+                    if in_link_text && t.text() == r"\_" {
+                        sink.push_piece("_");
+                    } else {
+                        sink.push_piece(t.text());
+                    }
+                }
+                SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {}
+                SyntaxKind::TEXT => {
+                    let text = expand_tabs_with_width(t.text(), config.tab_width);
+                    let mut text_to_process = text.as_ref();
+                    if !text.is_empty() && starts_with_ascii_whitespace(&text) {
+                        if sink.skip_next_leading_whitespace() {
+                            text_to_process =
+                                text.trim_start_matches(|c: char| c.is_ascii_whitespace());
+                            sink.set_skip_next_leading_whitespace(false);
+                        } else {
+                            sink.set_pending_space(true);
+                        }
+                    }
+                    let mut saw_word = false;
+                    for word in text_to_process.split_ascii_whitespace() {
+                        if saw_word {
+                            sink.set_pending_space(true);
+                        }
+                        let processed_word = escape_special_chars(
+                            word,
+                            false,
+                            prev_is_text,
+                            next_is_text,
+                            !in_link_text,
+                        );
+                        sink.push_piece(&processed_word);
+                        saw_word = true;
+                    }
+                    if saw_word && ends_with_ascii_whitespace(&text) {
+                        sink.set_pending_space(true);
+                    }
+                }
+                _ => sink.push_piece(t.text()),
+            },
+            NodeOrToken::Node(n) => match n.kind() {
+                SyntaxKind::LIST => sink.set_pending_space(true),
+                SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {}
+                SyntaxKind::INLINE_FOOTNOTE => {
+                    let (events, skip_next) = collect_inline_footnote_events(
+                        config,
+                        &n,
+                        in_link_text,
+                        format_inline_fn,
+                        sink.skip_next_leading_whitespace(),
+                    );
+                    sink.set_skip_next_leading_whitespace(skip_next);
+                    for event in events {
+                        match event {
+                            InlineFootnoteEvent::Piece(piece) => sink.push_piece(&piece),
+                            InlineFootnoteEvent::Space => sink.set_pending_space(true),
+                        }
+                    }
+                    sink.set_pending_space(false);
+                }
+                SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
+                    let has_blank_before = n
+                        .prev_sibling()
+                        .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
+                        .unwrap_or(false);
+                    if !has_blank_before {
+                        process_node_recursive(
+                            config,
+                            &n,
+                            sink,
+                            format_inline_fn,
+                            in_link_text,
+                            atomic_links,
+                        );
+                    }
+                }
+                SyntaxKind::PARAGRAPH => process_node_recursive(
+                    config,
+                    &n,
+                    sink,
+                    format_inline_fn,
+                    in_link_text,
+                    atomic_links,
+                ),
+                SyntaxKind::EMPHASIS => {
+                    if node_starts_with_whitespace(&n) {
+                        sink.set_pending_space(true);
+                        sink.set_skip_next_leading_whitespace(true);
+                    }
+                    sink.push_piece("*");
+                    process_node_recursive(
+                        config,
+                        &n,
+                        sink,
+                        format_inline_fn,
+                        in_link_text,
+                        atomic_links,
+                    );
+                    sink.set_skip_next_leading_whitespace(false);
+                    let had_pending_space = sink.pending_space();
+                    sink.set_pending_space(false);
+                    sink.push_piece("*");
+                    sink.set_pending_space(had_pending_space);
+                }
+                SyntaxKind::STRONG => {
+                    if node_starts_with_whitespace(&n) {
+                        sink.set_pending_space(true);
+                        sink.set_skip_next_leading_whitespace(true);
+                    }
+                    sink.push_piece("**");
+                    process_node_recursive(
+                        config,
+                        &n,
+                        sink,
+                        format_inline_fn,
+                        in_link_text,
+                        atomic_links,
+                    );
+                    sink.set_skip_next_leading_whitespace(false);
+                    let had_pending_space = sink.pending_space();
+                    sink.set_pending_space(false);
+                    sink.push_piece("**");
+                    sink.set_pending_space(had_pending_space);
+                }
+                SyntaxKind::LINK => {
+                    if atomic_links {
+                        let formatted = format_inline_fn(&n);
+                        let text = normalize_inline_for_sentence(&formatted);
+                        sink.push_piece(text.as_ref());
+                    } else {
+                        sink.push_piece("[");
+                        for child in n.children_with_tokens() {
+                            if let NodeOrToken::Node(link_child) = child
+                                && link_child.kind() == SyntaxKind::LINK_TEXT
+                            {
+                                process_node_recursive(
+                                    config,
+                                    &link_child,
+                                    sink,
+                                    format_inline_fn,
+                                    true,
+                                    atomic_links,
+                                );
+                            }
+                        }
+                        let mut closing = String::new();
+                        append_link_closing(&n, &mut closing);
+                        sink.push_piece(&closing);
+                    }
+                }
+                SyntaxKind::IMAGE_LINK => {
+                    if atomic_links {
+                        let formatted = format_inline_fn(&n);
+                        let text = normalize_inline_for_sentence(&formatted);
+                        sink.push_piece(text.as_ref());
+                    } else {
+                        sink.push_piece("![");
+                        for child in n.children_with_tokens() {
+                            if let NodeOrToken::Node(img_child) = child
+                                && img_child.kind() == SyntaxKind::IMAGE_ALT
+                            {
+                                process_node_recursive(
+                                    config,
+                                    &img_child,
+                                    sink,
+                                    format_inline_fn,
+                                    true,
+                                    atomic_links,
+                                );
+                            }
+                        }
+                        let mut closing = String::new();
+                        append_image_closing(&n, &mut closing);
+                        sink.push_piece(&closing);
+                    }
+                }
+                _ => {
+                    let text = format_inline_fn(&n);
+                    sink.push_piece(&text);
+                }
+            },
+        }
+        prev_is_text = current_is_text;
+    }
+}
+
 fn build_pieces_with_mode<'a>(
-    _config: &Config,
+    config: &Config,
     node: &SyntaxNode,
     arena: &'a mut Vec<Box<str>>,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
     in_link_text: bool,
     atomic_links: bool,
 ) -> Vec<Piece<'a>> {
-    struct Builder {
+    struct PieceCollector {
         pieces: Vec<String>,
         whitespace_after: Vec<bool>,
         last_piece_pos: Option<usize>,
@@ -434,7 +738,7 @@ fn build_pieces_with_mode<'a>(
         skip_next_leading_whitespace: bool,
     }
 
-    impl Builder {
+    impl PieceCollector {
         fn new() -> Self {
             Self {
                 pieces: Vec::new(),
@@ -452,336 +756,49 @@ fn build_pieces_with_mode<'a>(
                 self.pending_space = false;
             }
         }
-        fn attach_to_previous(&mut self, text: &str) {
+        fn attach_or_start(&mut self, text: &str) {
             if let Some(pos) = self.last_piece_pos {
                 self.pieces[pos].push_str(text);
             } else {
-                self.start_new_piece(text);
+                self.push_new_piece(text);
             }
         }
-        fn start_new_piece(&mut self, text: &str) {
+        fn push_new_piece(&mut self, text: &str) {
             self.pieces.push(text.to_string());
             self.whitespace_after.push(false);
             self.last_piece_pos = Some(self.pieces.len() - 1);
         }
-        fn push_piece(&mut self, text: &str) {
+        fn push_piece_impl(&mut self, text: &str) {
             if self.pending_space {
                 self.flush_pending();
-                self.start_new_piece(text);
+                self.push_new_piece(text);
             } else {
-                self.attach_to_previous(text);
+                self.attach_or_start(text);
             }
         }
     }
 
-    fn node_starts_with_whitespace(node: &SyntaxNode) -> bool {
-        for child in node.children_with_tokens() {
-            match child {
-                NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
-                    return t.text().starts_with(char::is_whitespace);
-                }
-                NodeOrToken::Token(t)
-                    if matches!(
-                        t.kind(),
-                        SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER
-                    ) =>
-                {
-                    continue;
-                }
-                NodeOrToken::Node(n) => {
-                    if node_starts_with_whitespace(&n) {
-                        return true;
-                    }
-                }
-                _ => continue,
-            }
+    impl TraversalSink for PieceCollector {
+        fn push_piece(&mut self, text: &str) {
+            self.push_piece_impl(text);
         }
-        false
-    }
-
-    fn process_node_recursive(
-        _config: &Config,
-        node: &SyntaxNode,
-        b: &mut Builder,
-        format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-        in_link_text: bool,
-        atomic_links: bool,
-    ) {
-        let mut children = node.children_with_tokens().peekable();
-        let mut prev_is_text = false;
-        while let Some(el) = children.next() {
-            let current_is_text =
-                matches!(&el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT);
-            let next_is_text = matches!(
-                children.peek(),
-                Some(NodeOrToken::Token(tok)) if tok.kind() == SyntaxKind::TEXT
-            );
-            match el {
-                NodeOrToken::Token(t) => match t.kind() {
-                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
-                        b.pending_space = true;
-                    }
-                    SyntaxKind::BLOCK_QUOTE_MARKER => {}
-                    SyntaxKind::ESCAPED_CHAR => {
-                        if in_link_text && t.text() == r"\_" {
-                            b.push_piece("_");
-                        } else {
-                            b.push_piece(t.text());
-                        }
-                    }
-                    SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {}
-                    SyntaxKind::TEXT => {
-                        let text = expand_tabs_with_width(t.text(), _config.tab_width);
-                        let mut text_to_process = text.as_ref();
-                        if !text.is_empty() && starts_with_ascii_whitespace(&text) {
-                            if b.skip_next_leading_whitespace {
-                                text_to_process =
-                                    text.trim_start_matches(|c: char| c.is_ascii_whitespace());
-                                b.skip_next_leading_whitespace = false;
-                            } else {
-                                b.pending_space = true;
-                            }
-                        }
-                        let mut saw_word = false;
-                        for word in text_to_process.split_ascii_whitespace() {
-                            if saw_word {
-                                b.pending_space = true;
-                            }
-                            let processed_word = escape_special_chars(
-                                word,
-                                false,
-                                prev_is_text,
-                                next_is_text,
-                                !in_link_text,
-                            );
-                            b.push_piece(&processed_word);
-                            saw_word = true;
-                        }
-                        if saw_word && ends_with_ascii_whitespace(&text) {
-                            b.pending_space = true;
-                        }
-                    }
-                    _ => b.push_piece(t.text()),
-                },
-                NodeOrToken::Node(n) => match n.kind() {
-                    SyntaxKind::LIST => b.pending_space = true,
-                    SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {}
-                    SyntaxKind::INLINE_FOOTNOTE => {
-                        let (events, skip_next) = collect_inline_footnote_events(
-                            _config,
-                            &n,
-                            in_link_text,
-                            format_inline_fn,
-                            b.skip_next_leading_whitespace,
-                        );
-                        b.skip_next_leading_whitespace = skip_next;
-                        for event in events {
-                            match event {
-                                InlineFootnoteEvent::Piece(piece) => b.push_piece(&piece),
-                                InlineFootnoteEvent::Space => b.pending_space = true,
-                            }
-                        }
-                        b.pending_space = false;
-                    }
-                    SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
-                        let has_blank_before = n
-                            .prev_sibling()
-                            .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
-                            .unwrap_or(false);
-                        if !has_blank_before {
-                            process_node_recursive(
-                                _config,
-                                &n,
-                                b,
-                                format_inline_fn,
-                                in_link_text,
-                                atomic_links,
-                            );
-                        }
-                    }
-                    SyntaxKind::PARAGRAPH => process_node_recursive(
-                        _config,
-                        &n,
-                        b,
-                        format_inline_fn,
-                        in_link_text,
-                        atomic_links,
-                    ),
-                    SyntaxKind::EMPHASIS => {
-                        if node_starts_with_whitespace(&n) {
-                            b.pending_space = true;
-                            b.skip_next_leading_whitespace = true;
-                        }
-                        b.push_piece("*");
-                        process_node_recursive(
-                            _config,
-                            &n,
-                            b,
-                            format_inline_fn,
-                            in_link_text,
-                            atomic_links,
-                        );
-                        b.skip_next_leading_whitespace = false;
-                        let had_pending_space = b.pending_space;
-                        b.pending_space = false;
-                        b.push_piece("*");
-                        b.pending_space = had_pending_space;
-                    }
-                    SyntaxKind::STRONG => {
-                        if node_starts_with_whitespace(&n) {
-                            b.pending_space = true;
-                            b.skip_next_leading_whitespace = true;
-                        }
-                        b.push_piece("**");
-                        process_node_recursive(
-                            _config,
-                            &n,
-                            b,
-                            format_inline_fn,
-                            in_link_text,
-                            atomic_links,
-                        );
-                        b.skip_next_leading_whitespace = false;
-                        let had_pending_space = b.pending_space;
-                        b.pending_space = false;
-                        b.push_piece("**");
-                        b.pending_space = had_pending_space;
-                    }
-                    SyntaxKind::LINK => {
-                        if atomic_links {
-                            let formatted = format_inline_fn(&n);
-                            let text = normalize_inline_for_sentence(&formatted);
-                            b.push_piece(text.as_ref());
-                        } else {
-                            b.push_piece("[");
-                            for child in n.children_with_tokens() {
-                                if let NodeOrToken::Node(link_child) = child
-                                    && link_child.kind() == SyntaxKind::LINK_TEXT
-                                {
-                                    process_node_recursive(
-                                        _config,
-                                        &link_child,
-                                        b,
-                                        format_inline_fn,
-                                        true,
-                                        atomic_links,
-                                    );
-                                }
-                            }
-                            let mut closing = String::new();
-                            let mut past_link_text = false;
-                            for child in n.children_with_tokens() {
-                                match child {
-                                    NodeOrToken::Node(link_child) => match link_child.kind() {
-                                        SyntaxKind::LINK_TEXT => past_link_text = true,
-                                        SyntaxKind::LINK_DEST
-                                        | SyntaxKind::LINK_REF
-                                        | SyntaxKind::ATTRIBUTE => {
-                                            if past_link_text {
-                                                if link_child.kind() == SyntaxKind::LINK_DEST {
-                                                    let raw = link_child.text().to_string();
-                                                    append_normalized_link_dest(&raw, &mut closing);
-                                                } else {
-                                                    let _ = write!(
-                                                        &mut closing,
-                                                        "{}",
-                                                        link_child.text()
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        _ => {}
-                                    },
-                                    NodeOrToken::Token(t) => {
-                                        if past_link_text {
-                                            match t.kind() {
-                                                SyntaxKind::LINK_TEXT_END
-                                                | SyntaxKind::LINK_DEST_START
-                                                | SyntaxKind::LINK_DEST_END
-                                                | SyntaxKind::TEXT => closing.push_str(t.text()),
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            b.attach_to_previous(&closing);
-                        }
-                    }
-                    SyntaxKind::IMAGE_LINK => {
-                        if atomic_links {
-                            let formatted = format_inline_fn(&n);
-                            let text = normalize_inline_for_sentence(&formatted);
-                            b.push_piece(text.as_ref());
-                        } else {
-                            b.push_piece("![");
-                            for child in n.children_with_tokens() {
-                                if let NodeOrToken::Node(img_child) = child
-                                    && img_child.kind() == SyntaxKind::IMAGE_ALT
-                                {
-                                    process_node_recursive(
-                                        _config,
-                                        &img_child,
-                                        b,
-                                        format_inline_fn,
-                                        true,
-                                        atomic_links,
-                                    );
-                                }
-                            }
-                            let mut closing = String::new();
-                            let mut past_image_alt = false;
-                            for child in n.children_with_tokens() {
-                                match child {
-                                    NodeOrToken::Node(img_child) => match img_child.kind() {
-                                        SyntaxKind::IMAGE_ALT => past_image_alt = true,
-                                        SyntaxKind::LINK_DEST
-                                        | SyntaxKind::ATTRIBUTE
-                                        | SyntaxKind::LINK_REF => {
-                                            if past_image_alt {
-                                                if img_child.kind() == SyntaxKind::LINK_DEST {
-                                                    let raw = img_child.text().to_string();
-                                                    append_normalized_link_dest(&raw, &mut closing);
-                                                } else {
-                                                    let _ = write!(
-                                                        &mut closing,
-                                                        "{}",
-                                                        img_child.text()
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        _ => {}
-                                    },
-                                    NodeOrToken::Token(t) => {
-                                        if past_image_alt {
-                                            match t.kind() {
-                                                SyntaxKind::IMAGE_ALT_END
-                                                | SyntaxKind::IMAGE_DEST_START
-                                                | SyntaxKind::IMAGE_DEST_END
-                                                | SyntaxKind::TEXT => closing.push_str(t.text()),
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            b.attach_to_previous(&closing);
-                        }
-                    }
-                    _ => {
-                        let text = format_inline_fn(&n);
-                        b.push_piece(&text);
-                    }
-                },
-            }
-            prev_is_text = current_is_text;
+        fn pending_space(&self) -> bool {
+            self.pending_space
+        }
+        fn set_pending_space(&mut self, value: bool) {
+            self.pending_space = value;
+        }
+        fn skip_next_leading_whitespace(&self) -> bool {
+            self.skip_next_leading_whitespace
+        }
+        fn set_skip_next_leading_whitespace(&mut self, value: bool) {
+            self.skip_next_leading_whitespace = value;
         }
     }
 
-    let mut b = Builder::new();
+    let mut b = PieceCollector::new();
     process_node_recursive(
-        _config,
+        config,
         node,
         &mut b,
         format_inline_fn,
@@ -793,9 +810,11 @@ fn build_pieces_with_mode<'a>(
     while i < b.pieces.len() {
         let current_idx = i;
         if current_idx + 1 < b.pieces.len()
-            && b.whitespace_after[current_idx]
-            && is_initialism_with_periods(&b.pieces[current_idx])
-            && is_year_like(&b.pieces[current_idx + 1])
+            && should_merge_initialism_year(
+                &b.pieces[current_idx],
+                b.whitespace_after[current_idx],
+                &b.pieces[current_idx + 1],
+            )
         {
             let right = std::mem::take(&mut b.pieces[current_idx + 1]);
             b.pieces[current_idx].push(' ');
@@ -879,7 +898,7 @@ pub(super) fn sentence_lines_for_paragraph(
 }
 
 fn wrap_node_greedy_streaming(
-    _config: &Config,
+    config: &Config,
     node: &SyntaxNode,
     line_widths: &[usize],
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
@@ -939,7 +958,7 @@ fn wrap_node_greedy_streaming(
             self.line_has_piece = true;
             self.prev_ws_after = piece_ws_after;
 
-            if self.sentence_mode && is_sentence_boundary_piece(&piece, piece_ws_after, is_last) {
+            if self.sentence_mode && is_sentence_boundary_text(&piece, piece_ws_after, is_last) {
                 self.out.push(std::mem::take(&mut self.line));
                 self.line_width = 0;
                 self.line_has_piece = false;
@@ -949,8 +968,7 @@ fn wrap_node_greedy_streaming(
 
         fn emit_piece(&mut self, piece: String, ws_after: bool) {
             if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
-                if pending_ws_after && is_initialism_with_periods(&pending) && is_year_like(&piece)
-                {
+                if should_merge_initialism_year(&pending, pending_ws_after, &piece) {
                     self.pending_piece = Some((format!("{pending} {piece}"), ws_after));
                     return;
                 }
@@ -995,7 +1013,7 @@ fn wrap_node_greedy_streaming(
             }
         }
 
-        fn push_piece(&mut self, text: &str) {
+        fn push_piece_impl(&mut self, text: &str) {
             if self.pending_space {
                 self.flush_current(true);
                 self.current_piece = Some(text.to_string());
@@ -1013,318 +1031,27 @@ fn wrap_node_greedy_streaming(
         }
     }
 
-    fn node_starts_with_whitespace(node: &SyntaxNode) -> bool {
-        for child in node.children_with_tokens() {
-            match child {
-                NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
-                    return t.text().starts_with(char::is_whitespace);
-                }
-                NodeOrToken::Token(t)
-                    if matches!(
-                        t.kind(),
-                        SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER
-                    ) =>
-                {
-                    continue;
-                }
-                NodeOrToken::Node(n) => {
-                    if node_starts_with_whitespace(&n) {
-                        return true;
-                    }
-                }
-                _ => continue,
-            }
+    impl TraversalSink for StreamingBuilder<'_> {
+        fn push_piece(&mut self, text: &str) {
+            self.push_piece_impl(text);
         }
-        false
-    }
-
-    fn process_node_recursive(
-        _config: &Config,
-        node: &SyntaxNode,
-        b: &mut StreamingBuilder<'_>,
-        format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-        in_link_text: bool,
-        atomic_links: bool,
-    ) {
-        let mut children = node.children_with_tokens().peekable();
-        let mut prev_is_text = false;
-
-        while let Some(el) = children.next() {
-            let current_is_text =
-                matches!(&el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT);
-            let next_is_text = matches!(
-                children.peek(),
-                Some(NodeOrToken::Token(tok)) if tok.kind() == SyntaxKind::TEXT
-            );
-            match el {
-                NodeOrToken::Token(t) => match t.kind() {
-                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
-                        b.pending_space = true;
-                    }
-                    SyntaxKind::BLOCK_QUOTE_MARKER => {}
-                    SyntaxKind::ESCAPED_CHAR => {
-                        if in_link_text && t.text() == r"\_" {
-                            b.push_piece("_");
-                        } else {
-                            b.push_piece(t.text());
-                        }
-                    }
-                    SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {}
-                    SyntaxKind::TEXT => {
-                        let text = expand_tabs_with_width(t.text(), _config.tab_width);
-                        let mut text_to_process = text.as_ref();
-                        if !text.is_empty() && starts_with_ascii_whitespace(&text) {
-                            if b.skip_next_leading_whitespace {
-                                text_to_process =
-                                    text.trim_start_matches(|c: char| c.is_ascii_whitespace());
-                                b.skip_next_leading_whitespace = false;
-                            } else {
-                                b.pending_space = true;
-                            }
-                        }
-
-                        let mut saw_word = false;
-                        for word in text_to_process.split_ascii_whitespace() {
-                            if saw_word {
-                                b.pending_space = true;
-                            }
-                            let processed_word = escape_special_chars(
-                                word,
-                                false,
-                                prev_is_text,
-                                next_is_text,
-                                !in_link_text,
-                            );
-                            b.push_piece(&processed_word);
-                            saw_word = true;
-                        }
-                        if saw_word && ends_with_ascii_whitespace(&text) {
-                            b.pending_space = true;
-                        }
-                    }
-                    _ => b.push_piece(t.text()),
-                },
-                NodeOrToken::Node(n) => match n.kind() {
-                    SyntaxKind::LIST => b.pending_space = true,
-                    SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {}
-                    SyntaxKind::INLINE_FOOTNOTE => {
-                        let (events, skip_next) = collect_inline_footnote_events(
-                            _config,
-                            &n,
-                            in_link_text,
-                            format_inline_fn,
-                            b.skip_next_leading_whitespace,
-                        );
-                        b.skip_next_leading_whitespace = skip_next;
-                        for event in events {
-                            match event {
-                                InlineFootnoteEvent::Piece(piece) => b.push_piece(&piece),
-                                InlineFootnoteEvent::Space => b.pending_space = true,
-                            }
-                        }
-                        b.pending_space = false;
-                    }
-                    SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
-                        let has_blank_before = n
-                            .prev_sibling()
-                            .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
-                            .unwrap_or(false);
-                        if !has_blank_before {
-                            process_node_recursive(
-                                _config,
-                                &n,
-                                b,
-                                format_inline_fn,
-                                in_link_text,
-                                atomic_links,
-                            );
-                        }
-                    }
-                    SyntaxKind::PARAGRAPH => process_node_recursive(
-                        _config,
-                        &n,
-                        b,
-                        format_inline_fn,
-                        in_link_text,
-                        atomic_links,
-                    ),
-                    SyntaxKind::EMPHASIS => {
-                        if node_starts_with_whitespace(&n) {
-                            b.pending_space = true;
-                            b.skip_next_leading_whitespace = true;
-                        }
-                        b.push_piece("*");
-                        process_node_recursive(
-                            _config,
-                            &n,
-                            b,
-                            format_inline_fn,
-                            in_link_text,
-                            atomic_links,
-                        );
-                        b.skip_next_leading_whitespace = false;
-                        let had_pending_space = b.pending_space;
-                        b.pending_space = false;
-                        b.push_piece("*");
-                        b.pending_space = had_pending_space;
-                    }
-                    SyntaxKind::STRONG => {
-                        if node_starts_with_whitespace(&n) {
-                            b.pending_space = true;
-                            b.skip_next_leading_whitespace = true;
-                        }
-                        b.push_piece("**");
-                        process_node_recursive(
-                            _config,
-                            &n,
-                            b,
-                            format_inline_fn,
-                            in_link_text,
-                            atomic_links,
-                        );
-                        b.skip_next_leading_whitespace = false;
-                        let had_pending_space = b.pending_space;
-                        b.pending_space = false;
-                        b.push_piece("**");
-                        b.pending_space = had_pending_space;
-                    }
-                    SyntaxKind::LINK => {
-                        if atomic_links {
-                            let formatted = format_inline_fn(&n);
-                            let text = normalize_inline_for_sentence(&formatted);
-                            b.push_piece(text.as_ref());
-                        } else {
-                            b.push_piece("[");
-                            for child in n.children_with_tokens() {
-                                if let NodeOrToken::Node(link_child) = child
-                                    && link_child.kind() == SyntaxKind::LINK_TEXT
-                                {
-                                    process_node_recursive(
-                                        _config,
-                                        &link_child,
-                                        b,
-                                        format_inline_fn,
-                                        true,
-                                        atomic_links,
-                                    );
-                                }
-                            }
-
-                            let mut closing = String::new();
-                            let mut past_link_text = false;
-                            for child in n.children_with_tokens() {
-                                match child {
-                                    NodeOrToken::Node(link_child) => match link_child.kind() {
-                                        SyntaxKind::LINK_TEXT => past_link_text = true,
-                                        SyntaxKind::LINK_DEST
-                                        | SyntaxKind::LINK_REF
-                                        | SyntaxKind::ATTRIBUTE => {
-                                            if past_link_text {
-                                                if link_child.kind() == SyntaxKind::LINK_DEST {
-                                                    let raw = link_child.text().to_string();
-                                                    append_normalized_link_dest(&raw, &mut closing);
-                                                } else {
-                                                    let _ = write!(
-                                                        &mut closing,
-                                                        "{}",
-                                                        link_child.text()
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        _ => {}
-                                    },
-                                    NodeOrToken::Token(t) => {
-                                        if past_link_text {
-                                            match t.kind() {
-                                                SyntaxKind::LINK_TEXT_END
-                                                | SyntaxKind::LINK_DEST_START
-                                                | SyntaxKind::LINK_DEST_END
-                                                | SyntaxKind::TEXT => closing.push_str(t.text()),
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            b.push_piece(&closing);
-                        }
-                    }
-                    SyntaxKind::IMAGE_LINK => {
-                        if atomic_links {
-                            let formatted = format_inline_fn(&n);
-                            let text = normalize_inline_for_sentence(&formatted);
-                            b.push_piece(text.as_ref());
-                        } else {
-                            b.push_piece("![");
-                            for child in n.children_with_tokens() {
-                                if let NodeOrToken::Node(img_child) = child
-                                    && img_child.kind() == SyntaxKind::IMAGE_ALT
-                                {
-                                    process_node_recursive(
-                                        _config,
-                                        &img_child,
-                                        b,
-                                        format_inline_fn,
-                                        true,
-                                        atomic_links,
-                                    );
-                                }
-                            }
-
-                            let mut closing = String::new();
-                            let mut past_image_alt = false;
-                            for child in n.children_with_tokens() {
-                                match child {
-                                    NodeOrToken::Node(img_child) => match img_child.kind() {
-                                        SyntaxKind::IMAGE_ALT => past_image_alt = true,
-                                        SyntaxKind::LINK_DEST
-                                        | SyntaxKind::ATTRIBUTE
-                                        | SyntaxKind::LINK_REF => {
-                                            if past_image_alt {
-                                                if img_child.kind() == SyntaxKind::LINK_DEST {
-                                                    let raw = img_child.text().to_string();
-                                                    append_normalized_link_dest(&raw, &mut closing);
-                                                } else {
-                                                    let _ = write!(
-                                                        &mut closing,
-                                                        "{}",
-                                                        img_child.text()
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        _ => {}
-                                    },
-                                    NodeOrToken::Token(t) => {
-                                        if past_image_alt {
-                                            match t.kind() {
-                                                SyntaxKind::IMAGE_ALT_END
-                                                | SyntaxKind::IMAGE_DEST_START
-                                                | SyntaxKind::IMAGE_DEST_END
-                                                | SyntaxKind::TEXT => closing.push_str(t.text()),
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            b.push_piece(&closing);
-                        }
-                    }
-                    _ => {
-                        let text = format_inline_fn(&n);
-                        b.push_piece(&text);
-                    }
-                },
-            }
-            prev_is_text = current_is_text;
+        fn pending_space(&self) -> bool {
+            self.pending_space
+        }
+        fn set_pending_space(&mut self, value: bool) {
+            self.pending_space = value;
+        }
+        fn skip_next_leading_whitespace(&self) -> bool {
+            self.skip_next_leading_whitespace
+        }
+        fn set_skip_next_leading_whitespace(&mut self, value: bool) {
+            self.skip_next_leading_whitespace = value;
         }
     }
 
     let mut builder = StreamingBuilder::new(line_widths, sentence_mode);
     process_node_recursive(
-        _config,
+        config,
         node,
         &mut builder,
         format_inline_fn,
