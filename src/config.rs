@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use globset::GlobBuilder;
 use serde::{Deserialize, Deserializer, Serialize};
 
+mod formatter_presets;
+
 /// The flavor of Markdown to parse and format.
 /// Each flavor has a different set of default extensions enabled.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
@@ -690,9 +692,10 @@ impl<'de> Deserialize<'de> for FormatterConfig {
         // If preset is specified, resolve it
         if let Some(preset_name) = raw.preset {
             let preset = get_formatter_preset(&preset_name).ok_or_else(|| {
+                let available = formatter_preset_names().join(", ");
                 serde::de::Error::custom(format!(
-                    "Unknown formatter preset: '{}'. Available presets: air, styler, ruff, black",
-                    preset_name
+                    "Unknown formatter preset: '{}'. Available presets: {}",
+                    preset_name, available
                 ))
             })?;
 
@@ -738,80 +741,12 @@ impl Default for FormatterConfig {
 /// Get a built-in formatter preset by name.
 /// Returns None if the preset doesn't exist.
 pub fn get_formatter_preset(name: &str) -> Option<FormatterConfig> {
-    match name {
-        // YAML formatters
-        "yamlfmt" => Some(FormatterConfig {
-            cmd: "yamlfmt".to_string(),
-            args: vec!["-".to_string()],
-            enabled: true,
-            stdin: true,
-        }),
-        "prettier" => Some(FormatterConfig {
-            cmd: "prettier".to_string(),
-            args: vec!["--parser".to_string(), "yaml".to_string()],
-            enabled: true,
-            stdin: true,
-        }),
+    formatter_presets::get_formatter_preset(name)
+}
 
-        // TOML formatters
-        "taplo" => Some(FormatterConfig {
-            cmd: "taplo".to_string(),
-            args: vec!["format".to_string(), "-".to_string()],
-            enabled: true,
-            stdin: true,
-        }),
-
-        // Shell formatters
-        "shfmt" => Some(FormatterConfig {
-            cmd: "shfmt".to_string(),
-            args: vec!["-".to_string()],
-            enabled: true,
-            stdin: true,
-        }),
-
-        // C and C++ formatters
-        "clang-format" => Some(FormatterConfig {
-            cmd: "clang-format".to_string(),
-            args: vec!["-".to_string()],
-            enabled: true,
-            stdin: true,
-        }),
-
-        // R formatters
-        "air" => Some(FormatterConfig {
-            cmd: "air".to_string(),
-            args: vec!["format".to_string(), "{}".to_string()],
-            enabled: true,
-            stdin: false,
-        }),
-        "styler" => Some(FormatterConfig {
-            cmd: "Rscript".to_string(),
-            args: vec!["-e".to_string(), "styler::style_file('{}')".to_string()],
-            enabled: true,
-            stdin: false,
-        }),
-
-        // Python formatters
-        "ruff" => Some(FormatterConfig {
-            cmd: "ruff".to_string(),
-            args: vec![
-                "format".to_string(),
-                "--stdin-filename".to_string(),
-                "stdin.py".to_string(),
-                "-".to_string(),
-            ],
-            enabled: true,
-            stdin: true,
-        }),
-        "black" => Some(FormatterConfig {
-            cmd: "black".to_string(),
-            args: vec!["-".to_string()],
-            enabled: true,
-            stdin: true,
-        }),
-
-        _ => None,
-    }
+/// Canonical built-in formatter preset names used for docs and diagnostics.
+pub fn formatter_preset_names() -> &'static [&'static str] {
+    formatter_presets::formatter_preset_names()
 }
 
 /// Get the default formatters HashMap with built-in presets.
@@ -1598,8 +1533,13 @@ fn resolve_old_format_definition(
 
     if let Some(preset_name) = &definition.preset {
         // Resolve preset
-        let preset = get_formatter_preset(preset_name)
-            .ok_or_else(|| format!("Unknown formatter preset '{}'", preset_name))?;
+        let preset = get_formatter_preset(preset_name).ok_or_else(|| {
+            let available = formatter_preset_names().join(", ");
+            format!(
+                "Unknown formatter preset '{}'. Available presets: {}",
+                preset_name, available
+            )
+        })?;
 
         let mut args = definition.args.clone().unwrap_or(preset.args);
 
@@ -2250,6 +2190,58 @@ mod tests {
         assert_eq!(py_fmt.cmd, "black");
         assert_eq!(py_fmt.args, vec!["-"]);
         assert!(py_fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_sqlfmt() {
+        let toml_str = r#"
+            [formatters.sql]
+            preset = "sqlfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("sql").unwrap()[0];
+        assert_eq!(fmt.cmd, "sqlfmt");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_alejandra() {
+        let toml_str = r#"
+            [formatters.nix]
+            preset = "alejandra"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("nix").unwrap()[0];
+        assert_eq!(fmt.cmd, "alejandra");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_terraform_fmt() {
+        let toml_str = r#"
+            [formatters.hcl]
+            preset = "terraform-fmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("hcl").unwrap()[0];
+        assert_eq!(fmt.cmd, "terraform");
+        assert_eq!(fmt.args, vec!["fmt", "-no-color", "-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_yamlfix() {
+        let toml_str = r#"
+            [formatters.yaml]
+            preset = "yamlfix"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("yaml").unwrap()[0];
+        assert_eq!(fmt.cmd, "yamlfix");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
     }
 
     #[test]

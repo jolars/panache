@@ -706,17 +706,22 @@ typescript = "prettier"
 
 Available presets:
 
-| Language | Preset         | Command                                 | Type       |
-| -------- | -------------- | --------------------------------------- | ---------- |
-| R        | `air`          | `air format {}`                         | File-based |
-| R        | `styler`       | `Rscript -e "styler::style_file('{}')"` | File-based |
-| Python   | `ruff`         | `ruff format`                           | Stdin      |
-| Python   | `black`        | `black -`                               | Stdin      |
-| YAML     | `yamlfmt`      | `yamlfmt -`                             | Stdin      |
-| YAML     | `prettier`     | `prettier --parser=yaml`                | Stdin      |
-| TOML     | `taplo`        | `taplo format -`                        | Stdin      |
-| Shell    | `shfmt`        | `shfmt -`                               | Stdin      |
-| C/C++    | `clang-format` | `clang-format -`                        | Stdin      |
+| Language  | Preset          | Command                                 | Type       |
+| --------- | --------------- | --------------------------------------- | ---------- |
+| R         | `air`           | `air format {}`                         | File-based |
+| R         | `styler`        | `Rscript -e "styler::style_file('{}')"` | File-based |
+| Python    | `ruff`          | `ruff format`                           | Stdin      |
+| Python    | `black`         | `black -`                               | Stdin      |
+| YAML      | `yamlfmt`       | `yamlfmt -`                             | Stdin      |
+| YAML      | `prettier`      | `prettier --parser=yaml`                | Stdin      |
+| TOML      | `taplo`         | `taplo format -`                        | Stdin      |
+| Shell     | `shfmt`         | `shfmt -`                               | Stdin      |
+| C/C++     | `clang-format`  | `clang-format -`                        | Stdin      |
+| Markdown  | `mdformat`      | `mdformat -`                            | Stdin      |
+| SQL       | `sqlfmt`        | `sqlfmt -`                              | Stdin      |
+| Nix       | `alejandra`     | `alejandra`                             | Stdin      |
+| Terraform | `terraform-fmt` | `terraform fmt -no-color -`             | Stdin      |
+| YAML      | `yamlfix`       | `yamlfix -`                             | Stdin      |
 
 ### Sequential Formatting
 
