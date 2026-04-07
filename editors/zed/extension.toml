@@ -1,6 +1,6 @@
 id = "panache"
 name = "Panache"
-description = "Panache formatter, linter, and language server"
+description = "Language server for Pandoc, Quarto, and R Markdown"
 version = "2.31.0"
 schema_version = 1
 authors = ["Johan Larsson <johan@jolars.co>"]
