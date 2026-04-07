@@ -314,6 +314,110 @@ pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> 
     wrap_words_first_fit(&words, &[line_width])
 }
 
+enum InlineFootnoteEvent {
+    Piece(String),
+    Space,
+}
+
+fn collect_inline_footnote_events(
+    config: &Config,
+    node: &SyntaxNode,
+    in_link_text: bool,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+    mut skip_next_leading_whitespace: bool,
+) -> (Vec<InlineFootnoteEvent>, bool) {
+    let mut events = vec![InlineFootnoteEvent::Piece("^[".to_string())];
+    let mut saw_content = false;
+    let mut foot_children = node.children_with_tokens().peekable();
+    let mut foot_prev_is_text = false;
+
+    while let Some(child) = foot_children.next() {
+        let foot_current_is_text =
+            matches!(&child, NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT);
+        let foot_next_is_text = matches!(
+            foot_children.peek(),
+            Some(NodeOrToken::Token(tok)) if tok.kind() == SyntaxKind::TEXT
+        );
+
+        match child {
+            NodeOrToken::Token(t)
+                if matches!(
+                    t.kind(),
+                    SyntaxKind::INLINE_FOOTNOTE_START | SyntaxKind::INLINE_FOOTNOTE_END
+                ) => {}
+            NodeOrToken::Token(t)
+                if matches!(
+                    t.kind(),
+                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE
+                ) =>
+            {
+                if saw_content {
+                    events.push(InlineFootnoteEvent::Space);
+                }
+            }
+            NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER => {}
+            NodeOrToken::Token(t) if t.kind() == SyntaxKind::ESCAPED_CHAR => {
+                events.push(InlineFootnoteEvent::Piece(t.text().to_string()));
+                saw_content = true;
+            }
+            NodeOrToken::Token(t)
+                if matches!(
+                    t.kind(),
+                    SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER
+                ) => {}
+            NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
+                let text = expand_tabs_with_width(t.text(), config.tab_width);
+                let mut text_to_process = text.as_ref();
+                if !saw_content && !text.is_empty() && starts_with_ascii_whitespace(&text) {
+                    text_to_process = text.trim_start_matches(|c: char| c.is_ascii_whitespace());
+                } else if !text.is_empty() && starts_with_ascii_whitespace(&text) {
+                    if skip_next_leading_whitespace {
+                        text_to_process =
+                            text.trim_start_matches(|c: char| c.is_ascii_whitespace());
+                        skip_next_leading_whitespace = false;
+                    } else {
+                        events.push(InlineFootnoteEvent::Space);
+                    }
+                }
+                let mut saw_word = false;
+                for word in text_to_process.split_ascii_whitespace() {
+                    if saw_word {
+                        events.push(InlineFootnoteEvent::Space);
+                    }
+                    let processed_word = escape_special_chars(
+                        word,
+                        false,
+                        foot_prev_is_text,
+                        foot_next_is_text,
+                        !in_link_text,
+                    );
+                    events.push(InlineFootnoteEvent::Piece(processed_word));
+                    saw_content = true;
+                    saw_word = true;
+                }
+                if saw_word && ends_with_ascii_whitespace(&text) {
+                    events.push(InlineFootnoteEvent::Space);
+                }
+            }
+            NodeOrToken::Token(t) => {
+                events.push(InlineFootnoteEvent::Piece(t.text().to_string()));
+                saw_content = true;
+            }
+            NodeOrToken::Node(child) => {
+                events.push(InlineFootnoteEvent::Piece(format_inline_fn(&child)));
+                saw_content = true;
+            }
+        }
+        foot_prev_is_text = foot_current_is_text;
+    }
+
+    while matches!(events.last(), Some(InlineFootnoteEvent::Space)) {
+        events.pop();
+    }
+    events.push(InlineFootnoteEvent::Piece("]".to_string()));
+    (events, skip_next_leading_whitespace)
+}
+
 fn build_pieces_with_mode<'a>(
     _config: &Config,
     node: &SyntaxNode,
@@ -462,6 +566,23 @@ fn build_pieces_with_mode<'a>(
                 NodeOrToken::Node(n) => match n.kind() {
                     SyntaxKind::LIST => b.pending_space = true,
                     SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {}
+                    SyntaxKind::INLINE_FOOTNOTE => {
+                        let (events, skip_next) = collect_inline_footnote_events(
+                            _config,
+                            &n,
+                            in_link_text,
+                            format_inline_fn,
+                            b.skip_next_leading_whitespace,
+                        );
+                        b.skip_next_leading_whitespace = skip_next;
+                        for event in events {
+                            match event {
+                                InlineFootnoteEvent::Piece(piece) => b.push_piece(&piece),
+                                InlineFootnoteEvent::Space => b.pending_space = true,
+                            }
+                        }
+                        b.pending_space = false;
+                    }
                     SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
                         let has_blank_before = n
                             .prev_sibling()
@@ -986,6 +1107,23 @@ fn wrap_node_greedy_streaming(
                 NodeOrToken::Node(n) => match n.kind() {
                     SyntaxKind::LIST => b.pending_space = true,
                     SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {}
+                    SyntaxKind::INLINE_FOOTNOTE => {
+                        let (events, skip_next) = collect_inline_footnote_events(
+                            _config,
+                            &n,
+                            in_link_text,
+                            format_inline_fn,
+                            b.skip_next_leading_whitespace,
+                        );
+                        b.skip_next_leading_whitespace = skip_next;
+                        for event in events {
+                            match event {
+                                InlineFootnoteEvent::Piece(piece) => b.push_piece(&piece),
+                                InlineFootnoteEvent::Space => b.pending_space = true,
+                            }
+                        }
+                        b.pending_space = false;
+                    }
                     SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
                         let has_blank_before = n
                             .prev_sibling()
