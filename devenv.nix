@@ -79,7 +79,7 @@
 
         name = "panache format";
 
-        entry = "cargo run -- format . --force-exclude";
+        entry = "cargo run -- format --force-exclude";
 
         language = "system";
 
