@@ -653,8 +653,7 @@ Homepage
 :   <https://prettier.io/>
 
 Supported Languages
-:   JavaScript, js, TypeScript, ts, jsx, tsx, JSON, jsonc, YAML, Markdown, md,
-    CSS, scss, less, HTML, Vue, Svelte, GraphQL, gql
+:   JavaScript, js, TypeScript, ts, jsx, tsx, JSON, jsonc, YAML, Markdown, md, CSS, scss, less, HTML, Vue, Svelte, GraphQL, gql
 
 Command
 :   `prettier`
@@ -987,3 +986,4 @@ Command
 
 Type
 :   Stdin
+
