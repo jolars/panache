@@ -8,6 +8,7 @@ use globset::GlobBuilder;
 use serde::{Deserialize, Deserializer, Serialize};
 
 mod formatter_presets;
+pub use formatter_presets::FormatterPresetMetadata;
 
 /// The flavor of Markdown to parse and format.
 /// Each flavor has a different set of default extensions enabled.
@@ -749,6 +750,48 @@ pub fn formatter_preset_names() -> &'static [&'static str] {
     formatter_presets::formatter_preset_names()
 }
 
+pub fn formatter_preset_supported_languages(name: &str) -> Option<&'static [&'static str]> {
+    formatter_presets::formatter_preset_supported_languages(name)
+}
+
+pub fn formatter_preset_metadata(name: &str) -> Option<&'static FormatterPresetMetadata> {
+    formatter_presets::formatter_preset_metadata(name)
+}
+
+pub fn all_formatter_preset_metadata() -> &'static [FormatterPresetMetadata] {
+    formatter_presets::all_formatter_preset_metadata()
+}
+
+pub fn formatter_presets_for_language(language: &str) -> Vec<&'static FormatterPresetMetadata> {
+    formatter_presets::formatter_presets_for_language(language)
+}
+
+fn normalize_formatter_language(language: &str) -> String {
+    language.trim().to_ascii_lowercase().replace('_', "-")
+}
+
+fn validate_formatter_language_for_preset(lang: &str, formatter_name: &str) -> Result<(), String> {
+    let Some(supported) = formatter_preset_supported_languages(formatter_name) else {
+        return Ok(()); // custom formatter or unknown preset handled elsewhere
+    };
+
+    let normalized_lang = normalize_formatter_language(lang);
+    let matches = supported
+        .iter()
+        .any(|supported_lang| *supported_lang == normalized_lang);
+
+    if matches {
+        return Ok(());
+    }
+
+    Err(format!(
+        "Language '{}': formatter '{}' does not support this language. Supported languages: {}",
+        lang,
+        formatter_name,
+        supported.join(", ")
+    ))
+}
+
 /// Get the default formatters HashMap with built-in presets.
 /// Currently includes R (air) and Python (ruff).
 pub fn default_formatters() -> HashMap<String, FormatterConfig> {
@@ -1202,6 +1245,7 @@ fn resolve_language_formatters(
     formatter_names
         .into_iter()
         .map(|name| {
+            validate_formatter_language_for_preset(lang, name)?;
             resolve_formatter_name(name, formatter_definitions)
                 .map_err(|e| format!("Language '{}': {}", lang, e))
         })
@@ -2245,6 +2289,149 @@ mod tests {
     }
 
     #[test]
+    fn preset_resolution_gofmt() {
+        let toml_str = r#"
+            [formatters.go]
+            preset = "gofmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("go").unwrap()[0];
+        assert_eq!(fmt.cmd, "gofmt");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_gofumpt() {
+        let toml_str = r#"
+            [formatters.go]
+            preset = "gofumpt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("go").unwrap()[0];
+        assert_eq!(fmt.cmd, "gofumpt");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_nixfmt() {
+        let toml_str = r#"
+            [formatters.nix]
+            preset = "nixfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("nix").unwrap()[0];
+        assert_eq!(fmt.cmd, "nixfmt");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_gleam() {
+        let toml_str = r#"
+            [formatters.gleam]
+            preset = "gleam"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("gleam").unwrap()[0];
+        assert_eq!(fmt.cmd, "gleam");
+        assert_eq!(fmt.args, vec!["format", "--stdin"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_yq() {
+        let toml_str = r#"
+            [formatters.yaml]
+            preset = "yq"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("yaml").unwrap()[0];
+        assert_eq!(fmt.cmd, "yq");
+        assert_eq!(fmt.args, vec!["-P", "-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_asmfmt() {
+        let toml_str = r#"
+            [formatters.asm]
+            preset = "asmfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("asm").unwrap()[0];
+        assert_eq!(fmt.cmd, "asmfmt");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_astyle() {
+        let toml_str = r#"
+            [formatters.cpp]
+            preset = "astyle"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("cpp").unwrap()[0];
+        assert_eq!(fmt.cmd, "astyle");
+        assert_eq!(fmt.args, vec!["--quiet"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_autocorrect() {
+        let toml_str = r#"
+            [formatters.text]
+            preset = "autocorrect"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("text").unwrap()[0];
+        assert_eq!(fmt.cmd, "autocorrect");
+        assert_eq!(fmt.args, vec!["--stdin"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_cmake_format() {
+        let toml_str = r#"
+            [formatters.cmake]
+            preset = "cmake-format"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("cmake").unwrap()[0];
+        assert_eq!(fmt.cmd, "cmake-format");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_cue_fmt() {
+        let toml_str = r#"
+            [formatters.cue]
+            preset = "cue-fmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("cue").unwrap()[0];
+        assert_eq!(fmt.cmd, "cue");
+        assert_eq!(fmt.args, vec!["fmt", "-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_jsonnetfmt() {
+        let toml_str = r#"
+            [formatters.jsonnet]
+            preset = "jsonnetfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("jsonnet").unwrap()[0];
+        assert_eq!(fmt.cmd, "jsonnetfmt");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
     fn preset_and_cmd_mutually_exclusive() {
         let toml_str = r#"
             [formatters.r]
@@ -2265,6 +2452,47 @@ mod tests {
         let cfg = toml::from_str::<Config>(toml_str).unwrap();
         // The formatter should be skipped (error logged), so r shouldn't be in the map
         assert!(!cfg.formatters.contains_key("r"));
+    }
+
+    #[test]
+    fn preset_language_mismatch_is_rejected() {
+        let toml_str = r#"
+            [formatters]
+            python = "gofmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        assert!(!cfg.formatters.contains_key("python"));
+    }
+
+    #[test]
+    fn preset_language_alias_is_accepted() {
+        let toml_str = r#"
+            [formatters]
+            yml = "yamlfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmts = cfg.formatters.get("yml").unwrap();
+        assert_eq!(fmts.len(), 1);
+        assert_eq!(fmts[0].cmd, "yamlfmt");
+    }
+
+    #[test]
+    fn preset_metadata_lookup_contains_url() {
+        let meta = formatter_preset_metadata("gofmt").unwrap();
+        assert_eq!(meta.name, "gofmt");
+        assert_eq!(meta.cmd, "gofmt");
+        assert!(meta.url.contains("pkg.go.dev"));
+    }
+
+    #[test]
+    fn preset_metadata_language_lookup_works() {
+        let names: Vec<&str> = formatter_presets_for_language("yaml")
+            .iter()
+            .map(|meta| meta.name)
+            .collect();
+        assert!(names.contains(&"yamlfmt"));
+        assert!(names.contains(&"yamlfix"));
+        assert!(names.contains(&"yq"));
     }
 
     #[test]

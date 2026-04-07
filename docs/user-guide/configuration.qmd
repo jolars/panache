@@ -717,11 +717,22 @@ Available presets:
 | TOML      | `taplo`         | `taplo format -`                        | Stdin      |
 | Shell     | `shfmt`         | `shfmt -`                               | Stdin      |
 | C/C++     | `clang-format`  | `clang-format -`                        | Stdin      |
+| C/C++     | `astyle`        | `astyle --quiet`                        | Stdin      |
+| Assembly  | `asmfmt`        | `asmfmt`                                | Stdin      |
+| Text/CJK  | `autocorrect`   | `autocorrect --stdin`                   | Stdin      |
+| CMake     | `cmake-format`  | `cmake-format -`                        | Stdin      |
+| CUE       | `cue-fmt`       | `cue fmt -`                             | Stdin      |
+| Jsonnet   | `jsonnetfmt`    | `jsonnetfmt -`                          | Stdin      |
 | Markdown  | `mdformat`      | `mdformat -`                            | Stdin      |
 | SQL       | `sqlfmt`        | `sqlfmt -`                              | Stdin      |
 | Nix       | `alejandra`     | `alejandra`                             | Stdin      |
+| Nix       | `nixfmt`        | `nixfmt`                                | Stdin      |
+| Go        | `gofmt`         | `gofmt`                                 | Stdin      |
+| Go        | `gofumpt`       | `gofumpt`                               | Stdin      |
+| Gleam     | `gleam`         | `gleam format --stdin`                  | Stdin      |
 | Terraform | `terraform-fmt` | `terraform fmt -no-color -`             | Stdin      |
 | YAML      | `yamlfix`       | `yamlfix -`                             | Stdin      |
+| YAML      | `yq`            | `yq -P -`                               | Stdin      |
 
 ### Sequential Formatting
 
@@ -893,6 +904,16 @@ Sequential chains
 
 Error handling
 :   Failed formatters preserve original code with a warning
+
+Language compatibility
+:   Built-in presets are checked against the configured language key (for
+    example, `python = "ruff"` is valid but `python = "gofmt"` is rejected with
+    a config warning). Custom formatter definitions remain unrestricted.
+
+Preset metadata
+:   Built-in presets include metadata (name, source URL, description, and
+    supported languages) in Panache internals, which is used for validation now
+    and can power future formatter lookup/help commands.
 
 Timeout
 :   30 seconds per formatter (not per chain)
