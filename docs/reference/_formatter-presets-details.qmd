@@ -7,7 +7,7 @@ Homepage
 :   <https://github.com/posit-dev/air>
 
 Supported Languages
-:   R
+:   `r`
 
 Command
 :   `air`
@@ -26,7 +26,7 @@ Homepage
 :   <https://kamadorueda.com/alejandra/>
 
 Supported Languages
-:   Nix
+:   `nix`
 
 Command
 :   `alejandra`
@@ -45,7 +45,7 @@ Homepage
 :   <https://github.com/klauspost/asmfmt>
 
 Supported Languages
-:   Assembly, assembly
+:   `asm`, `assembly`
 
 Command
 :   `asmfmt`
@@ -64,7 +64,7 @@ Homepage
 :   <https://astyle.sourceforge.net/astyle.html>
 
 Supported Languages
-:   C/C++, c++, Java, csharp, c#
+:   `c`, `cpp`, `c++`, `java`, `csharp`, `c#`
 
 Command
 :   `astyle`
@@ -83,7 +83,7 @@ Homepage
 :   <https://github.com/huacnlee/autocorrect>
 
 Supported Languages
-:   Text/CJK, txt, Markdown, md
+:   `text`, `txt`, `markdown`, `md`
 
 Command
 :   `autocorrect`
@@ -102,7 +102,7 @@ Homepage
 :   <https://beancount.github.io/docs/running_beancount_and_generating_reports.html#bean-format>
 
 Supported Languages
-:   Beancount, bean
+:   `beancount`, `bean`
 
 Command
 :   `bean-format`
@@ -121,7 +121,7 @@ Homepage
 :   <https://github.com/lovesegfault/beautysh>
 
 Supported Languages
-:   Shell, shell
+:   `sh`, `bash`, `shell`
 
 Command
 :   `beautysh`
@@ -140,7 +140,7 @@ Homepage
 :   <https://github.com/FlamingTempura/bibtex-tidy>
 
 Supported Languages
-:   BibTeX, bib
+:   `bibtex`, `bib`
 
 Command
 :   `bibtex-tidy`
@@ -159,7 +159,7 @@ Homepage
 :   <https://github.com/psf/black>
 
 Supported Languages
-:   Python
+:   `python`, `py`
 
 Command
 :   `black`
@@ -178,7 +178,7 @@ Homepage
 :   <https://source.android.com/docs/setup/reference/androidbp>
 
 Supported Languages
-:   Blueprint, blueprint
+:   `bp`, `blueprint`
 
 Command
 :   `bpfmt`
@@ -197,7 +197,7 @@ Homepage
 :   <https://github.com/rokucommunity/brighterscript-formatter>
 
 Supported Languages
-:   BrightScript, brighterscript, brightscript
+:   `brs`, `brighterscript`, `brightscript`
 
 Command
 :   `bsfmt`
@@ -216,7 +216,7 @@ Homepage
 :   <https://buf.build/docs/reference/cli/buf/format>
 
 Supported Languages
-:   Protobuf, protobuf
+:   `proto`, `protobuf`
 
 Command
 :   `buf`
@@ -235,7 +235,7 @@ Homepage
 :   <https://github.com/bazelbuild/buildtools/tree/main/buildifier>
 
 Supported Languages
-:   Bazel, bzl, starlark
+:   `bazel`, `bzl`, `starlark`
 
 Command
 :   `buildifier`
@@ -254,7 +254,7 @@ Homepage
 :   <https://hackage.haskell.org/package/cabal-fmt>
 
 Supported Languages
-:   Cabal, haskell
+:   `cabal`, `haskell`
 
 Command
 :   `cabal-fmt`
@@ -273,7 +273,7 @@ Homepage
 :   <https://clang.llvm.org/docs/ClangFormat.html>
 
 Supported Languages
-:   C/C++, h, c++, hpp, cc, cxx, objc, objective-c, obj-c, Java, csharp, c#
+:   `c`, `h`, `cpp`, `c++`, `hpp`, `cc`, `cxx`, `objc`, `objective-c`, `obj-c`, `java`, `csharp`, `c#`
 
 Command
 :   `clang-format`
@@ -292,7 +292,7 @@ Homepage
 :   <https://github.com/weavejester/cljfmt>
 
 Supported Languages
-:   Clojure, clj, cljs, cljc, edn
+:   `clojure`, `clj`, `cljs`, `cljc`, `edn`
 
 Command
 :   `cljfmt`
@@ -311,7 +311,7 @@ Homepage
 :   <https://github.com/cheshirekow/cmake_format>
 
 Supported Languages
-:   CMake
+:   `cmake`
 
 Command
 :   `cmake-format`
@@ -330,7 +330,7 @@ Homepage
 :   <https://cuelang.org>
 
 Supported Languages
-:   CUE
+:   `cue`
 
 Command
 :   `cue`
@@ -349,7 +349,7 @@ Homepage
 :   <https://github.com/dlang-community/dfmt>
 
 Supported Languages
-:   D
+:   `d`
 
 Command
 :   `dfmt`
@@ -368,7 +368,7 @@ Homepage
 :   <https://github.com/sile/efmt>
 
 Supported Languages
-:   Erlang, erl
+:   `erlang`, `erl`
 
 Command
 :   `efmt`
@@ -387,7 +387,7 @@ Homepage
 :   <https://fishshell.com/docs/current/cmds/fish_indent.html>
 
 Supported Languages
-:   Fish
+:   `fish`
 
 Command
 :   `fish_indent`
@@ -406,7 +406,7 @@ Homepage
 :   <https://github.com/rhysd/fixjson>
 
 Supported Languages
-:   JSON, json5
+:   `json`, `json5`
 
 Command
 :   `fixjson`
@@ -425,7 +425,7 @@ Homepage
 :   <https://github.com/Scony/godot-gdscript-toolkit>
 
 Supported Languages
-:   GDScript, gd
+:   `gdscript`, `gd`
 
 Command
 :   `gdformat`
@@ -444,7 +444,7 @@ Homepage
 :   <https://github.com/gleam-lang/gleam>
 
 Supported Languages
-:   Gleam
+:   `gleam`
 
 Command
 :   `gleam`
@@ -463,7 +463,7 @@ Homepage
 :   <https://pkg.go.dev/cmd/gofmt>
 
 Supported Languages
-:   Go, golang
+:   `go`, `golang`
 
 Command
 :   `gofmt`
@@ -482,7 +482,7 @@ Homepage
 :   <https://github.com/mvdan/gofumpt>
 
 Supported Languages
-:   Go, golang
+:   `go`, `golang`
 
 Command
 :   `gofumpt`
@@ -501,7 +501,7 @@ Homepage
 :   <https://github.com/google/google-java-format>
 
 Supported Languages
-:   Java
+:   `java`
 
 Command
 :   `google-java-format`
@@ -520,7 +520,7 @@ Homepage
 :   <https://hurl.dev/>
 
 Supported Languages
-:   Hurl
+:   `hurl`
 
 Command
 :   `hurlfmt`
@@ -539,7 +539,7 @@ Homepage
 :   <https://github.com/google/go-jsonnet>
 
 Supported Languages
-:   Jsonnet, libsonnet
+:   `jsonnet`, `libsonnet`
 
 Command
 :   `jsonnetfmt`
@@ -558,7 +558,7 @@ Homepage
 :   <https://github.com/facebook/ktfmt>
 
 Supported Languages
-:   Kotlin, kt, kts
+:   `kotlin`, `kt`, `kts`
 
 Command
 :   `ktfmt`
@@ -577,7 +577,7 @@ Homepage
 :   <https://github.com/bram209/leptosfmt>
 
 Supported Languages
-:   Rust, rs
+:   `rust`, `rs`
 
 Command
 :   `leptosfmt`
@@ -596,7 +596,7 @@ Homepage
 :   <https://github.com/executablebooks/mdformat>
 
 Supported Languages
-:   md, Markdown, qmd, rmd
+:   `md`, `markdown`, `qmd`, `rmd`
 
 Command
 :   `mdformat`
@@ -615,7 +615,7 @@ Homepage
 :   <https://github.com/slomkowski/nginx-config-formatter>
 
 Supported Languages
-:   Nginx, nginxconf
+:   `nginx`, `nginxconf`
 
 Command
 :   `nginxfmt`
@@ -634,7 +634,7 @@ Homepage
 :   <https://github.com/NixOS/nixfmt>
 
 Supported Languages
-:   Nix
+:   `nix`
 
 Command
 :   `nixfmt`
@@ -653,7 +653,7 @@ Homepage
 :   <https://prettier.io/>
 
 Supported Languages
-:   JavaScript, js, TypeScript, ts, jsx, tsx, JSON, jsonc, YAML, Markdown, md, CSS, scss, less, HTML, Vue, Svelte, GraphQL, gql
+:   `javascript`, `js`, `typescript`, `ts`, `jsx`, `tsx`, `json`, `jsonc`, `yaml`, `yml`, `markdown`, `md`, `css`, `scss`, `less`, `html`, `vue`, `svelte`, `graphql`, `gql`
 
 Command
 :   `prettier`
@@ -672,7 +672,7 @@ Homepage
 :   <https://github.com/hadialqattan/pycln>
 
 Supported Languages
-:   Python
+:   `python`, `py`
 
 Command
 :   `pycln`
@@ -691,7 +691,7 @@ Homepage
 :   <https://github.com/tox-dev/toml-fmt/tree/main/pyproject-fmt>
 
 Supported Languages
-:   TOML
+:   `toml`
 
 Command
 :   `pyproject-fmt`
@@ -710,7 +710,7 @@ Homepage
 :   <https://docs.racket-lang.org/fmt>
 
 Supported Languages
-:   Racket, rkt
+:   `racket`, `rkt`
 
 Command
 :   `raco`
@@ -729,7 +729,7 @@ Homepage
 :   <https://github.com/fables-tales/rubyfmt>
 
 Supported Languages
-:   Ruby, rb
+:   `ruby`, `rb`
 
 Command
 :   `rubyfmt`
@@ -748,7 +748,7 @@ Homepage
 :   <https://docs.astral.sh/ruff/>
 
 Supported Languages
-:   Python
+:   `python`, `py`
 
 Command
 :   `ruff`
@@ -767,7 +767,7 @@ Homepage
 :   <https://github.com/ruby-formatter/rufo>
 
 Supported Languages
-:   Ruby, rb
+:   `ruby`, `rb`
 
 Command
 :   `rufo`
@@ -786,7 +786,7 @@ Homepage
 :   <https://github.com/mvdan/sh>
 
 Supported Languages
-:   Shell, zsh, ksh, shell
+:   `sh`, `bash`, `zsh`, `ksh`, `shell`
 
 Command
 :   `shfmt`
@@ -805,7 +805,7 @@ Homepage
 :   <https://sqlfmt.com>
 
 Supported Languages
-:   SQL
+:   `sql`
 
 Command
 :   `sqlfmt`
@@ -824,7 +824,7 @@ Homepage
 :   <https://styler.r-lib.org/>
 
 Supported Languages
-:   R
+:   `r`
 
 Command
 :   `Rscript`
@@ -843,7 +843,7 @@ Homepage
 :   <https://taplo.tamasfe.dev/>
 
 Supported Languages
-:   TOML
+:   `toml`
 
 Command
 :   `taplo`
@@ -862,7 +862,7 @@ Homepage
 :   <https://github.com/nmoroze/tclint>
 
 Supported Languages
-:   Tcl
+:   `tcl`
 
 Command
 :   `tclfmt`
@@ -881,7 +881,7 @@ Homepage
 :   <https://developer.hashicorp.com/terraform/cli/commands/fmt>
 
 Supported Languages
-:   Terraform, hcl, tf
+:   `terraform`, `hcl`, `tf`
 
 Command
 :   `terraform`
@@ -900,7 +900,7 @@ Homepage
 :   <https://github.com/WGUNDERWOOD/tex-fmt>
 
 Supported Languages
-:   TeX, latex
+:   `tex`, `latex`
 
 Command
 :   `tex-fmt`
@@ -919,7 +919,7 @@ Homepage
 :   <https://github.com/Enter-tainer/typstyle>
 
 Supported Languages
-:   Typst
+:   `typst`
 
 Command
 :   `typstyle`
@@ -938,7 +938,7 @@ Homepage
 :   <https://github.com/lyz-code/yamlfix>
 
 Supported Languages
-:   YAML
+:   `yaml`, `yml`
 
 Command
 :   `yamlfix`
@@ -957,7 +957,7 @@ Homepage
 :   <https://github.com/google/yamlfmt>
 
 Supported Languages
-:   YAML
+:   `yaml`, `yml`
 
 Command
 :   `yamlfmt`
@@ -976,7 +976,7 @@ Homepage
 :   <https://github.com/mikefarah/yq>
 
 Supported Languages
-:   YAML
+:   `yaml`, `yml`
 
 Command
 :   `yq`

@@ -98,6 +98,8 @@ website:
               text: Command Line Interface
             - href: reference/formatter-presets.qmd
               text: External Formatter Presets
+            - href: reference/linter-presets.qmd
+              text: External Linter Presets
     - id: development
       style: floating
       collapse-level: 3

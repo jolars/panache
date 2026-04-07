@@ -14,3 +14,7 @@ description: >
   documentation for using external formatter presets with Panache, such as
   Prettier and Blackfriday, to customize the formatting behavior to match your
   preferred style or project conventions.
+
+- In [External Linter Presets](linter-presets.qmd) you can find documentation
+  for built-in external linter presets, including supported languages and the
+  commands Panache invokes for each linter.

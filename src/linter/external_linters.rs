@@ -67,6 +67,8 @@ pub(crate) struct ParseContext<'a> {
 /// Information about a supported linter.
 pub struct LinterInfo {
     pub name: &'static str,
+    pub description: &'static str,
+    pub url: &'static str,
     pub command: &'static str,
     pub args: Vec<&'static str>,
     pub supported_languages: Vec<&'static str>,
@@ -137,6 +139,8 @@ impl ExternalLinterRegistry {
             "jarl".to_string(),
             LinterInfo {
                 name: "jarl",
+                description: "Jarl is a fast linter for R: it does static code analysis to search for programming errors, bugs, and suspicious patterns of code.",
+                url: "https://github.com/etiennebacher/jarl",
                 command: "jarl",
                 args: vec!["check", "--output-format=json"],
                 supported_languages: vec!["r"],
@@ -146,6 +150,8 @@ impl ExternalLinterRegistry {
             "ruff".to_string(),
             LinterInfo {
                 name: "ruff",
+                description: "An extremely fast Python linter and code formatter, written in Rust. ",
+                url: "https://docs.astral.sh/ruff/",
                 command: "ruff",
                 args: vec!["check", "--output-format", "json"],
                 supported_languages: vec!["python"],
@@ -155,6 +161,8 @@ impl ExternalLinterRegistry {
             "eslint".to_string(),
             LinterInfo {
                 name: "eslint",
+                description: "JavaScript and TypeScript linter.",
+                url: "https://eslint.org/",
                 command: "eslint",
                 args: vec![
                     "--no-config-lookup",
@@ -179,6 +187,8 @@ impl ExternalLinterRegistry {
             "shellcheck".to_string(),
             LinterInfo {
                 name: "shellcheck",
+                description: "Static analysis for shell scripts.",
+                url: "https://www.shellcheck.net/",
                 command: "shellcheck",
                 args: vec!["-f", "json"],
                 supported_languages: vec!["sh", "bash", "zsh", "ksh", "shell"],
@@ -188,6 +198,8 @@ impl ExternalLinterRegistry {
             "staticcheck".to_string(),
             LinterInfo {
                 name: "staticcheck",
+                description: "Advanced static analysis for Go code.",
+                url: "https://staticcheck.dev/",
                 command: "staticcheck",
                 args: vec!["-f", "json"],
                 supported_languages: vec!["go", "golang"],
@@ -197,6 +209,8 @@ impl ExternalLinterRegistry {
             "clippy".to_string(),
             LinterInfo {
                 name: "clippy",
+                description: "Rust lints to catch mistakes and improve style.",
+                url: "https://doc.rust-lang.org/clippy/",
                 command: "clippy-driver",
                 args: vec!["--error-format=json", "-W", "clippy::all"],
                 supported_languages: vec!["rust", "rs"],

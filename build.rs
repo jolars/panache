@@ -103,57 +103,14 @@ struct FormatterPresetDocRow {
     mode: &'static str,
 }
 
-fn language_label(language: &str) -> &str {
-    match language {
-        "r" => "R",
-        "python" | "py" => "Python",
-        "yaml" | "yml" => "YAML",
-        "toml" => "TOML",
-        "sh" | "bash" => "Shell",
-        "c" | "cpp" => "C/C++",
-        "asm" => "Assembly",
-        "text" => "Text/CJK",
-        "beancount" => "Beancount",
-        "bibtex" => "BibTeX",
-        "bp" => "Blueprint",
-        "brs" => "BrightScript",
-        "proto" => "Protobuf",
-        "bazel" => "Bazel",
-        "cabal" => "Cabal",
-        "cmake" => "CMake",
-        "clojure" => "Clojure",
-        "cue" => "CUE",
-        "d" => "D",
-        "erlang" => "Erlang",
-        "fish" => "Fish",
-        "json" => "JSON",
-        "gdscript" => "GDScript",
-        "java" => "Java",
-        "jsonnet" => "Jsonnet",
-        "hurl" => "Hurl",
-        "kotlin" => "Kotlin",
-        "rust" => "Rust",
-        "markdown" => "Markdown",
-        "sql" => "SQL",
-        "nix" => "Nix",
-        "nginx" => "Nginx",
-        "racket" => "Racket",
-        "ruby" => "Ruby",
-        "go" => "Go",
-        "gleam" => "Gleam",
-        "tcl" => "Tcl",
-        "tex" => "TeX",
-        "terraform" => "Terraform",
-        "typst" => "Typst",
-        "javascript" => "JavaScript",
-        "typescript" => "TypeScript",
-        "css" => "CSS",
-        "html" => "HTML",
-        "vue" => "Vue",
-        "svelte" => "Svelte",
-        "graphql" => "GraphQL",
-        _ => language,
-    }
+#[derive(Debug)]
+struct LinterDocRow {
+    name: String,
+    description: String,
+    homepage: String,
+    supported_languages: Vec<String>,
+    cmd: String,
+    args: Vec<String>,
 }
 
 fn extract_quoted_strings(src: &str) -> Vec<String> {
@@ -182,15 +139,36 @@ fn extract_field_string(block: &str, field: &str) -> Option<String> {
 }
 
 fn extract_field_list(block: &str, field: &str) -> Option<Vec<String>> {
-    let marker = format!("{field}: &[");
-    let start = block.find(&marker)?;
-    let after = &block[start + marker.len()..];
+    let marker_slice = format!("{field}: &[");
+    if let Some(start) = block.find(&marker_slice) {
+        let after = &block[start + marker_slice.len()..];
+        let end = after.find("],")?;
+        return Some(extract_quoted_strings(&after[..end]));
+    }
+
+    let marker_vec = format!("{field}: vec![");
+    let start = block.find(&marker_vec)?;
+    let after = &block[start + marker_vec.len()..];
     let end = after.find("],")?;
     Some(extract_quoted_strings(&after[..end]))
 }
 
-fn normalize_language_for_label(language: &str) -> String {
-    language.trim().to_ascii_lowercase().replace('_', "-")
+fn format_languages_for_docs(languages: &[String]) -> String {
+    let mut unique: Vec<String> = Vec::new();
+    for language in languages {
+        let language = language.trim();
+        if language.is_empty() {
+            continue;
+        }
+        if !unique.iter().any(|existing| existing == language) {
+            unique.push(language.to_string());
+        }
+    }
+    unique
+        .into_iter()
+        .map(|language| format!("`{}`", language))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn format_args(args: &[String]) -> String {
@@ -246,23 +224,15 @@ fn generate_external_formatter_table() -> Result<()> {
         } else {
             "Stdin"
         };
-        let Some(languages) = extract_field_list(block, "supported_languages") else {
+        let Some(supported_languages) = extract_field_list(block, "supported_languages") else {
             continue;
         };
-        let mut supported_labels: Vec<String> = Vec::new();
-        for lang in languages {
-            let normalized = normalize_language_for_label(&lang);
-            let label = language_label(&normalized).to_string();
-            if !supported_labels.iter().any(|existing| existing == &label) {
-                supported_labels.push(label);
-            }
-        }
 
         rows.push(FormatterPresetDocRow {
             preset_name: name,
             description,
             homepage,
-            supported_languages: supported_labels,
+            supported_languages,
             cmd,
             args,
             mode,
@@ -279,7 +249,10 @@ fn generate_external_formatter_table() -> Result<()> {
         out.push_str("Homepage\n");
         out.push_str(&format!(":   <{}>\n\n", row.homepage));
         out.push_str("Supported Languages\n");
-        out.push_str(&format!(":   {}\n\n", row.supported_languages.join(", ")));
+        out.push_str(&format!(
+            ":   {}\n\n",
+            format_languages_for_docs(&row.supported_languages)
+        ));
         out.push_str("Command\n");
         out.push_str(&format!(":   `{}`\n\n", row.cmd));
         out.push_str("`args`\n");
@@ -291,6 +264,87 @@ fn generate_external_formatter_table() -> Result<()> {
     let output_path = docs_dir.join("_formatter-presets-details.qmd");
     fs::write(&output_path, out)?;
     println!("Generated external formatter presets: {:?}", output_path);
+
+    Ok(())
+}
+
+fn generate_external_linter_table() -> Result<()> {
+    // Skip during cargo package/publish - file should be committed to git
+    let is_packaging = std::env::current_dir()
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.contains("/target/package/")))
+        .unwrap_or(false);
+    if is_packaging {
+        return Ok(());
+    }
+
+    let linters_path = PathBuf::from("src/linter/external_linters.rs");
+    let docs_dir = PathBuf::from("docs/reference");
+    if !linters_path.exists() || !docs_dir.exists() {
+        return Ok(());
+    }
+
+    let source = fs::read_to_string(&linters_path)?;
+    let mut rows: Vec<LinterDocRow> = Vec::new();
+
+    for chunk in source.split("LinterInfo {").skip(1) {
+        let Some(block_end) = chunk.find("\n        );") else {
+            continue;
+        };
+        let block = &chunk[..block_end];
+
+        let Some(name) = extract_field_string(block, "name") else {
+            continue;
+        };
+        let Some(description) = extract_field_string(block, "description") else {
+            continue;
+        };
+        let Some(homepage) = extract_field_string(block, "url") else {
+            continue;
+        };
+        let Some(cmd) = extract_field_string(block, "command") else {
+            continue;
+        };
+        let Some(args) = extract_field_list(block, "args") else {
+            continue;
+        };
+        let Some(supported_languages) = extract_field_list(block, "supported_languages") else {
+            continue;
+        };
+
+        rows.push(LinterDocRow {
+            name,
+            description,
+            homepage,
+            supported_languages,
+            cmd,
+            args,
+        });
+    }
+
+    rows.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let mut out = String::new();
+    out.push_str("<!-- AUTO-GENERATED by build.rs -->\n");
+    for row in rows {
+        out.push_str(&format!("## `{}`\n\n", row.name));
+        out.push_str(&format!("{}\n\n", row.description));
+        out.push_str("Homepage\n");
+        out.push_str(&format!(":   <{}>\n\n", row.homepage));
+        out.push_str("Supported Languages\n");
+        out.push_str(&format!(
+            ":   {}\n\n",
+            format_languages_for_docs(&row.supported_languages)
+        ));
+        out.push_str("Command\n");
+        out.push_str(&format!(":   `{}`\n\n", row.cmd));
+        out.push_str("`args`\n");
+        out.push_str(&format!(":   `{}`\n\n", format_args(&row.args)));
+    }
+
+    let output_path = docs_dir.join("_linter-presets-details.qmd");
+    fs::write(&output_path, out)?;
+    println!("Generated external linter presets: {:?}", output_path);
 
     Ok(())
 }
@@ -379,9 +433,11 @@ fn main() -> Result<()> {
     // Generate CLI markdown documentation
     generate_cli_markdown()?;
     generate_external_formatter_table()?;
+    generate_external_linter_table()?;
 
     println!("cargo:rerun-if-changed=src/cli.rs");
     println!("cargo:rerun-if-changed=src/config/formatter_presets.rs");
+    println!("cargo:rerun-if-changed=src/linter/external_linters.rs");
     println!("cargo:rerun-if-changed=build.rs");
 
     Ok(())

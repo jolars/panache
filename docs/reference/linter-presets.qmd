@@ -1,0 +1,12 @@
+---
+title: "Linter Presets"
+description: >
+  This section provides a reference for the
+  external linter presets available in Panache.
+---
+
+Read the [Configuration Guide](../guide/configuration.qmd#external-code-linters)
+for instructions on how to configure external linters for code chunks in
+Panache.
+
+{{< include _linter-presets-details.qmd >}}

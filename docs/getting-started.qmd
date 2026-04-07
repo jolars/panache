@@ -27,10 +27,8 @@ page](https://github.com/jolars/panache/releases):
 - **Windows**: x86_64 and ARM64 (`.zip`)
 
 If you prefer a one-liner installer that picks the right release artifact for
-your platform, you can use the installer scripts below. These scripts download
-from this repository's latest GitHub release and install to a user-local
-directory by default. If you prefer, download and inspect the script before
-running it.
+your platform, you can use the installer scripts
+below.^[These scripts download from this repository's latest GitHub release and install to a user-local directory by default. If you prefer, download and inspect the script before running it.]
 
 ::: {.panel-tabset}
 ### Linux and macOS
