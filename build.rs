@@ -62,7 +62,7 @@ fn generate_cli_markdown() -> Result<()> {
     }
 
     let cmd = Cli::command();
-    let docs_dir = PathBuf::from("docs/user-guide");
+    let docs_dir = PathBuf::from("docs/reference");
 
     // Only proceed if docs directory exists
     if !docs_dir.exists() {
@@ -80,6 +80,7 @@ fn generate_cli_markdown() -> Result<()> {
     let mut document = String::new();
     document.push_str("---\n");
     document.push_str("title: CLI Reference\n");
+    document.push_str("description: >-\n  Comprehensive reference for the Panache CLI, including all commands, options, and usage examples.\n");
     document.push_str("---\n\n");
     document.push_str(&markdown);
 
@@ -87,6 +88,209 @@ fn generate_cli_markdown() -> Result<()> {
     let output_path = docs_dir.join("cli.qmd");
     fs::write(&output_path, &document)?;
     println!("Generated CLI markdown: {:?}", output_path);
+
+    Ok(())
+}
+
+#[derive(Debug)]
+struct FormatterPresetDocRow {
+    preset_name: String,
+    description: String,
+    homepage: String,
+    supported_languages: Vec<String>,
+    cmd: String,
+    args: Vec<String>,
+    mode: &'static str,
+}
+
+fn language_label(language: &str) -> &str {
+    match language {
+        "r" => "R",
+        "python" | "py" => "Python",
+        "yaml" | "yml" => "YAML",
+        "toml" => "TOML",
+        "sh" | "bash" => "Shell",
+        "c" | "cpp" => "C/C++",
+        "asm" => "Assembly",
+        "text" => "Text/CJK",
+        "beancount" => "Beancount",
+        "bibtex" => "BibTeX",
+        "bp" => "Blueprint",
+        "brs" => "BrightScript",
+        "proto" => "Protobuf",
+        "bazel" => "Bazel",
+        "cabal" => "Cabal",
+        "cmake" => "CMake",
+        "clojure" => "Clojure",
+        "cue" => "CUE",
+        "d" => "D",
+        "erlang" => "Erlang",
+        "fish" => "Fish",
+        "json" => "JSON",
+        "gdscript" => "GDScript",
+        "java" => "Java",
+        "jsonnet" => "Jsonnet",
+        "hurl" => "Hurl",
+        "kotlin" => "Kotlin",
+        "rust" => "Rust",
+        "markdown" => "Markdown",
+        "sql" => "SQL",
+        "nix" => "Nix",
+        "nginx" => "Nginx",
+        "racket" => "Racket",
+        "ruby" => "Ruby",
+        "go" => "Go",
+        "gleam" => "Gleam",
+        "tcl" => "Tcl",
+        "tex" => "TeX",
+        "terraform" => "Terraform",
+        "typst" => "Typst",
+        "javascript" => "JavaScript",
+        "typescript" => "TypeScript",
+        "css" => "CSS",
+        "html" => "HTML",
+        "vue" => "Vue",
+        "svelte" => "Svelte",
+        "graphql" => "GraphQL",
+        _ => language,
+    }
+}
+
+fn extract_quoted_strings(src: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = src;
+    while let Some(start) = rest.find('"') {
+        let after_start = &rest[start + 1..];
+        if let Some(end) = after_start.find('"') {
+            out.push(after_start[..end].to_string());
+            rest = &after_start[end + 1..];
+        } else {
+            break;
+        }
+    }
+    out
+}
+
+fn extract_field_string(block: &str, field: &str) -> Option<String> {
+    let marker = format!("{field}:");
+    let pos = block.find(&marker)?;
+    let after = &block[pos + marker.len()..];
+    let first = after.find('"')?;
+    let after_first = &after[first + 1..];
+    let end = after_first.find('"')?;
+    Some(after_first[..end].to_string())
+}
+
+fn extract_field_list(block: &str, field: &str) -> Option<Vec<String>> {
+    let marker = format!("{field}: &[");
+    let start = block.find(&marker)?;
+    let after = &block[start + marker.len()..];
+    let end = after.find("],")?;
+    Some(extract_quoted_strings(&after[..end]))
+}
+
+fn normalize_language_for_label(language: &str) -> String {
+    language.trim().to_ascii_lowercase().replace('_', "-")
+}
+
+fn format_args(args: &[String]) -> String {
+    if args.is_empty() {
+        "[]".to_string()
+    } else {
+        format!("[{}]", args.join(", "))
+    }
+}
+
+fn generate_external_formatter_table() -> Result<()> {
+    // Skip during cargo package/publish - file should be committed to git
+    let is_packaging = std::env::current_dir()
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.contains("/target/package/")))
+        .unwrap_or(false);
+    if is_packaging {
+        return Ok(());
+    }
+
+    let presets_path = PathBuf::from("src/config/formatter_presets.rs");
+    let docs_dir = PathBuf::from("docs/reference");
+    if !presets_path.exists() || !docs_dir.exists() {
+        return Ok(());
+    }
+
+    let source = fs::read_to_string(&presets_path)?;
+    let mut rows: Vec<FormatterPresetDocRow> = Vec::new();
+
+    for chunk in source.split("FormatterPresetMetadata {").skip(1) {
+        let Some(block_end) = chunk.find("\n    },") else {
+            continue;
+        };
+        let block = &chunk[..block_end];
+
+        let Some(name) = extract_field_string(block, "name") else {
+            continue;
+        };
+        let Some(cmd) = extract_field_string(block, "cmd") else {
+            continue;
+        };
+        let Some(description) = extract_field_string(block, "description") else {
+            continue;
+        };
+        let Some(homepage) = extract_field_string(block, "url") else {
+            continue;
+        };
+        let Some(args) = extract_field_list(block, "args") else {
+            continue;
+        };
+        let mode = if block.contains("stdin: false") {
+            "File-based"
+        } else {
+            "Stdin"
+        };
+        let Some(languages) = extract_field_list(block, "supported_languages") else {
+            continue;
+        };
+        let mut supported_labels: Vec<String> = Vec::new();
+        for lang in languages {
+            let normalized = normalize_language_for_label(&lang);
+            let label = language_label(&normalized).to_string();
+            if !supported_labels.iter().any(|existing| existing == &label) {
+                supported_labels.push(label);
+            }
+        }
+
+        rows.push(FormatterPresetDocRow {
+            preset_name: name,
+            description,
+            homepage,
+            supported_languages: supported_labels,
+            cmd,
+            args,
+            mode,
+        });
+    }
+
+    rows.sort_by(|a, b| a.preset_name.cmp(&b.preset_name));
+
+    let mut out = String::new();
+    out.push_str("<!-- AUTO-GENERATED by build.rs -->\n");
+    for row in rows {
+        out.push_str(&format!("## `{}`\n\n", row.preset_name));
+        out.push_str(&format!("{}\n\n", row.description));
+        out.push_str("Homepage\n");
+        out.push_str(&format!(":   <{}>\n\n", row.homepage));
+        out.push_str("Supported Languages\n");
+        out.push_str(&format!(":   {}\n\n", row.supported_languages.join(", ")));
+        out.push_str("Command\n");
+        out.push_str(&format!(":   `{}`\n\n", row.cmd));
+        out.push_str("`args`\n");
+        out.push_str(&format!(":   `{}`\n\n", format_args(&row.args)));
+        out.push_str("Type\n");
+        out.push_str(&format!(":   {}\n\n", row.mode));
+    }
+
+    let output_path = docs_dir.join("_formatter-presets-details.qmd");
+    fs::write(&output_path, out)?;
+    println!("Generated external formatter presets: {:?}", output_path);
 
     Ok(())
 }
@@ -174,8 +378,10 @@ fn main() -> Result<()> {
 
     // Generate CLI markdown documentation
     generate_cli_markdown()?;
+    generate_external_formatter_table()?;
 
     println!("cargo:rerun-if-changed=src/cli.rs");
+    println!("cargo:rerun-if-changed=src/config/formatter_presets.rs");
     println!("cargo:rerun-if-changed=build.rs");
 
     Ok(())

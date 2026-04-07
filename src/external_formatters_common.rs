@@ -80,6 +80,43 @@ pub fn log_missing_formatter_commands(missing: &HashSet<String>) {
     }
 }
 
+/// Resolve stdin argument placeholders against a language-aware virtual filename.
+///
+/// Some tools (for example Prettier) need a file path hint while still reading
+/// from stdin. We support `{}` as a placeholder in stdin args for this purpose.
+pub fn resolve_stdin_args(args: &[String], language: &str) -> Vec<String> {
+    let virtual_filename = virtual_filename_for_language(language);
+    args.iter()
+        .map(|arg| arg.replace("{}", virtual_filename))
+        .collect()
+}
+
+fn virtual_filename_for_language(language: &str) -> &'static str {
+    match language
+        .trim()
+        .to_ascii_lowercase()
+        .replace('_', "-")
+        .as_str()
+    {
+        "javascript" | "js" => "stdin.js",
+        "typescript" | "ts" => "stdin.ts",
+        "jsx" => "stdin.jsx",
+        "tsx" => "stdin.tsx",
+        "json" => "stdin.json",
+        "jsonc" => "stdin.jsonc",
+        "yaml" | "yml" => "stdin.yaml",
+        "markdown" | "md" | "qmd" | "rmd" => "stdin.md",
+        "css" => "stdin.css",
+        "scss" => "stdin.scss",
+        "less" => "stdin.less",
+        "html" => "stdin.html",
+        "vue" => "stdin.vue",
+        "svelte" => "stdin.svelte",
+        "graphql" | "gql" => "stdin.graphql",
+        _ => "stdin.txt",
+    }
+}
+
 fn missing_formatter_warning_message(missing: &HashSet<String>) -> Option<String> {
     if missing.is_empty() {
         return None;
@@ -112,7 +149,9 @@ fn has_path_separator(cmd: &str) -> bool {
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
-    use super::{find_missing_formatter_commands, missing_formatter_warning_message};
+    use super::{
+        find_missing_formatter_commands, missing_formatter_warning_message, resolve_stdin_args,
+    };
     use crate::config::FormatterConfig;
     use std::collections::{HashMap, HashSet};
 
@@ -171,6 +210,26 @@ mod tests {
         assert_eq!(
             message,
             "External formatter command(s) not found: black, rustfmt. Configured external formatting for these tools will be skipped."
+        );
+    }
+
+    #[test]
+    fn resolve_stdin_args_replaces_placeholder_with_language_filename() {
+        let args = vec!["--stdin-filepath".to_string(), "{}".to_string()];
+        let resolved = resolve_stdin_args(&args, "typescript");
+        assert_eq!(
+            resolved,
+            vec!["--stdin-filepath".to_string(), "stdin.ts".to_string()]
+        );
+    }
+
+    #[test]
+    fn resolve_stdin_args_falls_back_for_unknown_language() {
+        let args = vec!["--stdin-filepath".to_string(), "{}".to_string()];
+        let resolved = resolve_stdin_args(&args, "unknownlang");
+        assert_eq!(
+            resolved,
+            vec!["--stdin-filepath".to_string(), "stdin.txt".to_string()]
         );
     }
 }

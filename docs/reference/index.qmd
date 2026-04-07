@@ -1,0 +1,16 @@
+---
+title: Reference
+description: >
+  This section provides reference documentation for Panache, including detailed
+  instructions and examples for using the formatter, linter, language server,
+  configuration, and integrations.
+---
+
+- In [Command Line Reference](cli.qmd) you can find detailed documentation for
+  the Panache command line interface, including all available commands, options,
+  and examples for using the formatter and linter from the terminal.
+
+- In [External Formatter Presets](formatter-presets.qmd) you can find
+  documentation for using external formatter presets with Panache, such as
+  Prettier and Blackfriday, to customize the formatting behavior to match your
+  preferred style or project conventions.

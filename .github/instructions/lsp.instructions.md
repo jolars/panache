@@ -16,3 +16,5 @@ transitions.
 - If lint/diagnostic payloads change, explicitly verify expected LSP diagnostic
   fields remain stable unless the protocol output change is intentional.
 - Validate with targeted LSP integration tests before running the full suite.
+- Keep the docs at `docs/guide/lsp.qmd` aligned with any user-visible behavior
+  changes (e.g. new features, diagnostics, or client capabilities).

@@ -1245,7 +1245,12 @@ fn resolve_language_formatters(
     formatter_names
         .into_iter()
         .map(|name| {
-            validate_formatter_language_for_preset(lang, name)?;
+            // Language guards apply only to built-in presets. Named formatter
+            // definitions are user-owned and may be intentionally reused across
+            // languages (e.g. a custom "prettier" definition).
+            if !formatter_definitions.contains_key(name) {
+                validate_formatter_language_for_preset(lang, name)?;
+            }
             resolve_formatter_name(name, formatter_definitions)
                 .map_err(|e| format!("Language '{}': {}", lang, e))
         })
@@ -2432,6 +2437,370 @@ mod tests {
     }
 
     #[test]
+    fn preset_resolution_dfmt() {
+        let toml_str = r#"
+            [formatters.d]
+            preset = "dfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("d").unwrap()[0];
+        assert_eq!(fmt.cmd, "dfmt");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_efmt() {
+        let toml_str = r#"
+            [formatters.erl]
+            preset = "efmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("erl").unwrap()[0];
+        assert_eq!(fmt.cmd, "efmt");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_nginxfmt() {
+        let toml_str = r#"
+            [formatters.nginx]
+            preset = "nginxfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("nginx").unwrap()[0];
+        assert_eq!(fmt.cmd, "nginxfmt");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_tclfmt() {
+        let toml_str = r#"
+            [formatters.tcl]
+            preset = "tclfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("tcl").unwrap()[0];
+        assert_eq!(fmt.cmd, "tclfmt");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_tex_fmt() {
+        let toml_str = r#"
+            [formatters.tex]
+            preset = "tex-fmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("tex").unwrap()[0];
+        assert_eq!(fmt.cmd, "tex-fmt");
+        assert_eq!(fmt.args, vec!["-s"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_typstyle() {
+        let toml_str = r#"
+            [formatters.typst]
+            preset = "typstyle"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("typst").unwrap()[0];
+        assert_eq!(fmt.cmd, "typstyle");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_gdformat() {
+        let toml_str = r#"
+            [formatters.gdscript]
+            preset = "gdformat"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("gdscript").unwrap()[0];
+        assert_eq!(fmt.cmd, "gdformat");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_hurlfmt() {
+        let toml_str = r#"
+            [formatters.hurl]
+            preset = "hurlfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("hurl").unwrap()[0];
+        assert_eq!(fmt.cmd, "hurlfmt");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_ktfmt() {
+        let toml_str = r#"
+            [formatters.kotlin]
+            preset = "ktfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("kotlin").unwrap()[0];
+        assert_eq!(fmt.cmd, "ktfmt");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_leptosfmt() {
+        let toml_str = r#"
+            [formatters.rust]
+            preset = "leptosfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("rust").unwrap()[0];
+        assert_eq!(fmt.cmd, "leptosfmt");
+        assert_eq!(fmt.args, vec!["--stdin"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_pycln() {
+        let toml_str = r#"
+            [formatters.python]
+            preset = "pycln"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("python").unwrap()[0];
+        assert_eq!(fmt.cmd, "pycln");
+        assert_eq!(fmt.args, vec!["--silence", "-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_pyproject_fmt() {
+        let toml_str = r#"
+            [formatters.toml]
+            preset = "pyproject-fmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("toml").unwrap()[0];
+        assert_eq!(fmt.cmd, "pyproject-fmt");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_google_java_format() {
+        let toml_str = r#"
+            [formatters.java]
+            preset = "google-java-format"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("java").unwrap()[0];
+        assert_eq!(fmt.cmd, "google-java-format");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_racketfmt() {
+        let toml_str = r#"
+            [formatters.racket]
+            preset = "racketfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("racket").unwrap()[0];
+        assert_eq!(fmt.cmd, "raco");
+        assert_eq!(fmt.args, vec!["fmt"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_rubyfmt() {
+        let toml_str = r#"
+            [formatters.ruby]
+            preset = "rubyfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("ruby").unwrap()[0];
+        assert_eq!(fmt.cmd, "rubyfmt");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_rufo() {
+        let toml_str = r#"
+            [formatters.ruby]
+            preset = "rufo"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("ruby").unwrap()[0];
+        assert_eq!(fmt.cmd, "rufo");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_bean_format() {
+        let toml_str = r#"
+            [formatters.beancount]
+            preset = "bean-format"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("beancount").unwrap()[0];
+        assert_eq!(fmt.cmd, "bean-format");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_beautysh() {
+        let toml_str = r#"
+            [formatters.bash]
+            preset = "beautysh"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("bash").unwrap()[0];
+        assert_eq!(fmt.cmd, "beautysh");
+        assert_eq!(fmt.args, vec!["-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_cljfmt() {
+        let toml_str = r#"
+            [formatters.clojure]
+            preset = "cljfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("clojure").unwrap()[0];
+        assert_eq!(fmt.cmd, "cljfmt");
+        assert_eq!(fmt.args, vec!["fix", "-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_fish_indent() {
+        let toml_str = r#"
+            [formatters.fish]
+            preset = "fish_indent"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("fish").unwrap()[0];
+        assert_eq!(fmt.cmd, "fish_indent");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_fixjson() {
+        let toml_str = r#"
+            [formatters.json]
+            preset = "fixjson"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("json").unwrap()[0];
+        assert_eq!(fmt.cmd, "fixjson");
+        assert!(fmt.args.is_empty());
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_bibtex_tidy() {
+        let toml_str = r#"
+            [formatters.bibtex]
+            preset = "bibtex-tidy"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("bibtex").unwrap()[0];
+        assert_eq!(fmt.cmd, "bibtex-tidy");
+        assert_eq!(fmt.args, vec!["--quiet"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_bpfmt() {
+        let toml_str = r#"
+            [formatters.bp]
+            preset = "bpfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("bp").unwrap()[0];
+        assert_eq!(fmt.cmd, "bpfmt");
+        assert_eq!(fmt.args, vec!["-w", "{}"]);
+        assert!(!fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_bsfmt() {
+        let toml_str = r#"
+            [formatters.brs]
+            preset = "bsfmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("brs").unwrap()[0];
+        assert_eq!(fmt.cmd, "bsfmt");
+        assert_eq!(fmt.args, vec!["{}", "--write"]);
+        assert!(!fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_buf() {
+        let toml_str = r#"
+            [formatters.proto]
+            preset = "buf"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("proto").unwrap()[0];
+        assert_eq!(fmt.cmd, "buf");
+        assert_eq!(fmt.args, vec!["format", "-w", "{}"]);
+        assert!(!fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_buildifier() {
+        let toml_str = r#"
+            [formatters.bazel]
+            preset = "buildifier"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("bazel").unwrap()[0];
+        assert_eq!(fmt.cmd, "buildifier");
+        assert_eq!(fmt.args, vec!["-path", "{}", "-"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_cabal_fmt() {
+        let toml_str = r#"
+            [formatters.cabal]
+            preset = "cabal-fmt"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("cabal").unwrap()[0];
+        assert_eq!(fmt.cmd, "cabal-fmt");
+        assert_eq!(fmt.args, vec!["--inplace", "{}"]);
+        assert!(!fmt.stdin);
+    }
+
+    #[test]
+    fn preset_resolution_prettier_typescript() {
+        let toml_str = r#"
+            [formatters.typescript]
+            preset = "prettier"
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmt = &cfg.formatters.get("typescript").unwrap()[0];
+        assert_eq!(fmt.cmd, "prettier");
+        assert_eq!(fmt.args, vec!["--stdin-filepath", "{}"]);
+        assert!(fmt.stdin);
+    }
+
+    #[test]
     fn preset_and_cmd_mutually_exclusive() {
         let toml_str = r#"
             [formatters.r]
@@ -2477,6 +2846,23 @@ mod tests {
     }
 
     #[test]
+    fn named_definition_skips_builtin_language_guard() {
+        let toml_str = r#"
+            [formatters]
+            javascript = "prettier"
+
+            [formatters.prettier]
+            cmd = "prettier"
+            args = ["--print-width=100"]
+        "#;
+        let cfg = toml::from_str::<Config>(toml_str).unwrap();
+        let fmts = cfg.formatters.get("javascript").unwrap();
+        assert_eq!(fmts.len(), 1);
+        assert_eq!(fmts[0].cmd, "prettier");
+        assert_eq!(fmts[0].args, vec!["--print-width=100"]);
+    }
+
+    #[test]
     fn preset_metadata_lookup_contains_url() {
         let meta = formatter_preset_metadata("gofmt").unwrap();
         assert_eq!(meta.name, "gofmt");
@@ -2493,6 +2879,15 @@ mod tests {
         assert!(names.contains(&"yamlfmt"));
         assert!(names.contains(&"yamlfix"));
         assert!(names.contains(&"yq"));
+    }
+
+    #[test]
+    fn preset_metadata_language_lookup_includes_prettier_for_typescript() {
+        let names: Vec<&str> = formatter_presets_for_language("typescript")
+            .iter()
+            .map(|meta| meta.name)
+            .collect();
+        assert!(names.contains(&"prettier"));
     }
 
     #[test]

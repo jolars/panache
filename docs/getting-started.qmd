@@ -1,11 +1,11 @@
 ---
 title: Getting Started
+description: >
+  This guide gets you from zero to a productive Panache setup. You will install
+  the CLI, verify it works, run the core commands (`format`, `lint`, and `parse`),
+  and learn the minimum configuration and ignore directives you need for
+  day-to-day editing.
 ---
-
-This guide gets you from zero to a productive Panache setup. You will install
-the CLI, verify it works, run the core commands (`format`, `lint`, and `parse`),
-and learn the minimum configuration and ignore directives you need for
-day-to-day editing.
 
 ## Installation
 
@@ -229,7 +229,7 @@ citations = true
 ```
 
 To see all the available configuration options, check the [Configuration
-guide](user-guide/configuration.qmd).
+guide](guide/configuration.qmd).
 
 Panache looks for configuration files in this order:
 
@@ -286,8 +286,8 @@ Custom    formatting   and   no    lint    warnings
 These directives work anywhere in your document, including inside lists,
 blockquotes, and other nested structures.
 
-See the [Formatting](user-guide/formatting.qmd) and
-[Linting](user-guide/linting.qmd) guides for more details.
+See the [Formatting](guide/formatting.qmd) and [Linting](guide/linting.qmd)
+guides for more details.
 
 ## Getting Help
 

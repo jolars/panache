@@ -10,7 +10,7 @@ stable CLI/LSP behavior.
   preserves document intent.
 - Maintain rustc-like diagnostic UX in CLI output (clear primary span, optional
   context, and concise help/note text).
-- Keep lint docs in sync: update `docs/linting.qmd` whenever lint rules,
+- Keep lint docs in sync: update `docs/guide/linting.qmd` whenever lint rules,
   diagnostics, fix behavior, or CLI lint message format changes.
 - Preserve LSP compatibility: CLI rendering changes must not alter
   `src/lsp/conversions.rs` behavior unless explicitly intended.

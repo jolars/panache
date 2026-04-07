@@ -1,7 +1,7 @@
 ---
 title: "Panache"
 title-meta: "Panache: Language Server, Formatter, and Linter for Pandoc, Quarto, and R Markdown"
-description-meta: >-
+description-meta: >
   Panache provides authoring tools for Pandoc, Quarto, and R Markdown: a
   language server, formatter, and linter to help you write better documents,
   more efficiently.
@@ -72,8 +72,7 @@ builds), see [Getting Started](getting-started.qmd).
 
 - [Getting Started](getting-started.qmd): complete installation and first-run
   walkthrough.
-- [User Guide](user-guide/index.qmd): detailed docs for formatting, linting,
-  CLI, and editor integration.
-- [Configuration](user-guide/configuration.qmd): tune behavior with
-  `.panache.toml`.
+- [User Guide](guide/index.qmd): detailed docs for formatting, linting, CLI, and
+  editor integration.
+- [Configuration](guide/configuration.qmd): tune behavior with `.panache.toml`.
 - [Playground](playground/index.html): try formatting directly in the browser.

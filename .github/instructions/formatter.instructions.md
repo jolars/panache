@@ -9,9 +9,8 @@ Formatter changes should preserve idempotency and avoid parser-side workarounds.
   rendering logic.
 - If behavior changes, add or update the smallest relevant golden case in
   `tests/cases/`.
-- Keep docs aligned with formatter behavior: update
-  `docs/user-guide/formatting.qmd` when user-visible formatting rules or
-  examples change.
+- Keep docs aligned with formatter behavior: update `docs/guide/formatting.qmd`
+  when user-visible formatting rules or examples change.
 - Avoid touching unrelated golden cases; verify diffs are intentional.
 - Prefer targeted tests (`cargo test --test golden_cases <case_name>`) before
   full suite reruns.

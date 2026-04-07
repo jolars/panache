@@ -79,16 +79,11 @@
 
         name = "panache format";
 
-        entry = "cargo run -- format .";
+        entry = "cargo run -- format . --force-exclude";
 
         language = "system";
 
         files = "\.(qmd|md|Rmd)$";
-
-        excludes = [
-          "^(pandoc|assets|tests)"
-          "docs/user-guide/cli.qmd"
-        ];
       };
 
       eslint = {

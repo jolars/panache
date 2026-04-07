@@ -960,7 +960,7 @@ pub async fn spawn_and_await_formatters(
                     formatter_configs.len()
                 );
 
-                match format_code_async(&current_code, formatter_cfg, timeout).await {
+                match format_code_async(&current_code, &lang, formatter_cfg, timeout).await {
                     Ok(formatted) => {
                         current_code = formatted;
                     }

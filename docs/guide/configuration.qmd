@@ -1,5 +1,9 @@
 ---
 title: Configuration
+description: >
+  This guide describes how to configure Panache, both globally and on a
+  per-project basis, and how to use configuration files to customize the
+  formatting and linting rules.
 ---
 
 Panache aims to provide sensible defaults, but also be configurable enough to
@@ -682,19 +686,25 @@ bookdown-equation-references = true
 :   Bookdown equation references for labels like `(\#eq:label)` inside LaTeX
     math environments (default: disabled, enabled for RMarkdown flavor)
 
-## External Code Formatters
+## External Formatters
 
-Panache can invoke external formatters for code blocks. Formatters are
-opt-in—you choose which languages to format.
+Panache can invoke external formatters for code blocks. No external formatters
+are enabled by default, so you have to opt-in for each language you want to
+format.
+
+::: {.callout-note}
+### YAML
 
 YAML is special: Panache has built-in YAML formatting for frontmatter and
-hashpipe chunk options. External YAML formatters apply only to fenced code
-blocks with YAML language. The YAML parser/formatter path is implemented in
-Panache-owned in-repo components.
+hashpipe chunk options based on [Pretty
+YAML](https://github.com/g-plane/pretty_yaml). External YAML formatters apply
+*only* to fenced code blocks (with YAML language).
+:::
 
 ### Basic Usage
 
-Map languages to formatters using built-in presets:
+To enable formatting for a language, map the language key to a formatter preset
+or custom formatter name:
 
 ```toml
 [formatters]
@@ -704,46 +714,15 @@ javascript = "prettier"
 typescript = "prettier"
 ```
 
-Available presets:
-
-| Language  | Preset          | Command                                 | Type       |
-| --------- | --------------- | --------------------------------------- | ---------- |
-| R         | `air`           | `air format {}`                         | File-based |
-| R         | `styler`        | `Rscript -e "styler::style_file('{}')"` | File-based |
-| Python    | `ruff`          | `ruff format`                           | Stdin      |
-| Python    | `black`         | `black -`                               | Stdin      |
-| YAML      | `yamlfmt`       | `yamlfmt -`                             | Stdin      |
-| YAML      | `prettier`      | `prettier --parser=yaml`                | Stdin      |
-| TOML      | `taplo`         | `taplo format -`                        | Stdin      |
-| Shell     | `shfmt`         | `shfmt -`                               | Stdin      |
-| C/C++     | `clang-format`  | `clang-format -`                        | Stdin      |
-| C/C++     | `astyle`        | `astyle --quiet`                        | Stdin      |
-| Assembly  | `asmfmt`        | `asmfmt`                                | Stdin      |
-| Text/CJK  | `autocorrect`   | `autocorrect --stdin`                   | Stdin      |
-| CMake     | `cmake-format`  | `cmake-format -`                        | Stdin      |
-| CUE       | `cue-fmt`       | `cue fmt -`                             | Stdin      |
-| Jsonnet   | `jsonnetfmt`    | `jsonnetfmt -`                          | Stdin      |
-| Markdown  | `mdformat`      | `mdformat -`                            | Stdin      |
-| SQL       | `sqlfmt`        | `sqlfmt -`                              | Stdin      |
-| Nix       | `alejandra`     | `alejandra`                             | Stdin      |
-| Nix       | `nixfmt`        | `nixfmt`                                | Stdin      |
-| Go        | `gofmt`         | `gofmt`                                 | Stdin      |
-| Go        | `gofumpt`       | `gofumpt`                               | Stdin      |
-| Gleam     | `gleam`         | `gleam format --stdin`                  | Stdin      |
-| Terraform | `terraform-fmt` | `terraform fmt -no-color -`             | Stdin      |
-| YAML      | `yamlfix`       | `yamlfix -`                             | Stdin      |
-| YAML      | `yq`            | `yq -P -`                               | Stdin      |
-
-### Sequential Formatting
-
-Run multiple formatters in order by using an array:
+You can also specify multiple formatters for a language, which will run
+sequentially:
 
 ```toml
 [formatters]
 python = ["isort", "black"]
 ```
 
-Output from the first formatter is piped to the second.
+Go to [Formatter Presets](#formatter-presets) for a list of built-in presets.
 
 ### Custom Formatters
 
@@ -765,7 +744,9 @@ args = ["-"]
 stdin = true
 ```
 
-Formatter definition fields:
+### Formatter Fields
+
+The formatter definition supports the following fields:
 
 `cmd`
 :   Command to execute (required for custom formatters)
@@ -800,35 +781,35 @@ How it works:
 - Any fields you specify (`cmd`, `args`, `stdin`) override the preset defaults
 - Unspecified fields keep the preset values
 
-Examples:
+#### Examples
 
-Override only `args` (inherits `cmd = "air"`, `stdin = false`):
+- Override only `args` (inherits `cmd = "air"`, `stdin = false`):
 
-```toml
-[formatters.air]
-args = ["format", "--custom-flag", "{}"]
-```
+  ```toml
+  [formatters.air]
+  args = ["format", "--custom-flag", "{}"]
+  ```
 
-Override only `cmd` (inherits default `args` and `stdin`):
+- Override only `cmd` (inherits default `args` and `stdin`):
 
-```toml
-[formatters.ruff]
-cmd = "ruff-custom"
-```
+  ```toml
+  [formatters.ruff]
+  cmd = "ruff-custom"
+  ```
 
-Override everything (complete replacement):
+- Override everything (complete replacement):
 
-```toml
-[formatters.black]
-cmd = "my-black"
-args = ["--fast"]
-stdin = false
-```
+  ```toml
+  [formatters.black]
+  cmd = "my-black"
+  args = ["--fast"]
+  stdin = false
+  ```
 
 ### Incremental Argument Modification
 
 Instead of completely overriding `args`, you can append and prepend arguments to
-the preset's base `args` using `append-args` and `prepend-args`:[^1]
+the preset's base `args` using `append-args` and `prepend-args`[^1].
 
 ```toml
 [formatters]
@@ -841,15 +822,7 @@ append-args = ["-i", "2"]
 This adds `["-i", "2"]` after the preset's base args `["format", "{}"]`,
 resulting in final args `["format", "{}", "-i", "2"]`.
 
-Available modifiers:
-
-`prepend-args`
-:   Arguments added before base args
-
-`append-args`
-:   Arguments added after base args
-
-Multiple modifiers example:
+Consider the following example:
 
 ```toml
 [formatters.air]
@@ -857,18 +830,8 @@ prepend-args = ["--verbose"]
 append-args = ["-i", "2", "--check"]
 ```
 
-This produces final args: `["--verbose", "format", "{}", "-i", "2", "--check"]`.
-
-With explicit args (no preset):
-
-```toml
-[formatters.shfmt]
-cmd = "shfmt"
-args = ["-filename", "$FILENAME"]
-append-args = ["-i", "2", "-bn"]
-```
-
-Final args: `["-filename", "$FILENAME", "-i", "2", "-bn"]`.
+This will produce the following final args:
+`["--verbose", "format", "{}", "-i", "2", "--check"]`.
 
 [^1]: The idea of `append-args` and `prepend-args` is taken from the
     [conform.nvim](https://github.com/stevearc/conform.nvim) Neovim plugin.
@@ -897,7 +860,9 @@ Language matching
     (case-insensitive)
 
 Parallel execution
-:   All formatters run concurrently for speed
+:   A thread pool is used to run formatters in parallel across files and
+    languages. For a single code block, formatters run sequentially in the order
+    specified.
 
 Sequential chains
 :   Multiple formatters per language run in order
@@ -921,6 +886,15 @@ Timeout
 Config files
 :   Formatters respect their own config files (`.prettierrc`, `pyproject.toml`,
     etc.)
+
+### Presets {#formatter-presets}
+
+Here is a list of the current built-in formatter presets in Panache. **Command**
+and **Arguments** are the defaults for `cmd` and `args` when you specify the
+preset name in `[formatters]`.
+
+See [Formatter Presets](../reference/formatter-presets) for a list of all the
+presets available in Panache.
 
 ## External Code Linters
 

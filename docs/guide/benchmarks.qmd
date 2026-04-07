@@ -1,6 +1,10 @@
 ---
 title: "Performance Benchmarks"
-description: "panache performance metrics on real-world documents"
+description: >
+  This page presents performance benchmarks for Panache, measuring the time taken
+  to parse and format Quarto documents of varying sizes and complexities. The
+  benchmarks are designed to provide insights into the efficiency of Panache's
+  formatting pipeline.
 ---
 
 ## Benchmark Suite

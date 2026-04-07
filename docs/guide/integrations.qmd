@@ -1,5 +1,9 @@
 ---
 title: "Integrations"
+description: >
+  This section provides instructions for integrating Panache with other tools,
+  such as pre-commit hooks and GitHub actions, to automatically format and lint
+  your documents on commit or pull request.
 ---
 
 ## Pre-Commit

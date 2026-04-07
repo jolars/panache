@@ -1,5 +1,9 @@
 ---
 title: Language Server
+description: >
+  Panache includes a built-in language server protocol (LSP) implementation that
+  provides a rich set of editor features for Pandoc Markdown, Quarto, and R
+  Markdown files.
 ---
 
 Panache includes a built-in language server protocol (LSP) implementation that

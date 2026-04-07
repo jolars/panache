@@ -10,6 +10,7 @@ use tokio::process::Command;
 
 use crate::config::FormatterConfig;
 pub use crate::external_formatters_common::FormatterError;
+use crate::external_formatters_common::resolve_stdin_args;
 
 /// Format a code block using an external formatter.
 ///
@@ -23,11 +24,12 @@ pub use crate::external_formatters_common::FormatterError;
 /// * `Err(FormatterError)` - Error details if formatting failed
 pub async fn format_code_async(
     code: &str,
+    language: &str,
     config: &FormatterConfig,
     timeout: Duration,
 ) -> Result<String, FormatterError> {
     if config.stdin {
-        format_with_stdin(code, config, timeout).await
+        format_with_stdin(code, language, config, timeout).await
     } else {
         format_with_file(code, config, timeout).await
     }
@@ -36,18 +38,20 @@ pub async fn format_code_async(
 /// Format code by piping through stdin/stdout.
 async fn format_with_stdin(
     code: &str,
+    language: &str,
     config: &FormatterConfig,
     timeout: Duration,
 ) -> Result<String, FormatterError> {
+    let resolved_args = resolve_stdin_args(&config.args, language);
     log::debug!(
         "Invoking formatter (stdin): {} {}",
         config.cmd,
-        config.args.join(" ")
+        resolved_args.join(" ")
     );
 
     // Spawn the formatter process
     let mut child = Command::new(&config.cmd)
-        .args(&config.args)
+        .args(&resolved_args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -203,7 +207,7 @@ mod tests {
         };
 
         let code = "hello world\n";
-        let result = format_code_async(code, &config, Duration::from_secs(5))
+        let result = format_code_async(code, "text", &config, Duration::from_secs(5))
             .await
             .unwrap();
 
@@ -224,7 +228,7 @@ mod tests {
         };
 
         let code = "hello world";
-        let result = format_code_async(code, &config, Duration::from_secs(5))
+        let result = format_code_async(code, "text", &config, Duration::from_secs(5))
             .await
             .unwrap();
 
@@ -241,7 +245,7 @@ mod tests {
         };
 
         let code = "test";
-        let result = format_code_async(code, &config, Duration::from_secs(5)).await;
+        let result = format_code_async(code, "text", &config, Duration::from_secs(5)).await;
 
         assert!(result.is_err());
         assert!(matches!(
@@ -273,7 +277,7 @@ mod tests {
         };
 
         let code = "test";
-        let result = format_code_async(code, &config, Duration::from_millis(100)).await;
+        let result = format_code_async(code, "text", &config, Duration::from_millis(100)).await;
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), FormatterError::Timeout));
@@ -299,7 +303,7 @@ mod tests {
         };
 
         let code = "hello from file\n";
-        let result = format_code_async(code, &config, Duration::from_secs(5))
+        let result = format_code_async(code, "text", &config, Duration::from_secs(5))
             .await
             .unwrap();
 
@@ -333,7 +337,7 @@ mod tests {
         };
 
         let code = "test with placeholder\n";
-        let result = format_code_async(code, &config, Duration::from_secs(5))
+        let result = format_code_async(code, "text", &config, Duration::from_secs(5))
             .await
             .unwrap();
 

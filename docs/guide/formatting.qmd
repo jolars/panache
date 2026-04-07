@@ -1,5 +1,9 @@
 ---
 title: Formatting
+description: >
+  This section provides instructions and examples for using Panache to format
+  your documents, showing examples of the formatting rules and how to customize
+  them.
 ---
 
 Panache's formatting rules are designed to produce clean, consistent Markdown

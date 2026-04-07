@@ -52,9 +52,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://github.com/j
 
 There are also two recipies available for Arch Linux in the AUR:
 [panache](https://aur.archlinux.org/packages/panache/) and
-[panache-bin](https://aur.archlinux.org/packages/panache-bin/).
-The first builds from source for your system, the second uses precompiled binaries attatched to GH releases.
-Install either using `yay` or your favorite AUR helper:
+[panache-bin](https://aur.archlinux.org/packages/panache-bin/). The first builds
+from source for your system, the second uses precompiled binaries attatched to
+GH releases. Install either using `yay` or your favorite AUR helper:
 
 ```bash
 yay -S panache
@@ -190,7 +190,7 @@ panache lsp
 
 Most users will want to configure their editor to start the language server
 automatically when editing. See [the language server
-documentation](https://panache.bz/user-guide/lsp) for guides on configuring your
+documentation](https://panache.bz/guide/lsp) for guides on configuring your
 editor. For VS Code and related editors such as Positron, there is a [VS Code
 Marketplace
 extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
@@ -263,8 +263,8 @@ For CI, use the dedicated GitHub Action:
 - uses: jolars/panache-action@v1
 ```
 
-See the [Integrations documentation](https://panache.bz/user-guide/integrations)
-for configuration options.
+See the [Integrations documentation](https://panache.bz/guide/integrations) for
+configuration options.
 
 ### Pre-commit Hooks
 

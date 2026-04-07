@@ -14,7 +14,7 @@ clear migration paths.
 - Use canonical kebab-case keys while preserving documented aliases. Existing
   aliases to snake_case are only there for backwards compatibility and should
   not be used in new code.
-- Update `docs/user-guide/configuration.qmd` whenever defaults, keys, or
-  deprecation behavior changes.
+- Update `docs/guide/configuration.qmd` whenever defaults, keys, or deprecation
+  behavior changes.
 - Add focused tests in `src/config.rs` for parsing, precedence, merge behavior,
   and deprecation handling when config behavior changes.

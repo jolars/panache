@@ -36,11 +36,8 @@ $link-color: $cyan;
 $light: rgb(32.4,32.4,34.2);
 
 // Navigation element colors
-/*$footer-bg: shade-color($gray-800, 30%);*/
-/*$navbar-bg: shade-color($gray-800, 30%);*/
 $footer-bg: $gray-900;
 $navbar-bg: shade-color($gray-800, 10%);
-
 
 // Code blocks
 $code-block-bg-alpha: -.9;
@@ -72,54 +69,8 @@ $text-muted: lighten(#6a737b, 20%);
 
 /*-- scss:rules --*/
 
-/*Homepage custom css overrides */
-
-/* homepage hero link accessibiility hack to make contrast 4.5:1 */
-
-.hero-banner a:not(.btn) {
-/*color: tint-color($cyan, 2%);*/
-color: #D1DBE5;
-}
-
-.hero-banner .btn-action-primary, .get-started .btn-action-primary {
-  background-color: #f8f8f8;
-  border: 1px solid #f8f8f8;
-  color: $dark;
-}
-
-.hero-banner .btn-action-primary:hover, .get-started .btn-action-primary:hover {
-  background-color: #D1DBE5;
-  border: 1px solid #f8f8f8;
-  color: $dark;
-}
-
-.hero-banner .btn-secondary {
-  background-color: transparent;
-  border: 1px solid #f8f8f8;
-  color: #f8f8f8;
-}
-
-.hero-banner .btn-secondary:hover {
-  background-color: #305775;
-}
-
-.hello-quarto-banner .nav-pills .nav-link.active, .nav-pills .show>.nav-link {
-  border: none;
-  border-bottom: 2px solid #ffffff !important;
-  color: #ffffff !important;
-  background-color: transparent;
-}
-
-.hello-quarto-banner .nav-link {
-  color: #ffffff !important;
-}
-
 .bg-color {
   background-color: $body-bg;
-}
-
-.hello-output {
-  border: 1px solid $gray-700;
 }
 
 body.quarto-light .alt-background {
@@ -131,15 +82,6 @@ body.quarto-light .alt-background {
 .layout-example {
   background: $gray-700;
 }
-
-.hello-quarto-banner h1 {
-  margin-top: 0;
-  margin-bottom: 0.5rem;
-}
-
-// h2, .h2 {
-//   border-bottom-color: #666;
-// }
 
 .code-with-filename .code-with-filename-file pre {
   color: #ddd;
@@ -162,22 +104,4 @@ h6 code {
 
 details > summary {
   color: $text-muted;
-}
-
-#quarto-announcement {
-  padding: 1em;
-  font-size: 1em;
-  font-weight: bold;
-  color: $white;
-  background-color: #ff0039;
-}
-
-#quarto-announcement a {
-  color: $white;
-}
-
-/*Footer Posit logo color for dark mode*/
-
-img.footer-logo {
-  color: #ffffff;
 }

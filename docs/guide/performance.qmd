@@ -1,6 +1,10 @@
 ---
 title: "Performance"
-description: "Performance benchmarks and comparisons"
+description: >
+  This page presents performance benchmarks for Panache, comparing its formatting
+  speed against popular alternatives like Prettier and Pandoc on real Quarto
+  documents. The benchmarks highlight Panache's efficiency and suitability for
+  on-save formatting in editors.
 ---
 
 ## Overview

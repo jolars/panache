@@ -12,7 +12,7 @@ use std::time::Duration;
 use crate::config::FormatterConfig;
 pub use crate::external_formatters_common::FormatterError;
 use crate::external_formatters_common::{
-    find_missing_formatter_commands, log_missing_formatter_commands,
+    find_missing_formatter_commands, log_missing_formatter_commands, resolve_stdin_args,
 };
 use crate::formatter::code_blocks::{ExternalCodeBlock, FormattedCodeMap};
 
@@ -28,11 +28,12 @@ use crate::formatter::code_blocks::{ExternalCodeBlock, FormattedCodeMap};
 /// * `Err(FormatterError)` - Error details if formatting failed
 pub fn format_code_sync(
     code: &str,
+    language: &str,
     config: &FormatterConfig,
     timeout: Duration,
 ) -> Result<String, FormatterError> {
     if config.stdin {
-        format_with_stdin(code, config, timeout)
+        format_with_stdin(code, language, config, timeout)
     } else {
         format_with_file(code, config, timeout)
     }
@@ -41,18 +42,20 @@ pub fn format_code_sync(
 /// Format code by piping through stdin/stdout (synchronous).
 fn format_with_stdin(
     code: &str,
+    language: &str,
     config: &FormatterConfig,
     timeout: Duration,
 ) -> Result<String, FormatterError> {
+    let resolved_args = resolve_stdin_args(&config.args, language);
     log::debug!(
         "Invoking formatter (stdin): {} {}",
         config.cmd,
-        config.args.join(" ")
+        resolved_args.join(" ")
     );
 
     // Build command
     let mut cmd = Command::new(&config.cmd);
-    cmd.args(&config.args)
+    cmd.args(&resolved_args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -277,7 +280,7 @@ pub fn run_formatters_parallel(
                         formatter_configs.len()
                     );
 
-                    match format_code_sync(&current_code, formatter_cfg, timeout) {
+                    match format_code_sync(&current_code, &lang, formatter_cfg, timeout) {
                         Ok(formatted) => {
                             current_code = formatted;
                         }

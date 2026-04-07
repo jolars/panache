@@ -48,12 +48,14 @@ website:
         href: "https://github.com/jolars/panache"
 
     left:
-      - href: index.qmd
-        text: Overview
       - href: getting-started.qmd
         text: Getting Started
       - href: guide
         text: Guide
+      - href: reference
+        text: Reference
+      - href: development
+        text: Development
       - href: changelog.md
         text: Changelog
       - text: Help
@@ -78,28 +80,36 @@ website:
           style: floating
           href: guide/index.qmd
           contents:
-            - section: "User Guide"
-              href: "user-guide/index.qmd"
-              contents:
-                - href: user-guide/formatting.qmd
-                  text: Formatting
-                - href: user-guide/linting.qmd
-                  text: Linting
-                - href: user-guide/lsp.qmd
-                  text: Language Server
-                - href: user-guide/configuration.qmd
-                  text: Configuration
-                - href: user-guide/cli.qmd
-                  text: Command Line Interface
-                - href: user-guide/integrations.qmd
-                  text: Integrations
-            - section: "Development"
-              href: development/index.qmd
-              contents:
-                - href: development/lsp.qmd
-                  text: Language Server
-                - href: development/contributing.md
-                  text: Contributing
+            - href: guide/formatting.qmd
+              text: Formatting
+            - href: guide/linting.qmd
+              text: Linting
+            - href: guide/lsp.qmd
+              text: Language Server
+            - href: guide/configuration.qmd
+              text: Configuration
+            - href: guide/integrations.qmd
+              text: Integrations
+        - section: "Reference"
+          style: floating
+          href: reference/index.qmd
+          contents:
+            - href: reference/cli.qmd
+              text: Command Line Interface
+            - href: reference/formatter-presets.qmd
+              text: External Formatter Presets
+    - id: development
+      style: floating
+      collapse-level: 3
+      contents:
+        - section: "Development"
+          style: floating
+          href: development/index.qmd
+          contents:
+            - href: development/lsp.qmd
+              text: Language Server
+            - href: development/contributing.md
+              text: Contributing
 
 resources:
   - "playground/**"

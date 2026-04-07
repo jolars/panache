@@ -1,0 +1,11 @@
+---
+title: "Formatter Presets"
+description: >
+  This section provides a reference for the
+  external formatter presets available in Panache.
+---
+
+Read the [Formatting Guide](../guide/formatting.qmd) for instructions on how to
+configure external formatters for code chunks in Panache.
+
+{{< include _formatter-presets-details.qmd >}}

@@ -184,24 +184,24 @@ intentionally excluded.
 - [ ] `autoflake`
 - [ ] `autopep8`
 - [ ] `bake`
-- [ ] `bean-format`
-- [ ] `beautysh`
-- [ ] `bibtex-tidy`
+- [x] `bean-format`
+- [x] `beautysh`
+- [x] `bibtex-tidy`
 - [ ] `bicep`
 - [ ] `biome-check`
 - [ ] `biome-organize-imports`
 - [ ] `biome`
 - [ ] `blade-formatter`
 - [ ] `blue`
-- [ ] `bpfmt`
-- [ ] `bsfmt`
-- [ ] `buf`
-- [ ] `buildifier`
-- [ ] `cabal_fmt`
+- [x] `bpfmt`
+- [x] `bsfmt`
+- [x] `buf`
+- [x] `buildifier`
+- [x] `cabal_fmt`
 - [ ] `caramel_fmt`
 - [ ] `cbfmt`
 - [ ] `cedar`
-- [ ] `cljfmt`
+- [x] `cljfmt`
 - [ ] `cljstyle`
 - [x] `cmake_format`
 - [ ] `codeql`
@@ -218,7 +218,7 @@ intentionally excluded.
 - [ ] `dcm_fix`
 - [ ] `dcm_format`
 - [ ] `deno_fmt`
-- [ ] `dfmt`
+- [x] `dfmt`
 - [ ] `dioxus`
 - [ ] `djlint`
 - [ ] `docformatter`
@@ -227,15 +227,15 @@ intentionally excluded.
 - [ ] `doctoc`
 - [ ] `dprint`
 - [ ] `easy-coding-standard`
-- [ ] `efmt`
+- [x] `efmt`
 - [ ] `elm_format`
 - [ ] `erb_format`
 - [ ] `erlfmt`
 - [ ] `eslint_d`
 - [ ] `fantomas`
 - [ ] `findent`
-- [ ] `fish_indent`
-- [ ] `fixjson`
+- [x] `fish_indent`
+- [x] `fixjson`
 - [ ] `fnlfmt`
 - [ ] `forge_fmt`
 - [ ] `format-dune-file`
@@ -243,7 +243,7 @@ intentionally excluded.
 - [ ] `fprettify`
 - [ ] `gawk`
 - [ ] `gci`
-- [ ] `gdformat`
+- [x] `gdformat`
 - [ ] `gdscript-formatter`
 - [ ] `gersemi`
 - [ ] `ghdl`
@@ -258,14 +258,14 @@ intentionally excluded.
 - [ ] `gojq`
 - [ ] `golangci-lint`
 - [ ] `golines`
-- [ ] `google-java-format`
+- [x] `google-java-format`
 - [ ] `grain_format`
 - [ ] `hcl`
 - [ ] `hindent`
 - [ ] `hledger-fmt`
 - [ ] `html_beautify`
 - [ ] `htmlbeautifier`
-- [ ] `hurlfmt`
+- [x] `hurlfmt`
 - [ ] `imba_fmt`
 - [ ] `indent`
 - [ ] `injected`
@@ -281,11 +281,11 @@ intentionally excluded.
 - [ ] `kcl`
 - [ ] `kdlfmt`
 - [ ] `keep-sorted`
-- [ ] `ktfmt`
+- [x] `ktfmt`
 - [ ] `ktlint`
 - [ ] `kulala-fmt`
 - [ ] `latexindent`
-- [ ] `leptosfmt`
+- [x] `leptosfmt`
 - [ ] `liquidsoap-prettier`
 - [ ] `llf`
 - [ ] `lua-format`
@@ -301,7 +301,7 @@ intentionally excluded.
 - [ ] `mh_style`
 - [ ] `mix`
 - [ ] `mojo_format`
-- [ ] `nginxfmt`
+- [x] `nginxfmt`
 - [ ] `nickel`
 - [ ] `nimpretty`
 - [x] `nixfmt`
@@ -336,25 +336,25 @@ intentionally excluded.
 - [ ] `pruner`
 - [ ] `puppet-lint`
 - [ ] `purs-tidy`
-- [ ] `pycln`
+- [x] `pycln`
 - [ ] `pyink`
 - [ ] `pymarkdownlnt`
-- [ ] `pyproject-fmt`
+- [x] `pyproject-fmt`
 - [ ] `python-ly`
 - [ ] `pyupgrade`
 - [ ] `qmlformat`
-- [ ] `racketfmt`
+- [x] `racketfmt`
 - [ ] `reformat-gherkin`
 - [ ] `reorder-python-imports`
 - [ ] `rescript-format`
 - [ ] `roc`
 - [ ] `rstfmt`
 - [ ] `rubocop`
-- [ ] `rubyfmt`
+- [x] `rubyfmt`
 - [ ] `ruff_fix`
 - [ ] `ruff_format`
 - [ ] `ruff_organize_imports`
-- [ ] `rufo`
+- [x] `rufo`
 - [ ] `rumdl`
 - [ ] `runic`
 - [ ] `rustfmt`
@@ -383,11 +383,11 @@ intentionally excluded.
 - [ ] `swiftformat`
 - [ ] `swiftlint`
 - [ ] `syntax_tree`
-- [ ] `tclfmt`
+- [x] `tclfmt`
 - [ ] `templ`
 - [ ] `terraform_fmt`
 - [ ] `terragrunt_hclfmt`
-- [ ] `tex-fmt`
+- [x] `tex-fmt`
 - [ ] `tlint`
 - [ ] `tofu_fmt`
 - [ ] `tombi`
@@ -399,7 +399,7 @@ intentionally excluded.
 - [ ] `txtpbfmt`
 - [ ] `typespec`
 - [ ] `typos`
-- [ ] `typstyle`
+- [x] `typstyle`
 - [ ] `ufmt`
 - [ ] `uncrustify`
 - [ ] `usort`

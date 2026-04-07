@@ -1,5 +1,9 @@
 ---
 title: Linting
+description: >
+  This section provides instructions and examples for using the Panache linter,
+  which checks for correctness issues and best practice violations in your
+  Markdown documents.
 ---
 
 Panache includes a built-in linter that checks for correctness issues and best
