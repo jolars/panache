@@ -194,6 +194,14 @@ pub(super) enum NodeWrapMode {
 }
 
 #[derive(Clone, Copy)]
+pub(super) enum WrapStrategy {
+    ParagraphReflow,
+    ParagraphSentence,
+    ListReflow { in_blockquote: bool },
+    ListSentence { in_blockquote: bool },
+}
+
+#[derive(Clone, Copy)]
 pub(super) struct NodeWrapOptions<'a> {
     pub widths: &'a [usize],
     pub mode: NodeWrapMode,
@@ -224,50 +232,136 @@ impl<'a> NodeWrapOptions<'a> {
     }
 }
 
-fn strip_blockquote_prefix(line: &str) -> &str {
-    if let Some(rest) = line.strip_prefix("> ") {
-        rest
-    } else if let Some(rest) = line.strip_prefix('>') {
-        rest
-    } else {
-        line
+impl WrapStrategy {
+    fn options<'a>(self, widths: &'a [usize]) -> NodeWrapOptions<'a> {
+        match self {
+            Self::ParagraphReflow => NodeWrapOptions {
+                apply_special_cases: true,
+                ..NodeWrapOptions::reflow(widths, true)
+            },
+            Self::ParagraphSentence => NodeWrapOptions {
+                apply_special_cases: true,
+                ..NodeWrapOptions::sentence(true)
+            },
+            Self::ListReflow { in_blockquote } => NodeWrapOptions {
+                strip_standalone_blockquote_markers: in_blockquote,
+                ..NodeWrapOptions::reflow(widths, false)
+            },
+            Self::ListSentence { in_blockquote } => NodeWrapOptions {
+                strip_standalone_blockquote_markers: in_blockquote,
+                ..NodeWrapOptions::sentence(false)
+            },
+        }
     }
 }
 
-fn remove_standalone_blockquote_markers(line: &str) -> String {
-    line.split_ascii_whitespace()
-        .filter(|part| *part != ">")
-        .collect::<Vec<_>>()
-        .join(" ")
+struct StreamingCoreSink<'a> {
+    default_line_width: usize,
+    line_widths: &'a [usize],
+    sentence_mode: bool,
+    out: Vec<String>,
+    line: String,
+    line_width: usize,
+    line_has_piece: bool,
+    prev_ws_after: bool,
+    pending_piece: Option<(String, bool)>,
+    strip_standalone_blockquote_markers: bool,
+    merge_initialism_year: bool,
+}
+
+impl<'a> StreamingCoreSink<'a> {
+    fn new(
+        line_widths: &'a [usize],
+        sentence_mode: bool,
+        strip_standalone_blockquote_markers: bool,
+        merge_initialism_year: bool,
+    ) -> Self {
+        Self {
+            default_line_width: line_widths.last().copied().unwrap_or(0),
+            line_widths,
+            sentence_mode,
+            out: Vec::new(),
+            line: String::new(),
+            line_width: 0,
+            line_has_piece: false,
+            prev_ws_after: false,
+            pending_piece: None,
+            strip_standalone_blockquote_markers,
+            merge_initialism_year,
+        }
+    }
+
+    fn consume(&mut self, piece: String, piece_ws_after: bool, is_last: bool) {
+        let piece_width = UnicodeWidthStr::width(piece.as_str());
+        if !self.sentence_mode {
+            let width_limit = self
+                .line_widths
+                .get(self.out.len())
+                .copied()
+                .unwrap_or(self.default_line_width);
+            let spacer_width = usize::from(self.line_has_piece && self.prev_ws_after);
+            if self.line_has_piece && self.line_width + spacer_width + piece_width > width_limit {
+                self.out.push(std::mem::take(&mut self.line));
+                self.line_width = 0;
+                self.line_has_piece = false;
+                self.prev_ws_after = false;
+            }
+        }
+        if self.line_has_piece && self.prev_ws_after {
+            self.line.push(' ');
+            self.line_width += 1;
+        }
+        self.line.push_str(&piece);
+        self.line_width += piece_width;
+        self.line_has_piece = true;
+        self.prev_ws_after = piece_ws_after;
+
+        if self.sentence_mode && is_sentence_boundary_text(&piece, piece_ws_after, is_last) {
+            self.out.push(std::mem::take(&mut self.line));
+            self.line_width = 0;
+            self.line_has_piece = false;
+            self.prev_ws_after = false;
+        }
+    }
+
+    fn emit_piece(&mut self, piece: String, ws_after: bool) {
+        if self.strip_standalone_blockquote_markers && piece == ">" {
+            return;
+        }
+        if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
+            if self.merge_initialism_year
+                && should_merge_initialism_year(&pending, pending_ws_after, &piece)
+            {
+                self.pending_piece = Some((format!("{pending} {piece}"), ws_after));
+                return;
+            }
+            self.consume(pending, pending_ws_after, false);
+        }
+        self.pending_piece = Some((piece, ws_after));
+    }
+
+    fn finish(mut self) -> Vec<String> {
+        if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
+            self.consume(pending, pending_ws_after, true);
+        }
+        if self.line_has_piece {
+            self.out.push(self.line);
+        } else if self.out.is_empty() {
+            self.out.push(String::new());
+        }
+        self.out
+    }
 }
 
 pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
     let words: Vec<&str> = text.split_ascii_whitespace().collect();
-    let mut out = Vec::new();
-    let mut line = String::new();
-    let mut line_width_used = 0usize;
-
-    for word in words {
-        let word_width = UnicodeWidthStr::width(word);
-        let spacer = usize::from(!line.is_empty());
-        if !line.is_empty() && line_width_used + spacer + word_width > line_width {
-            out.push(std::mem::take(&mut line));
-            line_width_used = 0;
-        }
-        if !line.is_empty() {
-            line.push(' ');
-            line_width_used += 1;
-        }
-        line.push_str(word);
-        line_width_used += word_width;
+    let line_widths = [line_width];
+    let mut sink = StreamingCoreSink::new(&line_widths, false, false, false);
+    for (idx, word) in words.iter().enumerate() {
+        let ws_after = idx + 1 < words.len();
+        sink.emit_piece((*word).to_string(), ws_after);
     }
-
-    if !line.is_empty() {
-        out.push(line);
-    } else if out.is_empty() {
-        out.push(String::new());
-    }
-    out
+    sink.finish()
 }
 
 enum InlineFootnoteEvent {
@@ -465,18 +559,76 @@ fn append_image_closing(node: &SyntaxNode, out: &mut String) {
     }
 }
 
-trait TraversalSink {
-    fn push_piece(&mut self, text: &str);
-    fn pending_space(&self) -> bool;
-    fn set_pending_space(&mut self, value: bool);
-    fn skip_next_leading_whitespace(&self) -> bool;
-    fn set_skip_next_leading_whitespace(&mut self, value: bool);
+struct TraversalBuilder<'a> {
+    sink: StreamingCoreSink<'a>,
+    current_piece: Option<String>,
+    pending_space: bool,
+    skip_next_leading_whitespace: bool,
 }
 
-fn process_node_recursive<S: TraversalSink>(
+impl<'a> TraversalBuilder<'a> {
+    fn new(
+        line_widths: &'a [usize],
+        sentence_mode: bool,
+        strip_standalone_blockquote_markers: bool,
+    ) -> Self {
+        Self {
+            sink: StreamingCoreSink::new(
+                line_widths,
+                sentence_mode,
+                strip_standalone_blockquote_markers,
+                true,
+            ),
+            current_piece: None,
+            pending_space: false,
+            skip_next_leading_whitespace: false,
+        }
+    }
+
+    fn push_piece(&mut self, text: &str) {
+        if self.pending_space {
+            self.flush_current(true);
+            self.current_piece = Some(text.to_string());
+            self.pending_space = false;
+        } else if let Some(current) = &mut self.current_piece {
+            current.push_str(text);
+        } else {
+            self.current_piece = Some(text.to_string());
+        }
+    }
+
+    fn pending_space(&self) -> bool {
+        self.pending_space
+    }
+
+    fn set_pending_space(&mut self, value: bool) {
+        self.pending_space = value;
+    }
+
+    fn skip_next_leading_whitespace(&self) -> bool {
+        self.skip_next_leading_whitespace
+    }
+
+    fn set_skip_next_leading_whitespace(&mut self, value: bool) {
+        self.skip_next_leading_whitespace = value;
+    }
+
+    fn flush_current(&mut self, ws_after: bool) {
+        if let Some(piece) = self.current_piece.take() {
+            self.sink.emit_piece(piece, ws_after);
+        }
+    }
+
+    fn finish(mut self) -> Vec<String> {
+        self.flush_current(false);
+        self.sink.finish()
+    }
+}
+
+fn process_node_recursive(
     config: &Config,
     node: &SyntaxNode,
-    sink: &mut S,
+    sink: &mut TraversalBuilder<'_>,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
     in_link_text: bool,
     atomic_links: bool,
@@ -692,8 +844,9 @@ pub(super) fn wrapped_lines_for_paragraph(
     let out_lines = wrapped_lines_for_node(
         _config,
         node,
+        &[width],
         format_inline_fn,
-        NodeWrapOptions::reflow(&[width], true),
+        WrapStrategy::ParagraphReflow,
     );
     log::debug!("Wrapped into {} lines", out_lines.len());
     out_lines
@@ -709,8 +862,9 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
     let out_lines = wrapped_lines_for_node(
         _config,
         node,
+        widths,
         format_inline_fn,
-        NodeWrapOptions::reflow(widths, true),
+        WrapStrategy::ParagraphReflow,
     );
     log::debug!("Wrapped into {} lines", out_lines.len());
     out_lines
@@ -725,17 +879,20 @@ pub(super) fn sentence_lines_for_paragraph(
     wrapped_lines_for_node(
         _config,
         node,
+        &[],
         format_inline_fn,
-        NodeWrapOptions::sentence(true),
+        WrapStrategy::ParagraphSentence,
     )
 }
 
 pub(super) fn wrapped_lines_for_node(
     config: &Config,
     node: &SyntaxNode,
+    widths: &[usize],
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-    options: NodeWrapOptions<'_>,
+    strategy: WrapStrategy,
 ) -> Vec<String> {
+    let options = strategy.options(widths);
     let sentence_mode = matches!(options.mode, NodeWrapMode::Sentence);
     if options.apply_special_cases
         && let Some(lines) = special_case_lines(config, node, format_inline_fn)
@@ -747,184 +904,18 @@ pub(super) fn wrapped_lines_for_node(
     } else {
         &[1]
     };
-    let lines = wrap_node_greedy_streaming(
-        config,
-        node,
+    let mut builder = TraversalBuilder::new(
         line_widths,
-        format_inline_fn,
         sentence_mode,
-        options.atomic_links_root,
+        options.strip_standalone_blockquote_markers,
     );
-    if options.strip_standalone_blockquote_markers {
-        lines
-            .into_iter()
-            .map(|line| remove_standalone_blockquote_markers(&line))
-            .collect()
-    } else {
-        lines
-    }
-}
-
-fn wrap_node_greedy_streaming(
-    config: &Config,
-    node: &SyntaxNode,
-    line_widths: &[usize],
-    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-    sentence_mode: bool,
-    atomic_links_root: bool,
-) -> Vec<String> {
-    struct GreedySink<'a> {
-        default_line_width: usize,
-        line_widths: &'a [usize],
-        sentence_mode: bool,
-        out: Vec<String>,
-        line: String,
-        line_width: usize,
-        line_has_piece: bool,
-        prev_ws_after: bool,
-        pending_piece: Option<(String, bool)>,
-    }
-
-    impl<'a> GreedySink<'a> {
-        fn new(line_widths: &'a [usize], sentence_mode: bool) -> Self {
-            Self {
-                default_line_width: line_widths.last().copied().unwrap_or(0),
-                line_widths,
-                sentence_mode,
-                out: Vec::new(),
-                line: String::new(),
-                line_width: 0,
-                line_has_piece: false,
-                prev_ws_after: false,
-                pending_piece: None,
-            }
-        }
-
-        fn consume(&mut self, piece: String, piece_ws_after: bool, is_last: bool) {
-            let piece_width = UnicodeWidthStr::width(piece.as_str());
-            if !self.sentence_mode {
-                let width_limit = self
-                    .line_widths
-                    .get(self.out.len())
-                    .copied()
-                    .unwrap_or(self.default_line_width);
-                let spacer_width = usize::from(self.line_has_piece && self.prev_ws_after);
-                if self.line_has_piece && self.line_width + spacer_width + piece_width > width_limit
-                {
-                    self.out.push(std::mem::take(&mut self.line));
-                    self.line_width = 0;
-                    self.line_has_piece = false;
-                    self.prev_ws_after = false;
-                }
-            }
-            if self.line_has_piece && self.prev_ws_after {
-                self.line.push(' ');
-                self.line_width += 1;
-            }
-            self.line.push_str(&piece);
-            self.line_width += piece_width;
-            self.line_has_piece = true;
-            self.prev_ws_after = piece_ws_after;
-
-            if self.sentence_mode && is_sentence_boundary_text(&piece, piece_ws_after, is_last) {
-                self.out.push(std::mem::take(&mut self.line));
-                self.line_width = 0;
-                self.line_has_piece = false;
-                self.prev_ws_after = false;
-            }
-        }
-
-        fn emit_piece(&mut self, piece: String, ws_after: bool) {
-            if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
-                if should_merge_initialism_year(&pending, pending_ws_after, &piece) {
-                    self.pending_piece = Some((format!("{pending} {piece}"), ws_after));
-                    return;
-                }
-                self.consume(pending, pending_ws_after, false);
-            }
-            self.pending_piece = Some((piece, ws_after));
-        }
-
-        fn finish(mut self) -> Vec<String> {
-            if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
-                self.consume(pending, pending_ws_after, true);
-            }
-            if self.line_has_piece {
-                self.out.push(self.line);
-            } else if self.out.is_empty() {
-                self.out.push(String::new());
-            }
-            self.out
-        }
-    }
-
-    struct StreamingBuilder<'a> {
-        sink: GreedySink<'a>,
-        current_piece: Option<String>,
-        pending_space: bool,
-        skip_next_leading_whitespace: bool,
-    }
-
-    impl<'a> StreamingBuilder<'a> {
-        fn new(line_widths: &'a [usize], sentence_mode: bool) -> Self {
-            Self {
-                sink: GreedySink::new(line_widths, sentence_mode),
-                current_piece: None,
-                pending_space: false,
-                skip_next_leading_whitespace: false,
-            }
-        }
-
-        fn flush_current(&mut self, ws_after: bool) {
-            if let Some(piece) = self.current_piece.take() {
-                self.sink.emit_piece(piece, ws_after);
-            }
-        }
-
-        fn push_piece_impl(&mut self, text: &str) {
-            if self.pending_space {
-                self.flush_current(true);
-                self.current_piece = Some(text.to_string());
-                self.pending_space = false;
-            } else if let Some(current) = &mut self.current_piece {
-                current.push_str(text);
-            } else {
-                self.current_piece = Some(text.to_string());
-            }
-        }
-
-        fn finish(mut self) -> Vec<String> {
-            self.flush_current(false);
-            self.sink.finish()
-        }
-    }
-
-    impl TraversalSink for StreamingBuilder<'_> {
-        fn push_piece(&mut self, text: &str) {
-            self.push_piece_impl(text);
-        }
-        fn pending_space(&self) -> bool {
-            self.pending_space
-        }
-        fn set_pending_space(&mut self, value: bool) {
-            self.pending_space = value;
-        }
-        fn skip_next_leading_whitespace(&self) -> bool {
-            self.skip_next_leading_whitespace
-        }
-        fn set_skip_next_leading_whitespace(&mut self, value: bool) {
-            self.skip_next_leading_whitespace = value;
-        }
-    }
-
-    let mut builder = StreamingBuilder::new(line_widths, sentence_mode);
     process_node_recursive(
         config,
         node,
         &mut builder,
         format_inline_fn,
         false,
-        atomic_links_root,
+        options.atomic_links_root,
     );
     builder.finish()
 }
@@ -934,6 +925,16 @@ fn special_case_lines(
     node: &SyntaxNode,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Option<Vec<String>> {
+    fn strip_blockquote_prefix(line: &str) -> &str {
+        if let Some(rest) = line.strip_prefix("> ") {
+            rest
+        } else if let Some(rest) = line.strip_prefix('>') {
+            rest
+        } else {
+            line
+        }
+    }
+
     let mut has_hard_breaks = false;
     let mut has_dollar_text = false;
     for el in node.descendants_with_tokens() {

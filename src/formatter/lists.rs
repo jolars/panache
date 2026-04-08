@@ -1,6 +1,6 @@
 use crate::config::WrapMode;
 use crate::formatter::indent_utils::{calculate_list_item_indent, is_alignable_marker};
-use crate::formatter::wrapping::{self, NodeWrapOptions};
+use crate::formatter::wrapping::{self, WrapStrategy};
 use crate::syntax::{BlockQuote, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -410,11 +410,9 @@ impl Formatter {
                     wrapping::wrapped_lines_for_node(
                         &self.config,
                         source,
+                        &line_widths,
                         &|n| self.format_inline_node(n),
-                        NodeWrapOptions {
-                            strip_standalone_blockquote_markers: in_blockquote,
-                            ..NodeWrapOptions::reflow(&line_widths, false)
-                        },
+                        WrapStrategy::ListReflow { in_blockquote },
                     )
                 })
                 .unwrap_or_default(),
@@ -436,11 +434,9 @@ impl Formatter {
                         wrapping::wrapped_lines_for_node(
                             &self.config,
                             source,
+                            &[],
                             &|n| self.format_inline_node(n),
-                            NodeWrapOptions {
-                                strip_standalone_blockquote_markers: in_blockquote,
-                                ..NodeWrapOptions::sentence(false)
-                            },
+                            WrapStrategy::ListSentence { in_blockquote },
                         )
                     })
                     .unwrap_or_default(),
