@@ -1,4 +1,7 @@
 use crate::config::Config;
+use crate::formatter::sentence_wrap::{
+    SentenceLanguage, is_sentence_boundary_text, resolve_sentence_language,
+};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::borrow::Cow;
@@ -171,17 +174,6 @@ fn normalize_inline_for_sentence<'a>(text: &'a str) -> Cow<'a, str> {
     }
 }
 
-fn is_sentence_boundary_text(word: &str, has_whitespace_after: bool, is_last: bool) -> bool {
-    let trimmed = word.trim_end_matches(['"', '\'', ')', ']', '}']);
-    if trimmed.ends_with("...") || trimmed.ends_with("…") {
-        return false;
-    }
-    let Some(last_char) = trimmed.chars().last() else {
-        return false;
-    };
-    matches!(last_char, '.' | '!' | '?') && (has_whitespace_after || is_last)
-}
-
 fn should_merge_initialism_year(left: &str, left_ws_after: bool, right: &str) -> bool {
     left_ws_after && is_initialism_with_periods(left) && is_year_like(right)
 }
@@ -257,6 +249,7 @@ struct StreamingCoreSink<'a> {
     pending_piece: Option<(String, bool)>,
     strip_standalone_blockquote_markers: bool,
     merge_initialism_year: bool,
+    sentence_language: SentenceLanguage,
 }
 
 impl<'a> StreamingCoreSink<'a> {
@@ -265,6 +258,7 @@ impl<'a> StreamingCoreSink<'a> {
         sentence_mode: bool,
         strip_standalone_blockquote_markers: bool,
         merge_initialism_year: bool,
+        sentence_language: SentenceLanguage,
     ) -> Self {
         Self {
             default_line_width: line_widths.last().copied().unwrap_or(0),
@@ -278,6 +272,7 @@ impl<'a> StreamingCoreSink<'a> {
             pending_piece: None,
             strip_standalone_blockquote_markers,
             merge_initialism_year,
+            sentence_language,
         }
     }
 
@@ -306,7 +301,9 @@ impl<'a> StreamingCoreSink<'a> {
         self.line_has_piece = true;
         self.prev_ws_after = piece_ws_after;
 
-        if self.sentence_mode && is_sentence_boundary_text(&piece, piece_ws_after, is_last) {
+        if self.sentence_mode
+            && is_sentence_boundary_text(&piece, piece_ws_after, is_last, self.sentence_language)
+        {
             self.out.push(std::mem::take(&mut self.line));
             self.line_width = 0;
             self.line_has_piece = false;
@@ -360,7 +357,8 @@ impl<'a> StreamingCoreSink<'a> {
 pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
     let words: Vec<&str> = text.split_ascii_whitespace().collect();
     let line_widths = [line_width];
-    let mut sink = StreamingCoreSink::new(&line_widths, false, false, false);
+    let mut sink =
+        StreamingCoreSink::new(&line_widths, false, false, false, SentenceLanguage::English);
     for (idx, word) in words.iter().enumerate() {
         let ws_after = idx + 1 < words.len();
         sink.emit_piece((*word).to_string(), ws_after);
@@ -471,6 +469,7 @@ impl<'a> TraversalBuilder<'a> {
         line_widths: &'a [usize],
         sentence_mode: bool,
         strip_standalone_blockquote_markers: bool,
+        sentence_language: SentenceLanguage,
     ) -> Self {
         Self {
             sink: StreamingCoreSink::new(
@@ -478,6 +477,7 @@ impl<'a> TraversalBuilder<'a> {
                 sentence_mode,
                 strip_standalone_blockquote_markers,
                 true,
+                sentence_language,
             ),
             current_piece: None,
             pending_space: false,
@@ -925,10 +925,12 @@ pub(super) fn wrapped_lines_for_node(
     } else {
         &[1]
     };
+    let sentence_language = resolve_sentence_language(node);
     let mut builder = TraversalBuilder::new(
         line_widths,
         sentence_mode,
         options.strip_standalone_blockquote_markers,
+        sentence_language,
     );
     process_node_recursive(
         config,

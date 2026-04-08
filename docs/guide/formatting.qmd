@@ -39,6 +39,15 @@ number of columns specified by the `line-width` configuration option (default
 not reflow paragraphs. If `wrap` is set to `sentence`, Panache will break lines
 at sentence boundaries, ensuring that each sentence starts on a new line.
 
+In sentence mode, Panache applies conservative no-break rules for common
+abbreviations (for example `i.e.` and `e.g.`), so these do not trigger sentence
+splits by themselves.
+
+When document metadata provides `lang` (as in Quarto and Pandoc frontmatter),
+Panache uses it to choose sentence-boundary behavior. Currently, English rules
+are applied as the default fallback when language-specific rules are not
+available.
+
 Input
 
 :   ```markdown
