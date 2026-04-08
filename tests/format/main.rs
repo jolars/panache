@@ -4,6 +4,7 @@ mod code_chunks;
 mod comments;
 mod definition_lists;
 mod external_formatters;
+mod fenced_divs;
 mod frontmatter;
 mod header_attributes;
 mod headings;

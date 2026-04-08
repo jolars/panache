@@ -174,40 +174,6 @@ impl Formatter {
         "-".repeat(available_width.max(3))
     }
 
-    fn bare_fence_paragraph_line(&self, node: &SyntaxNode) -> Option<String> {
-        let mut atoms = Vec::new();
-
-        for child in node.children_with_tokens() {
-            match child {
-                NodeOrToken::Token(t)
-                    if matches!(
-                        t.kind(),
-                        SyntaxKind::TEXT | SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE
-                    ) =>
-                {
-                    if t.kind() == SyntaxKind::TEXT {
-                        atoms.extend(t.text().split_whitespace().map(|s| s.to_string()));
-                    }
-                }
-                NodeOrToken::Node(n) => {
-                    let formatted = self.format_inline_node(&n);
-                    if formatted.contains('\n') {
-                        return None;
-                    }
-                    atoms.push(formatted);
-                }
-                _ => return None,
-            }
-        }
-
-        if atoms.len() < 2 || atoms.first()? != ":::" || atoms.last()? != ":::" {
-            return None;
-        }
-
-        let middle = atoms[1..atoms.len() - 1].join(" ");
-        Some(format!("::: {} :::", middle))
-    }
-
     fn paragraph_starts_with_atx_heading_candidate(&self, node: &SyntaxNode) -> bool {
         if node.kind() != SyntaxKind::PARAGRAPH {
             return false;
@@ -1151,16 +1117,6 @@ impl Formatter {
                     return;
                 }
 
-                // Pandoc formats bare fenced div paragraphs on a single line ("::: A :::").
-                if let Some(line) = self.bare_fence_paragraph_line(node) {
-                    if indent > 0 {
-                        self.output.push_str(&paragraph_indent);
-                    }
-                    self.output.push_str(&line);
-                    self.output.push('\n');
-                    return;
-                }
-
                 if self.config.extensions.bookdown_references
                     && paragraphs::is_bookdown_text_reference(node)
                 {
@@ -1983,17 +1939,24 @@ impl Formatter {
                     })
                     .collect();
 
-                let start = if in_list_item { 0 } else { leading_blank_lines };
                 let end = content_children.len();
-                let first_non_blank_kind = content_children[start..end]
+                let first_non_blank_kind = content_children[0..end]
                     .iter()
                     .find(|child| child.kind() != SyntaxKind::BLANK_LINE)
                     .map(|child| child.kind());
+                let should_strip_leading_blanks = matches!(
+                    first_non_blank_kind,
+                    Some(SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN | SyntaxKind::LIST)
+                );
+                let start = if should_strip_leading_blanks {
+                    leading_blank_lines
+                } else {
+                    0
+                };
 
                 for (idx, child) in content_children[start..end].iter().enumerate() {
                     if child.kind() == SyntaxKind::BLANK_LINE {
-                        if in_list_item
-                            && idx < leading_blank_lines
+                        if idx < leading_blank_lines
                             && first_non_blank_kind == Some(SyntaxKind::LIST)
                         {
                             continue;

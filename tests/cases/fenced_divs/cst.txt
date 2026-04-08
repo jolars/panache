@@ -1,4 +1,4 @@
-DOCUMENT@0..734
+DOCUMENT@0..834
   FENCED_DIV@0..72
     DIV_FENCE_OPEN@0..19
       TEXT@0..3 ":::"
@@ -215,4 +215,45 @@ DOCUMENT@0..734
     NEWLINE@729..730 "\n"
     TEXT@730..733 ":::"
     NEWLINE@733..734 "\n"
+  BLANK_LINE@734..735
+    BLANK_LINE@734..735 "\n"
+  PARAGRAPH@735..768
+    TEXT@735..767 "This is not a fenced  ..."
+    NEWLINE@767..768 "\n"
+  BLANK_LINE@768..769
+    BLANK_LINE@768..769 "\n"
+  PARAGRAPH@769..789
+    TEXT@769..770 "B"
+    NEWLINE@770..771 "\n"
+    TEXT@771..782 "::: declare"
+    NEWLINE@782..783 "\n"
+    TEXT@783..784 "A"
+    NEWLINE@784..785 "\n"
+    TEXT@785..788 ":::"
+    NEWLINE@788..789 "\n"
+  BLANK_LINE@789..790
+    BLANK_LINE@789..790 "\n"
+  PARAGRAPH@790..812
+    TEXT@790..811 "Here is a fenced div:"
+    NEWLINE@811..812 "\n"
+  BLANK_LINE@812..813
+    BLANK_LINE@812..813 "\n"
+  FENCED_DIV@813..832
+    DIV_FENCE_OPEN@813..825
+      TEXT@813..816 ":::"
+      WHITESPACE@816..817 " "
+      DIV_INFO@817..824
+        TEXT@817..824 "declare"
+      NEWLINE@824..825 "\n"
+    BLANK_LINE@825..826
+      BLANK_LINE@825..826 "\n"
+    PARAGRAPH@826..828
+      TEXT@826..827 "A"
+      NEWLINE@827..828 "\n"
+    DIV_FENCE_CLOSE@828..832
+      TEXT@828..831 ":::"
+      NEWLINE@831..832 "\n"
+  PARAGRAPH@832..834
+    TEXT@832..833 "B"
+    NEWLINE@833..834 "\n"
 

@@ -1873,8 +1873,29 @@ impl<'a> Parser<'a> {
         } else if let Some(block_match) = dispatcher_match.as_ref() {
             // Without blank-before, only allow interrupting blocks OR blocks that are
             // explicitly allowed without blank lines (e.g. reference definitions).
+            let parser_name = self.block_registry.parser_name(block_match);
             match block_match.detection {
                 BlockDetectionResult::YesCanInterrupt => {
+                    if matches!(block_match.effect, BlockEffect::OpenFencedDiv)
+                        && self.is_paragraph_open()
+                    {
+                        // Fenced divs must not interrupt paragraphs without a blank line.
+                        if !self.is_paragraph_open() {
+                            paragraphs::start_paragraph_if_needed(
+                                &mut self.containers,
+                                &mut self.builder,
+                            );
+                        }
+                        paragraphs::append_paragraph_line(
+                            &mut self.containers,
+                            &mut self.builder,
+                            line_to_append.unwrap_or(self.lines[self.pos]),
+                            self.config,
+                        );
+                        self.pos += 1;
+                        return true;
+                    }
+
                     if matches!(block_match.effect, BlockEffect::OpenList)
                         && self.is_paragraph_open()
                         && !lists::in_list(&self.containers)
@@ -1897,7 +1918,24 @@ impl<'a> Parser<'a> {
                     }
                 }
                 BlockDetectionResult::Yes => {
-                    // E.g. reference definitions: no preparation (matches previous behavior).
+                    // Non-interrupting blocks generally require blank-before.
+                    // Keep the legacy allowance only for reference definitions.
+                    if parser_name != "reference_definition" {
+                        if !self.is_paragraph_open() {
+                            paragraphs::start_paragraph_if_needed(
+                                &mut self.containers,
+                                &mut self.builder,
+                            );
+                        }
+                        paragraphs::append_paragraph_line(
+                            &mut self.containers,
+                            &mut self.builder,
+                            line_to_append.unwrap_or(self.lines[self.pos]),
+                            self.config,
+                        );
+                        self.pos += 1;
+                        return true;
+                    }
                 }
                 BlockDetectionResult::No => unreachable!(),
             }

@@ -850,6 +850,14 @@ pub(super) fn wrapped_lines_for_paragraph(
     width: usize,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
+    if is_fence_like_triplet_paragraph(node) {
+        return node
+            .text()
+            .to_string()
+            .lines()
+            .map(ToString::to_string)
+            .collect();
+    }
     log::debug!("wrapped_lines_for_paragraph called with width={}", width);
     let out_lines = wrapped_lines_for_node(
         _config,
@@ -868,6 +876,14 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
     widths: &[usize],
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
+    if is_fence_like_triplet_paragraph(node) {
+        return node
+            .text()
+            .to_string()
+            .lines()
+            .map(ToString::to_string)
+            .collect();
+    }
     log::debug!("wrapped_lines_for_paragraph_with_widths called");
     let out_lines = wrapped_lines_for_node(
         _config,
@@ -924,4 +940,23 @@ pub(super) fn wrapped_lines_for_node(
         false,
     );
     builder.finish()
+}
+
+fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {
+    if node.kind() != SyntaxKind::PARAGRAPH {
+        return false;
+    }
+
+    let text = node.text().to_string();
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() != 3 {
+        return false;
+    }
+
+    let first = lines[0].trim();
+    let middle = lines[1].trim();
+    let last = lines[2].trim();
+
+    let is_fence = |line: &str| line.len() >= 3 && line.chars().all(|c| c == ':');
+    is_fence(first) && is_fence(last) && !middle.is_empty()
 }

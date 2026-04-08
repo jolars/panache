@@ -56,4 +56,18 @@ B
 Pandoc requires that opening fences have attributes, so this is not a fenced
 div:
 
-::: A :::
+:::
+A
+:::
+
+This is not a fenced div either:
+
+B ::: declare A :::
+
+Here is a fenced div:
+
+::: declare
+A
+:::
+
+B

@@ -134,6 +134,13 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_div_fence_open_with_class_name_and_trailing_colons() {
+        let line = "::: Warning :::";
+        let fence = try_parse_div_fence_open(line).unwrap();
+        assert_eq!(fence.attributes, "Warning");
+    }
+
+    #[test]
     fn test_opening_fence_empty_attributes() {
         let line = ":::";
         assert!(try_parse_div_fence_open(line).is_none());
