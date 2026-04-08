@@ -209,3 +209,67 @@ fn loose_list_figure_and_followup_paragraph_keep_list_indentation() {
     let output = format(input, None, None);
     assert_eq!(output, expected);
 }
+
+#[test]
+fn list_item_with_inline_fenced_div_opener_text_stays_idempotent() {
+    let input = "\
+- Parent item
+
+  ::: {.callout-note}
+  Body text in callout.
+  :::
+
+- Next item
+";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
+fn list_item_with_layout_div_and_nested_table_div_stays_idempotent() {
+    let input = "\
+- Parent list item introducing an example:
+
+  ::: {layout-ncol=\"2\"}
+  ```markdown
+  ::: {#tbl-table}
+
+  ![](table.png)
+
+  An image treated like a table
+
+  :::
+  ```
+
+  ::: {#tbl-table}
+
+  ![](images/crossref-div-table.png)
+
+  An image treated like a table
+
+  :::
+
+  :::
+";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
+fn content_visible_div_with_ordered_item_does_not_gain_leading_blank_line() {
+    let input = "\
+::: {.content-visible when-meta=\"tool.is_jupyterlab\"}
+3.  You'll be working inside this directory throughout the tutorial, so if you are ready to proceed, navigate inside the directory, and start Jupyter Lab:
+
+    ``` {.bash filename=\"Terminal\"}
+    cd manuscript-tutorial
+    python3 -m jupyter lab
+    ```
+:::
+";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}

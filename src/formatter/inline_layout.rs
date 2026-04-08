@@ -819,11 +819,20 @@ fn process_node_recursive(
                     }
 
                     let mut text = format_inline_fn(&n);
+                    let is_environment_math = text.starts_with("\\begin{");
+                    let in_list_item = n
+                        .ancestors()
+                        .any(|ancestor| ancestor.kind() == SyntaxKind::LIST_ITEM);
                     if let Some(attrs) = trailing_attrs {
                         text.push(' ');
                         text.push_str(attrs.trim());
                     }
-                    sink.push_verbatim_block(text.trim_end_matches(['\r', '\n']));
+                    let verbatim = text.trim_end_matches(['\r', '\n']);
+                    if is_environment_math && in_list_item {
+                        sink.push_piece(verbatim);
+                    } else {
+                        sink.push_verbatim_block(verbatim);
+                    }
                 }
                 _ => {
                     let text = format_inline_fn(&n);

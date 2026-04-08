@@ -1131,9 +1131,20 @@ impl Formatter {
             SyntaxKind::PARAGRAPH => {
                 let text = node.text().to_string();
                 log::debug!("Formatting paragraph, text length: {}", text.len());
+                let paragraph_indent = " ".repeat(indent);
 
                 if self.is_grid_table_continuation_paragraph(node) {
-                    self.output.push_str(&text);
+                    if indent > 0 {
+                        for (i, line) in text.lines().enumerate() {
+                            if i > 0 {
+                                self.output.push('\n');
+                            }
+                            self.output.push_str(&paragraph_indent);
+                            self.output.push_str(line.trim_start());
+                        }
+                    } else {
+                        self.output.push_str(&text);
+                    }
                     if !self.output.ends_with('\n') {
                         self.output.push('\n');
                     }
@@ -1142,6 +1153,9 @@ impl Formatter {
 
                 // Pandoc formats bare fenced div paragraphs on a single line ("::: A :::").
                 if let Some(line) = self.bare_fence_paragraph_line(node) {
+                    if indent > 0 {
+                        self.output.push_str(&paragraph_indent);
+                    }
                     self.output.push_str(&line);
                     self.output.push('\n');
                     return;
@@ -1150,7 +1164,17 @@ impl Formatter {
                 if self.config.extensions.bookdown_references
                     && paragraphs::is_bookdown_text_reference(node)
                 {
-                    self.output.push_str(&text);
+                    if indent > 0 {
+                        for (i, line) in text.lines().enumerate() {
+                            if i > 0 {
+                                self.output.push('\n');
+                            }
+                            self.output.push_str(&paragraph_indent);
+                            self.output.push_str(line.trim_start());
+                        }
+                    } else {
+                        self.output.push_str(&text);
+                    }
                     if !self.output.ends_with('\n') {
                         self.output.push('\n');
                     }
@@ -1161,7 +1185,17 @@ impl Formatter {
                 let preserve_newlines_for_latex =
                     self.fenced_div_depth > 0 && self.contains_latex_command(node);
                 if preserve_newlines_for_latex && self.fenced_div_depth > 0 {
-                    self.output.push_str(&text);
+                    if indent > 0 {
+                        for (i, line) in text.lines().enumerate() {
+                            if i > 0 {
+                                self.output.push('\n');
+                            }
+                            self.output.push_str(&paragraph_indent);
+                            self.output.push_str(line.trim_start());
+                        }
+                    } else {
+                        self.output.push_str(&text);
+                    }
                     if !self.output.ends_with('\n') {
                         self.output.push('\n');
                     }
@@ -1175,7 +1209,17 @@ impl Formatter {
                 match wrap_mode {
                     WrapMode::Preserve => {
                         log::trace!("Preserving paragraph line breaks");
-                        self.output.push_str(&text);
+                        if indent > 0 {
+                            for (i, line) in text.lines().enumerate() {
+                                if i > 0 {
+                                    self.output.push('\n');
+                                }
+                                self.output.push_str(&paragraph_indent);
+                                self.output.push_str(line.trim_start());
+                            }
+                        } else {
+                            self.output.push_str(&text);
+                        }
                         if !self.output.ends_with('\n') {
                             self.output.push('\n');
                         }
@@ -1188,6 +1232,9 @@ impl Formatter {
                             if i > 0 {
                                 self.output.push('\n');
                             }
+                            if indent > 0 {
+                                self.output.push_str(&paragraph_indent);
+                            }
                             self.output.push_str(line);
                         }
                     }
@@ -1198,6 +1245,9 @@ impl Formatter {
                         for (i, line) in lines.iter().enumerate() {
                             if i > 0 {
                                 self.output.push('\n');
+                            }
+                            if indent > 0 {
+                                self.output.push_str(&paragraph_indent);
                             }
                             self.output.push_str(line);
                         }
@@ -1825,11 +1875,63 @@ impl Formatter {
                     return;
                 };
 
-                let has_close = fenced_div.has_closing_fence();
-                let has_content = fenced_div.body_blocks().next().is_some();
+                let opening_has_trailing_inline_text =
+                    fenced_div.opening_fence().is_some_and(|open| {
+                        let mut saw_info = false;
+                        for child in open.syntax().children_with_tokens() {
+                            match child {
+                                rowan::NodeOrToken::Node(n) if n.kind() == SyntaxKind::DIV_INFO => {
+                                    saw_info = true;
+                                }
+                                rowan::NodeOrToken::Token(t)
+                                    if saw_info && t.kind() == SyntaxKind::TEXT =>
+                                {
+                                    let trimmed = t.text().trim();
+                                    if !trimmed.is_empty() && !trimmed.chars().all(|c| c == ':') {
+                                        return true;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        false
+                    });
+                if opening_has_trailing_inline_text {
+                    self.output
+                        .push_str(node.text().to_string().trim_end_matches('\n'));
+                    return;
+                }
 
-                // Normalize fence lengths by nesting depth.
-                let colon_count = 3 + (self.fenced_div_depth * 2);
+                let has_close = fenced_div.has_closing_fence();
+                let has_content = fenced_div
+                    .body_blocks()
+                    .any(|child| child.kind() != SyntaxKind::BLANK_LINE);
+                let leading_blank_lines = fenced_div
+                    .body_blocks()
+                    .take_while(|child| child.kind() == SyntaxKind::BLANK_LINE)
+                    .count();
+
+                // Preserve malformed one-line divs verbatim. Patterns like
+                // `::: {.callout} inline :::` can parse as an opening fence with
+                // trailing text but no body/closing node; normalizing them creates
+                // unstable nesting and loses inline content.
+                if !has_close && !has_content {
+                    self.output
+                        .push_str(node.text().to_string().trim_end_matches('\n'));
+                    return;
+                }
+
+                // Normalize fence lengths by nesting depth. Within list items we
+                // preserve 3-colon fences for nested divs to avoid cross-pass
+                // inflation when list continuation parsing changes div depth.
+                let in_list_item = node
+                    .ancestors()
+                    .any(|ancestor| ancestor.kind() == SyntaxKind::LIST_ITEM);
+                let colon_count = if in_list_item {
+                    3
+                } else {
+                    3 + (self.fenced_div_depth * 2)
+                };
                 let colons = ":".repeat(colon_count);
 
                 let attributes = fenced_div.info_text();
@@ -1881,15 +1983,34 @@ impl Formatter {
                     })
                     .collect();
 
-                let mut start = 0usize;
+                let start = if in_list_item { 0 } else { leading_blank_lines };
                 let end = content_children.len();
-                while start < end && content_children[start].kind() == SyntaxKind::BLANK_LINE {
-                    start += 1;
-                }
+                let first_non_blank_kind = content_children[start..end]
+                    .iter()
+                    .find(|child| child.kind() != SyntaxKind::BLANK_LINE)
+                    .map(|child| child.kind());
 
-                for child in &content_children[start..end] {
-                    if child.kind() == SyntaxKind::CODE_BLOCK && indent > 0 {
+                for (idx, child) in content_children[start..end].iter().enumerate() {
+                    if child.kind() == SyntaxKind::BLANK_LINE {
+                        if in_list_item
+                            && idx < leading_blank_lines
+                            && first_non_blank_kind == Some(SyntaxKind::LIST)
+                        {
+                            continue;
+                        }
+                        self.output.push('\n');
+                    } else if child.kind() == SyntaxKind::CODE_BLOCK && indent > 0 {
                         self.format_indented_code_block(child, indent);
+                        if let Some(next) = content_children[start..end].get(idx + 1)
+                            && ((next.kind() == SyntaxKind::PARAGRAPH
+                                && next.text().to_string().trim_start().starts_with(":::"))
+                                || (next.kind() == SyntaxKind::PLAIN
+                                    && next.text().to_string().trim_start().starts_with(":::"))
+                                || next.kind() == SyntaxKind::FENCED_DIV)
+                            && !self.output.ends_with("\n\n")
+                        {
+                            self.output.push('\n');
+                        }
                     } else {
                         self.format_node_sync(child, indent);
                     }

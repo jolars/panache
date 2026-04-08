@@ -760,10 +760,12 @@ fn emit_hashpipe_continuation_line(
     let ws_after_prefix_len = after_prefix
         .len()
         .saturating_sub(after_prefix.trim_start_matches([' ', '\t']).len());
-    let continuation_value = after_prefix[ws_after_prefix_len..].trim_end_matches([' ', '\t']);
+    let continuation_with_trailing = &after_prefix[ws_after_prefix_len..];
+    let continuation_value = continuation_with_trailing.trim_end_matches([' ', '\t']);
     if continuation_value.is_empty() {
         return false;
     }
+    let continuation_ws_suffix = &continuation_with_trailing[continuation_value.len()..];
 
     builder.start_node(SyntaxKind::CHUNK_OPTION.into());
     if leading_ws_len > 0 {
@@ -780,6 +782,9 @@ fn emit_hashpipe_continuation_line(
         );
     }
     builder.token(SyntaxKind::CHUNK_OPTION_VALUE.into(), continuation_value);
+    if !continuation_ws_suffix.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), continuation_ws_suffix);
+    }
     builder.finish_node();
     true
 }
@@ -826,7 +831,7 @@ fn hashpipe_option_value(line_without_newline: &str, prefix: &str) -> Option<Str
     let colon_idx = rest.find(':')?;
     let value = rest[colon_idx + 1..]
         .trim_start_matches([' ', '\t'])
-        .trim_end_matches([' ', '\t']);
+        .trim_end_matches(['\r', '\n']);
     Some(value.to_string())
 }
 
@@ -839,7 +844,7 @@ fn hashpipe_continuation_value(line_without_newline: &str, prefix: &str) -> Opti
     Some(
         after_prefix
             .trim_start_matches([' ', '\t'])
-            .trim_end_matches([' ', '\t'])
+            .trim_end_matches(['\r', '\n'])
             .to_string(),
     )
 }

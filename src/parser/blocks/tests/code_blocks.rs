@@ -515,6 +515,13 @@ fn executable_chunk_hashpipe_trivia_preserves_whitespace_and_crlf() {
 }
 
 #[test]
+fn executable_chunk_hashpipe_continuation_preserves_trailing_space() {
+    let input = "```{r}\n#| fig-subcap:\n#|   - \"Histogram of `price`s\"\n#|   - \"Histogram of `area`s\" \nx <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+    assert_eq!(node.text().to_string(), input);
+}
+
+#[test]
 fn executable_code_respects_extension_guard() {
     let input = "```{r}\na <- 1\n```\n";
     let mut config = Config::default();
