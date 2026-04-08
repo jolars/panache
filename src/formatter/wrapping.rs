@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::formatter::math_delimiters::has_ambiguous_dollar_delimiters;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::borrow::Cow;
@@ -363,101 +362,6 @@ impl<'a> StreamingCoreSink<'a> {
     }
 }
 
-fn stream_verbatim_lines(lines: Vec<String>) -> Vec<String> {
-    if lines.is_empty() {
-        return lines;
-    }
-    let line_widths = [usize::MAX / 2];
-    let mut sink = StreamingCoreSink::new(&line_widths, false, false, false);
-    let total = lines.len();
-    for (idx, line) in lines.into_iter().enumerate() {
-        sink.emit_piece(line, false);
-        if idx + 1 < total {
-            sink.force_line_break();
-        }
-    }
-    sink.finish()
-}
-
-fn dollar_special_case_lines(node: &SyntaxNode) -> Option<Vec<String>> {
-    fn strip_blockquote_prefix(line: &str) -> &str {
-        if let Some(rest) = line.strip_prefix("> ") {
-            rest
-        } else if let Some(rest) = line.strip_prefix('>') {
-            rest
-        } else {
-            line
-        }
-    }
-
-    let has_dollar_text = node
-        .descendants_with_tokens()
-        .any(|el| matches!(el, NodeOrToken::Token(t) if t.text().contains('$')));
-    if !has_dollar_text {
-        return None;
-    }
-
-    let has_blockquote_markers = node.children_with_tokens().any(
-        |el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER),
-    );
-    let in_blockquote = node
-        .ancestors()
-        .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_QUOTE);
-    let paragraph_text = node.text().to_string();
-    let normalized: Cow<'_, str> = if paragraph_text.contains("\r\n") {
-        Cow::Owned(paragraph_text.replace("\r\n", "\n"))
-    } else {
-        Cow::Borrowed(paragraph_text.as_str())
-    };
-
-    if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
-        return Some(stream_verbatim_lines(
-            paragraph_text.lines().map(ToString::to_string).collect(),
-        ));
-    }
-
-    let standalone_fences = normalized
-        .lines()
-        .map(|line| {
-            if has_blockquote_markers {
-                strip_blockquote_prefix(line)
-            } else {
-                line
-            }
-        })
-        .filter(|line| line.trim_start().starts_with("$$"))
-        .count();
-    if standalone_fences >= 2 && standalone_fences % 2 == 0 {
-        if has_blockquote_markers {
-            return Some(stream_verbatim_lines(
-                paragraph_text
-                    .lines()
-                    .map(strip_blockquote_prefix)
-                    .map(ToString::to_string)
-                    .collect(),
-            ));
-        }
-        return Some(stream_verbatim_lines(
-            paragraph_text
-                .lines()
-                .map(|line| line.trim_end().to_string())
-                .collect(),
-        ));
-    }
-
-    let fence_marker_count = normalized.match_indices("$$").count();
-    if fence_marker_count >= 2 && fence_marker_count.is_multiple_of(2) && in_blockquote {
-        return Some(stream_verbatim_lines(
-            paragraph_text
-                .lines()
-                .map(strip_blockquote_prefix)
-                .map(|line| line.trim_end().to_string())
-                .collect(),
-        ));
-    }
-    None
-}
-
 pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
     let words: Vec<&str> = text.split_ascii_whitespace().collect();
     let line_widths = [line_width];
@@ -629,6 +533,17 @@ impl<'a> TraversalBuilder<'a> {
     fn finish(mut self) -> Vec<String> {
         self.flush_current(false);
         self.sink.finish()
+    }
+
+    fn push_verbatim_lines(&mut self, text: &str) {
+        self.flush_current(false);
+        let mut lines = text.lines().peekable();
+        while let Some(line) = lines.next() {
+            self.sink.emit_piece(line.to_string(), false);
+            if lines.peek().is_some() {
+                self.sink.force_line_break();
+            }
+        }
     }
 }
 
@@ -848,6 +763,10 @@ fn process_node_recursive(
                         sink.push_piece(&closing);
                     }
                 }
+                SyntaxKind::DISPLAY_MATH => {
+                    let text = format_inline_fn(&n);
+                    sink.push_verbatim_lines(text.trim_end());
+                }
                 _ => {
                     let text = format_inline_fn(&n);
                     sink.push_piece(&text);
@@ -918,13 +837,10 @@ pub(super) fn wrapped_lines_for_node(
 ) -> Vec<String> {
     let options = strategy.options(widths);
     let sentence_mode = matches!(options.mode, NodeWrapMode::Sentence);
-    if options.apply_special_cases {
-        if let Some(lines) = dollar_special_case_lines(node) {
-            return lines;
-        }
-        if let Some(lines) = special_case_lines(config, node, format_inline_fn) {
-            return lines;
-        }
+    if options.apply_special_cases
+        && let Some(lines) = special_case_lines(config, node, format_inline_fn)
+    {
+        return lines;
     }
     let line_widths = if sentence_mode || !options.widths.is_empty() {
         options.widths
