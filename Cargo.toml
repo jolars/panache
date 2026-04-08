@@ -30,7 +30,7 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [dependencies]
-annotate-snippets = "0.12.7"
+annotate-snippets = "0.12.15"
 clap = { version = "4.6.0", features = ["derive", "env"], optional = true }
 dirs = "6.0.0"
 env_logger = "0.11.10"
