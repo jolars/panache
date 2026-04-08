@@ -1,7 +1,6 @@
 extend-exclude = [
   "tests/*",
   "assets/*",
-  "pandoc/*",
   "docs/reference/cli.qmd",
   "docs/changelog.md",
   "tests/",
