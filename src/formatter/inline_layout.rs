@@ -276,7 +276,13 @@ impl<'a> StreamingCoreSink<'a> {
         }
     }
 
-    fn consume(&mut self, piece: String, piece_ws_after: bool, is_last: bool) {
+    fn consume(
+        &mut self,
+        piece: String,
+        piece_ws_after: bool,
+        is_last: bool,
+        next_piece: Option<&str>,
+    ) {
         let piece_width = UnicodeWidthStr::width(piece.as_str());
         if !self.sentence_mode {
             let width_limit = self
@@ -302,7 +308,13 @@ impl<'a> StreamingCoreSink<'a> {
         self.prev_ws_after = piece_ws_after;
 
         if self.sentence_mode
-            && is_sentence_boundary_text(&piece, piece_ws_after, is_last, self.sentence_language)
+            && is_sentence_boundary_text(
+                &piece,
+                next_piece,
+                piece_ws_after,
+                is_last,
+                self.sentence_language,
+            )
         {
             self.out.push(std::mem::take(&mut self.line));
             self.line_width = 0;
@@ -322,14 +334,14 @@ impl<'a> StreamingCoreSink<'a> {
                 self.pending_piece = Some((format!("{pending} {piece}"), ws_after));
                 return;
             }
-            self.consume(pending, pending_ws_after, false);
+            self.consume(pending, pending_ws_after, false, Some(&piece));
         }
         self.pending_piece = Some((piece, ws_after));
     }
 
     fn force_line_break(&mut self) {
         if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
-            self.consume(pending, pending_ws_after, false);
+            self.consume(pending, pending_ws_after, false, None);
         }
         self.out.push(std::mem::take(&mut self.line));
         self.line_width = 0;
@@ -343,7 +355,7 @@ impl<'a> StreamingCoreSink<'a> {
 
     fn finish(mut self) -> Vec<String> {
         if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
-            self.consume(pending, pending_ws_after, true);
+            self.consume(pending, pending_ws_after, true, None);
         }
         if self.line_has_piece {
             self.out.push(self.line);

@@ -7,12 +7,21 @@ pub(super) enum SentenceLanguage {
 
 struct LanguageProfile {
     no_break_abbreviations: &'static [&'static str],
+    contextual_abbreviations: &'static [&'static str],
+    meridiem_abbreviations: &'static [&'static str],
+    sentence_starters: &'static [&'static str],
 }
 
 const ENGLISH_PROFILE: LanguageProfile = LanguageProfile {
     no_break_abbreviations: &[
         "e.g.", "i.e.", "etc.", "mr.", "mrs.", "ms.", "dr.", "prof.", "vs.", "cf.", "fig.",
-        "figs.", "eq.", "no.", "dept.", "st.",
+        "figs.", "eq.", "dept.", "st.",
+    ],
+    contextual_abbreviations: &["co.", "inc.", "ltd.", "corp.", "u.s.", "u.k."],
+    meridiem_abbreviations: &["a.m.", "p.m."],
+    sentence_starters: &[
+        "a", "an", "and", "but", "for", "he", "how", "however", "i", "in", "it", "my", "she", "so",
+        "that", "the", "there", "they", "this", "we", "what", "when", "where", "who", "why", "you",
     ],
 };
 
@@ -46,8 +55,46 @@ fn is_no_break_abbreviation(word: &str, profile: &LanguageProfile) -> bool {
     }
 }
 
+fn normalize_next_token_candidate(word: &str) -> String {
+    word.trim_start_matches(['"', '\'', '(', '[', '{', '`'])
+        .trim_end_matches(['"', '\'', ')', ']', '}', ',', ';', ':', '`'])
+        .to_ascii_lowercase()
+}
+
+fn starts_with_uppercase_after_opening_punct(word: &str) -> bool {
+    word.trim_start_matches(['"', '\'', '(', '[', '{', '`'])
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_uppercase())
+}
+
+fn is_contextual_sentence_boundary(
+    current_word: &str,
+    next_word: Option<&str>,
+    profile: &LanguageProfile,
+) -> bool {
+    let current = normalize_abbreviation_candidate(current_word);
+    if !profile.contextual_abbreviations.contains(&current.as_str())
+        && !profile.meridiem_abbreviations.contains(&current.as_str())
+    {
+        return false;
+    }
+    let Some(next) = next_word else {
+        return false;
+    };
+    if !starts_with_uppercase_after_opening_punct(next) {
+        return false;
+    }
+    if profile.meridiem_abbreviations.contains(&current.as_str()) {
+        return true;
+    }
+    let next_norm = normalize_next_token_candidate(next);
+    profile.sentence_starters.contains(&next_norm.as_str())
+}
+
 pub(super) fn is_sentence_boundary_text(
     word: &str,
+    next_word: Option<&str>,
     has_whitespace_after: bool,
     is_last: bool,
     language: SentenceLanguage,
@@ -60,6 +107,9 @@ pub(super) fn is_sentence_boundary_text(
     let Some(last_char) = trimmed.chars().last() else {
         return false;
     };
+    if last_char == '.' && is_contextual_sentence_boundary(trimmed, next_word, profile) {
+        return true;
+    }
     if last_char == '.' && is_no_break_abbreviation(trimmed, profile) {
         return false;
     }
@@ -122,25 +172,68 @@ mod tests {
     fn abbreviation_periods_are_not_sentence_boundaries() {
         assert!(!is_sentence_boundary_text(
             "(e.g.)",
+            Some("Next"),
             true,
             false,
             SentenceLanguage::English
         ));
         assert!(!is_sentence_boundary_text(
             "i.e.",
+            Some("Next"),
             true,
             false,
             SentenceLanguage::English
         ));
         assert!(!is_sentence_boundary_text(
             "`etc.`",
+            Some("Next"),
             true,
             false,
             SentenceLanguage::English
         ));
         assert!(is_sentence_boundary_text(
             "complete.",
+            Some("Next"),
             true,
+            false,
+            SentenceLanguage::English
+        ));
+    }
+
+    #[test]
+    fn contextual_abbreviations_use_next_token_signal() {
+        assert!(!is_sentence_boundary_text(
+            "co.",
+            Some("at"),
+            false,
+            false,
+            SentenceLanguage::English
+        ));
+        assert!(is_sentence_boundary_text(
+            "co.",
+            Some("They"),
+            true,
+            false,
+            SentenceLanguage::English
+        ));
+        assert!(!is_sentence_boundary_text(
+            "U.S.",
+            Some("Government"),
+            false,
+            false,
+            SentenceLanguage::English
+        ));
+        assert!(is_sentence_boundary_text(
+            "U.S.",
+            Some("How"),
+            true,
+            false,
+            SentenceLanguage::English
+        ));
+        assert!(!is_sentence_boundary_text(
+            "p.m.",
+            Some("traveler"),
+            false,
             false,
             SentenceLanguage::English
         ));

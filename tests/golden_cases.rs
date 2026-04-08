@@ -245,6 +245,7 @@ golden_test_cases!(
     standardize_bullets,
     sentence_wrap_basic,
     sentence_wrap_abbreviations,
+    sentence_wrap_contextual_abbrev,
     sentence_wrap_lang_metadata,
     sentence_wrap_list_blockquote,
     sentence_wrap_lazy_continuation,
