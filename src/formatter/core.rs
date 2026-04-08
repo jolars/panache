@@ -125,11 +125,6 @@ impl Formatter {
         headings::format_heading(node)
     }
 
-    // Delegate to paragraphs module
-    fn contains_inline_display_math(&self, node: &SyntaxNode) -> bool {
-        paragraphs::contains_inline_display_math(node)
-    }
-
     fn contains_latex_command(&self, node: &SyntaxNode) -> bool {
         paragraphs::contains_latex_command(node)
     }
@@ -272,21 +267,6 @@ impl Formatter {
             return false;
         }
         try_parse_setext_heading(&[first, second], 0).is_some()
-    }
-
-    // Delegate to paragraphs module
-    fn format_paragraph_with_display_math(
-        &mut self,
-        node: &SyntaxNode,
-        _indent: usize,
-        line_width: usize,
-    ) {
-        paragraphs::format_paragraph_with_display_math(
-            node,
-            line_width,
-            &self.config,
-            &mut self.output,
-        );
     }
 
     // Delegate to code_blocks module
@@ -1163,12 +1143,6 @@ impl Formatter {
                     return;
                 }
 
-                // Check if paragraph contains inline display math ($$...$$)
-                if self.contains_inline_display_math(node) {
-                    log::debug!("Paragraph has display math");
-                    self.format_paragraph_with_display_math(node, indent, line_width);
-                    return;
-                }
                 if self.config.extensions.bookdown_references
                     && paragraphs::is_bookdown_text_reference(node)
                 {

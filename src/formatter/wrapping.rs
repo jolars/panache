@@ -340,6 +340,10 @@ impl<'a> StreamingCoreSink<'a> {
         self.prev_ws_after = false;
     }
 
+    fn has_content_or_pending(&self) -> bool {
+        self.line_has_piece || self.pending_piece.is_some()
+    }
+
     fn finish(mut self) -> Vec<String> {
         if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
             self.consume(pending, pending_ws_after, true);
@@ -534,6 +538,18 @@ impl<'a> TraversalBuilder<'a> {
             if lines.peek().is_some() {
                 self.sink.force_line_break();
             }
+        }
+    }
+
+    fn push_verbatim_block(&mut self, text: &str) {
+        self.set_pending_space(false);
+        self.flush_current(false);
+        if self.sink.has_content_or_pending() {
+            self.sink.force_line_break();
+        }
+        self.push_verbatim_lines(text);
+        if self.sink.has_content_or_pending() {
+            self.sink.force_line_break();
         }
     }
 
@@ -772,8 +788,44 @@ fn process_node_recursive(
                     }
                 }
                 SyntaxKind::DISPLAY_MATH => {
-                    let text = format_inline_fn(&n);
-                    sink.push_verbatim_lines(text.trim_end());
+                    let mut trailing_attrs = None;
+                    let mut consumed_interstitial_whitespace = false;
+                    if config.extensions.quarto_crossrefs {
+                        if let Some(NodeOrToken::Token(t)) = children.peek()
+                            && t.kind() == SyntaxKind::WHITESPACE
+                        {
+                            let _ = children.next();
+                            consumed_interstitial_whitespace = true;
+                        }
+                        if let Some(next) = children.peek() {
+                            match next {
+                                NodeOrToken::Node(attr_node)
+                                    if attr_node.kind() == SyntaxKind::ATTRIBUTE =>
+                                {
+                                    trailing_attrs = Some(attr_node.text().to_string());
+                                    let _ = children.next();
+                                }
+                                NodeOrToken::Token(t)
+                                    if t.kind() == SyntaxKind::TEXT
+                                        && t.text().trim_start().starts_with('{') =>
+                                {
+                                    trailing_attrs = Some(t.text().to_string());
+                                    let _ = children.next();
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    if consumed_interstitial_whitespace && trailing_attrs.is_none() {
+                        sink.set_pending_space(true);
+                    }
+
+                    let mut text = format_inline_fn(&n);
+                    if let Some(attrs) = trailing_attrs {
+                        text.push(' ');
+                        text.push_str(attrs.trim());
+                    }
+                    sink.push_verbatim_block(text.trim_end_matches(['\r', '\n']));
                 }
                 _ => {
                     let text = format_inline_fn(&n);
