@@ -1,6 +1,6 @@
 use crate::config::WrapMode;
 use crate::formatter::indent_utils::{calculate_list_item_indent, is_alignable_marker};
-use crate::formatter::wrapping::{self, WrapStrategy};
+use crate::formatter::inline_layout::{self, WrapStrategy};
 use crate::syntax::{BlockQuote, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -407,7 +407,7 @@ impl Formatter {
             WrapMode::Sentence => Vec::new(),
             WrapMode::Reflow => wrap_source
                 .map(|source| {
-                    wrapping::wrapped_lines_for_node(
+                    inline_layout::wrapped_lines_for_node(
                         &self.config,
                         source,
                         &line_widths,
@@ -431,7 +431,7 @@ impl Formatter {
             WrapMode::Sentence => Some(
                 wrap_source
                     .map(|source| {
-                        wrapping::wrapped_lines_for_node(
+                        inline_layout::wrapped_lines_for_node(
                             &self.config,
                             source,
                             &[],

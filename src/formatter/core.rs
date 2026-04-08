@@ -10,10 +10,10 @@ use super::code_blocks;
 use super::code_blocks::FormattedCodeMap;
 use super::headings;
 use super::inline;
+use super::inline_layout;
 use super::paragraphs;
 use super::tables;
 use super::utils::{is_block_element, is_structural_block};
-use super::wrapping;
 
 pub struct Formatter {
     pub(super) output: String,
@@ -101,7 +101,7 @@ impl Formatter {
         node: &SyntaxNode,
         width: usize,
     ) -> Vec<String> {
-        wrapping::wrapped_lines_for_paragraph(&self.config, node, width, &|n| {
+        inline_layout::wrapped_lines_for_paragraph(&self.config, node, width, &|n| {
             self.format_inline_node(n)
         })
     }
@@ -111,13 +111,15 @@ impl Formatter {
         node: &SyntaxNode,
         widths: &[usize],
     ) -> Vec<String> {
-        wrapping::wrapped_lines_for_paragraph_with_widths(&self.config, node, widths, &|n| {
+        inline_layout::wrapped_lines_for_paragraph_with_widths(&self.config, node, widths, &|n| {
             self.format_inline_node(n)
         })
     }
 
     pub(super) fn sentence_lines_for_paragraph(&self, node: &SyntaxNode) -> Vec<String> {
-        wrapping::sentence_lines_for_paragraph(&self.config, node, &|n| self.format_inline_node(n))
+        inline_layout::sentence_lines_for_paragraph(&self.config, node, &|n| {
+            self.format_inline_node(n)
+        })
     }
 
     // Delegate to headings module
@@ -251,7 +253,9 @@ impl Formatter {
         let width = self.config.line_width.saturating_sub(indent);
         match wrap_mode {
             WrapMode::Preserve => vec![text.to_string()],
-            WrapMode::Reflow | WrapMode::Sentence => wrapping::wrap_text_first_fit(text, width),
+            WrapMode::Reflow | WrapMode::Sentence => {
+                inline_layout::wrap_text_first_fit(text, width)
+            }
         }
     }
 

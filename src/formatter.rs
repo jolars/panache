@@ -9,13 +9,13 @@ mod hashpipe;
 mod headings;
 mod indent_utils;
 mod inline;
+mod inline_layout;
 mod lists;
 mod metadata;
 mod paragraphs;
 mod shortcodes;
 mod tables;
 mod utils;
-mod wrapping;
 
 // Re-export the main types
 pub use core::Formatter;
