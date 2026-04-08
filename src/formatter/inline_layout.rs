@@ -613,14 +613,12 @@ fn process_node_recursive(
                 SyntaxKind::TEXT => {
                     let text = expand_tabs_with_width(t.text(), config.tab_width);
                     let mut text_to_process = text.as_ref();
-                    if !text.is_empty() && starts_with_ascii_whitespace(&text) {
-                        if sink.skip_next_leading_whitespace() {
-                            text_to_process =
-                                text.trim_start_matches(|c: char| c.is_ascii_whitespace());
-                            sink.set_skip_next_leading_whitespace(false);
-                        } else {
-                            sink.set_pending_space(true);
-                        }
+                    if sink.skip_next_leading_whitespace() {
+                        text_to_process =
+                            text.trim_start_matches(|c: char| c.is_ascii_whitespace());
+                        sink.set_skip_next_leading_whitespace(false);
+                    } else if !text.is_empty() && starts_with_ascii_whitespace(&text) {
+                        sink.set_pending_space(true);
                     }
                     let mut saw_word = false;
                     for word in text_to_process.split_ascii_whitespace() {

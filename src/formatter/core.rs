@@ -1213,10 +1213,12 @@ impl Formatter {
                 // Figure is a standalone image - format the inline content directly
                 log::debug!("Formatting figure");
                 let text = self.format_inline_node(node);
-                self.output.push_str(text.trim());
-                if !self.output.ends_with('\n') {
-                    self.output.push('\n');
+                let trimmed = text.trim();
+                if indent > 0 {
+                    self.output.push_str(&" ".repeat(indent));
                 }
+                self.output.push_str(trimmed);
+                self.output.push('\n');
             }
 
             SyntaxKind::PLAIN => {

@@ -7,6 +7,20 @@ use rowan::NodeOrToken;
 use super::Formatter;
 
 impl Formatter {
+    fn has_continuation_eligible_predecessor(node: &SyntaxNode) -> bool {
+        let mut prev = node.prev_sibling();
+        while let Some(sibling) = prev {
+            match sibling.kind() {
+                SyntaxKind::BLANK_LINE => prev = sibling.prev_sibling(),
+                SyntaxKind::LIST_ITEM | SyntaxKind::PARAGRAPH | SyntaxKind::CODE_BLOCK => {
+                    return true;
+                }
+                _ => return false,
+            }
+        }
+        false
+    }
+
     fn normalize_task_checkbox(checkbox: &str) -> String {
         if checkbox == "[X]" {
             "[x]".to_string()
@@ -233,11 +247,19 @@ impl Formatter {
                 }
                 continue;
             } else if child.kind() == SyntaxKind::PARAGRAPH {
-                // Paragraphs that are siblings of ListItems are continuation content
-                self.format_list_continuation_paragraph(&child, last_item_content_indent);
+                if Self::has_continuation_eligible_predecessor(&child) {
+                    // Paragraphs that are siblings of ListItems are continuation content.
+                    self.format_list_continuation_paragraph(&child, last_item_content_indent);
+                } else {
+                    self.format_node_sync(&child, indent);
+                }
             } else if child.kind() == SyntaxKind::CODE_BLOCK {
-                // Code blocks that are siblings of ListItems are also continuation content
-                self.format_indented_code_block(&child, last_item_content_indent);
+                if Self::has_continuation_eligible_predecessor(&child) {
+                    // Code blocks that are siblings of ListItems are also continuation content.
+                    self.format_indented_code_block(&child, last_item_content_indent);
+                } else {
+                    self.format_node_sync(&child, indent);
+                }
             } else {
                 self.format_node_sync(&child, indent);
             }

@@ -166,3 +166,46 @@ fn blockquote_list_reflow_does_not_emit_inline_quote_markers() {
     let output = format(input, Some(cfg), None);
     assert_eq!(output, expected);
 }
+
+#[test]
+fn loose_list_paragraph_after_image_continuation_stays_idempotent() {
+    let cfg = panache::ConfigBuilder::default().line_width(80).build();
+    let input = "\
+- If you commit your rendered book output to GitHub (e.g., the `_book`
+  directory), then you can use the Static Document deployment
+
+![Static Deployment Icon on the Connect Cloud publish page](images/static-deploy.png)
+
+  When configuring this deployment, select the rendered index.html as the
+  Primary file. Example:
+
+![Screenshot showing selection of \"\\_book/index.html\" as Primary file for deploy on Connect Cloud](images/primary-doc.png)
+";
+    let output1 = format(input, Some(cfg.clone()), None);
+    let output2 = format(&output1, Some(cfg), None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
+fn loose_list_figure_and_followup_paragraph_keep_list_indentation() {
+    let input = "\
+- Item intro
+
+    ![Figure alt](images/figure.png)
+
+    Follow-up paragraph after figure.
+
+- Next item
+";
+    let expected = "\
+- Item intro
+
+  ![Figure alt](images/figure.png)
+
+  Follow-up paragraph after figure.
+
+- Next item
+";
+    let output = format(input, None, None);
+    assert_eq!(output, expected);
+}

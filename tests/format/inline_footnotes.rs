@@ -51,3 +51,12 @@ fn inline_footnote_in_list_item_wraps_without_losing_marker_or_indent() {
     let output = format(input, Some(cfg), None);
     similar_asserts::assert_eq!(output, expected);
 }
+
+#[test]
+fn inline_footnote_with_link_and_codespan_stays_idempotent() {
+    let cfg = panache::ConfigBuilder::default().line_width(80).build();
+    let input = "a^[For the [`bs4_book()`](#bs4-book)format, the `edit`, `history`, and `view` fields have no effect and similar configuration can be specified with the [repo](#specifying-the-repository) argument of the output function.]\n";
+    let output1 = format(input, Some(cfg.clone()), None);
+    let output2 = format(&output1, Some(cfg), None);
+    similar_asserts::assert_eq!(output1, output2, "Formatting should be idempotent");
+}
