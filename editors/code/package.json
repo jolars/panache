@@ -140,7 +140,7 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.5.2",
     "@types/vscode": "^1.115.0",
     "@vscode/vsce": "^3.6.0",
     "esbuild": "^0.28.0",
