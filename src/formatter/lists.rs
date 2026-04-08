@@ -1,12 +1,19 @@
 use crate::config::WrapMode;
 use crate::formatter::indent_utils::{calculate_list_item_indent, is_alignable_marker};
-use crate::formatter::wrapping;
+use crate::formatter::wrapping::{self, NodeWrapOptions};
 use crate::syntax::{BlockQuote, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
 use super::Formatter;
 
 impl Formatter {
+    fn remove_standalone_blockquote_markers(line: &str) -> String {
+        line.split_ascii_whitespace()
+            .filter(|part| *part != ">")
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     fn normalize_task_checkbox(checkbox: &str) -> String {
         if checkbox == "[X]" {
             "[x]".to_string()
@@ -289,7 +296,6 @@ impl Formatter {
 
         // Compute indent, marker, and checkbox from leading tokens
         let mut marker = String::new();
-        let mut original_marker = String::new(); // Track original for word removal
         let mut checkbox = None;
         // NOTE: We ignore WHITESPACE tokens for list indentation calculation.
         // The WHITESPACE tokens are emitted by the parser for losslessness, but the
@@ -305,7 +311,6 @@ impl Formatter {
                     }
                     SyntaxKind::LIST_MARKER => {
                         let raw_marker = t.text().to_string();
-                        original_marker = raw_marker.clone();
                         // Standardize bullet list markers to "-"
                         marker = if raw_marker.len() == 1
                             && matches!(raw_marker.as_str(), "-" | "*" | "+")
@@ -381,7 +386,7 @@ impl Formatter {
             return;
         }
 
-        // Build words from Plain/PARAGRAPH content node if present, otherwise from entire ListItem
+        // Build source node for wrapping from Plain/PARAGRAPH content node if present.
         let content_node = Self::find_content_node(node);
 
         let content_has_hard_breaks = content_node
@@ -393,51 +398,29 @@ impl Formatter {
             })
             .unwrap_or(false);
 
-        let mut words = if let Some(ref content) = content_node {
-            // Extract words from Plain/PARAGRAPH child (postprocessor wraps all content in one node)
-            wrapping::build_words(&self.config, content, &|n| self.format_inline_node(n))
-        } else {
-            // Backwards compatibility: scan entire ListItem and remove marker/checkbox
-            let mut node_words =
-                wrapping::build_words(&self.config, node, &|n| self.format_inline_node(n));
-
-            // Remove the original marker from words (not the standardized one)
-            if let Some(first) = node_words.first()
-                && first.word == original_marker
-            {
-                // Remove the marker; we will print it ourselves with a following space
-                node_words.remove(0);
-            }
-
-            // Remove checkbox from words if present
-            if checkbox.is_some()
-                && let Some(first) = node_words.first()
-            {
-                let trimmed = first.word.trim_start();
-                if trimmed.starts_with('[') && trimmed.len() >= 3 {
-                    node_words.remove(0);
-                }
-            }
-
-            node_words
-        };
-
-        let in_blockquote = BlockQuote::contains_node(node);
-        if in_blockquote {
-            words.retain(|w| w.word != ">");
-        }
+        let wrap_source = content_node.as_ref();
 
         // Check if this item contains only an empty nested list (special case formatting)
         let has_only_empty_nested_list = node
             .children()
             .any(|c| c.kind() == SyntaxKind::LIST && Self::is_empty_nested_list(&c))
-            && words.is_empty();
+            && wrap_source.is_none_or(|source| source.text().to_string().trim().is_empty());
 
         let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
         let line_widths = [available_width];
         let lines = match wrap_mode {
             WrapMode::Preserve => Vec::new(),
-            _ => wrapping::wrap_words_first_fit(&words, &line_widths),
+            WrapMode::Sentence => Vec::new(),
+            WrapMode::Reflow => wrap_source
+                .map(|source| {
+                    wrapping::wrapped_lines_for_node(
+                        &self.config,
+                        source,
+                        &|n| self.format_inline_node(n),
+                        NodeWrapOptions::reflow(&line_widths, false),
+                    )
+                })
+                .unwrap_or_default(),
         };
         let preserve_lines = match wrap_mode {
             WrapMode::Preserve => {
@@ -449,10 +432,39 @@ impl Formatter {
             }
             _ => None,
         };
-        let sentence_lines = match wrap_mode {
-            WrapMode::Sentence => Some(wrapping::sentence_lines_from_words(&words)),
+        let sentence_lines: Option<Vec<String>> = match wrap_mode {
+            WrapMode::Sentence => Some(
+                wrap_source
+                    .map(|source| {
+                        wrapping::wrapped_lines_for_node(
+                            &self.config,
+                            source,
+                            &|n| self.format_inline_node(n),
+                            NodeWrapOptions::sentence(false),
+                        )
+                    })
+                    .unwrap_or_default(),
+            ),
             _ => None,
         };
+        let lines = if BlockQuote::contains_node(node) {
+            lines
+                .into_iter()
+                .map(|line| Self::remove_standalone_blockquote_markers(&line))
+                .collect::<Vec<String>>()
+        } else {
+            lines
+        };
+        let sentence_lines = sentence_lines.map(|lines| {
+            if BlockQuote::contains_node(node) {
+                lines
+                    .into_iter()
+                    .map(|line| Self::remove_standalone_blockquote_markers(&line))
+                    .collect::<Vec<String>>()
+            } else {
+                lines
+            }
+        });
 
         let heading_with_remainder = content_node
             .as_ref()

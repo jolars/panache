@@ -187,6 +187,40 @@ fn should_merge_initialism_year(left: &str, left_ws_after: bool, right: &str) ->
     left_ws_after && is_initialism_with_periods(left) && is_year_like(right)
 }
 
+#[derive(Clone, Copy)]
+pub(super) enum NodeWrapMode {
+    Reflow,
+    Sentence,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct NodeWrapOptions<'a> {
+    pub widths: &'a [usize],
+    pub mode: NodeWrapMode,
+    pub atomic_links_root: bool,
+    pub apply_special_cases: bool,
+}
+
+impl<'a> NodeWrapOptions<'a> {
+    pub(super) fn reflow(widths: &'a [usize], apply_special_cases: bool) -> Self {
+        Self {
+            widths,
+            mode: NodeWrapMode::Reflow,
+            atomic_links_root: false,
+            apply_special_cases,
+        }
+    }
+
+    pub(super) fn sentence(apply_special_cases: bool) -> Self {
+        Self {
+            widths: &[],
+            mode: NodeWrapMode::Sentence,
+            atomic_links_root: true,
+            apply_special_cases,
+        }
+    }
+}
+
 fn strip_blockquote_prefix(line: &str) -> &str {
     if let Some(rest) = line.strip_prefix("> ") {
         rest
@@ -197,117 +231,33 @@ fn strip_blockquote_prefix(line: &str) -> &str {
     }
 }
 
-#[derive(Clone, Copy)]
-struct Piece<'a> {
-    word: &'a str,
-    whitespace_after: bool,
-}
-
-#[derive(Clone)]
-pub(super) struct WrapWord {
-    pub word: String,
-    pub whitespace: String,
-    pub penalty: String,
-}
-
-fn is_sentence_boundary(word: &WrapWord, is_last: bool) -> bool {
-    is_sentence_boundary_text(&word.word, !word.whitespace.is_empty(), is_last)
-}
-
-pub(super) fn sentence_lines_from_words(words: &[WrapWord]) -> Vec<String> {
-    let mut out_lines = Vec::new();
-    let mut current = String::new();
-    for (idx, word) in words.iter().enumerate() {
-        let is_last = idx + 1 == words.len();
-        current.push_str(&word.word);
-        if is_sentence_boundary(word, is_last) {
-            current.push_str(&word.penalty);
-            if !current.is_empty() {
-                out_lines.push(current);
-                current = String::new();
-            }
-        } else {
-            current.push_str(&word.whitespace);
-        }
-    }
-    if !current.is_empty() {
-        out_lines.push(current);
-    }
-    out_lines
-}
-
-fn build_words_from_pieces<'a>(pieces: Vec<Piece<'a>>) -> Vec<WrapWord> {
-    pieces
-        .into_iter()
-        .map(|piece| WrapWord {
-            word: piece.word.to_string(),
-            whitespace: if piece.whitespace_after {
-                " ".to_string()
-            } else {
-                String::new()
-            },
-            penalty: String::new(),
-        })
-        .collect()
-}
-
-pub(super) fn build_words(
-    config: &Config,
-    node: &SyntaxNode,
-    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-) -> Vec<WrapWord> {
-    let mut arena: Vec<Box<str>> = Vec::new();
-    build_words_from_pieces(build_pieces_with_mode(
-        config,
-        node,
-        &mut arena,
-        format_inline_fn,
-        false,
-        false,
-    ))
-}
-
-pub(super) fn wrap_words_first_fit(words: &[WrapWord], line_widths: &[usize]) -> Vec<String> {
-    let default_line_width = line_widths.last().copied().unwrap_or(0);
+pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
+    let words: Vec<&str> = text.split_ascii_whitespace().collect();
     let mut out = Vec::new();
     let mut line = String::new();
-    let mut line_width = 0usize;
-    for w in words {
-        let ww = UnicodeWidthStr::width(w.word.as_str());
-        let line_limit = line_widths
-            .get(out.len())
-            .copied()
-            .unwrap_or(default_line_width);
+    let mut line_width_used = 0usize;
+
+    for word in words {
+        let word_width = UnicodeWidthStr::width(word);
         let spacer = usize::from(!line.is_empty());
-        if !line.is_empty() && line_width + spacer + ww > line_limit {
+        if !line.is_empty() && line_width_used + spacer + word_width > line_width {
             out.push(std::mem::take(&mut line));
-            line_width = 0;
+            line_width_used = 0;
         }
         if !line.is_empty() {
             line.push(' ');
-            line_width += 1;
+            line_width_used += 1;
         }
-        line.push_str(&w.word);
-        line_width += ww;
+        line.push_str(word);
+        line_width_used += word_width;
     }
+
     if !line.is_empty() {
         out.push(line);
     } else if out.is_empty() {
         out.push(String::new());
     }
     out
-}
-
-pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
-    let words: Vec<WrapWord> = text
-        .split_ascii_whitespace()
-        .map(|w| WrapWord {
-            word: w.to_string(),
-            whitespace: " ".to_string(),
-            penalty: String::new(),
-        })
-        .collect();
-    wrap_words_first_fit(&words, &[line_width])
 }
 
 enum InlineFootnoteEvent {
@@ -722,134 +672,6 @@ fn process_node_recursive<S: TraversalSink>(
     }
 }
 
-fn build_pieces_with_mode<'a>(
-    config: &Config,
-    node: &SyntaxNode,
-    arena: &'a mut Vec<Box<str>>,
-    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-    in_link_text: bool,
-    atomic_links: bool,
-) -> Vec<Piece<'a>> {
-    struct PieceCollector {
-        pieces: Vec<String>,
-        whitespace_after: Vec<bool>,
-        last_piece_pos: Option<usize>,
-        pending_space: bool,
-        skip_next_leading_whitespace: bool,
-    }
-
-    impl PieceCollector {
-        fn new() -> Self {
-            Self {
-                pieces: Vec::new(),
-                whitespace_after: Vec::new(),
-                last_piece_pos: None,
-                pending_space: false,
-                skip_next_leading_whitespace: false,
-            }
-        }
-        fn flush_pending(&mut self) {
-            if self.pending_space {
-                if let Some(prev) = self.last_piece_pos {
-                    self.whitespace_after[prev] = true;
-                }
-                self.pending_space = false;
-            }
-        }
-        fn attach_or_start(&mut self, text: &str) {
-            if let Some(pos) = self.last_piece_pos {
-                self.pieces[pos].push_str(text);
-            } else {
-                self.push_new_piece(text);
-            }
-        }
-        fn push_new_piece(&mut self, text: &str) {
-            self.pieces.push(text.to_string());
-            self.whitespace_after.push(false);
-            self.last_piece_pos = Some(self.pieces.len() - 1);
-        }
-        fn push_piece_impl(&mut self, text: &str) {
-            if self.pending_space {
-                self.flush_pending();
-                self.push_new_piece(text);
-            } else {
-                self.attach_or_start(text);
-            }
-        }
-    }
-
-    impl TraversalSink for PieceCollector {
-        fn push_piece(&mut self, text: &str) {
-            self.push_piece_impl(text);
-        }
-        fn pending_space(&self) -> bool {
-            self.pending_space
-        }
-        fn set_pending_space(&mut self, value: bool) {
-            self.pending_space = value;
-        }
-        fn skip_next_leading_whitespace(&self) -> bool {
-            self.skip_next_leading_whitespace
-        }
-        fn set_skip_next_leading_whitespace(&mut self, value: bool) {
-            self.skip_next_leading_whitespace = value;
-        }
-    }
-
-    let mut b = PieceCollector::new();
-    process_node_recursive(
-        config,
-        node,
-        &mut b,
-        format_inline_fn,
-        in_link_text,
-        atomic_links,
-    );
-    let mut merged_len = 0usize;
-    let mut i = 0;
-    while i < b.pieces.len() {
-        let current_idx = i;
-        if current_idx + 1 < b.pieces.len()
-            && should_merge_initialism_year(
-                &b.pieces[current_idx],
-                b.whitespace_after[current_idx],
-                &b.pieces[current_idx + 1],
-            )
-        {
-            let right = std::mem::take(&mut b.pieces[current_idx + 1]);
-            b.pieces[current_idx].push(' ');
-            b.pieces[current_idx].push_str(&right);
-            b.whitespace_after[current_idx] = b.whitespace_after[current_idx + 1];
-            i += 2;
-        } else {
-            i += 1;
-        }
-        if merged_len != current_idx {
-            b.pieces.swap(merged_len, current_idx);
-            b.whitespace_after.swap(merged_len, current_idx);
-        }
-        merged_len += 1;
-    }
-    b.pieces.truncate(merged_len);
-    b.whitespace_after.truncate(merged_len);
-
-    let start_idx = arena.len();
-    for text in b.pieces {
-        arena.push(text.into_boxed_str());
-    }
-    b.whitespace_after
-        .into_iter()
-        .enumerate()
-        .map(|(offset, whitespace_after)| {
-            let s: &'a str = &arena[start_idx + offset];
-            Piece {
-                word: s,
-                whitespace_after,
-            }
-        })
-        .collect()
-}
-
 pub(super) fn wrapped_lines_for_paragraph(
     _config: &Config,
     node: &SyntaxNode,
@@ -857,12 +679,12 @@ pub(super) fn wrapped_lines_for_paragraph(
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
     log::debug!("wrapped_lines_for_paragraph called with width={}", width);
-    if let Some(lines) = special_case_lines(_config, node, format_inline_fn) {
-        return lines;
-    }
-
-    let out_lines =
-        wrap_node_greedy_streaming(_config, node, &[width], format_inline_fn, false, false);
+    let out_lines = wrapped_lines_for_node(
+        _config,
+        node,
+        format_inline_fn,
+        NodeWrapOptions::reflow(&[width], true),
+    );
     log::debug!("Wrapped into {} lines", out_lines.len());
     out_lines
 }
@@ -874,13 +696,12 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
     log::debug!("wrapped_lines_for_paragraph_with_widths called");
-    if let Some(lines) = special_case_lines(_config, node, format_inline_fn) {
-        return lines;
-    }
-
-    let line_widths = if widths.is_empty() { &[1] } else { widths };
-    let out_lines =
-        wrap_node_greedy_streaming(_config, node, line_widths, format_inline_fn, false, false);
+    let out_lines = wrapped_lines_for_node(
+        _config,
+        node,
+        format_inline_fn,
+        NodeWrapOptions::reflow(widths, true),
+    );
     log::debug!("Wrapped into {} lines", out_lines.len());
     out_lines
 }
@@ -891,10 +712,39 @@ pub(super) fn sentence_lines_for_paragraph(
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
     log::debug!("sentence_lines_for_paragraph called");
-    if let Some(lines) = special_case_lines(_config, node, format_inline_fn) {
+    wrapped_lines_for_node(
+        _config,
+        node,
+        format_inline_fn,
+        NodeWrapOptions::sentence(true),
+    )
+}
+
+pub(super) fn wrapped_lines_for_node(
+    config: &Config,
+    node: &SyntaxNode,
+    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
+    options: NodeWrapOptions<'_>,
+) -> Vec<String> {
+    let sentence_mode = matches!(options.mode, NodeWrapMode::Sentence);
+    if options.apply_special_cases
+        && let Some(lines) = special_case_lines(config, node, format_inline_fn)
+    {
         return lines;
     }
-    wrap_node_greedy_streaming(_config, node, &[], format_inline_fn, true, true)
+    let line_widths = if sentence_mode || !options.widths.is_empty() {
+        options.widths
+    } else {
+        &[1]
+    };
+    wrap_node_greedy_streaming(
+        config,
+        node,
+        line_widths,
+        format_inline_fn,
+        sentence_mode,
+        options.atomic_links_root,
+    )
 }
 
 fn wrap_node_greedy_streaming(

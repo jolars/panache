@@ -1,4 +1,5 @@
-use panache::format;
+use panache::config::WrapMode;
+use panache::{Config, format};
 
 #[test]
 fn list_item_link_no_break() {
@@ -119,5 +120,49 @@ fn empty_brackets_in_list_item_are_escaped() {
     let input = "- [] a\n";
     let expected = "- \\[\\] a\n";
     let output = format(input, None, None);
+    assert_eq!(output, expected);
+}
+
+#[test]
+fn list_item_keeps_initialism_year_together_when_wrapping() {
+    let cfg = Config {
+        line_width: 8,
+        ..Default::default()
+    };
+    let input = "- M.A. 2007\n";
+    let expected = "- M.A. 2007\n";
+    let output = format(input, Some(cfg), None);
+    assert_eq!(output, expected);
+}
+
+#[test]
+fn sentence_wrap_keeps_task_list_hanging_indent() {
+    let cfg = Config {
+        wrap: Some(WrapMode::Sentence),
+        line_width: 40,
+        ..Default::default()
+    };
+    let input = "- [ ] First sentence. Second sentence! Third sentence?\n";
+    let expected = "\
+- [ ] First sentence.
+      Second sentence!
+      Third sentence?
+";
+    let output = format(input, Some(cfg), None);
+    assert_eq!(output, expected);
+}
+
+#[test]
+fn blockquote_list_reflow_does_not_emit_inline_quote_markers() {
+    let cfg = Config {
+        line_width: 60,
+        ..Default::default()
+    };
+    let input = "> - This line is intentionally long so that wrapping happens inside the list item within a blockquote context.\n";
+    let expected = "\
+> - This line is intentionally long so that wrapping happens
+>   inside the list item within a blockquote context.
+";
+    let output = format(input, Some(cfg), None);
     assert_eq!(output, expected);
 }

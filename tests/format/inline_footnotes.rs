@@ -38,3 +38,16 @@ fn inline_footnote_with_emphasis_whitespace_stays_stable() {
     let output = format(input, Some(cfg), None);
     similar_asserts::assert_eq!(output, "Text^[\\* emphasized\\* tail words]\n");
 }
+
+#[test]
+fn inline_footnote_in_list_item_wraps_without_losing_marker_or_indent() {
+    let cfg = panache::ConfigBuilder::default().line_width(70).build();
+    let input = "- Intro text before note.^[This inline footnote has enough words to force wrapping and should preserve inline syntax while aligning with list continuation indentation.]\n";
+    let expected = "\
+- Intro text before note.^[This inline footnote has enough words to
+  force wrapping and should preserve inline syntax while aligning with
+  list continuation indentation.]
+";
+    let output = format(input, Some(cfg), None);
+    similar_asserts::assert_eq!(output, expected);
+}
