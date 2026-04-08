@@ -199,6 +199,7 @@ pub(super) struct NodeWrapOptions<'a> {
     pub mode: NodeWrapMode,
     pub atomic_links_root: bool,
     pub apply_special_cases: bool,
+    pub strip_standalone_blockquote_markers: bool,
 }
 
 impl<'a> NodeWrapOptions<'a> {
@@ -208,6 +209,7 @@ impl<'a> NodeWrapOptions<'a> {
             mode: NodeWrapMode::Reflow,
             atomic_links_root: false,
             apply_special_cases,
+            strip_standalone_blockquote_markers: false,
         }
     }
 
@@ -217,6 +219,7 @@ impl<'a> NodeWrapOptions<'a> {
             mode: NodeWrapMode::Sentence,
             atomic_links_root: true,
             apply_special_cases,
+            strip_standalone_blockquote_markers: false,
         }
     }
 }
@@ -229,6 +232,13 @@ fn strip_blockquote_prefix(line: &str) -> &str {
     } else {
         line
     }
+}
+
+fn remove_standalone_blockquote_markers(line: &str) -> String {
+    line.split_ascii_whitespace()
+        .filter(|part| *part != ">")
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
@@ -737,14 +747,22 @@ pub(super) fn wrapped_lines_for_node(
     } else {
         &[1]
     };
-    wrap_node_greedy_streaming(
+    let lines = wrap_node_greedy_streaming(
         config,
         node,
         line_widths,
         format_inline_fn,
         sentence_mode,
         options.atomic_links_root,
-    )
+    );
+    if options.strip_standalone_blockquote_markers {
+        lines
+            .into_iter()
+            .map(|line| remove_standalone_blockquote_markers(&line))
+            .collect()
+    } else {
+        lines
+    }
 }
 
 fn wrap_node_greedy_streaming(

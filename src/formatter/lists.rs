@@ -7,13 +7,6 @@ use rowan::NodeOrToken;
 use super::Formatter;
 
 impl Formatter {
-    fn remove_standalone_blockquote_markers(line: &str) -> String {
-        line.split_ascii_whitespace()
-            .filter(|part| *part != ">")
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
     fn normalize_task_checkbox(checkbox: &str) -> String {
         if checkbox == "[X]" {
             "[x]".to_string()
@@ -407,6 +400,7 @@ impl Formatter {
             && wrap_source.is_none_or(|source| source.text().to_string().trim().is_empty());
 
         let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+        let in_blockquote = BlockQuote::contains_node(node);
         let line_widths = [available_width];
         let lines = match wrap_mode {
             WrapMode::Preserve => Vec::new(),
@@ -417,7 +411,10 @@ impl Formatter {
                         &self.config,
                         source,
                         &|n| self.format_inline_node(n),
-                        NodeWrapOptions::reflow(&line_widths, false),
+                        NodeWrapOptions {
+                            strip_standalone_blockquote_markers: in_blockquote,
+                            ..NodeWrapOptions::reflow(&line_widths, false)
+                        },
                     )
                 })
                 .unwrap_or_default(),
@@ -440,31 +437,16 @@ impl Formatter {
                             &self.config,
                             source,
                             &|n| self.format_inline_node(n),
-                            NodeWrapOptions::sentence(false),
+                            NodeWrapOptions {
+                                strip_standalone_blockquote_markers: in_blockquote,
+                                ..NodeWrapOptions::sentence(false)
+                            },
                         )
                     })
                     .unwrap_or_default(),
             ),
             _ => None,
         };
-        let lines = if BlockQuote::contains_node(node) {
-            lines
-                .into_iter()
-                .map(|line| Self::remove_standalone_blockquote_markers(&line))
-                .collect::<Vec<String>>()
-        } else {
-            lines
-        };
-        let sentence_lines = sentence_lines.map(|lines| {
-            if BlockQuote::contains_node(node) {
-                lines
-                    .into_iter()
-                    .map(|line| Self::remove_standalone_blockquote_markers(&line))
-                    .collect::<Vec<String>>()
-            } else {
-                lines
-            }
-        });
 
         let heading_with_remainder = content_node
             .as_ref()
