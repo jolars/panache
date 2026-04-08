@@ -1,11 +1,10 @@
 extend-exclude = [
-  "tests/*",
   "assets/*",
-  "docs/reference/cli.qmd",
   "docs/changelog.md",
-  "tests/",
   "docs/reference/_formatter-presets-details.qmd",
   "docs/reference/_linter-presets-details.qmd",
+  "docs/reference/cli.qmd",
+  "tests/*",
 ]
 
 [formatters]
