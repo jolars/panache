@@ -298,75 +298,89 @@ DOCUMENT@0..4373
         NEWLINE@2326..2327 "\n"
       BLANK_LINE@2327..2328
         BLANK_LINE@2327..2328 "\n"
-      PLAIN@2328..2484
-        TEXT@2328..2374 "    ::: {.content-vis ..."
-        TEXT@2374..2384 "_rstudio\"}"
-        NEWLINE@2384..2385 "\n"
-        TEXT@2385..2483 "    You can do this a ..."
-        NEWLINE@2483..2484 "\n"
-      BLANK_LINE@2484..2485
-        BLANK_LINE@2484..2485 "\n"
-      CODE_BLOCK@2485..2585
-        WHITESPACE@2485..2489 "    "
-        CODE_FENCE_OPEN@2489..2521
-          CODE_FENCE_MARKER@2489..2492 "```"
-          WHITESPACE@2492..2493 " "
-          CODE_INFO@2493..2520
-            TEXT@2493..2494 "{"
-            TEXT@2494..2495 "."
-            CODE_LANGUAGE@2495..2499 "bash"
-            TEXT@2499..2520 " filename=\"Terminal\"}"
-          NEWLINE@2520..2521 "\n"
-        CODE_CONTENT@2521..2577
-          WHITESPACE@2521..2525 "    "
-          TEXT@2525..2576 "git clone git@github. ..."
-          NEWLINE@2576..2577 "\n"
-        WHITESPACE@2577..2581 "    "
-        CODE_FENCE_CLOSE@2581..2585
-          CODE_FENCE_MARKER@2581..2584 "```"
-          NEWLINE@2584..2585 "\n"
-      BLANK_LINE@2585..2586
-        BLANK_LINE@2585..2586 "\n"
-      PLAIN@2586..2646
-        TEXT@2586..2637 "    Where you use you ..."
-        NEWLINE@2637..2638 "\n"
-        TEXT@2638..2645 "    :::"
-        NEWLINE@2645..2646 "\n"
+      FENCED_DIV@2328..2646
+        DIV_FENCE_OPEN@2328..2385
+          WHITESPACE@2328..2332 "    "
+          TEXT@2332..2335 ":::"
+          WHITESPACE@2335..2336 " "
+          DIV_INFO@2336..2384
+            TEXT@2336..2384 "{.content-visible unl ..."
+          NEWLINE@2384..2385 "\n"
+        PARAGRAPH@2385..2484
+          TEXT@2385..2483 "    You can do this a ..."
+          NEWLINE@2483..2484 "\n"
+        BLANK_LINE@2484..2485
+          BLANK_LINE@2484..2485 "\n"
+        CODE_BLOCK@2485..2585
+          WHITESPACE@2485..2489 "    "
+          CODE_FENCE_OPEN@2489..2521
+            CODE_FENCE_MARKER@2489..2492 "```"
+            WHITESPACE@2492..2493 " "
+            CODE_INFO@2493..2520
+              TEXT@2493..2494 "{"
+              TEXT@2494..2495 "."
+              CODE_LANGUAGE@2495..2499 "bash"
+              TEXT@2499..2520 " filename=\"Terminal\"}"
+            NEWLINE@2520..2521 "\n"
+          CODE_CONTENT@2521..2577
+            WHITESPACE@2521..2525 "    "
+            TEXT@2525..2576 "git clone git@github. ..."
+            NEWLINE@2576..2577 "\n"
+          WHITESPACE@2577..2581 "    "
+          CODE_FENCE_CLOSE@2581..2585
+            CODE_FENCE_MARKER@2581..2584 "```"
+            NEWLINE@2584..2585 "\n"
+        BLANK_LINE@2585..2586
+          BLANK_LINE@2585..2586 "\n"
+        PARAGRAPH@2586..2638
+          TEXT@2586..2637 "    Where you use you ..."
+          NEWLINE@2637..2638 "\n"
+        DIV_FENCE_CLOSE@2638..2646
+          WHITESPACE@2638..2642 "    "
+          TEXT@2642..2645 ":::"
+          NEWLINE@2645..2646 "\n"
       BLANK_LINE@2646..2647
         BLANK_LINE@2646..2647 "\n"
-      PLAIN@2647..2937
-        TEXT@2647..2691 "    ::: {.content-vis ..."
-        TEXT@2691..2701 "_rstudio\"}"
-        NEWLINE@2701..2702 "\n"
-        TEXT@2702..2778 "    You can do this a ..."
-        STRONG@2778..2786
-          STRONG_MARKER@2778..2780 "**"
-          TEXT@2780..2784 "File"
-          STRONG_MARKER@2784..2786 "**"
-        TEXT@2786..2789 " > "
-        STRONG@2789..2804
-          STRONG_MARKER@2789..2791 "**"
-          TEXT@2791..2802 "New Project"
-          STRONG_MARKER@2802..2804 "**"
-        TEXT@2804..2813 ". In the "
-        STRONG@2813..2828
-          STRONG_MARKER@2813..2815 "**"
-          TEXT@2815..2826 "New Project"
-          STRONG_MARKER@2826..2828 "**"
-        TEXT@2828..2844 " dialog, select "
-        STRONG@2844..2868
-          STRONG_MARKER@2844..2846 "**"
-          TEXT@2846..2866 "From Version Control"
-          STRONG_MARKER@2866..2868 "**"
-        TEXT@2868..2875 ", then "
-        STRONG@2875..2882
-          STRONG_MARKER@2875..2877 "**"
-          TEXT@2877..2880 "Git"
-          STRONG_MARKER@2880..2882 "**"
-        TEXT@2882..2928 ", and copy and paste  ..."
-        NEWLINE@2928..2929 "\n"
-        TEXT@2929..2936 "    :::"
-        NEWLINE@2936..2937 "\n"
+      FENCED_DIV@2647..2937
+        DIV_FENCE_OPEN@2647..2702
+          WHITESPACE@2647..2651 "    "
+          TEXT@2651..2654 ":::"
+          WHITESPACE@2654..2655 " "
+          DIV_INFO@2655..2701
+            TEXT@2655..2701 "{.content-visible whe ..."
+          NEWLINE@2701..2702 "\n"
+        PARAGRAPH@2702..2929
+          TEXT@2702..2778 "    You can do this a ..."
+          STRONG@2778..2786
+            STRONG_MARKER@2778..2780 "**"
+            TEXT@2780..2784 "File"
+            STRONG_MARKER@2784..2786 "**"
+          TEXT@2786..2789 " > "
+          STRONG@2789..2804
+            STRONG_MARKER@2789..2791 "**"
+            TEXT@2791..2802 "New Project"
+            STRONG_MARKER@2802..2804 "**"
+          TEXT@2804..2813 ". In the "
+          STRONG@2813..2828
+            STRONG_MARKER@2813..2815 "**"
+            TEXT@2815..2826 "New Project"
+            STRONG_MARKER@2826..2828 "**"
+          TEXT@2828..2844 " dialog, select "
+          STRONG@2844..2868
+            STRONG_MARKER@2844..2846 "**"
+            TEXT@2846..2866 "From Version Control"
+            STRONG_MARKER@2866..2868 "**"
+          TEXT@2868..2875 ", then "
+          STRONG@2875..2882
+            STRONG_MARKER@2875..2877 "**"
+            TEXT@2877..2880 "Git"
+            STRONG_MARKER@2880..2882 "**"
+          TEXT@2882..2928 ", and copy and paste  ..."
+          NEWLINE@2928..2929 "\n"
+        DIV_FENCE_CLOSE@2929..2937
+          WHITESPACE@2929..2933 "    "
+          TEXT@2933..2936 ":::"
+          NEWLINE@2936..2937 "\n"
   BLANK_LINE@2937..2938
     BLANK_LINE@2937..2938 "\n"
   FENCED_DIV@2938..3329

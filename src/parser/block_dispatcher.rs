@@ -1680,6 +1680,17 @@ impl BlockParser for LineBlockParser {
 
 pub(crate) struct FencedDivOpenParser;
 
+fn content_for_fenced_div_detection<'a>(ctx: &BlockContext<'a>) -> &'a str {
+    if let Some(list_info) = ctx.list_indent_info {
+        let (indent_cols, _) = leading_indent(ctx.content);
+        if indent_cols >= list_info.content_col {
+            let idx = byte_index_at_column(ctx.content, list_info.content_col);
+            return &ctx.content[idx..];
+        }
+    }
+    ctx.content
+}
+
 impl BlockParser for FencedDivOpenParser {
     fn effect(&self) -> BlockEffect {
         BlockEffect::OpenFencedDiv
@@ -1695,7 +1706,8 @@ impl BlockParser for FencedDivOpenParser {
             return None;
         }
 
-        let div_fence = try_parse_div_fence_open(ctx.content)?;
+        let content = content_for_fenced_div_detection(ctx);
+        let div_fence = try_parse_div_fence_open(content)?;
         Some((BlockDetectionResult::Yes, Some(Box::new(div_fence))))
     }
 
@@ -1712,7 +1724,7 @@ impl BlockParser for FencedDivOpenParser {
         let div_fence = payload
             .and_then(|p| p.downcast_ref::<DivFenceInfo>())
             .cloned()
-            .or_else(|| try_parse_div_fence_open(ctx.content))
+            .or_else(|| try_parse_div_fence_open(content_for_fenced_div_detection(ctx)))
             .unwrap_or(DivFenceInfo {
                 attributes: String::new(),
                 fence_count: 3,
@@ -1819,7 +1831,7 @@ impl BlockParser for FencedDivCloseParser {
             return None;
         }
 
-        if !is_div_closing_fence(ctx.content) {
+        if !is_div_closing_fence(content_for_fenced_div_detection(ctx)) {
             return None;
         }
 

@@ -1,10 +1,23 @@
-use super::helpers::{assert_block_kinds, count_children, find_all, find_first, parse_blocks};
+use super::helpers::{
+    assert_block_kinds, count_children, find_all, find_first, parse_blocks,
+    parse_blocks_with_config,
+};
+use crate::config::{Config, Extensions, Flavor};
 use crate::syntax::SyntaxKind;
 
 #[test]
 fn simple_bullet_list() {
     let input = "* one\n* two\n* three\n";
-    let tree = parse_blocks(input);
+    let config = Config {
+        flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
+        ..Default::default()
+    };
+    assert!(
+        config.extensions.fenced_divs,
+        "fenced_divs should be enabled for this test"
+    );
+    let tree = parse_blocks_with_config(input, &config);
     let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
     assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 3);
 }
@@ -243,6 +256,19 @@ fn list_after_paragraph() {
             SyntaxKind::BLANK_LINE,
             SyntaxKind::LIST,
         ],
+    );
+}
+
+#[test]
+fn list_item_with_valid_fenced_divs_parses_as_fenced_div_nodes() {
+    let input = "2.  Once your repository is created, clone it to your local computer.\n\n    ::: {.content-visible unless-meta=\"tool.is_rstudio\"}\n    You can do this any way you are comfortable, for instance in the Terminal, it might look like:\n\n    ``` {.bash filename=\"Terminal\"}\n    git clone git@github.com:<username>/<repo-name>.git\n    ```\n\n    Where you use your own user name and repo name.\n    :::\n\n    ::: {.content-visible when-meta=\"tool.is_rstudio\"}\n    You can do this any way you are comfortable, but one approach is to use **File** > **New Project**. In the **New Project** dialog, select **From Version Control**, then **Git**, and copy and paste the repo URL from GitHub.\n    :::\n";
+    let tree = parse_blocks(input);
+    let list_item = find_first(&tree, SyntaxKind::LIST_ITEM).expect("list item");
+    let fenced_divs = find_all(&list_item, SyntaxKind::FENCED_DIV);
+    assert_eq!(
+        fenced_divs.len(),
+        2,
+        "expected two fenced divs inside list item"
     );
 }
 
