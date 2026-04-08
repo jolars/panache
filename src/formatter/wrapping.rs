@@ -340,6 +340,16 @@ impl<'a> StreamingCoreSink<'a> {
         self.pending_piece = Some((piece, ws_after));
     }
 
+    fn force_line_break(&mut self) {
+        if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
+            self.consume(pending, pending_ws_after, false);
+        }
+        self.out.push(std::mem::take(&mut self.line));
+        self.line_width = 0;
+        self.line_has_piece = false;
+        self.prev_ws_after = false;
+    }
+
     fn finish(mut self) -> Vec<String> {
         if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
             self.consume(pending, pending_ws_after, true);
@@ -353,6 +363,101 @@ impl<'a> StreamingCoreSink<'a> {
     }
 }
 
+fn stream_verbatim_lines(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() {
+        return lines;
+    }
+    let line_widths = [usize::MAX / 2];
+    let mut sink = StreamingCoreSink::new(&line_widths, false, false, false);
+    let total = lines.len();
+    for (idx, line) in lines.into_iter().enumerate() {
+        sink.emit_piece(line, false);
+        if idx + 1 < total {
+            sink.force_line_break();
+        }
+    }
+    sink.finish()
+}
+
+fn dollar_special_case_lines(node: &SyntaxNode) -> Option<Vec<String>> {
+    fn strip_blockquote_prefix(line: &str) -> &str {
+        if let Some(rest) = line.strip_prefix("> ") {
+            rest
+        } else if let Some(rest) = line.strip_prefix('>') {
+            rest
+        } else {
+            line
+        }
+    }
+
+    let has_dollar_text = node
+        .descendants_with_tokens()
+        .any(|el| matches!(el, NodeOrToken::Token(t) if t.text().contains('$')));
+    if !has_dollar_text {
+        return None;
+    }
+
+    let has_blockquote_markers = node.children_with_tokens().any(
+        |el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER),
+    );
+    let in_blockquote = node
+        .ancestors()
+        .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_QUOTE);
+    let paragraph_text = node.text().to_string();
+    let normalized: Cow<'_, str> = if paragraph_text.contains("\r\n") {
+        Cow::Owned(paragraph_text.replace("\r\n", "\n"))
+    } else {
+        Cow::Borrowed(paragraph_text.as_str())
+    };
+
+    if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
+        return Some(stream_verbatim_lines(
+            paragraph_text.lines().map(ToString::to_string).collect(),
+        ));
+    }
+
+    let standalone_fences = normalized
+        .lines()
+        .map(|line| {
+            if has_blockquote_markers {
+                strip_blockquote_prefix(line)
+            } else {
+                line
+            }
+        })
+        .filter(|line| line.trim_start().starts_with("$$"))
+        .count();
+    if standalone_fences >= 2 && standalone_fences % 2 == 0 {
+        if has_blockquote_markers {
+            return Some(stream_verbatim_lines(
+                paragraph_text
+                    .lines()
+                    .map(strip_blockquote_prefix)
+                    .map(ToString::to_string)
+                    .collect(),
+            ));
+        }
+        return Some(stream_verbatim_lines(
+            paragraph_text
+                .lines()
+                .map(|line| line.trim_end().to_string())
+                .collect(),
+        ));
+    }
+
+    let fence_marker_count = normalized.match_indices("$$").count();
+    if fence_marker_count >= 2 && fence_marker_count.is_multiple_of(2) && in_blockquote {
+        return Some(stream_verbatim_lines(
+            paragraph_text
+                .lines()
+                .map(strip_blockquote_prefix)
+                .map(|line| line.trim_end().to_string())
+                .collect(),
+        ));
+    }
+    None
+}
+
 pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
     let words: Vec<&str> = text.split_ascii_whitespace().collect();
     let line_widths = [line_width];
@@ -362,110 +467,6 @@ pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> 
         sink.emit_piece((*word).to_string(), ws_after);
     }
     sink.finish()
-}
-
-enum InlineFootnoteEvent {
-    Piece(String),
-    Space,
-}
-
-fn collect_inline_footnote_events(
-    config: &Config,
-    node: &SyntaxNode,
-    in_link_text: bool,
-    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-    mut skip_next_leading_whitespace: bool,
-) -> (Vec<InlineFootnoteEvent>, bool) {
-    let mut events = vec![InlineFootnoteEvent::Piece("^[".to_string())];
-    let mut saw_content = false;
-    let mut foot_children = node.children_with_tokens().peekable();
-    let mut foot_prev_is_text = false;
-
-    while let Some(child) = foot_children.next() {
-        let foot_current_is_text =
-            matches!(&child, NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT);
-        let foot_next_is_text = matches!(
-            foot_children.peek(),
-            Some(NodeOrToken::Token(tok)) if tok.kind() == SyntaxKind::TEXT
-        );
-
-        match child {
-            NodeOrToken::Token(t)
-                if matches!(
-                    t.kind(),
-                    SyntaxKind::INLINE_FOOTNOTE_START | SyntaxKind::INLINE_FOOTNOTE_END
-                ) => {}
-            NodeOrToken::Token(t)
-                if matches!(
-                    t.kind(),
-                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE
-                ) =>
-            {
-                if saw_content {
-                    events.push(InlineFootnoteEvent::Space);
-                }
-            }
-            NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER => {}
-            NodeOrToken::Token(t) if t.kind() == SyntaxKind::ESCAPED_CHAR => {
-                events.push(InlineFootnoteEvent::Piece(t.text().to_string()));
-                saw_content = true;
-            }
-            NodeOrToken::Token(t)
-                if matches!(
-                    t.kind(),
-                    SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER
-                ) => {}
-            NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT => {
-                let text = expand_tabs_with_width(t.text(), config.tab_width);
-                let mut text_to_process = text.as_ref();
-                if !saw_content && !text.is_empty() && starts_with_ascii_whitespace(&text) {
-                    text_to_process = text.trim_start_matches(|c: char| c.is_ascii_whitespace());
-                } else if !text.is_empty() && starts_with_ascii_whitespace(&text) {
-                    if skip_next_leading_whitespace {
-                        text_to_process =
-                            text.trim_start_matches(|c: char| c.is_ascii_whitespace());
-                        skip_next_leading_whitespace = false;
-                    } else {
-                        events.push(InlineFootnoteEvent::Space);
-                    }
-                }
-                let mut saw_word = false;
-                for word in text_to_process.split_ascii_whitespace() {
-                    if saw_word {
-                        events.push(InlineFootnoteEvent::Space);
-                    }
-                    let processed_word = escape_special_chars(
-                        word,
-                        false,
-                        foot_prev_is_text,
-                        foot_next_is_text,
-                        !in_link_text,
-                    );
-                    events.push(InlineFootnoteEvent::Piece(processed_word));
-                    saw_content = true;
-                    saw_word = true;
-                }
-                if saw_word && ends_with_ascii_whitespace(&text) {
-                    events.push(InlineFootnoteEvent::Space);
-                }
-            }
-            NodeOrToken::Token(t) => {
-                events.push(InlineFootnoteEvent::Piece(t.text().to_string()));
-                saw_content = true;
-            }
-            NodeOrToken::Node(child) => {
-                events.push(InlineFootnoteEvent::Piece(format_inline_fn(&child)));
-                saw_content = true;
-            }
-        }
-        foot_prev_is_text = foot_current_is_text;
-    }
-
-    while matches!(events.last(), Some(InlineFootnoteEvent::Space)) {
-        events.pop();
-    }
-    events.push(InlineFootnoteEvent::Piece("]".to_string()));
-    (events, skip_next_leading_whitespace)
 }
 
 fn node_starts_with_whitespace(node: &SyntaxNode) -> bool {
@@ -613,6 +614,12 @@ impl<'a> TraversalBuilder<'a> {
         self.skip_next_leading_whitespace = value;
     }
 
+    fn is_at_inline_footnote_open(&self) -> bool {
+        self.current_piece
+            .as_deref()
+            .is_some_and(|piece| piece.ends_with("^["))
+    }
+
     fn flush_current(&mut self, ws_after: bool) {
         if let Some(piece) = self.current_piece.take() {
             self.sink.emit_piece(piece, ws_after);
@@ -632,6 +639,7 @@ fn process_node_recursive(
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
     in_link_text: bool,
     atomic_links: bool,
+    in_inline_footnote: bool,
 ) {
     let mut children = node.children_with_tokens().peekable();
     let mut prev_is_text = false;
@@ -644,7 +652,15 @@ fn process_node_recursive(
         match el {
             NodeOrToken::Token(t) => match t.kind() {
                 SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
+                    if in_inline_footnote && sink.is_at_inline_footnote_open() {
+                        continue;
+                    }
                     sink.set_pending_space(true);
+                }
+                SyntaxKind::INLINE_FOOTNOTE_START | SyntaxKind::INLINE_FOOTNOTE_END => {
+                    if !in_inline_footnote {
+                        sink.push_piece(t.text());
+                    }
                 }
                 SyntaxKind::BLOCK_QUOTE_MARKER => {}
                 SyntaxKind::ESCAPED_CHAR => {
@@ -692,21 +708,23 @@ fn process_node_recursive(
                 SyntaxKind::LIST => sink.set_pending_space(true),
                 SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {}
                 SyntaxKind::INLINE_FOOTNOTE => {
-                    let (events, skip_next) = collect_inline_footnote_events(
+                    let had_pending_space = sink.pending_space();
+                    sink.set_pending_space(false);
+                    sink.push_piece("^[");
+                    sink.set_skip_next_leading_whitespace(true);
+                    process_node_recursive(
                         config,
                         &n,
-                        in_link_text,
+                        sink,
                         format_inline_fn,
-                        sink.skip_next_leading_whitespace(),
+                        in_link_text,
+                        atomic_links,
+                        true,
                     );
-                    sink.set_skip_next_leading_whitespace(skip_next);
-                    for event in events {
-                        match event {
-                            InlineFootnoteEvent::Piece(piece) => sink.push_piece(&piece),
-                            InlineFootnoteEvent::Space => sink.set_pending_space(true),
-                        }
-                    }
                     sink.set_pending_space(false);
+                    sink.push_piece("]");
+                    sink.set_skip_next_leading_whitespace(false);
+                    sink.set_pending_space(had_pending_space);
                 }
                 SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
                     let has_blank_before = n
@@ -721,6 +739,7 @@ fn process_node_recursive(
                             format_inline_fn,
                             in_link_text,
                             atomic_links,
+                            in_inline_footnote,
                         );
                     }
                 }
@@ -731,6 +750,7 @@ fn process_node_recursive(
                     format_inline_fn,
                     in_link_text,
                     atomic_links,
+                    in_inline_footnote,
                 ),
                 SyntaxKind::EMPHASIS => {
                     if node_starts_with_whitespace(&n) {
@@ -745,6 +765,7 @@ fn process_node_recursive(
                         format_inline_fn,
                         in_link_text,
                         atomic_links,
+                        in_inline_footnote,
                     );
                     sink.set_skip_next_leading_whitespace(false);
                     let had_pending_space = sink.pending_space();
@@ -765,6 +786,7 @@ fn process_node_recursive(
                         format_inline_fn,
                         in_link_text,
                         atomic_links,
+                        in_inline_footnote,
                     );
                     sink.set_skip_next_leading_whitespace(false);
                     let had_pending_space = sink.pending_space();
@@ -790,6 +812,7 @@ fn process_node_recursive(
                                     format_inline_fn,
                                     true,
                                     atomic_links,
+                                    in_inline_footnote,
                                 );
                             }
                         }
@@ -816,6 +839,7 @@ fn process_node_recursive(
                                     format_inline_fn,
                                     true,
                                     atomic_links,
+                                    in_inline_footnote,
                                 );
                             }
                         }
@@ -894,10 +918,13 @@ pub(super) fn wrapped_lines_for_node(
 ) -> Vec<String> {
     let options = strategy.options(widths);
     let sentence_mode = matches!(options.mode, NodeWrapMode::Sentence);
-    if options.apply_special_cases
-        && let Some(lines) = special_case_lines(config, node, format_inline_fn)
-    {
-        return lines;
+    if options.apply_special_cases {
+        if let Some(lines) = dollar_special_case_lines(node) {
+            return lines;
+        }
+        if let Some(lines) = special_case_lines(config, node, format_inline_fn) {
+            return lines;
+        }
     }
     let line_widths = if sentence_mode || !options.widths.is_empty() {
         options.widths
@@ -916,6 +943,7 @@ pub(super) fn wrapped_lines_for_node(
         format_inline_fn,
         false,
         options.atomic_links_root,
+        false,
     );
     builder.finish()
 }
@@ -925,85 +953,13 @@ fn special_case_lines(
     node: &SyntaxNode,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Option<Vec<String>> {
-    fn strip_blockquote_prefix(line: &str) -> &str {
-        if let Some(rest) = line.strip_prefix("> ") {
-            rest
-        } else if let Some(rest) = line.strip_prefix('>') {
-            rest
-        } else {
-            line
-        }
-    }
-
     let mut has_hard_breaks = false;
-    let mut has_dollar_text = false;
     for el in node.descendants_with_tokens() {
         if el.kind() == SyntaxKind::HARD_LINE_BREAK {
             has_hard_breaks = true;
         }
-        if let NodeOrToken::Token(t) = el
-            && t.text().contains('$')
-        {
-            has_dollar_text = true;
-        }
-        if has_hard_breaks && has_dollar_text {
+        if has_hard_breaks {
             break;
-        }
-    }
-
-    let has_blockquote_markers = node.children_with_tokens().any(
-        |el| matches!(el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER),
-    );
-    let in_blockquote = node
-        .ancestors()
-        .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_QUOTE);
-    if has_dollar_text {
-        let paragraph_text = node.text().to_string();
-        let normalized: Cow<'_, str> = if paragraph_text.contains("\r\n") {
-            Cow::Owned(paragraph_text.replace("\r\n", "\n"))
-        } else {
-            Cow::Borrowed(paragraph_text.as_str())
-        };
-        if has_ambiguous_dollar_delimiters(&normalized) && !has_blockquote_markers {
-            return Some(paragraph_text.lines().map(ToString::to_string).collect());
-        }
-        let standalone_fences = normalized
-            .lines()
-            .map(|line| {
-                if has_blockquote_markers {
-                    strip_blockquote_prefix(line)
-                } else {
-                    line
-                }
-            })
-            .filter(|line| line.trim_start().starts_with("$$"))
-            .count();
-        if standalone_fences >= 2 && standalone_fences % 2 == 0 {
-            if has_blockquote_markers {
-                return Some(
-                    paragraph_text
-                        .lines()
-                        .map(strip_blockquote_prefix)
-                        .map(ToString::to_string)
-                        .collect(),
-                );
-            }
-            return Some(
-                paragraph_text
-                    .lines()
-                    .map(|line| line.trim_end().to_string())
-                    .collect(),
-            );
-        }
-        let fence_marker_count = normalized.match_indices("$$").count();
-        if fence_marker_count >= 2 && fence_marker_count.is_multiple_of(2) && in_blockquote {
-            return Some(
-                paragraph_text
-                    .lines()
-                    .map(strip_blockquote_prefix)
-                    .map(|line| line.trim_end().to_string())
-                    .collect(),
-            );
         }
     }
 
