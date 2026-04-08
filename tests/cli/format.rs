@@ -160,8 +160,49 @@ exclude = ["tests/"]
         .args(["format", temp_dir.path().to_str().unwrap()])
         .assert()
         .success()
-        .stdout(predicate::str::contains("doc.qmd"))
+        .stdout(predicate::str::contains("1 file left unchanged"))
         .stdout(predicate::str::contains("snapshot.md").not());
+}
+
+#[test]
+fn test_format_directory_reports_only_changed_files_and_summary() {
+    let temp_dir = TempDir::new().unwrap();
+    let changed = temp_dir.path().join("changed.qmd");
+    let unchanged = temp_dir.path().join("unchanged.qmd");
+
+    fs::write(
+        &changed,
+        "# Heading\n\nThis is a very long line that exceeds the default line width of 80 characters and should be wrapped when formatted.",
+    )
+    .unwrap();
+    fs::write(&unchanged, "# Unchanged\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", temp_dir.path().to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Formatted").and(predicate::str::contains("changed.qmd")))
+        .stdout(predicate::str::contains("unchanged.qmd").not())
+        .stdout(predicate::str::contains(
+            "1 file reformatted, 1 file left unchanged",
+        ));
+}
+
+#[test]
+fn test_format_directory_all_unchanged_prints_summary_only() {
+    let temp_dir = TempDir::new().unwrap();
+    let file1 = temp_dir.path().join("a.qmd");
+    let file2 = temp_dir.path().join("b.md");
+
+    fs::write(&file1, "# A\n\nParagraph.\n").unwrap();
+    fs::write(&file2, "# B\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", temp_dir.path().to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Formatted").not())
+        .stdout(predicate::str::contains("2 files left unchanged"));
 }
 
 #[test]

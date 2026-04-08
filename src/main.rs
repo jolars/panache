@@ -235,6 +235,14 @@ fn read_all(path: Option<&PathBuf>) -> io::Result<String> {
     }
 }
 
+fn file_count_label(count: usize, singular: &str, plural: &str) -> String {
+    if count == 1 {
+        format!("{count} {singular}")
+    } else {
+        format!("{count} {plural}")
+    }
+}
+
 fn start_dir_for(input_path: Option<&Path>) -> io::Result<PathBuf> {
     if let Some(p) = input_path {
         Ok(p.parent().unwrap_or(Path::new(".")).to_path_buf())
@@ -675,6 +683,8 @@ fn main() -> io::Result<()> {
 
             // Handle file(s) case
             let mut all_formatted = true;
+            let mut reformatted_count = 0usize;
+            let mut unchanged_count = 0usize;
 
             for file_path in &expanded_files {
                 let start_dir = file_path.parent().unwrap_or(Path::new(".")).to_path_buf();
@@ -774,9 +784,14 @@ fn main() -> io::Result<()> {
                         println!("{} is correctly formatted", file_path.display());
                     }
                 } else if !verify {
-                    // Format in place (default for file paths)
-                    fs::write(file_path, &output)?;
-                    println!("Formatted {}", file_path.display());
+                    if input != output {
+                        // Format in place (default for file paths)
+                        fs::write(file_path, &output)?;
+                        println!("Formatted {}", file_path.display());
+                        reformatted_count += 1;
+                    } else {
+                        unchanged_count += 1;
+                    }
                 }
             }
 
@@ -787,6 +802,31 @@ fn main() -> io::Result<()> {
                     }
                 } else {
                     std::process::exit(1);
+                }
+            } else if !verify {
+                if reformatted_count == 0 {
+                    println!(
+                        "{}",
+                        file_count_label(
+                            unchanged_count,
+                            "file left unchanged",
+                            "files left unchanged"
+                        )
+                    );
+                } else {
+                    println!(
+                        "{}, {}",
+                        file_count_label(
+                            reformatted_count,
+                            "file reformatted",
+                            "files reformatted"
+                        ),
+                        file_count_label(
+                            unchanged_count,
+                            "file left unchanged",
+                            "files left unchanged"
+                        )
+                    );
                 }
             }
             if let Some(cache_ref) = cache.as_mut() {
