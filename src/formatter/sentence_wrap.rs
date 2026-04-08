@@ -5,6 +5,21 @@ pub(super) enum SentenceLanguage {
     English,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum BoundaryDecision {
+    Break,
+    NoBreak,
+    Undecided,
+}
+
+#[derive(Clone, Copy)]
+struct BoundaryContext<'a> {
+    current_word: &'a str,
+    next_word: Option<&'a str>,
+    has_whitespace_after: bool,
+    is_last: bool,
+}
+
 struct LanguageProfile {
     no_break_abbreviations: &'static [&'static str],
     contextual_abbreviations: &'static [&'static str],
@@ -92,6 +107,83 @@ fn is_contextual_sentence_boundary(
     profile.sentence_starters.contains(&next_norm.as_str())
 }
 
+fn rule_ellipsis_no_break(ctx: &BoundaryContext<'_>) -> BoundaryDecision {
+    let trimmed = trim_sentence_closing_punctuation(ctx.current_word);
+    if trimmed.ends_with("...") || trimmed.ends_with("…") {
+        return BoundaryDecision::NoBreak;
+    }
+    BoundaryDecision::Undecided
+}
+
+fn rule_contextual_abbreviation_break(
+    ctx: &BoundaryContext<'_>,
+    profile: &LanguageProfile,
+) -> BoundaryDecision {
+    let trimmed = trim_sentence_closing_punctuation(ctx.current_word);
+    let Some(last_char) = trimmed.chars().last() else {
+        return BoundaryDecision::NoBreak;
+    };
+    if last_char == '.' && is_contextual_sentence_boundary(trimmed, ctx.next_word, profile) {
+        return BoundaryDecision::Break;
+    }
+    BoundaryDecision::Undecided
+}
+
+fn rule_abbreviation_no_break(
+    ctx: &BoundaryContext<'_>,
+    profile: &LanguageProfile,
+) -> BoundaryDecision {
+    let trimmed = trim_sentence_closing_punctuation(ctx.current_word);
+    let Some(last_char) = trimmed.chars().last() else {
+        return BoundaryDecision::NoBreak;
+    };
+    if last_char == '.' && is_no_break_abbreviation(trimmed, profile) {
+        return BoundaryDecision::NoBreak;
+    }
+    BoundaryDecision::Undecided
+}
+
+fn rule_terminal_punctuation_break(ctx: &BoundaryContext<'_>) -> BoundaryDecision {
+    let trimmed = trim_sentence_closing_punctuation(ctx.current_word);
+    let Some(last_char) = trimmed.chars().last() else {
+        return BoundaryDecision::NoBreak;
+    };
+    if matches!(last_char, '.' | '!' | '?') && (ctx.has_whitespace_after || ctx.is_last) {
+        return BoundaryDecision::Break;
+    }
+    BoundaryDecision::NoBreak
+}
+
+pub(super) fn decide_sentence_boundary(
+    word: &str,
+    next_word: Option<&str>,
+    has_whitespace_after: bool,
+    is_last: bool,
+    language: SentenceLanguage,
+) -> BoundaryDecision {
+    let profile = language.profile();
+    let ctx = BoundaryContext {
+        current_word: word,
+        next_word,
+        has_whitespace_after,
+        is_last,
+    };
+
+    let rules: [BoundaryDecision; 4] = [
+        rule_ellipsis_no_break(&ctx),
+        rule_contextual_abbreviation_break(&ctx, profile),
+        rule_abbreviation_no_break(&ctx, profile),
+        rule_terminal_punctuation_break(&ctx),
+    ];
+
+    for decision in rules {
+        if decision != BoundaryDecision::Undecided {
+            return decision;
+        }
+    }
+    BoundaryDecision::NoBreak
+}
+
 pub(super) fn is_sentence_boundary_text(
     word: &str,
     next_word: Option<&str>,
@@ -99,21 +191,10 @@ pub(super) fn is_sentence_boundary_text(
     is_last: bool,
     language: SentenceLanguage,
 ) -> bool {
-    let profile = language.profile();
-    let trimmed = trim_sentence_closing_punctuation(word);
-    if trimmed.ends_with("...") || trimmed.ends_with("…") {
-        return false;
-    }
-    let Some(last_char) = trimmed.chars().last() else {
-        return false;
-    };
-    if last_char == '.' && is_contextual_sentence_boundary(trimmed, next_word, profile) {
-        return true;
-    }
-    if last_char == '.' && is_no_break_abbreviation(trimmed, profile) {
-        return false;
-    }
-    matches!(last_char, '.' | '!' | '?') && (has_whitespace_after || is_last)
+    matches!(
+        decide_sentence_boundary(word, next_word, has_whitespace_after, is_last, language),
+        BoundaryDecision::Break
+    )
 }
 
 fn extract_lang_from_yaml_text(yaml_text: &str) -> Option<String> {
@@ -198,6 +279,24 @@ mod tests {
             false,
             SentenceLanguage::English
         ));
+        assert_eq!(
+            decide_sentence_boundary(
+                "complete.",
+                Some("Next"),
+                true,
+                false,
+                SentenceLanguage::English
+            ),
+            BoundaryDecision::Break
+        );
+    }
+
+    #[test]
+    fn boundary_decision_reports_no_break_for_abbreviation() {
+        assert_eq!(
+            decide_sentence_boundary("e.g.", Some("Next"), true, false, SentenceLanguage::English),
+            BoundaryDecision::NoBreak
+        );
     }
 
     #[test]
