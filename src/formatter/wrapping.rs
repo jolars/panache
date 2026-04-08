@@ -205,27 +205,24 @@ pub(super) struct NodeWrapOptions<'a> {
     pub widths: &'a [usize],
     pub mode: NodeWrapMode,
     pub atomic_links_root: bool,
-    pub apply_special_cases: bool,
     pub strip_standalone_blockquote_markers: bool,
 }
 
 impl<'a> NodeWrapOptions<'a> {
-    pub(super) fn reflow(widths: &'a [usize], apply_special_cases: bool) -> Self {
+    pub(super) fn reflow(widths: &'a [usize]) -> Self {
         Self {
             widths,
             mode: NodeWrapMode::Reflow,
             atomic_links_root: false,
-            apply_special_cases,
             strip_standalone_blockquote_markers: false,
         }
     }
 
-    pub(super) fn sentence(apply_special_cases: bool) -> Self {
+    pub(super) fn sentence() -> Self {
         Self {
             widths: &[],
             mode: NodeWrapMode::Sentence,
             atomic_links_root: true,
-            apply_special_cases,
             strip_standalone_blockquote_markers: false,
         }
     }
@@ -234,21 +231,15 @@ impl<'a> NodeWrapOptions<'a> {
 impl WrapStrategy {
     fn options<'a>(self, widths: &'a [usize]) -> NodeWrapOptions<'a> {
         match self {
-            Self::ParagraphReflow => NodeWrapOptions {
-                apply_special_cases: true,
-                ..NodeWrapOptions::reflow(widths, true)
-            },
-            Self::ParagraphSentence => NodeWrapOptions {
-                apply_special_cases: true,
-                ..NodeWrapOptions::sentence(true)
-            },
+            Self::ParagraphReflow => NodeWrapOptions::reflow(widths),
+            Self::ParagraphSentence => NodeWrapOptions::sentence(),
             Self::ListReflow { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
-                ..NodeWrapOptions::reflow(widths, false)
+                ..NodeWrapOptions::reflow(widths)
             },
             Self::ListSentence { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
-                ..NodeWrapOptions::sentence(false)
+                ..NodeWrapOptions::sentence()
             },
         }
     }
@@ -545,6 +536,15 @@ impl<'a> TraversalBuilder<'a> {
             }
         }
     }
+
+    fn push_hard_line_break(&mut self, marker: &str) {
+        self.set_pending_space(false);
+        self.flush_current(false);
+        if !marker.is_empty() {
+            self.sink.emit_piece(marker.to_string(), false);
+        }
+        self.sink.force_line_break();
+    }
 }
 
 fn process_node_recursive(
@@ -566,6 +566,14 @@ fn process_node_recursive(
         );
         match el {
             NodeOrToken::Token(t) => match t.kind() {
+                SyntaxKind::HARD_LINE_BREAK => {
+                    let marker = if config.extensions.escaped_line_breaks {
+                        "\\"
+                    } else {
+                        t.text().trim_end_matches(['\r', '\n'])
+                    };
+                    sink.push_hard_line_break(marker);
+                }
                 SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
                     if in_inline_footnote && sink.is_at_inline_footnote_open() {
                         continue;
@@ -837,11 +845,6 @@ pub(super) fn wrapped_lines_for_node(
 ) -> Vec<String> {
     let options = strategy.options(widths);
     let sentence_mode = matches!(options.mode, NodeWrapMode::Sentence);
-    if options.apply_special_cases
-        && let Some(lines) = special_case_lines(config, node, format_inline_fn)
-    {
-        return lines;
-    }
     let line_widths = if sentence_mode || !options.widths.is_empty() {
         options.widths
     } else {
@@ -862,54 +865,4 @@ pub(super) fn wrapped_lines_for_node(
         false,
     );
     builder.finish()
-}
-
-fn special_case_lines(
-    config: &Config,
-    node: &SyntaxNode,
-    format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
-) -> Option<Vec<String>> {
-    let mut has_hard_breaks = false;
-    for el in node.descendants_with_tokens() {
-        if el.kind() == SyntaxKind::HARD_LINE_BREAK {
-            has_hard_breaks = true;
-        }
-        if has_hard_breaks {
-            break;
-        }
-    }
-
-    if !has_hard_breaks {
-        return None;
-    }
-
-    let mut result = String::new();
-    let mut skip_next_whitespace = false;
-    for child in node.children_with_tokens() {
-        match child {
-            NodeOrToken::Node(n) => {
-                skip_next_whitespace = false;
-                result.push_str(&format_inline_fn(&n));
-            }
-            NodeOrToken::Token(t) => {
-                if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
-                    skip_next_whitespace = true;
-                } else if t.kind() == SyntaxKind::WHITESPACE && skip_next_whitespace {
-                    skip_next_whitespace = false;
-                } else if t.kind() == SyntaxKind::HARD_LINE_BREAK {
-                    skip_next_whitespace = false;
-                    if config.extensions.escaped_line_breaks {
-                        result.push_str("\\\n");
-                    } else {
-                        result.push_str(t.text());
-                    }
-                } else {
-                    skip_next_whitespace = false;
-                    result.push_str(t.text());
-                }
-            }
-        }
-    }
-
-    Some(result.lines().map(|s| s.to_string()).collect())
 }
