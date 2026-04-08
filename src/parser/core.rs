@@ -1918,9 +1918,9 @@ impl<'a> Parser<'a> {
                     }
                 }
                 BlockDetectionResult::Yes => {
-                    // Non-interrupting blocks generally require blank-before.
-                    // Keep the legacy allowance only for reference definitions.
-                    if parser_name != "reference_definition" {
+                    // Keep ambiguous fenced-div openers from interrupting an
+                    // active paragraph without a blank line.
+                    if parser_name == "fenced_div_open" && self.is_paragraph_open() {
                         if !self.is_paragraph_open() {
                             paragraphs::start_paragraph_if_needed(
                                 &mut self.containers,

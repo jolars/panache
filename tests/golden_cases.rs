@@ -177,6 +177,7 @@ golden_test_cases!(
     fenced_code,
     fenced_code_quarto,
     fenced_divs,
+    fenced_div_list_idempotency_setup,
     fenced_div_close_grid_table,
     footnote_continuation_idempotency,
     footnote_continuation_idempotency_reflow,

@@ -1853,8 +1853,13 @@ impl Formatter {
                         false
                     });
                 if opening_has_trailing_inline_text {
-                    self.output
-                        .push_str(node.text().to_string().trim_end_matches('\n'));
+                    // Preserve malformed one-line div text verbatim to keep parser shape stable
+                    // across format passes. Trimming can shift boundary ownership of following
+                    // blank lines and break idempotency.
+                    self.output.push_str(&node.text().to_string());
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
+                    }
                     return;
                 }
 
@@ -1872,29 +1877,44 @@ impl Formatter {
                 // trailing text but no body/closing node; normalizing them creates
                 // unstable nesting and loses inline content.
                 if !has_close && !has_content {
-                    self.output
-                        .push_str(node.text().to_string().trim_end_matches('\n'));
+                    if let Some(open) = fenced_div.opening_fence() {
+                        self.output
+                            .push_str(open.syntax().text().to_string().trim_end_matches('\n'));
+                    } else {
+                        self.output
+                            .push_str(node.text().to_string().trim_end_matches('\n'));
+                    }
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
+                    }
                     return;
                 }
 
-                // Normalize fence lengths by nesting depth. Within list items we
-                // preserve 3-colon fences for nested divs to avoid cross-pass
-                // inflation when list continuation parsing changes div depth.
+                let source_opening_colons = fenced_div
+                    .opening_fence()
+                    .map(|open| {
+                        open.syntax()
+                            .text()
+                            .to_string()
+                            .trim_start()
+                            .chars()
+                            .take_while(|&c| c == ':')
+                            .count()
+                    })
+                    .unwrap_or(3)
+                    .max(3);
                 let in_list_item = node
                     .ancestors()
                     .any(|ancestor| ancestor.kind() == SyntaxKind::LIST_ITEM);
-                let colon_count = if in_list_item {
-                    3
+                let depth_encoded_colons = 3 + (self.fenced_div_depth * 2);
+                let opening_colons = if in_list_item {
+                    source_opening_colons
                 } else {
-                    3 + (self.fenced_div_depth * 2)
+                    depth_encoded_colons
                 };
-                let colons = ":".repeat(colon_count);
+                let colons = ":".repeat(opening_colons);
 
                 let attributes = fenced_div.info_text();
-                let trailing_colons = fenced_div
-                    .opening_fence()
-                    .and_then(|open| open.trailing_colons());
-
                 // Emit normalized opening fence
                 if !has_close && !has_content {
                     self.output.push_str(&" ".repeat(indent));
@@ -1904,10 +1924,6 @@ impl Formatter {
                         self.output.push_str(&colons);
                         self.output.push(' ');
                         self.output.push_str(attrs);
-                        if let Some(trailing) = &trailing_colons {
-                            self.output.push(' ');
-                            self.output.push_str(trailing);
-                        }
                         self.output.push('\n');
                         return;
                     }
@@ -1946,7 +1962,12 @@ impl Formatter {
                     .map(|child| child.kind());
                 let should_strip_leading_blanks = matches!(
                     first_non_blank_kind,
-                    Some(SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN | SyntaxKind::LIST)
+                    Some(
+                        SyntaxKind::PARAGRAPH
+                            | SyntaxKind::PLAIN
+                            | SyntaxKind::LIST
+                            | SyntaxKind::LIST_ITEM
+                    )
                 );
                 let start = if should_strip_leading_blanks {
                     leading_blank_lines
@@ -1957,7 +1978,10 @@ impl Formatter {
                 for (idx, child) in content_children[start..end].iter().enumerate() {
                     if child.kind() == SyntaxKind::BLANK_LINE {
                         if idx < leading_blank_lines
-                            && first_non_blank_kind == Some(SyntaxKind::LIST)
+                            && matches!(
+                                first_non_blank_kind,
+                                Some(SyntaxKind::LIST | SyntaxKind::LIST_ITEM)
+                            )
                         {
                             continue;
                         }
@@ -1982,12 +2006,12 @@ impl Formatter {
                 // Decrement depth after processing content
                 self.fenced_div_depth -= 1;
 
-                // Emit normalized closing fence (ensure it's on its own line)
+                // Emit closing fence using the opener's colon count.
                 if !self.output.ends_with('\n') {
                     self.output.push('\n');
                 }
                 self.output.push_str(&" ".repeat(indent));
-                self.output.push_str(&colons);
+                self.output.push_str(&":".repeat(opening_colons));
                 self.output.push('\n');
 
                 // Reset blank line tracking so outer blocks don't suppress separation.
@@ -1998,8 +2022,21 @@ impl Formatter {
                     && is_block_element(next.kind())
                     && !self.output.ends_with("\n\n")
                 {
-                    self.output.push('\n');
-                    self.consecutive_blank_lines = 1;
+                    // In list items, keep separator for continuation block content
+                    // (e.g. list marker or paragraph) but avoid adding extra space
+                    // before nested structural blocks that already manage spacing.
+                    let needs_separator = if in_list_item {
+                        matches!(
+                            next.kind(),
+                            SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN | SyntaxKind::LIST
+                        )
+                    } else {
+                        true
+                    };
+                    if needs_separator {
+                        self.output.push('\n');
+                        self.consecutive_blank_lines = 1;
+                    }
                 }
             }
 

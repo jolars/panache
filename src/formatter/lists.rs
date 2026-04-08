@@ -1,12 +1,25 @@
 use crate::config::WrapMode;
 use crate::formatter::indent_utils::{calculate_list_item_indent, is_alignable_marker};
 use crate::formatter::inline_layout::{self, WrapStrategy};
-use crate::syntax::{BlockQuote, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, BlockQuote, FencedDiv, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
 use super::Formatter;
 
 impl Formatter {
+    fn has_open_only_fenced_div(item: &SyntaxNode) -> bool {
+        item.descendants().any(|node| {
+            let Some(fenced_div) = FencedDiv::cast(node) else {
+                return false;
+            };
+
+            !fenced_div.has_closing_fence()
+                && !fenced_div
+                    .body_blocks()
+                    .any(|body_child| body_child.kind() != SyntaxKind::BLANK_LINE)
+        })
+    }
+
     fn has_continuation_eligible_predecessor(node: &SyntaxNode) -> bool {
         let mut prev = node.prev_sibling();
         while let Some(sibling) = prev {
@@ -220,6 +233,13 @@ impl Formatter {
 
         for child in node.children() {
             if child.kind() == SyntaxKind::LIST_ITEM {
+                let prev_is_fenced_div = child
+                    .prev_sibling()
+                    .map(|n| n.kind() == SyntaxKind::FENCED_DIV)
+                    .unwrap_or(false);
+                if prev_is_fenced_div && self.output.ends_with("\n\n") {
+                    self.output.pop();
+                }
                 item_count += 1;
 
                 // Calculate content indent for this list item (marker + space)
@@ -229,8 +249,25 @@ impl Formatter {
                 self.format_node_sync(&child, indent);
 
                 // Add blank line after each item for loose lists (except last)
-                if is_loose && item_count < total_items && !self.output.ends_with("\n\n") {
-                    self.output.push('\n');
+                if is_loose
+                    && item_count < total_items
+                    && !self.output.ends_with("\n\n")
+                    && !Self::has_open_only_fenced_div(&child)
+                {
+                    let mut next = child.next_sibling();
+                    while let Some(sibling) = next.clone() {
+                        if sibling.kind() == SyntaxKind::BLANK_LINE {
+                            next = sibling.next_sibling();
+                        } else {
+                            break;
+                        }
+                    }
+                    let next_non_blank_is_list_item = next
+                        .map(|n| n.kind() == SyntaxKind::LIST_ITEM)
+                        .unwrap_or(false);
+                    if next_non_blank_is_list_item {
+                        self.output.push('\n');
+                    }
                 }
             } else if child.kind() == SyntaxKind::BLANK_LINE {
                 // Preserve explicit separators when not treating this list as globally loose.
