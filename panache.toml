@@ -1,4 +1,3 @@
-include = ["docs/**/*.{md,Rmd,qmd}"]
 extend-exclude = [
   "tests/*",
   "assets/*",
