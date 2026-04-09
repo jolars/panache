@@ -26,6 +26,7 @@ jobs:
         wch/rgcookbook
         rstudio/rmarkdown-cookbook
         mattiasvillani/BayesianLearningBook
+        nielsrhansen/CSwR
     steps:
       - uses: actions/checkout@v6
 
