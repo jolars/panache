@@ -3,6 +3,9 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config::FormatterConfig;
+use crate::external_tools_common::{
+    find_missing_commands, log_warning_once, missing_commands_warning_message,
+};
 
 /// Errors that can occur when invoking external formatters.
 #[derive(Debug)]
@@ -43,18 +46,11 @@ impl From<std::io::Error> for FormatterError {
 pub fn find_missing_formatter_commands(
     formatters: &HashMap<String, Vec<FormatterConfig>>,
 ) -> HashSet<String> {
-    formatters
-        .values()
-        .flat_map(|configs| configs.iter())
-        .filter_map(|cfg| {
-            let cmd = cfg.cmd.trim();
-            if cmd.is_empty() || command_exists(cmd) {
-                None
-            } else {
-                Some(cmd.to_string())
-            }
-        })
-        .collect()
+    find_missing_commands(
+        formatters
+            .values()
+            .flat_map(|configs| configs.iter().map(|cfg| cfg.cmd.as_str())),
+    )
 }
 
 /// WASM has no external formatter execution.
@@ -70,14 +66,7 @@ pub fn log_missing_formatter_commands(missing: &HashSet<String>) {
     let Some(message) = missing_formatter_warning_message(missing) else {
         return;
     };
-
-    // CLI users often run without RUST_LOG configured, in which case warn logs
-    // are filtered out. Fall back to stderr so this warning is still visible.
-    if log::log_enabled!(log::Level::Warn) {
-        log::warn!("{}", message);
-    } else {
-        eprintln!("Warning: {}", message);
-    }
+    log_warning_once(&message);
 }
 
 /// Resolve stdin argument placeholders against a language-aware virtual filename.
@@ -118,33 +107,7 @@ fn virtual_filename_for_language(language: &str) -> &'static str {
 }
 
 fn missing_formatter_warning_message(missing: &HashSet<String>) -> Option<String> {
-    if missing.is_empty() {
-        return None;
-    }
-
-    let mut sorted_missing: Vec<_> = missing.iter().map(String::as_str).collect();
-    sorted_missing.sort_unstable();
-
-    Some(format!(
-        "External formatter command(s) not found: {}. Configured external formatting for these tools will be skipped.",
-        sorted_missing.join(", ")
-    ))
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn command_exists(cmd: &str) -> bool {
-    use std::path::Path;
-
-    if has_path_separator(cmd) {
-        return Path::new(cmd).exists();
-    }
-    which::which(cmd).is_ok()
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn has_path_separator(cmd: &str) -> bool {
-    cmd.contains(std::path::MAIN_SEPARATOR)
-        || cfg!(windows) && (cmd.contains('/') || cmd.contains('\\'))
+    missing_commands_warning_message(missing, "formatter", "formatting")
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]

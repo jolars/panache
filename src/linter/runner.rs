@@ -7,6 +7,8 @@ use crate::linter::diagnostics::Diagnostic;
 use crate::linter::external_linters::ExternalLinterRegistry;
 #[cfg(all(not(target_arch = "wasm32"), feature = "lsp"))]
 use crate::linter::external_linters::run_linter;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::linter::external_linters::{find_missing_linter_commands, log_missing_linter_commands};
 use crate::linter::rules::RuleRegistry;
 use crate::syntax::SyntaxNode;
 #[cfg(not(target_arch = "wasm32"))]
@@ -146,6 +148,12 @@ impl LintRunner {
             return diagnostics;
         }
 
+        let missing_linter_commands = find_missing_linter_commands(
+            config.linters.values().map(String::as_str),
+            &self.external_linters,
+        );
+        log_missing_linter_commands(&missing_linter_commands);
+
         // Collect code blocks by language
         let code_blocks = collect_code_blocks(tree, input);
 
@@ -159,6 +167,9 @@ impl LintRunner {
                 );
                 continue;
             };
+            if missing_linter_commands.contains(linter_info.command) {
+                continue;
+            }
 
             if !self
                 .external_linters
@@ -236,6 +247,12 @@ impl LintRunner {
             return diagnostics;
         }
 
+        let missing_linter_commands = find_missing_linter_commands(
+            config.linters.values().map(String::as_str),
+            &self.external_linters,
+        );
+        log_missing_linter_commands(&missing_linter_commands);
+
         // Collect code blocks by language
         let code_blocks = collect_code_blocks(tree, input);
 
@@ -249,6 +266,9 @@ impl LintRunner {
                 );
                 continue;
             };
+            if missing_linter_commands.contains(linter_info.command) {
+                continue;
+            }
 
             if !self
                 .external_linters

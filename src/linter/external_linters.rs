@@ -1,6 +1,6 @@
 //! External linter integration for code blocks.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 #[cfg(feature = "lsp")]
@@ -8,6 +8,10 @@ use std::process::{Command, Stdio};
 #[cfg(feature = "lsp")]
 use std::time::Duration;
 
+#[cfg(not(target_arch = "wasm32"))]
+use crate::external_tools_common::{
+    find_missing_commands, log_warning_once, missing_commands_warning_message,
+};
 use crate::linter::code_block_collector::BlockMapping;
 use crate::linter::diagnostics::Diagnostic;
 use crate::linter::offsets::line_col_to_byte_offset_1based;
@@ -238,6 +242,32 @@ impl Default for ExternalLinterRegistry {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub fn find_missing_linter_commands<'a, I>(
+    configured_linter_names: I,
+    registry: &ExternalLinterRegistry,
+) -> HashSet<String>
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    find_missing_commands(
+        configured_linter_names
+            .into_iter()
+            .filter_map(|name| registry.get(name).map(|info| info.command)),
+    )
+}
+
+pub fn log_missing_linter_commands(missing: &HashSet<String>) {
+    let Some(message) = missing_linter_warning_message(missing) else {
+        return;
+    };
+    log_warning_once(&message);
+}
+
+fn missing_linter_warning_message(missing: &HashSet<String>) -> Option<String> {
+    missing_commands_warning_message(missing, "linter", "linting")
+}
+
 #[cfg(feature = "lsp")]
 pub async fn run_linter(
     linter_name: &str,
@@ -457,5 +487,29 @@ mod tests {
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect();
         assert_eq!(args, vec!["--shell".to_string(), "bash".to_string()]);
+    }
+
+    #[test]
+    fn missing_linter_warning_message_sorts_and_deduplicates_commands() {
+        let missing = HashSet::from([
+            "ruff".to_string(),
+            "shellcheck".to_string(),
+            "ruff".to_string(),
+        ]);
+        let message = missing_linter_warning_message(&missing).expect("message expected");
+        assert_eq!(
+            message,
+            "External linter command(s) not found: ruff, shellcheck. Configured external linting for these tools will be skipped."
+        );
+    }
+
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn find_missing_linter_commands_uses_registry_commands() {
+        let registry = ExternalLinterRegistry::new();
+        let missing =
+            find_missing_linter_commands(["ruff", "definitely_unknown_linter"], &registry);
+        // Unknown linter names are ignored here; they are handled by runner warnings.
+        assert!(!missing.contains("definitely_unknown_linter"));
     }
 }
