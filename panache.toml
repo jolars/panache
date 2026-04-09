@@ -4,7 +4,9 @@ extend-exclude = [
   "docs/reference/_formatter-presets-details.qmd",
   "docs/reference/_linter-presets-details.qmd",
   "docs/reference/cli.qmd",
+  "docs/changelog.d",
   "tests/**/*",
+  "CHANGELOG.md",
 ]
 
 [formatters]
