@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.32.0](https://github.com/jolars/panache/compare/v2.31.0...v2.32.0) (2026-04-09)
+
+### Features
+
+* **config:** more presets and add metadata ([8623393](https://github.com/jolars/panache/commit/86233937384c9e0e90db1517381d22f7963b8c80))
+* **editors:** add Zed extension ([c87e45d](https://github.com/jolars/panache/commit/c87e45da91dc856f60c5fd558511e732363218c4)), closes [#102](https://github.com/jolars/panache/issues/102)
+* **formatter:** contextual abbreviaton rules for wrapping ([1cf1a57](https://github.com/jolars/panache/commit/1cf1a57b7caf4b4f95d470b589397a58ec3af7f2))
+* **formatter:** indent tables by two spaces ([864cc25](https://github.com/jolars/panache/commit/864cc251cb83086b107c7ed72d148b01d5134840)), closes [#89](https://github.com/jolars/panache/issues/89)
+* **formatter:** presets for sqlfmt, alejandra, etc ([75f3df3](https://github.com/jolars/panache/commit/75f3df3e7440bbbe7c7f2ba00f3c12a08c1dbe74))
+* **formatter:** reinstate wrapping in footnotes ([6bc8be1](https://github.com/jolars/panache/commit/6bc8be13e2b3b0f4b075862661154a238eb064bf))
+* **formatter:** wrap table captions ([84a7fd1](https://github.com/jolars/panache/commit/84a7fd1d1b60f3c389b6a4e4962867ed6f02d191))
+* implement caching for linting and formatting ([db37713](https://github.com/jolars/panache/commit/db3771361f59e6c4ce2761a483a7798944e29251))
+
+### Bug Fixes
+
+* **cli:** unify missing linters/formatters ([20c06c7](https://github.com/jolars/panache/commit/20c06c727b79d01b61c86f2770dd344953b84b66))
+* **formatter:** fix idempotency issue with lists and images ([9a4c5ae](https://github.com/jolars/panache/commit/9a4c5aeeec143728e507619478eca7ba537bf862))
+* **formatter:** handle idempotency issues in YAML, divs ([100f94c](https://github.com/jolars/panache/commit/100f94c46cc4b6c9c6499b9ddd4e253a181f3770))
+* **formatter:** handle inline footnote newline wrapping ([b65a1f2](https://github.com/jolars/panache/commit/b65a1f29ceba4de39eb570f796c646fb97188954))
+* **formatter:** setup proper rules for sentence wrapping ([4227f3a](https://github.com/jolars/panache/commit/4227f3a5079c311498f366f845787bdda34a9f4d)), closes [#113](https://github.com/jolars/panache/issues/113)
+* **formatter:** treat code as non-breakable in sentence wrap ([482fe61](https://github.com/jolars/panache/commit/482fe6109ad677444b07615f1c6f246d0d2973a7))
+* **formatter:** use pandoc blankline normalization in divs ([8491e97](https://github.com/jolars/panache/commit/8491e97936858294e6e9c21483fe9dd18f763efb))
+* **formatting:** slacken non-breaking code logic ([131bc56](https://github.com/jolars/panache/commit/131bc56d239f1efee77bbef0e1d2c8812efd8a7b))
+* **linter:** pass explicit shell dialect for shellsheck ([2d8c065](https://github.com/jolars/panache/commit/2d8c0658607aa221d0b61d27b9d521cb74f774ce))
+* **parser:** handle complex fenced div case ([34e6e8c](https://github.com/jolars/panache/commit/34e6e8cae92836b66c998cc03a19ca3f92f5cd9a))
+* workaround ambiguous fenced div idempotency ([19409ce](https://github.com/jolars/panache/commit/19409cea9be2bbb47ca2457364d8d4ce1a2a0a6a))
+
 ## [2.31.0](https://github.com/jolars/panache/compare/v2.30.0...v2.31.0) (2026-04-02)
 
 ### Features
