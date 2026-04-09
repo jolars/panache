@@ -86,6 +86,18 @@ extension](https://open-vsx.org/extension/jolars/panache), which will
 automatically also install the `panache` CLI and start the language server when
 editing supported files.
 
+### Development Version
+
+To install the latest development version, you can run
+
+```bash
+cargo install --git https://github.com/jolars/panache.git panache
+```
+
+This presumes you have a working and up-to-date Rust toolchain (stable, 2024
+edition) installed. You also need to have `cargo` in your `PATH` if you want to
+use the `panache` command directly after installation.
+
 ## Usage
 
 Panache provides a single CLI interface for formatting, linting, and running the
