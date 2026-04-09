@@ -1,0 +1,200 @@
+name: Smoke Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  debug-format-repo-scan:
+    name: Scan Repositories
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    outputs:
+      failure_count: ${{ steps.summarize.outputs.failure_count }}
+    env:
+      TARGET_REPOS: |
+        quarto-dev/quarto-web
+        rstudio/bookdown
+        rstudio/rmarkdown
+        jgm/pandoc
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-scan-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-scan-
+            ${{ runner.os }}-cargo-
+
+      - name: Build panache binary
+        run: cargo build --release --verbose
+
+      - name: Scan repositories for debug-format regressions
+        id: scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          PANACHE_BIN="$GITHUB_WORKSPACE/target/release/panache"
+          RESULTS_DIR="$RUNNER_TEMP/panache-debug-format-scan"
+          REPOS_DIR="$RESULTS_DIR/repos"
+          LOGS_DIR="$RESULTS_DIR/logs"
+          mkdir -p "$REPOS_DIR" "$LOGS_DIR"
+
+          FAILURES_TSV="$RESULTS_DIR/failures.tsv"
+          {
+            printf 'repo\tfailure_type\tfile\tlog_path\n'
+          } > "$FAILURES_TSV"
+
+          while IFS= read -r repo; do
+            if [ -z "$repo" ]; then
+              continue
+            fi
+            repo_dir="$REPOS_DIR/${repo//\//__}"
+            git clone --depth 1 "https://github.com/${repo}.git" "$repo_dir"
+
+            while IFS= read -r -d '' rel_file; do
+              file_key="$(printf '%s' "${repo}:${rel_file}" | sha256sum | awk '{print $1}')"
+              log_path="$LOGS_DIR/$file_key.log"
+
+              if ! (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all "$rel_file") >"$log_path" 2>&1; then
+                matched=0
+                if grep -Eiq 'idempot' "$log_path"; then
+                  printf '%s\t%s\t%s\t%s\n' "$repo" "idempotency" "$rel_file" "logs/$file_key.log" >> "$FAILURES_TSV"
+                  matched=1
+                fi
+                if grep -Eiq 'lossless' "$log_path"; then
+                  printf '%s\t%s\t%s\t%s\n' "$repo" "losslessness" "$rel_file" "logs/$file_key.log" >> "$FAILURES_TSV"
+                  matched=1
+                fi
+                if [ "$matched" -eq 0 ]; then
+                  printf '%s\t%s\t%s\t%s\n' "$repo" "unknown" "$rel_file" "logs/$file_key.log" >> "$FAILURES_TSV"
+                fi
+              fi
+            done < <(git -C "$repo_dir" ls-files -z -- '*.md' '*.qmd' '*.Rmd')
+          done <<< "$TARGET_REPOS"
+
+      - name: Summarize scan results
+        id: summarize
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULTS_DIR="$RUNNER_TEMP/panache-debug-format-scan"
+          FAILURES_TSV="$RESULTS_DIR/failures.tsv"
+          failure_count="$(($(wc -l < "$FAILURES_TSV") - 1))"
+          if [ "$failure_count" -lt 0 ]; then
+            failure_count=0
+          fi
+
+          echo "failure_count=$failure_count" >> "$GITHUB_OUTPUT"
+          echo "### Panache debug format repo scan" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Failure records: $failure_count" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Scanned extensions: \`.md\`, \`.qmd\`, \`.Rmd\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload scan results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-format-repo-scan-results
+          path: ${{ runner.temp }}/panache-debug-format-scan
+          if-no-files-found: error
+
+  debug-format-repo-scan-issues:
+    name: Create Regression Issues
+    needs: debug-format-repo-scan
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Download scan results artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-format-repo-scan-results
+          path: ${{ runner.temp }}/panache-debug-format-scan
+
+      - name: Create or update regression issues
+        if: needs.debug-format-repo-scan.outputs.failure_count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULTS_DIR="$RUNNER_TEMP/panache-debug-format-scan"
+          FAILURES_TSV="$RESULTS_DIR/failures.tsv"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          tail -n +2 "$FAILURES_TSV" | awk -F '\t' '{print $1 "\t" $2}' | sort -u | while IFS=$'\t' read -r repo failure_type; do
+            if [ -z "$repo" ] || [ -z "$failure_type" ]; then
+              continue
+            fi
+
+            marker="panache-debug-format-key:repo=${repo};type=${failure_type}"
+            title="CI: debug-format regression in ${repo} (${failure_type})"
+            count="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {c++} END {print c+0}' "$FAILURES_TSV")"
+            samples="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {printf "- `%s`\n", $3; c++; if (c == 10) exit}' "$FAILURES_TSV")"
+
+            ISSUE_TITLE="$title"
+            export ISSUE_TITLE
+            issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json number,title --jq '.[] | select(.title == env.ISSUE_TITLE) | .number' | head -n 1)"
+
+            if [ -n "$issue_number" ]; then
+              comment_file="$RUNNER_TEMP/panache-issue-comment.md"
+              {
+                echo "Regression still reproduces for \`$repo\` (\`$failure_type\`)."
+                echo ""
+                echo "- New failure records: $count"
+                echo "- Workflow run: $RUN_URL"
+                echo ""
+                echo "Sample files:"
+                echo "$samples"
+              } > "$comment_file"
+              gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file "$comment_file"
+            else
+              body_file="$RUNNER_TEMP/panache-issue-body.md"
+              {
+                echo "<!-- $marker -->"
+                echo "# Debug-format regression detected"
+                echo ""
+                echo "- Target repository: \`$repo\`"
+                echo "- Failure type: \`$failure_type\`"
+                echo "- Failure records in this run: $count"
+                echo "- Workflow run: $RUN_URL"
+                echo ""
+                echo "Sample files:"
+                echo "$samples"
+                echo ""
+                echo "See artifact \`debug-format-repo-scan-results\` for full logs."
+              } > "$body_file"
+              gh issue create \
+                --repo "$GITHUB_REPOSITORY" \
+                --title "$title" \
+                --label "ci" \
+                --label "debug-format" \
+                --label "$failure_type" \
+                --body-file "$body_file"
+            fi
+          done
+
+      - name: Fail workflow when regressions are detected
+        if: needs.debug-format-repo-scan.outputs.failure_count != '0'
+        shell: bash
+        run: |
+          echo "Debug format regressions detected: ${{ needs.debug-format-repo-scan.outputs.failure_count }}"
+          exit 1
