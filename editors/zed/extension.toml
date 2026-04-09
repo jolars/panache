@@ -1,4 +1,4 @@
-id = "panache"
+id = "panache-language-server"
 name = "Panache"
 description = "Language server for Pandoc, Quarto, and R Markdown"
 version = "2.31.0"
@@ -6,6 +6,6 @@ schema_version = 1
 authors = ["Johan Larsson <johan@jolars.co>"]
 repository = "https://github.com/jolars/panache"
 
-[language_servers.panache]
+[language_servers.panache-language-server]
 name = "Panache Language Server"
 languages = ["Markdown", "Quarto", "RMarkdown"]
