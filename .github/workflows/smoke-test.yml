@@ -23,6 +23,9 @@ jobs:
         rstudio/bookdown
         rstudio/rmarkdown
         jgm/pandoc
+        wch/rgcookbook
+        rstudio/rmarkdown-cookbook
+        mattiasvillani/BayesianLearningBook
     steps:
       - uses: actions/checkout@v6
 
