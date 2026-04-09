@@ -59,20 +59,22 @@ Format your first document:
 panache format document.qmd
 ```
 
-Run lint checks:
+Lint a document:
 
 ```bash
 panache lint document.qmd
 ```
 
-For full installation options (prebuilt binaries, package managers, and source
-builds), see [Getting Started](getting-started.qmd).
+To get the most out of Panache, you will want to set up the language server in
+your editor. See [Getting Started](getting-started.qmd) for instructions on how
+to do that.
 
 ## Where to Go Next
 
-- [Getting Started](getting-started.qmd): complete installation and first-run
-  walkthrough.
+- [Getting Started](getting-started.qmd): A slightly more detailed guide on how
+  to get up and running with Panache, including setting up the language server
+  in your editor.
 - [User Guide](guide/index.qmd): detailed docs for formatting, linting, CLI, and
   editor integration.
-- [Configuration](guide/configuration.qmd): tune behavior with `.panache.toml`.
+- [Configuration](guide/configuration.qmd): tune behavior with `panache.toml`.
 - [Playground](playground/index.html): try formatting directly in the browser.

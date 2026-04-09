@@ -183,16 +183,13 @@ vim.keymap.set("n", "<leader>f", vim.lsp.buf.format, { desc = "Format buffer" })
 
 ### VS Code
 
-Panache is available as a VS Code extension with built-in LSP support:
-
-- VS Code Marketplace:
-  <https://marketplace.visualstudio.com/items?itemName=jolars.panache>
-- Open VSX: <https://open-vsx.org/extension/jolars/panache>
+Install the [VS Code Marketplace
+extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache).
+The extension starts the language server automatically for supported files.
 
 To install through the command line, run:
 
 ```bash
-# VS Code
 code --install-extension jolars.panache
 ```
 
@@ -222,9 +219,14 @@ Optional extension settings:
 `panache.experimental.incrementalParsing` enables an experimental incremental
 parse path for `textDocument/didChange`. It is disabled by default.
 
-### Positron
+### Open VSX (Positron, Cursor, VSCodium, etc.)
 
-See the [VS Code] section above.
+Install the [Open VSX extension](https://open-vsx.org/extension/jolars/panache).
+The extension starts the language server automatically for supported files.
+
+The Open VSX extension is identical to the VS Code extension and uses the same
+configuration settings, so see the [VS Code] section above for configuration
+instructions.
 
 ### Helix
 

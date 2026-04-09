@@ -2,9 +2,8 @@
 title: Getting Started
 description: >
   This guide gets you from zero to a productive Panache setup. You will install
-  the CLI, verify it works, run the core commands (`format`, `lint`, and `parse`),
-  and learn the minimum configuration and ignore directives you need for
-  day-to-day editing.
+  the CLI, verify it works, connect your editor, run the core commands
+  (`format` and  `lint`), and learn how to configure Panache.
 ---
 
 ## Installation
@@ -45,7 +44,6 @@ curl --proto '=https' --tlsv1.2 -LsSf \
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://github.com/jolars/panache/releases/latest/download/panache-installer.ps1 | iex"
 ```
-
 :::
 
 ### Arch Linux
@@ -71,16 +69,6 @@ to your system configuration, include it in the `environment.systemPackages`:
 }
 ```
 
-### From Source
-
-Clone the repository and build:
-
-```bash
-git clone https://github.com/jolars/panache.git
-cd panache
-cargo install --path .
-```
-
 ### Verify Installation
 
 Check that panache is installed correctly:
@@ -88,6 +76,52 @@ Check that panache is installed correctly:
 ```bash
 panache --version
 ```
+
+## Editor Setup
+
+You will get the most out of Panache by integrating its language server into
+your editor. This gets you access to
+
+- formatting on save,
+- real-time linting feedback,
+- information on hovering over syntax,
+- document symbols (outline views),
+- clickable links for references and citations,
+- renaming support,
+- and much more.
+
+### VS Code
+
+Install the [VS Code Marketplace
+extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache).
+The extension starts the language server automatically for supported files.
+
+### Open VSX (Positron, Cursor, VSCodium, etc.)
+
+Install the [Open VSX extension](https://open-vsx.org/extension/jolars/panache).
+The extension starts the language server automatically for supported files.
+
+### Neovim and other editors
+
+In Neovim (version 0.11 or later), add the following to your LSP configuration:
+
+```lua
+-- .config/nvim/lsp/panache.lua
+
+return {
+  cmd = { "panache", "lsp" },
+  filetypes = { "quarto", "markdown", "rmarkdown" },
+    root_markers = { ".panache.toml", "panache.toml", ".git" },
+  settings = {},
+}
+
+-- Enable it
+vim.lsp.enable({"panache"})
+```
+
+See the [Language Server guide](guide/lsp.qmd#editor-integration) for more
+detailed instructions on configuring the Panache language server in Neovim,
+Emacs, Helix, Emacs, Helix, and other LSP-capable editors.
 
 ## Basic Usage
 
@@ -213,7 +247,7 @@ panache parse --json cst.json document.qmd
 
 ## Configuration
 
-Create `.panache.toml` in your project root with your preferred settings:
+Create `panache.toml` in your project root with your preferred settings:
 
 ```toml
 flavor = "quarto"
@@ -222,10 +256,6 @@ line-width = 80
 [format]
 wrap = "reflow"
 blank-lines = "collapse"
-
-[extensions]
-hard-line-breaks = false
-citations = true
 ```
 
 To see all the available configuration options, check the [Configuration
@@ -236,12 +266,6 @@ Panache looks for configuration files in this order:
 1. Explicit `--config` path
 2. `.panache.toml` or `panache.toml` in current/parent directories
 3. `~/.config/panache/config.toml` (XDG config directory)
-
-If you like, you can also specify a custom configuration file directly:
-
-```bash
-panache format --config custom.toml document.qmd
-```
 
 ## Ignore Directives
 
