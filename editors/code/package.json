@@ -15,7 +15,7 @@
     "url": "https://github.com/jolars/panache/issues"
   },
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.115.0"
   },
   "categories": [
     "Formatters",
