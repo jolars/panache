@@ -27,6 +27,8 @@ mod yaml_regions;
 pub use config::BlankLines;
 pub use config::Config;
 pub use config::ConfigBuilder;
+#[cfg(any(feature = "lsp", not(target_arch = "wasm32")))]
+pub use external_tools_common::set_warning_color_override;
 pub use formatter::format_tree;
 #[cfg(feature = "lsp")]
 pub use formatter::format_tree_async;

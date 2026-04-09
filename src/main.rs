@@ -498,6 +498,7 @@ fn run_debug_checks_for_content(
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
     let use_color = color_enabled(cli.color, cli.no_color);
+    panache::set_warning_color_override(use_color);
     let debug_log = match &cli.command {
         Commands::Lsp { debug } if *debug => Some(init_lsp_debug_log()?),
         _ => None,

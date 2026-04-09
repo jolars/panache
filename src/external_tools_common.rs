@@ -1,9 +1,11 @@
 //! Shared helpers for external tool availability checks and warning emission.
 
 use std::collections::HashSet;
+use std::io::IsTerminal;
 use std::sync::{Mutex, OnceLock};
 
 static WARNED_MESSAGES: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+static COLOR_OVERRIDE: OnceLock<Option<bool>> = OnceLock::new();
 
 /// Find missing commands from an iterator of command names.
 #[cfg(not(target_arch = "wasm32"))]
@@ -59,9 +61,36 @@ pub fn log_warning_once(message: &str) -> bool {
     if log::log_enabled!(log::Level::Warn) {
         log::warn!("{}", message);
     } else {
-        eprintln!("Warning: {}", message);
+        eprintln!("{}", format_warning_line(message, warning_color_enabled()));
     }
     true
+}
+
+/// Set CLI-driven warning color policy once per process.
+pub fn set_warning_color_override(use_color: bool) {
+    let _ = COLOR_OVERRIDE.set(Some(use_color));
+}
+
+fn format_warning_line(message: &str, use_color: bool) -> String {
+    if use_color {
+        format!("\x1b[1;33mwarning:\x1b[0m \x1b[1m{}\x1b[0m", message)
+    } else {
+        format!("Warning: {}", message)
+    }
+}
+
+fn warning_color_enabled() -> bool {
+    if let Some(Some(use_color)) = COLOR_OVERRIDE.get() {
+        return *use_color;
+    }
+    default_stderr_warning_color()
+}
+
+fn default_stderr_warning_color() -> bool {
+    if std::env::var_os("NO_COLOR").is_some() {
+        return false;
+    }
+    std::io::stderr().is_terminal()
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -82,7 +111,10 @@ fn has_path_separator(cmd: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{find_missing_commands, log_warning_once, missing_commands_warning_message};
+    use super::{
+        default_stderr_warning_color, find_missing_commands, format_warning_line, log_warning_once,
+        missing_commands_warning_message,
+    };
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -135,5 +167,33 @@ mod tests {
         ]);
         assert_eq!(missing.len(), 1);
         assert!(missing.contains("definitely-not-a-real-tool-123"));
+    }
+
+    #[test]
+    fn warning_line_uses_styled_prefix_when_color_enabled() {
+        let line = format_warning_line("External formatter command(s) not found", true);
+        assert!(line.contains("\x1b[1;33mwarning:\x1b[0m"));
+        assert!(line.contains("\x1b[1mExternal formatter command(s) not found\x1b[0m"));
+    }
+
+    #[test]
+    fn warning_line_uses_plain_prefix_without_color() {
+        let line = format_warning_line("External formatter command(s) not found", false);
+        assert_eq!(line, "Warning: External formatter command(s) not found");
+    }
+
+    #[test]
+    fn default_warning_color_disables_with_no_color_env() {
+        let was_set = std::env::var_os("NO_COLOR");
+        // SAFETY: tests in this module only read/write NO_COLOR for this assertion.
+        unsafe { std::env::set_var("NO_COLOR", "1") };
+        assert!(!default_stderr_warning_color());
+        if let Some(previous) = was_set {
+            // SAFETY: restoring original process env var for test isolation.
+            unsafe { std::env::set_var("NO_COLOR", previous) };
+        } else {
+            // SAFETY: restoring original process env var for test isolation.
+            unsafe { std::env::remove_var("NO_COLOR") };
+        }
     }
 }
