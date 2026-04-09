@@ -26,43 +26,43 @@ binary) - Documents: Real Quarto files from quarto-dev/quarto-web
 
 ### Small Document (747 bytes)
 
-| Formatter   | Time (ms) | vs panache   |
-| ----------- | --------- | ------------ |
-| **panache** | **4.1**   | baseline     |
-| Prettier    | 71.8      | 17.7x slower |
-| Pandoc      | 10.0      | 2.5x slower  |
+  | Formatter   | Time (ms) | vs panache   |
+  | ----------- | --------- | ------------ |
+  | **panache** | **4.1**   | baseline     |
+  | Prettier    | 71.8      | 17.7x slower |
+  | Pandoc      | 10.0      | 2.5x slower  |
 
 ### Medium Document (9 KB)
 
-| Formatter   | Time (ms) | vs panache   |
-| ----------- | --------- | ------------ |
-| **panache** | **8.7**   | baseline     |
-| Prettier    | 105.0     | 12.1x slower |
-| Pandoc      | 32.5      | 3.8x slower  |
+  | Formatter   | Time (ms) | vs panache   |
+  | ----------- | --------- | ------------ |
+  | **panache** | **8.7**   | baseline     |
+  | Prettier    | 105.0     | 12.1x slower |
+  | Pandoc      | 32.5      | 3.8x slower  |
 
 ### Tables Document (19 KB)
 
-| Formatter   | Time (ms) | vs panache   |
-| ----------- | --------- | ------------ |
-| **panache** | **8.5**   | baseline     |
-| Prettier    | 131.5     | 15.5x slower |
-| Pandoc      | 60.0      | 7.1x slower  |
+  | Formatter   | Time (ms) | vs panache   |
+  | ----------- | --------- | ------------ |
+  | **panache** | **8.5**   | baseline     |
+  | Prettier    | 131.5     | 15.5x slower |
+  | Pandoc      | 60.0      | 7.1x slower  |
 
 ### Math Document (29 KB)
 
-| Formatter   | Time (ms) | vs panache   |
-| ----------- | --------- | ------------ |
-| **panache** | **8.7**   | baseline     |
-| Prettier    | 143.7     | 16.4x slower |
-| Pandoc      | 48.1      | 5.5x slower  |
+  | Formatter   | Time (ms) | vs panache   |
+  | ----------- | --------- | ------------ |
+  | **panache** | **8.7**   | baseline     |
+  | Prettier    | 143.7     | 16.4x slower |
+  | Pandoc      | 48.1      | 5.5x slower  |
 
 ### Large Document (30 KB)
 
-| Formatter   | Time (ms) | vs panache   |
-| ----------- | --------- | ------------ |
-| **panache** | **5.8**   | baseline     |
-| Prettier    | 133.9     | 23.0x slower |
-| Pandoc      | 56.6      | 9.7x slower  |
+  | Formatter   | Time (ms) | vs panache   |
+  | ----------- | --------- | ------------ |
+  | **panache** | **5.8**   | baseline     |
+  | Prettier    | 133.9     | 23.0x slower |
+  | Pandoc      | 56.6      | 9.7x slower  |
 
 ## Key Takeaways
 

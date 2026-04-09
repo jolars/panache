@@ -474,14 +474,14 @@ rust = "clippy"
 
 Available external linters:
 
-| Language              | Linter        | Description                         |
-| --------------------- | ------------- | ----------------------------------- |
-| R                     | `jarl`        | R linter with JSON diagnostics      |
-| Python                | `ruff`        | Python linter with JSON diagnostics |
-| Shell                 | `shellcheck`  | Shell linter with JSON diagnostics  |
-| JavaScript/TypeScript | `eslint`      | JS/TS linter with JSON diagnostics  |
-| Go                    | `staticcheck` | Go linter with JSON diagnostics     |
-| Rust                  | `clippy`      | Rust linter with JSON diagnostics   |
+  | Language              | Linter        | Description                         |
+  | --------------------- | ------------- | ----------------------------------- |
+  | R                     | `jarl`        | R linter with JSON diagnostics      |
+  | Python                | `ruff`        | Python linter with JSON diagnostics |
+  | Shell                 | `shellcheck`  | Shell linter with JSON diagnostics  |
+  | JavaScript/TypeScript | `eslint`      | JS/TS linter with JSON diagnostics  |
+  | Go                    | `staticcheck` | Go linter with JSON diagnostics     |
+  | Rust                  | `clippy`      | Rust linter with JSON diagnostics   |
 
 ### How External Linters Work
 
