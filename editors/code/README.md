@@ -77,7 +77,8 @@ Pin to a specific release from a specific repository:
 - `panache.serverArgs`: extra args after `panache lsp`
 - `panache.serverEnv`: extra environment variables
 - `panache.trace.server`: LSP trace level (`off`, `messages`, `verbose`)
-- `panache.experimental.incrementalParsing`: enable experimental incremental parsing in LSP (default: `false`)
+- `panache.experimental.incrementalParsing`: enable experimental incremental
+  parsing in LSP (default: `false`)
 
 ## Security and trust
 
