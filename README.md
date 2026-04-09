@@ -263,7 +263,7 @@ prepend-args = ["--print-width=100"]
 r = "jarl" # Enable R linting
 ```
 
-See [./examples/panache.toml](./examples/panache.toml) for a complete
+See [examples/panache.toml](./examples/panache.toml) for a complete
 configuration reference.
 
 ## Integrations
