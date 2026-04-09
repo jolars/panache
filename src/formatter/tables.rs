@@ -1,7 +1,8 @@
 use crate::config::{Config, WrapMode};
 use crate::formatter::inline::format_inline_node;
 use crate::formatter::sentence_wrap::{
-    SentenceLanguage, is_sentence_boundary_text, resolve_sentence_language,
+    SentenceBoundaryClass, SentenceLanguage, SentenceSegment, resolve_sentence_language,
+    split_sentence_segments,
 };
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
@@ -108,26 +109,16 @@ fn split_sentences(text: &str, language: SentenceLanguage) -> Vec<String> {
     if words.is_empty() {
         return Vec::new();
     }
-
-    let mut lines = Vec::new();
-    let mut current = Vec::new();
-
-    for (idx, word) in words.iter().enumerate() {
-        current.push(*word);
-        let is_last = idx + 1 == words.len();
-        let next_word = words.get(idx + 1).copied();
-        let boundary = is_sentence_boundary_text(word, next_word, !is_last, is_last, language);
-        if boundary {
-            lines.push(current.join(" "));
-            current.clear();
-        }
-    }
-
-    if !current.is_empty() {
-        lines.push(current.join(" "));
-    }
-
-    lines
+    let segments: Vec<SentenceSegment> = words
+        .iter()
+        .enumerate()
+        .map(|(idx, word)| SentenceSegment {
+            text: (*word).to_string(),
+            has_whitespace_after: idx + 1 < words.len(),
+            boundary_class: SentenceBoundaryClass::Normal,
+        })
+        .collect();
+    split_sentence_segments(&segments, language)
 }
 
 fn format_table_caption_with_language(

@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::formatter::sentence_wrap::{
-    SentenceLanguage, is_sentence_boundary_text, resolve_sentence_language,
+    SentenceBoundaryClass, SentenceLanguage, SentenceSegment, is_sentence_boundary_segment,
+    resolve_sentence_language,
 };
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
@@ -246,7 +247,7 @@ struct StreamingCoreSink<'a> {
     line_width: usize,
     line_has_piece: bool,
     prev_ws_after: bool,
-    pending_piece: Option<(String, bool, bool)>,
+    pending_piece: Option<SentenceSegment>,
     strip_standalone_blockquote_markers: bool,
     merge_initialism_year: bool,
     sentence_language: SentenceLanguage,
@@ -278,13 +279,11 @@ impl<'a> StreamingCoreSink<'a> {
 
     fn consume(
         &mut self,
-        piece: String,
-        piece_ws_after: bool,
-        break_eligible: bool,
+        segment: SentenceSegment,
         is_last: bool,
-        next_piece: Option<&str>,
+        next_segment: Option<&SentenceSegment>,
     ) {
-        let piece_width = UnicodeWidthStr::width(piece.as_str());
+        let piece_width = UnicodeWidthStr::width(segment.text.as_str());
         if !self.sentence_mode {
             let width_limit = self
                 .line_widths
@@ -303,20 +302,13 @@ impl<'a> StreamingCoreSink<'a> {
             self.line.push(' ');
             self.line_width += 1;
         }
-        self.line.push_str(&piece);
+        self.line.push_str(&segment.text);
         self.line_width += piece_width;
         self.line_has_piece = true;
-        self.prev_ws_after = piece_ws_after;
+        self.prev_ws_after = segment.has_whitespace_after;
 
         if self.sentence_mode
-            && break_eligible
-            && is_sentence_boundary_text(
-                &piece,
-                next_piece,
-                piece_ws_after,
-                is_last,
-                self.sentence_language,
-            )
+            && is_sentence_boundary_segment(&segment, next_segment, is_last, self.sentence_language)
         {
             self.out.push(std::mem::take(&mut self.line));
             self.line_width = 0;
@@ -326,42 +318,45 @@ impl<'a> StreamingCoreSink<'a> {
     }
 
     fn emit_piece(&mut self, piece: String, ws_after: bool) {
-        self.emit_piece_with_boundary(piece, ws_after, true);
+        self.emit_piece_with_boundary(piece, ws_after, SentenceBoundaryClass::Normal);
     }
 
-    fn emit_piece_with_boundary(&mut self, piece: String, ws_after: bool, break_eligible: bool) {
+    fn emit_piece_with_boundary(
+        &mut self,
+        piece: String,
+        ws_after: bool,
+        boundary_class: SentenceBoundaryClass,
+    ) {
         if self.strip_standalone_blockquote_markers && piece == ">" {
             return;
         }
-        if let Some((pending, pending_ws_after, pending_break_eligible)) = self.pending_piece.take()
-        {
+        let incoming = SentenceSegment {
+            text: piece,
+            has_whitespace_after: ws_after,
+            boundary_class,
+        };
+        if let Some(mut pending) = self.pending_piece.take() {
             if self.merge_initialism_year
-                && should_merge_initialism_year(&pending, pending_ws_after, &piece)
+                && should_merge_initialism_year(
+                    &pending.text,
+                    pending.has_whitespace_after,
+                    &incoming.text,
+                )
             {
-                self.pending_piece = Some((format!("{pending} {piece}"), ws_after, break_eligible));
+                pending.text = format!("{} {}", pending.text, incoming.text);
+                pending.has_whitespace_after = incoming.has_whitespace_after;
+                pending.boundary_class = incoming.boundary_class;
+                self.pending_piece = Some(pending);
                 return;
             }
-            self.consume(
-                pending,
-                pending_ws_after,
-                pending_break_eligible,
-                false,
-                Some(&piece),
-            );
+            self.consume(pending, false, Some(&incoming));
         }
-        self.pending_piece = Some((piece, ws_after, break_eligible));
+        self.pending_piece = Some(incoming);
     }
 
     fn force_line_break(&mut self) {
-        if let Some((pending, pending_ws_after, pending_break_eligible)) = self.pending_piece.take()
-        {
-            self.consume(
-                pending,
-                pending_ws_after,
-                pending_break_eligible,
-                false,
-                None,
-            );
+        if let Some(pending) = self.pending_piece.take() {
+            self.consume(pending, false, None);
         }
         self.out.push(std::mem::take(&mut self.line));
         self.line_width = 0;
@@ -374,15 +369,8 @@ impl<'a> StreamingCoreSink<'a> {
     }
 
     fn finish(mut self) -> Vec<String> {
-        if let Some((pending, pending_ws_after, pending_break_eligible)) = self.pending_piece.take()
-        {
-            self.consume(
-                pending,
-                pending_ws_after,
-                pending_break_eligible,
-                true,
-                None,
-            );
+        if let Some(pending) = self.pending_piece.take() {
+            self.consume(pending, true, None);
         }
         if self.line_has_piece {
             self.out.push(self.line);
@@ -499,7 +487,7 @@ fn append_image_closing(node: &SyntaxNode, out: &mut String) {
 struct TraversalBuilder<'a> {
     sink: StreamingCoreSink<'a>,
     current_piece: Option<String>,
-    current_piece_break_eligible: bool,
+    current_piece_boundary_class: SentenceBoundaryClass,
     pending_space: bool,
     skip_next_leading_whitespace: bool,
 }
@@ -520,28 +508,28 @@ impl<'a> TraversalBuilder<'a> {
                 sentence_language,
             ),
             current_piece: None,
-            current_piece_break_eligible: true,
+            current_piece_boundary_class: SentenceBoundaryClass::Normal,
             pending_space: false,
             skip_next_leading_whitespace: false,
         }
     }
 
     fn push_piece(&mut self, text: &str) {
-        self.push_piece_with_boundary(text, true);
+        self.push_piece_with_boundary(text, SentenceBoundaryClass::Normal);
     }
 
-    fn push_piece_with_boundary(&mut self, text: &str, break_eligible: bool) {
+    fn push_piece_with_boundary(&mut self, text: &str, boundary_class: SentenceBoundaryClass) {
         if self.pending_space {
             self.flush_current(true);
             self.current_piece = Some(text.to_string());
-            self.current_piece_break_eligible = break_eligible;
+            self.current_piece_boundary_class = boundary_class;
             self.pending_space = false;
         } else if let Some(current) = &mut self.current_piece {
             current.push_str(text);
-            self.current_piece_break_eligible = break_eligible;
+            self.current_piece_boundary_class = boundary_class;
         } else {
             self.current_piece = Some(text.to_string());
-            self.current_piece_break_eligible = break_eligible;
+            self.current_piece_boundary_class = boundary_class;
         }
     }
 
@@ -570,8 +558,8 @@ impl<'a> TraversalBuilder<'a> {
     fn flush_current(&mut self, ws_after: bool) {
         if let Some(piece) = self.current_piece.take() {
             self.sink
-                .emit_piece_with_boundary(piece, ws_after, self.current_piece_break_eligible);
-            self.current_piece_break_eligible = true;
+                .emit_piece_with_boundary(piece, ws_after, self.current_piece_boundary_class);
+            self.current_piece_boundary_class = SentenceBoundaryClass::Normal;
         }
     }
 
@@ -839,7 +827,7 @@ fn process_node_recursive(
                 | SyntaxKind::INLINE_EXECUTABLE_CODE
                 | SyntaxKind::INLINE_EXEC_CODE => {
                     let text = format_inline_fn(&n);
-                    sink.push_piece_with_boundary(&text, false);
+                    sink.push_piece_with_boundary(&text, SentenceBoundaryClass::NonBoundary);
                 }
                 SyntaxKind::DISPLAY_MATH => {
                     let mut trailing_attrs = None;

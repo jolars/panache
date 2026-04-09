@@ -12,6 +12,19 @@ pub(super) enum BoundaryDecision {
     Undecided,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SentenceBoundaryClass {
+    Normal,
+    NonBoundary,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct SentenceSegment {
+    pub text: String,
+    pub has_whitespace_after: bool,
+    pub boundary_class: SentenceBoundaryClass,
+}
+
 #[derive(Clone, Copy)]
 struct BoundaryContext<'a> {
     current_word: &'a str,
@@ -197,6 +210,62 @@ pub(super) fn is_sentence_boundary_text(
     )
 }
 
+pub(super) fn is_sentence_boundary_segment(
+    segment: &SentenceSegment,
+    next_segment: Option<&SentenceSegment>,
+    is_last: bool,
+    language: SentenceLanguage,
+) -> bool {
+    if segment.boundary_class == SentenceBoundaryClass::NonBoundary {
+        return false;
+    }
+    is_sentence_boundary_text(
+        &segment.text,
+        next_segment.map(|next| next.text.as_str()),
+        segment.has_whitespace_after,
+        is_last,
+        language,
+    )
+}
+
+pub(super) fn split_sentence_segments(
+    segments: &[SentenceSegment],
+    language: SentenceLanguage,
+) -> Vec<String> {
+    if segments.is_empty() {
+        return Vec::new();
+    }
+
+    let mut lines = Vec::new();
+    let mut current = String::new();
+
+    for (idx, segment) in segments.iter().enumerate() {
+        if !current.is_empty() && segment.has_whitespace_after {
+            // spacing is handled when appending previous segment
+        }
+        if !current.is_empty()
+            && idx > 0
+            && segments
+                .get(idx.wrapping_sub(1))
+                .is_some_and(|prev| prev.has_whitespace_after)
+        {
+            current.push(' ');
+        }
+        current.push_str(&segment.text);
+
+        let is_last = idx + 1 == segments.len();
+        let next = segments.get(idx + 1);
+        if is_sentence_boundary_segment(segment, next, is_last, language) {
+            lines.push(std::mem::take(&mut current));
+        }
+    }
+
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines
+}
+
 fn extract_lang_from_yaml_text(yaml_text: &str) -> Option<String> {
     let mut lines = yaml_text.lines().peekable();
     if lines
@@ -355,5 +424,23 @@ mod tests {
 
         let lang = resolve_sentence_language(&paragraph);
         assert!(matches!(lang, SentenceLanguage::English));
+    }
+
+    #[test]
+    fn non_boundary_segment_never_breaks() {
+        let segments = vec![
+            SentenceSegment {
+                text: "`???`".to_string(),
+                has_whitespace_after: true,
+                boundary_class: SentenceBoundaryClass::NonBoundary,
+            },
+            SentenceSegment {
+                text: "also".to_string(),
+                has_whitespace_after: true,
+                boundary_class: SentenceBoundaryClass::Normal,
+            },
+        ];
+        let lines = split_sentence_segments(&segments, SentenceLanguage::English);
+        assert_eq!(lines, vec!["`???` also"]);
     }
 }
