@@ -30,20 +30,20 @@ syntax that many generic Markdown tools struggle with, including fenced divs,
 grid tables, definition lists, citations, and inline footnotes.
 
 Panache is designed to be used in your editor, on the command line, and in CI,
-with consistent behavior across all environments. It is highly configurable,
-with sensible defaults that work well for most projects but can be tuned to
-match your preferred style and linting rules.
+with consistent behavior across all environments.
 
 <div style="clear: both;"></div>
 
 ## Why Panache
 
-- **Pandoc and Quarto aware**: understands syntax extensions directly instead of
-  flattening them into plain Markdown.
+- **Pandoc, R Markdown and Quarto aware**: understands syntax extensions
+  directly instead of flattening them into plain Markdown.
 - **Formatter + linter + LSP in one tool**: consistent behavior in your CLI,
   editor, and CI.
 - **Configurable defaults**: tune wrapping, flavor, extensions, and linting to
   match your project.
+- **External tool support**: plug in external formatters and linters for code
+  blocks to enable language-aware formatting and linting of embedded code.
 
 ## Quick Start
 

@@ -9,7 +9,8 @@ description: >
 Panache's formatting rules are designed to produce clean, consistent Markdown
 output that adheres to common style guidelines while preserving the semantic
 meaning of the original document. We often try to stick quite close to the
-output of Pandoc's writer, but not always.
+output of Pandoc's writer, but not always. Panache is an opinionated formatter
+and provides a minimal set of options to configure the formatting behavior.
 
 The golden rule is that a markdown document should be readable in its raw form,
 which for instance has guided the decision to convert `---` horizontal rules to
