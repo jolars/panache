@@ -246,7 +246,7 @@ struct StreamingCoreSink<'a> {
     line_width: usize,
     line_has_piece: bool,
     prev_ws_after: bool,
-    pending_piece: Option<(String, bool)>,
+    pending_piece: Option<(String, bool, bool)>,
     strip_standalone_blockquote_markers: bool,
     merge_initialism_year: bool,
     sentence_language: SentenceLanguage,
@@ -280,6 +280,7 @@ impl<'a> StreamingCoreSink<'a> {
         &mut self,
         piece: String,
         piece_ws_after: bool,
+        break_eligible: bool,
         is_last: bool,
         next_piece: Option<&str>,
     ) {
@@ -308,6 +309,7 @@ impl<'a> StreamingCoreSink<'a> {
         self.prev_ws_after = piece_ws_after;
 
         if self.sentence_mode
+            && break_eligible
             && is_sentence_boundary_text(
                 &piece,
                 next_piece,
@@ -324,24 +326,42 @@ impl<'a> StreamingCoreSink<'a> {
     }
 
     fn emit_piece(&mut self, piece: String, ws_after: bool) {
+        self.emit_piece_with_boundary(piece, ws_after, true);
+    }
+
+    fn emit_piece_with_boundary(&mut self, piece: String, ws_after: bool, break_eligible: bool) {
         if self.strip_standalone_blockquote_markers && piece == ">" {
             return;
         }
-        if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
+        if let Some((pending, pending_ws_after, pending_break_eligible)) = self.pending_piece.take()
+        {
             if self.merge_initialism_year
                 && should_merge_initialism_year(&pending, pending_ws_after, &piece)
             {
-                self.pending_piece = Some((format!("{pending} {piece}"), ws_after));
+                self.pending_piece = Some((format!("{pending} {piece}"), ws_after, break_eligible));
                 return;
             }
-            self.consume(pending, pending_ws_after, false, Some(&piece));
+            self.consume(
+                pending,
+                pending_ws_after,
+                pending_break_eligible,
+                false,
+                Some(&piece),
+            );
         }
-        self.pending_piece = Some((piece, ws_after));
+        self.pending_piece = Some((piece, ws_after, break_eligible));
     }
 
     fn force_line_break(&mut self) {
-        if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
-            self.consume(pending, pending_ws_after, false, None);
+        if let Some((pending, pending_ws_after, pending_break_eligible)) = self.pending_piece.take()
+        {
+            self.consume(
+                pending,
+                pending_ws_after,
+                pending_break_eligible,
+                false,
+                None,
+            );
         }
         self.out.push(std::mem::take(&mut self.line));
         self.line_width = 0;
@@ -354,8 +374,15 @@ impl<'a> StreamingCoreSink<'a> {
     }
 
     fn finish(mut self) -> Vec<String> {
-        if let Some((pending, pending_ws_after)) = self.pending_piece.take() {
-            self.consume(pending, pending_ws_after, true, None);
+        if let Some((pending, pending_ws_after, pending_break_eligible)) = self.pending_piece.take()
+        {
+            self.consume(
+                pending,
+                pending_ws_after,
+                pending_break_eligible,
+                true,
+                None,
+            );
         }
         if self.line_has_piece {
             self.out.push(self.line);
@@ -472,6 +499,7 @@ fn append_image_closing(node: &SyntaxNode, out: &mut String) {
 struct TraversalBuilder<'a> {
     sink: StreamingCoreSink<'a>,
     current_piece: Option<String>,
+    current_piece_break_eligible: bool,
     pending_space: bool,
     skip_next_leading_whitespace: bool,
 }
@@ -492,20 +520,28 @@ impl<'a> TraversalBuilder<'a> {
                 sentence_language,
             ),
             current_piece: None,
+            current_piece_break_eligible: true,
             pending_space: false,
             skip_next_leading_whitespace: false,
         }
     }
 
     fn push_piece(&mut self, text: &str) {
+        self.push_piece_with_boundary(text, true);
+    }
+
+    fn push_piece_with_boundary(&mut self, text: &str, break_eligible: bool) {
         if self.pending_space {
             self.flush_current(true);
             self.current_piece = Some(text.to_string());
+            self.current_piece_break_eligible = break_eligible;
             self.pending_space = false;
         } else if let Some(current) = &mut self.current_piece {
             current.push_str(text);
+            self.current_piece_break_eligible &= break_eligible;
         } else {
             self.current_piece = Some(text.to_string());
+            self.current_piece_break_eligible = break_eligible;
         }
     }
 
@@ -533,7 +569,9 @@ impl<'a> TraversalBuilder<'a> {
 
     fn flush_current(&mut self, ws_after: bool) {
         if let Some(piece) = self.current_piece.take() {
-            self.sink.emit_piece(piece, ws_after);
+            self.sink
+                .emit_piece_with_boundary(piece, ws_after, self.current_piece_break_eligible);
+            self.current_piece_break_eligible = true;
         }
     }
 
@@ -796,6 +834,12 @@ fn process_node_recursive(
                         append_image_closing(&n, &mut closing);
                         sink.push_piece(&closing);
                     }
+                }
+                SyntaxKind::CODE_SPAN
+                | SyntaxKind::INLINE_EXECUTABLE_CODE
+                | SyntaxKind::INLINE_EXEC_CODE => {
+                    let text = format_inline_fn(&n);
+                    sink.push_piece_with_boundary(&text, false);
                 }
                 SyntaxKind::DISPLAY_MATH => {
                     let mut trailing_attrs = None;
