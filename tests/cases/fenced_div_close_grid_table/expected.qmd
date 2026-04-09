@@ -19,11 +19,11 @@ ENV["QUARTO_DOCUMENT_PATH"]
 ```
 :::
 
-+-----+----------------+
-| Var | Description    |
-+=====+================+
-| `A` | Example value. |
-+-----+----------------+
+  +-----+----------------+
+  | Var | Description    |
+  +=====+================+
+  | `A` | Example value. |
+  +-----+----------------+
 
 For more information, see [Quarto engine execution
 information](./quarto-execute-info.qmd).

@@ -5,6 +5,59 @@ use rowan::NodeOrToken;
 use std::collections::HashMap;
 use unicode_width::UnicodeWidthStr;
 
+const TABLE_BLOCK_INDENT: &str = "  ";
+
+fn indent_table_block(block: &str) -> String {
+    let already_indented = block
+        .lines()
+        .filter(|line| !line.is_empty())
+        .all(|line| line.starts_with(TABLE_BLOCK_INDENT));
+    if already_indented {
+        return block.to_string();
+    }
+
+    let mut output = String::with_capacity(block.len() + 32);
+    let mut line_start = 0;
+
+    for (idx, ch) in block.char_indices() {
+        if ch == '\n' {
+            let line = &block[line_start..idx];
+            if !line.is_empty() {
+                output.push_str(TABLE_BLOCK_INDENT);
+            }
+            output.push_str(line);
+            output.push('\n');
+            line_start = idx + 1;
+        }
+    }
+
+    if line_start < block.len() {
+        let line = &block[line_start..];
+        if !line.is_empty() {
+            output.push_str(TABLE_BLOCK_INDENT);
+        }
+        output.push_str(line);
+    }
+
+    output
+}
+
+fn normalize_table_caption(caption_body: &str) -> String {
+    let normalized_body = caption_body
+        .lines()
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string();
+
+    if normalized_body.is_empty() {
+        "Table:".to_string()
+    } else {
+        format!("Table: {normalized_body}")
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Alignment {
     Left,
@@ -130,8 +183,7 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                // Build normalized caption: "Table: " + caption text (without prefix)
-                let mut caption_text = String::from("Table: ");
+                let mut caption_body = String::new();
 
                 for caption_child in child.children_with_tokens() {
                     match caption_child {
@@ -141,15 +193,15 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                             // Skip the original prefix - we're adding normalized "Table: " above
                         }
                         rowan::NodeOrToken::Token(token) => {
-                            caption_text.push_str(token.text());
+                            caption_body.push_str(token.text());
                         }
                         rowan::NodeOrToken::Node(node) => {
-                            caption_text.push_str(&node.text().to_string());
+                            caption_body.push_str(&node.text().to_string());
                         }
                     }
                 }
 
-                caption = Some(caption_text.trim().to_string());
+                caption = Some(normalize_table_caption(&caption_body));
                 caption_after = seen_separator; // After if we've seen separator/rows
             }
             SyntaxKind::TABLE_SEPARATOR => {
@@ -331,7 +383,7 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
         output.push('\n');
     }
 
-    output
+    indent_table_block(&output)
 }
 
 // Grid Table Formatting
@@ -582,7 +634,7 @@ fn format_spanning_grid_table_raw(raw_table: &str) -> String {
         out.push_str(&caption);
         out.push('\n');
     }
-    out
+    indent_table_block(&out)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -615,8 +667,7 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                // Build normalized caption: "Table: " + caption text (without prefix)
-                let mut caption_text = String::from("Table: ");
+                let mut caption_body = String::new();
 
                 for caption_child in child.children_with_tokens() {
                     match caption_child {
@@ -625,14 +676,14 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
                         {
                             // Skip the original prefix
                         }
-                        rowan::NodeOrToken::Token(token) => caption_text.push_str(token.text()),
+                        rowan::NodeOrToken::Token(token) => caption_body.push_str(token.text()),
                         rowan::NodeOrToken::Node(node) => {
-                            caption_text.push_str(&node.text().to_string())
+                            caption_body.push_str(&node.text().to_string())
                         }
                     }
                 }
 
-                caption = Some(caption_text.trim().to_string());
+                caption = Some(normalize_table_caption(&caption_body));
                 caption_after = seen_header; // After if we've seen table content
             }
             SyntaxKind::TABLE_SEPARATOR => {
@@ -920,7 +971,7 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
         output.push('\n');
     }
 
-    output
+    indent_table_block(&output)
 }
 
 // Simple Table Formatting
@@ -1089,7 +1140,6 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                // Build normalized caption: "Table: " + trimmed caption text (without prefix)
                 let mut caption_body = String::new();
 
                 for caption_child in child.children_with_tokens() {
@@ -1108,7 +1158,7 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                     }
                 }
 
-                caption = Some(format!("Table: {}", caption_body.trim()));
+                caption = Some(normalize_table_caption(&caption_body));
                 caption_after = seen_separator;
             }
             SyntaxKind::TABLE_SEPARATOR => {
@@ -1499,7 +1549,7 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
         output.push('\n');
     }
 
-    output
+    indent_table_block(&output)
 }
 
 /// Extract column information from multiline table separator line
@@ -1655,26 +1705,25 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                // Build normalized caption: "Table: " + caption text (without prefix)
-                let mut caption_text = String::from("Table: ");
+                let mut caption_body = String::new();
 
                 for caption_child in child.children_with_tokens() {
                     match caption_child {
                         rowan::NodeOrToken::Token(token)
                             if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
                         {
-                            // Skip the original prefix - we're using ": " prefix
+                            // Skip the original prefix
                         }
                         rowan::NodeOrToken::Token(token) => {
-                            caption_text.push_str(token.text());
+                            caption_body.push_str(token.text());
                         }
                         rowan::NodeOrToken::Node(node) => {
-                            caption_text.push_str(&node.text().to_string());
+                            caption_body.push_str(&node.text().to_string());
                         }
                     }
                 }
 
-                caption = Some(caption_text.trim().to_string());
+                caption = Some(normalize_table_caption(&caption_body));
             }
             SyntaxKind::TABLE_SEPARATOR => {
                 separator_count += 1;
@@ -1774,7 +1823,21 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
         return node.text().to_string();
     }
 
-    let positions = &table_data.column_positions;
+    let base_offset = table_data
+        .column_positions
+        .first()
+        .map(|(start, _)| *start)
+        .unwrap_or(0);
+    let positions: Vec<(usize, usize)> = table_data
+        .column_positions
+        .iter()
+        .map(|(start, end)| {
+            (
+                start.saturating_sub(base_offset),
+                end.saturating_sub(base_offset),
+            )
+        })
+        .collect();
 
     // Calculate total table width
     let last_col_end = positions.last().map(|(_, end)| *end).unwrap_or(0);
@@ -1793,7 +1856,7 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
     } else {
         // Headerless: opening separator shows column boundaries
         let mut sep_chars: Vec<char> = vec![' '; last_col_end];
-        for &(col_start, col_end) in positions {
+        for &(col_start, col_end) in &positions {
             for item in sep_chars.iter_mut().take(col_end).skip(col_start) {
                 *item = '-';
             }
@@ -1849,7 +1912,7 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
 
         // Emit column separator (no indent)
         let mut sep_chars: Vec<char> = vec![' '; last_col_end];
-        for &(col_start, col_end) in positions {
+        for &(col_start, col_end) in &positions {
             for item in sep_chars.iter_mut().take(col_end).skip(col_start) {
                 *item = '-';
             }
@@ -1923,7 +1986,7 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
     } else {
         // Headerless: closing separator shows column boundaries
         let mut sep_chars: Vec<char> = vec![' '; last_col_end];
-        for &(col_start, col_end) in positions {
+        for &(col_start, col_end) in &positions {
             for item in sep_chars.iter_mut().take(col_end).skip(col_start) {
                 *item = '-';
             }
@@ -1932,5 +1995,5 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
         output.push('\n');
     }
 
-    output
+    indent_table_block(&output)
 }

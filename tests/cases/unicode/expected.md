@@ -26,9 +26,9 @@ Term
     └── hello.py
     ```
 
-| Greek | Emoji | CJK  |
-| ----- | ----- | ---- |
-| αβγ   | 😀    | 測試 |
+  | Greek | Emoji | CJK  |
+  | ----- | ----- | ---- |
+  | αβγ   | 😀    | 測試 |
 
 > Blockquote with unicode: naïve façade résumé.
 >
