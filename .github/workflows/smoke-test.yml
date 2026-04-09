@@ -71,7 +71,17 @@ jobs:
               continue
             fi
             repo_dir="$REPOS_DIR/${repo//\//__}"
-            git clone --depth 1 "https://github.com/${repo}.git" "$repo_dir"
+            clone_log="$LOGS_DIR/${repo//\//__}__clone.log"
+            echo "Scanning repository: $repo"
+            if timeout 20m git clone --depth 1 --filter=blob:none "https://github.com/${repo}.git" "$repo_dir" >"$clone_log" 2>&1; then
+              :
+            else
+              clone_exit=$?
+              printf '%s\t%s\t%s\t%s\n' "$repo" "unknown" "[repo clone failed: exit=$clone_exit]" "logs/${repo//\//__}__clone.log" >> "$FAILURES_TSV"
+              echo "::error title=Repository clone failed::$repo (exit=$clone_exit). See logs/${repo//\//__}__clone.log in artifact."
+              tail -n 40 "$clone_log" || true
+              continue
+            fi
 
             while IFS= read -r -d '' rel_file; do
               file_key="$(printf '%s' "${repo}:${rel_file}" | sha256sum | awk '{print $1}')"
@@ -111,6 +121,11 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- Failure records: $failure_count" >> "$GITHUB_STEP_SUMMARY"
           echo "- Scanned extensions: \`.md\`, \`.qmd\`, \`.Rmd\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$failure_count" -gt 0 ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Failure breakdown:" >> "$GITHUB_STEP_SUMMARY"
+            awk -F '\t' 'NR > 1 {counts[$2]++} END {for (k in counts) printf "- `%s`: %d\n", k, counts[k]}' "$FAILURES_TSV" | sort >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload scan results artifact
         uses: actions/upload-artifact@v4
