@@ -266,6 +266,23 @@ pub(super) fn split_sentence_segments(
     lines
 }
 
+pub(super) fn split_sentence_text(text: &str, language: SentenceLanguage) -> Vec<String> {
+    let words: Vec<&str> = text.split_ascii_whitespace().collect();
+    if words.is_empty() {
+        return Vec::new();
+    }
+    let segments: Vec<SentenceSegment> = words
+        .iter()
+        .enumerate()
+        .map(|(idx, word)| SentenceSegment {
+            text: (*word).to_string(),
+            has_whitespace_after: idx + 1 < words.len(),
+            boundary_class: SentenceBoundaryClass::Normal,
+        })
+        .collect();
+    split_sentence_segments(&segments, language)
+}
+
 fn extract_lang_from_yaml_text(yaml_text: &str) -> Option<String> {
     let mut lines = yaml_text.lines().peekable();
     if lines
@@ -442,5 +459,11 @@ mod tests {
         ];
         let lines = split_sentence_segments(&segments, SentenceLanguage::English);
         assert_eq!(lines, vec!["`???` also"]);
+    }
+
+    #[test]
+    fn split_sentence_text_uses_normal_segment_defaults() {
+        let lines = split_sentence_text("Alpha. Beta.", SentenceLanguage::English);
+        assert_eq!(lines, vec!["Alpha.", "Beta."]);
     }
 }

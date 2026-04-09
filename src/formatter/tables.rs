@@ -1,8 +1,7 @@
 use crate::config::{Config, WrapMode};
 use crate::formatter::inline::format_inline_node;
 use crate::formatter::sentence_wrap::{
-    SentenceBoundaryClass, SentenceLanguage, SentenceSegment, resolve_sentence_language,
-    split_sentence_segments,
+    SentenceLanguage, resolve_sentence_language, split_sentence_text,
 };
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
@@ -105,20 +104,7 @@ fn wrap_words_with_widths(words: &[&str], first_width: usize, rest_width: usize)
 }
 
 fn split_sentences(text: &str, language: SentenceLanguage) -> Vec<String> {
-    let words: Vec<&str> = text.split_ascii_whitespace().collect();
-    if words.is_empty() {
-        return Vec::new();
-    }
-    let segments: Vec<SentenceSegment> = words
-        .iter()
-        .enumerate()
-        .map(|(idx, word)| SentenceSegment {
-            text: (*word).to_string(),
-            has_whitespace_after: idx + 1 < words.len(),
-            boundary_class: SentenceBoundaryClass::Normal,
-        })
-        .collect();
-    split_sentence_segments(&segments, language)
+    split_sentence_text(text, language)
 }
 
 fn format_table_caption_with_language(
