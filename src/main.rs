@@ -12,7 +12,7 @@ mod cache;
 mod cli;
 mod diagnostic_renderer;
 use cache::{CachedLintDocument, CliCache, FormatCacheMode, FormatStoreArgs};
-use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands};
+use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands, TranslateProviderArg};
 use diagnostic_renderer::print_diagnostics;
 
 /// Supported file extensions for formatting
@@ -1259,6 +1259,146 @@ fn main() -> io::Result<()> {
                 std::process::exit(1);
             }
 
+            Ok(())
+        }
+        Commands::Translate {
+            files,
+            provider,
+            source_lang,
+            target_lang,
+            api_key,
+            endpoint,
+            stdout,
+            force_exclude,
+        } => {
+            let provider = provider.map(|p| match p {
+                TranslateProviderArg::Deepl => panache::config::TranslateProvider::Deepl,
+                TranslateProviderArg::Libretranslate => {
+                    panache::config::TranslateProvider::Libretranslate
+                }
+            });
+
+            let overrides = panache::translate::TranslateOverrides {
+                provider,
+                source_lang,
+                target_lang,
+                api_key,
+                endpoint,
+            };
+
+            if files.is_empty() {
+                let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
+                let (cfg, cfg_path) = load_config_for_cli(
+                    cli.config.as_deref(),
+                    cli.isolated,
+                    cli.cache_dir.as_deref(),
+                    &start_dir,
+                    cli.stdin_filename.as_deref(),
+                )?;
+                if let Some(path) = &cfg_path {
+                    log::debug!("Using config from: {}", path.display());
+                } else {
+                    log::debug!("Using default config");
+                }
+                let input = read_all(None)?;
+                let output = panache::translate::translate_document(&input, &cfg, &overrides)
+                    .map_err(|e| io::Error::other(e.to_string()))?;
+                print!("{output}");
+                return Ok(());
+            }
+
+            if files.len() == 2 && files[0].is_file() && !files[1].is_dir() {
+                let input_path = &files[0];
+                let output_path = &files[1];
+                let start_dir = input_path.parent().unwrap_or(Path::new(".")).to_path_buf();
+                let (cfg, cfg_path) = load_config_for_cli(
+                    cli.config.as_deref(),
+                    cli.isolated,
+                    cli.cache_dir.as_deref(),
+                    &start_dir,
+                    Some(input_path),
+                )?;
+                if let Some(path) = &cfg_path {
+                    log::debug!("Using config from: {}", path.display());
+                } else {
+                    log::debug!("Using default config");
+                }
+                let input = fs::read_to_string(input_path)?;
+                let output = panache::translate::translate_document(&input, &cfg, &overrides)
+                    .map_err(|e| io::Error::other(e.to_string()))?;
+                fs::write(output_path, output)?;
+                println!(
+                    "Translated {} -> {}",
+                    input_path.display(),
+                    output_path.display()
+                );
+                return Ok(());
+            }
+
+            let traversal_anchor = files.first().map(PathBuf::as_path);
+            let traversal_start_dir = if let Some(anchor) = traversal_anchor {
+                if anchor.is_dir() {
+                    anchor.to_path_buf()
+                } else {
+                    start_dir_for(Some(anchor))?
+                }
+            } else {
+                start_dir_for(None)?
+            };
+            let (traversal_cfg, traversal_cfg_path) = load_config_for_cli(
+                cli.config.as_deref(),
+                cli.isolated,
+                cli.cache_dir.as_deref(),
+                &traversal_start_dir,
+                traversal_anchor,
+            )?;
+            let matching_root = path_matching_root(
+                cli.config.as_deref(),
+                traversal_cfg_path.as_deref(),
+                &traversal_start_dir,
+            )?;
+            let expanded_files =
+                expand_paths(&files, &traversal_cfg, &matching_root, force_exclude)?;
+
+            if expanded_files.is_empty() {
+                if force_exclude {
+                    return Ok(());
+                }
+                if has_explicit_file_targets(&files) {
+                    eprintln!("Error: No supported files found");
+                    std::process::exit(1);
+                }
+                println!("No supported files found");
+                return Ok(());
+            }
+
+            for file_path in &expanded_files {
+                let start_dir = file_path.parent().unwrap_or(Path::new(".")).to_path_buf();
+                let (cfg, cfg_path) = load_config_for_cli(
+                    cli.config.as_deref(),
+                    cli.isolated,
+                    cli.cache_dir.as_deref(),
+                    &start_dir,
+                    Some(file_path),
+                )?;
+
+                if let Some(path) = &cfg_path {
+                    log::debug!("Using config from: {}", path.display());
+                } else {
+                    log::debug!("Using default config");
+                }
+
+                let input = fs::read_to_string(file_path)?;
+                let output = panache::translate::translate_document(&input, &cfg, &overrides)
+                    .map_err(|e| io::Error::other(e.to_string()))?;
+
+                if stdout {
+                    print!("{output}");
+                } else {
+                    fs::write(file_path, &output)?;
+                    println!("Translated {}", file_path.display());
+                }
+            }
             Ok(())
         }
     }

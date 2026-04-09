@@ -12,6 +12,7 @@ mod debug;
 mod format;
 mod lint;
 mod parse;
+mod translate;
 
 #[cfg(feature = "lsp")]
 mod lsp;

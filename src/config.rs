@@ -908,6 +908,29 @@ impl ParserConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum TranslateProvider {
+    Deepl,
+    Libretranslate,
+}
+
+/// Translation configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct TranslateSettings {
+    /// Translation provider backend.
+    pub provider: Option<TranslateProvider>,
+    /// Source language code (for providers that support explicit source).
+    pub source_lang: Option<String>,
+    /// Target language code.
+    pub target_lang: Option<String>,
+    /// Provider API key.
+    pub api_key: Option<String>,
+    /// Optional custom provider endpoint URL.
+    pub endpoint: Option<String>,
+}
+
 /// Linter configuration.
 /// Preferred shape is `[lint.rules] rule-name = true/false`.
 /// Legacy `[lint] rule-name = true/false` is still supported (deprecated).
@@ -1028,6 +1051,8 @@ struct RawConfig {
     // Parser configuration (deprecated home for pandoc-compat)
     #[serde(default)]
     parser: Option<ParserConfig>,
+    #[serde(default)]
+    translate: Option<TranslateSettings>,
 
     // NEW: Language → Formatter(s) mapping
     // This will be a raw Value that we'll parse manually to handle both formats
@@ -1356,6 +1381,7 @@ impl RawConfig {
             parser: ParserConfig {
                 pandoc_compat: resolved_pandoc_compat,
             },
+            translate: self.translate.unwrap_or_default(),
             built_in_greedy_wrap: style.built_in_greedy_wrap,
             exclude: self.exclude,
             extend_exclude: self.extend_exclude,
@@ -1638,6 +1664,8 @@ pub struct Config {
     pub external_max_parallel: usize,
     /// Parser configuration (experimental)
     pub parser: ParserConfig,
+    /// Translation command configuration.
+    pub translate: TranslateSettings,
     /// Linter rule toggles.
     pub lint: LintConfig,
     /// Optional CLI cache directory override.
@@ -1677,6 +1705,7 @@ impl Default for Config {
             linters: HashMap::new(),    // Opt-in: empty by default
             external_max_parallel: default_external_max_parallel(),
             parser: ParserConfig::default(),
+            translate: TranslateSettings::default(),
             lint: LintConfig::default(),
             cache_dir: None,
             built_in_greedy_wrap: true,
@@ -4139,4 +4168,39 @@ fn test_formatter_prepend_append_args_kebab_case() {
 
     assert_eq!(fmt.cmd, "test");
     assert_eq!(fmt.args, vec!["--before", "--middle", "--after"]);
+}
+
+#[test]
+fn test_translate_section_parses_kebab_case_fields() {
+    let toml_str = r#"
+        [translate]
+        provider = "libretranslate"
+        source-lang = "en"
+        target-lang = "fr"
+        api-key = "secret"
+        endpoint = "https://example.test/translate"
+    "#;
+
+    let cfg = toml::from_str::<Config>(toml_str).unwrap();
+    assert_eq!(
+        cfg.translate.provider,
+        Some(TranslateProvider::Libretranslate)
+    );
+    assert_eq!(cfg.translate.source_lang.as_deref(), Some("en"));
+    assert_eq!(cfg.translate.target_lang.as_deref(), Some("fr"));
+    assert_eq!(cfg.translate.api_key.as_deref(), Some("secret"));
+    assert_eq!(
+        cfg.translate.endpoint.as_deref(),
+        Some("https://example.test/translate")
+    );
+}
+
+#[test]
+fn test_translate_section_defaults_to_none() {
+    let cfg = Config::default();
+    assert_eq!(cfg.translate.provider, None);
+    assert_eq!(cfg.translate.source_lang, None);
+    assert_eq!(cfg.translate.target_lang, None);
+    assert_eq!(cfg.translate.api_key, None);
+    assert_eq!(cfg.translate.endpoint, None);
 }

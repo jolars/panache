@@ -19,6 +19,8 @@ pub mod parser;
 pub mod range_utils;
 pub mod salsa;
 pub mod syntax;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod translate;
 mod utils;
 mod yaml_engine;
 #[cfg(test)]

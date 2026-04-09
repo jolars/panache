@@ -162,6 +162,44 @@ version. When any of these change, Panache recomputes and refreshes entries. Use
 invocation. Use `--no-cache` (or `RUFF_NO_CACHE`) to bypass cache reads/writes
 for a single CLI invocation.
 
+## Translation
+
+Configure provider defaults for `panache translate` with `[translate]`:
+
+```toml
+[translate]
+provider = "libretranslate"
+source-lang = "en"
+target-lang = "fr"
+endpoint = "https://libretranslate.example.com/translate"
+api-key = "your-api-key"
+```
+
+`provider`
+
+:   Translation backend to use. Supported values:
+
+    - `libretranslate` - `deepl`
+
+`source-lang`
+:   Optional source language code. If omitted, provider defaults apply (for
+    LibreTranslate this typically means auto-detect).
+
+`target-lang`
+:   Target language code for translations. Required unless passed via
+    `panache translate --target-lang`.
+
+`endpoint`
+:   Optional provider endpoint override. Useful for custom LibreTranslate
+    instances or DeepL endpoint routing.
+
+`api-key`
+:   Provider API key. Required for DeepL and optional/instance-dependent for
+    LibreTranslate.
+
+CLI flags (`--provider`, `--source-lang`, `--target-lang`, `--endpoint`,
+`--api-key`) override values configured in `[translate]`.
+
 ## Formatting Style
 
 Formatting style preferences are organized under the `[format]` section:

@@ -22,6 +22,7 @@ For help with a specific command, see: `panache help <command>`.
 * `parse` — Parse and display the CST tree for debugging
 * `lsp` — Start the Language Server Protocol server
 * `lint` — Lint a Quarto, Pandoc, or Markdown document
+* `translate` — Translate human-readable text while preserving document structure
 * `debug` — Debug utilities for parser/formatter diagnostics
 
 ###### **Options:**
@@ -122,6 +123,31 @@ Configure rules in panache.toml with [lint] section.
 
   Possible values: `human`, `short`
 
+* `--force-exclude` — Apply exclude patterns to explicitly provided files
+
+
+
+## `panache translate`
+
+Translate human-readable text in Quarto, Pandoc, or Markdown documents while preserving syntax and structure. With a single input path, translates in place by default. With two input paths, treats them as input and output paths (`in.md out.md`). Stdin input always outputs to stdout.
+
+**Usage:** `panache translate [OPTIONS] [FILES]...`
+
+###### **Arguments:**
+
+* `<FILES>` — Path arguments for translation. If omitted, reads from stdin and writes to stdout. If one path is provided and it is a file, translation is applied in place. If two file paths are provided, the first is input and the second is output. Directory traversal supports .qmd, .md, .Rmd, and other Markdown-based formats.
+
+###### **Options:**
+
+* `--provider <PROVIDER>` — Translation provider to use
+
+  Possible values: `deepl`, `libretranslate`
+
+* `--source-lang <LANG>` — Source language code
+* `--target-lang <LANG>` — Target language code
+* `--api-key <KEY>` — Provider API key
+* `--endpoint <URL>` — Provider endpoint URL
+* `--stdout` — Output translated content to stdout
 * `--force-exclude` — Apply exclude patterns to explicitly provided files
 
 

@@ -264,6 +264,59 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         #[arg(help = "Apply exclude patterns to explicitly provided files")]
         force_exclude: bool,
     },
+    /// Translate human-readable text while preserving document structure
+    #[command(
+        long_about = "Translate human-readable text in Quarto, Pandoc, or Markdown documents \
+        while preserving syntax and structure. With a single input path, translates in place by default. \
+        With two input paths, treats them as input and output paths (`in.md out.md`). \
+        Stdin input always outputs to stdout."
+    )]
+    Translate {
+        /// Input path(s) (stdin if not provided)
+        #[arg(help = "Input path(s) or input/output file pair")]
+        #[arg(
+            long_help = "Path arguments for translation. If omitted, reads from stdin and writes to stdout. \
+            If one path is provided and it is a file, translation is applied in place. \
+            If two file paths are provided, the first is input and the second is output. \
+            Directory traversal supports .qmd, .md, .Rmd, and other Markdown-based formats."
+        )]
+        files: Vec<PathBuf>,
+
+        /// Translation provider backend
+        #[arg(long, value_enum)]
+        #[arg(help = "Translation provider to use")]
+        provider: Option<TranslateProviderArg>,
+
+        /// Source language code (e.g. en, fr, de). Use auto where supported.
+        #[arg(long, value_name = "LANG")]
+        #[arg(help = "Source language code")]
+        source_lang: Option<String>,
+
+        /// Target language code (e.g. en, fr, de)
+        #[arg(long, value_name = "LANG")]
+        #[arg(help = "Target language code")]
+        target_lang: Option<String>,
+
+        /// Provider API key (overrides config)
+        #[arg(long, value_name = "KEY")]
+        #[arg(help = "Provider API key")]
+        api_key: Option<String>,
+
+        /// Provider endpoint URL (overrides config)
+        #[arg(long, value_name = "URL")]
+        #[arg(help = "Provider endpoint URL")]
+        endpoint: Option<String>,
+
+        /// Print translated output to stdout instead of writing files in place
+        #[arg(long)]
+        #[arg(help = "Output translated content to stdout")]
+        stdout: bool,
+
+        /// Enforce exclude patterns even for explicitly provided files
+        #[arg(long)]
+        #[arg(help = "Apply exclude patterns to explicitly provided files")]
+        force_exclude: bool,
+    },
     /// Debug utilities for parser/formatter diagnostics
     #[command(
         long_about = "Debugging utilities for parse/format workflows. These commands are intended \
@@ -326,4 +379,10 @@ pub enum ColorMode {
 pub enum MessageFormat {
     Human,
     Short,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum TranslateProviderArg {
+    Deepl,
+    Libretranslate,
 }
