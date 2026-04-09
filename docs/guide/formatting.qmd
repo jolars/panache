@@ -468,7 +468,8 @@ Output
 ## Tables
 
 Panache supports all Pandoc table types and normalizes alignment and spacing
-while preserving content and attributes.
+while preserving content and attributes. Formatted table blocks are indented by
+two spaces.
 
 ### Pipe Tables
 
@@ -489,11 +490,11 @@ Input
 Output
 
 :   ```markdown
-    | Right | Left | Default | Center |
-    | ----: | :--- | ------- | :----: |
-    |    12 | 12   | 12      |   12   |
-    |   123 | 123  | 123     |  123   |
-    |     1 | 1    | 1       |   1    |
+      | Right | Left | Default | Center |
+      | ----: | :--- | ------- | :----: |
+      |    12 | 12   | 12      |   12   |
+      |   123 | 123  | 123     |  123   |
+      |     1 | 1    | 1       |   1    |
     ```
 
 ### Grid Tables
@@ -513,11 +514,11 @@ Input
 Output
 
 :   ```markdown
-    +-----+----------------+
-    | Var | Description    |
-    +=====+================+
-    | `A` | Example value. |
-    +-----+----------------+
+      +-----+----------------+
+      | Var | Description    |
+      +=====+================+
+      | `A` | Example value. |
+      +-----+----------------+
     ```
 
 ### Simple Tables
@@ -540,13 +541,13 @@ Input
 Output
 
 :   ```markdown
-      Right     Left     Center     Default
-    -------     ------ ----------   -------
-         12     12         12       12
-        123     123       123       123
-          1     1          1        1
+        Right     Left     Center     Default
+      -------     ------ ----------   -------
+           12     12         12       12
+          123     123       123       123
+            1     1          1        1
 
-    Table: A caption
+      Table: A caption
     ```
 
 ### Multiline Tables
@@ -571,23 +572,27 @@ Input
 Output
 
 :   ```markdown
-    -------------------------------------------------------------
-     Centered   Default           Right Left
-      Header    Aligned         Aligned Aligned
-    ----------- ------- --------------- -------------------------
-       First    row                12.0 Example of a row that
-                                        spans multiple lines.
+      -------------------------------------------------------------
+       Centered   Default           Right Left
+        Header    Aligned         Aligned Aligned
+      ----------- ------- --------------- -------------------------
+         First    row                12.0 Example of a row that
+                                          spans multiple lines.
 
-      Second    row                 5.0 Here's another one. Note
-                                        the blank line between
-                                        rows.
-    -------------------------------------------------------------
+        Second    row                 5.0 Here's another one. Note
+                                          the blank line between
+                                          rows.
+      -------------------------------------------------------------
     ```
 
 ### Table Captions
 
-Table captions are normalized to be on a separate line the table, prefixed with
-`Table:`, and flush left with the table content.
+Table captions are normalized to be on a separate line from the table, prefixed
+with `Table:`, and flush left with the table content.
+
+Captions also follow the configured wrapping mode (`reflow`, `preserve`, or
+`sentence`). In `reflow` mode, long captions wrap to the configured
+`line-width`. In `sentence` mode, each sentence starts on its own line.
 
 Input
 
@@ -602,11 +607,22 @@ Input
 Output
 
 :   ```markdown
-     a   b
-    --- ---
-     1   2
+       a   b
+      --- ---
+       1   2
 
-    Table: A caption with extra spaces
+      Table: A caption with extra spaces
+    ```
+
+Output (`wrap = "sentence"`)
+
+:   ```markdown
+       a   b
+      --- ---
+       1   2
+
+      Table: First caption sentence.
+      Second caption sentence.
     ```
 
 ## Math

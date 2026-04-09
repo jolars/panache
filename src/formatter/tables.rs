@@ -1,5 +1,8 @@
-use crate::config::Config;
+use crate::config::{Config, WrapMode};
 use crate::formatter::inline::format_inline_node;
+use crate::formatter::sentence_wrap::{
+    SentenceLanguage, is_sentence_boundary_text, resolve_sentence_language,
+};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;
@@ -56,6 +59,138 @@ fn normalize_table_caption(caption_body: &str) -> String {
     } else {
         format!("Table: {normalized_body}")
     }
+}
+
+fn collapse_ascii_whitespace(text: &str) -> String {
+    text.split_ascii_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn wrap_words_with_widths(words: &[&str], first_width: usize, rest_width: usize) -> Vec<String> {
+    if words.is_empty() {
+        return Vec::new();
+    }
+
+    let mut out = Vec::new();
+    let mut current = String::new();
+    let mut current_width = 0usize;
+    let mut line_width = first_width.max(1);
+
+    for word in words {
+        let word_width = word.width();
+        if current.is_empty() {
+            current.push_str(word);
+            current_width = word_width;
+            continue;
+        }
+
+        if current_width + 1 + word_width > line_width {
+            out.push(current);
+            current = (*word).to_string();
+            current_width = word_width;
+            line_width = rest_width.max(1);
+            continue;
+        }
+
+        current.push(' ');
+        current.push_str(word);
+        current_width += 1 + word_width;
+    }
+
+    if !current.is_empty() {
+        out.push(current);
+    }
+
+    out
+}
+
+fn split_sentences(text: &str, language: SentenceLanguage) -> Vec<String> {
+    let words: Vec<&str> = text.split_ascii_whitespace().collect();
+    if words.is_empty() {
+        return Vec::new();
+    }
+
+    let mut lines = Vec::new();
+    let mut current = Vec::new();
+
+    for (idx, word) in words.iter().enumerate() {
+        current.push(*word);
+        let is_last = idx + 1 == words.len();
+        let next_word = words.get(idx + 1).copied();
+        let boundary = is_sentence_boundary_text(word, next_word, !is_last, is_last, language);
+        if boundary {
+            lines.push(current.join(" "));
+            current.clear();
+        }
+    }
+
+    if !current.is_empty() {
+        lines.push(current.join(" "));
+    }
+
+    lines
+}
+
+fn format_table_caption_with_language(
+    caption_text: &str,
+    config: &Config,
+    sentence_language: SentenceLanguage,
+) -> String {
+    let Some(rest) = caption_text.strip_prefix("Table:") else {
+        return caption_text.to_string();
+    };
+    let body = rest.trim();
+    if body.is_empty() {
+        return "Table:".to_string();
+    }
+
+    let wrap_mode = config.wrap.clone().unwrap_or(WrapMode::Reflow);
+    let available_width = config
+        .line_width
+        .saturating_sub(TABLE_BLOCK_INDENT.len())
+        .max(1);
+
+    match wrap_mode {
+        WrapMode::Preserve => caption_text.to_string(),
+        WrapMode::Reflow => {
+            let normalized = collapse_ascii_whitespace(body);
+            let words: Vec<&str> = normalized.split_ascii_whitespace().collect();
+            let first_width = available_width.saturating_sub("Table: ".width()).max(1);
+            let wrapped = wrap_words_with_widths(&words, first_width, available_width);
+            if wrapped.is_empty() {
+                "Table:".to_string()
+            } else {
+                let mut out = String::new();
+                out.push_str("Table: ");
+                out.push_str(&wrapped[0]);
+                for line in wrapped.iter().skip(1) {
+                    out.push('\n');
+                    out.push_str(line);
+                }
+                out
+            }
+        }
+        WrapMode::Sentence => {
+            let normalized = collapse_ascii_whitespace(body);
+            let lines = split_sentences(&normalized, sentence_language);
+            if lines.is_empty() {
+                "Table:".to_string()
+            } else {
+                let mut out = String::new();
+                out.push_str("Table: ");
+                out.push_str(&lines[0]);
+                for line in lines.iter().skip(1) {
+                    out.push('\n');
+                    out.push_str(line);
+                }
+                out
+            }
+        }
+    }
+}
+
+fn format_table_caption(caption_text: &str, config: &Config, node: &SyntaxNode) -> String {
+    let language = resolve_sentence_language(node);
+    format_table_caption_with_language(caption_text, config, language)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -288,9 +423,8 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
     if let Some(ref caption_text) = table_data.caption
         && !table_data.caption_after
     {
-        // Caption text now includes the prefix (e.g., "Table: " or ": "),
-        // so just output it as-is
-        output.push_str(caption_text);
+        let formatted_caption = format_table_caption(caption_text, config, node);
+        output.push_str(&formatted_caption);
         output.push_str("\n\n"); // Blank line between caption and table
     }
 
@@ -378,8 +512,8 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
         && table_data.caption_after
     {
         output.push('\n');
-        // Caption text now includes the prefix, so output as-is
-        output.push_str(caption_text);
+        let formatted_caption = format_table_caption(caption_text, config, node);
+        output.push_str(&formatted_caption);
         output.push('\n');
     }
 
@@ -457,7 +591,11 @@ fn grid_separator_widths(separator_text: &str) -> Vec<usize> {
         .collect()
 }
 
-fn format_spanning_grid_table_raw(raw_table: &str) -> String {
+fn format_spanning_grid_table_raw(
+    raw_table: &str,
+    config: &Config,
+    sentence_language: SentenceLanguage,
+) -> String {
     let mut lines: Vec<&str> = raw_table.lines().collect();
     while lines.last().is_some_and(|l| l.trim().is_empty()) {
         lines.pop();
@@ -630,6 +768,7 @@ fn format_spanning_grid_table_raw(raw_table: &str) -> String {
     }
 
     if let Some(caption) = caption {
+        let caption = format_table_caption_with_language(&caption, config, sentence_language);
         out.push('\n');
         out.push_str(&caption);
         out.push('\n');
@@ -807,11 +946,12 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
 /// Format a grid table with consistent alignment and padding
 pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
     let raw_table = node.text().to_string();
+    let sentence_language = resolve_sentence_language(node);
     if raw_table
         .lines()
         .any(|line| line.trim_start().starts_with('|') && line.contains('+'))
     {
-        return format_spanning_grid_table_raw(&raw_table);
+        return format_spanning_grid_table_raw(&raw_table, config, sentence_language);
     }
 
     let table_data = extract_grid_table_data(node, config);
@@ -828,7 +968,8 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
     if let Some(ref caption_text) = table_data.caption
         && !table_data.caption_after
     {
-        output.push_str(caption_text);
+        let formatted_caption = format_table_caption(caption_text, config, node);
+        output.push_str(&formatted_caption);
         output.push_str("\n\n");
     }
 
@@ -967,7 +1108,8 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
         && table_data.caption_after
     {
         output.push('\n');
-        output.push_str(caption_text);
+        let formatted_caption = format_table_caption(caption_text, config, node);
+        output.push_str(&formatted_caption);
         output.push('\n');
     }
 
@@ -1314,7 +1456,8 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
     if let Some(ref caption_text) = table_data.caption
         && !table_data.caption_after
     {
-        output.push_str(caption_text);
+        let formatted_caption = format_table_caption(caption_text, config, node);
+        output.push_str(&formatted_caption);
         output.push_str("\n\n");
     }
 
@@ -1545,7 +1688,8 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
         && table_data.caption_after
     {
         output.push('\n');
-        output.push_str(caption_text);
+        let formatted_caption = format_table_caption(caption_text, config, node);
+        output.push_str(&formatted_caption);
         output.push('\n');
     }
 
@@ -1844,7 +1988,8 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
 
     // Emit caption before if present
     if let Some(ref caption_text) = table_data.caption {
-        output.push_str(caption_text);
+        let formatted_caption = format_table_caption(caption_text, config, node);
+        output.push_str(&formatted_caption);
         output.push_str("\n\n"); // Blank line between caption and table
     }
 

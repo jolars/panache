@@ -1,4 +1,5 @@
-use panache::format;
+use panache::config::WrapMode;
+use panache::{Config, format};
 
 #[test]
 fn test_basic_pipe_table() {
@@ -64,6 +65,34 @@ fn test_pipe_table_with_caption_before() {
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_pipe_table_caption_reflow_wraps() {
+    let input = "| A | B |\n|---|---|\n| C | D |\n\n: A long caption that should wrap over multiple lines when reflow mode is enabled for formatting.";
+    let config = Config {
+        wrap: Some(WrapMode::Reflow),
+        line_width: 56,
+        ..Default::default()
+    };
+
+    let result = format(input, Some(config), None);
+    assert!(result.contains("  Table: A long caption that should wrap over multiple"));
+    assert!(result.contains("\n  lines when reflow mode is enabled for formatting."));
+}
+
+#[test]
+fn test_pipe_table_caption_sentence_wraps() {
+    let input =
+        ": First caption sentence. Second caption sentence.\n\n| A | B |\n|---|---|\n| C | D |";
+    let config = Config {
+        wrap: Some(WrapMode::Sentence),
+        line_width: 100,
+        ..Default::default()
+    };
+
+    let result = format(input, Some(config), None);
+    assert!(result.contains("  Table: First caption sentence.\n  Second caption sentence."));
 }
 
 #[test]

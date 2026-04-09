@@ -1,5 +1,5 @@
-DOCUMENT@0..243
-  SIMPLE_TABLE@0..243
+DOCUMENT@0..314
+  SIMPLE_TABLE@0..314
     TABLE_HEADER@0..40
       WHITESPACE@0..2 "  "
       TABLE_CELL@2..7
@@ -61,8 +61,8 @@ DOCUMENT@0..243
       NEWLINE@196..197 "\n"
     BLANK_LINE@197..198
       BLANK_LINE@197..198 "\n"
-    TABLE_CAPTION@198..243
+    TABLE_CAPTION@198..314
       TABLE_CAPTION_PREFIX@198..205 "Table: "
-      TEXT@205..242 "Demonstration of simp ..."
-      NEWLINE@242..243 "\n"
+      TEXT@205..313 "Demonstration of simp ..."
+      NEWLINE@313..314 "\n"
 
