@@ -538,7 +538,7 @@ impl<'a> TraversalBuilder<'a> {
             self.pending_space = false;
         } else if let Some(current) = &mut self.current_piece {
             current.push_str(text);
-            self.current_piece_break_eligible &= break_eligible;
+            self.current_piece_break_eligible = break_eligible;
         } else {
             self.current_piece = Some(text.to_string());
             self.current_piece_break_eligible = break_eligible;

@@ -252,6 +252,7 @@ golden_test_cases!(
     sentence_wrap_links_figures,
     sentence_wrap_lists,
     sentence_wrap_ellipsis,
+    sentence_wrap_inline_code_sentence_end,
     sentence_wrap_quote_multisentence,
     sentence_wrap_inline_code_question,
     sentence_wrap_table_caption,
