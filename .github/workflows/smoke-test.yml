@@ -27,6 +27,17 @@ jobs:
         rstudio/rmarkdown-cookbook
         mattiasvillani/BayesianLearningBook
         nielsrhansen/CSwR
+        hadley/r4ds
+        hadley/adv-r
+        hadley/r-pkgs
+        rstudio-education/hopr
+        kevinheavey/modern-polars
+        mlr-org/mlr3book
+        RohanAlexander/tswd
+        davidfoxcroft/lsj-book
+        ddotta/cookbook-rpolars
+        r-causal/causal-inference-in-R
+        elong0527/r4csr
     steps:
       - uses: actions/checkout@v6
 
