@@ -233,3 +233,12 @@ fn hashpipe_fig_cap_list_value_is_idempotent() {
     assert_eq!(output2.matches("#|   - A").count(), 1);
     assert_eq!(output2.matches("#|   - B").count(), 1);
 }
+
+#[test]
+fn hashpipe_long_quoted_fig_cap_stays_idempotent() {
+    let input = "```{r}\n#| fig-cap: \"Relationship between inflation and GDP growth for Australia, Ethiopia, India, and the United States\"\n1+1\n```\n";
+    let output1 = format(input, Some(quarto_config()), None);
+    let output2 = format(&output1, Some(quarto_config()), None);
+
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}

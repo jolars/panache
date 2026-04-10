@@ -101,6 +101,10 @@ impl Formatter {
         node: &SyntaxNode,
         width: usize,
     ) -> Vec<String> {
+        let text = node.text().to_string();
+        if text.contains("[@") && text.contains("]:") {
+            return text.lines().map(ToString::to_string).collect();
+        }
         inline_layout::wrapped_lines_for_paragraph(&self.config, node, width, &|n| {
             self.format_inline_node(n)
         })

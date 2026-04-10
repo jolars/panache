@@ -509,6 +509,31 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 .join(" ");
             format!("^[{}]", normalized)
         }
+        SyntaxKind::CITATION => {
+            let mut result = String::new();
+            let mut skip_marker_whitespace = false;
+            for child in node.children_with_tokens() {
+                match child {
+                    NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::BLOCK_QUOTE_MARKER => {
+                        skip_marker_whitespace = true;
+                    }
+                    NodeOrToken::Token(tok)
+                        if tok.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace =>
+                    {
+                        skip_marker_whitespace = false;
+                    }
+                    NodeOrToken::Token(tok) => {
+                        skip_marker_whitespace = false;
+                        result.push_str(tok.text());
+                    }
+                    NodeOrToken::Node(n) => {
+                        skip_marker_whitespace = false;
+                        result.push_str(&n.text().to_string());
+                    }
+                }
+            }
+            result
+        }
         SyntaxKind::CROSSREF => {
             let mut result = String::new();
             let mut skip_marker_whitespace = false;

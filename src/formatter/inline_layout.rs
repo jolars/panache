@@ -52,7 +52,8 @@ fn escape_special_chars(
                 }
 
                 // If underscore is at start and previous token was TEXT, it's intraword
-                let intraword_start = at_start && prev_is_text;
+                let intraword_start =
+                    at_start && prev_is_text && !matches!(chars.peek(), Some((_, '_')));
                 // If underscore is at end and next token is TEXT, it's intraword
                 let intraword_end = at_end && next_is_text;
 
@@ -665,6 +666,10 @@ fn process_node_recursive(
                 SyntaxKind::TEXT => {
                     skip_marker_whitespace = false;
                     let text = expand_tabs_with_width(t.text(), config.tab_width);
+                    if text.as_ref().contains("[@") && text.as_ref().contains("]:") {
+                        sink.push_piece(text.as_ref());
+                        continue;
+                    }
                     let mut text_to_process = text.as_ref();
                     if sink.skip_next_leading_whitespace() {
                         text_to_process =

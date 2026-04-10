@@ -237,3 +237,11 @@ fn blockquote_wrapped_strong_continuation_stays_idempotent() {
     let output2 = format(&output1, None, None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn blockquote_lazy_continuation_after_citation_stays_idempotent() {
+    let input = "We cleaned and tidied the dataset using the statistical programming language R [@citeR] including the `tidyverse`\n[@tidyverse] and `janitor` [@janitor].\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}

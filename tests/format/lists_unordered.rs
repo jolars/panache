@@ -124,6 +124,14 @@ fn empty_brackets_in_list_item_are_escaped() {
 }
 
 #[test]
+fn escaped_double_underscore_in_list_item_stays_idempotent() {
+    let input = "- b. WHERE firstName LIKE 'Ma_\\_';\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
 fn list_item_keeps_initialism_year_together_when_wrapping() {
     let cfg = Config {
         line_width: 8,

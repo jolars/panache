@@ -296,6 +296,56 @@ pub fn split_options_from_cst_with_content(
 }
 
 fn extract_leading_hashpipe_options(content: &str, prefix: &str) -> Vec<(String, String)> {
+    fn is_unclosed_flow_collection(value: &str) -> bool {
+        let trimmed = value.trim_start();
+        if !trimmed.starts_with('[') && !trimmed.starts_with('{') {
+            return false;
+        }
+
+        let mut stack: Vec<char> = Vec::new();
+        let mut in_single = false;
+        let mut in_double = false;
+        let mut escaped = false;
+
+        for ch in value.chars() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            match ch {
+                '\\' if in_double => {
+                    escaped = true;
+                }
+                '\'' if !in_double => in_single = !in_single,
+                '"' if !in_single => in_double = !in_double,
+                '[' | '{' if !in_single && !in_double => stack.push(ch),
+                ']' if !in_single && !in_double => {
+                    if stack.pop() != Some('[') {
+                        return false;
+                    }
+                }
+                '}' if !in_single && !in_double => {
+                    if stack.pop() != Some('{') {
+                        return false;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        !stack.is_empty() || in_single || in_double
+    }
+
+    fn is_flow_collection_continuation_line(after_prefix: &str) -> bool {
+        if is_block_scalar_continuation_line(after_prefix) {
+            return true;
+        }
+        let trimmed = after_prefix
+            .trim_end_matches(['\n', '\r'])
+            .trim_start_matches([' ', '\t']);
+        trimmed.starts_with(']') || trimmed.starts_with('}')
+    }
+
     let mut options = Vec::new();
     let lines: Vec<&str> = content.lines().collect();
     let mut i = 0usize;
@@ -341,6 +391,27 @@ fn extract_leading_hashpipe_options(content: &str, prefix: &str) -> Vec<(String,
                 merged_value.push_str(continuation);
                 i += 1;
                 if !is_unclosed_double_quoted(&merged_value) {
+                    break;
+                }
+            }
+        } else if is_unclosed_flow_collection(&merged_value)
+            && (merged_value.contains('\n')
+                || merged_value.starts_with('[')
+                || merged_value.starts_with('{'))
+        {
+            while i < lines.len() {
+                let next_trimmed = lines[i].trim_start();
+                if !next_trimmed.starts_with(prefix) {
+                    break;
+                }
+                let next_after_prefix = &next_trimmed[prefix.len()..];
+                if !is_flow_collection_continuation_line(next_after_prefix) {
+                    break;
+                }
+                merged_value.push('\n');
+                merged_value.push_str(next_after_prefix);
+                i += 1;
+                if !is_unclosed_flow_collection(&merged_value) {
                     break;
                 }
             }

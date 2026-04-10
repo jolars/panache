@@ -390,6 +390,44 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
         chars.all(|ch| ch == '+' || ch == '-' || ch.is_ascii_digit())
     }
 
+    fn is_unclosed_flow_collection(value: &str) -> bool {
+        let trimmed = value.trim_start();
+        if !trimmed.starts_with('[') && !trimmed.starts_with('{') {
+            return false;
+        }
+
+        let mut stack: Vec<char> = Vec::new();
+        let mut in_single = false;
+        let mut in_double = false;
+        let mut escaped = false;
+
+        for ch in value.chars() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            match ch {
+                '\\' if in_double => escaped = true,
+                '\'' if !in_double => in_single = !in_single,
+                '"' if !in_single => in_double = !in_double,
+                '[' | '{' if !in_single && !in_double => stack.push(ch),
+                ']' if !in_single && !in_double => {
+                    if stack.pop() != Some('[') {
+                        return false;
+                    }
+                }
+                '}' if !in_single && !in_double => {
+                    if stack.pop() != Some('{') {
+                        return false;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        !stack.is_empty() || in_single || in_double
+    }
+
     fn leading_ws_count(text: &str) -> usize {
         text.chars().take_while(|c| matches!(c, ' ' | '\t')).count()
     }
@@ -402,10 +440,21 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
         leading_ws_count(text) >= 2
     }
 
+    fn is_flow_collection_continuation_line(after_prefix: &str) -> bool {
+        if is_block_scalar_continuation_line(after_prefix) {
+            return true;
+        }
+        let trimmed = after_prefix
+            .trim_end_matches(['\n', '\r'])
+            .trim_start_matches([' ', '\t']);
+        trimmed.starts_with(']') || trimmed.starts_with('}')
+    }
+
     let mut header_end = 0usize;
     let mut saw_prefix = false;
     let mut open_quoted: Option<String> = None;
     let mut open_block_scalar = false;
+    let mut open_flow_collection = false;
     let mut open_indented_yaml_value = false;
     let lines: Vec<&str> = content.split_inclusive('\n').collect();
     let mut i = 0usize;
@@ -440,6 +489,22 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
             open_block_scalar = false;
         }
 
+        if open_flow_collection {
+            if let Some(after_prefix) = trimmed.strip_prefix(prefix)
+                && is_flow_collection_continuation_line(after_prefix)
+            {
+                header_end += line.len();
+                i += 1;
+                if let Some(value) = option_value(trimmed, prefix)
+                    && !is_unclosed_flow_collection(&value)
+                {
+                    open_flow_collection = false;
+                }
+                continue;
+            }
+            open_flow_collection = false;
+        }
+
         if open_indented_yaml_value {
             if let Some(after_prefix) = trimmed.strip_prefix(prefix)
                 && is_block_scalar_continuation_line(after_prefix)
@@ -458,6 +523,8 @@ fn split_hashpipe_header(content: &str, prefix: &str) -> Option<(String, String)
                     open_quoted = Some(value);
                 } else if is_yaml_block_scalar_indicator(&value) {
                     open_block_scalar = true;
+                } else if is_unclosed_flow_collection(&value) {
+                    open_flow_collection = true;
                 } else if value.is_empty() {
                     // `key:` values may continue on indented hashpipe lines
                     // (e.g., YAML sequences/mappings).
