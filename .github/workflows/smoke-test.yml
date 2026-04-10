@@ -225,9 +225,13 @@ jobs:
                 echo "$samples"
                 if [ -n "$report_excerpt" ]; then
                   echo ""
-                  echo "Sample report excerpt:"
+                  echo "<details>"
+                  echo "<summary>Sample report excerpt</summary>"
                   echo ""
+                  echo '````text'
                   printf '%s\n' "$report_excerpt"
+                  echo '````'
+                  echo "</details>"
                 fi
               } > "$comment_file"
               gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file "$comment_file"
@@ -256,9 +260,13 @@ jobs:
                 echo "$samples"
                 if [ -n "$report_excerpt" ]; then
                   echo ""
-                  echo "Sample report excerpt:"
+                  echo "<details>"
+                  echo "<summary>Sample report excerpt</summary>"
                   echo ""
+                  echo '````text'
                   printf '%s\n' "$report_excerpt"
+                  echo '````'
+                  echo "</details>"
                 fi
                 echo ""
                 echo "See artifact \`debug-format-repo-scan-results\` for full logs."
