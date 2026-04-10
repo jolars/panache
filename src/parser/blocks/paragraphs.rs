@@ -7,8 +7,23 @@ use crate::config::Config;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
+use crate::parser::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
 use crate::parser::utils::container_stack::{Container, ContainerStack};
 use crate::parser::utils::text_buffer::ParagraphBuffer;
+
+fn extract_end_environment_name(line: &str) -> Option<&str> {
+    let trimmed = line.trim_start();
+    if !trimmed.starts_with("\\end{") {
+        return None;
+    }
+    let rest = &trimmed[5..];
+    let close = rest.find('}')?;
+    let name = &rest[..close];
+    if name.is_empty() {
+        return None;
+    }
+    Some(name)
+}
 
 /// Start a paragraph if not already in one.
 pub(in crate::parser) fn start_paragraph_if_needed(
@@ -19,6 +34,7 @@ pub(in crate::parser) fn start_paragraph_if_needed(
         builder.start_node(SyntaxKind::PARAGRAPH.into());
         containers.push(Container::Paragraph {
             buffer: ParagraphBuffer::new(),
+            open_inline_math_envs: Vec::new(),
         });
     }
 }
@@ -32,8 +48,28 @@ pub(in crate::parser) fn append_paragraph_line(
 ) {
     // Buffer the line (with newline for losslessness)
     // Works for ALL paragraphs including those in blockquotes
-    if let Some(Container::Paragraph { buffer }) = containers.stack.last_mut() {
+    if let Some(Container::Paragraph {
+        buffer,
+        open_inline_math_envs,
+    }) = containers.stack.last_mut()
+    {
         buffer.push_text(line);
+
+        let line_no_newline = line.trim_end_matches(&['\r', '\n'][..]);
+        if let Some(env_name) = extract_environment_name(line_no_newline)
+            && is_inline_math_environment(&env_name)
+        {
+            open_inline_math_envs.push(env_name);
+            return;
+        }
+
+        if let Some(end_name) = extract_end_environment_name(line_no_newline)
+            && open_inline_math_envs
+                .last()
+                .is_some_and(|open| open == end_name)
+        {
+            open_inline_math_envs.pop();
+        }
     }
 }
 
@@ -47,9 +83,19 @@ pub(in crate::parser) fn append_paragraph_marker(
     leading_spaces: usize,
     has_trailing_space: bool,
 ) {
-    if let Some(Container::Paragraph { buffer }) = containers.stack.last_mut() {
+    if let Some(Container::Paragraph { buffer, .. }) = containers.stack.last_mut() {
         buffer.push_marker(leading_spaces, has_trailing_space);
     }
+}
+
+pub(in crate::parser) fn has_open_inline_math_environment(containers: &ContainerStack) -> bool {
+    matches!(
+        containers.last(),
+        Some(Container::Paragraph {
+            open_inline_math_envs,
+            ..
+        }) if !open_inline_math_envs.is_empty()
+    )
 }
 
 /// Get the current content column from the container stack.

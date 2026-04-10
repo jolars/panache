@@ -35,6 +35,7 @@ pub(crate) enum Container {
     },
     Paragraph {
         buffer: ParagraphBuffer, // Interleaved buffer for paragraph content with markers
+        open_inline_math_envs: Vec<String>,
     },
     FootnoteDefinition {
         content_col: usize,

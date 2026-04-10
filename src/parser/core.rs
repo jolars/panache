@@ -143,7 +143,7 @@ impl<'a> Parser<'a> {
                     self.builder.finish_node();
                 }
                 // Handle Paragraph with buffering
-                Some(Container::Paragraph { buffer }) if !buffer.is_empty() => {
+                Some(Container::Paragraph { buffer, .. }) if !buffer.is_empty() => {
                     // Clone buffer to avoid borrow issues
                     let buffer_clone = buffer.clone();
                     // Pop container first
@@ -323,50 +323,6 @@ impl<'a> Parser<'a> {
     /// Check if a paragraph is currently open.
     fn is_paragraph_open(&self) -> bool {
         matches!(self.containers.last(), Some(Container::Paragraph { .. }))
-    }
-
-    fn extract_end_environment_name(line: &str) -> Option<&str> {
-        let trimmed = line.trim_start();
-        if !trimmed.starts_with("\\end{") {
-            return None;
-        }
-        let rest = &trimmed[5..];
-        let close = rest.find('}')?;
-        let name = &rest[..close];
-        if name.is_empty() {
-            return None;
-        }
-        Some(name)
-    }
-
-    fn current_open_inline_math_env(&self) -> Option<String> {
-        let Some(Container::Paragraph { buffer }) = self.containers.last() else {
-            return None;
-        };
-
-        let text = buffer.get_text_for_parsing();
-        if text.is_empty() {
-            return None;
-        }
-
-        let mut stack: Vec<String> = Vec::new();
-
-        for line in text.split('\n') {
-            if let Some(env_name) = extract_environment_name(line)
-                && is_inline_math_environment(&env_name)
-            {
-                stack.push(env_name);
-                continue;
-            }
-
-            if let Some(end_name) = Self::extract_end_environment_name(line)
-                && stack.last().is_some_and(|open| open == end_name)
-            {
-                stack.pop();
-            }
-        }
-
-        stack.pop()
     }
 
     /// Close paragraph if one is currently open.
@@ -1059,7 +1015,9 @@ impl<'a> Parser<'a> {
             || (bq_depth > 0 && inner_content.trim_end_matches('\n').trim().is_empty());
 
         if is_blank {
-            if self.is_paragraph_open() && self.current_open_inline_math_env().is_some() {
+            if self.is_paragraph_open()
+                && paragraphs::has_open_inline_math_environment(&self.containers)
+            {
                 paragraphs::append_paragraph_line(
                     &mut self.containers,
                     &mut self.builder,
@@ -1766,7 +1724,9 @@ impl<'a> Parser<'a> {
         // Store the stripped content for later use
         let content = stripped_content;
 
-        if self.is_paragraph_open() && self.current_open_inline_math_env().is_some() {
+        if self.is_paragraph_open()
+            && paragraphs::has_open_inline_math_environment(&self.containers)
+        {
             paragraphs::append_paragraph_line(
                 &mut self.containers,
                 &mut self.builder,
