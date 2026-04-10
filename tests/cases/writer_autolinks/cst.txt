@@ -151,10 +151,10 @@ DOCUMENT@0..641
     BLANK_LINE@546..547 "\n"
   PARAGRAPH@547..605
     TEXT@547..581 "Auto-links should not ..."
-    CODE_SPAN@581..604
-      CODE_SPAN_MARKER@581..582 "`"
+    INLINE_CODE@581..604
+      INLINE_CODE_MARKER@581..582 "`"
       TEXT@582..603 "<http://example.com/>"
-      CODE_SPAN_MARKER@603..604 "`"
+      INLINE_CODE_MARKER@603..604 "`"
     NEWLINE@604..605 "\n"
   BLANK_LINE@605..606
     BLANK_LINE@605..606 "\n"

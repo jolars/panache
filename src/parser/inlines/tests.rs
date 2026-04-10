@@ -221,7 +221,7 @@ mod code_tests {
     fn find_code_spans(node: &crate::syntax::SyntaxNode) -> Vec<String> {
         let mut code_spans = Vec::new();
         for child in node.descendants() {
-            if child.kind() == SyntaxKind::CODE_SPAN {
+            if child.kind() == SyntaxKind::INLINE_CODE {
                 code_spans.push(child.to_string());
             }
         }
@@ -399,7 +399,7 @@ mod escape_tests {
         let tree = parse_inline(input);
 
         let escaped = count_nodes_of_kind(&tree, SyntaxKind::ESCAPED_CHAR);
-        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
+        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::INLINE_CODE);
 
         assert_eq!(escaped, 2, "Should have two escaped backticks");
         assert_eq!(code_spans, 0, "Should not create code span");
@@ -455,7 +455,7 @@ mod escape_tests {
         let input = r"\`not code\`";
         let tree = parse_inline(input);
 
-        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
+        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::INLINE_CODE);
         assert_eq!(code_spans, 0, "Escaped backticks should prevent code span");
     }
 
@@ -474,7 +474,7 @@ mod escape_tests {
         let input = r"`\*code\*`";
         let tree = parse_inline(input);
 
-        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::CODE_SPAN);
+        let code_spans = count_nodes_of_kind(&tree, SyntaxKind::INLINE_CODE);
         assert_eq!(code_spans, 1, "Should create code span");
 
         // The backslashes should be preserved as-is inside the code span
@@ -637,7 +637,7 @@ mod bracketed_span_tests {
     fn span_with_code() {
         let tree = parse_inline("[`code` text]{.mono}");
         assert_has_kind(&tree, SyntaxKind::BRACKETED_SPAN);
-        assert_has_kind(&tree, SyntaxKind::CODE_SPAN);
+        assert_has_kind(&tree, SyntaxKind::INLINE_CODE);
     }
 
     #[test]
@@ -775,7 +775,7 @@ mod raw_inline_tests {
     fn find_code_spans(node: &crate::syntax::SyntaxNode) -> Vec<String> {
         let mut code_spans = Vec::new();
         for child in node.descendants() {
-            if child.kind() == SyntaxKind::CODE_SPAN {
+            if child.kind() == SyntaxKind::INLINE_CODE {
                 code_spans.push(child.to_string());
             }
         }
@@ -961,7 +961,7 @@ mod extension_guard_tests {
         let tree = parse_with_config("`code`{.lang}", config);
         let code_span = tree
             .descendants()
-            .find(|n| n.kind() == SyntaxKind::CODE_SPAN)
+            .find(|n| n.kind() == SyntaxKind::INLINE_CODE)
             .expect("code span");
         assert_eq!(code_span.to_string(), "`code`");
         assert!(tree.to_string().contains("{.lang}"));
@@ -1136,7 +1136,7 @@ mod extension_guard_tests {
         config.extensions.rmarkdown_inline_code = true;
         config.extensions.quarto_inline_code = false;
         let tree = parse_with_config("`3 == `r 2 + 1``", config);
-        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 1);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXEC), 1);
     }
 
     #[test]
@@ -1145,8 +1145,8 @@ mod extension_guard_tests {
         config.extensions.rmarkdown_inline_code = false;
         config.extensions.quarto_inline_code = false;
         let tree = parse_with_config("`3 == `r 2 + 1``", config);
-        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 0);
-        assert_eq!(count_kind(&tree, SyntaxKind::CODE_SPAN), 1);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXEC), 0);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_CODE), 1);
     }
 
     #[test]
@@ -1155,7 +1155,7 @@ mod extension_guard_tests {
         config.extensions.rmarkdown_inline_code = false;
         config.extensions.quarto_inline_code = true;
         let tree = parse_with_config("`3 == `{r} 2 + 1``", config);
-        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 1);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXEC), 1);
     }
 
     #[test]
@@ -1164,8 +1164,8 @@ mod extension_guard_tests {
         config.extensions.rmarkdown_inline_code = false;
         config.extensions.quarto_inline_code = false;
         let tree = parse_with_config("`3 == `{r} 2 + 1``", config);
-        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 0);
-        assert_eq!(count_kind(&tree, SyntaxKind::CODE_SPAN), 1);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXEC), 0);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_CODE), 1);
     }
 
     #[test]
@@ -1174,7 +1174,7 @@ mod extension_guard_tests {
         config.extensions.rmarkdown_inline_code = false;
         config.extensions.quarto_inline_code = true;
         let tree = parse_with_config("`3 == `r 2 + 1``", config);
-        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 0);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXEC), 0);
     }
 
     #[test]
@@ -1183,7 +1183,7 @@ mod extension_guard_tests {
         config.extensions.rmarkdown_inline_code = true;
         config.extensions.quarto_inline_code = false;
         let tree = parse_with_config("`3 == `{r} 2 + 1``", config);
-        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXECUTABLE_CODE), 0);
+        assert_eq!(count_kind(&tree, SyntaxKind::INLINE_EXEC), 0);
     }
 }
 

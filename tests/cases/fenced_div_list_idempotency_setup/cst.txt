@@ -161,20 +161,20 @@ DOCUMENT@0..4373
       BLANK_LINE@1197..1198 "\n"
     PARAGRAPH@1198..1379
       TEXT@1198..1294 "The template manuscri ..."
-      CODE_SPAN@1294..1303
-        CODE_SPAN_MARKER@1294..1295 "`"
+      INLINE_CODE@1294..1303
+        INLINE_CODE_MARKER@1294..1295 "`"
         TEXT@1295..1302 "jupyter"
-        CODE_SPAN_MARKER@1302..1303 "`"
+        INLINE_CODE_MARKER@1302..1303 "`"
       TEXT@1303..1351 " along with the packa ..."
-      CODE_SPAN@1351..1359
-        CODE_SPAN_MARKER@1351..1352 "`"
+      INLINE_CODE@1351..1359
+        INLINE_CODE_MARKER@1351..1352 "`"
         TEXT@1352..1358 "pandas"
-        CODE_SPAN_MARKER@1358..1359 "`"
+        INLINE_CODE_MARKER@1358..1359 "`"
       TEXT@1359..1365 ", and "
-      CODE_SPAN@1365..1377
-        CODE_SPAN_MARKER@1365..1366 "`"
+      INLINE_CODE@1365..1377
+        INLINE_CODE_MARKER@1365..1366 "`"
         TEXT@1366..1376 "matplotlib"
-        CODE_SPAN_MARKER@1376..1377 "`"
+        INLINE_CODE_MARKER@1376..1377 "`"
       TEXT@1377..1378 ":"
       NEWLINE@1378..1379 "\n"
     BLANK_LINE@1379..1380
@@ -198,10 +198,10 @@ DOCUMENT@0..4373
       BLANK_LINE@1465..1466 "\n"
     PARAGRAPH@1466..1590
       TEXT@1466..1541 "Alternatively, once y ..."
-      CODE_SPAN@1541..1559
-        CODE_SPAN_MARKER@1541..1542 "`"
+      INLINE_CODE@1541..1559
+        INLINE_CODE_MARKER@1541..1542 "`"
         TEXT@1542..1558 "requirements.txt"
-        CODE_SPAN_MARKER@1558..1559 "`"
+        INLINE_CODE_MARKER@1558..1559 "`"
       TEXT@1559..1589 " to get the packages  ..."
       NEWLINE@1589..1590 "\n"
     BLANK_LINE@1590..1591

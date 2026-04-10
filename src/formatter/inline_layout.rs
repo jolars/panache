@@ -850,9 +850,9 @@ fn process_node_recursive(
                         sink.push_piece(&closing);
                     }
                 }
-                SyntaxKind::CODE_SPAN
-                | SyntaxKind::INLINE_EXECUTABLE_CODE
-                | SyntaxKind::INLINE_EXEC_CODE => {
+                SyntaxKind::INLINE_CODE
+                | SyntaxKind::INLINE_EXEC
+                | SyntaxKind::INLINE_EXEC_CONTENT => {
                     skip_marker_whitespace = false;
                     let text = format_inline_fn(&n);
                     sink.push_piece_with_boundary(&text, SentenceBoundaryClass::NonBoundary);

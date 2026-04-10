@@ -166,10 +166,10 @@ DOCUMENT@0..879
       WHITESPACE@699..700 " "
       PLAIN@700..727
         TEXT@700..720 "Second example with "
-        CODE_SPAN@720..726
-          CODE_SPAN_MARKER@720..721 "`"
+        INLINE_CODE@720..726
+          INLINE_CODE_MARKER@720..721 "`"
           TEXT@721..725 "code"
-          CODE_SPAN_MARKER@725..726 "`"
+          INLINE_CODE_MARKER@725..726 "`"
         NEWLINE@726..727 "\n"
     LIST_ITEM@727..780
       LIST_MARKER@727..730 "(@)"

@@ -42,10 +42,10 @@ DOCUMENT@0..1668
       WHITESPACE@348..349 " "
       PLAIN@349..473
         TEXT@349..365 "Final item with "
-        CODE_SPAN@365..378
-          CODE_SPAN_MARKER@365..366 "`"
+        INLINE_CODE@365..378
+          INLINE_CODE_MARKER@365..366 "`"
           TEXT@366..377 "inline code"
-          CODE_SPAN_MARKER@377..378 "`"
+          INLINE_CODE_MARKER@377..378 "`"
         TEXT@378..472 " that should be prese ..."
         NEWLINE@472..473 "\n"
   BLANK_LINE@473..474

@@ -34,10 +34,10 @@ DOCUMENT@0..542
       WHITESPACE@279..280 " "
       TABLE_CELL@280..299
         TEXT@280..284 "    "
-        CODE_SPAN@284..290
-          CODE_SPAN_MARKER@284..285 "`"
+        INLINE_CODE@284..290
+          INLINE_CODE_MARKER@284..285 "`"
           TEXT@285..289 "code"
-          CODE_SPAN_MARKER@289..290 "`"
+          INLINE_CODE_MARKER@289..290 "`"
         TEXT@290..299 " spans   "
       WHITESPACE@299..300 " "
       TABLE_CELL@300..314
@@ -70,10 +70,10 @@ DOCUMENT@0..542
       WHITESPACE@376..377 " "
       TABLE_CELL@377..396
         TEXT@377..386 "    more "
-        CODE_SPAN@386..392
-          CODE_SPAN_MARKER@386..387 "`"
+        INLINE_CODE@386..392
+          INLINE_CODE_MARKER@386..387 "`"
           TEXT@387..391 "code"
-          CODE_SPAN_MARKER@391..392 "`"
+          INLINE_CODE_MARKER@391..392 "`"
         TEXT@392..396 "    "
       WHITESPACE@396..397 " "
       TABLE_CELL@397..407

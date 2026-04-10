@@ -65,11 +65,11 @@ pub fn emit_code_span(
     backtick_count: usize,
     attributes: Option<AttributeBlock>,
 ) {
-    builder.start_node(SyntaxKind::CODE_SPAN.into());
+    builder.start_node(SyntaxKind::INLINE_CODE.into());
 
     // Opening backticks
     builder.token(
-        SyntaxKind::CODE_SPAN_MARKER.into(),
+        SyntaxKind::INLINE_CODE_MARKER.into(),
         &"`".repeat(backtick_count),
     );
 
@@ -78,7 +78,7 @@ pub fn emit_code_span(
 
     // Closing backticks
     builder.token(
-        SyntaxKind::CODE_SPAN_MARKER.into(),
+        SyntaxKind::INLINE_CODE_MARKER.into(),
         &"`".repeat(backtick_count),
     );
 

@@ -119,10 +119,10 @@ DOCUMENT@0..734
       TASK_CHECKBOX@340..343 "[x]"
       PLAIN@343..371
         TEXT@343..364 " Completed task with "
-        CODE_SPAN@364..370
-          CODE_SPAN_MARKER@364..365 "`"
+        INLINE_CODE@364..370
+          INLINE_CODE_MARKER@364..365 "`"
           TEXT@365..369 "code"
-          CODE_SPAN_MARKER@369..370 "`"
+          INLINE_CODE_MARKER@369..370 "`"
         NEWLINE@370..371 "\n"
     LIST_ITEM@371..417
       LIST_MARKER@371..372 "-"

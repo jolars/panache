@@ -10,28 +10,28 @@ DOCUMENT@0..427
     BLANK_LINE@13..14 "\n"
   PARAGRAPH@14..34
     TEXT@14..27 "Simple code: "
-    CODE_SPAN@27..33
-      CODE_SPAN_MARKER@27..28 "`"
+    INLINE_CODE@27..33
+      INLINE_CODE_MARKER@27..28 "`"
       TEXT@28..32 "code"
-      CODE_SPAN_MARKER@32..33 "`"
+      INLINE_CODE_MARKER@32..33 "`"
     NEWLINE@33..34 "\n"
   BLANK_LINE@34..35
     BLANK_LINE@34..35 "\n"
   PARAGRAPH@35..69
     TEXT@35..48 "With spaces: "
-    CODE_SPAN@48..68
-      CODE_SPAN_MARKER@48..49 "`"
+    INLINE_CODE@48..68
+      INLINE_CODE_MARKER@48..49 "`"
       TEXT@49..67 " code with spaces "
-      CODE_SPAN_MARKER@67..68 "`"
+      INLINE_CODE_MARKER@67..68 "`"
     NEWLINE@68..69 "\n"
   BLANK_LINE@69..70
     BLANK_LINE@69..70 "\n"
   PARAGRAPH@70..122
     TEXT@70..90 "Multiple backticks: "
-    CODE_SPAN@90..121
-      CODE_SPAN_MARKER@90..92 "``"
+    INLINE_CODE@90..121
+      INLINE_CODE_MARKER@90..92 "``"
       TEXT@92..119 "code with `backtick`  ..."
-      CODE_SPAN_MARKER@119..121 "``"
+      INLINE_CODE_MARKER@119..121 "``"
     NEWLINE@121..122 "\n"
   BLANK_LINE@122..123
     BLANK_LINE@122..123 "\n"
@@ -40,10 +40,10 @@ DOCUMENT@0..427
     EMPHASIS@141..166
       EMPHASIS_MARKER@141..142 "*"
       TEXT@142..152 "text with "
-      CODE_SPAN@152..158
-        CODE_SPAN_MARKER@152..153 "`"
+      INLINE_CODE@152..158
+        INLINE_CODE_MARKER@152..153 "`"
         TEXT@153..157 "code"
-        CODE_SPAN_MARKER@157..158 "`"
+        INLINE_CODE_MARKER@157..158 "`"
       TEXT@158..165 " inside"
       EMPHASIS_MARKER@165..166 "*"
     NEWLINE@166..167 "\n"
@@ -51,15 +51,15 @@ DOCUMENT@0..427
     BLANK_LINE@167..168 "\n"
   PARAGRAPH@168..215
     TEXT@168..183 "Adjacent code: "
-    CODE_SPAN@183..190
-      CODE_SPAN_MARKER@183..184 "`"
+    INLINE_CODE@183..190
+      INLINE_CODE_MARKER@183..184 "`"
       TEXT@184..189 "first"
-      CODE_SPAN_MARKER@189..190 "`"
+      INLINE_CODE_MARKER@189..190 "`"
     TEXT@190..195 " and "
-    CODE_SPAN@195..203
-      CODE_SPAN_MARKER@195..196 "`"
+    INLINE_CODE@195..203
+      INLINE_CODE_MARKER@195..196 "`"
       TEXT@196..202 "second"
-      CODE_SPAN_MARKER@202..203 "`"
+      INLINE_CODE_MARKER@202..203 "`"
     TEXT@203..214 " code spans"
     NEWLINE@214..215 "\n"
   BLANK_LINE@215..216
@@ -76,15 +76,15 @@ DOCUMENT@0..427
     TEXT@256..332 "Hard line breaks, whi ..."
     NEWLINE@332..333 "\n"
     TEXT@333..341 "spaces ("
-    CODE_SPAN@341..345
-      CODE_SPAN_MARKER@341..342 "`"
+    INLINE_CODE@341..345
+      INLINE_CODE_MARKER@341..342 "`"
       TEXT@342..344 "  "
-      CODE_SPAN_MARKER@344..345 "`"
+      INLINE_CODE_MARKER@344..345 "`"
     TEXT@345..372 ") or by using a backs ..."
-    CODE_SPAN@372..377
-      CODE_SPAN_MARKER@372..373 "`"
+    INLINE_CODE@372..377
+      INLINE_CODE_MARKER@372..373 "`"
       TEXT@373..376 "\\\\n"
-      CODE_SPAN_MARKER@376..377 "`"
+      INLINE_CODE_MARKER@376..377 "`"
     TEXT@377..411 "), are preserved rega ..."
     NEWLINE@411..412 "\n"
     TEXT@412..426 "wrapping mode:"

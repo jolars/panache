@@ -149,10 +149,10 @@ DOCUMENT@0..1852
       TEXT@466..474 "emphasis"
       EMPHASIS_MARKER@474..475 "*"
     TEXT@475..480 " and "
-    CODE_SPAN@480..486
-      CODE_SPAN_MARKER@480..481 "`"
+    INLINE_CODE@480..486
+      INLINE_CODE_MARKER@480..481 "`"
       TEXT@481..485 "code"
-      CODE_SPAN_MARKER@485..486 "`"
+      INLINE_CODE_MARKER@485..486 "`"
     TEXT@486..487 ":"
     NEWLINE@487..488 "\n"
   BLANK_LINE@488..489
@@ -173,10 +173,10 @@ DOCUMENT@0..1852
       TEXT@520..521 "|"
       WHITESPACE@521..522 " "
       TABLE_CELL@522..530
-        CODE_SPAN@522..530
-          CODE_SPAN_MARKER@522..523 "`"
+        INLINE_CODE@522..530
+          INLINE_CODE_MARKER@522..523 "`"
           TEXT@523..529 "inline"
-          CODE_SPAN_MARKER@529..530 "`"
+          INLINE_CODE_MARKER@529..530 "`"
       WHITESPACE@530..531 " "
       TEXT@531..532 "|"
       NEWLINE@532..533 "\n"
@@ -230,19 +230,19 @@ DOCUMENT@0..1852
       TEXT@1153..1154 "|"
       WHITESPACE@1154..1155 " "
       TABLE_CELL@1155..1162
-        CODE_SPAN@1155..1162
-          CODE_SPAN_MARKER@1155..1156 "`"
+        INLINE_CODE@1155..1162
+          INLINE_CODE_MARKER@1155..1156 "`"
           TEXT@1156..1161 "width"
-          CODE_SPAN_MARKER@1161..1162 "`"
+          INLINE_CODE_MARKER@1161..1162 "`"
       WHITESPACE@1162..1180 "                  "
       TEXT@1180..1181 "|"
       WHITESPACE@1181..1182 " "
       TABLE_CELL@1182..1218
         TEXT@1182..1210 "Width in CSS units. D ..."
-        CODE_SPAN@1210..1217
-          CODE_SPAN_MARKER@1210..1211 "`"
+        INLINE_CODE@1210..1217
+          INLINE_CODE_MARKER@1210..1211 "`"
           TEXT@1211..1216 "1.5in"
-          CODE_SPAN_MARKER@1216..1217 "`"
+          INLINE_CODE_MARKER@1216..1217 "`"
         TEXT@1217..1218 "."
       WHITESPACE@1218..1325 "                      ..."
       TEXT@1325..1326 "|"
@@ -255,15 +255,15 @@ DOCUMENT@0..1852
       TEXT@1503..1504 "|"
       WHITESPACE@1504..1505 " "
       TABLE_CELL@1505..1530
-        CODE_SPAN@1505..1514
-          CODE_SPAN_MARKER@1505..1506 "`"
+        INLINE_CODE@1505..1514
+          INLINE_CODE_MARKER@1505..1506 "`"
           TEXT@1506..1513 "padding"
-          CODE_SPAN_MARKER@1513..1514 "`"
+          INLINE_CODE_MARKER@1513..1514 "`"
         TEXT@1514..1516 ", "
-        CODE_SPAN@1516..1529
-          CODE_SPAN_MARKER@1516..1517 "`"
+        INLINE_CODE@1516..1529
+          INLINE_CODE_MARKER@1516..1517 "`"
           TEXT@1517..1528 "padding-top"
-          CODE_SPAN_MARKER@1528..1529 "`"
+          INLINE_CODE_MARKER@1528..1529 "`"
         TEXT@1529..1530 ","
       TEXT@1530..1531 "|"
       WHITESPACE@1531..1532 " "
@@ -273,10 +273,10 @@ DOCUMENT@0..1852
           LINK_START@1593..1594
             LINK_START@1593..1594 "["
           LINK_TEXT@1594..1603
-            CODE_SPAN@1594..1603
-              CODE_SPAN_MARKER@1594..1595 "`"
+            INLINE_CODE@1594..1603
+              INLINE_CODE_MARKER@1594..1595 "`"
               TEXT@1595..1602 "padding"
-              CODE_SPAN_MARKER@1602..1603 "`"
+              INLINE_CODE_MARKER@1602..1603 "`"
           LINK_TEXT_END@1603..1604 "]"
           LINK_DEST_START@1604..1605 "("
           LINK_DEST@1605..1661

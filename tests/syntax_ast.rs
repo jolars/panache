@@ -496,7 +496,7 @@ fn heading_with_inline_formatting() {
     let has_code = heading
         .syntax()
         .descendants()
-        .any(|n| n.kind() == SyntaxKind::CODE_SPAN);
+        .any(|n| n.kind() == SyntaxKind::INLINE_CODE);
 
     assert!(has_emphasis, "Heading should contain EMPHASIS node");
     assert!(has_code, "Heading should contain CODE_SPAN node");

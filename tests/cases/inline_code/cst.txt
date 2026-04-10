@@ -1,8 +1,8 @@
 DOCUMENT@0..11
   PARAGRAPH@0..11
-    CODE_SPAN@0..10
-      CODE_SPAN_MARKER@0..2 "``"
+    INLINE_CODE@0..10
+      INLINE_CODE_MARKER@0..2 "``"
       TEXT@2..8 " ```r "
-      CODE_SPAN_MARKER@8..10 "``"
+      INLINE_CODE_MARKER@8..10 "``"
     NEWLINE@10..11 "\n"
 

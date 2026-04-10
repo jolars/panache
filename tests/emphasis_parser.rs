@@ -62,7 +62,7 @@ fn code_span_in_emphasis() {
 
     let emphasis = &emphasis_nodes[0];
     assert!(
-        has_child(emphasis, SyntaxKind::CODE_SPAN),
+        has_child(emphasis, SyntaxKind::INLINE_CODE),
         "Emphasis should contain code span as child"
     );
 }
@@ -82,12 +82,12 @@ fn code_span_with_asterisk_in_emphasis() {
 
     let emphasis = &emphasis_nodes[0];
     assert!(
-        has_child(emphasis, SyntaxKind::CODE_SPAN),
+        has_child(emphasis, SyntaxKind::INLINE_CODE),
         "Emphasis should contain code span"
     );
 
     // Verify the code span content includes the asterisk
-    let code_spans = find_nodes(&tree, SyntaxKind::CODE_SPAN);
+    let code_spans = find_nodes(&tree, SyntaxKind::INLINE_CODE);
     assert_eq!(code_spans.len(), 1, "Should have exactly one code span");
 }
 
@@ -202,7 +202,7 @@ fn strong_with_code_span() {
 
     let strong = &strong_nodes[0];
     assert!(
-        has_child(strong, SyntaxKind::CODE_SPAN),
+        has_child(strong, SyntaxKind::INLINE_CODE),
         "Strong should contain code span"
     );
 }
@@ -222,7 +222,7 @@ fn complex_nesting() {
 
     let emphasis = &emphasis_nodes[0];
     assert!(
-        has_child(emphasis, SyntaxKind::CODE_SPAN),
+        has_child(emphasis, SyntaxKind::INLINE_CODE),
         "Should contain code span"
     );
     assert!(has_child(emphasis, SyntaxKind::LINK), "Should contain link");
@@ -609,7 +609,7 @@ fn emphasis_only_code() {
 
     let emphasis = &emphasis_nodes[0];
     assert!(
-        has_child(emphasis, SyntaxKind::CODE_SPAN),
+        has_child(emphasis, SyntaxKind::INLINE_CODE),
         "Emphasis should contain code span"
     );
 }

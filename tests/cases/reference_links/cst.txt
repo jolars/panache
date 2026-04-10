@@ -132,10 +132,10 @@ DOCUMENT@0..1126
         LINK_START@400..401 "["
       LINK_TEXT@401..417
         TEXT@401..411 "text with "
-        CODE_SPAN@411..417
-          CODE_SPAN_MARKER@411..412 "`"
+        INLINE_CODE@411..417
+          INLINE_CODE_MARKER@411..412 "`"
           TEXT@412..416 "code"
-          CODE_SPAN_MARKER@416..417 "`"
+          INLINE_CODE_MARKER@416..417 "`"
       TEXT@417..418 "]"
       TEXT@418..419 "["
       LINK_REF@419..423
@@ -288,15 +288,15 @@ DOCUMENT@0..1126
     TEXT@990..1053 "implicit heading refe ..."
     NEWLINE@1053..1054 "\n"
     TEXT@1054..1073 "link will point to "
-    CODE_SPAN@1073..1078
-      CODE_SPAN_MARKER@1073..1074 "`"
+    INLINE_CODE@1073..1078
+      INLINE_CODE_MARKER@1073..1074 "`"
       TEXT@1074..1077 "bar"
-      CODE_SPAN_MARKER@1077..1078 "`"
+      INLINE_CODE_MARKER@1077..1078 "`"
     TEXT@1078..1087 ", not to "
-    CODE_SPAN@1087..1093
-      CODE_SPAN_MARKER@1087..1088 "`"
+    INLINE_CODE@1087..1093
+      INLINE_CODE_MARKER@1087..1088 "`"
       TEXT@1088..1092 "#foo"
-      CODE_SPAN_MARKER@1092..1093 "`"
+      INLINE_CODE_MARKER@1092..1093 "`"
     TEXT@1093..1094 ":"
     NEWLINE@1094..1095 "\n"
   BLANK_LINE@1095..1096

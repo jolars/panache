@@ -71,7 +71,7 @@ impl AstNode for CodeSpan {
     type Language = PanacheLanguage;
 
     fn can_cast(kind: SyntaxKind) -> bool {
-        kind == SyntaxKind::CODE_SPAN
+        kind == SyntaxKind::INLINE_CODE
     }
 
     fn cast(syntax: SyntaxNode) -> Option<Self> {
@@ -91,7 +91,7 @@ impl CodeSpan {
     pub fn marker(&self) -> Option<String> {
         self.0.children_with_tokens().find_map(|child| {
             child.into_token().and_then(|token| {
-                (token.kind() == SyntaxKind::CODE_SPAN_MARKER).then(|| token.text().to_string())
+                (token.kind() == SyntaxKind::INLINE_CODE_MARKER).then(|| token.text().to_string())
             })
         })
     }
@@ -100,7 +100,7 @@ impl CodeSpan {
         self.0
             .children_with_tokens()
             .filter_map(|child| child.into_token())
-            .filter(|token| token.kind() != SyntaxKind::CODE_SPAN_MARKER)
+            .filter(|token| token.kind() != SyntaxKind::INLINE_CODE_MARKER)
             .map(|token| token.text().to_string())
             .collect::<Vec<_>>()
             .join("")
@@ -111,7 +111,7 @@ impl CodeSpan {
             .0
             .children_with_tokens()
             .filter_map(|child| child.into_token())
-            .filter(|token| token.kind() == SyntaxKind::CODE_SPAN_MARKER);
+            .filter(|token| token.kind() == SyntaxKind::INLINE_CODE_MARKER);
 
         let start = markers.next()?.text_range().end();
         let end = markers.next()?.text_range().start();

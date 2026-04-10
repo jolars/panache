@@ -107,10 +107,10 @@ DOCUMENT@0..493
       TEXT@289..290 "|"
       WHITESPACE@290..291 " "
       TABLE_CELL@291..294
-        CODE_SPAN@291..294
-          CODE_SPAN_MARKER@291..292 "`"
+        INLINE_CODE@291..294
+          INLINE_CODE_MARKER@291..292 "`"
           TEXT@292..293 "A"
-          CODE_SPAN_MARKER@293..294 "`"
+          INLINE_CODE_MARKER@293..294 "`"
       WHITESPACE@294..298 "    "
       TEXT@298..299 "|"
       WHITESPACE@299..300 " "

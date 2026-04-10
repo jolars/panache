@@ -121,10 +121,10 @@ DOCUMENT@0..520
           TEXT@346..350 "bold"
           STRONG_MARKER@350..352 "**"
         TEXT@352..357 " and "
-        CODE_SPAN@357..363
-          CODE_SPAN_MARKER@357..358 "`"
+        INLINE_CODE@357..363
+          INLINE_CODE_MARKER@357..358 "`"
           TEXT@358..362 "code"
-          CODE_SPAN_MARKER@362..363 "`"
+          INLINE_CODE_MARKER@362..363 "`"
       TEXT@363..364 "]"
       TEXT@364..365 "["
       LINK_REF@365..369

@@ -2680,7 +2680,7 @@ mod multiline_table_tests {
         // Should have CODE_SPAN child
         let children: Vec<_> = node.children().collect();
         assert_eq!(children.len(), 1);
-        assert_eq!(children[0].kind(), SyntaxKind::CODE_SPAN);
+        assert_eq!(children[0].kind(), SyntaxKind::INLINE_CODE);
     }
 
     #[test]

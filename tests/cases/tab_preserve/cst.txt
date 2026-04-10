@@ -6,15 +6,15 @@ DOCUMENT@0..135
     BLANK_LINE@48..49 "\n"
   PARAGRAPH@49..104
     TEXT@49..77 "Inline code preserves ..."
-    CODE_SPAN@77..87
-      CODE_SPAN_MARKER@77..78 "`"
+    INLINE_CODE@77..87
+      INLINE_CODE_MARKER@77..78 "`"
       TEXT@78..86 "tab\tcode"
-      CODE_SPAN_MARKER@86..87 "`"
+      INLINE_CODE_MARKER@86..87 "`"
     TEXT@87..92 " and "
-    CODE_SPAN@92..102
-      CODE_SPAN_MARKER@92..93 "`"
+    INLINE_CODE@92..102
+      INLINE_CODE_MARKER@92..93 "`"
       TEXT@93..101 "code\tend"
-      CODE_SPAN_MARKER@101..102 "`"
+      INLINE_CODE_MARKER@101..102 "`"
     TEXT@102..103 "."
     NEWLINE@103..104 "\n"
   BLANK_LINE@104..105

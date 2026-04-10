@@ -91,7 +91,7 @@ pub(crate) fn emit_inline_executable(
     builder: &mut GreenNodeBuilder,
     m: &InlineExecutableMatch<'_>,
 ) {
-    builder.start_node(SyntaxKind::INLINE_EXECUTABLE_CODE.into());
+    builder.start_node(SyntaxKind::INLINE_EXEC.into());
     builder.token(
         SyntaxKind::INLINE_EXEC_MARKER.into(),
         &"`".repeat(m.backtick_count),
@@ -105,7 +105,7 @@ pub(crate) fn emit_inline_executable(
     };
     builder.token(SyntaxKind::INLINE_EXEC_LANG.into(), lang);
     builder.token(SyntaxKind::WHITESPACE.into(), m.spacing_after_marker);
-    builder.token(SyntaxKind::INLINE_EXEC_CODE.into(), m.code);
+    builder.token(SyntaxKind::INLINE_EXEC_CONTENT.into(), m.code);
     builder.token(
         SyntaxKind::INLINE_EXEC_MARKER.into(),
         &"`".repeat(m.backtick_count),

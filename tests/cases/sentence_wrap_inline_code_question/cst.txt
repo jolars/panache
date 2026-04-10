@@ -1,0 +1,49 @@
+DOCUMENT@0..222
+  PARAGRAPH@0..222
+    INLINE_CODE@0..3
+      INLINE_CODE_MARKER@0..1 "`"
+      TEXT@1..2 "?"
+      INLINE_CODE_MARKER@2..3 "`"
+    TEXT@3..8 " and "
+    INLINE_CODE@8..16
+      INLINE_CODE_MARKER@8..9 "`"
+      TEXT@9..15 "help()"
+      INLINE_CODE_MARKER@15..16 "`"
+    TEXT@16..41 " look for topic alias ..."
+    INLINE_CODE@41..47
+      INLINE_CODE_MARKER@41..42 "`"
+      TEXT@42..46 "?foo"
+      INLINE_CODE_MARKER@46..47 "`"
+    TEXT@47..86 " will find any topic  ..."
+    INLINE_CODE@86..91
+      INLINE_CODE_MARKER@86..87 "`"
+      TEXT@87..90 "foo"
+      INLINE_CODE_MARKER@90..91 "`"
+    TEXT@91..134 " alias. As well as lo ..."
+    INLINE_CODE@134..149
+      INLINE_CODE_MARKER@134..135 "`"
+      TEXT@135..148 "help.search()"
+      INLINE_CODE_MARKER@148..149 "`"
+    TEXT@149..154 " and "
+    INLINE_CODE@154..159
+      INLINE_CODE_MARKER@154..155 "`"
+      TEXT@155..158 "???"
+      INLINE_CODE_MARKER@158..159 "`"
+    TEXT@159..177 " also look in the "
+    INLINE_CODE@177..185
+      INLINE_CODE_MARKER@177..178 "`"
+      TEXT@178..184 "@title"
+      INLINE_CODE_MARKER@184..185 "`"
+    TEXT@185..187 ", "
+    INLINE_CODE@187..198
+      INLINE_CODE_MARKER@187..188 "`"
+      TEXT@188..197 "@keywords"
+      INLINE_CODE_MARKER@197..198 "`"
+    TEXT@198..204 ", and "
+    INLINE_CODE@204..214
+      INLINE_CODE_MARKER@204..205 "`"
+      TEXT@205..213 "@concept"
+      INLINE_CODE_MARKER@213..214 "`"
+    TEXT@214..221 "s tags."
+    NEWLINE@221..222 "\n"
+

@@ -55,7 +55,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             }
             result
         }
-        SyntaxKind::CODE_SPAN => {
+        SyntaxKind::INLINE_CODE => {
             let mut content = String::new();
             let mut attributes = String::new();
             let mut marker_len = 1usize;
@@ -71,7 +71,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                             skip_marker_whitespace = true;
                         } else if t.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace {
                             skip_marker_whitespace = false;
-                        } else if t.kind() == SyntaxKind::CODE_SPAN_MARKER {
+                        } else if t.kind() == SyntaxKind::INLINE_CODE_MARKER {
                             skip_marker_whitespace = false;
                             marker_len = marker_len.max(t.text().len());
                         } else if t.kind() != SyntaxKind::ATTRIBUTE {
@@ -140,7 +140,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 attributes
             )
         }
-        SyntaxKind::INLINE_EXECUTABLE_CODE => {
+        SyntaxKind::INLINE_EXEC => {
             let mut prefix = String::new();
             let mut spacing = String::from(" ");
             let mut code = String::new();
@@ -150,7 +150,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                     match t.kind() {
                         SyntaxKind::TEXT => prefix.push_str(t.text()),
                         SyntaxKind::WHITESPACE => spacing = t.text().to_string(),
-                        SyntaxKind::INLINE_EXEC_CODE => code.push_str(t.text()),
+                        SyntaxKind::INLINE_EXEC_CONTENT => code.push_str(t.text()),
                         _ => {}
                     }
                 }

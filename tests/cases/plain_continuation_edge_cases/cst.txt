@@ -149,10 +149,10 @@ DOCUMENT@0..1248
             STRONG_MARKER@588..590 "**"
           NEWLINE@590..591 "\n"
           TEXT@591..610 "    continues with "
-          CODE_SPAN@610..616
-            CODE_SPAN_MARKER@610..611 "`"
+          INLINE_CODE@610..616
+            INLINE_CODE_MARKER@610..611 "`"
             TEXT@611..615 "code"
-            CODE_SPAN_MARKER@615..616 "`"
+            INLINE_CODE_MARKER@615..616 "`"
           TEXT@616..629 " on next line"
           NEWLINE@629..630 "\n"
           TEXT@630..638 "    and "

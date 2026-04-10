@@ -94,10 +94,10 @@ DOCUMENT@0..472
     BLANK_LINE@414..415 "\n"
   PARAGRAPH@415..472
     TEXT@415..460 "In inline code tabs a ..."
-    CODE_SPAN@460..470
-      CODE_SPAN_MARKER@460..461 "`"
+    INLINE_CODE@460..470
+      INLINE_CODE_MARKER@460..461 "`"
       TEXT@461..469 "tab\tcode"
-      CODE_SPAN_MARKER@469..470 "`"
+      INLINE_CODE_MARKER@469..470 "`"
     TEXT@470..471 "."
     NEWLINE@471..472 "\n"
 

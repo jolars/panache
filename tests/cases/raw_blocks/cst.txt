@@ -10,10 +10,10 @@ DOCUMENT@0..496
     BLANK_LINE@18..19 "\n"
   PARAGRAPH@19..61
     TEXT@19..34 "This tests the "
-    CODE_SPAN@34..49
-      CODE_SPAN_MARKER@34..35 "`"
+    INLINE_CODE@34..49
+      INLINE_CODE_MARKER@34..35 "`"
       TEXT@35..48 "raw_attribute"
-      CODE_SPAN_MARKER@48..49 "`"
+      INLINE_CODE_MARKER@48..49 "`"
     TEXT@49..60 " extension."
     NEWLINE@60..61 "\n"
   BLANK_LINE@61..62
