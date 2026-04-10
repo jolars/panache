@@ -1,0 +1,683 @@
+//! Math parsing for both inline and display math.
+//!
+//! This module handles all math-related parsing:
+//! - **Inline math**: `$...$`, `\(...\)`, `\\(...\\)` - single line only
+//! - **Display math**: `$$...$$`, `\[...\]`, `\\[...\\]` - can span multiple lines
+//!
+//! Display math can appear both inline (within paragraphs) and as block-level elements.
+//! The parsing functions return `Option<(usize, &str)>` tuples containing the length
+//! consumed and the math content, allowing calling contexts to emit appropriate nodes.
+
+use crate::parser::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
+use crate::syntax::SyntaxKind;
+use rowan::GreenNodeBuilder;
+
+/// Try to parse an inline math span starting at the current position.
+/// Returns the number of characters consumed if successful, or None if not inline math.
+///
+/// Per Pandoc spec (tex_math_dollars extension):
+/// - Opening $ must have non-space character immediately to its right
+/// - Closing $ must have non-space character immediately to its left
+/// - Closing $ must not be followed immediately by a digit
+pub fn try_parse_inline_math(text: &str) -> Option<(usize, &str)> {
+    // Must start with exactly one $
+    if !text.starts_with('$') || text.starts_with("$$") {
+        return None;
+    }
+
+    let rest = &text[1..];
+
+    // Opening $ must have non-space character immediately to its right
+    if rest.is_empty() || rest.starts_with(char::is_whitespace) {
+        return None;
+    }
+
+    // Look for closing $
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '$' {
+            // Check if it's escaped
+            if pos > 0 && rest.as_bytes()[pos - 1] == b'\\' {
+                // Escaped dollar, continue searching
+                pos += 1;
+                continue;
+            }
+
+            // Closing $ must have non-space character immediately to its left
+            if pos == 0 || rest[..pos].ends_with(char::is_whitespace) {
+                // Continue searching - this $ doesn't close the math
+                pos += 1;
+                continue;
+            }
+
+            // Closing $ must not be followed immediately by a digit
+            if let Some(next_ch) = rest[pos + 1..].chars().next()
+                && next_ch.is_ascii_digit()
+            {
+                // Continue searching - this $ doesn't close the math
+                pos += 1;
+                continue;
+            }
+
+            // Found valid closing $
+            let math_content = &rest[..pos];
+            let total_len = 1 + pos + 1; // opening $ + content + closing $
+            return Some((total_len, math_content));
+        }
+
+        // Dollar signs can't span multiple lines
+        if ch == '\n' {
+            return None;
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    // No matching close found
+    None
+}
+
+/// Try to parse GFM inline math: $`...`$
+/// Extension: tex_math_gfm
+pub fn try_parse_gfm_inline_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with("$`") {
+        return None;
+    }
+
+    let rest = &text[2..];
+    if rest.is_empty() {
+        return None;
+    }
+
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+        if ch == '\n' {
+            return None;
+        }
+        if rest[pos..].starts_with("`$") {
+            if pos == 0 {
+                return None;
+            }
+            let math_content = &rest[..pos];
+            let total_len = 2 + pos + 2; // $` + content + `$
+            return Some((total_len, math_content));
+        }
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
+/// Try to parse single backslash inline math: \(...\)
+/// Extension: tex_math_single_backslash
+pub fn try_parse_single_backslash_inline_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with(r"\(") {
+        return None;
+    }
+
+    let rest = &text[2..]; // Skip \(
+
+    // Look for closing \)
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '\\' && rest[pos..].starts_with(r"\)") {
+            // Found closing \)
+            let math_content = &rest[..pos];
+            let total_len = 2 + pos + 2; // \( + content + \)
+            return Some((total_len, math_content));
+        }
+
+        // Can't span multiple lines
+        if ch == '\n' {
+            return None;
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
+/// Try to parse double backslash inline math: \\(...\\)
+/// Extension: tex_math_double_backslash
+pub fn try_parse_double_backslash_inline_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with(r"\\(") {
+        return None;
+    }
+
+    let rest = &text[3..]; // Skip \\(
+
+    // Look for closing \\)
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '\\' && rest[pos..].starts_with(r"\\)") {
+            // Found closing \\)
+            let math_content = &rest[..pos];
+            let total_len = 3 + pos + 3; // \\( + content + \\)
+            return Some((total_len, math_content));
+        }
+
+        // Can't span multiple lines
+        if ch == '\n' {
+            return None;
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
+/// Try to parse display math ($$...$$) starting at the current position.
+/// Returns the number of characters consumed and the math content if successful.
+/// Display math can span multiple lines in inline contexts.
+///
+/// Per Pandoc spec (tex_math_dollars extension):
+/// - Opening delimiter is at least $$
+/// - Closing delimiter must have at least as many $ as opening
+/// - Content can span multiple lines
+pub fn try_parse_display_math(text: &str) -> Option<(usize, &str)> {
+    // Must start with at least $$
+    if !text.starts_with("$$") {
+        return None;
+    }
+
+    // Count opening dollar signs
+    let opening_count = text.chars().take_while(|&c| c == '$').count();
+    if opening_count < 2 {
+        return None;
+    }
+
+    let rest = &text[opening_count..];
+
+    // Look for matching closing delimiter
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '$' {
+            // Check if it's escaped
+            if pos > 0 && rest.as_bytes()[pos - 1] == b'\\' {
+                // Escaped dollar, continue searching
+                pos += ch.len_utf8();
+                continue;
+            }
+
+            // Count closing dollar signs
+            let closing_count = rest[pos..].chars().take_while(|&c| c == '$').count();
+
+            // Must have at least as many closing dollars as opening
+            if closing_count >= opening_count {
+                let math_content = &rest[..pos];
+                let total_len = opening_count + pos + closing_count;
+                return Some((total_len, math_content));
+            }
+
+            // Not enough dollars, skip this run and continue
+            pos += closing_count;
+            continue;
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    // No matching close found
+    None
+}
+
+/// Try to parse single backslash display math: \[...\]
+/// Extension: tex_math_single_backslash
+///
+/// Per Pandoc spec:
+/// - Content can span multiple lines
+/// - No escape handling needed (backslash is the delimiter)
+pub fn try_parse_single_backslash_display_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with(r"\[") {
+        return None;
+    }
+
+    let rest = &text[2..]; // Skip \[
+
+    // Look for closing \]
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '\\' && rest[pos..].starts_with(r"\]") {
+            // Found closing \]
+            let math_content = &rest[..pos];
+            let total_len = 2 + pos + 2; // \[ + content + \]
+            return Some((total_len, math_content));
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
+/// Try to parse double backslash display math: \\[...\\]
+/// Extension: tex_math_double_backslash
+///
+/// Per Pandoc spec:
+/// - Content can span multiple lines
+/// - Double backslash is the delimiter
+pub fn try_parse_double_backslash_display_math(text: &str) -> Option<(usize, &str)> {
+    if !text.starts_with(r"\\[") {
+        return None;
+    }
+
+    let rest = &text[3..]; // Skip \\[
+
+    // Look for closing \\]
+    let mut pos = 0;
+    while pos < rest.len() {
+        let ch = rest[pos..].chars().next()?;
+
+        if ch == '\\' && rest[pos..].starts_with(r"\\]") {
+            // Found closing \\]
+            let math_content = &rest[..pos];
+            let total_len = 3 + pos + 3; // \\[ + content + \\]
+            return Some((total_len, math_content));
+        }
+
+        pos += ch.len_utf8();
+    }
+
+    None
+}
+
+/// Try to parse a LaTeX math environment (\begin{equation}...\end{equation})
+/// as display math. Returns (total_len, begin_marker, content, end_marker).
+pub fn try_parse_math_environment(text: &str) -> Option<(usize, &str, &str, &str)> {
+    let env_name = extract_environment_name(text)?;
+    if !is_inline_math_environment(&env_name) {
+        return None;
+    }
+
+    let begin_marker_len = text.find('}')? + 1;
+    let begin_marker = &text[..begin_marker_len];
+    let end_marker = format!("\\end{{{}}}", env_name);
+
+    let after_begin = &text[begin_marker_len..];
+    let end_rel = after_begin.find(&end_marker)?;
+    let end_start = begin_marker_len + end_rel;
+    let end_marker_end = end_start + end_marker.len();
+
+    let mut end_line_end = end_marker_end;
+    while end_line_end < text.len() {
+        let ch = text[end_line_end..].chars().next()?;
+        if ch == '\n' || ch == '\r' {
+            break;
+        }
+        end_line_end += ch.len_utf8();
+    }
+
+    if end_line_end < text.len() {
+        if text[end_line_end..].starts_with("\r\n") {
+            end_line_end += 2;
+        } else {
+            end_line_end += 1;
+        }
+    }
+
+    let content = &text[begin_marker_len..end_start];
+    let end_marker_text = &text[end_start..end_line_end];
+    Some((end_line_end, begin_marker, content, end_marker_text))
+}
+
+/// Emit an inline math node to the builder.
+pub fn emit_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::INLINE_MATH.into());
+
+    // Opening $
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "$");
+
+    // Math content
+    builder.token(SyntaxKind::TEXT.into(), content);
+
+    // Closing $
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "$");
+
+    builder.finish_node();
+}
+
+/// Emit a GFM inline math node: $`...`$
+pub fn emit_gfm_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::INLINE_MATH.into());
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "$`");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), "`$");
+    builder.finish_node();
+}
+
+/// Emit a single backslash inline math node: \(...\)
+pub fn emit_single_backslash_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::INLINE_MATH.into());
+
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), r"\(");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), r"\)");
+
+    builder.finish_node();
+}
+
+/// Emit a double backslash inline math node: \\(...\\)
+pub fn emit_double_backslash_inline_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::INLINE_MATH.into());
+
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), r"\\(");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::INLINE_MATH_MARKER.into(), r"\\)");
+
+    builder.finish_node();
+}
+
+/// Emit a display math node to the builder (when occurring inline in paragraph).
+pub fn emit_display_math(builder: &mut GreenNodeBuilder, content: &str, dollar_count: usize) {
+    builder.start_node(SyntaxKind::DISPLAY_MATH.into());
+
+    // Opening $$
+    let marker = "$".repeat(dollar_count);
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), &marker);
+
+    // Math content
+    builder.token(SyntaxKind::TEXT.into(), content);
+
+    // Closing $$
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), &marker);
+
+    builder.finish_node();
+}
+
+/// Emit a display math environment node using raw \begin...\end... markers.
+pub fn emit_display_math_environment(
+    builder: &mut GreenNodeBuilder,
+    begin_marker: &str,
+    content: &str,
+    end_marker: &str,
+) {
+    builder.start_node(SyntaxKind::DISPLAY_MATH.into());
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), begin_marker);
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), end_marker);
+    builder.finish_node();
+}
+
+/// Emit a single backslash display math node: \[...\]
+pub fn emit_single_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::DISPLAY_MATH.into());
+
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), r"\[");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), r"\]");
+
+    builder.finish_node();
+}
+
+/// Emit a double backslash display math node: \\[...\\]
+pub fn emit_double_backslash_display_math(builder: &mut GreenNodeBuilder, content: &str) {
+    builder.start_node(SyntaxKind::DISPLAY_MATH.into());
+
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), r"\\[");
+    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::DISPLAY_MATH_MARKER.into(), r"\\]");
+
+    builder.finish_node();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_simple_inline_math() {
+        let result = try_parse_inline_math("$x = y$");
+        assert_eq!(result, Some((7, "x = y")));
+    }
+
+    #[test]
+    fn test_parse_inline_math_with_spaces_inside() {
+        // Spaces inside math are OK, just not immediately after opening or before closing
+        let result = try_parse_inline_math("$a + b$");
+        assert_eq!(result, Some((7, "a + b")));
+    }
+
+    #[test]
+    fn test_parse_inline_math_complex() {
+        let result = try_parse_inline_math(r"$\frac{1}{2}$");
+        assert_eq!(result, Some((13, r"\frac{1}{2}")));
+    }
+
+    #[test]
+    fn test_not_inline_math_display() {
+        // $$ is display math, not inline
+        let result = try_parse_inline_math("$$x = y$$");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_inline_math_no_close() {
+        let result = try_parse_inline_math("$no close");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_inline_math_no_multiline() {
+        let result = try_parse_inline_math("$x =\ny$");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_not_inline_math() {
+        let result = try_parse_inline_math("no dollar");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_inline_math_with_trailing_text() {
+        let result = try_parse_inline_math("$x$ and more");
+        assert_eq!(result, Some((3, "x")));
+    }
+
+    #[test]
+    fn test_inline_math_escaped_dollar() {
+        // Currently we don't handle escaped dollars - this is a TODO
+        // This test documents current behavior
+        let result = try_parse_inline_math(r"$a \$ b$");
+        // This should find the first unescaped $, but our simple impl
+        // will find the escaped one. We'll improve this later.
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_spec_opening_must_have_non_space_right() {
+        // Per Pandoc spec: opening $ must have non-space immediately to right
+        let result = try_parse_inline_math("$ x$");
+        assert_eq!(result, None, "Opening $ with space should not parse");
+    }
+
+    #[test]
+    fn test_spec_closing_must_have_non_space_left() {
+        // Per Pandoc spec: closing $ must have non-space immediately to left
+        let result = try_parse_inline_math("$x $");
+        assert_eq!(result, None, "Closing $ with space should not parse");
+    }
+
+    #[test]
+    fn test_spec_closing_not_followed_by_digit() {
+        // Per Pandoc spec: closing $ must not be followed by digit
+        let result = try_parse_inline_math("$x$5");
+        assert_eq!(result, None, "Closing $ followed by digit should not parse");
+    }
+
+    #[test]
+    fn test_spec_dollar_amounts() {
+        // $20,000 should not parse as math
+        let result = try_parse_inline_math("$20,000");
+        assert_eq!(result, None, "Dollar amounts should not parse as math");
+    }
+
+    #[test]
+    fn test_valid_math_after_spec_checks() {
+        // $x$ alone should still parse
+        let result = try_parse_inline_math("$x$");
+        assert_eq!(result, Some((3, "x")), "Valid math should parse");
+    }
+
+    #[test]
+    fn test_math_followed_by_non_digit() {
+        // $x$a should parse (not followed by digit)
+        let result = try_parse_inline_math("$x$a");
+        assert_eq!(
+            result,
+            Some((3, "x")),
+            "Math followed by non-digit should parse"
+        );
+    }
+
+    // Display math tests
+    #[test]
+    fn test_parse_display_math_simple() {
+        let result = try_parse_display_math("$$x = y$$");
+        assert_eq!(result, Some((9, "x = y")));
+    }
+
+    #[test]
+    fn test_parse_display_math_multiline() {
+        let result = try_parse_display_math("$$\nx = y\n$$");
+        assert_eq!(result, Some((11, "\nx = y\n")));
+    }
+
+    #[test]
+    fn test_parse_display_math_triple_dollars() {
+        let result = try_parse_display_math("$$$x = y$$$");
+        assert_eq!(result, Some((11, "x = y")));
+    }
+
+    #[test]
+    fn test_parse_display_math_no_close() {
+        let result = try_parse_display_math("$$no close");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_not_display_math() {
+        let result = try_parse_display_math("$single dollar");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_display_math_with_trailing_text() {
+        let result = try_parse_display_math("$$x = y$$ and more");
+        assert_eq!(result, Some((9, "x = y")));
+    }
+
+    // Single backslash math tests
+    #[test]
+    fn test_single_backslash_inline_math() {
+        let result = try_parse_single_backslash_inline_math(r"\(x^2\)");
+        assert_eq!(result, Some((7, "x^2")));
+    }
+
+    #[test]
+    fn test_single_backslash_inline_math_complex() {
+        let result = try_parse_single_backslash_inline_math(r"\(\frac{a}{b}\)");
+        assert_eq!(result, Some((15, r"\frac{a}{b}")));
+    }
+
+    #[test]
+    fn test_single_backslash_inline_math_no_close() {
+        let result = try_parse_single_backslash_inline_math(r"\(no close");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_single_backslash_inline_math_no_multiline() {
+        let result = try_parse_single_backslash_inline_math("\\(x =\ny\\)");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_single_backslash_display_math() {
+        let result = try_parse_single_backslash_display_math(r"\[E = mc^2\]");
+        assert_eq!(result, Some((12, "E = mc^2")));
+    }
+
+    #[test]
+    fn test_single_backslash_display_math_multiline() {
+        let result = try_parse_single_backslash_display_math("\\[\nx = y\n\\]");
+        assert_eq!(result, Some((11, "\nx = y\n")));
+    }
+
+    #[test]
+    fn test_single_backslash_display_math_no_close() {
+        let result = try_parse_single_backslash_display_math(r"\[no close");
+        assert_eq!(result, None);
+    }
+
+    // Double backslash math tests
+    #[test]
+    fn test_double_backslash_inline_math() {
+        let result = try_parse_double_backslash_inline_math(r"\\(x^2\\)");
+        assert_eq!(result, Some((9, "x^2")));
+    }
+
+    #[test]
+    fn test_double_backslash_inline_math_complex() {
+        let result = try_parse_double_backslash_inline_math(r"\\(\alpha + \beta\\)");
+        assert_eq!(result, Some((20, r"\alpha + \beta")));
+    }
+
+    #[test]
+    fn test_double_backslash_inline_math_no_close() {
+        let result = try_parse_double_backslash_inline_math(r"\\(no close");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_double_backslash_inline_math_no_multiline() {
+        let result = try_parse_double_backslash_inline_math("\\\\(x =\ny\\\\)");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_double_backslash_display_math() {
+        let result = try_parse_double_backslash_display_math(r"\\[E = mc^2\\]");
+        assert_eq!(result, Some((14, "E = mc^2")));
+    }
+
+    #[test]
+    fn test_double_backslash_display_math_multiline() {
+        let result = try_parse_double_backslash_display_math("\\\\[\nx = y\n\\\\]");
+        assert_eq!(result, Some((13, "\nx = y\n")));
+    }
+
+    #[test]
+    fn test_double_backslash_display_math_no_close() {
+        let result = try_parse_double_backslash_display_math(r"\\[no close");
+        assert_eq!(result, None);
+    }
+
+    // Additional edge case tests
+    #[test]
+    fn test_display_math_escaped_dollar() {
+        // Escaped dollar should be skipped
+        let result = try_parse_display_math(r"$$a = \$100$$");
+        assert_eq!(result, Some((13, r"a = \$100")));
+    }
+
+    #[test]
+    fn test_display_math_with_content_on_fence_line() {
+        // Content can appear on same line as opening delimiter
+        let result = try_parse_display_math("$$x = y\n$$");
+        assert_eq!(result, Some((10, "x = y\n")));
+    }
+}

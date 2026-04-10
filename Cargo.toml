@@ -18,6 +18,7 @@ authors = ["Johan Larsson <johan@jolars.co>"]
 
 [workspace]
 members = [
+    "crates/panache-parser",
     "crates/panache-wasm",
 ]
 
@@ -30,6 +31,7 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [dependencies]
+panache-parser = { path = "crates/panache-parser", version = "2.32.0" }
 annotate-snippets = "0.12.15"
 clap = { version = "4.6.0", features = ["derive", "env"], optional = true }
 dirs = "6.0.0"

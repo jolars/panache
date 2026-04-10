@@ -1,0 +1,33 @@
+[package]
+name = "panache-parser"
+version = "2.32.0"
+edition = "2024"
+readme = "../../README.md"
+description = "Lossless CST parser and syntax wrappers for Pandoc markdown, Quarto, and RMarkdown"
+license = "MIT"
+repository = "https://github.com/jolars/panache"
+homepage = "https://jolars.github.io/panache"
+keywords = ["quarto", "pandoc", "markdown", "parser", "syntax"]
+categories = [
+    "text-processing",
+    "parsing",
+    "parser-implementations",
+]
+authors = ["Johan Larsson <johan@jolars.co>"]
+
+[dependencies]
+globset = "0.4"
+rowan = "0.16.1"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0"
+yaml_parser = "0.3.0"
+pretty_yaml = "0.6.0"
+regex = "1.12.2"
+log = { version = "0.4.28", features = ["release_max_level_info"] }
+toml = "1.1.2"
+unicode-width = "0.2"
+env_logger = "0.11.10"
+
+[dev-dependencies]
+similar-asserts = "2.0.0"
+insta = { version = "1.47.2", features = ["json"] }

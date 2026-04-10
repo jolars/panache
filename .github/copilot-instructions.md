@@ -105,13 +105,14 @@ RUST_LOG=info ./target/release/panache format document.qmd
 - Pattern borrowed from rust-analyzer
 - Example: `Heading::cast(node).level()` returns `1` without exposing `#`
   markers
-- Located in `src/syntax/{headings,links,tables,references}.rs`
+- Located in
+  `crates/panache-parser/src/syntax/{headings,links,tables,references}.rs`
 
 ### Single-Pass Parsing Architecture
 
-**Parser** (`src/parser/`):
+**Parser** (`crates/panache-parser/src/parser/`):
 
-1. **Parser** (`src/parser/core.rs`):
+1. **Parser** (`crates/panache-parser/src/parser/core.rs`):
    - Main parsing implementation in `Parser` struct
    - Parses block structures (headings, code blocks, paragraphs, tables, lists,
      etc.) in a single forward pass
@@ -125,7 +126,8 @@ RUST_LOG=info ./target/release/panache format document.qmd
    - Recursive for nested elements (e.g., emphasis in links)
    - Available in `inlines/` directory for specific constructs
 
-3. **Block Dispatcher** (`src/parser/block_dispatcher.rs`):
+3. **Block Dispatcher**
+   (`crates/panache-parser/src/parser/block_dispatcher.rs`):
    - Centralized block detection via `detect_prepared()` and emission via
      `parse_prepared()` (legacy `can_parse/parse` removed)
    - Carries prepared payloads (e.g., blockquote markers, list metadata) to
@@ -277,7 +279,7 @@ panache lint --fix document.qmd   # Apply auto-fixes
 
 Instead of listing every file, understand the patterns:
 
-**Parser modules** (`src/parser/`):
+**Parser modules** (`crates/panache-parser/src/parser/`):
 
 - `core.rs`: Main `Parser` struct and orchestration logic
 - `blocks/`: Block-level constructs (headings, tables, lists, paragraphs, etc.)
@@ -295,7 +297,7 @@ Instead of listing every file, understand the patterns:
 - Core orchestration in `core.rs`
 - Public API limited to `format_tree()` and `format_tree_async()`
 
-**Syntax modules** (`src/syntax/`):
+**Syntax modules** (`crates/panache-parser/src/syntax/`):
 
 - `kind.rs`: SyntaxKind enum
 - `ast.rs`: AstNode trait
@@ -310,9 +312,9 @@ Instead of listing every file, understand the patterns:
   `tests/fixtures/yaml-test-suite/` refreshed via
   `scripts/update-yaml-test-suite-fixtures.sh`; incremental coverage is tracked
   by `tests/yaml/allowlist.txt`.
-- Long-term YAML parser groundwork lives in `src/parser/yaml.rs`; treat it as an
-  incremental, shadow-mode-first effort toward full CST/LSP/formatting
-  integration.
+- Long-term YAML parser groundwork lives in
+  `crates/panache-parser/src/parser/yaml.rs`; treat it as an incremental,
+  shadow-mode-first effort toward full CST/LSP/formatting integration.
 - This YAML work is intentionally long-horizon (many months). Do not frame it as
   a near-term replacement for the existing `yaml_parser` dependency.
 

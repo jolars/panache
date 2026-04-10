@@ -856,6 +856,7 @@ dependencies = [
  "ignore",
  "insta",
  "log",
+ "panache-parser",
  "predicates",
  "pretty_yaml",
  "rayon",
@@ -874,6 +875,25 @@ dependencies = [
  "uuid",
  "which",
  "wincode",
+ "yaml_parser",
+]
+
+[[package]]
+name = "panache-parser"
+version = "2.32.0"
+dependencies = [
+ "env_logger",
+ "globset",
+ "insta",
+ "log",
+ "pretty_yaml",
+ "regex",
+ "rowan",
+ "serde",
+ "serde_json",
+ "similar-asserts",
+ "toml",
+ "unicode-width",
  "yaml_parser",
 ]
 

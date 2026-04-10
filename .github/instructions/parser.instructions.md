@@ -1,5 +1,5 @@
 ---
-applyTo: "src/parser/**/*.rs,src/parser.rs,src/syntax/**/*.rs,src/syntax.rs"
+applyTo: "crates/panache-parser/src/parser/**/*.rs,crates/panache-parser/src/parser.rs,crates/panache-parser/src/syntax/**/*.rs,crates/panache-parser/src/syntax.rs,src/parser.rs,src/syntax.rs"
 ---
 
 Parser and syntax changes must preserve lossless CST behavior.

@@ -4,12 +4,12 @@ tasks:
   lint:
     desc: Run linter
     cmds:
-      - cargo clippy --all-targets --all-features -- -D warnings
+      - cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   format:
     desc: Check code formatting
     cmds:
-      - cargo fmt --
+      - cargo fmt --workspace --
 
   build-release:
     desc: Build release version
@@ -19,7 +19,7 @@ tasks:
   test:
     desc: Run tests
     cmds:
-      - cargo test
+      - cargo test --workspace
 
   test-debug:
     desc: Run tests with debug logging

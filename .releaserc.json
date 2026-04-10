@@ -56,6 +56,22 @@
             "from": "version = \"[0-9]+\\.[0-9]+\\.[0-9]+\"",
             "to": "version = \"${nextRelease.version}\"",
             "countMatches": true
+          },
+          {
+            "files": [
+              "crates/panache-parser/Cargo.toml"
+            ],
+            "from": "(\\[package\\][\\s\\S]*?\\nversion = \")[0-9]+\\.[0-9]+\\.[0-9]+(\")",
+            "to": "$1${nextRelease.version}$2",
+            "countMatches": true
+          },
+          {
+            "files": [
+              "Cargo.toml"
+            ],
+            "from": "panache-parser = \\{ path = \"crates/panache-parser\", version = \"[0-9]+\\.[0-9]+\\.[0-9]+\" \\}",
+            "to": "panache-parser = { path = \"crates/panache-parser\", version = \"${nextRelease.version}\" }",
+            "countMatches": true
           }
         ]
       }
@@ -69,6 +85,7 @@
           "CHANGELOG.md",
           "Cargo.toml",
           "Cargo.lock",
+          "crates/panache-parser/Cargo.toml",
           "flake.nix",
           "editors/zed/extension.toml",
           "editors/zed/Cargo.toml",
