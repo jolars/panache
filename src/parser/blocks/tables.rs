@@ -1470,19 +1470,37 @@ fn slice_cell_by_display_width(line: &str, start_byte: usize, width: usize) -> (
     let mut display_cols = 0usize;
 
     for (offset, ch) in line[start_byte..].char_indices() {
-        if ch == '|' || display_cols >= width {
+        if ch == '|' {
+            let sep_byte = start_byte + offset;
+            return (sep_byte, sep_byte + 1);
+        }
+        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if display_cols + ch_width > width {
             break;
         }
-        display_cols += UnicodeWidthChar::width(ch).unwrap_or(0);
+        display_cols += ch_width;
         end_byte = start_byte + offset + ch.len_utf8();
+        if display_cols >= width {
+            break;
+        }
     }
 
-    let mut next_start = end_byte;
-    if next_start < line.len() && line[next_start..].starts_with('|') {
-        next_start += 1;
+    // If the width budget is exhausted before seeing a separator (for example
+    // because of padding/layout drift), advance to the next literal separator
+    // to keep row slicing aligned and preserve losslessness.
+    let mut sep_byte = end_byte;
+    while sep_byte < line.len() {
+        let mut chars = line[sep_byte..].chars();
+        let Some(ch) = chars.next() else {
+            break;
+        };
+        if ch == '|' {
+            return (sep_byte, sep_byte + 1);
+        }
+        sep_byte += ch.len_utf8();
     }
 
-    (end_byte, next_start)
+    (end_byte, end_byte)
 }
 
 /// Check if a line is a grid table content row.

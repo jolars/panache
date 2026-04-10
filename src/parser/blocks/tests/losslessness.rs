@@ -141,6 +141,15 @@ fn test_losslessness_grid_table_spanning_style_row() {
 }
 
 #[test]
+fn test_losslessness_grid_table_three_col_row_with_asymmetric_padding() {
+    let input = "+-------------------------+---------------------------+-----------------------+\n| `scale_fill_grey()`     | `scale_colour_grey()`     | Greyscale palette     |\n+-------------------------+---------------------------+-----------------------+\n| `scale_fill_viridis_d()`| `scale_colour_viridis_d()` |  Viridis palettes    |\n+-------------------------+---------------------------+-----------------------+\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}
+
+#[test]
 fn test_losslessness_blockquote_fenced_code_lines() {
     let input = "> ~~~ {.xml}\n> <ruby>text</ruby>\n> ~~~\n";
     let config = Config::default();
