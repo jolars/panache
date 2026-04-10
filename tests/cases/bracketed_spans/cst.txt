@@ -54,7 +54,7 @@ DOCUMENT@0..338
         TEXT@134..138 "The "
         INLINE_CODE@138..150
           INLINE_CODE_MARKER@138..139 "`"
-          TEXT@139..149 "function()"
+          INLINE_CODE_CONTENT@139..149 "function()"
           INLINE_CODE_MARKER@149..150 "`"
         TEXT@150..155 " call"
       SPAN_BRACKET_CLOSE@155..156 "]"

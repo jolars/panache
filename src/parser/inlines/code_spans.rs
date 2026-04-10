@@ -74,7 +74,7 @@ pub fn emit_code_span(
     );
 
     // Code content
-    builder.token(SyntaxKind::TEXT.into(), content);
+    builder.token(SyntaxKind::INLINE_CODE_CONTENT.into(), content);
 
     // Closing backticks
     builder.token(

@@ -96,7 +96,7 @@ DOCUMENT@0..472
     TEXT@415..460 "In inline code tabs a ..."
     INLINE_CODE@460..470
       INLINE_CODE_MARKER@460..461 "`"
-      TEXT@461..469 "tab\tcode"
+      INLINE_CODE_CONTENT@461..469 "tab\tcode"
       INLINE_CODE_MARKER@469..470 "`"
     TEXT@470..471 "."
     NEWLINE@471..472 "\n"

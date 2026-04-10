@@ -74,7 +74,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         } else if t.kind() == SyntaxKind::INLINE_CODE_MARKER {
                             skip_marker_whitespace = false;
                             marker_len = marker_len.max(t.text().len());
-                        } else if t.kind() != SyntaxKind::ATTRIBUTE {
+                        } else if t.kind() == SyntaxKind::INLINE_CODE_CONTENT {
                             skip_marker_whitespace = false;
                             content.push_str(t.text());
                         }

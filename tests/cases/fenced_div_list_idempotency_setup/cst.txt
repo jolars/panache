@@ -163,17 +163,17 @@ DOCUMENT@0..4373
       TEXT@1198..1294 "The template manuscri ..."
       INLINE_CODE@1294..1303
         INLINE_CODE_MARKER@1294..1295 "`"
-        TEXT@1295..1302 "jupyter"
+        INLINE_CODE_CONTENT@1295..1302 "jupyter"
         INLINE_CODE_MARKER@1302..1303 "`"
       TEXT@1303..1351 " along with the packa ..."
       INLINE_CODE@1351..1359
         INLINE_CODE_MARKER@1351..1352 "`"
-        TEXT@1352..1358 "pandas"
+        INLINE_CODE_CONTENT@1352..1358 "pandas"
         INLINE_CODE_MARKER@1358..1359 "`"
       TEXT@1359..1365 ", and "
       INLINE_CODE@1365..1377
         INLINE_CODE_MARKER@1365..1366 "`"
-        TEXT@1366..1376 "matplotlib"
+        INLINE_CODE_CONTENT@1366..1376 "matplotlib"
         INLINE_CODE_MARKER@1376..1377 "`"
       TEXT@1377..1378 ":"
       NEWLINE@1378..1379 "\n"
@@ -200,7 +200,7 @@ DOCUMENT@0..4373
       TEXT@1466..1541 "Alternatively, once y ..."
       INLINE_CODE@1541..1559
         INLINE_CODE_MARKER@1541..1542 "`"
-        TEXT@1542..1558 "requirements.txt"
+        INLINE_CODE_CONTENT@1542..1558 "requirements.txt"
         INLINE_CODE_MARKER@1558..1559 "`"
       TEXT@1559..1589 " to get the packages  ..."
       NEWLINE@1589..1590 "\n"

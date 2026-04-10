@@ -151,7 +151,7 @@ DOCUMENT@0..1248
           TEXT@591..610 "    continues with "
           INLINE_CODE@610..616
             INLINE_CODE_MARKER@610..611 "`"
-            TEXT@611..615 "code"
+            INLINE_CODE_CONTENT@611..615 "code"
             INLINE_CODE_MARKER@615..616 "`"
           TEXT@616..629 " on next line"
           NEWLINE@629..630 "\n"

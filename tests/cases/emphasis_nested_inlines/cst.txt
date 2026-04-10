@@ -23,7 +23,7 @@ DOCUMENT@0..1387
       TEXT@68..73 "text "
       INLINE_CODE@73..84
         INLINE_CODE_MARKER@73..74 "`"
-        TEXT@74..83 "code here"
+        INLINE_CODE_CONTENT@74..83 "code here"
         INLINE_CODE_MARKER@83..84 "`"
       TEXT@84..88 " end"
       EMPHASIS_MARKER@88..89 "*"
@@ -36,7 +36,7 @@ DOCUMENT@0..1387
       TEXT@93..98 "text "
       INLINE_CODE@98..109
         INLINE_CODE_MARKER@98..99 "`"
-        TEXT@99..108 "code here"
+        INLINE_CODE_CONTENT@99..108 "code here"
         INLINE_CODE_MARKER@108..109 "`"
       TEXT@109..113 " end"
       STRONG_MARKER@113..115 "**"
@@ -51,7 +51,7 @@ DOCUMENT@0..1387
         TEXT@120..125 "text "
         INLINE_CODE@125..136
           INLINE_CODE_MARKER@125..126 "`"
-          TEXT@126..135 "code here"
+          INLINE_CODE_CONTENT@126..135 "code here"
           INLINE_CODE_MARKER@135..136 "`"
         TEXT@136..140 " end"
         EMPHASIS_MARKER@140..141 "*"
@@ -65,7 +65,7 @@ DOCUMENT@0..1387
       TEXT@146..151 "text "
       INLINE_CODE@151..168
         INLINE_CODE_MARKER@151..152 "`"
-        TEXT@152..167 "code * asterisk"
+        INLINE_CODE_CONTENT@152..167 "code * asterisk"
         INLINE_CODE_MARKER@167..168 "`"
       TEXT@168..172 " end"
       EMPHASIS_MARKER@172..173 "*"
@@ -78,7 +78,7 @@ DOCUMENT@0..1387
       TEXT@177..182 "text "
       INLINE_CODE@182..201
         INLINE_CODE_MARKER@182..183 "`"
-        TEXT@183..200 "code ** asterisks"
+        INLINE_CODE_CONTENT@183..200 "code ** asterisks"
         INLINE_CODE_MARKER@200..201 "`"
       TEXT@201..205 " end"
       STRONG_MARKER@205..207 "**"
@@ -424,7 +424,7 @@ DOCUMENT@0..1387
       TEXT@777..785 "em with "
       INLINE_CODE@785..791
         INLINE_CODE_MARKER@785..786 "`"
-        TEXT@786..790 "code"
+        INLINE_CODE_CONTENT@786..790 "code"
         INLINE_CODE_MARKER@790..791 "`"
       TEXT@791..793 ", "
       LINK@793..804
@@ -455,7 +455,7 @@ DOCUMENT@0..1387
       TEXT@838..850 "strong with "
       INLINE_CODE@850..856
         INLINE_CODE_MARKER@850..851 "`"
-        TEXT@851..855 "code"
+        INLINE_CODE_CONTENT@851..855 "code"
         INLINE_CODE_MARKER@855..856 "`"
       TEXT@856..858 ", "
       LINK@858..869
@@ -494,7 +494,7 @@ DOCUMENT@0..1387
       EMPHASIS_MARKER@937..938 "*"
       INLINE_CODE@938..944
         INLINE_CODE_MARKER@938..939 "`"
-        TEXT@939..943 "code"
+        INLINE_CODE_CONTENT@939..943 "code"
         INLINE_CODE_MARKER@943..944 "`"
       EMPHASIS_MARKER@944..945 "*"
     NEWLINE@945..946 "\n"
@@ -505,7 +505,7 @@ DOCUMENT@0..1387
       STRONG_MARKER@947..949 "**"
       INLINE_CODE@949..955
         INLINE_CODE_MARKER@949..950 "`"
-        TEXT@950..954 "code"
+        INLINE_CODE_CONTENT@950..954 "code"
         INLINE_CODE_MARKER@954..955 "`"
       STRONG_MARKER@955..957 "**"
     NEWLINE@957..958 "\n"
@@ -548,7 +548,7 @@ DOCUMENT@0..1387
   PARAGRAPH@991..1012
     INLINE_CODE@991..1011
       INLINE_CODE_MARKER@991..992 "`"
-      TEXT@992..1010 "code *inside* code"
+      INLINE_CODE_CONTENT@992..1010 "code *inside* code"
       INLINE_CODE_MARKER@1010..1011 "`"
     NEWLINE@1011..1012 "\n"
   BLANK_LINE@1012..1013
@@ -599,7 +599,7 @@ DOCUMENT@0..1387
       TEXT@1102..1107 "text "
       INLINE_CODE@1107..1116
         INLINE_CODE_MARKER@1107..1108 "`"
-        TEXT@1108..1115 "code \\*"
+        INLINE_CODE_CONTENT@1108..1115 "code \\*"
         INLINE_CODE_MARKER@1115..1116 "`"
       TEXT@1116..1120 " end"
       EMPHASIS_MARKER@1120..1121 "*"
@@ -676,7 +676,7 @@ DOCUMENT@0..1387
         TEXT@1289..1301 "triple with "
         INLINE_CODE@1301..1307
           INLINE_CODE_MARKER@1301..1302 "`"
-          TEXT@1302..1306 "code"
+          INLINE_CODE_CONTENT@1302..1306 "code"
           INLINE_CODE_MARKER@1306..1307 "`"
         TEXT@1307..1312 " here"
         EMPHASIS_MARKER@1312..1313 "*"

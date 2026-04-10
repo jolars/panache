@@ -42,7 +42,7 @@ DOCUMENT@0..529
       TEXT@89..102 "Heading with "
       INLINE_CODE@102..108
         INLINE_CODE_MARKER@102..103 "`"
-        TEXT@103..107 "code"
+        INLINE_CODE_CONTENT@103..107 "code"
         INLINE_CODE_MARKER@107..108 "`"
     NEWLINE@108..109 "\n"
   BLANK_LINE@109..110
@@ -111,7 +111,7 @@ DOCUMENT@0..529
       TEXT@271..284 "Heading with "
       INLINE_CODE@284..290
         INLINE_CODE_MARKER@284..285 "`"
-        TEXT@285..289 "code"
+        INLINE_CODE_CONTENT@285..289 "code"
         INLINE_CODE_MARKER@289..290 "`"
       TEXT@290..295 " and "
       EMPHASIS@295..305

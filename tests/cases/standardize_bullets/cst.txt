@@ -198,7 +198,7 @@ DOCUMENT@0..1226
         TEXT@700..715 "List item with "
         INLINE_CODE@715..728
           INLINE_CODE_MARKER@715..716 "`"
-          TEXT@716..727 "inline code"
+          INLINE_CODE_CONTENT@716..727 "inline code"
           INLINE_CODE_MARKER@727..728 "`"
         NEWLINE@728..729 "\n"
     LIST_ITEM@729..911

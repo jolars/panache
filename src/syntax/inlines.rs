@@ -100,7 +100,7 @@ impl CodeSpan {
         self.0
             .children_with_tokens()
             .filter_map(|child| child.into_token())
-            .filter(|token| token.kind() != SyntaxKind::INLINE_CODE_MARKER)
+            .filter(|token| token.kind() == SyntaxKind::INLINE_CODE_CONTENT)
             .map(|token| token.text().to_string())
             .collect::<Vec<_>>()
             .join("")

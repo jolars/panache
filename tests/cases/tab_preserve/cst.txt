@@ -8,12 +8,12 @@ DOCUMENT@0..135
     TEXT@49..77 "Inline code preserves ..."
     INLINE_CODE@77..87
       INLINE_CODE_MARKER@77..78 "`"
-      TEXT@78..86 "tab\tcode"
+      INLINE_CODE_CONTENT@78..86 "tab\tcode"
       INLINE_CODE_MARKER@86..87 "`"
     TEXT@87..92 " and "
     INLINE_CODE@92..102
       INLINE_CODE_MARKER@92..93 "`"
-      TEXT@93..101 "code\tend"
+      INLINE_CODE_CONTENT@93..101 "code\tend"
       INLINE_CODE_MARKER@101..102 "`"
     TEXT@102..103 "."
     NEWLINE@103..104 "\n"

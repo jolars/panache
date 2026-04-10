@@ -121,7 +121,14 @@ impl HeadingContent {
         self.0
             .descendants_with_tokens()
             .filter_map(|it| it.into_token())
-            .filter(|token| token.kind() == SyntaxKind::TEXT)
+            .filter(|token| {
+                matches!(
+                    token.kind(),
+                    SyntaxKind::TEXT
+                        | SyntaxKind::INLINE_CODE_CONTENT
+                        | SyntaxKind::INLINE_EXEC_CONTENT
+                )
+            })
             .map(|token| token.text().to_string())
             .collect()
     }

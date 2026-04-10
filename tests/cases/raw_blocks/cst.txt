@@ -12,7 +12,7 @@ DOCUMENT@0..496
     TEXT@19..34 "This tests the "
     INLINE_CODE@34..49
       INLINE_CODE_MARKER@34..35 "`"
-      TEXT@35..48 "raw_attribute"
+      INLINE_CODE_CONTENT@35..48 "raw_attribute"
       INLINE_CODE_MARKER@48..49 "`"
     TEXT@49..60 " extension."
     NEWLINE@60..61 "\n"

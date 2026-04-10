@@ -14,17 +14,17 @@ DOCUMENT@0..542
     TEXT@58..60 " ("
     INLINE_CODE@60..70
       INLINE_CODE_MARKER@60..62 "``"
-      TEXT@62..68 " `r ` "
+      INLINE_CODE_CONTENT@62..68 " `r ` "
       INLINE_CODE_MARKER@68..70 "``"
     TEXT@70..139 "), which generates th ..."
     INLINE_CODE@139..161
       INLINE_CODE_MARKER@139..140 "`"
-      TEXT@140..160 "devtools::document()"
+      INLINE_CODE_CONTENT@140..160 "devtools::document()"
       INLINE_CODE_MARKER@160..161 "`"
     TEXT@161..207 "). This only requires ..."
     INLINE_CODE@207..217
       INLINE_CODE_MARKER@207..208 "`"
-      TEXT@208..216 "Suggests"
+      INLINE_CODE_CONTENT@208..216 "Suggests"
       INLINE_CODE_MARKER@216..217 "`"
     TEXT@217..218 "."
     NEWLINE@218..219 "\n"
@@ -39,12 +39,12 @@ DOCUMENT@0..542
     TEXT@243..277 " by adding a roxygen  ..."
     INLINE_CODE@277..289
       INLINE_CODE_MARKER@277..278 "`"
-      TEXT@278..288 "setClass()"
+      INLINE_CODE_CONTENT@278..288 "setClass()"
       INLINE_CODE_MARKER@288..289 "`"
     TEXT@289..291 ". "
     INLINE_CODE@291..300
       INLINE_CODE_MARKER@291..292 "`"
-      TEXT@292..299 "@export"
+      INLINE_CODE_CONTENT@292..299 "@export"
       INLINE_CODE_MARKER@299..300 "`"
     TEXT@300..410 " a class if you want  ..."
     NEWLINE@410..411 "\n"
@@ -54,7 +54,7 @@ DOCUMENT@0..542
     TEXT@412..443 "S7 methods are regist ..."
     INLINE_CODE@443..473
       INLINE_CODE_MARKER@443..444 "`"
-      TEXT@444..472 "method(generic, class ..."
+      INLINE_CODE_CONTENT@444..472 "method(generic, class ..."
       INLINE_CODE_MARKER@472..473 "`"
     TEXT@473..541 ". Generally, it's not ..."
     NEWLINE@541..542 "\n"

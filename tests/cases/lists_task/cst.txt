@@ -121,7 +121,7 @@ DOCUMENT@0..734
         TEXT@343..364 " Completed task with "
         INLINE_CODE@364..370
           INLINE_CODE_MARKER@364..365 "`"
-          TEXT@365..369 "code"
+          INLINE_CODE_CONTENT@365..369 "code"
           INLINE_CODE_MARKER@369..370 "`"
         NEWLINE@370..371 "\n"
     LIST_ITEM@371..417

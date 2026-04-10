@@ -123,7 +123,7 @@ DOCUMENT@0..520
         TEXT@352..357 " and "
         INLINE_CODE@357..363
           INLINE_CODE_MARKER@357..358 "`"
-          TEXT@358..362 "code"
+          INLINE_CODE_CONTENT@358..362 "code"
           INLINE_CODE_MARKER@362..363 "`"
       TEXT@363..364 "]"
       TEXT@364..365 "["

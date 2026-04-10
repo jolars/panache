@@ -151,7 +151,7 @@ DOCUMENT@0..1852
     TEXT@475..480 " and "
     INLINE_CODE@480..486
       INLINE_CODE_MARKER@480..481 "`"
-      TEXT@481..485 "code"
+      INLINE_CODE_CONTENT@481..485 "code"
       INLINE_CODE_MARKER@485..486 "`"
     TEXT@486..487 ":"
     NEWLINE@487..488 "\n"
@@ -175,7 +175,7 @@ DOCUMENT@0..1852
       TABLE_CELL@522..530
         INLINE_CODE@522..530
           INLINE_CODE_MARKER@522..523 "`"
-          TEXT@523..529 "inline"
+          INLINE_CODE_CONTENT@523..529 "inline"
           INLINE_CODE_MARKER@529..530 "`"
       WHITESPACE@530..531 " "
       TEXT@531..532 "|"
@@ -232,7 +232,7 @@ DOCUMENT@0..1852
       TABLE_CELL@1155..1162
         INLINE_CODE@1155..1162
           INLINE_CODE_MARKER@1155..1156 "`"
-          TEXT@1156..1161 "width"
+          INLINE_CODE_CONTENT@1156..1161 "width"
           INLINE_CODE_MARKER@1161..1162 "`"
       WHITESPACE@1162..1180 "                  "
       TEXT@1180..1181 "|"
@@ -241,7 +241,7 @@ DOCUMENT@0..1852
         TEXT@1182..1210 "Width in CSS units. D ..."
         INLINE_CODE@1210..1217
           INLINE_CODE_MARKER@1210..1211 "`"
-          TEXT@1211..1216 "1.5in"
+          INLINE_CODE_CONTENT@1211..1216 "1.5in"
           INLINE_CODE_MARKER@1216..1217 "`"
         TEXT@1217..1218 "."
       WHITESPACE@1218..1325 "                      ..."
@@ -257,12 +257,12 @@ DOCUMENT@0..1852
       TABLE_CELL@1505..1530
         INLINE_CODE@1505..1514
           INLINE_CODE_MARKER@1505..1506 "`"
-          TEXT@1506..1513 "padding"
+          INLINE_CODE_CONTENT@1506..1513 "padding"
           INLINE_CODE_MARKER@1513..1514 "`"
         TEXT@1514..1516 ", "
         INLINE_CODE@1516..1529
           INLINE_CODE_MARKER@1516..1517 "`"
-          TEXT@1517..1528 "padding-top"
+          INLINE_CODE_CONTENT@1517..1528 "padding-top"
           INLINE_CODE_MARKER@1528..1529 "`"
         TEXT@1529..1530 ","
       TEXT@1530..1531 "|"
@@ -275,7 +275,7 @@ DOCUMENT@0..1852
           LINK_TEXT@1594..1603
             INLINE_CODE@1594..1603
               INLINE_CODE_MARKER@1594..1595 "`"
-              TEXT@1595..1602 "padding"
+              INLINE_CODE_CONTENT@1595..1602 "padding"
               INLINE_CODE_MARKER@1602..1603 "`"
           LINK_TEXT_END@1603..1604 "]"
           LINK_DEST_START@1604..1605 "("

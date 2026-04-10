@@ -431,7 +431,7 @@ DOCUMENT@0..1432
         TEXT@1135..1151 "Third item with "
         INLINE_CODE@1151..1157
           INLINE_CODE_MARKER@1151..1152 "`"
-          TEXT@1152..1156 "code"
+          INLINE_CODE_CONTENT@1152..1156 "code"
           INLINE_CODE_MARKER@1156..1157 "`"
         NEWLINE@1157..1158 "\n"
   BLANK_LINE@1158..1159
