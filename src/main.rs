@@ -389,10 +389,62 @@ fn sanitize_path_for_filename(path: &str) -> String {
         .collect()
 }
 
+#[derive(Clone)]
 struct DebugFailure {
     kind: CheckKind,
     left: String,
     right: String,
+}
+
+fn build_debug_failure_report(
+    checks: DebugChecks,
+    files_checked: usize,
+    failures: &[(String, DebugFailure)],
+) -> String {
+    let mut out = String::new();
+    out.push_str("# Debug-format regression report\n\n");
+    out.push_str(&format!(
+        "- Checks: `{}`\n- Files checked: {}\n- Failures: {}\n\n",
+        format!("{:?}", checks).to_lowercase(),
+        files_checked,
+        failures.len()
+    ));
+
+    if failures.is_empty() {
+        out.push_str("All checks passed.\n");
+        return out;
+    }
+
+    out.push_str("## Failures\n\n");
+    for (idx, (file, failure)) in failures.iter().enumerate() {
+        let diff = TextDiff::from_lines(&failure.left, &failure.right);
+        let location_line = diff
+            .grouped_ops(0)
+            .first()
+            .and_then(|group| group.first().map(|op| op.old_range().start + 1))
+            .unwrap_or(1);
+
+        out.push_str(&format!(
+            "### {}. `{}` ({})\n\n",
+            idx + 1,
+            file,
+            failure.kind.label()
+        ));
+        out.push_str(&format!("- Approx. diff start line: {}\n\n", location_line));
+        out.push_str("```diff\n");
+        for change in diff.iter_all_changes() {
+            let sign = match change.tag() {
+                ChangeTag::Delete => "-",
+                ChangeTag::Insert => "+",
+                ChangeTag::Equal => " ",
+            };
+            out.push_str(sign);
+            out.push_str(change.value());
+        }
+        out.push_str("```\n\n");
+    }
+
+    out
 }
 
 #[derive(Default)]
@@ -870,10 +922,15 @@ fn main() -> io::Result<()> {
                 files,
                 checks,
                 json,
+                report,
                 dump_dir,
                 dump_passes,
                 force_exclude,
             } => {
+                if json && report {
+                    eprintln!("Error: --json and --report cannot be used together");
+                    std::process::exit(1);
+                }
                 if dump_passes && dump_dir.is_none() {
                     eprintln!("Error: --dump-passes requires --dump-dir <DIR>");
                     std::process::exit(1);
@@ -933,6 +990,7 @@ fn main() -> io::Result<()> {
                 let mut files_checked = 0usize;
                 let mut failure_count = 0usize;
                 let mut json_failures = Vec::new();
+                let mut collected_failures: Vec<(String, DebugFailure)> = Vec::new();
 
                 if use_stdin {
                     let start_dir = start_dir_for(cli.stdin_filename.as_deref())?;
@@ -953,7 +1011,7 @@ fn main() -> io::Result<()> {
 
                     for failure in &artifacts.failures {
                         failure_count += 1;
-                        if !json {
+                        if !json && !report {
                             eprintln!("Debug check failed ({}) in <stdin>", failure.kind.label());
                             print_diff("<stdin>", &failure.left, &failure.right, use_color);
                         }
@@ -961,6 +1019,9 @@ fn main() -> io::Result<()> {
                             "file": "<stdin>",
                             "kind": failure.kind.label(),
                         }));
+                        if report {
+                            collected_failures.push(("<stdin>".to_string(), failure.clone()));
+                        }
                     }
                 } else {
                     for file_path in &targets {
@@ -985,7 +1046,7 @@ fn main() -> io::Result<()> {
 
                         for failure in &artifacts.failures {
                             failure_count += 1;
-                            if !json {
+                            if !json && !report {
                                 eprintln!(
                                     "Debug check failed ({}) in {}",
                                     failure.kind.label(),
@@ -997,6 +1058,9 @@ fn main() -> io::Result<()> {
                                 "file": file_label,
                                 "kind": failure.kind.label(),
                             }));
+                            if report {
+                                collected_failures.push((file_label.to_string(), failure.clone()));
+                            }
                         }
                     }
                 }
@@ -1012,6 +1076,10 @@ fn main() -> io::Result<()> {
                         "{}",
                         serde_json::to_string_pretty(&output).map_err(io::Error::other)?
                     );
+                } else if report {
+                    let markdown =
+                        build_debug_failure_report(checks, files_checked, &collected_failures);
+                    println!("{markdown}");
                 } else if failure_count == 0 {
                     println!(
                         "All checks passed (checks: {}, files: {})",

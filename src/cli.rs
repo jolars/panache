@@ -292,6 +292,10 @@ pub enum DebugCommands {
         #[arg(long)]
         json: bool,
 
+        /// Emit Markdown report output suitable for issue descriptions
+        #[arg(long)]
+        report: bool,
+
         /// Directory where failing artifacts are written
         #[arg(long, value_name = "DIR")]
         dump_dir: Option<PathBuf>,

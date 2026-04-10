@@ -28,6 +28,29 @@ fn test_debug_format_json_output() {
 }
 
 #[test]
+fn test_debug_format_report_output() {
+    cargo_bin_cmd!("panache")
+        .args(["debug", "format", "--report"])
+        .write_stdin("# Heading\n\nParagraph.\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("# Debug-format regression report"))
+        .stdout(predicate::str::contains("All checks passed."));
+}
+
+#[test]
+fn test_debug_format_report_and_json_are_mutually_exclusive() {
+    cargo_bin_cmd!("panache")
+        .args(["debug", "format", "--json", "--report"])
+        .write_stdin("# Heading\n\nParagraph.\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "Error: --json and --report cannot be used together",
+        ));
+}
+
+#[test]
 fn test_debug_format_directory_uses_supported_extensions() {
     let temp_dir = TempDir::new().unwrap();
     let file_md = temp_dir.path().join("doc.md");
