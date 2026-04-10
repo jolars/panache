@@ -1413,6 +1413,14 @@ impl<'a> Parser<'a> {
                 }
             }
 
+            // Fenced code blocks inside list items need marker emission in this branch.
+            // If we keep continuation buffering for these lines, opening fence markers in
+            // blockquote contexts can be dropped from CST text.
+            if list_item_continuation && code_blocks::try_parse_fence_open(inner_content).is_some()
+            {
+                list_item_continuation = false;
+            }
+
             if !list_item_continuation {
                 let marker_info = parse_blockquote_marker_info(line);
                 for i in 0..bq_depth {

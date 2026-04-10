@@ -222,3 +222,12 @@ fn test_losslessness_blockquote_line_with_pipe_does_not_hang() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_blockquote_list_fenced_code_indentation() {
+    let input = "> - One bullet.\n> \n>   ````\n>   ```{r, eval=TRUE}`r ''`\n>   ````\n>   ```r\n>   2 + 2\n>   ```\n>   ```\n>   ## [1] 4\n>   ```\n>   ````\n>   ```\n>   ````\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

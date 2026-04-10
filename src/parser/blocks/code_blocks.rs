@@ -501,6 +501,13 @@ fn prepare_fence_open_line<'a>(
     let first_inner = if bq_depth > 0 && first_line_override.is_none() {
         strip_n_blockquote_markers(first_line, bq_depth)
     } else {
+        if bq_depth > 0 && first_line_override.is_some() && source_line != first_line {
+            let stripped = strip_n_blockquote_markers(source_line, bq_depth);
+            let prefix_len = source_line.len().saturating_sub(stripped.len());
+            if prefix_len > 0 {
+                emit_blockquote_prefix_tokens(builder, &source_line[..prefix_len]);
+            }
+        }
         first_line
     };
 
@@ -1661,6 +1668,13 @@ mod tests {
     #[test]
     fn test_fenced_code_preserves_leading_gt() {
         let input = "```\n> foo\n```\n";
+        let tree = crate::parse(input, None);
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn test_fenced_code_in_blockquote_preserves_opening_fence_marker() {
+        let input = "> ```\n> code\n> ```\n";
         let tree = crate::parse(input, None);
         assert_eq!(tree.text().to_string(), input);
     }
