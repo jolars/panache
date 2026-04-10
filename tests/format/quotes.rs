@@ -221,3 +221,11 @@ fn blockquote_autolink_line_stays_idempotent() {
     let output2 = format(&output1, None, None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn blockquote_bracketed_span_continuation_stays_idempotent() {
+    let input = "> Roses are [red and **bold**]{color=\"red\"} and\n> violets are [blue]{color=\"blue\"}.\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}

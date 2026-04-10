@@ -647,6 +647,9 @@ fn process_node_recursive(
                         sink.push_piece(t.text());
                     }
                 }
+                SyntaxKind::NONBREAKING_SPACE => {
+                    sink.push_piece(r"\ ");
+                }
                 SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {}
                 SyntaxKind::TEXT => {
                     let text = expand_tabs_with_width(t.text(), config.tab_width);

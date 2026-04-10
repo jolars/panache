@@ -224,18 +224,43 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             // Format bracketed span: [content]{.attributes}
             // Need to traverse children to avoid extra spaces
             let mut result = String::new();
+            let mut skip_marker_whitespace = false;
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Token(t) => {
+                        if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
+                            skip_marker_whitespace = true;
+                            continue;
+                        }
+                        if t.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace {
+                            skip_marker_whitespace = false;
+                            continue;
+                        }
+                        skip_marker_whitespace = false;
                         result.push_str(t.text());
                     }
                     NodeOrToken::Node(n) => {
                         // Recursively format nested content
                         if n.kind() == SyntaxKind::SPAN_CONTENT {
+                            let mut skip_marker_whitespace = false;
                             for elem in n.children_with_tokens() {
                                 match elem {
-                                    NodeOrToken::Token(t) => result.push_str(t.text()),
+                                    NodeOrToken::Token(t) => {
+                                        if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
+                                            skip_marker_whitespace = true;
+                                            continue;
+                                        }
+                                        if t.kind() == SyntaxKind::WHITESPACE
+                                            && skip_marker_whitespace
+                                        {
+                                            skip_marker_whitespace = false;
+                                            continue;
+                                        }
+                                        skip_marker_whitespace = false;
+                                        result.push_str(t.text());
+                                    }
                                     NodeOrToken::Node(nested) => {
+                                        skip_marker_whitespace = false;
                                         result.push_str(&format_inline_node(&nested, config));
                                     }
                                 }
@@ -432,6 +457,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 node.text().to_string()
             }
         }
+        SyntaxKind::NONBREAKING_SPACE => "\\ ".to_string(),
         SyntaxKind::SHORTCODE => {
             // Format Quarto shortcodes with normalized spacing
             format_shortcode(node)

@@ -425,6 +425,10 @@ impl Formatter {
                                 // Token already includes backslash (e.g., "\*")
                                 self.output.push_str(t.text());
                             }
+                            SyntaxKind::NONBREAKING_SPACE => {
+                                // Keep Pandoc escaped-space form for idempotency and losslessness.
+                                self.output.push_str(r"\ ");
+                            }
                             SyntaxKind::IMAGE_LINK_START
                             | SyntaxKind::LINK_START
                             | SyntaxKind::LATEX_COMMAND => {

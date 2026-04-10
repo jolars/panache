@@ -54,8 +54,9 @@ pub enum EscapeType {
 pub fn emit_escape(builder: &mut GreenNodeBuilder, ch: char, escape_type: EscapeType) {
     match escape_type {
         EscapeType::NonbreakingSpace => {
-            // Emit as a special nonbreaking space token
-            builder.token(SyntaxKind::NONBREAKING_SPACE.into(), "\u{00A0}");
+            // Preserve source bytes for losslessness while still tagging the
+            // semantic token kind as NONBREAKING_SPACE.
+            builder.token(SyntaxKind::NONBREAKING_SPACE.into(), "\\ ");
         }
         EscapeType::HardLineBreak => {
             // Emit as a special hard line break token - include backslash for losslessness
