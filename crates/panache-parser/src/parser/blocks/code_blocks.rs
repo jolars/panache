@@ -1341,14 +1341,10 @@ pub(crate) fn parse_fenced_code_block(
                             break;
                         }
                         let continuation_line = content_lines[line_idx];
-                        let continuation_after_indent = emit_content_line_prefixes(
-                            builder,
-                            continuation_line,
-                            bq_depth,
-                            base_indent,
-                        );
-                        let (continuation_without_newline, continuation_newline) =
-                            strip_newline(continuation_after_indent);
+                        let continuation_preview =
+                            strip_content_line_prefixes(continuation_line, bq_depth, base_indent);
+                        let (continuation_without_newline, _continuation_newline) =
+                            strip_newline(continuation_preview);
 
                         if in_block_scalar || in_indented_value {
                             if !is_hashpipe_block_scalar_continuation_line(
@@ -1357,6 +1353,14 @@ pub(crate) fn parse_fenced_code_block(
                             ) {
                                 break;
                             }
+                            let continuation_after_indent = emit_content_line_prefixes(
+                                builder,
+                                continuation_line,
+                                bq_depth,
+                                base_indent,
+                            );
+                            let (continuation_without_newline, continuation_newline) =
+                                strip_newline(continuation_after_indent);
                             if !emit_hashpipe_continuation_line(
                                 builder,
                                 continuation_without_newline,
@@ -1377,6 +1381,14 @@ pub(crate) fn parse_fenced_code_block(
                             else {
                                 break;
                             };
+                            let continuation_after_indent = emit_content_line_prefixes(
+                                builder,
+                                continuation_line,
+                                bq_depth,
+                                base_indent,
+                            );
+                            let (continuation_without_newline, continuation_newline) =
+                                strip_newline(continuation_after_indent);
 
                             if !emit_hashpipe_continuation_line(
                                 builder,

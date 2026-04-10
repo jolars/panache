@@ -522,6 +522,13 @@ fn executable_chunk_hashpipe_continuation_preserves_trailing_space() {
 }
 
 #[test]
+fn executable_chunk_hashpipe_multiline_scalar_in_list_does_not_gain_indent() {
+    let input = "-   Press Ctrl + `.` to open tool.\n\n    ```{r}\n    #| fig-cap: >\n    #|   Go to File/Function in RStudio.\n    #| fig-alt: >\n    #|   Screenshot of the \"Go to File/Function\" tool in the\n    #|   RStudio IDE. It is a text box with the cursor in it.\n    knitr::include_graphics(\"images/file-finder.png\", dpi = 220)\n    ```\n";
+    let node = parse_blocks_quarto(input);
+    assert_eq!(node.text().to_string(), input);
+}
+
+#[test]
 fn executable_code_respects_extension_guard() {
     let input = "```{r}\na <- 1\n```\n";
     let mut config = Config::default();
