@@ -357,6 +357,16 @@ mod math_tests {
         assert_eq!(math.len(), 1);
         assert_eq!(math[0], input);
     }
+
+    #[test]
+    fn test_math_environment_with_indented_end_marker_stays_single_display_math() {
+        let input = "\\begin{align*}\n    x = y\n  \n  \\end{align*}\n";
+        let inline_tree = parse_inline(input);
+
+        let math = find_display_math(&inline_tree);
+        assert_eq!(math.len(), 1);
+        assert_eq!(math[0], input);
+    }
 }
 
 #[cfg(test)]

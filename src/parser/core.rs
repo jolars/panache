@@ -14,6 +14,7 @@ use super::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
 use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::paragraphs;
+use super::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
 use super::utils::container_stack;
 use super::utils::helpers::{split_lines_inclusive, strip_newline};
 use super::utils::inline_emission;
@@ -322,6 +323,50 @@ impl<'a> Parser<'a> {
     /// Check if a paragraph is currently open.
     fn is_paragraph_open(&self) -> bool {
         matches!(self.containers.last(), Some(Container::Paragraph { .. }))
+    }
+
+    fn extract_end_environment_name(line: &str) -> Option<&str> {
+        let trimmed = line.trim_start();
+        if !trimmed.starts_with("\\end{") {
+            return None;
+        }
+        let rest = &trimmed[5..];
+        let close = rest.find('}')?;
+        let name = &rest[..close];
+        if name.is_empty() {
+            return None;
+        }
+        Some(name)
+    }
+
+    fn current_open_inline_math_env(&self) -> Option<String> {
+        let Some(Container::Paragraph { buffer }) = self.containers.last() else {
+            return None;
+        };
+
+        let text = buffer.get_text_for_parsing();
+        if text.is_empty() {
+            return None;
+        }
+
+        let mut stack: Vec<String> = Vec::new();
+
+        for line in text.split('\n') {
+            if let Some(env_name) = extract_environment_name(line)
+                && is_inline_math_environment(&env_name)
+            {
+                stack.push(env_name);
+                continue;
+            }
+
+            if let Some(end_name) = Self::extract_end_environment_name(line)
+                && stack.last().is_some_and(|open| open == end_name)
+            {
+                stack.pop();
+            }
+        }
+
+        stack.pop()
     }
 
     /// Close paragraph if one is currently open.
@@ -1014,6 +1059,17 @@ impl<'a> Parser<'a> {
             || (bq_depth > 0 && inner_content.trim_end_matches('\n').trim().is_empty());
 
         if is_blank {
+            if self.is_paragraph_open() && self.current_open_inline_math_env().is_some() {
+                paragraphs::append_paragraph_line(
+                    &mut self.containers,
+                    &mut self.builder,
+                    line,
+                    self.config,
+                );
+                self.pos += 1;
+                return true;
+            }
+
             // Close paragraph if open
             self.close_paragraph_if_open();
 
@@ -1710,6 +1766,17 @@ impl<'a> Parser<'a> {
         // Store the stripped content for later use
         let content = stripped_content;
 
+        if self.is_paragraph_open() && self.current_open_inline_math_env().is_some() {
+            paragraphs::append_paragraph_line(
+                &mut self.containers,
+                &mut self.builder,
+                line_to_append.unwrap_or(self.lines[self.pos]),
+                self.config,
+            );
+            self.pos += 1;
+            return true;
+        }
+
         // Precompute dispatcher match once per line (reused by multiple branches below).
         // This covers: blocks requiring blank lines, blocks that can interrupt paragraphs,
         // and blocks that can appear without blank lines (e.g. reference definitions).
@@ -1818,6 +1885,22 @@ impl<'a> Parser<'a> {
             };
 
         if has_blank_before {
+            if let Some(env_name) = extract_environment_name(content)
+                && is_inline_math_environment(&env_name)
+            {
+                if !self.is_paragraph_open() {
+                    paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+                }
+                paragraphs::append_paragraph_line(
+                    &mut self.containers,
+                    &mut self.builder,
+                    line_to_append.unwrap_or(self.lines[self.pos]),
+                    self.config,
+                );
+                self.pos += 1;
+                return true;
+            }
+
             if let Some(block_match) = dispatcher_match.as_ref() {
                 let detection = block_match.detection;
 
