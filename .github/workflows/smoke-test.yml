@@ -143,6 +143,26 @@ jobs:
           RESULTS_DIR="$RUNNER_TEMP/panache-debug-format-scan"
           FAILURES_TSV="$RESULTS_DIR/failures.tsv"
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          existing_labels="$(gh label list --repo "$GITHUB_REPOSITORY" --limit 500 --json name --jq '.[].name')"
+
+          has_label() {
+            local target="$1"
+            grep -Fxq "$target" <<< "$existing_labels"
+          }
+
+          ensure_label() {
+            local name="$1"
+            local color="$2"
+            local description="$3"
+            if has_label "$name"; then
+              return 0
+            fi
+            if gh label create "$name" --repo "$GITHUB_REPOSITORY" --color "$color" --description "$description" >/dev/null 2>&1; then
+              existing_labels+=$'\n'"$name"
+            else
+              echo "warning: could not create label '$name'; issues will be created without that label"
+            fi
+          }
 
           tail -n +2 "$FAILURES_TSV" | awk -F '\t' '{print $1 "\t" $2}' | sort -u | while IFS=$'\t' read -r repo failure_type; do
             if [ -z "$repo" ] || [ -z "$failure_type" ]; then
@@ -186,12 +206,28 @@ jobs:
                 echo ""
                 echo "See artifact \`debug-format-repo-scan-results\` for full logs."
               } > "$body_file"
+
+              ensure_label "ci" "0366D6" "Continuous integration"
+              ensure_label "debug-format" "5319E7" "Panache debug format scan regressions"
+              case "$failure_type" in
+                idempotency) failure_color="B60205" ;;
+                losslessness) failure_color="D93F0B" ;;
+                unknown) failure_color="6E7781" ;;
+                *) failure_color="6E7781" ;;
+              esac
+              ensure_label "$failure_type" "$failure_color" "Regression category from debug format scan"
+
+              label_args=()
+              for label in "ci" "debug-format" "$failure_type"; do
+                if has_label "$label"; then
+                  label_args+=(--label "$label")
+                fi
+              done
+
               gh issue create \
                 --repo "$GITHUB_REPOSITORY" \
                 --title "$title" \
-                --label "ci" \
-                --label "debug-format" \
-                --label "$failure_type" \
+                "${label_args[@]}" \
                 --body-file "$body_file"
             fi
           done
