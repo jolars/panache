@@ -612,6 +612,7 @@ fn process_node_recursive(
 ) {
     let mut children = node.children_with_tokens().peekable();
     let mut prev_is_text = false;
+    let mut skip_marker_whitespace = false;
     while let Some(el) = children.next() {
         let current_is_text = matches!(&el, NodeOrToken::Token(t) if t.kind() == SyntaxKind::TEXT);
         let next_is_text = matches!(
@@ -621,6 +622,7 @@ fn process_node_recursive(
         match el {
             NodeOrToken::Token(t) => match t.kind() {
                 SyntaxKind::HARD_LINE_BREAK => {
+                    skip_marker_whitespace = false;
                     let marker = if config.extensions.escaped_line_breaks {
                         "\\"
                     } else {
@@ -629,18 +631,26 @@ fn process_node_recursive(
                     sink.push_hard_line_break(marker);
                 }
                 SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE | SyntaxKind::BLANK_LINE => {
+                    if skip_marker_whitespace {
+                        skip_marker_whitespace = false;
+                        continue;
+                    }
                     if in_inline_footnote && sink.is_at_inline_footnote_open() {
                         continue;
                     }
                     sink.set_pending_space(true);
                 }
                 SyntaxKind::INLINE_FOOTNOTE_START | SyntaxKind::INLINE_FOOTNOTE_END => {
+                    skip_marker_whitespace = false;
                     if !in_inline_footnote {
                         sink.push_piece(t.text());
                     }
                 }
-                SyntaxKind::BLOCK_QUOTE_MARKER => {}
+                SyntaxKind::BLOCK_QUOTE_MARKER => {
+                    skip_marker_whitespace = true;
+                }
                 SyntaxKind::ESCAPED_CHAR => {
+                    skip_marker_whitespace = false;
                     if in_link_text && t.text() == r"\_" {
                         sink.push_piece("_");
                     } else {
@@ -648,10 +658,12 @@ fn process_node_recursive(
                     }
                 }
                 SyntaxKind::NONBREAKING_SPACE => {
+                    skip_marker_whitespace = false;
                     sink.push_piece(r"\ ");
                 }
                 SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {}
                 SyntaxKind::TEXT => {
+                    skip_marker_whitespace = false;
                     let text = expand_tabs_with_width(t.text(), config.tab_width);
                     let mut text_to_process = text.as_ref();
                     if sink.skip_next_leading_whitespace() {
@@ -680,12 +692,19 @@ fn process_node_recursive(
                         sink.set_pending_space(true);
                     }
                 }
-                _ => sink.push_piece(t.text()),
+                _ => {
+                    skip_marker_whitespace = false;
+                    sink.push_piece(t.text());
+                }
             },
             NodeOrToken::Node(n) => match n.kind() {
-                SyntaxKind::LIST => sink.set_pending_space(true),
+                SyntaxKind::LIST => {
+                    skip_marker_whitespace = false;
+                    sink.set_pending_space(true)
+                }
                 SyntaxKind::CODE_BLOCK | SyntaxKind::BLANK_LINE => {}
                 SyntaxKind::INLINE_FOOTNOTE => {
+                    skip_marker_whitespace = false;
                     let had_pending_space = sink.pending_space();
                     sink.set_pending_space(false);
                     sink.push_piece("^[");
@@ -705,6 +724,7 @@ fn process_node_recursive(
                     sink.set_pending_space(had_pending_space);
                 }
                 SyntaxKind::PARAGRAPH if matches!(node.kind(), SyntaxKind::LIST_ITEM) => {
+                    skip_marker_whitespace = false;
                     let has_blank_before = n
                         .prev_sibling()
                         .map(|prev| prev.kind() == SyntaxKind::BLANK_LINE)
@@ -731,6 +751,7 @@ fn process_node_recursive(
                     in_inline_footnote,
                 ),
                 SyntaxKind::EMPHASIS => {
+                    skip_marker_whitespace = false;
                     if node_starts_with_whitespace(&n) {
                         sink.set_pending_space(true);
                         sink.set_skip_next_leading_whitespace(true);
@@ -752,6 +773,7 @@ fn process_node_recursive(
                     sink.set_pending_space(had_pending_space);
                 }
                 SyntaxKind::STRONG => {
+                    skip_marker_whitespace = false;
                     if node_starts_with_whitespace(&n) {
                         sink.set_pending_space(true);
                         sink.set_skip_next_leading_whitespace(true);
@@ -773,6 +795,7 @@ fn process_node_recursive(
                     sink.set_pending_space(had_pending_space);
                 }
                 SyntaxKind::LINK => {
+                    skip_marker_whitespace = false;
                     if atomic_links {
                         let formatted = format_inline_fn(&n);
                         let text = normalize_inline_for_sentence(&formatted);
@@ -800,6 +823,7 @@ fn process_node_recursive(
                     }
                 }
                 SyntaxKind::IMAGE_LINK => {
+                    skip_marker_whitespace = false;
                     if atomic_links {
                         let formatted = format_inline_fn(&n);
                         let text = normalize_inline_for_sentence(&formatted);
@@ -829,10 +853,12 @@ fn process_node_recursive(
                 SyntaxKind::CODE_SPAN
                 | SyntaxKind::INLINE_EXECUTABLE_CODE
                 | SyntaxKind::INLINE_EXEC_CODE => {
+                    skip_marker_whitespace = false;
                     let text = format_inline_fn(&n);
                     sink.push_piece_with_boundary(&text, SentenceBoundaryClass::NonBoundary);
                 }
                 SyntaxKind::DISPLAY_MATH => {
+                    skip_marker_whitespace = false;
                     let mut trailing_attrs = None;
                     let mut consumed_interstitial_whitespace = false;
                     if config.extensions.quarto_crossrefs {

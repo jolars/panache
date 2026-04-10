@@ -190,10 +190,23 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
         }
         SyntaxKind::EMPHASIS => {
             let mut content = String::new();
+            let mut skip_marker_whitespace = false;
             for child in node.children_with_tokens() {
                 match child {
-                    NodeOrToken::Node(n) => content.push_str(&format_inline_node(&n, config)),
+                    NodeOrToken::Node(n) => {
+                        skip_marker_whitespace = false;
+                        content.push_str(&format_inline_node(&n, config));
+                    }
                     NodeOrToken::Token(t) => {
+                        if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
+                            skip_marker_whitespace = true;
+                            continue;
+                        }
+                        if t.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace {
+                            skip_marker_whitespace = false;
+                            continue;
+                        }
+                        skip_marker_whitespace = false;
                         if t.kind() != SyntaxKind::EMPHASIS_MARKER {
                             content.push_str(t.text());
                         }
@@ -206,10 +219,23 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
         }
         SyntaxKind::STRONG => {
             let mut content = String::new();
+            let mut skip_marker_whitespace = false;
             for child in node.children_with_tokens() {
                 match child {
-                    NodeOrToken::Node(n) => content.push_str(&format_inline_node(&n, config)),
+                    NodeOrToken::Node(n) => {
+                        skip_marker_whitespace = false;
+                        content.push_str(&format_inline_node(&n, config));
+                    }
                     NodeOrToken::Token(t) => {
+                        if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
+                            skip_marker_whitespace = true;
+                            continue;
+                        }
+                        if t.kind() == SyntaxKind::WHITESPACE && skip_marker_whitespace {
+                            skip_marker_whitespace = false;
+                            continue;
+                        }
+                        skip_marker_whitespace = false;
                         if t.kind() != SyntaxKind::STRONG_MARKER {
                             content.push_str(t.text());
                         }
