@@ -1095,7 +1095,7 @@ fn main() -> io::Result<()> {
                     eprintln!("Wrote debug artifacts to {}", dir.display());
                 }
 
-                if failure_count > 0 && !json && dump_dir.is_none() {
+                if failure_count > 0 && !json && !report && dump_dir.is_none() {
                     eprintln!(
                         "Tip: rerun with --dump-dir <DIR> --dump-passes to inspect input, parse, and format passes."
                     );
