@@ -36,8 +36,8 @@ For help with a specific command, see: `panache help <command>`.
 
 * `--no-color` — Disable colored output (equivalent to --color never)
 * `--isolated` — Ignore all discovered configuration files
-* `--no-cache` — Disable all lint/format cache reads and writes for this run. Can also be enabled with RUFF_NO_CACHE.
-* `--cache-dir <CACHE_DIR>` — Path to the cache directory for this invocation. Overrides config `cache-dir`. Can also be set with RUFF_CACHE_DIR.
+* `--no-cache` — Disable all lint/format cache reads and writes for this run. Can also be enabled with PANACHE_NO_CACHE.
+* `--cache-dir <CACHE_DIR>` — Path to the cache directory for this invocation. Overrides config `cache-dir`. Can also be set with PANACHE_CACHE_DIR.
 
 
 

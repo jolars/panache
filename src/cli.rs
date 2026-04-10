@@ -78,12 +78,12 @@ pub struct Cli {
     #[arg(
         long,
         global = true,
-        env = "RUFF_NO_CACHE",
+        env = "PANACHE_NO_CACHE",
         help_heading = "Global options"
     )]
     #[arg(help = "Disable all lint/format cache reads and writes for this run")]
     #[arg(
-        long_help = "Disable all lint/format cache reads and writes for this run. Can also be enabled with RUFF_NO_CACHE."
+        long_help = "Disable all lint/format cache reads and writes for this run. Can also be enabled with PANACHE_NO_CACHE."
     )]
     pub no_cache: bool,
 
@@ -92,12 +92,12 @@ pub struct Cli {
         long,
         global = true,
         value_name = "CACHE_DIR",
-        env = "RUFF_CACHE_DIR",
+        env = "PANACHE_CACHE_DIR",
         help_heading = "Global options"
     )]
     #[arg(help = "Path to the cache directory (overrides config cache-dir)")]
     #[arg(
-        long_help = "Path to the cache directory for this invocation. Overrides config `cache-dir`. Can also be set with RUFF_CACHE_DIR."
+        long_help = "Path to the cache directory for this invocation. Overrides config `cache-dir`. Can also be set with PANACHE_CACHE_DIR."
     )]
     pub cache_dir: Option<PathBuf>,
 }

@@ -158,9 +158,9 @@ cache-dir = ".panache-cache"
 
 Cache validity currently includes file content, effective config, and Panache
 version. When any of these change, Panache recomputes and refreshes entries. Use
-`--cache-dir <CACHE_DIR>` (or `RUFF_CACHE_DIR`) to override `cache-dir` for one
-invocation. Use `--no-cache` (or `RUFF_NO_CACHE`) to bypass cache reads/writes
-for a single CLI invocation.
+`--cache-dir <CACHE_DIR>` (or `PANACHE_CACHE_DIR`) to override `cache-dir` for
+one invocation. Use `--no-cache` (or `PANACHE_NO_CACHE`) to bypass cache
+reads/writes for a single CLI invocation.
 
 ## Formatting Style
 
