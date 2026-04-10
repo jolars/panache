@@ -240,3 +240,14 @@ fn test_losslessness_blockquote_list_fenced_code_indentation() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_hashpipe_block_scalar_in_list_fenced_chunk() {
+    // Regression (#140): continuation metadata lines like `#| fig-alt: |`
+    // must keep their original indentation in indented list contexts.
+    let input = "- item\n\n    ```{r}\n    #| fig-cap: |\n    #|   A visual representation.\n    #| fig-alt: |\n    #|   Alt text.\n    plot(1:3)\n    ```\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

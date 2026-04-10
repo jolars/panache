@@ -501,6 +501,14 @@ pub fn format_hashpipe_option_with_wrap(
     value: &str,
     line_width: usize,
 ) -> Vec<String> {
+    fn floor_char_boundary(s: &str, max: usize) -> usize {
+        let mut idx = max.min(s.len());
+        while idx > 0 && !s.is_char_boundary(idx) {
+            idx -= 1;
+        }
+        idx
+    }
+
     if let Some((first, rest)) = value.split_once('\n')
         && is_yaml_block_scalar_indicator(first)
     {
@@ -553,10 +561,19 @@ pub fn format_hashpipe_option_with_wrap(
             remaining.len()
         } else {
             // Find last space before or at available
-            remaining[..=available]
-                .rfind(' ')
-                .map(|i| i + 1) // Include the space
-                .unwrap_or(available) // No space found, break at available
+            let upper = floor_char_boundary(remaining, available);
+            if upper == 0 {
+                remaining
+                    .char_indices()
+                    .nth(1)
+                    .map(|(i, _)| i)
+                    .unwrap_or(remaining.len())
+            } else {
+                remaining[..upper]
+                    .rfind(' ')
+                    .map(|i| i + 1) // Include the space
+                    .unwrap_or(upper) // No space found, break at safe boundary
+            }
         };
 
         let chunk = &remaining[..break_point].trim_end();
@@ -727,6 +744,16 @@ mod tests {
         assert!(lines[1].starts_with("#|   ")); // 3-space indent
         assert!(lines[0].len() <= 80);
         // Continuation lines might be slightly over due to word boundaries
+    }
+
+    #[test]
+    fn test_format_hashpipe_option_wrap_handles_utf8_boundaries() {
+        let value = "comparison data for three methods:- Student’s t, Bayes factor, and Welch’s t.";
+        let lines = format_hashpipe_option_with_wrap("#|", "fig-cap", value, 60);
+
+        assert!(lines.len() > 1, "Should wrap into multiple lines");
+        assert!(lines[0].starts_with("#| fig-cap:"));
+        assert!(lines[1].starts_with("#|   "));
     }
 
     #[test]
