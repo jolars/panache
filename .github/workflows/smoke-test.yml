@@ -60,16 +60,34 @@ jobs:
           REPOS_DIR="$RESULTS_DIR/repos"
           LOGS_DIR="$RESULTS_DIR/logs"
           mkdir -p "$REPOS_DIR" "$LOGS_DIR"
+          SCAN_MAX_MINUTES=80
 
           FAILURES_TSV="$RESULTS_DIR/failures.tsv"
+          STATS_FILE="$RESULTS_DIR/stats.env"
           {
             printf 'repo\tfailure_type\tfile\tlog_path\n'
           } > "$FAILURES_TSV"
+
+          scan_start_epoch="$(date +%s)"
+          scan_deadline_epoch="$((scan_start_epoch + (SCAN_MAX_MINUTES * 60)))"
+          repos_scanned=0
+          files_scanned=0
+          budget_exceeded=0
 
           while IFS= read -r repo; do
             if [ -z "$repo" ]; then
               continue
             fi
+
+            now_epoch="$(date +%s)"
+            if [ "$now_epoch" -ge "$scan_deadline_epoch" ]; then
+              budget_exceeded=1
+              echo "::warning title=Scan budget reached::Stopping before job timeout after ${SCAN_MAX_MINUTES}m."
+              printf '%s\t%s\t%s\t%s\n' "$repo" "unknown" "[scan budget reached after ${SCAN_MAX_MINUTES}m]" "" >> "$FAILURES_TSV"
+              break
+            fi
+
+            repos_scanned=$((repos_scanned + 1))
             repo_dir="$REPOS_DIR/${repo//\//__}"
             clone_log="$LOGS_DIR/${repo//\//__}__clone.log"
             echo "Scanning repository: $repo"
@@ -83,26 +101,90 @@ jobs:
               continue
             fi
 
+            repo_file_list="$LOGS_DIR/${repo//\//__}__files.zlist"
+            file_count=0
+            repo_files=()
+            git -C "$repo_dir" ls-files -z -- '*.md' '*.qmd' '*.Rmd' '*.markdown' '*.mdown' '*.mkd' >"$repo_file_list"
             while IFS= read -r -d '' rel_file; do
-              file_key="$(printf '%s' "${repo}:${rel_file}" | sha256sum | awk '{print $1}')"
-              log_path="$LOGS_DIR/$file_key.log"
+              file_count=$((file_count + 1))
+              repo_files+=("$repo_dir/$rel_file")
+            done < "$repo_file_list"
+            echo "Found $file_count candidate files in $repo"
+            files_scanned=$((files_scanned + file_count))
 
-              if ! (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all "$rel_file") >"$log_path" 2>&1; then
-                matched=0
-                if grep -Eiq 'idempot' "$log_path"; then
-                  printf '%s\t%s\t%s\t%s\n' "$repo" "idempotency" "$rel_file" "logs/$file_key.log" >> "$FAILURES_TSV"
-                  matched=1
-                fi
-                if grep -Eiq 'lossless' "$log_path"; then
-                  printf '%s\t%s\t%s\t%s\n' "$repo" "losslessness" "$rel_file" "logs/$file_key.log" >> "$FAILURES_TSV"
-                  matched=1
-                fi
-                if [ "$matched" -eq 0 ]; then
-                  printf '%s\t%s\t%s\t%s\n' "$repo" "unknown" "$rel_file" "logs/$file_key.log" >> "$FAILURES_TSV"
-                fi
-              fi
-            done < <(git -C "$repo_dir" ls-files -z -- '*.md' '*.qmd' '*.Rmd')
+            if [ "$file_count" -eq 0 ]; then
+              continue
+            fi
+
+            now_epoch="$(date +%s)"
+            if [ "$now_epoch" -ge "$scan_deadline_epoch" ]; then
+              budget_exceeded=1
+              echo "::warning title=Scan budget reached::Stopping before job timeout after ${SCAN_MAX_MINUTES}m."
+              printf '%s\t%s\t%s\t%s\n' "$repo" "unknown" "[scan budget reached after ${SCAN_MAX_MINUTES}m]" "" >> "$FAILURES_TSV"
+              break
+            fi
+
+            repo_json="$LOGS_DIR/${repo//\//__}__debug-format.json"
+            repo_err="$LOGS_DIR/${repo//\//__}__debug-format.err.log"
+            echo "Running panache once for $repo ($file_count files)"
+            if timeout 45m "$PANACHE_BIN" debug format --checks all --json "${repo_files[@]}" >"$repo_json" 2>"$repo_err"; then
+              repo_scan_exit=0
+            else
+              repo_scan_exit=$?
+            fi
+
+            if [ "$repo_scan_exit" -eq 124 ]; then
+              printf '%s\t%s\t%s\t%s\n' "$repo" "unknown" "[repo debug-format timed out after 45m]" "logs/${repo//\//__}__debug-format.err.log" >> "$FAILURES_TSV"
+              echo "::error title=Repository scan timeout::$repo timed out. See logs/${repo//\//__}__debug-format.err.log in artifact."
+              continue
+            fi
+
+            if [ ! -s "$repo_json" ]; then
+              printf '%s\t%s\t%s\t%s\n' "$repo" "unknown" "[repo debug-format produced no JSON output: exit=$repo_scan_exit]" "logs/${repo//\//__}__debug-format.err.log" >> "$FAILURES_TSV"
+              echo "::error title=Repository scan missing JSON::$repo produced no JSON output (exit=$repo_scan_exit)."
+              tail -n 40 "$repo_err" || true
+              continue
+            fi
+
+            if ! python3 - "$repo" "$repo_json" "$FAILURES_TSV" <<'PY'
+import json
+import sys
+
+repo, json_path, failures_tsv = sys.argv[1:4]
+try:
+    with open(json_path, encoding="utf-8") as f:
+        payload = json.load(f)
+except Exception as exc:
+    print(f"failed to parse JSON from {json_path}: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+failures = payload.get("failures", [])
+with open(failures_tsv, "a", encoding="utf-8") as out:
+    for item in failures:
+        failure_type = str(item.get("kind", "unknown")).strip().lower()
+        if failure_type not in {"idempotency", "losslessness"}:
+            failure_type = "unknown"
+        file_label = str(item.get("file", "<unknown>"))
+        log_path = f"logs/{repo.replace('/', '__')}__debug-format.json"
+        out.write(f"{repo}\t{failure_type}\t{file_label}\t{log_path}\n")
+PY
+            then
+              printf '%s\t%s\t%s\t%s\n' "$repo" "unknown" "[failed to parse debug-format JSON output]" "logs/${repo//\//__}__debug-format.json" >> "$FAILURES_TSV"
+              echo "::error title=Repository scan JSON parse failed::$repo JSON parse failed."
+              continue
+            fi
+
+            if [ "$budget_exceeded" -eq 1 ]; then
+              break
+            fi
           done <<< "$TARGET_REPOS"
+
+          {
+            echo "repos_scanned=$repos_scanned"
+            echo "files_scanned=$files_scanned"
+            echo "scan_budget_minutes=$SCAN_MAX_MINUTES"
+            echo "scan_budget_exceeded=$budget_exceeded"
+          } > "$STATS_FILE"
 
       - name: Summarize scan results
         id: summarize
@@ -111,6 +193,16 @@ jobs:
           set -euo pipefail
           RESULTS_DIR="$RUNNER_TEMP/panache-debug-format-scan"
           FAILURES_TSV="$RESULTS_DIR/failures.tsv"
+          STATS_FILE="$RESULTS_DIR/stats.env"
+          if [ -f "$STATS_FILE" ]; then
+            # shellcheck disable=SC1090
+            source "$STATS_FILE"
+          else
+            repos_scanned=0
+            files_scanned=0
+            scan_budget_minutes=0
+            scan_budget_exceeded=0
+          fi
           failure_count="$(($(wc -l < "$FAILURES_TSV") - 1))"
           if [ "$failure_count" -lt 0 ]; then
             failure_count=0
@@ -120,7 +212,12 @@ jobs:
           echo "### Panache debug format repo scan" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- Failure records: $failure_count" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Repositories scanned: $repos_scanned" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Files scanned: $files_scanned" >> "$GITHUB_STEP_SUMMARY"
           echo "- Scanned extensions: \`.md\`, \`.qmd\`, \`.Rmd\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${scan_budget_exceeded:-0}" = "1" ]; then
+            echo "- Scan budget reached: yes (${scan_budget_minutes}m limit)" >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ "$failure_count" -gt 0 ]; then
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Failure breakdown:" >> "$GITHUB_STEP_SUMMARY"
