@@ -13,6 +13,7 @@ use crate::config::FormatterConfig;
 pub use crate::external_formatters_common::FormatterError;
 use crate::external_formatters_common::{
     find_missing_formatter_commands, log_missing_formatter_commands, resolve_stdin_args,
+    temp_file_extension_for_language,
 };
 use crate::formatter::code_blocks::{ExternalCodeBlock, FormattedCodeMap};
 
@@ -35,7 +36,7 @@ pub fn format_code_sync(
     if config.stdin {
         format_with_stdin(code, language, config, timeout)
     } else {
-        format_with_file(code, config, timeout)
+        format_with_file(code, language, config, timeout)
     }
 }
 
@@ -123,6 +124,7 @@ fn format_with_stdin(
 /// Format code using a temporary file (synchronous).
 fn format_with_file(
     code: &str,
+    language: &str,
     config: &FormatterConfig,
     timeout: Duration,
 ) -> Result<String, FormatterError> {
@@ -136,7 +138,11 @@ fn format_with_file(
 
     // Create a temporary file
     let temp_dir = std::env::temp_dir();
-    let temp_path = temp_dir.join(format!("panache-{}.tmp", uuid::Uuid::new_v4()));
+    let temp_path = temp_dir.join(format!(
+        "panache-{}.{}",
+        uuid::Uuid::new_v4(),
+        temp_file_extension_for_language(language)
+    ));
 
     // Write code to temp file
     fs::write(&temp_path, code).map_err(FormatterError::IoError)?;

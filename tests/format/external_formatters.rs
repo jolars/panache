@@ -22,6 +22,8 @@ fn code_block_with_shfmt() {
     );
 
     let config = Config {
+        flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
         formatters,
         ..Default::default()
     };
@@ -55,6 +57,8 @@ fn code_block_with_external_formatter() {
     );
 
     let config = Config {
+        flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
         formatters,
         ..Default::default()
     };
@@ -103,6 +107,8 @@ fn code_block_with_disabled_formatter() {
     let formatters = HashMap::new(); // No formatter configured
 
     let config = Config {
+        flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
         formatters,
         ..Default::default()
     };
@@ -190,4 +196,40 @@ print("ok")
     assert!(output.contains("#| fig-cap: \"My figure\""));
     assert!(output.contains("PRINT(\"OK\")"));
     assert!(!output.contains("# |"));
+}
+
+#[test]
+fn r_air_formats_equals_spacing_in_quarto_r_block() {
+    if which::which("air").is_err() {
+        println!("Skipping air test - air not installed");
+        return;
+    }
+
+    let mut formatters = HashMap::new();
+    formatters.insert(
+        "r".to_string(),
+        vec![panache::config::FormatterConfig {
+            cmd: "air".to_string(),
+            args: vec!["format".to_string(), "{}".to_string()],
+            enabled: true,
+            stdin: false,
+        }],
+    );
+
+    let config = Config {
+        flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
+        formatters,
+        ..Default::default()
+    };
+
+    let input = r#"
+```{r}
+a=1
+```
+"#
+    .trim_start();
+
+    let output = format(input, Some(config), None);
+    assert!(output.contains("a = 1"));
 }

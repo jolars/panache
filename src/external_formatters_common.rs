@@ -76,34 +76,38 @@ pub fn log_missing_formatter_commands(missing: &HashSet<String>) {
 pub fn resolve_stdin_args(args: &[String], language: &str) -> Vec<String> {
     let virtual_filename = virtual_filename_for_language(language);
     args.iter()
-        .map(|arg| arg.replace("{}", virtual_filename))
+        .map(|arg| arg.replace("{}", &virtual_filename))
         .collect()
 }
 
-fn virtual_filename_for_language(language: &str) -> &'static str {
-    match language
-        .trim()
-        .to_ascii_lowercase()
-        .replace('_', "-")
-        .as_str()
-    {
-        "javascript" | "js" => "stdin.js",
-        "typescript" | "ts" => "stdin.ts",
-        "jsx" => "stdin.jsx",
-        "tsx" => "stdin.tsx",
-        "json" => "stdin.json",
-        "jsonc" => "stdin.jsonc",
-        "yaml" | "yml" => "stdin.yaml",
-        "markdown" | "md" | "qmd" | "rmd" => "stdin.md",
-        "css" => "stdin.css",
-        "scss" => "stdin.scss",
-        "less" => "stdin.less",
-        "html" => "stdin.html",
-        "vue" => "stdin.vue",
-        "svelte" => "stdin.svelte",
-        "graphql" | "gql" => "stdin.graphql",
-        _ => "stdin.txt",
+pub(crate) fn temp_file_extension_for_language(language: &str) -> &'static str {
+    match normalized_language(language).as_str() {
+        "javascript" | "js" => "js",
+        "typescript" | "ts" => "ts",
+        "jsx" => "jsx",
+        "tsx" => "tsx",
+        "json" => "json",
+        "jsonc" => "jsonc",
+        "yaml" | "yml" => "yaml",
+        "markdown" | "md" | "qmd" | "rmd" => "md",
+        "css" => "css",
+        "scss" => "scss",
+        "less" => "less",
+        "html" => "html",
+        "vue" => "vue",
+        "svelte" => "svelte",
+        "graphql" | "gql" => "graphql",
+        "r" => "r",
+        _ => "txt",
     }
+}
+
+fn virtual_filename_for_language(language: &str) -> String {
+    format!("stdin.{}", temp_file_extension_for_language(language))
+}
+
+fn normalized_language(language: &str) -> String {
+    language.trim().to_ascii_lowercase().replace('_', "-")
 }
 
 fn missing_formatter_warning_message(missing: &HashSet<String>) -> Option<String> {
@@ -114,6 +118,7 @@ fn missing_formatter_warning_message(missing: &HashSet<String>) -> Option<String
 mod tests {
     use super::{
         find_missing_formatter_commands, missing_formatter_warning_message, resolve_stdin_args,
+        temp_file_extension_for_language,
     };
     use crate::config::FormatterConfig;
     use std::collections::{HashMap, HashSet};
@@ -194,5 +199,12 @@ mod tests {
             resolved,
             vec!["--stdin-filepath".to_string(), "stdin.txt".to_string()]
         );
+    }
+
+    #[test]
+    fn temp_file_extension_is_language_aware() {
+        assert_eq!(temp_file_extension_for_language("r"), "r");
+        assert_eq!(temp_file_extension_for_language("TypeScript"), "ts");
+        assert_eq!(temp_file_extension_for_language("unknownlang"), "txt");
     }
 }

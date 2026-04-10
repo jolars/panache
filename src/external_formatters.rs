@@ -10,7 +10,7 @@ use tokio::process::Command;
 
 use crate::config::FormatterConfig;
 pub use crate::external_formatters_common::FormatterError;
-use crate::external_formatters_common::resolve_stdin_args;
+use crate::external_formatters_common::{resolve_stdin_args, temp_file_extension_for_language};
 
 /// Format a code block using an external formatter.
 ///
@@ -31,7 +31,7 @@ pub async fn format_code_async(
     if config.stdin {
         format_with_stdin(code, language, config, timeout).await
     } else {
-        format_with_file(code, config, timeout).await
+        format_with_file(code, language, config, timeout).await
     }
 }
 
@@ -106,6 +106,7 @@ async fn format_with_stdin(
 /// Format code using a temporary file.
 async fn format_with_file(
     code: &str,
+    language: &str,
     config: &FormatterConfig,
     timeout: Duration,
 ) -> Result<String, FormatterError> {
@@ -116,7 +117,10 @@ async fn format_with_file(
     );
 
     // Create a temporary file using tempfile crate
-    let mut temp_file = tempfile::NamedTempFile::new().map_err(FormatterError::IoError)?;
+    let mut temp_file = tempfile::Builder::new()
+        .suffix(&format!(".{}", temp_file_extension_for_language(language)))
+        .tempfile()
+        .map_err(FormatterError::IoError)?;
 
     // Write code to temp file (sync write since NamedTempFile is std::fs::File)
     use std::io::Write;
