@@ -76,8 +76,11 @@ jobs:
             while IFS= read -r -d '' rel_file; do
               file_key="$(printf '%s' "${repo}:${rel_file}" | sha256sum | awk '{print $1}')"
               log_path="$LOGS_DIR/$file_key.log"
+              report_path="$LOGS_DIR/$file_key.report.md"
 
               if ! (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all "$rel_file") >"$log_path" 2>&1; then
+                # Generate human-friendly markdown report for issue snippets.
+                (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all --report "$rel_file") >"$report_path" 2>&1 || true
                 matched=0
                 if grep -Eiq 'idempot' "$log_path"; then
                   printf '%s\t%s\t%s\t%s\n' "$repo" "idempotency" "$rel_file" "logs/$file_key.log" >> "$FAILURES_TSV"
@@ -173,6 +176,20 @@ jobs:
             title="CI: debug-format regression in ${repo} (${failure_type})"
             count="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {c++} END {print c+0}' "$FAILURES_TSV")"
             samples="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {printf "- `%s`\n", $3; c++; if (c == 10) exit}' "$FAILURES_TSV")"
+            sample_file="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {print $3; exit}' "$FAILURES_TSV")"
+            sample_log_rel="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {print $4; exit}' "$FAILURES_TSV")"
+            if [ -n "$sample_log_rel" ]; then
+              sample_report_rel="${sample_log_rel%.log}.report.md"
+              sample_report_path="$RESULTS_DIR/$sample_report_rel"
+            else
+              sample_report_rel=""
+              sample_report_path=""
+            fi
+
+            report_excerpt=""
+            if [ -n "$sample_report_path" ] && [ -f "$sample_report_path" ]; then
+              report_excerpt="$(sed -n '1,120p' "$sample_report_path")"
+            fi
 
             ISSUE_TITLE="$title"
             export ISSUE_TITLE
@@ -185,9 +202,22 @@ jobs:
                 echo ""
                 echo "- New failure records: $count"
                 echo "- Workflow run: $RUN_URL"
+                echo "- Panache command: \`panache debug format --checks all --report <FILE>\`"
+                if [ -n "$sample_log_rel" ]; then
+                  echo "- Sample log path: \`$sample_log_rel\`"
+                fi
+                if [ -n "$sample_report_rel" ]; then
+                  echo "- Sample report path: \`$sample_report_rel\`"
+                fi
                 echo ""
                 echo "Sample files:"
                 echo "$samples"
+                if [ -n "$report_excerpt" ]; then
+                  echo ""
+                  echo "Sample report excerpt:"
+                  echo ""
+                  printf '%s\n' "$report_excerpt"
+                fi
               } > "$comment_file"
               gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" --body-file "$comment_file"
             else
@@ -200,9 +230,25 @@ jobs:
                 echo "- Failure type: \`$failure_type\`"
                 echo "- Failure records in this run: $count"
                 echo "- Workflow run: $RUN_URL"
+                echo "- Panache command: \`panache debug format --checks all --report <FILE>\`"
+                if [ -n "$sample_file" ]; then
+                  echo "- Sample file: \`$sample_file\`"
+                fi
+                if [ -n "$sample_log_rel" ]; then
+                  echo "- Sample log path: \`$sample_log_rel\`"
+                fi
+                if [ -n "$sample_report_rel" ]; then
+                  echo "- Sample report path: \`$sample_report_rel\`"
+                fi
                 echo ""
                 echo "Sample files:"
                 echo "$samples"
+                if [ -n "$report_excerpt" ]; then
+                  echo ""
+                  echo "Sample report excerpt:"
+                  echo ""
+                  printf '%s\n' "$report_excerpt"
+                fi
                 echo ""
                 echo "See artifact \`debug-format-repo-scan-results\` for full logs."
               } > "$body_file"
