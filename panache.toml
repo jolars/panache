@@ -17,6 +17,10 @@ sh = "shfmt"
 python = "ruff"
 lua = "stylua"
 
+[formatters.air]
+stdin = true
+args = ["format", "--stdin-file-path", "{}"]
+
 [formatters.stylua]
 cmd = "stylua"
 args = ["--indent-type", "Spaces", "--indent-width", "2", "-"]
