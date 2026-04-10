@@ -464,10 +464,17 @@ fn run_debug_checks_for_content(
     input: &str,
     cfg: &panache::Config,
     checks: DebugChecks,
+    target_label: &str,
 ) -> DebugRunArtifacts {
     let mut artifacts = DebugRunArtifacts::default();
+    log::debug!(
+        "debug format: start checks={} target={}",
+        format!("{:?}", checks).to_lowercase(),
+        target_label
+    );
 
     if matches!(checks, DebugChecks::Losslessness | DebugChecks::All) {
+        log::debug!("debug format: losslessness start target={}", target_label);
         let tree_text = parse(input, Some(cfg.clone())).text().to_string();
         artifacts.losslessness = Some((input.to_string(), tree_text.clone()));
         if input != tree_text {
@@ -477,11 +484,28 @@ fn run_debug_checks_for_content(
                 right: tree_text,
             });
         }
+        log::debug!("debug format: losslessness end target={}", target_label);
     }
 
     if matches!(checks, DebugChecks::Idempotency | DebugChecks::All) {
+        log::debug!(
+            "debug format: idempotency pass1 start target={}",
+            target_label
+        );
         let once = format(input, Some(cfg.clone()), None);
+        log::debug!(
+            "debug format: idempotency pass1 end target={}",
+            target_label
+        );
+        log::debug!(
+            "debug format: idempotency pass2 start target={}",
+            target_label
+        );
         let twice = format(&once, Some(cfg.clone()), None);
+        log::debug!(
+            "debug format: idempotency pass2 end target={}",
+            target_label
+        );
         artifacts.idempotency = Some((input.to_string(), once.clone(), twice.clone()));
         if once != twice {
             artifacts.failures.push(DebugFailure {
@@ -492,6 +516,11 @@ fn run_debug_checks_for_content(
         }
     }
 
+    log::debug!(
+        "debug format: end target={} failures={}",
+        target_label,
+        artifacts.failures.len()
+    );
     artifacts
 }
 
@@ -917,7 +946,7 @@ fn main() -> io::Result<()> {
                     let input = read_all(None)?;
                     files_checked += 1;
 
-                    let artifacts = run_debug_checks_for_content(&input, &cfg, checks);
+                    let artifacts = run_debug_checks_for_content(&input, &cfg, checks, "<stdin>");
                     if let Some(dir) = dump_dir.as_ref() {
                         write_debug_artifacts(dir, "stdin", &artifacts, dump_passes)?;
                     }
@@ -947,7 +976,8 @@ fn main() -> io::Result<()> {
                         files_checked += 1;
                         let file_label = file_path.to_str().unwrap_or("<unknown>");
 
-                        let artifacts = run_debug_checks_for_content(&input, &cfg, checks);
+                        let artifacts =
+                            run_debug_checks_for_content(&input, &cfg, checks, file_label);
                         if let Some(dir) = dump_dir.as_ref() {
                             let safe = sanitize_path_for_filename(file_label);
                             write_debug_artifacts(dir, &safe, &artifacts, dump_passes)?;

@@ -1867,6 +1867,15 @@ impl<'a> Parser<'a> {
                     }
                 }
 
+                if lines_consumed == 0 {
+                    log::warn!(
+                        "block parser made no progress at line {} (parser={})",
+                        self.pos + 1,
+                        self.block_registry.parser_name(block_match)
+                    );
+                    return false;
+                }
+
                 self.pos += lines_consumed;
                 return true;
             }
@@ -1975,6 +1984,15 @@ impl<'a> Parser<'a> {
                     }
                 }
 
+                if lines_consumed == 0 {
+                    log::warn!(
+                        "block parser made no progress at line {} (parser={})",
+                        self.pos + 1,
+                        self.block_registry.parser_name(block_match)
+                    );
+                    return false;
+                }
+
                 self.pos += lines_consumed;
                 return true;
             }
@@ -1984,14 +2002,20 @@ impl<'a> Parser<'a> {
         if self.config.extensions.line_blocks
             && (has_blank_before || self.pos == 0)
             && try_parse_line_block_start(content).is_some()
+            // Guard against context-stripped content (e.g. inside blockquotes) that
+            // looks like a line block while the raw source line does not. Calling
+            // parse_line_block on raw lines in that state would consume 0 lines.
+            && try_parse_line_block_start(self.lines[self.pos]).is_some()
         {
             log::debug!("Parsed line block at line {}", self.pos);
             // Close paragraph before opening line block
             self.close_paragraph_if_open();
 
             let new_pos = parse_line_block(&self.lines, self.pos, &mut self.builder, self.config);
-            self.pos = new_pos;
-            return true;
+            if new_pos > self.pos {
+                self.pos = new_pos;
+                return true;
+            }
         }
 
         // Paragraph or list item continuation

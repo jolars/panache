@@ -211,3 +211,14 @@ fn test_losslessness_triple_underscore_emphasis_preserves_delimiters() {
     let tree = parser.parse();
     assert_eq!(tree.text().to_string(), input);
 }
+
+#[test]
+fn test_losslessness_blockquote_line_with_pipe_does_not_hang() {
+    // Regression: this shape previously triggered a non-progress loop by
+    // misdetecting a line block from blockquote-stripped content.
+    let input = "> | When dollars appear it's a sign\n";
+    let config = Config::default();
+    let parser = Parser::new(input, &config);
+    let tree = parser.parse();
+    assert_eq!(tree.text().to_string(), input);
+}

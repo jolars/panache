@@ -1636,14 +1636,19 @@ impl BlockParser for LineBlockParser {
     fn detect_prepared(
         &self,
         ctx: &BlockContext,
-        _lines: &[&str],
-        _line_pos: usize,
+        lines: &[&str],
+        line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         if !ctx.config.extensions.line_blocks {
             return None;
         }
 
         try_parse_line_block_start(ctx.content)?;
+        // Ensure the raw source line at the current parser position also starts
+        // a line block marker. This prevents false positives when `ctx.content`
+        // was stripped from container markers (e.g. blockquote prefixes).
+        let raw_line = lines.get(line_pos)?;
+        try_parse_line_block_start(raw_line)?;
 
         // Require a blank line (or document start) before a line block.
         // This prevents accidental line-block parsing for wrapped paragraph lines
