@@ -1,0 +1,4 @@
+{
+  "*": "2.32.0",
+  "crates/panache-parser": "0.0.1"
+}
