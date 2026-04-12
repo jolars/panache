@@ -1,6 +1,6 @@
 [package]
 name = "zed_panache"
-version = "2.33.0"
+version = "2.32.0"
 edition = "2021"
 license = "MIT"
 publish = false
