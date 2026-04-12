@@ -2,7 +2,7 @@
   "plugins": [
     "cargo-workspace"
   ],
-  "bootstrap-sha": "a0bcf5a86ac078d63e8745d5c771dda99e6fd8ad",
+  "bootstrap-sha": "073a42037348a9b2421b26d799e0cab4cd4b3d18",
   "release-type": "rust",
   "bump-minor-pre-major": true,
   "include-commit-authors": true,
