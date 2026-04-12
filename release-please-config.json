@@ -4,16 +4,5 @@
   ],
   "release-type": "rust",
   "bump-minor-pre-major": true,
-  "include-commit-authors": true,
-  "prerelease": true,
-  "packages": {
-    ".": {
-      "exclude-paths": [
-        "crates/panache-parser"
-      ]
-    },
-    "crates/panache-parser": {
-      "release-type": "rust"
-    }
-  }
+  "include-commit-authors": true
 }
