@@ -880,7 +880,7 @@ dependencies = [
 
 [[package]]
 name = "panache-parser"
-version = "2.32.0"
+version = "0.1.0"
 dependencies = [
  "env_logger",
  "globset",
