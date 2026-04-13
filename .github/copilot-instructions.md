@@ -31,7 +31,10 @@ is the definitive reference for parser implementation.
 **Development workflow** (always run before making changes):
 
 ```bash
-cargo check && cargo test && cargo clippy --all-targets --all-features -- -D warnings && cargo fmt -- --check
+cargo check --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo fmt -- --check
 ```
 
 **CLI testing:**
@@ -331,8 +334,8 @@ Instead of listing every file, understand the patterns:
 - Run full test suite after changes: `cargo test`
 - Add tests for bugs before fixing them (test-driven development)
 - Ensure clippy passes:
-  `cargo clippy --all-targets --all-features -- -D warnings`
-- Auto-fix clippy warnings when possible: `cargo clippy --fix`
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- Auto-fix clippy warnings when possible: `cargo clippy --workspace --fix`
 - Consider idempotency - formatting twice should equal formatting once
 - Verify CST snapshots and expected outputs before updating them.
 - Update the docs in `docs/` when adding features or changing behavior.
