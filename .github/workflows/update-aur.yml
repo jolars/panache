@@ -1,10 +1,9 @@
 name: Update AUR
 
 on:
-  workflow_run:
-    workflows: ["Build and Test"]
+  release:
     types:
-      - completed
+      - published
   workflow_dispatch:
     inputs:
       version:
@@ -16,10 +15,7 @@ jobs:
   trigger-aur-update:
     name: Trigger AUR Update
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'release' }}
 
     steps:
       - name: Get latest release
@@ -31,37 +27,46 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get version from workflow_run
-        if: github.event_name == 'workflow_run'
-        id: workflow_run_version
+      - name: Get version from release event
+        if: github.event_name == 'release'
+        id: release_version
         run: |
-          HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
-          TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name')
+          echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          # Resolve tag commit (supports both lightweight and annotated tags).
-          TAG_SHA=$(git ls-remote --tags "https://github.com/${{ github.repository }}.git" "refs/tags/${TAG}^{}" | awk '{print $1}')
-          if [ -z "$TAG_SHA" ]; then
-            TAG_SHA=$(git ls-remote --tags "https://github.com/${{ github.repository }}.git" "refs/tags/${TAG}" | awk '{print $1}')
-          fi
+      - name: Wait for release binaries
+        if: github.event_name == 'release'
+        run: |
+          RELEASE_ID="${{ github.event.release.id }}"
+          REQUIRED_ASSET="panache-x86_64-unknown-linux-gnu.tar.gz"
+          ATTEMPTS=20
+          SLEEP_SECONDS=15
 
-          if [ -z "$TAG_SHA" ]; then
-            echo "No resolvable SHA found for tag ${TAG}; skipping AUR dispatch."
-            exit 0
-          fi
+          for i in $(seq 1 "$ATTEMPTS"); do
+            ASSET_FOUND=$(gh api repos/${{ github.repository }}/releases/"$RELEASE_ID"/assets \
+              --jq '[.[].name] | any(. == "'"$REQUIRED_ASSET"'")')
 
-          if [ "$TAG_SHA" != "$HEAD_SHA" ]; then
-            echo "Latest release tag ${TAG} (${TAG_SHA}) does not match workflow SHA ${HEAD_SHA}; skipping."
-            exit 0
-          fi
+            if [ "$ASSET_FOUND" = "true" ]; then
+              echo "Found required asset: $REQUIRED_ASSET"
+              exit 0
+            fi
 
-          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+            if [ "$i" -lt "$ATTEMPTS" ]; then
+              echo "Asset not available yet (attempt $i/$ATTEMPTS), retrying in ${SLEEP_SECONDS}s..."
+              sleep "$SLEEP_SECONDS"
+            fi
+          done
+
+          echo "Required release asset '$REQUIRED_ASSET' is still missing; skipping AUR dispatch."
+          exit 1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Trigger AUR repository
-        if: ${{ inputs.version != '' || steps.latest.outputs.version != '' || steps.workflow_run_version.outputs.version != '' }}
+        if: ${{ inputs.version != '' || steps.latest.outputs.version != '' || steps.release_version.outputs.version != '' }}
         run: |
-          VERSION="${{ inputs.version || steps.latest.outputs.version || steps.workflow_run_version.outputs.version }}"
+          VERSION="${{ inputs.version || steps.latest.outputs.version || steps.release_version.outputs.version }}"
           VERSION="${VERSION#v}"  # Remove 'v' prefix if present
           gh api repos/jolars/panache-aur/dispatches \
             -f event_type=new-release \
