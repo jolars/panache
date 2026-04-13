@@ -2,6 +2,16 @@ name: Build Release Binaries
 
 on:
   workflow_call:
+    inputs:
+      upload:
+        description: "Upload to release (requires a release to exist)"
+        required: false
+        default: "false"
+        type: string
+      tag:
+        description: "Release tag to upload to (only if upload is true)"
+        required: false
+        type: string
   workflow_dispatch:
     inputs:
       upload:
@@ -132,7 +142,7 @@ jobs:
             panache-${{ matrix.target }}.zip
 
       - name: Upload binary to release
-        if: github.event_name == 'workflow_dispatch' && inputs.upload == 'true'
+        if: inputs.upload == 'true'
         shell: bash
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
@@ -187,7 +197,7 @@ jobs:
             *.rpm
 
       - name: Upload DEB package
-        if: matrix.build_packages == true && github.event_name == 'workflow_dispatch' && inputs.upload == 'true'
+        if: matrix.build_packages == true && inputs.upload == 'true'
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           DEB_FILE=$(ls target/${{ matrix.target }}/debian/*.deb)
@@ -196,7 +206,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload RPM package
-        if: matrix.build_packages == true && github.event_name == 'workflow_dispatch' && inputs.upload == 'true'
+        if: matrix.build_packages == true && inputs.upload == 'true'
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
           RPM_FILE=$(ls target/${{ matrix.target }}/generate-rpm/*.rpm)
