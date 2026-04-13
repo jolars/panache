@@ -168,6 +168,7 @@ golden_test_cases!(
     lazy_continuation_deep,
     leading_blanklines,
     line_blocks,
+    list_alpha_nested_idempotency_143,
     line_ending_crlf,
     line_ending_lf,
     links,

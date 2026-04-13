@@ -884,8 +884,16 @@ pub(in crate::parser) fn find_matching_list_level(
             && markers_match(marker, list_marker)
         {
             let matches = if indent_cols >= 4 && *base_indent_cols >= 4 {
-                // Both deeply indented - require close match
-                indent_cols >= *base_indent_cols && indent_cols <= base_indent_cols + 3
+                // Deep indentation:
+                // - bullets stay directional to preserve nesting boundaries
+                // - ordered markers allow small symmetric drift to keep
+                //   marker-width-aligned lists (i./ii./iii.) at one level
+                match (marker, list_marker) {
+                    (ListMarker::Ordered(_), ListMarker::Ordered(_)) => {
+                        indent_cols.abs_diff(*base_indent_cols) <= 3
+                    }
+                    _ => indent_cols >= *base_indent_cols && indent_cols <= base_indent_cols + 3,
+                }
             } else if indent_cols >= 4 || *base_indent_cols >= 4 {
                 // One shallow, one deep - no match
                 false
