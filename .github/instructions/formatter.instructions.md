@@ -1,5 +1,5 @@
 ---
-applyTo: "src/formatter/**/*.rs,src/formatter.rs,tests/cases/**/expected.md,tests/format/**/*.rs"
+applyTo: "src/formatter/**/*.rs,src/formatter.rs,tests/fixtures/cases/**/expected.md,tests/format/**/*.rs"
 ---
 
 Formatter changes should preserve idempotency and avoid parser-side workarounds.
@@ -8,7 +8,7 @@ Formatter changes should preserve idempotency and avoid parser-side workarounds.
 - Reuse existing wrapping/inline/list/table helpers instead of duplicating
   rendering logic.
 - If behavior changes, add or update the smallest relevant golden case in
-  `tests/cases/`.
+  `tests/fixtures/cases/`.
 - Keep docs aligned with formatter behavior: update `docs/guide/formatting.qmd`
   when user-visible formatting rules or examples change.
 - Avoid touching unrelated golden cases; verify diffs are intentional.

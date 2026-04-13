@@ -15,5 +15,9 @@ Parser and syntax changes must preserve lossless CST behavior.
   remain lossless syntax capture only.
 - For bug fixes and new parsing behavior, add a focused test first (unit or
   golden case).
-- If golden snapshots change, validate each case and ensure formatting
-  idempotency still holds.
+- Parser golden fixtures live under
+  `crates/panache-parser/tests/fixtures/cases/`; keep parser-specific coverage
+  there.
+- If parser CST snapshots change
+  (`crates/panache-parser/tests/snapshots/parser_cst_*.snap`), validate each
+  case intentionally.

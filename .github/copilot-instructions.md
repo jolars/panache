@@ -58,8 +58,11 @@ cargo run -- debug format --checks losslessness document.qmd
 # Parse (show CST for debugging)
 printf "# Test" | cargo run -- parse
 
-# Targeted golden case
+# Targeted formatter golden case
 cargo test --test golden_cases <case_name>
+
+# Targeted parser CST/losslessness case
+cargo test -p panache-parser --test golden_parser_cases <case_name>
 
 # Lint
 cargo run -- lint document.qmd
@@ -172,7 +175,7 @@ Located in `src/formatter/`:
 Hierarchical lookup:
 
 1. Explicit `--config` path (errors if invalid)
-2. `.panache.toml` or `panache.toml` in current/parent directories
+2. `panache.toml` or `.panache.toml` in current/parent directories
 3. `~/.config/panache/config.toml` (XDG)
 4. Built-in defaults
 
@@ -199,43 +202,53 @@ Use kebab-case for config keys (e.g., `line-width`, not `line_width`).
 - Integration tests: `tests/` directory (CLI, LSP, format scenarios)
   - **Linting tests**: `tests/linting/*.md` with focused assertions in
     `tests/linting.rs`
-  - **Formatting tests**: `tests/golden_cases.rs` with CST snapshots (use
-    `UPDATE_EXPECTED=1` or `UPDATE_CST=1`)
+  - **Formatting tests**: `tests/golden_cases.rs` with fixture-based expected
+    output assertions (use `UPDATE_EXPECTED=1`)
+- Parser crate integration tests: `crates/panache-parser/tests/`
+  - **Parser golden tests**: `golden_parser_cases.rs` validates losslessness +
+    CST snapshots (`insta`) from `crates/panache-parser/tests/fixtures/cases/*/`
+  - **YAML tests**: `yaml.rs` uses fixture-driven parity checks against
+    `crates/panache-parser/tests/fixtures/yaml-test-suite/`
 - Architecture tests: `blocks/tests/` verifies block parsing behavior
 - 98 golden test scenarios covering all syntax elements
 
 ### Golden Tests (`tests/golden_cases.rs`)
 
-Each `tests/cases/*/` directory contains:
+Each `tests/fixtures/cases/*/` directory contains:
 
 - `input.md` (or `.qmd`, `.Rmd`)
 - `expected.md`: expected formatted output
-- `cst.txt` - CST snapshot for debugging
 - `panache.toml`: optional test-specific config
 
 You need to update the list of tests in `tests/golden_cases.rs` when adding a
 new directory.
 
-To update expected outputs or CST snapshots, set environment variables:
+To update expected outputs, set environment variable:
 
 ```bash
 # Update expected formatted outputs (BE CAREFUL - verify changes!)
 UPDATE_EXPECTED=1 cargo test
 
-# Update CST snapshots
-UPDATE_CST=1 cargo test
-
-# Both together
-UPDATE_EXPECTED=1 UPDATE_CST=1 cargo test
+# Update expected formatted outputs
+UPDATE_EXPECTED=1 cargo test
 ```
 
-But be *very careful* when updating snapshots - always verify changes are
+But be *very careful* when updating expected outputs - always verify diffs are
 correct before committing!
+
+### Parser Golden Tests (`crates/panache-parser/tests/golden_parser_cases.rs`)
+
+Each `crates/panache-parser/tests/fixtures/cases/*/` directory contains:
+
+- `input.md` (or `.qmd`, `.Rmd`)
+- `parser-options.toml`: optional parser-only options for the case
+
+CST expectations are reviewed via `insta` snapshots under
+`crates/panache-parser/tests/snapshots/`.
 
 ### Test verification
 
 - Formatting is idempotent
-- CST structure matches snapshot
 - Output matches expected
 
 ## LSP Implementation (`src/lsp/`)

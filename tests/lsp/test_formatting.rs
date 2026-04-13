@@ -105,7 +105,7 @@ async fn test_format_document_normalizes_yaml_frontmatter_with_builtin_engine() 
 async fn test_range_formatting_fenced_code_case_file() {
     let server = TestLspServer::new();
 
-    let content = include_str!("../cases/fenced_code/input.md");
+    let content = include_str!("../fixtures/cases/fenced_code/input.md");
     server
         .open_document("file:///fenced_code.md", content, "markdown")
         .await;
@@ -125,7 +125,7 @@ async fn test_range_formatting_fenced_code_case_file() {
 async fn test_range_formatting_executable_chunk_case_file() {
     let server = TestLspServer::new();
 
-    let content = include_str!("../cases/code_blocks_executable/input.qmd");
+    let content = include_str!("../fixtures/cases/code_blocks_executable/input.qmd");
     server
         .open_document("file:///code_blocks_executable.qmd", content, "quarto")
         .await;

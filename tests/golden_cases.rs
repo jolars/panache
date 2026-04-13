@@ -1,6 +1,6 @@
 //! Golden test cases for panache formatter.
 //!
-//! Each test case is a directory under `tests/cases/` containing:
+//! Each test case is a directory under `tests/fixtures/cases/` containing:
 //! - `input.*` - Source file (`.md`, `.qmd`, or `.Rmd`)
 //! - `expected.*` - Expected formatted output (same extension as input)
 //! - `panache.toml` - (Optional) Config to test specific flavors/extensions
@@ -39,6 +39,7 @@ fn load_test_config(dir: &Path) -> Option<Config> {
 fn run_golden_case(case_name: &str) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
+        .join("fixtures")
         .join("cases")
         .join(case_name);
 
@@ -96,7 +97,7 @@ macro_rules! golden_test_cases {
 
 // Generate test functions for each case directory.
 // To add a new test case:
-// 1. Create a new directory under tests/cases/
+// 1. Create a new directory under tests/fixtures/cases/
 // 2. Add the directory name to this list
 golden_test_cases!(
     alerts,

@@ -1,35 +1,16 @@
 ---
-applyTo: "src/parser/yaml.rs,src/parser/yaml/**/*.rs,src/parser/**/*.rs,src/syntax/**/*.rs,tests/**/*yaml*"
+applyTo: "crates/panache-parser/src/parser/yaml.rs,crates/panache-parser/src/parser/yaml/**/*.rs,crates/panache-parser/src/parser/**/*.rs,crates/panache-parser/src/syntax/**/*.rs,crates/panache-parser/tests/**/*yaml*"
 ---
 
-Panache has a planned long-term in-tree YAML parser initiative. Treat current
-work as groundwork unless explicitly marked as a production rollout.
+YAML parser work is incremental and parser-crate scoped.
 
-Timeline expectation: this is a multi-month effort. Do not propose or imply
-short-term replacement of the existing `yaml_parser` pipeline.
-
-- Keep all YAML parser changes lossless and CST-first: preserve markers,
-  whitespace, comments, and scalar style trivia.
-- Prefer a lexer-driven recursive-descent YAML core (stateful, indentation-aware
-  tokenization followed by parse over token stream) to keep CST construction
-  explicit, deterministic, and robust.
-- Treat indentation as lexical structure in YAML work (explicit block/indent
-  boundaries in tokens) rather than implicit parser-only state when possible.
-- Design for both plain YAML files and hashpipe-prefixed YAML so one parser core
-  can serve frontmatter, chunk metadata, bibliography YAML, and workspace YAML
-  files (for example `_quarto.yml` and metadata files).
-- Prefer explicit host↔embedded range mapping APIs, even when many spans are
-  identity mappings, so LSP position conversion remains deterministic.
-- Keep host-level Panache parsing single-pass; YAML internal layering is allowed
-  as an implementation detail as long as integration remains deterministic.
-- Avoid combinator-first YAML parser designs that obscure indentation state,
-  recovery boundaries, or CST/range fidelity.
-- Do not replace the existing YAML pipeline directly. New behavior should be
-  introduced in shadow/read-only mode first, with parity checks before any
-  formatter/edit-path adoption.
-- Keep parser policy separate from formatter policy: parser captures syntax;
-  formatting and normalization stay in formatter layers.
-- Plan for first-class YAML formatting support as a follow-up phase after parser
-  parity and mapping correctness are validated.
-- Add focused tests for new YAML behavior and range mapping rules before broad
-  integration; keep tests deterministic and feature-gated where appropriate.
+- Keep YAML parsing lossless and CST-first (markers, whitespace, comments,
+  scalar trivia).
+- Prefer explicit, indentation-aware lexer + parser design; avoid parser styles
+  that hide indentation/recovery state.
+- Support both plain YAML and hashpipe-prefixed YAML through one core model.
+- Keep host↔embedded range mapping explicit and deterministic.
+- Introduce new behavior in shadow/parity mode before replacing existing YAML
+  pipeline paths.
+- Keep parser policy separate from formatter policy.
+- Add focused, deterministic tests for new YAML behavior and mapping rules.

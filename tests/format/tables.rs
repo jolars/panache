@@ -251,8 +251,8 @@ fn test_grid_table_with_caption_after() {
 
 #[test]
 fn test_grid_table_planets_regression_case() {
-    let input = include_str!("../cases/grid_table_planets/input.md");
-    let expected = include_str!("../cases/grid_table_planets/expected.md");
+    let input = include_str!("../fixtures/cases/grid_table_planets/input.md");
+    let expected = include_str!("../fixtures/cases/grid_table_planets/expected.md");
     let result = format(input, None, None);
     assert_eq!(result, expected);
 }

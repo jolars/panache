@@ -1,5 +1,5 @@
 ---
-applyTo: "tests/**/*.rs,tests/cases/**"
+applyTo: "tests/**/*.rs,tests/fixtures/cases/**"
 ---
 
 Integration tests should reflect user-visible behavior and minimize brittleness.
@@ -9,7 +9,7 @@ Integration tests should reflect user-visible behavior and minimize brittleness.
   layouts.
 - For new golden scenarios, add a new case directory and wire it into
   `tests/golden_cases.rs`.
-- Update expected outputs/CST only when behavior intentionally changed and after
+- Update expected outputs only when behavior intentionally changed and after
   manual diff review.
 - For CLI diagnostics, prefer focused substring/order assertions over asserting
   entire rendered blocks (to reduce brittleness across renderer/layout tweaks).

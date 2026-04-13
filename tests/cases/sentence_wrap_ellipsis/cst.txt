@@ -1,5 +1,0 @@
-DOCUMENT@0..72
-  PARAGRAPH@0..72
-    TEXT@0..71 "He paused... then sai ..."
-    NEWLINE@71..72 "\n"
-
