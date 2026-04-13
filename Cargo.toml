@@ -1,11 +1,18 @@
+[workspace.package]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/jolars/panache"
+homepage = "https://panache.bz"
+authors = ["Johan Larsson <johan@jolars.co>"]
+
 [package]
 name = "panache"
 version = "2.32.0"
-edition = "2024"
+edition.workspace = true
 readme = "README.md"
 description = "An LSP, formatter, and linter for Pandoc markdown, Quarto, and RMarkdown"
-license = "MIT"
-repository = "https://github.com/jolars/panache"
+license.workspace = true
+repository.workspace = true
 homepage = "https://panache.bz"
 keywords = ["quarto", "pandoc", "markdown", "formatter", "language-server"]
 categories = [
@@ -14,7 +21,7 @@ categories = [
     "parsing",
     "parser-implementations",
 ]
-authors = ["Johan Larsson <johan@jolars.co>"]
+authors.workspace = true
 
 [workspace]
 members = ["crates/panache-parser", "crates/panache-wasm"]

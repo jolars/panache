@@ -1,15 +1,16 @@
 [package]
 name = "panache-parser"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
 readme = "README.md"
 description = "Lossless CST parser and syntax wrappers for Pandoc markdown, Quarto, and RMarkdown"
-license = "MIT"
-repository = "https://github.com/jolars/panache"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 documentation = "https://docs.rs/panache-parser"
 keywords = ["quarto", "pandoc", "markdown", "parser", "syntax"]
 categories = ["text-processing", "parsing", "parser-implementations"]
-authors = ["Johan Larsson <johan@jolars.co>"]
+authors.workspace = true
 
 [dependencies]
 globset = "0.4"
