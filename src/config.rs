@@ -16,7 +16,6 @@ pub use formatter_presets::get_formatter_preset;
 pub use panache_parser::Extensions;
 pub use panache_parser::Flavor;
 pub use panache_parser::PandocCompat;
-pub use panache_parser::ParserConfig;
 pub use panache_parser::ParserOptions;
 pub use types::BlankLines;
 pub use types::Config;

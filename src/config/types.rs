@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use panache_parser::{Extensions, Flavor, PandocCompat, ParserConfig, ParserOptions};
+use panache_parser::{Extensions, Flavor, PandocCompat, ParserOptions};
 
 use super::formatter_presets;
 
@@ -392,10 +392,6 @@ struct RawConfig {
     tab_stops: TabStopMode,
     #[serde(default = "default_tab_width")]
     tab_width: usize,
-    // Parser configuration (deprecated home for pandoc-compat)
-    #[serde(default)]
-    parser: Option<ParserConfig>,
-
     // NEW: Language → Formatter(s) mapping
     // This will be a raw Value that we'll parse manually to handle both formats
     #[serde(default)]
@@ -592,26 +588,7 @@ fn resolve_language_formatters(
 impl RawConfig {
     /// Finalize into Config, applying flavor-based defaults where needed
     fn finalize(self) -> Config {
-        let parser_from_section = self.parser.unwrap_or_default();
-        let parser_pandoc_compat = parser_from_section.pandoc_compat;
-
-        let resolved_pandoc_compat = if let Some(pandoc_compat) = self.pandoc_compat {
-            if parser_pandoc_compat != PandocCompat::default()
-                && parser_pandoc_compat != pandoc_compat
-            {
-                eprintln!(
-                    "Warning: Both top-level 'pandoc-compat' and [parser].pandoc-compat are set. Using top-level 'pandoc-compat'."
-                );
-            }
-            pandoc_compat
-        } else {
-            if parser_pandoc_compat != PandocCompat::default() {
-                eprintln!(
-                    "Warning: [parser].pandoc-compat is deprecated. Please use top-level 'pandoc-compat'."
-                );
-            }
-            parser_pandoc_compat
-        };
+        let resolved_pandoc_compat = self.pandoc_compat.unwrap_or_default();
 
         // Check for deprecated top-level style fields
         let has_deprecated_fields = self.wrap.is_some()
@@ -685,9 +662,7 @@ impl RawConfig {
             external_max_parallel: self
                 .external_max_parallel
                 .unwrap_or_else(default_external_max_parallel),
-            parser: ParserConfig {
-                pandoc_compat: resolved_pandoc_compat,
-            },
+            parser: resolved_pandoc_compat,
             built_in_greedy_wrap: style.built_in_greedy_wrap,
             exclude: self.exclude,
             extend_exclude: self.extend_exclude,
@@ -898,8 +873,8 @@ pub struct Config {
     pub linters: HashMap<String, String>,
     /// Max parallel external tool invocations (formatters/linters) per document.
     pub external_max_parallel: usize,
-    /// Parser configuration (experimental)
-    pub parser: ParserConfig,
+    /// Compatibility target for ambiguous Pandoc behavior.
+    pub parser: PandocCompat,
     /// Linter rule toggles.
     pub lint: LintConfig,
     /// Optional CLI cache directory override.
@@ -938,7 +913,7 @@ impl Default for Config {
             formatters: HashMap::new(), // Opt-in: empty by default
             linters: HashMap::new(),    // Opt-in: empty by default
             external_max_parallel: default_external_max_parallel(),
-            parser: ParserConfig::default(),
+            parser: PandocCompat::default(),
             lint: LintConfig::default(),
             cache_dir: None,
             built_in_greedy_wrap: true,
@@ -956,7 +931,7 @@ impl Config {
         ParserOptions {
             flavor: self.flavor,
             extensions: self.extensions.clone(),
-            parser: self.parser.clone(),
+            pandoc_compat: self.parser,
         }
     }
 }
