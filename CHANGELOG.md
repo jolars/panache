@@ -1,5 +1,47 @@
 # Changelog
 
+## [2.33.0](https://github.com/jolars/panache/compare/panache-v2.32.0...panache-v2.33.0) (2026-04-13)
+
+
+### Features
+
+* **cli:** add `--report` argument for `debug` command ([55f3489](https://github.com/jolars/panache/commit/55f3489272956e0dd593afdc72f03e62fd7d9db6))
+* **formatter:** normalize non-breaking spaces to `\ ` ([8c1756b](https://github.com/jolars/panache/commit/8c1756bd4f3b2865f1e8e70a1091428b9652a75f))
+
+
+### Bug Fixes
+
+* **cli:** change `RUFF_CACHE_DIR` to `PANACHE_CACHE_DIR` ([644480b](https://github.com/jolars/panache/commit/644480b4ba7e2866bd662677329717d579055d12))
+* **formatter:** don't allow `([@sec](https://github.com/sec))` to wrap to new line ([215a9c1](https://github.com/jolars/panache/commit/215a9c19ba5ce2fefb65470680891142250e1ba8)), closes [#138](https://github.com/jolars/panache/issues/138)
+* **formatter:** fix block quote marker leakage into emphasis ([b5deeb3](https://github.com/jolars/panache/commit/b5deeb3e2feedb141f41db70b0ced2a18a3c6b22))
+* **formatter:** improve citation and hashpipe handling ([768c741](https://github.com/jolars/panache/commit/768c741fcd30134ed19f6e27f5bdf2ffe32bacdc))
+* **formatters:** use proper extensions for external format ([9fd9ab9](https://github.com/jolars/panache/commit/9fd9ab9cbcb9fe860341ba210f900847089d9376))
+* **parser:** fix continuation detection in indented context ([4f1e51d](https://github.com/jolars/panache/commit/4f1e51d7fd0b8cc795747b95f3c223826832c9d7)), closes [#139](https://github.com/jolars/panache/issues/139)
+* **parser:** fix losslessness bug in grid table parsing ([28f47dd](https://github.com/jolars/panache/commit/28f47dd0f66873fc092551520f9a356f038a431f)), closes [#132](https://github.com/jolars/panache/issues/132)
+* **parser:** fix missing whitespace in nested fenced code ([426aa87](https://github.com/jolars/panache/commit/426aa87d70bf6b4ca7cf79853cdf2cf557e498de))
+* **parser:** mitigate infinite recursion in line block ([612dc80](https://github.com/jolars/panache/commit/612dc80fc8adeeadcfe72ebf82ac332e00236347))
+* **parser:** mitigate UTF-8 panic in hashpipe path ([26c702d](https://github.com/jolars/panache/commit/26c702dd0f66f8e3e36a7476e813eea3bc5ab2ee)), closes [#135](https://github.com/jolars/panache/issues/135)
+* **parser:** preserve nonbreaking spaces in parser ([8c1756b](https://github.com/jolars/panache/commit/8c1756bd4f3b2865f1e8e70a1091428b9652a75f))
+* **parser:** properly handle blandlines inside display math ([1e37724](https://github.com/jolars/panache/commit/1e377246d634c75abfcb9c77f7a142dd6d8e82ac)), closes [#130](https://github.com/jolars/panache/issues/130)
+
+
+### Performance Improvements
+
+* **parser:** move inline math tracking into container stack ([5df8308](https://github.com/jolars/panache/commit/5df8308a7f840ad22f86c254668b7725c9a4d03a))
+
+
+### Reverts
+
+* "chore(release): release 2.33.0 [skip ci]" ([01ac037](https://github.com/jolars/panache/commit/01ac037dc55b39ddcda83f5243e5e3a0192314fd))
+* "ci: update smoke test" ([93c2ae9](https://github.com/jolars/panache/commit/93c2ae99fd39efd253c1644f7037689f72e54847))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * panache-parser bumped from 0.1.0 to 0.2.0
+
 ## [2.32.0](https://github.com/jolars/panache/compare/v2.31.0...v2.32.0) (2026-04-09)
 
 ### Features
