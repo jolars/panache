@@ -28,7 +28,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
     }
 
     fn definition_min_block_indent(&self, content_col: usize) -> usize {
-        if self.config.parser.effective_pandoc_compat() == PandocCompat::V3_7 {
+        if self.config.effective_pandoc_compat() == PandocCompat::V3_7 {
             content_col.max(4)
         } else {
             content_col

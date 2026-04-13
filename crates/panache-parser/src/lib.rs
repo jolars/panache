@@ -29,7 +29,6 @@ pub mod syntax;
 pub use options::Extensions;
 pub use options::Flavor;
 pub use options::PandocCompat;
-pub use options::ParserConfig;
 pub use options::ParserOptions;
 pub use parser::parse;
 pub use syntax::SyntaxNode;

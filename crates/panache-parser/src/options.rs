@@ -3,7 +3,7 @@ use std::collections::HashMap;
 /// The flavor of Markdown to parse and format.
 /// Each flavor has a different set of default extensions enabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum Flavor {
     /// Standard Pandoc Markdown (default extensions enabled)
@@ -666,27 +666,14 @@ impl PandocCompat {
     }
 }
 
-/// Parser configuration.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case"))]
-pub struct ParserConfig {
-    /// Compatibility target for ambiguous Pandoc behavior.
-    pub pandoc_compat: PandocCompat,
-}
-
-impl ParserConfig {
-    pub fn effective_pandoc_compat(&self) -> PandocCompat {
-        self.pandoc_compat.effective()
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct ParserOptions {
     pub flavor: Flavor,
     pub extensions: Extensions,
-    /// Parser configuration (experimental)
-    pub parser: ParserConfig,
+    /// Compatibility target for ambiguous Pandoc behavior.
+    pub pandoc_compat: PandocCompat,
 }
 
 impl Default for ParserOptions {
@@ -695,7 +682,13 @@ impl Default for ParserOptions {
         Self {
             flavor,
             extensions: Extensions::for_flavor(flavor),
-            parser: ParserConfig::default(),
+            pandoc_compat: PandocCompat::default(),
         }
+    }
+}
+
+impl ParserOptions {
+    pub fn effective_pandoc_compat(&self) -> PandocCompat {
+        self.pandoc_compat.effective()
     }
 }
