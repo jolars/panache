@@ -132,11 +132,6 @@ mod emphasis_tests {
 }
 
 #[cfg(test)]
-mod link_tests {
-    // TODO: Add tests for link parsing ([text](url), [text][ref])
-}
-
-#[cfg(test)]
 mod citation_tests {
     use crate::options::ParserOptions;
     use crate::syntax::SyntaxKind;
