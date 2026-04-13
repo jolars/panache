@@ -200,6 +200,7 @@ pub(super) struct NodeWrapOptions<'a> {
     pub mode: NodeWrapMode,
     pub atomic_links_root: bool,
     pub strip_standalone_blockquote_markers: bool,
+    pub avoid_example_marker_line_start: bool,
 }
 
 impl<'a> NodeWrapOptions<'a> {
@@ -209,6 +210,7 @@ impl<'a> NodeWrapOptions<'a> {
             mode: NodeWrapMode::Reflow,
             atomic_links_root: false,
             strip_standalone_blockquote_markers: false,
+            avoid_example_marker_line_start: false,
         }
     }
 
@@ -218,6 +220,7 @@ impl<'a> NodeWrapOptions<'a> {
             mode: NodeWrapMode::Sentence,
             atomic_links_root: true,
             strip_standalone_blockquote_markers: false,
+            avoid_example_marker_line_start: false,
         }
     }
 }
@@ -229,14 +232,29 @@ impl WrapStrategy {
             Self::ParagraphSentence => NodeWrapOptions::sentence(),
             Self::ListReflow { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
+                avoid_example_marker_line_start: true,
                 ..NodeWrapOptions::reflow(widths)
             },
             Self::ListSentence { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
+                avoid_example_marker_line_start: true,
                 ..NodeWrapOptions::sentence()
             },
         }
     }
+}
+
+fn is_example_list_marker_piece(piece: &str) -> bool {
+    let Some(rest) = piece.strip_prefix("(@") else {
+        return false;
+    };
+    let Some(label) = rest.strip_suffix(')') else {
+        return false;
+    };
+    !label.is_empty()
+        && label
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 struct StreamingCoreSink<'a> {
@@ -252,6 +270,7 @@ struct StreamingCoreSink<'a> {
     strip_standalone_blockquote_markers: bool,
     merge_initialism_year: bool,
     sentence_language: SentenceLanguage,
+    avoid_example_marker_line_start: bool,
 }
 
 impl<'a> StreamingCoreSink<'a> {
@@ -261,6 +280,7 @@ impl<'a> StreamingCoreSink<'a> {
         strip_standalone_blockquote_markers: bool,
         merge_initialism_year: bool,
         sentence_language: SentenceLanguage,
+        avoid_example_marker_line_start: bool,
     ) -> Self {
         Self {
             default_line_width: line_widths.last().copied().unwrap_or(0),
@@ -275,6 +295,7 @@ impl<'a> StreamingCoreSink<'a> {
             strip_standalone_blockquote_markers,
             merge_initialism_year,
             sentence_language,
+            avoid_example_marker_line_start,
         }
     }
 
@@ -292,7 +313,13 @@ impl<'a> StreamingCoreSink<'a> {
                 .copied()
                 .unwrap_or(self.default_line_width);
             let spacer_width = usize::from(self.line_has_piece && self.prev_ws_after);
-            if self.line_has_piece && self.line_width + spacer_width + piece_width > width_limit {
+            let would_start_line_with_example_marker = self.avoid_example_marker_line_start
+                && self.prev_ws_after
+                && is_example_list_marker_piece(segment.text.as_str());
+            if self.line_has_piece
+                && self.line_width + spacer_width + piece_width > width_limit
+                && !would_start_line_with_example_marker
+            {
                 self.out.push(std::mem::take(&mut self.line));
                 self.line_width = 0;
                 self.line_has_piece = false;
@@ -385,8 +412,14 @@ impl<'a> StreamingCoreSink<'a> {
 pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> {
     let words: Vec<&str> = text.split_ascii_whitespace().collect();
     let line_widths = [line_width];
-    let mut sink =
-        StreamingCoreSink::new(&line_widths, false, false, false, SentenceLanguage::English);
+    let mut sink = StreamingCoreSink::new(
+        &line_widths,
+        false,
+        false,
+        false,
+        SentenceLanguage::English,
+        false,
+    );
     for (idx, word) in words.iter().enumerate() {
         let ws_after = idx + 1 < words.len();
         sink.emit_piece((*word).to_string(), ws_after);
@@ -499,6 +532,7 @@ impl<'a> TraversalBuilder<'a> {
         sentence_mode: bool,
         strip_standalone_blockquote_markers: bool,
         sentence_language: SentenceLanguage,
+        avoid_example_marker_line_start: bool,
     ) -> Self {
         Self {
             sink: StreamingCoreSink::new(
@@ -507,6 +541,7 @@ impl<'a> TraversalBuilder<'a> {
                 strip_standalone_blockquote_markers,
                 true,
                 sentence_language,
+                avoid_example_marker_line_start,
             ),
             current_piece: None,
             current_piece_boundary_class: SentenceBoundaryClass::Normal,
@@ -1009,6 +1044,7 @@ pub(super) fn wrapped_lines_for_node(
         sentence_mode,
         options.strip_standalone_blockquote_markers,
         sentence_language,
+        options.avoid_example_marker_line_start,
     );
     process_node_recursive(
         config,
@@ -1039,4 +1075,15 @@ fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {
 
     let is_fence = |line: &str| line.len() >= 3 && line.chars().all(|c| c == ':');
     is_fence(first) && is_fence(last) && !middle.is_empty()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::wrap_text_first_fit;
+
+    #[test]
+    fn wrap_text_first_fit_wraps_normally_when_marker_like_piece_isnt_forbidden() {
+        let lines = wrap_text_first_fit("alpha beta (@foo-bar-123) gamma", 10);
+        assert_eq!(lines, vec!["alpha beta", "(@foo-bar-123)", "gamma"]);
+    }
 }

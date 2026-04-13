@@ -89,6 +89,14 @@ fn parenthesized_marker_in_list_continuation_stays_paragraph_text() {
 }
 
 #[test]
+fn parenthesized_citation_in_list_continuation_stays_idempotent() {
+    let input = "- When should you take a dependency? What are the risk and rewards? In @sec-dependencies-pros-cons we provide a framework for deciding whether a dependency is worth it. This chapter also includes specific sections for deciding between `Imports` and `Suggests` (@sec-dependencies-imports-vs-suggests) and between `Imports` and `Depends` (@sec-dependencies-imports-vs-depends).\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
 fn list_item_with_hard_breaks_stays_idempotent() {
     let input = "- `some(.x, .p)` returns `TRUE` if *any* element matches;  \n  `every(.x, .p)` returns `TRUE` if *all* elements match;  \n  `none(.x, .p)` returns `TRUE` if *no* element matches.\n";
     let output1 = format(input, None, None);
