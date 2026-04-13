@@ -1,5 +1,6 @@
 {
   ".": "2.33.0",
   "crates/panache-parser": "0.2.0",
-  "crates/panache-wasm": "0.1.1"
+  "crates/panache-wasm": "0.1.1",
+  "editors/code": "2.32.0"
 }
