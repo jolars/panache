@@ -2,8 +2,8 @@
 //!
 //! These tests target specific uncovered code paths in syntax modules.
 
-use panache::parse;
-use panache::syntax::{
+use panache_parser::parse;
+use panache_parser::syntax::{
     AstNode, Citation, FootnoteDefinition, GridTable, List, MultilineTable, ReferenceDefinition,
     SimpleTable, TableCaption,
 };

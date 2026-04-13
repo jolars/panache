@@ -4,10 +4,10 @@
 //! expose accessors for their underlying CST nodes. We test links, images,
 //! tables, headings, and other AST constructs.
 
-use panache::{parse, syntax::SyntaxKind};
+use panache_parser::{parse, syntax::SyntaxKind};
 
 // Import AST wrappers
-use panache::syntax::{
+use panache_parser::syntax::{
     AstNode, Figure, GridTable, Heading, ImageAlt, ImageLink, Link, LinkDest, LinkRef, LinkText,
     MultilineTable, PipeTable, SimpleTable, TableCaption, TableCell, TableRow,
 };

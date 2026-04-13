@@ -4,10 +4,13 @@
 //! rather than formatter output. Each test parses input and inspects the
 //! resulting syntax tree to ensure emphasis is parsed correctly.
 
-use panache::{parse, syntax::SyntaxKind};
+use panache_parser::{parse, syntax::SyntaxKind};
 
 /// Helper to get all nodes/tokens of a specific kind from a syntax tree.
-fn find_nodes(tree: &panache::SyntaxNode, kind: SyntaxKind) -> Vec<panache::SyntaxNode> {
+fn find_nodes(
+    tree: &panache_parser::SyntaxNode,
+    kind: SyntaxKind,
+) -> Vec<panache_parser::SyntaxNode> {
     tree.descendants_with_tokens()
         .filter_map(|element| {
             if element.kind() == kind {
@@ -24,20 +27,20 @@ fn find_nodes(tree: &panache::SyntaxNode, kind: SyntaxKind) -> Vec<panache::Synt
 }
 
 /// Helper to count nodes OR tokens of a specific kind.
-fn count_elements(tree: &panache::SyntaxNode, kind: SyntaxKind) -> usize {
+fn count_elements(tree: &panache_parser::SyntaxNode, kind: SyntaxKind) -> usize {
     tree.descendants_with_tokens()
         .filter(|element| element.kind() == kind)
         .count()
 }
 
 /// Helper to check if a node contains a specific child kind (node or token).
-fn has_child(node: &panache::SyntaxNode, kind: SyntaxKind) -> bool {
+fn has_child(node: &panache_parser::SyntaxNode, kind: SyntaxKind) -> bool {
     node.children_with_tokens()
         .any(|child| child.kind() == kind)
 }
 
 /// Helper to count nodes of a specific kind.
-fn count_nodes(tree: &panache::SyntaxNode, kind: SyntaxKind) -> usize {
+fn count_nodes(tree: &panache_parser::SyntaxNode, kind: SyntaxKind) -> usize {
     find_nodes(tree, kind).len()
 }
 

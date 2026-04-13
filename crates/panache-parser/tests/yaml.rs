@@ -1,7 +1,7 @@
-use panache::parser::yaml::{
+use panache_parser::parser::yaml::{
     ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_basic_mapping_tree, parse_shadow,
 };
-use panache::syntax::cst_to_json;
+use panache_parser::syntax::SyntaxNode as ParserSyntaxNode;
 use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -123,38 +123,38 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     let mut values = Vec::new();
     for entry in tree
         .descendants()
-        .filter(|n| n.kind() == panache::syntax::SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+        .filter(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP_ENTRY)
     {
         let key_node = entry
             .children()
-            .find(|n| n.kind() == panache::syntax::SyntaxKind::YAML_BLOCK_MAP_KEY)
+            .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP_KEY)
             .expect("key node");
         let value_node = entry
             .children()
-            .find(|n| n.kind() == panache::syntax::SyntaxKind::YAML_BLOCK_MAP_VALUE)
+            .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP_VALUE)
             .expect("value node");
 
         let key_tag = key_node
             .children_with_tokens()
             .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == panache::syntax::SyntaxKind::YAML_TAG)
+            .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_TAG)
             .map(|tok| tok.text().to_string());
         let key_text = key_node
             .children_with_tokens()
             .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == panache::syntax::SyntaxKind::YAML_KEY)
+            .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_KEY)
             .map(|tok| tok.text().to_string())
             .expect("key token");
 
         let value_tag = value_node
             .children_with_tokens()
             .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == panache::syntax::SyntaxKind::YAML_TAG)
+            .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_TAG)
             .map(|tok| tok.text().to_string());
         let value_text = value_node
             .children_with_tokens()
             .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == panache::syntax::SyntaxKind::YAML_SCALAR)
+            .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
             .map(|tok| tok.text().to_string())
             .expect("value token");
 
@@ -215,7 +215,36 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     events
 }
 
-fn render_shadow_report(label: &str, report: &panache::parser::yaml::ShadowYamlReport) -> String {
+fn cst_to_json(node: &ParserSyntaxNode) -> serde_json::Value {
+    let children: Vec<serde_json::Value> = node
+        .children_with_tokens()
+        .map(|element| match element {
+            rowan::NodeOrToken::Node(child_node) => cst_to_json(&child_node),
+            rowan::NodeOrToken::Token(token) => json!({
+                "kind": format!("{:?}", token.kind()),
+                "range": {
+                    "start": u32::from(token.text_range().start()),
+                    "end": u32::from(token.text_range().end()),
+                },
+                "text": token.text().to_string(),
+            }),
+        })
+        .collect();
+
+    json!({
+        "kind": format!("{:?}", node.kind()),
+        "range": {
+            "start": u32::from(node.text_range().start()),
+            "end": u32::from(node.text_range().end()),
+        },
+        "children": children,
+    })
+}
+
+fn render_shadow_report(
+    label: &str,
+    report: &panache_parser::parser::yaml::ShadowYamlReport,
+) -> String {
     format!(
         "{label}\noutcome={:?}\nreason={}\nkind={:?}\nbytes={}\nlines={}\nnormalized={:?}\n",
         report.outcome,
@@ -311,9 +340,8 @@ fn yaml_allowlist_losslessness_raw_input() {
         let tree = parse_basic_mapping_tree(&input)
             .unwrap_or_else(|| panic!("failed to parse raw input for {}", case_id));
         let tree_text = tree.text().to_string();
-        similar_asserts::assert_eq!(
-            input,
-            tree_text,
+        assert_eq!(
+            input, tree_text,
             "yaml raw losslessness mismatch for {}",
             case_id
         );

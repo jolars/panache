@@ -1,14 +1,16 @@
-//! Golden test cases for panache formatter.
+//! Golden parser regression cases for panache-parser.
 //!
 //! Each test case is a directory under `tests/cases/` containing:
 //! - `input.*` - Source file (`.md`, `.qmd`, or `.Rmd`)
-//! - `expected.*` - Expected formatted output (same extension as input)
-//! - `panache.toml` - (Optional) Config to test specific flavors/extensions
+//! - `cst.txt` - (Optional) Expected CST structure for parse regression testing
+//! - `panache.toml` - (Optional) Parser config options
 //!
-//! Run with `UPDATE_EXPECTED=1 cargo test` to regenerate expected outputs.
+//! Run with `UPDATE_CST=1 cargo test -p panache-parser --test golden_parser_cases`
+//! to regenerate CST files.
 
-use panache::{Config, format};
+use panache_parser::{Extensions, Flavor, ParserOptions, parse};
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -24,65 +26,88 @@ fn find_file_with_extension(dir: &Path, base: &str) -> Option<PathBuf> {
     None
 }
 
-/// Load config from test case directory if it exists.
-fn load_test_config(dir: &Path) -> Option<Config> {
+/// Load parser options from test case directory if panache.toml exists.
+fn load_test_parser_options(dir: &Path) -> Option<ParserOptions> {
     let config_path = dir.join("panache.toml");
-    if config_path.exists() {
-        let content = fs::read_to_string(config_path).ok()?;
-        toml::from_str(&content).ok()
-    } else {
-        None
+    if !config_path.exists() {
+        return None;
     }
+
+    let content = fs::read_to_string(config_path).ok()?;
+    let value: toml::Value = toml::from_str(&content).ok()?;
+
+    let mut options = ParserOptions::default();
+
+    if let Some(flavor_str) = value.get("flavor").and_then(toml::Value::as_str) {
+        let flavor = match flavor_str {
+            "pandoc" => Flavor::Pandoc,
+            "quarto" => Flavor::Quarto,
+            "rmarkdown" => Flavor::RMarkdown,
+            "gfm" => Flavor::Gfm,
+            "commonmark" => Flavor::CommonMark,
+            "multimarkdown" => Flavor::MultiMarkdown,
+            _ => Flavor::default(),
+        };
+        options.flavor = flavor;
+        options.extensions = Extensions::for_flavor(flavor);
+    }
+
+    if let Some(ext_table) = value.get("extensions").and_then(toml::Value::as_table) {
+        let mut overrides: HashMap<String, bool> = HashMap::new();
+        for (key, val) in ext_table {
+            if let Some(v) = val.as_bool() {
+                overrides.insert(key.clone(), v);
+            }
+        }
+        options.extensions = Extensions::merge_with_flavor(overrides, options.flavor);
+    }
+
+    Some(options)
 }
 
-/// Run a single golden test case.
+/// Run parser-only checks for a single golden case.
 fn run_golden_case(case_name: &str) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
         .join("tests")
         .join("cases")
         .join(case_name);
 
-    let update_expected = std::env::var_os("UPDATE_EXPECTED").is_some();
-    // Find input file with any supported extension
+    let update_cst = std::env::var_os("UPDATE_CST").is_some();
+
     let input_path = find_file_with_extension(&dir, "input")
         .unwrap_or_else(|| panic!("No input file found in {}", case_name));
 
-    // Determine expected path based on input extension
-    let input_ext = input_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("qmd");
-    let expected_path = dir.join(format!("expected.{}", input_ext));
+    let cst_path = dir.join("cst.txt");
+    let parser_options = load_test_parser_options(&dir);
 
-    // Load optional config
-    let config = load_test_config(&dir);
-
-    // Read input file - preserve line endings exactly
     let input = fs::read_to_string(&input_path).unwrap();
 
-    // Test formatting
-    let output = format(&input, config.clone(), None);
+    let tree = parse(&input, parser_options);
+    let tree_text = tree.text().to_string();
 
-    // Idempotency: formatting twice should equal once
-    let output_twice = format(&output, config.clone(), None);
-    similar_asserts::assert_eq!(output, output_twice, "idempotency: {}", case_name);
+    assert_eq!(
+        input,
+        tree_text,
+        "losslessness check failed for {} (tree text does not match input, diff: {:+} bytes)",
+        case_name,
+        tree_text.len() as i64 - input.len() as i64
+    );
 
-    if update_expected {
-        fs::write(&expected_path, &output).unwrap();
-        return;
+    if cst_path.exists() || update_cst {
+        let cst_output = format!("{:#?}\n", tree);
+
+        if update_cst {
+            fs::write(&cst_path, &cst_output).unwrap();
+        } else {
+            let expected_cst = fs::read_to_string(&cst_path)
+                .unwrap_or_else(|_| panic!("Failed to read cst.txt in {}", case_name));
+            assert_eq!(expected_cst, cst_output, "CST mismatch: {}", case_name);
+        }
     }
-
-    let expected = fs::read_to_string(&expected_path).unwrap_or_else(|_| input.clone());
-
-    similar_asserts::assert_eq!(expected, output, "case: {}", case_name);
 }
 
-/// Macro to generate individual test functions for each golden case.
-///
-/// Usage: `golden_test_cases!(case1, case2, case3);`
-///
-/// This generates separate test functions named `golden_case1`, `golden_case2`, etc.
-/// Each test runs independently, so failures don't stop other tests from running.
 macro_rules! golden_test_cases {
     ($($case:ident),+ $(,)?) => {
         $(

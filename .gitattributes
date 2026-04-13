@@ -6,7 +6,7 @@ tests/cases/*/*.md eol=lf
 tests/cases/*/*.qmd eol=lf
 tests/cases/*/*.Rmd eol=lf
 tests/bibtex_samples/*.bib eol=lf
-tests/fixtures/yaml-test-suite/**/in.yaml eol=lf
+crates/panache-parser/tests/fixtures/yaml-test-suite/**/in.yaml eol=lf
 
 # Preserve CRLF in test cases that specifically test CRLF handling (must have CRLF line endings)
 tests/cases/crlf_*/* -text

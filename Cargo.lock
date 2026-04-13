@@ -886,7 +886,8 @@ dependencies = [
  "log",
  "rowan",
  "serde",
- "similar-asserts",
+ "serde_json",
+ "toml",
  "unicode-width",
  "yaml_parser",
 ]
