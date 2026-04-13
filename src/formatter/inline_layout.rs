@@ -200,7 +200,7 @@ pub(super) struct NodeWrapOptions<'a> {
     pub mode: NodeWrapMode,
     pub atomic_links_root: bool,
     pub strip_standalone_blockquote_markers: bool,
-    pub avoid_example_marker_line_start: bool,
+    pub avoid_unsafe_line_start: bool,
 }
 
 impl<'a> NodeWrapOptions<'a> {
@@ -210,7 +210,7 @@ impl<'a> NodeWrapOptions<'a> {
             mode: NodeWrapMode::Reflow,
             atomic_links_root: false,
             strip_standalone_blockquote_markers: false,
-            avoid_example_marker_line_start: false,
+            avoid_unsafe_line_start: false,
         }
     }
 
@@ -220,7 +220,7 @@ impl<'a> NodeWrapOptions<'a> {
             mode: NodeWrapMode::Sentence,
             atomic_links_root: true,
             strip_standalone_blockquote_markers: false,
-            avoid_example_marker_line_start: false,
+            avoid_unsafe_line_start: false,
         }
     }
 }
@@ -232,12 +232,12 @@ impl WrapStrategy {
             Self::ParagraphSentence => NodeWrapOptions::sentence(),
             Self::ListReflow { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
-                avoid_example_marker_line_start: true,
+                avoid_unsafe_line_start: true,
                 ..NodeWrapOptions::reflow(widths)
             },
             Self::ListSentence { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
-                avoid_example_marker_line_start: true,
+                avoid_unsafe_line_start: true,
                 ..NodeWrapOptions::sentence()
             },
         }
@@ -257,6 +257,10 @@ fn is_example_list_marker_piece(piece: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
+fn is_unsafe_line_start_piece(piece: &str) -> bool {
+    is_example_list_marker_piece(piece)
+}
+
 struct StreamingCoreSink<'a> {
     default_line_width: usize,
     line_widths: &'a [usize],
@@ -270,7 +274,7 @@ struct StreamingCoreSink<'a> {
     strip_standalone_blockquote_markers: bool,
     merge_initialism_year: bool,
     sentence_language: SentenceLanguage,
-    avoid_example_marker_line_start: bool,
+    avoid_unsafe_line_start: bool,
 }
 
 impl<'a> StreamingCoreSink<'a> {
@@ -280,7 +284,7 @@ impl<'a> StreamingCoreSink<'a> {
         strip_standalone_blockquote_markers: bool,
         merge_initialism_year: bool,
         sentence_language: SentenceLanguage,
-        avoid_example_marker_line_start: bool,
+        avoid_unsafe_line_start: bool,
     ) -> Self {
         Self {
             default_line_width: line_widths.last().copied().unwrap_or(0),
@@ -295,7 +299,7 @@ impl<'a> StreamingCoreSink<'a> {
             strip_standalone_blockquote_markers,
             merge_initialism_year,
             sentence_language,
-            avoid_example_marker_line_start,
+            avoid_unsafe_line_start,
         }
     }
 
@@ -313,12 +317,12 @@ impl<'a> StreamingCoreSink<'a> {
                 .copied()
                 .unwrap_or(self.default_line_width);
             let spacer_width = usize::from(self.line_has_piece && self.prev_ws_after);
-            let would_start_line_with_example_marker = self.avoid_example_marker_line_start
+            let would_start_line_with_unsafe_piece = self.avoid_unsafe_line_start
                 && self.prev_ws_after
-                && is_example_list_marker_piece(segment.text.as_str());
+                && is_unsafe_line_start_piece(segment.text.as_str());
             if self.line_has_piece
                 && self.line_width + spacer_width + piece_width > width_limit
-                && !would_start_line_with_example_marker
+                && !would_start_line_with_unsafe_piece
             {
                 self.out.push(std::mem::take(&mut self.line));
                 self.line_width = 0;
@@ -532,7 +536,7 @@ impl<'a> TraversalBuilder<'a> {
         sentence_mode: bool,
         strip_standalone_blockquote_markers: bool,
         sentence_language: SentenceLanguage,
-        avoid_example_marker_line_start: bool,
+        avoid_unsafe_line_start: bool,
     ) -> Self {
         Self {
             sink: StreamingCoreSink::new(
@@ -541,7 +545,7 @@ impl<'a> TraversalBuilder<'a> {
                 strip_standalone_blockquote_markers,
                 true,
                 sentence_language,
-                avoid_example_marker_line_start,
+                avoid_unsafe_line_start,
             ),
             current_piece: None,
             current_piece_boundary_class: SentenceBoundaryClass::Normal,
@@ -1044,7 +1048,7 @@ pub(super) fn wrapped_lines_for_node(
         sentence_mode,
         options.strip_standalone_blockquote_markers,
         sentence_language,
-        options.avoid_example_marker_line_start,
+        options.avoid_unsafe_line_start,
     );
     process_node_recursive(
         config,
@@ -1079,11 +1083,18 @@ fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::wrap_text_first_fit;
+    use super::{is_example_list_marker_piece, is_unsafe_line_start_piece, wrap_text_first_fit};
 
     #[test]
     fn wrap_text_first_fit_wraps_normally_when_marker_like_piece_isnt_forbidden() {
         let lines = wrap_text_first_fit("alpha beta (@foo-bar-123) gamma", 10);
         assert_eq!(lines, vec!["alpha beta", "(@foo-bar-123)", "gamma"]);
+    }
+
+    #[test]
+    fn unsafe_line_start_rule_currently_matches_example_marker_only() {
+        assert!(is_example_list_marker_piece("(@foo-bar-123)"));
+        assert!(is_unsafe_line_start_piece("(@foo-bar-123)"));
+        assert!(!is_unsafe_line_start_piece(":::"));
     }
 }
