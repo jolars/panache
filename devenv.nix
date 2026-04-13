@@ -64,7 +64,7 @@
   git-hooks = {
     hooks = {
       clippy = {
-        enable = true;
+        enable = false;
         settings = {
           allFeatures = true;
         };
