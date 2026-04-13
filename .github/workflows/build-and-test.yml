@@ -54,7 +54,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shfmt
 
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test --workspace --verbose
 
   cargo-audit:
     name: Cargo Audit
