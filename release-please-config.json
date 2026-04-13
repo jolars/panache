@@ -9,11 +9,9 @@
   "packages": {
     ".": {
       "exclude-paths": [
-        "crates/panache-parser"
+        "crates"
       ]
     },
-    "crates/panache-parser": {
-      "release-type": "rust"
-    }
+    "crates/panache-parser": {}
   }
 }
