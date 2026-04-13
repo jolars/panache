@@ -6,7 +6,7 @@ readme = "README.md"
 description = "An LSP, formatter, and linter for Pandoc markdown, Quarto, and RMarkdown"
 license = "MIT"
 repository = "https://github.com/jolars/panache"
-homepage = "https://jolars.github.io/panache"
+homepage = "https://panache.bz"
 keywords = ["quarto", "pandoc", "markdown", "formatter", "language-server"]
 categories = [
     "command-line-utilities",
