@@ -1,11 +1,25 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "plugins": [
-    "cargo-workspace"
+    {
+      "type": "cargo-workspace",
+      "merge": false
+    }
   ],
+  "bootstrap-sha": "073a42037348a9b2421b26d799e0cab4cd4b3d18",
   "bump-minor-pre-major": true,
   "include-commit-authors": true,
   "packages": {
+    ".": {
+      "release-type": "rust",
+      "exclude-paths": [
+        "crates",
+        "editors"
+      ]
+    },
+    "crates/panache-parser": {
+      "release-type": "rust"
+    },
     "editors/code": {
       "release-type": "node",
       "package-name": "panache-code"
