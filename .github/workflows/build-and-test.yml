@@ -97,6 +97,31 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+  alias-root-tag:
+    name: Create v* compatibility tag
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' && startsWith(needs.release-please.outputs.tag_name, 'panache-v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create compatibility tag
+        run: |
+          SOURCE_TAG="${{ needs.release-please.outputs.tag_name }}"
+          ALIAS_TAG="v${SOURCE_TAG#panache-v}"
+
+          if git ls-remote --tags origin "refs/tags/$ALIAS_TAG" | grep -q "$ALIAS_TAG"; then
+            echo "Compatibility tag already exists: $ALIAS_TAG"
+            exit 0
+          fi
+
+          git tag "$ALIAS_TAG" "${{ github.sha }}"
+          git push origin "$ALIAS_TAG"
+
   build-release-assets:
     name: Build & Upload Release Assets
     needs: release-please
