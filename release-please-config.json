@@ -10,8 +10,7 @@
     ".": {
       "exclude-paths": [
         "crates"
-      ],
-      "include-component-in-tag": false
+      ]
     },
     "crates/panache-parser": {}
   }
