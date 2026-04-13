@@ -169,6 +169,7 @@ golden_test_cases!(
     leading_blanklines,
     line_blocks,
     list_alpha_nested_idempotency_143,
+    list_deep_roman_idempotency_137,
     line_ending_crlf,
     line_ending_lf,
     links,

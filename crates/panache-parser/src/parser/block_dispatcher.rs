@@ -560,7 +560,29 @@ impl BlockParser for ListParser {
         _line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         let marker_match = try_parse_list_marker(ctx.content, ctx.config)?;
+        let after_marker_text = {
+            let (_, indent_bytes) = super::utils::container_stack::leading_indent(ctx.content);
+            let marker_end = indent_bytes + marker_match.marker_len;
+            if marker_end <= ctx.content.len() {
+                &ctx.content[marker_end..]
+            } else {
+                ""
+            }
+        };
         if marker_match.spaces_after_cols == 0 {
+            return None;
+        }
+        if !ctx.has_blank_before
+            && ctx.in_list
+            && matches!(
+                marker_match.marker,
+                ListMarker::Ordered(OrderedMarker::Decimal {
+                    style: ListDelimiter::RightParen,
+                    ..
+                })
+            )
+            && after_marker_text.trim() == ")"
+        {
             return None;
         }
         if (ctx.has_blank_before || ctx.at_document_start)

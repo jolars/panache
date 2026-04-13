@@ -784,6 +784,80 @@ fn detects_example_list_markers() {
 }
 
 #[test]
+fn deep_ordered_prefers_nearest_enclosing_indent_over_nearest_below() {
+    use crate::parser::utils::container_stack::{Container, ContainerStack};
+
+    let marker = ListMarker::Ordered(OrderedMarker::LowerRoman {
+        numeral: "ii".to_string(),
+        style: ListDelimiter::Period,
+    });
+
+    let mut containers = ContainerStack::new();
+    containers.push(Container::List {
+        marker: marker.clone(),
+        base_indent_cols: 8,
+        has_blank_between_items: false,
+    });
+    containers.push(Container::ListItem {
+        content_col: 11,
+        buffer: crate::parser::utils::list_item_buffer::ListItemBuffer::new(),
+    });
+    containers.push(Container::List {
+        marker,
+        base_indent_cols: 6,
+        has_blank_between_items: false,
+    });
+
+    // With deep ordered drift (indent 7), we should keep the enclosing level
+    // (base indent 8), not re-associate to the nearest lower sibling level (6).
+    assert_eq!(
+        find_matching_list_level(
+            &containers,
+            &ListMarker::Ordered(OrderedMarker::LowerRoman {
+                numeral: "iii".to_string(),
+                style: ListDelimiter::Period,
+            }),
+            7
+        ),
+        Some(0)
+    );
+}
+
+#[test]
+fn deep_ordered_matches_exact_indent_when_available() {
+    use crate::parser::utils::container_stack::{Container, ContainerStack};
+
+    let marker = ListMarker::Ordered(OrderedMarker::LowerRoman {
+        numeral: "ii".to_string(),
+        style: ListDelimiter::Period,
+    });
+
+    let mut containers = ContainerStack::new();
+    containers.push(Container::List {
+        marker: marker.clone(),
+        base_indent_cols: 8,
+        has_blank_between_items: false,
+    });
+    containers.push(Container::List {
+        marker,
+        base_indent_cols: 6,
+        has_blank_between_items: false,
+    });
+
+    assert_eq!(
+        find_matching_list_level(
+            &containers,
+            &ListMarker::Ordered(OrderedMarker::LowerRoman {
+                numeral: "iii".to_string(),
+                style: ListDelimiter::Period,
+            }),
+            6
+        ),
+        Some(1)
+    );
+}
+
+#[test]
 fn parses_nested_bullet_list_from_single_marker() {
     use crate::parse;
     use crate::syntax::SyntaxKind;
@@ -875,6 +949,9 @@ pub(in crate::parser) fn find_matching_list_level(
     // But for shallow items (0-3 indent), prefer matching at the closest base indent
     let mut best_match: Option<(usize, usize, bool)> = None; // (index, distance, base_leq_indent)
 
+    let is_deep_ordered = matches!(marker, ListMarker::Ordered(_)) && indent_cols >= 4;
+    let mut best_above_match: Option<(usize, usize)> = None; // (index, delta = base - indent), ordered deep only
+
     for (i, c) in containers.stack.iter().enumerate().rev() {
         if let Container::List {
             marker: list_marker,
@@ -906,6 +983,23 @@ pub(in crate::parser) fn find_matching_list_level(
             if matches {
                 let distance = indent_cols.abs_diff(*base_indent_cols);
                 let base_leq_indent = *base_indent_cols <= indent_cols;
+
+                // For deep ordered lists, avoid "nearest below" re-association caused by
+                // formatter alignment shifts (e.g. i./ii./iii. becoming 6/7/8-space indents).
+                // Prefer matching the nearest enclosing level whose base indent is >= current.
+                if is_deep_ordered
+                    && matches!(
+                        (marker, list_marker),
+                        (ListMarker::Ordered(_), ListMarker::Ordered(_))
+                    )
+                    && *base_indent_cols >= indent_cols
+                {
+                    let delta = *base_indent_cols - indent_cols;
+                    if best_above_match.is_none_or(|(_, best_delta)| delta < best_delta) {
+                        best_above_match = Some((i, delta));
+                    }
+                }
+
                 if let Some((_, best_dist, best_base_leq)) = best_match {
                     if distance < best_dist
                         || (distance == best_dist && base_leq_indent && !best_base_leq)
@@ -922,6 +1016,10 @@ pub(in crate::parser) fn find_matching_list_level(
                 }
             }
         }
+    }
+
+    if let Some((index, _)) = best_above_match {
+        return Some(index);
     }
 
     best_match.map(|(i, _, _)| i)

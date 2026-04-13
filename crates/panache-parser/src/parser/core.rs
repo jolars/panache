@@ -27,7 +27,7 @@ use container_stack::{Container, ContainerStack, byte_index_at_column, leading_i
 use definition_lists::{emit_definition_marker, emit_term};
 use line_blocks::{parse_line_block, try_parse_line_block_start};
 use lists::{
-    ListItemEmissionInput, is_content_nested_bullet_marker, start_nested_list,
+    ListItemEmissionInput, ListMarker, is_content_nested_bullet_marker, start_nested_list,
     try_parse_list_marker,
 };
 use marker_utils::{count_blockquote_markers, parse_blockquote_marker_info};
@@ -435,8 +435,29 @@ impl<'a> Parser<'a> {
             indent_bytes: prepared.indent_bytes,
         };
         let current_content_col = paragraphs::current_content_col(&self.containers);
+        let deep_ordered_matched_level = matched_level
+            .and_then(|level| self.containers.stack.get(level).map(|c| (level, c)))
+            .and_then(|(level, container)| match container {
+                Container::List {
+                    marker: list_marker,
+                    base_indent_cols,
+                    ..
+                } if matches!(
+                    (&prepared.marker, list_marker),
+                    (ListMarker::Ordered(_), ListMarker::Ordered(_))
+                ) && prepared.indent_cols >= 4
+                    && *base_indent_cols >= 4
+                    && prepared.indent_cols.abs_diff(*base_indent_cols) <= 3 =>
+                {
+                    Some(level)
+                }
+                _ => None,
+            });
 
-        if current_content_col > 0 && prepared.indent_cols >= current_content_col {
+        if deep_ordered_matched_level.is_none()
+            && current_content_col > 0
+            && prepared.indent_cols >= current_content_col
+        {
             if let Some(level) = matched_level
                 && let Some(Container::List {
                     base_indent_cols, ..

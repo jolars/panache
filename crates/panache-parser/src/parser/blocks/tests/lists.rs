@@ -215,6 +215,17 @@ fn mixed_markers_create_separate_lists() {
 }
 
 #[test]
+fn parenthesized_decimal_with_only_closer_text_does_not_interrupt_list_item() {
+    let input = "- outer\n  4) )\n  continued\n";
+    let tree = parse_blocks(input);
+
+    let lists = find_all(&tree, SyntaxKind::LIST);
+    assert_eq!(lists.len(), 1, "should keep a single outer list");
+    let outer = lists.first().expect("outer list");
+    assert_eq!(count_children(outer, SyntaxKind::LIST_ITEM), 1);
+}
+
+#[test]
 fn task_list_unchecked() {
     let input = "- [ ] unchecked task\n";
     let tree = parse_blocks(input);
