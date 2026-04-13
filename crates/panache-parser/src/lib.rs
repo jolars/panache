@@ -27,8 +27,6 @@ pub mod range_utils;
 pub mod syntax;
 
 pub use config::BlankLines;
-pub use config::Config;
-pub use config::ConfigBuilder;
 pub use config::ParserOptions;
 pub use parser::parse;
 pub use syntax::SyntaxNode;
