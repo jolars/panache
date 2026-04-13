@@ -9,9 +9,13 @@
   "packages": {
     ".": {
       "exclude-paths": [
-        "crates"
+        "crates",
+        "editors"
       ]
     },
-    "crates/panache-parser": {}
+    "crates/panache-parser": {},
+    "editors/code": {
+      "release-type": "node"
+    }
   }
 }
