@@ -3,17 +3,9 @@
   "plugins": [
     "cargo-workspace"
   ],
-  "release-type": "rust",
   "bump-minor-pre-major": true,
   "include-commit-authors": true,
   "packages": {
-    ".": {
-      "exclude-paths": [
-        "crates",
-        "editors"
-      ]
-    },
-    "crates/panache-parser": {},
     "editors/code": {
       "release-type": "node",
       "package-name": "panache-code"
