@@ -1,5 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "plugins": [
+    "cargo-workspace"
+  ],
   "release-type": "rust",
   "bump-minor-pre-major": true,
   "include-commit-authors": true,
