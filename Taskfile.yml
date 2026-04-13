@@ -9,7 +9,7 @@ tasks:
   format:
     desc: Check code formatting
     cmds:
-      - cargo fmt --workspace --
+      - cargo fmt --
 
   build-release:
     desc: Build release version
