@@ -1,0 +1,24 @@
+DOCUMENT@0..20
+  CODE_BLOCK@0..9
+    CODE_FENCE_OPEN@0..5
+      CODE_FENCE_MARKER@0..3 "```"
+      CODE_INFO@3..4
+        CODE_LANGUAGE@3..4 "r"
+      NEWLINE@4..5 "\n"
+    CODE_FENCE_CLOSE@5..9
+      CODE_FENCE_MARKER@5..8 "```"
+      NEWLINE@8..9 "\n"
+  BLANK_LINE@9..10
+    BLANK_LINE@9..10 "\n"
+  BLANK_LINE@10..11
+    BLANK_LINE@10..11 "\n"
+  CODE_BLOCK@11..20
+    CODE_FENCE_OPEN@11..16
+      CODE_FENCE_MARKER@11..14 "```"
+      CODE_INFO@14..15
+        CODE_LANGUAGE@14..15 "r"
+      NEWLINE@15..16 "\n"
+    CODE_FENCE_CLOSE@16..20
+      CODE_FENCE_MARKER@16..19 "```"
+      NEWLINE@19..20 "\n"
+

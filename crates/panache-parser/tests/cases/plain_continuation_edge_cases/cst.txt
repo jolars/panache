@@ -1,0 +1,313 @@
+DOCUMENT@0..1248
+  HEADING@0..32
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..31
+      TEXT@2..31 "PLAIN Continuation Ed ..."
+    NEWLINE@31..32 "\n"
+  BLANK_LINE@32..33
+    BLANK_LINE@32..33 "\n"
+  HEADING@33..58
+    ATX_HEADING_MARKER@33..35
+      ATX_HEADING_MARKER@33..35 "##"
+    WHITESPACE@35..36 " "
+    HEADING_CONTENT@36..57
+      TEXT@36..57 "Multi-line Definition"
+    NEWLINE@57..58 "\n"
+  BLANK_LINE@58..59
+    BLANK_LINE@58..59 "\n"
+  DEFINITION_LIST@59..196
+    DEFINITION_ITEM@59..160
+      TERM@59..66
+        TEXT@59..65 "Term 1"
+        NEWLINE@65..66 "\n"
+      DEFINITION@66..160
+        DEFINITION_MARKER@66..67 ":"
+        WHITESPACE@67..70 "   "
+        PLAIN@70..160
+          TEXT@70..94 "First line of definition"
+          NEWLINE@94..95 "\n"
+          TEXT@95..132 "    continues here wi ..."
+          NEWLINE@132..133 "\n"
+          TEXT@133..159 "    and even a third  ..."
+          NEWLINE@159..160 "\n"
+    BLANK_LINE@160..161
+      BLANK_LINE@160..161 "\n"
+    DEFINITION_ITEM@161..196
+      TERM@161..168
+        TEXT@161..167 "Term 2"
+        NEWLINE@167..168 "\n"
+      DEFINITION@168..196
+        DEFINITION_MARKER@168..169 ":"
+        WHITESPACE@169..172 "   "
+        PLAIN@172..196
+          TEXT@172..195 "Single line definition."
+          NEWLINE@195..196 "\n"
+  BLANK_LINE@196..197
+    BLANK_LINE@196..197 "\n"
+  HEADING@197..228
+    ATX_HEADING_MARKER@197..199
+      ATX_HEADING_MARKER@197..199 "##"
+    WHITESPACE@199..200 " "
+    HEADING_CONTENT@200..227
+      TEXT@200..227 "Definition with Blank ..."
+    NEWLINE@227..228 "\n"
+  BLANK_LINE@228..229
+    BLANK_LINE@228..229 "\n"
+  DEFINITION_LIST@229..327
+    DEFINITION_ITEM@229..327
+      TERM@229..245
+        TEXT@229..244 "Term with blank"
+        NEWLINE@244..245 "\n"
+      DEFINITION@245..327
+        DEFINITION_MARKER@245..246 ":"
+        WHITESPACE@246..249 "   "
+        PLAIN@249..272
+          TEXT@249..271 "Definition starts here"
+          NEWLINE@271..272 "\n"
+        BLANK_LINE@272..273
+          BLANK_LINE@272..273 "\n"
+        PLAIN@273..327
+          TEXT@273..303 "    Continues after b ..."
+          NEWLINE@303..304 "\n"
+          TEXT@304..326 "    with more content."
+          NEWLINE@326..327 "\n"
+  BLANK_LINE@327..328
+    BLANK_LINE@327..328 "\n"
+  HEADING@328..366
+    ATX_HEADING_MARKER@328..330
+      ATX_HEADING_MARKER@328..330 "##"
+    WHITESPACE@330..331 " "
+    HEADING_CONTENT@331..365
+      TEXT@331..365 "Definition Followed b ..."
+    NEWLINE@365..366 "\n"
+  BLANK_LINE@366..367
+    BLANK_LINE@366..367 "\n"
+  DEFINITION_LIST@367..498
+    DEFINITION_ITEM@367..498
+      TERM@367..384
+        TEXT@367..383 "Term before list"
+        NEWLINE@383..384 "\n"
+      DEFINITION@384..498
+        DEFINITION_MARKER@384..385 ":"
+        WHITESPACE@385..388 "   "
+        PLAIN@388..439
+          TEXT@388..411 "Definition content here"
+          NEWLINE@411..412 "\n"
+          TEXT@412..438 "    continues on next ..."
+          NEWLINE@438..439 "\n"
+        BLANK_LINE@439..444
+          BLANK_LINE@439..444 "    \n"
+        LIST@444..498
+          WHITESPACE@444..448 "    "
+          LIST_ITEM@448..480
+            LIST_MARKER@448..449 "-"
+            WHITESPACE@449..450 " "
+            PLAIN@450..480
+              TEXT@450..479 "Nested list inside de ..."
+              NEWLINE@479..480 "\n"
+          WHITESPACE@480..484 "    "
+          LIST_ITEM@484..498
+            LIST_MARKER@484..485 "-"
+            WHITESPACE@485..486 " "
+            PLAIN@486..498
+              TEXT@486..497 "Second item"
+              NEWLINE@497..498 "\n"
+  BLANK_LINE@498..499
+    BLANK_LINE@498..499 "\n"
+  HEADING@499..532
+    ATX_HEADING_MARKER@499..501
+      ATX_HEADING_MARKER@499..501 "##"
+    WHITESPACE@501..502 " "
+    HEADING_CONTENT@502..531
+      TEXT@502..531 "Definition with Inlin ..."
+    NEWLINE@531..532 "\n"
+  BLANK_LINE@532..533
+    BLANK_LINE@532..533 "\n"
+  DEFINITION_LIST@533..671
+    DEFINITION_ITEM@533..671
+      TERM@533..547
+        STRONG@533..546
+          STRONG_MARKER@533..535 "**"
+          TEXT@535..544 "Bold term"
+          STRONG_MARKER@544..546 "**"
+        NEWLINE@546..547 "\n"
+      DEFINITION@547..671
+        DEFINITION_MARKER@547..548 ":"
+        WHITESPACE@548..551 "   "
+        PLAIN@551..671
+          TEXT@551..567 "Definition with "
+          EMPHASIS@567..577
+            EMPHASIS_MARKER@567..568 "*"
+            TEXT@568..576 "emphasis"
+            EMPHASIS_MARKER@576..577 "*"
+          TEXT@577..582 " and "
+          STRONG@582..590
+            STRONG_MARKER@582..584 "**"
+            TEXT@584..588 "bold"
+            STRONG_MARKER@588..590 "**"
+          NEWLINE@590..591 "\n"
+          TEXT@591..610 "    continues with "
+          INLINE_CODE@610..616
+            INLINE_CODE_MARKER@610..611 "`"
+            INLINE_CODE_CONTENT@611..615 "code"
+            INLINE_CODE_MARKER@615..616 "`"
+          TEXT@616..629 " on next line"
+          NEWLINE@629..630 "\n"
+          TEXT@630..638 "    and "
+          LINK@638..664
+            LINK_START@638..639
+              LINK_START@638..639 "["
+            LINK_TEXT@639..643
+              TEXT@639..643 "link"
+            LINK_TEXT_END@643..644 "]"
+            LINK_DEST_START@644..645 "("
+            LINK_DEST@645..663
+              TEXT@645..663 "http://example.com"
+            LINK_DEST_END@663..664 ")"
+          TEXT@664..670 " here."
+          NEWLINE@670..671 "\n"
+  BLANK_LINE@671..672
+    BLANK_LINE@671..672 "\n"
+  HEADING@672..709
+    ATX_HEADING_MARKER@672..674
+      ATX_HEADING_MARKER@672..674 "##"
+    WHITESPACE@674..675 " "
+    HEADING_CONTENT@675..708
+      TEXT@675..708 "Definition Followed b ..."
+    NEWLINE@708..709 "\n"
+  BLANK_LINE@709..710
+    BLANK_LINE@709..710 "\n"
+  DEFINITION_LIST@710..762
+    DEFINITION_ITEM@710..762
+      TERM@710..723
+        TEXT@710..722 "Regular term"
+        NEWLINE@722..723 "\n"
+      DEFINITION@723..762
+        DEFINITION_MARKER@723..724 ":"
+        WHITESPACE@724..727 "   "
+        PLAIN@727..762
+          TEXT@727..742 "Definition text"
+          NEWLINE@742..743 "\n"
+          TEXT@743..761 "    continues here"
+          NEWLINE@761..762 "\n"
+  BLANK_LINE@762..763
+    BLANK_LINE@762..763 "\n"
+  BLOCK_QUOTE@763..793
+    BLOCK_QUOTE_MARKER@763..764 ">"
+    WHITESPACE@764..765 " "
+    PARAGRAPH@765..793
+      TEXT@765..792 "Blockquote after defi ..."
+      NEWLINE@792..793 "\n"
+  BLANK_LINE@793..794
+    BLANK_LINE@793..794 "\n"
+  HEADING@794..815
+    ATX_HEADING_MARKER@794..796
+      ATX_HEADING_MARKER@794..796 "##"
+    WHITESPACE@796..797 " "
+    HEADING_CONTENT@797..814
+      TEXT@797..814 "Lazy Continuation"
+    NEWLINE@814..815 "\n"
+  BLANK_LINE@815..816
+    BLANK_LINE@815..816 "\n"
+  DEFINITION_LIST@816..925
+    DEFINITION_ITEM@816..925
+      TERM@816..826
+        TEXT@816..825 "Lazy term"
+        NEWLINE@825..826 "\n"
+      DEFINITION@826..925
+        DEFINITION_MARKER@826..827 ":"
+        WHITESPACE@827..830 "   "
+        PLAIN@830..925
+          TEXT@830..849 "Definition line one"
+          NEWLINE@849..850 "\n"
+          TEXT@850..894 "continues without ind ..."
+          NEWLINE@894..895 "\n"
+          TEXT@895..924 "still part of the def ..."
+          NEWLINE@924..925 "\n"
+  BLANK_LINE@925..926
+    BLANK_LINE@925..926 "\n"
+  HEADING@926..964
+    ATX_HEADING_MARKER@926..928
+      ATX_HEADING_MARKER@926..928 "##"
+    WHITESPACE@928..929 " "
+    HEADING_CONTENT@929..963
+      TEXT@929..963 "Multiple Definitions  ..."
+    NEWLINE@963..964 "\n"
+  BLANK_LINE@964..965
+    BLANK_LINE@964..965 "\n"
+  DEFINITION_LIST@965..1161
+    DEFINITION_ITEM@965..1059
+      TERM@965..977
+        TEXT@965..976 "Shared term"
+        NEWLINE@976..977 "\n"
+      DEFINITION@977..1017
+        DEFINITION_MARKER@977..978 ":"
+        WHITESPACE@978..981 "   "
+        PLAIN@981..1017
+          TEXT@981..997 "First definition"
+          NEWLINE@997..998 "\n"
+          TEXT@998..1016 "    continues here"
+          NEWLINE@1016..1017 "\n"
+      BLANK_LINE@1017..1018
+        BLANK_LINE@1017..1018 "\n"
+      DEFINITION@1018..1059
+        DEFINITION_MARKER@1018..1019 ":"
+        WHITESPACE@1019..1022 "   "
+        PLAIN@1022..1059
+          TEXT@1022..1039 "Second definition"
+          NEWLINE@1039..1040 "\n"
+          TEXT@1040..1058 "    also continues"
+          NEWLINE@1058..1059 "\n"
+    BLANK_LINE@1059..1060
+      BLANK_LINE@1059..1060 "\n"
+    DEFINITION_ITEM@1060..1161
+      TERM@1060..1078
+        TEXT@1060..1077 "Shared loose term"
+        NEWLINE@1077..1078 "\n"
+      BLANK_LINE@1078..1079
+        BLANK_LINE@1078..1079 "\n"
+      DEFINITION@1079..1119
+        DEFINITION_MARKER@1079..1080 ":"
+        WHITESPACE@1080..1083 "   "
+        PLAIN@1083..1119
+          TEXT@1083..1099 "First definition"
+          NEWLINE@1099..1100 "\n"
+          TEXT@1100..1118 "    continues here"
+          NEWLINE@1118..1119 "\n"
+      BLANK_LINE@1119..1120
+        BLANK_LINE@1119..1120 "\n"
+      DEFINITION@1120..1161
+        DEFINITION_MARKER@1120..1121 ":"
+        WHITESPACE@1121..1124 "   "
+        PLAIN@1124..1161
+          TEXT@1124..1141 "Second definition"
+          NEWLINE@1141..1142 "\n"
+          TEXT@1142..1160 "    also continues"
+          NEWLINE@1160..1161 "\n"
+  BLANK_LINE@1161..1162
+    BLANK_LINE@1161..1162 "\n"
+  HEADING@1162..1185
+    ATX_HEADING_MARKER@1162..1164
+      ATX_HEADING_MARKER@1162..1164 "##"
+    WHITESPACE@1164..1165 " "
+    HEADING_CONTENT@1165..1184
+      TEXT@1165..1184 "End with Definition"
+    NEWLINE@1184..1185 "\n"
+  BLANK_LINE@1185..1186
+    BLANK_LINE@1185..1186 "\n"
+  DEFINITION_LIST@1186..1248
+    DEFINITION_ITEM@1186..1248
+      TERM@1186..1197
+        TEXT@1186..1196 "Final term"
+        NEWLINE@1196..1197 "\n"
+      DEFINITION@1197..1248
+        DEFINITION_MARKER@1197..1198 ":"
+        WHITESPACE@1198..1201 "   "
+        PLAIN@1201..1248
+          TEXT@1201..1226 "Last definition conti ..."
+          NEWLINE@1226..1227 "\n"
+          TEXT@1227..1247 "    to the very end."
+          NEWLINE@1247..1248 "\n"
+

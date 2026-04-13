@@ -1,6 +1,6 @@
 //! Golden parser regression cases for panache-parser.
 //!
-//! Each test case is a directory under `tests/cases/` containing:
+//! Each test case is a directory under `crates/panache-parser/tests/cases/` containing:
 //! - `input.*` - Source file (`.md`, `.qmd`, or `.Rmd`)
 //! - `cst.txt` - (Optional) Expected CST structure for parse regression testing
 //! - `panache.toml` - (Optional) Parser config options
@@ -68,8 +68,6 @@ fn load_test_parser_options(dir: &Path) -> Option<ParserOptions> {
 /// Run parser-only checks for a single golden case.
 fn run_golden_case(case_name: &str) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
         .join("tests")
         .join("cases")
         .join(case_name);
@@ -121,7 +119,7 @@ macro_rules! golden_test_cases {
 
 // Generate test functions for each case directory.
 // To add a new test case:
-// 1. Create a new directory under tests/cases/
+// 1. Create a new directory under crates/panache-parser/tests/cases/
 // 2. Add the directory name to this list
 golden_test_cases!(
     alerts,

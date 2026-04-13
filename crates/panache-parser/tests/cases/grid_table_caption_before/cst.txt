@@ -1,0 +1,25 @@
+ROOT@0..69
+  DOCUMENT@0..69
+    BlankLine@0..1
+      BlankLine@0..1 "\n"
+    GridTable@1..69
+      TableCaption@1..19
+        TableCaptionPrefix@1..8 "Table: "
+        TEXT@8..18 "My caption"
+        NEWLINE@18..19 "\n"
+      TableSeparator@19..29
+        TEXT@19..28 "+---+---+"
+        NEWLINE@28..29 "\n"
+      TableHeader@29..39
+        TEXT@29..38 "| A | B |"
+        NEWLINE@38..39 "\n"
+      TableSeparator@39..49
+        TEXT@39..48 "+===+===+"
+        NEWLINE@48..49 "\n"
+      TableRow@49..59
+        TEXT@49..58 "| C | D |"
+        NEWLINE@58..59 "\n"
+      TableSeparator@59..69
+        TEXT@59..68 "+---+---+"
+        NEWLINE@68..69 "\n"
+

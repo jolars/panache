@@ -1,0 +1,4 @@
+flavor = "quarto"
+
+[code-blocks]
+attribute-style = "shortcut"

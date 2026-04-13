@@ -5,6 +5,9 @@
 tests/cases/*/*.md eol=lf
 tests/cases/*/*.qmd eol=lf
 tests/cases/*/*.Rmd eol=lf
+crates/panache-parser/tests/cases/*/*.md eol=lf
+crates/panache-parser/tests/cases/*/*.qmd eol=lf
+crates/panache-parser/tests/cases/*/*.Rmd eol=lf
 tests/bibtex_samples/*.bib eol=lf
 crates/panache-parser/tests/fixtures/yaml-test-suite/**/in.yaml eol=lf
 
@@ -12,10 +15,14 @@ crates/panache-parser/tests/fixtures/yaml-test-suite/**/in.yaml eol=lf
 tests/cases/crlf_*/* -text
 tests/cases/line_ending_crlf/* -text
 tests/cases/line_ending_lf/* -text
+crates/panache-parser/tests/cases/crlf_*/* -text
+crates/panache-parser/tests/cases/line_ending_crlf/* -text
+crates/panache-parser/tests/cases/line_ending_lf/* -text
 tests/bibtex_samples/bibtex_crlf.bib -text
 
 # CST files should always use LF endings (they contain literal string representations)
 tests/cases/*/cst.txt eol=lf
+crates/panache-parser/tests/cases/*/cst.txt eol=lf
 tests/bibtex_samples/*.cst eol=lf
 
 # Other test cases can use LF (the default for most projects)

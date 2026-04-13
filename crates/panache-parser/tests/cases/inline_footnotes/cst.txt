@@ -1,0 +1,30 @@
+DOCUMENT@0..210
+  HEADING@0..19
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..18
+      TEXT@2..18 "Inline Footnotes"
+    NEWLINE@18..19 "\n"
+  BLANK_LINE@19..20
+    BLANK_LINE@19..20 "\n"
+  PARAGRAPH@20..143
+    TEXT@20..56 "This document has an  ..."
+    INLINE_FOOTNOTE@56..101
+      INLINE_FOOTNOTE_START@56..58 "^["
+      TEXT@58..100 "This is an inline foo ..."
+      INLINE_FOOTNOTE_END@100..101 "]"
+    NEWLINE@101..102 "\n"
+    TEXT@102..142 "that should be parsab ..."
+    NEWLINE@142..143 "\n"
+  BLANK_LINE@143..144
+    BLANK_LINE@143..144 "\n"
+  PARAGRAPH@144..210
+    TEXT@144..172 "Another inline footno ..."
+    INLINE_FOOTNOTE@172..187
+      INLINE_FOOTNOTE_START@172..174 "^["
+      TEXT@174..186 "Another note"
+      INLINE_FOOTNOTE_END@186..187 "]"
+    TEXT@187..209 " in the same document."
+    NEWLINE@209..210 "\n"
+

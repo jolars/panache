@@ -1,0 +1,103 @@
+DOCUMENT@0..472
+  CODE_BLOCK@0..40
+    CODE_CONTENT@0..40
+      WHITESPACE@0..1 "\t"
+      TEXT@1..39 "this code block is in ..."
+      NEWLINE@39..40 "\n"
+  BLANK_LINE@40..41
+    BLANK_LINE@40..41 "\n"
+  PARAGRAPH@41..46
+    TEXT@41..45 "And:"
+    NEWLINE@45..46 "\n"
+  BLANK_LINE@46..47
+    BLANK_LINE@46..47 "\n"
+  CODE_BLOCK@47..89
+    CODE_CONTENT@47..89
+      WHITESPACE@47..49 "\t\t"
+      TEXT@49..88 "this code block is in ..."
+      NEWLINE@88..89 "\n"
+  BLANK_LINE@89..90
+    BLANK_LINE@89..90 "\n"
+  LIST@90..293
+    LIST_ITEM@90..132
+      LIST_MARKER@90..91 "+"
+      WHITESPACE@91..92 "\t"
+      PLAIN@92..132
+        TEXT@92..111 "this is a list item"
+        NEWLINE@111..112 "\n"
+        TEXT@112..131 "\tindented with tabs"
+        NEWLINE@131..132 "\n"
+    BLANK_LINE@132..133
+      BLANK_LINE@132..133 "\n"
+    LIST_ITEM@133..182
+      LIST_MARKER@133..134 "+"
+      WHITESPACE@134..137 "   "
+      PLAIN@137..182
+        TEXT@137..156 "this is a list item"
+        NEWLINE@156..157 "\n"
+        TEXT@157..181 "    indented with spaces"
+        NEWLINE@181..182 "\n"
+    BLANK_LINE@182..183
+      BLANK_LINE@182..183 "\n"
+    LIST_ITEM@183..234
+      LIST_MARKER@183..184 "+"
+      WHITESPACE@184..185 "\t"
+      PLAIN@185..234
+        TEXT@185..213 "this is an example li ..."
+        NEWLINE@213..214 "\n"
+        TEXT@214..233 "\tindented with tabs"
+        NEWLINE@233..234 "\n"
+    BLANK_LINE@234..235
+      BLANK_LINE@234..235 "\n"
+    LIST_ITEM@235..293
+      LIST_MARKER@235..236 "+"
+      WHITESPACE@236..239 "   "
+      PLAIN@239..293
+        TEXT@239..267 "this is an example li ..."
+        NEWLINE@267..268 "\n"
+        TEXT@268..292 "    indented with spaces"
+        NEWLINE@292..293 "\n"
+  BLANK_LINE@293..294
+    BLANK_LINE@293..294 "\n"
+  DEFINITION_LIST@294..328
+    DEFINITION_ITEM@294..328
+      TERM@294..299
+        TEXT@294..298 "Term"
+        NEWLINE@298..299 "\n"
+      DEFINITION@299..328
+        DEFINITION_MARKER@299..300 ":"
+        WHITESPACE@300..301 "\t"
+        PLAIN@301..328
+          TEXT@301..327 "Definition with tab i ..."
+          NEWLINE@327..328 "\n"
+  BLANK_LINE@328..329
+    BLANK_LINE@328..329 "\n"
+  PARAGRAPH@329..379
+    LINK@329..377
+      LINK_START@329..330
+        LINK_START@329..330 "["
+      LINK_TEXT@330..343
+        TEXT@330..343 "URL and title"
+      LINK_TEXT_END@343..344 "]"
+      LINK_DEST_START@344..345 "("
+      LINK_DEST@345..376
+        TEXT@345..376 "/url/\t\"title preceded ..."
+      LINK_DEST_END@376..377 ")"
+    TEXT@377..378 "."
+    NEWLINE@378..379 "\n"
+  BLANK_LINE@379..380
+    BLANK_LINE@379..380 "\n"
+  PARAGRAPH@380..414
+    TEXT@380..413 "Tab stops in text are ..."
+    NEWLINE@413..414 "\n"
+  BLANK_LINE@414..415
+    BLANK_LINE@414..415 "\n"
+  PARAGRAPH@415..472
+    TEXT@415..460 "In inline code tabs a ..."
+    INLINE_CODE@460..470
+      INLINE_CODE_MARKER@460..461 "`"
+      INLINE_CODE_CONTENT@461..469 "tab\tcode"
+      INLINE_CODE_MARKER@469..470 "`"
+    TEXT@470..471 "."
+    NEWLINE@471..472 "\n"
+

@@ -1,0 +1,68 @@
+DOCUMENT@0..314
+  SIMPLE_TABLE@0..314
+    TABLE_HEADER@0..40
+      WHITESPACE@0..2 "  "
+      TABLE_CELL@2..7
+        TEXT@2..7 "Right"
+      WHITESPACE@7..12 "     "
+      TABLE_CELL@12..16
+        TEXT@12..16 "Left"
+      WHITESPACE@16..21 "     "
+      TABLE_CELL@21..27
+        TEXT@21..27 "Center"
+      WHITESPACE@27..32 "     "
+      TABLE_CELL@32..39
+        TEXT@32..39 "Default"
+      NEWLINE@39..40 "\n"
+    TABLE_SEPARATOR@40..80
+      TEXT@40..79 "-------     ------ -- ..."
+      NEWLINE@79..80 "\n"
+    TABLE_ROW@80..119
+      WHITESPACE@80..85 "     "
+      TABLE_CELL@85..87
+        TEXT@85..87 "12"
+      WHITESPACE@87..92 "     "
+      TABLE_CELL@92..94
+        TEXT@92..94 "12"
+      WHITESPACE@94..102 "        "
+      TABLE_CELL@102..104
+        TEXT@102..104 "12"
+      WHITESPACE@104..116 "            "
+      TABLE_CELL@116..118
+        TEXT@116..118 "12"
+      NEWLINE@118..119 "\n"
+    TABLE_ROW@119..158
+      WHITESPACE@119..123 "    "
+      TABLE_CELL@123..126
+        TEXT@123..126 "123"
+      WHITESPACE@126..131 "     "
+      TABLE_CELL@131..134
+        TEXT@131..134 "123"
+      WHITESPACE@134..141 "       "
+      TABLE_CELL@141..144
+        TEXT@141..144 "123"
+      WHITESPACE@144..154 "          "
+      TABLE_CELL@154..157
+        TEXT@154..157 "123"
+      NEWLINE@157..158 "\n"
+    TABLE_ROW@158..197
+      WHITESPACE@158..164 "      "
+      TABLE_CELL@164..165
+        TEXT@164..165 "1"
+      WHITESPACE@165..170 "     "
+      TABLE_CELL@170..171
+        TEXT@170..171 "1"
+      WHITESPACE@171..181 "          "
+      TABLE_CELL@181..182
+        TEXT@181..182 "1"
+      WHITESPACE@182..195 "             "
+      TABLE_CELL@195..196
+        TEXT@195..196 "1"
+      NEWLINE@196..197 "\n"
+    BLANK_LINE@197..198
+      BLANK_LINE@197..198 "\n"
+    TABLE_CAPTION@198..314
+      TABLE_CAPTION_PREFIX@198..205 "Table: "
+      TEXT@205..313 "Demonstration of simp ..."
+      NEWLINE@313..314 "\n"
+

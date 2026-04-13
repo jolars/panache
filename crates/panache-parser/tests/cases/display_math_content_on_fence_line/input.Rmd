@@ -1,0 +1,20 @@
+# Display Math with Content on Fence Line
+
+Testing content on same line as opening/closing markers.
+
+$$ x = y + z
+$$
+
+And with closing content:
+
+$$
+a = b $$
+
+Both on same line:
+
+$$ E = mc^2 $$
+
+Backslash variant:
+
+\[ \alpha + \beta = \gamma
+\]

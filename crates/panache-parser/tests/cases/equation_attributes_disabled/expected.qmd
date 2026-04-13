@@ -1,0 +1,8 @@
+When quarto_crossrefs is disabled, attributes should not be parsed:
+
+$$
+E = mc^2
+$$
+{#eq-einstein}
+
+The {#eq-einstein} becomes a paragraph.

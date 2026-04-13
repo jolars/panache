@@ -1,0 +1,37 @@
+DOCUMENT@0..240
+  YAML_METADATA@0..45
+    YAML_METADATA_DELIM@0..3 "---"
+    NEWLINE@3..4 "\n"
+    YAML_METADATA_CONTENT@4..41
+      TEXT@4..40 "title: \"Footnote inde ..."
+      NEWLINE@40..41 "\n"
+    YAML_METADATA_DELIM@41..44 "---"
+    NEWLINE@44..45 "\n"
+  BLANK_LINE@45..46
+    BLANK_LINE@45..46 "\n"
+  PARAGRAPH@46..79
+    TEXT@46..72 "Some text with a foot ..."
+    FOOTNOTE_REFERENCE@72..78
+      FOOTNOTE_LABEL_START@72..74 "[^"
+      FOOTNOTE_LABEL_ID@74..77 "fn1"
+      FOOTNOTE_LABEL_END@77..78 "]"
+    NEWLINE@78..79 "\n"
+  BLANK_LINE@79..80
+    BLANK_LINE@79..80 "\n"
+  FOOTNOTE_DEFINITION@80..220
+    FOOTNOTE_LABEL_START@80..82 "[^"
+    FOOTNOTE_LABEL_ID@82..85 "fn1"
+    FOOTNOTE_LABEL_END@85..86 "]"
+    FOOTNOTE_LABEL_COLON@86..87 ":"
+    WHITESPACE@87..88 " "
+    PARAGRAPH@88..220
+      TEXT@88..150 "First sentence of the ..."
+      NEWLINE@150..151 "\n"
+      TEXT@151..219 "    will wrap it onto ..."
+      NEWLINE@219..220 "\n"
+  BLANK_LINE@220..221
+    BLANK_LINE@220..221 "\n"
+  PARAGRAPH@221..240
+    TEXT@221..239 "Another paragraph."
+    NEWLINE@239..240 "\n"
+

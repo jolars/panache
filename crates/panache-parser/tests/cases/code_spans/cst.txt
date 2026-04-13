@@ -1,0 +1,92 @@
+DOCUMENT@0..427
+  HEADING@0..13
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..12
+      TEXT@2..12 "Code Spans"
+    NEWLINE@12..13 "\n"
+  BLANK_LINE@13..14
+    BLANK_LINE@13..14 "\n"
+  PARAGRAPH@14..34
+    TEXT@14..27 "Simple code: "
+    INLINE_CODE@27..33
+      INLINE_CODE_MARKER@27..28 "`"
+      INLINE_CODE_CONTENT@28..32 "code"
+      INLINE_CODE_MARKER@32..33 "`"
+    NEWLINE@33..34 "\n"
+  BLANK_LINE@34..35
+    BLANK_LINE@34..35 "\n"
+  PARAGRAPH@35..69
+    TEXT@35..48 "With spaces: "
+    INLINE_CODE@48..68
+      INLINE_CODE_MARKER@48..49 "`"
+      INLINE_CODE_CONTENT@49..67 " code with spaces "
+      INLINE_CODE_MARKER@67..68 "`"
+    NEWLINE@68..69 "\n"
+  BLANK_LINE@69..70
+    BLANK_LINE@69..70 "\n"
+  PARAGRAPH@70..122
+    TEXT@70..90 "Multiple backticks: "
+    INLINE_CODE@90..121
+      INLINE_CODE_MARKER@90..92 "``"
+      INLINE_CODE_CONTENT@92..119 "code with `backtick`  ..."
+      INLINE_CODE_MARKER@119..121 "``"
+    NEWLINE@121..122 "\n"
+  BLANK_LINE@122..123
+    BLANK_LINE@122..123 "\n"
+  PARAGRAPH@123..167
+    TEXT@123..141 "Code in emphasis: "
+    EMPHASIS@141..166
+      EMPHASIS_MARKER@141..142 "*"
+      TEXT@142..152 "text with "
+      INLINE_CODE@152..158
+        INLINE_CODE_MARKER@152..153 "`"
+        INLINE_CODE_CONTENT@153..157 "code"
+        INLINE_CODE_MARKER@157..158 "`"
+      TEXT@158..165 " inside"
+      EMPHASIS_MARKER@165..166 "*"
+    NEWLINE@166..167 "\n"
+  BLANK_LINE@167..168
+    BLANK_LINE@167..168 "\n"
+  PARAGRAPH@168..215
+    TEXT@168..183 "Adjacent code: "
+    INLINE_CODE@183..190
+      INLINE_CODE_MARKER@183..184 "`"
+      INLINE_CODE_CONTENT@184..189 "first"
+      INLINE_CODE_MARKER@189..190 "`"
+    TEXT@190..195 " and "
+    INLINE_CODE@195..203
+      INLINE_CODE_MARKER@195..196 "`"
+      INLINE_CODE_CONTENT@196..202 "second"
+      INLINE_CODE_MARKER@202..203 "`"
+    TEXT@203..214 " code spans"
+    NEWLINE@214..215 "\n"
+  BLANK_LINE@215..216
+    BLANK_LINE@215..216 "\n"
+  PARAGRAPH@216..255
+    TEXT@216..242 "Escaped backtick outs ..."
+    ESCAPED_CHAR@242..244 "\\`"
+    TEXT@244..252 "not code"
+    ESCAPED_CHAR@252..254 "\\`"
+    NEWLINE@254..255 "\n"
+  BLANK_LINE@255..256
+    BLANK_LINE@255..256 "\n"
+  PARAGRAPH@256..427
+    TEXT@256..332 "Hard line breaks, whi ..."
+    NEWLINE@332..333 "\n"
+    TEXT@333..341 "spaces ("
+    INLINE_CODE@341..345
+      INLINE_CODE_MARKER@341..342 "`"
+      INLINE_CODE_CONTENT@342..344 "  "
+      INLINE_CODE_MARKER@344..345 "`"
+    TEXT@345..372 ") or by using a backs ..."
+    INLINE_CODE@372..377
+      INLINE_CODE_MARKER@372..373 "`"
+      INLINE_CODE_CONTENT@373..376 "\\\\n"
+      INLINE_CODE_MARKER@376..377 "`"
+    TEXT@377..411 "), are preserved rega ..."
+    NEWLINE@411..412 "\n"
+    TEXT@412..426 "wrapping mode:"
+    NEWLINE@426..427 "\n"
+

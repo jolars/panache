@@ -1,0 +1,87 @@
+DOCUMENT@0..542
+  MULTILINE_TABLE@0..542
+    TABLE_SEPARATOR@0..70
+      TEXT@0..69 "--------------------- ..."
+      NEWLINE@69..70 "\n"
+    TABLE_HEADER@70..182
+      TABLE_CELL@70..81
+        TEXT@70..81 " Column    "
+      WHITESPACE@81..82 " "
+      TABLE_CELL@82..97
+        TEXT@82..97 "Bold           "
+      WHITESPACE@97..98 " "
+      TABLE_CELL@98..117
+        TEXT@98..117 "    Code           "
+      WHITESPACE@117..118 " "
+      TABLE_CELL@118..125
+        TEXT@118..125 "   Link"
+      NEWLINE@125..126 "\n"
+      TEXT@126..181 "  One       Two       ..."
+      NEWLINE@181..182 "\n"
+    TABLE_SEPARATOR@182..252
+      TEXT@182..251 "----------- --------- ..."
+      NEWLINE@251..252 "\n"
+    TABLE_ROW@252..348
+      TABLE_CELL@252..263
+        TEXT@252..263 "   First   "
+      WHITESPACE@263..264 " "
+      TABLE_CELL@264..279
+        STRONG@264..272
+          STRONG_MARKER@264..266 "**"
+          TEXT@266..270 "bold"
+          STRONG_MARKER@270..272 "**"
+        TEXT@272..279 "       "
+      WHITESPACE@279..280 " "
+      TABLE_CELL@280..299
+        TEXT@280..284 "    "
+        INLINE_CODE@284..290
+          INLINE_CODE_MARKER@284..285 "`"
+          INLINE_CODE_CONTENT@285..289 "code"
+          INLINE_CODE_MARKER@289..290 "`"
+        TEXT@290..299 " spans   "
+      WHITESPACE@299..300 " "
+      TABLE_CELL@300..314
+        TEXT@300..303 "   "
+        LINK@303..314
+          LINK_START@303..304
+            LINK_START@303..304 "["
+          LINK_TEXT@304..308
+            TEXT@304..308 "link"
+          LINK_TEXT_END@308..309 "]"
+          LINK_DEST_START@309..310 "("
+          LINK_DEST@310..313
+            TEXT@310..313 "url"
+          LINK_DEST_END@313..314 ")"
+      NEWLINE@314..315 "\n"
+      TEXT@315..347 "            text      ..."
+      NEWLINE@347..348 "\n"
+    BLANK_LINE@348..349
+      BLANK_LINE@348..349 "\n"
+    TABLE_ROW@349..472
+      TABLE_CELL@349..360
+        TEXT@349..360 "  Second   "
+      WHITESPACE@360..361 " "
+      TABLE_CELL@361..376
+        EMPHASIS@361..371
+          EMPHASIS_MARKER@361..362 "*"
+          TEXT@362..370 "emphasis"
+          EMPHASIS_MARKER@370..371 "*"
+        TEXT@371..376 "     "
+      WHITESPACE@376..377 " "
+      TABLE_CELL@377..396
+        TEXT@377..386 "    more "
+        INLINE_CODE@386..392
+          INLINE_CODE_MARKER@386..387 "`"
+          INLINE_CODE_CONTENT@387..391 "code"
+          INLINE_CODE_MARKER@391..392 "`"
+        TEXT@392..396 "    "
+      WHITESPACE@396..397 " "
+      TABLE_CELL@397..407
+        TEXT@397..407 "   another"
+      NEWLINE@407..408 "\n"
+      TEXT@408..471 "            row       ..."
+      NEWLINE@471..472 "\n"
+    TABLE_SEPARATOR@472..542
+      TEXT@472..541 "--------------------- ..."
+      NEWLINE@541..542 "\n"
+

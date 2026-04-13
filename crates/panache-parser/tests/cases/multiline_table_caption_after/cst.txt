@@ -1,0 +1,65 @@
+DOCUMENT@0..506
+  MULTILINE_TABLE@0..506
+    TABLE_SEPARATOR@0..62
+      TEXT@0..61 "--------------------- ..."
+      NEWLINE@61..62 "\n"
+    TABLE_HEADER@62..147
+      TABLE_CELL@62..73
+        TEXT@62..73 " Centered  "
+      WHITESPACE@73..74 " "
+      TABLE_CELL@74..81
+        TEXT@74..81 "Default"
+      WHITESPACE@81..82 " "
+      TABLE_CELL@82..97
+        TEXT@82..97 "          Right"
+      WHITESPACE@97..98 " "
+      TABLE_CELL@98..102
+        TEXT@98..102 "Left"
+      NEWLINE@102..103 "\n"
+      TEXT@103..146 "  Header    Aligned   ..."
+      NEWLINE@146..147 "\n"
+    TABLE_SEPARATOR@147..209
+      TEXT@147..208 "----------- ------- - ..."
+      NEWLINE@208..209 "\n"
+    TABLE_ROW@209..325
+      TABLE_CELL@209..220
+        TEXT@209..220 "   First   "
+      WHITESPACE@220..221 " "
+      TABLE_CELL@221..228
+        TEXT@221..228 "row    "
+      WHITESPACE@228..229 " "
+      TABLE_CELL@229..244
+        TEXT@229..244 "           12.0"
+      WHITESPACE@244..245 " "
+      TABLE_CELL@245..266
+        TEXT@245..266 "Example of a row that"
+      NEWLINE@266..267 "\n"
+      TEXT@267..324 "                      ..."
+      NEWLINE@324..325 "\n"
+    BLANK_LINE@325..326
+      BLANK_LINE@325..326 "\n"
+    TABLE_ROW@326..382
+      TABLE_CELL@326..337
+        TEXT@326..337 "  Second   "
+      WHITESPACE@337..338 " "
+      TABLE_CELL@338..345
+        TEXT@338..345 "row    "
+      WHITESPACE@345..346 " "
+      TABLE_CELL@346..361
+        TEXT@346..361 "            5.0"
+      WHITESPACE@361..362 " "
+      TABLE_CELL@362..381
+        TEXT@362..381 "Here's another one."
+      NEWLINE@381..382 "\n"
+    TABLE_SEPARATOR@382..444
+      TEXT@382..443 "--------------------- ..."
+      NEWLINE@443..444 "\n"
+    BLANK_LINE@444..445
+      BLANK_LINE@444..445 "\n"
+    TABLE_CAPTION@445..506
+      TABLE_CAPTION_PREFIX@445..452 "Table: "
+      TEXT@452..489 "Here's the caption. I ..."
+      NEWLINE@489..490 "\n"
+      TEXT@490..505 "multiple lines."
+      NEWLINE@505..506 "\n"
+

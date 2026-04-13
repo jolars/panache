@@ -1,0 +1,60 @@
+DOCUMENT@0..404
+  PARAGRAPH@0..5
+    TEXT@0..4 "Test"
+    NEWLINE@4..5 "\n"
+  BLANK_LINE@5..6
+    BLANK_LINE@5..6 "\n"
+  CODE_BLOCK@6..15
+    CODE_CONTENT@6..15
+      WHITESPACE@6..10 "    "
+      TEXT@10..14 "code"
+      NEWLINE@14..15 "\n"
+  BLANK_LINE@15..16
+    BLANK_LINE@15..16 "\n"
+  PARAGRAPH@16..93
+    TEXT@16..92 "Again, I want to than ..."
+    NEWLINE@92..93 "\n"
+  BLANK_LINE@93..94
+    BLANK_LINE@93..94 "\n"
+  PARAGRAPH@94..143
+    TEXT@94..142 "Here's an indented co ..."
+    NEWLINE@142..143 "\n"
+  BLANK_LINE@143..144
+    BLANK_LINE@143..144 "\n"
+  CODE_BLOCK@144..176
+    CODE_CONTENT@144..176
+      WHITESPACE@144..148 "    "
+      TEXT@148..153 "* one"
+      NEWLINE@153..154 "\n"
+      WHITESPACE@154..158 "    "
+      TEXT@158..163 "* two"
+      NEWLINE@163..164 "\n"
+      WHITESPACE@164..168 "    "
+      TEXT@168..175 "* three"
+      NEWLINE@175..176 "\n"
+  BLANK_LINE@176..177
+    BLANK_LINE@176..177 "\n"
+  PARAGRAPH@177..227
+    TEXT@177..226 "Here's indented code  ..."
+    NEWLINE@226..227 "\n"
+  BLANK_LINE@227..228
+    BLANK_LINE@227..228 "\n"
+  CODE_BLOCK@228..404
+    CODE_CONTENT@228..404
+      WHITESPACE@228..232 "    "
+      TEXT@232..277 "[^longnote]: Here's o ..."
+      NEWLINE@277..278 "\n"
+      TEXT@278..278 ""
+      NEWLINE@278..279 "\n"
+      WHITESPACE@279..287 "        "
+      TEXT@287..339 "Subsequent paragraphs ..."
+      NEWLINE@339..340 "\n"
+      WHITESPACE@340..344 "    "
+      TEXT@344..376 "belong to the previou ..."
+      NEWLINE@376..377 "\n"
+      TEXT@377..377 ""
+      NEWLINE@377..378 "\n"
+      WHITESPACE@378..390 "            "
+      TEXT@390..403 "{ some.code }"
+      NEWLINE@403..404 "\n"
+

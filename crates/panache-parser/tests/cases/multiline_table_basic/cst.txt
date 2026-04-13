@@ -1,0 +1,63 @@
+DOCUMENT@0..551
+  MULTILINE_TABLE@0..551
+    TABLE_SEPARATOR@0..62
+      TEXT@0..61 "--------------------- ..."
+      NEWLINE@61..62 "\n"
+    TABLE_HEADER@62..147
+      TABLE_CELL@62..73
+        TEXT@62..73 " Centered  "
+      WHITESPACE@73..74 " "
+      TABLE_CELL@74..81
+        TEXT@74..81 "Default"
+      WHITESPACE@81..82 " "
+      TABLE_CELL@82..97
+        TEXT@82..97 "          Right"
+      WHITESPACE@97..98 " "
+      TABLE_CELL@98..102
+        TEXT@98..102 "Left"
+      NEWLINE@102..103 "\n"
+      TEXT@103..146 "  Header    Aligned   ..."
+      NEWLINE@146..147 "\n"
+    TABLE_SEPARATOR@147..209
+      TEXT@147..208 "----------- ------- - ..."
+      NEWLINE@208..209 "\n"
+    TABLE_ROW@209..325
+      TABLE_CELL@209..220
+        TEXT@209..220 "  First    "
+      WHITESPACE@220..221 " "
+      TABLE_CELL@221..228
+        TEXT@221..228 "row    "
+      WHITESPACE@228..229 " "
+      TABLE_CELL@229..244
+        TEXT@229..244 "         12.0  "
+      WHITESPACE@244..245 " "
+      TABLE_CELL@245..266
+        TEXT@245..266 "Example of a row that"
+      NEWLINE@266..267 "\n"
+      TEXT@267..324 "                      ..."
+      NEWLINE@324..325 "\n"
+    BLANK_LINE@325..326
+      BLANK_LINE@325..326 "\n"
+    BLANK_LINE@326..327
+      BLANK_LINE@326..327 "\n"
+    TABLE_ROW@327..489
+      TABLE_CELL@327..338
+        TEXT@327..338 "  Second   "
+      WHITESPACE@338..339 " "
+      TABLE_CELL@339..346
+        TEXT@339..346 "row    "
+      WHITESPACE@346..347 " "
+      TABLE_CELL@347..362
+        TEXT@347..362 "            5.0"
+      WHITESPACE@362..363 " "
+      TABLE_CELL@363..387
+        TEXT@363..387 "Here's another one. Note"
+      NEWLINE@387..388 "\n"
+      TEXT@388..446 "                      ..."
+      NEWLINE@446..447 "\n"
+      TEXT@447..488 "                      ..."
+      NEWLINE@488..489 "\n"
+    TABLE_SEPARATOR@489..551
+      TEXT@489..550 "--------------------- ..."
+      NEWLINE@550..551 "\n"
+

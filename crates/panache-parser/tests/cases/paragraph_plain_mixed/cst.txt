@@ -1,0 +1,107 @@
+DOCUMENT@0..471
+  HEADING@0..28
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..27
+      TEXT@2..27 "Mixed Paragraph and P ..."
+    NEWLINE@27..28 "\n"
+  BLANK_LINE@28..29
+    BLANK_LINE@28..29 "\n"
+  HEADING@29..71
+    ATX_HEADING_MARKER@29..31
+      ATX_HEADING_MARKER@29..31 "##"
+    WHITESPACE@31..32 " "
+    HEADING_CONTENT@32..70
+      TEXT@32..70 "Definition Immediatel ..."
+    NEWLINE@70..71 "\n"
+  BLANK_LINE@71..72
+    BLANK_LINE@71..72 "\n"
+  PARAGRAPH@72..134
+    TEXT@72..99 "This is a regular par ..."
+    NEWLINE@99..100 "\n"
+    TEXT@100..133 "that continues on mul ..."
+    NEWLINE@133..134 "\n"
+  BLANK_LINE@134..135
+    BLANK_LINE@134..135 "\n"
+  DEFINITION_LIST@135..202
+    DEFINITION_ITEM@135..202
+      TERM@135..151
+        TEXT@135..150 "Definition term"
+        NEWLINE@150..151 "\n"
+      DEFINITION@151..202
+        DEFINITION_MARKER@151..152 ":"
+        WHITESPACE@152..155 "   "
+        PLAIN@155..202
+          TEXT@155..181 "Definition content (P ..."
+          NEWLINE@181..182 "\n"
+          TEXT@182..201 "    continues here."
+          NEWLINE@201..202 "\n"
+  BLANK_LINE@202..203
+    BLANK_LINE@202..203 "\n"
+  PARAGRAPH@203..268
+    TEXT@203..241 "Another paragraph aft ..."
+    NEWLINE@241..242 "\n"
+    TEXT@242..267 "spans multiple lines  ..."
+    NEWLINE@267..268 "\n"
+  BLANK_LINE@268..269
+    BLANK_LINE@268..269 "\n"
+  HEADING@269..288
+    ATX_HEADING_MARKER@269..271
+      ATX_HEADING_MARKER@269..271 "##"
+    WHITESPACE@271..272 " "
+    HEADING_CONTENT@272..287
+      TEXT@272..287 "Adjacent Blocks"
+    NEWLINE@287..288 "\n"
+  BLANK_LINE@288..289
+    BLANK_LINE@288..289 "\n"
+  PARAGRAPH@289..314
+    TEXT@289..302 "Paragraph one"
+    NEWLINE@302..303 "\n"
+    TEXT@303..313 "continues."
+    NEWLINE@313..314 "\n"
+  BLANK_LINE@314..315
+    BLANK_LINE@314..315 "\n"
+  DEFINITION_LIST@315..362
+    DEFINITION_ITEM@315..362
+      TERM@315..322
+        TEXT@315..321 "Term A"
+        NEWLINE@321..322 "\n"
+      DEFINITION@322..362
+        DEFINITION_MARKER@322..323 ":"
+        WHITESPACE@323..326 "   "
+        PLAIN@326..362
+          TEXT@326..346 "Definition A (PLAIN)"
+          NEWLINE@346..347 "\n"
+          TEXT@347..361 "    continues."
+          NEWLINE@361..362 "\n"
+  BLANK_LINE@362..363
+    BLANK_LINE@362..363 "\n"
+  PARAGRAPH@363..388
+    TEXT@363..376 "Paragraph two"
+    NEWLINE@376..377 "\n"
+    TEXT@377..387 "continues."
+    NEWLINE@387..388 "\n"
+  BLANK_LINE@388..389
+    BLANK_LINE@388..389 "\n"
+  DEFINITION_LIST@389..436
+    DEFINITION_ITEM@389..436
+      TERM@389..396
+        TEXT@389..395 "Term B"
+        NEWLINE@395..396 "\n"
+      DEFINITION@396..436
+        DEFINITION_MARKER@396..397 ":"
+        WHITESPACE@397..400 "   "
+        PLAIN@400..436
+          TEXT@400..420 "Definition B (PLAIN)"
+          NEWLINE@420..421 "\n"
+          TEXT@421..435 "    continues."
+          NEWLINE@435..436 "\n"
+  BLANK_LINE@436..437
+    BLANK_LINE@436..437 "\n"
+  PARAGRAPH@437..471
+    TEXT@437..452 "Paragraph three"
+    NEWLINE@452..453 "\n"
+    TEXT@453..470 "continues to end."
+    NEWLINE@470..471 "\n"
+

@@ -1,0 +1,15 @@
+DOCUMENT@0..50
+  PARAGRAPH@0..45
+    TEXT@0..44 "A document with many  ..."
+    NEWLINE@44..45 "\n"
+  BLANK_LINE@45..46
+    BLANK_LINE@45..46 "\n"
+  BLANK_LINE@46..47
+    BLANK_LINE@46..47 "\n"
+  BLANK_LINE@47..48
+    BLANK_LINE@47..48 "\n"
+  BLANK_LINE@48..49
+    BLANK_LINE@48..49 "\n"
+  BLANK_LINE@49..50
+    BLANK_LINE@49..50 "\n"
+

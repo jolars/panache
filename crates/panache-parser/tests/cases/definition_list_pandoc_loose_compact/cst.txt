@@ -1,0 +1,66 @@
+DOCUMENT@0..81
+  DEFINITION_LIST@0..81
+    DEFINITION_ITEM@0..13
+      TERM@0..5
+        TEXT@0..4 "Term"
+        NEWLINE@4..5 "\n"
+      DEFINITION@5..13
+        DEFINITION_MARKER@5..6 ":"
+        WHITESPACE@6..9 "   "
+        PLAIN@9..13
+          TEXT@9..12 "Def"
+          NEWLINE@12..13 "\n"
+    BLANK_LINE@13..14
+      BLANK_LINE@13..14 "\n"
+    DEFINITION_ITEM@14..32
+      TERM@14..19
+        TEXT@14..18 "Term"
+        NEWLINE@18..19 "\n"
+      DEFINITION@19..25
+        DEFINITION_MARKER@19..20 ":"
+        WHITESPACE@20..21 " "
+        PLAIN@21..25
+          TEXT@21..24 "Def"
+          NEWLINE@24..25 "\n"
+      BLANK_LINE@25..26
+        BLANK_LINE@25..26 "\n"
+      DEFINITION@26..32
+        DEFINITION_MARKER@26..27 ":"
+        WHITESPACE@27..28 " "
+        PLAIN@28..32
+          TEXT@28..31 "Def"
+          NEWLINE@31..32 "\n"
+    BLANK_LINE@32..33
+      BLANK_LINE@32..33 "\n"
+    DEFINITION_ITEM@33..66
+      TERM@33..38
+        TEXT@33..37 "Term"
+        NEWLINE@37..38 "\n"
+      DEFINITION@38..66
+        DEFINITION_MARKER@38..39 ":"
+        WHITESPACE@39..40 " "
+        HEADING@40..50
+          ATX_HEADING_MARKER@40..41
+            ATX_HEADING_MARKER@40..41 "#"
+          WHITESPACE@41..42 " "
+          HEADING_CONTENT@42..49
+            TEXT@42..49 "Heading"
+          NEWLINE@49..50 "\n"
+        BLANK_LINE@50..51
+          BLANK_LINE@50..51 "\n"
+        PLAIN@51..66
+          TEXT@51..65 "  Continuation"
+          NEWLINE@65..66 "\n"
+    BLANK_LINE@66..67
+      BLANK_LINE@66..67 "\n"
+    DEFINITION_ITEM@67..81
+      TERM@67..72
+        TEXT@67..71 "Term"
+        NEWLINE@71..72 "\n"
+      DEFINITION@72..81
+        DEFINITION_MARKER@72..73 ":"
+        WHITESPACE@73..74 " "
+        PLAIN@74..81
+          TEXT@74..80 "- List"
+          NEWLINE@80..81 "\n"
+

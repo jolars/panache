@@ -1,0 +1,33 @@
+::: panel-tabset
+## R
+
+``` r
+Sys.getenv("QUARTO_DOCUMENT_PATH")
+```
+
+## Python
+
+``` python
+import os
+print(os.environ["QUARTO_DOCUMENT_PATH"])
+```
+
+## Julia
+
+``` julia
+ENV["QUARTO_DOCUMENT_PATH"]
+```
+:::
+
++--------+----------------+
+| Var    | Description    |
++========+================+
+| `A`    | Example value. |
++--------+----------------+
+
+For more information, see [Quarto engine execution information](./quarto-execute-info.qmd).
+
+#### No blank before div
+:::: panel
+Inside panel
+::::

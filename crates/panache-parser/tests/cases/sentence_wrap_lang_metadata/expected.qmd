@@ -1,0 +1,7 @@
+---
+lang: en-GB
+title: Sentence Lang Test
+---
+
+Use abbreviations like i.e. and e.g. inside one sentence.
+Then stop here.

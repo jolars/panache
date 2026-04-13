@@ -1,0 +1,4 @@
+line-width = 40
+
+[style]
+wrap = "reflow"

@@ -1,0 +1,45 @@
+DOCUMENT@0..287
+  PARAGRAPH@0..205
+    TEXT@0..36 "In most cases, you ca ..."
+    INLINE_CODE@36..45
+      INLINE_CODE_MARKER@36..37 "`"
+      INLINE_CODE_CONTENT@37..44 "@export"
+      INLINE_CODE_MARKER@44..45 "`"
+    TEXT@45..100 " tag, and roxygen2 wi ..."
+    INLINE_CODE@100..111
+      INLINE_CODE_MARKER@100..101 "`"
+      INLINE_CODE_CONTENT@101..110 "NAMESPACE"
+      INLINE_CODE_MARKER@110..111 "`"
+    TEXT@111..128 " directive (i.e. "
+    INLINE_CODE@128..138
+      INLINE_CODE_MARKER@128..129 "`"
+      INLINE_CODE_CONTENT@129..137 "export()"
+      INLINE_CODE_MARKER@137..138 "`"
+    TEXT@138..140 ", "
+    INLINE_CODE@140..152
+      INLINE_CODE_MARKER@140..141 "`"
+      INLINE_CODE_CONTENT@141..151 "S3method()"
+      INLINE_CODE_MARKER@151..152 "`"
+    TEXT@152..154 ", "
+    INLINE_CODE@154..171
+      INLINE_CODE_MARKER@154..155 "`"
+      INLINE_CODE_CONTENT@155..170 "exportClasses()"
+      INLINE_CODE_MARKER@170..171 "`"
+    TEXT@171..176 ", or "
+    INLINE_CODE@176..193
+      INLINE_CODE_MARKER@176..177 "`"
+      INLINE_CODE_CONTENT@177..192 "exportMethods()"
+      INLINE_CODE_MARKER@192..193 "`"
+    TEXT@193..204 ") you need."
+    NEWLINE@204..205 "\n"
+  BLANK_LINE@205..206
+    BLANK_LINE@205..206 "\n"
+  PARAGRAPH@206..287
+    TEXT@206..255 "If this happens to yo ..."
+    INLINE_CODE@255..285
+      INLINE_CODE_MARKER@255..256 "`"
+      INLINE_CODE_CONTENT@256..284 "@method all.equal dat ..."
+      INLINE_CODE_MARKER@284..285 "`"
+    TEXT@285..286 "."
+    NEWLINE@286..287 "\n"
+

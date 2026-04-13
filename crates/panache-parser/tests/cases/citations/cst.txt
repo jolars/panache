@@ -1,0 +1,294 @@
+DOCUMENT@0..1707
+  HEADING@0..12
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..11
+      TEXT@2..11 "Citations"
+    NEWLINE@11..12 "\n"
+  BLANK_LINE@12..13
+    BLANK_LINE@12..13 "\n"
+  PARAGRAPH@13..115
+    TEXT@13..114 "Introductory text to  ..."
+    NEWLINE@114..115 "\n"
+  BLANK_LINE@115..116
+    BLANK_LINE@115..116 "\n"
+  PARAGRAPH@116..207
+    TEXT@116..126 "Blah blah "
+    CITATION@126..158
+      LINK_START@126..127 "["
+      CITATION_MARKER@127..128 "@"
+      CITATION_KEY@128..133 "doe99"
+      CITATION_SEPARATOR@133..134 ";"
+      CITATION_CONTENT@134..135 " "
+      CITATION_MARKER@135..136 "@"
+      CITATION_KEY@136..145 "smith2000"
+      CITATION_SEPARATOR@145..146 ";"
+      CITATION_CONTENT@146..147 " "
+      CITATION_MARKER@147..148 "@"
+      CITATION_KEY@148..157 "smith2004"
+      LINK_DEST@157..158 "]"
+    TEXT@158..206 " with extra words to  ..."
+    NEWLINE@206..207 "\n"
+  BLANK_LINE@207..208
+    BLANK_LINE@207..208 "\n"
+  PARAGRAPH@208..307
+    TEXT@208..218 "Blah blah "
+    LINK@218..273
+      LINK_START@218..219
+        LINK_START@218..219 "["
+      LINK_TEXT@219..272
+        TEXT@219..223 "see "
+        CITATION@223..229
+          CITATION_MARKER@223..224 "@"
+          CITATION_KEY@224..229 "doe99"
+        TEXT@229..245 ", pp. 33-35 and "
+        EMPHASIS@245..253
+          EMPHASIS_MARKER@245..246 "*"
+          TEXT@246..252 "passim"
+          EMPHASIS_MARKER@252..253 "*"
+        TEXT@253..255 "; "
+        CITATION@255..263
+          CITATION_MARKER@255..256 "@"
+          CITATION_KEY@256..263 "smith04"
+        TEXT@263..272 ", chap. 1"
+      TEXT@272..273 "]"
+    TEXT@273..306 " in a longer sentence ..."
+    NEWLINE@306..307 "\n"
+  BLANK_LINE@307..308
+    BLANK_LINE@307..308 "\n"
+  PARAGRAPH@308..382
+    TEXT@308..324 "Smith says blah "
+    CITATION@324..335
+      LINK_START@324..325 "["
+      CITATION_MARKER@325..327 "-@"
+      CITATION_KEY@327..334 "smith04"
+      LINK_DEST@334..335 "]"
+    TEXT@335..381 " when the author appe ..."
+    NEWLINE@381..382 "\n"
+  BLANK_LINE@382..383
+    BLANK_LINE@382..383 "\n"
+  PARAGRAPH@383..476
+    CITATION@383..391
+      CITATION_MARKER@383..384 "@"
+      CITATION_KEY@384..391 "smith04"
+    TEXT@391..475 " says blah in a sente ..."
+    NEWLINE@475..476 "\n"
+  BLANK_LINE@476..477
+    BLANK_LINE@476..477 "\n"
+  PARAGRAPH@477..557
+    CITATION@477..485
+      CITATION_MARKER@477..478 "@"
+      CITATION_KEY@478..485 "smith04"
+    TEXT@485..486 " "
+    LINK@486..493
+      LINK_START@486..487
+        LINK_START@486..487 "["
+      LINK_TEXT@487..492
+        TEXT@487..492 "p. 33"
+      TEXT@492..493 "]"
+    TEXT@493..556 " says blah with a loc ..."
+    NEWLINE@556..557 "\n"
+  BLANK_LINE@557..558
+    BLANK_LINE@557..558 "\n"
+  PARAGRAPH@558..650
+    TEXT@558..591 "Citation with suffix  ..."
+    CITATION@591..631
+      LINK_START@591..592 "["
+      CITATION_MARKER@592..593 "@"
+      CITATION_KEY@593..598 "item1"
+      CITATION_CONTENT@598..630 " pp. 33, 35-37, and n ..."
+      LINK_DEST@630..631 "]"
+    TEXT@631..649 " in a longer line."
+    NEWLINE@649..650 "\n"
+  BLANK_LINE@650..651
+    BLANK_LINE@650..651 "\n"
+  PARAGRAPH@651..739
+    TEXT@651..677 "Citation with suffix  ..."
+    CITATION@677..702
+      LINK_START@677..678 "["
+      CITATION_MARKER@678..679 "@"
+      CITATION_KEY@679..684 "item1"
+      CITATION_CONTENT@684..701 " and nowhere else"
+      LINK_DEST@701..702 "]"
+    TEXT@702..738 " followed by more exp ..."
+    NEWLINE@738..739 "\n"
+  BLANK_LINE@739..740
+    BLANK_LINE@739..740 "\n"
+  PARAGRAPH@740..822
+    TEXT@740..757 "With some markup "
+    LINK@757..781
+      LINK_START@757..758
+        LINK_START@757..758 "["
+      LINK_TEXT@758..780
+        EMPHASIS@758..763
+          EMPHASIS_MARKER@758..759 "*"
+          TEXT@759..762 "see"
+          EMPHASIS_MARKER@762..763 "*"
+        TEXT@763..764 " "
+        CITATION@764..770
+          CITATION_MARKER@764..765 "@"
+          CITATION_KEY@765..770 "item1"
+        TEXT@770..774 " p. "
+        STRONG@774..780
+          STRONG_MARKER@774..776 "**"
+          TEXT@776..778 "32"
+          STRONG_MARKER@778..780 "**"
+      TEXT@780..781 "]"
+    TEXT@781..821 " in a sentence that s ..."
+    NEWLINE@821..822 "\n"
+  BLANK_LINE@822..823
+    BLANK_LINE@822..823 "\n"
+  PARAGRAPH@823..924
+    TEXT@823..855 "Citation group with u ..."
+    LINK@855..903
+      LINK_START@855..856
+        LINK_START@855..856 "["
+      LINK_TEXT@856..902
+        TEXT@856..860 "see "
+        CITATION@860..866
+          CITATION_MARKER@860..861 "@"
+          CITATION_KEY@861..866 "item1"
+        TEXT@866..881 " chap. 3; also "
+        CITATION@881..893
+          CITATION_MARKER@881..882 "@"
+          CITATION_KEY@882..893 "пункт3"
+        TEXT@893..902 " p. 34-35"
+      TEXT@902..903 "]"
+    TEXT@903..923 " for UTF-8 handling."
+    NEWLINE@923..924 "\n"
+  BLANK_LINE@924..925
+    BLANK_LINE@924..925 "\n"
+  PARAGRAPH@925..1041
+    TEXT@925..953 "Braced keys and punct ..."
+    CITATION@953..1020
+      LINK_START@953..954 "["
+      CITATION_MARKER@954..955 "@"
+      CITATION_BRACE_OPEN@955..956 "{"
+      CITATION_KEY@956..968 "Foo_bar.baz."
+      CITATION_BRACE_CLOSE@968..969 "}"
+      CITATION_SEPARATOR@969..970 ";"
+      CITATION_CONTENT@970..971 " "
+      CITATION_MARKER@971..972 "@"
+      CITATION_BRACE_OPEN@972..973 "{"
+      CITATION_KEY@973..1018 "https://example.com/b ..."
+      CITATION_BRACE_CLOSE@1018..1019 "}"
+      LINK_DEST@1019..1020 "]"
+    TEXT@1020..1040 " in a long sentence."
+    NEWLINE@1040..1041 "\n"
+  BLANK_LINE@1041..1042
+    BLANK_LINE@1041..1042 "\n"
+  PARAGRAPH@1042..1130
+    TEXT@1042..1078 "Repeated punctuation  ..."
+    CITATION@1078..1093
+      LINK_START@1078..1079 "["
+      CITATION_MARKER@1079..1080 "@"
+      CITATION_KEY@1080..1087 "Foo_bar"
+      CITATION_CONTENT@1087..1092 "--baz"
+      LINK_DEST@1092..1093 "]"
+    TEXT@1093..1129 " with extra text to e ..."
+    NEWLINE@1129..1130 "\n"
+  BLANK_LINE@1130..1131
+    BLANK_LINE@1130..1131 "\n"
+  PARAGRAPH@1131..1221
+    TEXT@1131..1154 "Complex locator braces "
+    CITATION@1154..1189
+      LINK_START@1154..1155 "["
+      CITATION_MARKER@1155..1156 "@"
+      CITATION_KEY@1156..1161 "smith"
+      CITATION_CONTENT@1161..1188 "{ii, A, D-Z}, with a  ..."
+      LINK_DEST@1188..1189 "]"
+    TEXT@1189..1220 " and additional text  ..."
+    NEWLINE@1220..1221 "\n"
+  BLANK_LINE@1221..1222
+    BLANK_LINE@1221..1222 "\n"
+  PARAGRAPH@1222..1321
+    TEXT@1222..1237 "Locator braces "
+    CITATION@1237..1292
+      LINK_START@1237..1238 "["
+      CITATION_MARKER@1238..1239 "@"
+      CITATION_KEY@1239..1244 "smith"
+      CITATION_CONTENT@1244..1291 ", {pp. iv, vi-xi, (xv ..."
+      LINK_DEST@1291..1292 "]"
+    TEXT@1292..1320 " and more text for wr ..."
+    NEWLINE@1320..1321 "\n"
+  BLANK_LINE@1321..1322
+    BLANK_LINE@1321..1322 "\n"
+  PARAGRAPH@1322..1394
+    TEXT@1322..1336 "Empty locator "
+    CITATION@1336..1362
+      LINK_START@1336..1337 "["
+      CITATION_MARKER@1337..1338 "@"
+      CITATION_KEY@1338..1343 "smith"
+      CITATION_CONTENT@1343..1361 "{}, 99 years later"
+      LINK_DEST@1361..1362 "]"
+    TEXT@1362..1393 " with additional word ..."
+    NEWLINE@1393..1394 "\n"
+  BLANK_LINE@1394..1395
+    BLANK_LINE@1394..1395 "\n"
+  PARAGRAPH@1395..1546
+    TEXT@1395..1431 "Reference link follow ..."
+    NEWLINE@1431..1432 "\n"
+    TEXT@1432..1471 "MapReduce is a paradi ..."
+    LINK@1471..1479
+      LINK_START@1471..1472
+        LINK_START@1471..1472 "["
+      LINK_TEXT@1472..1478
+        TEXT@1472..1478 "Google"
+      TEXT@1478..1479 "]"
+    TEXT@1479..1480 " "
+    CITATION@1480..1492
+      LINK_START@1480..1481 "["
+      CITATION_MARKER@1481..1482 "@"
+      CITATION_KEY@1482..1491 "mapreduce"
+      LINK_DEST@1491..1492 "]"
+    TEXT@1492..1545 " as its most vocal pr ..."
+    NEWLINE@1545..1546 "\n"
+  BLANK_LINE@1546..1547
+    BLANK_LINE@1546..1547 "\n"
+  REFERENCE_DEFINITION@1547..1575
+    LINK@1547..1555
+      LINK_START@1547..1548
+        LINK_START@1547..1548 "["
+      LINK_TEXT@1548..1554
+        TEXT@1548..1554 "Google"
+      TEXT@1554..1555 "]"
+    TEXT@1555..1574 ": http://google.com"
+    NEWLINE@1574..1575 "\n"
+  BLANK_LINE@1575..1576
+    BLANK_LINE@1575..1576 "\n"
+  PARAGRAPH@1576..1605
+    TEXT@1576..1600 "Footnote with citations."
+    FOOTNOTE_REFERENCE@1600..1604
+      FOOTNOTE_LABEL_START@1600..1602 "[^"
+      FOOTNOTE_LABEL_ID@1602..1603 "1"
+      FOOTNOTE_LABEL_END@1603..1604 "]"
+    NEWLINE@1604..1605 "\n"
+  BLANK_LINE@1605..1606
+    BLANK_LINE@1605..1606 "\n"
+  FOOTNOTE_DEFINITION@1606..1707
+    FOOTNOTE_LABEL_START@1606..1608 "[^"
+    FOOTNOTE_LABEL_ID@1608..1609 "1"
+    FOOTNOTE_LABEL_END@1609..1610 "]"
+    FOOTNOTE_LABEL_COLON@1610..1611 ":"
+    WHITESPACE@1611..1612 " "
+    PARAGRAPH@1612..1707
+      CITATION@1612..1624
+        CITATION_MARKER@1612..1613 "@"
+        CITATION_KEY@1613..1624 "пункт3"
+      TEXT@1624..1625 " "
+      LINK@1625..1632
+        LINK_START@1625..1626
+          LINK_START@1625..1626 "["
+        LINK_TEXT@1626..1631
+          TEXT@1626..1631 "p. 12"
+        TEXT@1631..1632 "]"
+      TEXT@1632..1665 " and a citation witho ..."
+      CITATION@1665..1679
+        LINK_START@1665..1666 "["
+        CITATION_MARKER@1666..1667 "@"
+        CITATION_KEY@1667..1678 "пункт3"
+        LINK_DEST@1678..1679 "]"
+      TEXT@1679..1706 " in a longer note sen ..."
+      NEWLINE@1706..1707 "\n"
+
