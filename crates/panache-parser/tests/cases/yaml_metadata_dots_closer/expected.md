@@ -1,5 +1,0 @@
----
-title: Dot closer
-...
-
-# Heading

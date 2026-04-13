@@ -1,0 +1,21 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..180
+  MMD_TITLE_BLOCK@0..154
+    TEXT@0..17 "Title:   My title"
+    NEWLINE@17..18 "\n"
+    TEXT@18..35 "Author:  John Doe"
+    NEWLINE@35..36 "\n"
+    TEXT@36..62 "Date:    September 1, ..."
+    NEWLINE@62..63 "\n"
+    TEXT@63..110 "Comment: This is a sa ..."
+    NEWLINE@110..111 "\n"
+    TEXT@111..152 "         a field span ..."
+    NEWLINE@152..153 "\n"
+    TEXT@153..153 ""
+    NEWLINE@153..154 "\n"
+  PARAGRAPH@154..180
+    TEXT@154..179 "Paragraph after metad ..."
+    NEWLINE@179..180 "\n"

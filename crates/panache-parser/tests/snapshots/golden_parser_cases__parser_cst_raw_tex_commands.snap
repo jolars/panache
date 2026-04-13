@@ -1,0 +1,38 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..191
+  TEX_BLOCK@0..64
+    TEXT@0..29 "\\DeclareMathOperator{ ..."
+    NEWLINE@29..30 "\n"
+    TEXT@30..63 "\\DeclareMathOperator{ ..."
+    NEWLINE@63..64 "\n"
+  BLANK_LINE@64..65
+    BLANK_LINE@64..65 "\n"
+  PARAGRAPH@65..84
+    TEXT@65..83 "Regular paragraph."
+    NEWLINE@83..84 "\n"
+  BLANK_LINE@84..85
+    BLANK_LINE@84..85 "\n"
+  TEX_BLOCK@85..108
+    TEXT@85..107 "\\newcommand{\\foo}{bar}"
+    NEWLINE@107..108 "\n"
+  BLANK_LINE@108..109
+    BLANK_LINE@108..109 "\n"
+  PARAGRAPH@109..151
+    TEXT@109..132 "Another paragraph with "
+    LATEX_COMMAND@132..142
+      TEXT@132..142 "\\cite{ref}"
+    TEXT@142..150 " inline."
+    NEWLINE@150..151 "\n"
+  BLANK_LINE@151..152
+    BLANK_LINE@151..152 "\n"
+  TEX_BLOCK@152..173
+    TEXT@152..172 "\\usepackage{amsmath}"
+    NEWLINE@172..173 "\n"
+  BLANK_LINE@173..174
+    BLANK_LINE@173..174 "\n"
+  PARAGRAPH@174..191
+    TEXT@174..190 "Final paragraph."
+    NEWLINE@190..191 "\n"

@@ -1,0 +1,70 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..347
+  YAML_METADATA@0..99
+    YAML_METADATA_DELIM@0..3 "---"
+    NEWLINE@3..4 "\n"
+    YAML_METADATA_CONTENT@4..95
+      TEXT@4..26 "title: \"Test Document\""
+      NEWLINE@26..27 "\n"
+      TEXT@27..43 "author: John Doe"
+      NEWLINE@43..44 "\n"
+      TEXT@44..60 "date: 2024-01-01"
+      NEWLINE@60..61 "\n"
+      TEXT@61..70 "keywords:"
+      NEWLINE@70..71 "\n"
+      TEXT@71..83 "  - markdown"
+      NEWLINE@83..84 "\n"
+      TEXT@84..94 "  - quarto"
+      NEWLINE@94..95 "\n"
+    YAML_METADATA_DELIM@95..98 "---"
+    NEWLINE@98..99 "\n"
+  HEADING@99..114
+    ATX_HEADING_MARKER@99..100
+      ATX_HEADING_MARKER@99..100 "#"
+    WHITESPACE@100..101 " "
+    HEADING_CONTENT@101..113
+      TEXT@101..113 "Introduction"
+    NEWLINE@113..114 "\n"
+  BLANK_LINE@114..115
+    BLANK_LINE@114..115 "\n"
+  PARAGRAPH@115..162
+    TEXT@115..161 "This is a test docume ..."
+    NEWLINE@161..162 "\n"
+  BLANK_LINE@162..163
+    BLANK_LINE@162..163 "\n"
+  PARAGRAPH@163..198
+    TEXT@163..197 "First paragraph with  ..."
+    NEWLINE@197..198 "\n"
+  BLANK_LINE@198..199
+    BLANK_LINE@198..199 "\n"
+  YAML_METADATA@199..242
+    YAML_METADATA_DELIM@199..202 "---"
+    NEWLINE@202..203 "\n"
+    YAML_METADATA_CONTENT@203..238
+      TEXT@203..237 "subtitle: \"A subtitle ..."
+      NEWLINE@237..238 "\n"
+    YAML_METADATA_DELIM@238..241 "---"
+    NEWLINE@241..242 "\n"
+  BLANK_LINE@242..243
+    BLANK_LINE@242..243 "\n"
+  PARAGRAPH@243..285
+    TEXT@243..284 "Second section after  ..."
+    NEWLINE@284..285 "\n"
+  BLANK_LINE@285..286
+    BLANK_LINE@285..286 "\n"
+  PARAGRAPH@286..314
+    TEXT@286..313 "Para before horizonta ..."
+    NEWLINE@313..314 "\n"
+  BLANK_LINE@314..315
+    BLANK_LINE@314..315 "\n"
+  HORIZONTAL_RULE@315..319
+    HORIZONTAL_RULE@315..318 "---"
+    NEWLINE@318..319 "\n"
+  BLANK_LINE@319..320
+    BLANK_LINE@319..320 "\n"
+  PARAGRAPH@320..347
+    TEXT@320..346 "Para after horizontal ..."
+    NEWLINE@346..347 "\n"

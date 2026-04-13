@@ -1,0 +1,23 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..140
+  PARAGRAPH@0..68
+    TEXT@0..11 "When quarto"
+    TEXT@11..67 "_crossrefs is disable ..."
+    NEWLINE@67..68 "\n"
+  BLANK_LINE@68..69
+    BLANK_LINE@68..69 "\n"
+  PARAGRAPH@69..99
+    DISPLAY_MATH@69..83
+      DISPLAY_MATH_MARKER@69..71 "$$"
+      TEXT@71..81 "\nE = mc^2\n"
+      DISPLAY_MATH_MARKER@81..83 "$$"
+    TEXT@83..98 " {#eq-einstein}"
+    NEWLINE@98..99 "\n"
+  BLANK_LINE@99..100
+    BLANK_LINE@99..100 "\n"
+  PARAGRAPH@100..140
+    TEXT@100..139 "The {#eq-einstein} be ..."
+    NEWLINE@139..140 "\n"

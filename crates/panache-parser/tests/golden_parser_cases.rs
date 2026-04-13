@@ -1,12 +1,14 @@
 //! Golden parser regression cases for panache-parser.
 //!
-//! Each test case is a directory under `crates/panache-parser/tests/cases/` containing:
+//! Each test case is a directory under
+//! `crates/panache-parser/tests/fixtures/cases/` containing:
 //! - `input.*` - Source file (`.md`, `.qmd`, or `.Rmd`)
-//! - `cst.txt` - (Optional) Expected CST structure for parse regression testing
-//! - `panache.toml` - (Optional) Parser config options
+//! - `parser-options.toml` - (Optional) parser-only options (`flavor`, `[extensions]`)
 //!
-//! Run with `UPDATE_CST=1 cargo test -p panache-parser --test golden_parser_cases`
-//! to regenerate CST files.
+//! CST snapshots are stored via insta in
+//! `crates/panache-parser/tests/snapshots/`.
+//! Run `INSTA_UPDATE=always cargo test -p panache-parser --test golden_parser_cases`
+//! to update snapshots intentionally.
 
 use panache_parser::{Extensions, Flavor, ParserOptions, parse};
 use std::{
@@ -26,9 +28,9 @@ fn find_file_with_extension(dir: &Path, base: &str) -> Option<PathBuf> {
     None
 }
 
-/// Load parser options from test case directory if panache.toml exists.
+/// Load parser options from test case directory if parser-options.toml exists.
 fn load_test_parser_options(dir: &Path) -> Option<ParserOptions> {
-    let config_path = dir.join("panache.toml");
+    let config_path = dir.join("parser-options.toml");
     if !config_path.exists() {
         return None;
     }
@@ -69,15 +71,12 @@ fn load_test_parser_options(dir: &Path) -> Option<ParserOptions> {
 fn run_golden_case(case_name: &str) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
+        .join("fixtures")
         .join("cases")
         .join(case_name);
 
-    let update_cst = std::env::var_os("UPDATE_CST").is_some();
-
     let input_path = find_file_with_extension(&dir, "input")
         .unwrap_or_else(|| panic!("No input file found in {}", case_name));
-
-    let cst_path = dir.join("cst.txt");
     let parser_options = load_test_parser_options(&dir);
 
     let input = fs::read_to_string(&input_path).unwrap();
@@ -93,17 +92,8 @@ fn run_golden_case(case_name: &str) {
         tree_text.len() as i64 - input.len() as i64
     );
 
-    if cst_path.exists() || update_cst {
-        let cst_output = format!("{:#?}\n", tree);
-
-        if update_cst {
-            fs::write(&cst_path, &cst_output).unwrap();
-        } else {
-            let expected_cst = fs::read_to_string(&cst_path)
-                .unwrap_or_else(|_| panic!("Failed to read cst.txt in {}", case_name));
-            assert_eq!(expected_cst, cst_output, "CST mismatch: {}", case_name);
-        }
-    }
+    let cst_output = format!("{:#?}\n", tree);
+    insta::assert_snapshot!(format!("parser_cst_{}", case_name), cst_output);
 }
 
 macro_rules! golden_test_cases {
@@ -119,7 +109,7 @@ macro_rules! golden_test_cases {
 
 // Generate test functions for each case directory.
 // To add a new test case:
-// 1. Create a new directory under crates/panache-parser/tests/cases/
+// 1. Create a new directory under crates/panache-parser/tests/fixtures/cases/
 // 2. Add the directory name to this list
 golden_test_cases!(
     alerts,

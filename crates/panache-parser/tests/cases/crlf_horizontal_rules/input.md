@@ -1,9 +1,0 @@
-# Test
-
-***
-
-More text.
-
----
-
-End.

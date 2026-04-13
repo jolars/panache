@@ -1,0 +1,507 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..4373
+  FENCED_DIV@0..166
+    DIV_FENCE_OPEN@0..54
+      TEXT@0..3 ":::"
+      WHITESPACE@3..4 " "
+      DIV_INFO@4..53
+        TEXT@4..53 "{.content-visible whe ..."
+      NEWLINE@53..54 "\n"
+    PARAGRAPH@54..162
+      TEXT@54..161 "To follow along, you' ..."
+      NEWLINE@161..162 "\n"
+    DIV_FENCE_CLOSE@162..166
+      TEXT@162..165 ":::"
+      NEWLINE@165..166 "\n"
+  BLANK_LINE@166..167
+    BLANK_LINE@166..167 "\n"
+  FENCED_DIV@167..285
+    DIV_FENCE_OPEN@167..218
+      TEXT@167..170 ":::"
+      WHITESPACE@170..171 " "
+      DIV_INFO@171..217
+        TEXT@171..217 "{.content-visible whe ..."
+      NEWLINE@217..218 "\n"
+    PARAGRAPH@218..281
+      TEXT@218..280 "To follow along, you' ..."
+      NEWLINE@280..281 "\n"
+    DIV_FENCE_CLOSE@281..285
+      TEXT@281..284 ":::"
+      NEWLINE@284..285 "\n"
+  BLANK_LINE@285..286
+    BLANK_LINE@285..286 "\n"
+  FENCED_DIV@286..475
+    DIV_FENCE_OPEN@286..336
+      TEXT@286..289 ":::"
+      WHITESPACE@289..290 " "
+      DIV_INFO@290..335
+        TEXT@290..335 "{.content-visible whe ..."
+      NEWLINE@335..336 "\n"
+    PARAGRAPH@336..471
+      TEXT@336..470 "To follow along, you' ..."
+      NEWLINE@470..471 "\n"
+    DIV_FENCE_CLOSE@471..475
+      TEXT@471..474 ":::"
+      NEWLINE@474..475 "\n"
+  BLANK_LINE@475..476
+    BLANK_LINE@475..476 "\n"
+  FENCED_DIV@476..696
+    DIV_FENCE_OPEN@476..498
+      TEXT@476..479 ":::"
+      WHITESPACE@479..480 " "
+      DIV_INFO@480..497
+        TEXT@480..497 "callout-important"
+      NEWLINE@497..498 "\n"
+    HEADING@498..522
+      ATX_HEADING_MARKER@498..500
+        ATX_HEADING_MARKER@498..500 "##"
+      WHITESPACE@500..501 " "
+      HEADING_CONTENT@501..521
+        TEXT@501..521 "Install Quarto First"
+      NEWLINE@521..522 "\n"
+    BLANK_LINE@522..523
+      BLANK_LINE@522..523 "\n"
+    PARAGRAPH@523..692
+      TEXT@523..632 "If you haven't alread ..."
+      LINK@632..690
+        LINK_START@632..633
+          LINK_START@632..633 "["
+        LINK_TEXT@633..652
+          TEXT@633..652 "Manuscript Overview"
+        LINK_TEXT_END@652..653 "]"
+        LINK_DEST_START@653..654 "("
+        LINK_DEST@654..689
+          TEXT@654..689 "/docs/manuscripts/ind ..."
+        LINK_DEST_END@689..690 ")"
+      TEXT@690..691 "."
+      NEWLINE@691..692 "\n"
+    DIV_FENCE_CLOSE@692..696
+      TEXT@692..695 ":::"
+      NEWLINE@695..696 "\n"
+  BLANK_LINE@696..697
+    BLANK_LINE@696..697 "\n"
+  FENCED_DIV@697..864
+    DIV_FENCE_OPEN@697..751
+      TEXT@697..700 ":::"
+      WHITESPACE@700..701 " "
+      DIV_INFO@701..750
+        TEXT@701..750 "{.content-visible whe ..."
+      NEWLINE@750..751 "\n"
+    HEADING@751..796
+      ATX_HEADING_MARKER@751..754
+        ATX_HEADING_MARKER@751..754 "###"
+      WHITESPACE@754..755 " "
+      HEADING_CONTENT@755..795
+        TEXT@755..795 "Install the Jupyter L ..."
+      NEWLINE@795..796 "\n"
+    BLANK_LINE@796..797
+      BLANK_LINE@796..797 "\n"
+    PARAGRAPH@797..860
+      SHORTCODE@797..859
+        SHORTCODE_MARKER_OPEN@797..800 "{{<"
+        SHORTCODE_CONTENT@800..856
+          TEXT@800..856 " include /docs/tools/ ..."
+        SHORTCODE_MARKER_CLOSE@856..859 ">}}"
+      NEWLINE@859..860 "\n"
+    DIV_FENCE_CLOSE@860..864
+      TEXT@860..863 ":::"
+      NEWLINE@863..864 "\n"
+  BLANK_LINE@864..865
+    BLANK_LINE@864..865 "\n"
+  FENCED_DIV@865..1595
+    DIV_FENCE_OPEN@865..915
+      TEXT@865..868 ":::"
+      WHITESPACE@868..869 " "
+      DIV_INFO@869..914
+        TEXT@869..914 "{.content-visible whe ..."
+      NEWLINE@914..915 "\n"
+    HEADING@915..956
+      ATX_HEADING_MARKER@915..918
+        ATX_HEADING_MARKER@915..918 "###"
+      WHITESPACE@918..919 " "
+      HEADING_CONTENT@919..955
+        TEXT@919..955 "Install the Quarto VS ..."
+      NEWLINE@955..956 "\n"
+    BLANK_LINE@956..957
+      BLANK_LINE@956..957 "\n"
+    PARAGRAPH@957..1168
+      TEXT@957..995 "Install the Quarto ex ..."
+      LINK@995..1093
+        LINK_START@995..996
+          LINK_START@995..996 "["
+        LINK_TEXT@996..1025
+          TEXT@996..1025 "VS Code Extension Mar ..."
+        LINK_TEXT_END@1025..1026 "]"
+        LINK_DEST_START@1026..1027 "("
+        LINK_DEST@1027..1092
+          TEXT@1027..1092 "https://marketplace.v ..."
+        LINK_DEST_END@1092..1093 ")"
+      TEXT@1093..1101 " or the "
+      LINK@1101..1166
+        LINK_START@1101..1102
+          LINK_START@1101..1102 "["
+        LINK_TEXT@1102..1119
+          TEXT@1102..1119 "Open VSX Registry"
+        LINK_TEXT_END@1119..1120 "]"
+        LINK_DEST_START@1120..1121 "("
+        LINK_DEST@1121..1165
+          TEXT@1121..1165 "https://open-vsx.org/ ..."
+        LINK_DEST_END@1165..1166 ")"
+      TEXT@1166..1167 "."
+      NEWLINE@1167..1168 "\n"
+    BLANK_LINE@1168..1169
+      BLANK_LINE@1168..1169 "\n"
+    HEADING@1169..1197
+      ATX_HEADING_MARKER@1169..1172
+        ATX_HEADING_MARKER@1169..1172 "###"
+      WHITESPACE@1172..1173 " "
+      HEADING_CONTENT@1173..1196
+        TEXT@1173..1196 "Install Python Packages"
+      NEWLINE@1196..1197 "\n"
+    BLANK_LINE@1197..1198
+      BLANK_LINE@1197..1198 "\n"
+    PARAGRAPH@1198..1379
+      TEXT@1198..1294 "The template manuscri ..."
+      INLINE_CODE@1294..1303
+        INLINE_CODE_MARKER@1294..1295 "`"
+        INLINE_CODE_CONTENT@1295..1302 "jupyter"
+        INLINE_CODE_MARKER@1302..1303 "`"
+      TEXT@1303..1351 " along with the packa ..."
+      INLINE_CODE@1351..1359
+        INLINE_CODE_MARKER@1351..1352 "`"
+        INLINE_CODE_CONTENT@1352..1358 "pandas"
+        INLINE_CODE_MARKER@1358..1359 "`"
+      TEXT@1359..1365 ", and "
+      INLINE_CODE@1365..1377
+        INLINE_CODE_MARKER@1365..1366 "`"
+        INLINE_CODE_CONTENT@1366..1376 "matplotlib"
+        INLINE_CODE_MARKER@1376..1377 "`"
+      TEXT@1377..1378 ":"
+      NEWLINE@1378..1379 "\n"
+    BLANK_LINE@1379..1380
+      BLANK_LINE@1379..1380 "\n"
+    CODE_BLOCK@1380..1465
+      CODE_FENCE_OPEN@1380..1411
+        CODE_FENCE_MARKER@1380..1383 "```"
+        CODE_INFO@1383..1410
+          TEXT@1383..1384 "{"
+          TEXT@1384..1385 "."
+          CODE_LANGUAGE@1385..1389 "bash"
+          TEXT@1389..1410 " filename=\"Terminal\"}"
+        NEWLINE@1410..1411 "\n"
+      CODE_CONTENT@1411..1461
+        TEXT@1411..1460 "python3 -m pip instal ..."
+        NEWLINE@1460..1461 "\n"
+      CODE_FENCE_CLOSE@1461..1465
+        CODE_FENCE_MARKER@1461..1464 "```"
+        NEWLINE@1464..1465 "\n"
+    BLANK_LINE@1465..1466
+      BLANK_LINE@1465..1466 "\n"
+    PARAGRAPH@1466..1590
+      TEXT@1466..1541 "Alternatively, once y ..."
+      INLINE_CODE@1541..1559
+        INLINE_CODE_MARKER@1541..1542 "`"
+        INLINE_CODE_CONTENT@1542..1558 "requirements.txt"
+        INLINE_CODE_MARKER@1558..1559 "`"
+      TEXT@1559..1589 " to get the packages  ..."
+      NEWLINE@1589..1590 "\n"
+    BLANK_LINE@1590..1591
+      BLANK_LINE@1590..1591 "\n"
+    DIV_FENCE_CLOSE@1591..1595
+      TEXT@1591..1594 ":::"
+      NEWLINE@1594..1595 "\n"
+  BLANK_LINE@1595..1596
+    BLANK_LINE@1595..1596 "\n"
+  HEADING@1596..1644
+    ATX_HEADING_MARKER@1596..1599
+      ATX_HEADING_MARKER@1596..1599 "###"
+    WHITESPACE@1599..1600 " "
+    HEADING_CONTENT@1600..1629
+      TEXT@1600..1629 "Clone the Template Re ..."
+    WHITESPACE@1629..1630 " "
+    ATTRIBUTE@1630..1643
+      ATTRIBUTE@1630..1643 "{#clone-repo}"
+    NEWLINE@1643..1644 "\n"
+  BLANK_LINE@1644..1645
+    BLANK_LINE@1644..1645 "\n"
+  PARAGRAPH@1645..1789
+    TEXT@1645..1702 "To follow this tutori ..."
+    LINK@1702..1756
+      LINK_START@1702..1703
+        LINK_START@1702..1703 "["
+      LINK_TEXT@1703..1722
+        TEXT@1703..1722 "template repository"
+      LINK_TEXT_END@1722..1723 "]"
+      LINK_DEST_START@1723..1724 "("
+      LINK_DEST@1724..1755
+        TEXT@1724..1755 "{{< meta tool.templat ..."
+      LINK_DEST_END@1755..1756 ")"
+    TEXT@1756..1788 ", including all of it ..."
+    NEWLINE@1788..1789 "\n"
+  BLANK_LINE@1789..1790
+    BLANK_LINE@1789..1790 "\n"
+  LIST@1790..2937
+    LIST_ITEM@1790..2256
+      LIST_MARKER@1790..1792 "1."
+      WHITESPACE@1792..1794 "  "
+      PLAIN@1794..1899
+        TEXT@1794..1802 "Head to "
+        LINK@1802..1897
+          LINK_START@1802..1803
+            LINK_START@1802..1803 "["
+          LINK_TEXT@1803..1854
+            TEXT@1803..1854 "GitHub to create a ne ..."
+          LINK_TEXT_END@1854..1855 "]"
+          LINK_DEST_START@1855..1856 "("
+          LINK_DEST@1856..1896
+            TEXT@1856..1896 "{{< meta tool.templat ..."
+          LINK_DEST_END@1896..1897 ")"
+        TEXT@1897..1898 "."
+        NEWLINE@1898..1899 "\n"
+      BLANK_LINE@1899..1900
+        BLANK_LINE@1899..1900 "\n"
+      PLAIN@1900..2256
+        TEXT@1900..1914 "    Provide a "
+        STRONG@1914..1933
+          STRONG_MARKER@1914..1916 "**"
+          TEXT@1916..1931 "Repository Name"
+          STRONG_MARKER@1931..1933 "**"
+        TEXT@1933..1958 " and make sure you ch ..."
+        STRONG@1958..1982
+          STRONG_MARKER@1958..1960 "**"
+          TEXT@1960..1980 "Include all branches"
+          STRONG_MARKER@1980..1982 "**"
+        TEXT@1982..1989 ". Then "
+        STRONG@1989..2024
+          STRONG_MARKER@1989..1991 "**"
+          TEXT@1991..2022 "Create repository fro ..."
+          STRONG_MARKER@2022..2024 "**"
+        TEXT@2024..2026 ". "
+        IMAGE_LINK@2026..2255
+          IMAGE_LINK_START@2026..2028
+            IMAGE_LINK_START@2026..2028 "!["
+          IMAGE_ALT@2028..2028
+          IMAGE_ALT_END@2028..2029 "]"
+          IMAGE_DEST_START@2029..2030 "("
+          LINK_DEST@2030..2068
+            TEXT@2030..2068 "images/github-create- ..."
+          IMAGE_DEST_END@2068..2069 ")"
+          ATTRIBUTE@2069..2255
+            ATTRIBUTE@2069..2255 "{fig-alt=\"Screenshot  ..."
+        NEWLINE@2255..2256 "\n"
+    BLANK_LINE@2256..2257
+      BLANK_LINE@2256..2257 "\n"
+    LIST_ITEM@2257..2937
+      LIST_MARKER@2257..2259 "2."
+      WHITESPACE@2259..2261 "  "
+      PLAIN@2261..2327
+        TEXT@2261..2326 "Once your repository  ..."
+        NEWLINE@2326..2327 "\n"
+      BLANK_LINE@2327..2328
+        BLANK_LINE@2327..2328 "\n"
+      FENCED_DIV@2328..2646
+        DIV_FENCE_OPEN@2328..2385
+          WHITESPACE@2328..2332 "    "
+          TEXT@2332..2335 ":::"
+          WHITESPACE@2335..2336 " "
+          DIV_INFO@2336..2384
+            TEXT@2336..2384 "{.content-visible unl ..."
+          NEWLINE@2384..2385 "\n"
+        PARAGRAPH@2385..2484
+          TEXT@2385..2483 "    You can do this a ..."
+          NEWLINE@2483..2484 "\n"
+        BLANK_LINE@2484..2485
+          BLANK_LINE@2484..2485 "\n"
+        CODE_BLOCK@2485..2585
+          WHITESPACE@2485..2489 "    "
+          CODE_FENCE_OPEN@2489..2521
+            CODE_FENCE_MARKER@2489..2492 "```"
+            WHITESPACE@2492..2493 " "
+            CODE_INFO@2493..2520
+              TEXT@2493..2494 "{"
+              TEXT@2494..2495 "."
+              CODE_LANGUAGE@2495..2499 "bash"
+              TEXT@2499..2520 " filename=\"Terminal\"}"
+            NEWLINE@2520..2521 "\n"
+          CODE_CONTENT@2521..2577
+            WHITESPACE@2521..2525 "    "
+            TEXT@2525..2576 "git clone git@github. ..."
+            NEWLINE@2576..2577 "\n"
+          WHITESPACE@2577..2581 "    "
+          CODE_FENCE_CLOSE@2581..2585
+            CODE_FENCE_MARKER@2581..2584 "```"
+            NEWLINE@2584..2585 "\n"
+        BLANK_LINE@2585..2586
+          BLANK_LINE@2585..2586 "\n"
+        PARAGRAPH@2586..2638
+          TEXT@2586..2637 "    Where you use you ..."
+          NEWLINE@2637..2638 "\n"
+        DIV_FENCE_CLOSE@2638..2646
+          WHITESPACE@2638..2642 "    "
+          TEXT@2642..2645 ":::"
+          NEWLINE@2645..2646 "\n"
+      BLANK_LINE@2646..2647
+        BLANK_LINE@2646..2647 "\n"
+      FENCED_DIV@2647..2937
+        DIV_FENCE_OPEN@2647..2702
+          WHITESPACE@2647..2651 "    "
+          TEXT@2651..2654 ":::"
+          WHITESPACE@2654..2655 " "
+          DIV_INFO@2655..2701
+            TEXT@2655..2701 "{.content-visible whe ..."
+          NEWLINE@2701..2702 "\n"
+        PARAGRAPH@2702..2929
+          TEXT@2702..2778 "    You can do this a ..."
+          STRONG@2778..2786
+            STRONG_MARKER@2778..2780 "**"
+            TEXT@2780..2784 "File"
+            STRONG_MARKER@2784..2786 "**"
+          TEXT@2786..2789 " > "
+          STRONG@2789..2804
+            STRONG_MARKER@2789..2791 "**"
+            TEXT@2791..2802 "New Project"
+            STRONG_MARKER@2802..2804 "**"
+          TEXT@2804..2813 ". In the "
+          STRONG@2813..2828
+            STRONG_MARKER@2813..2815 "**"
+            TEXT@2815..2826 "New Project"
+            STRONG_MARKER@2826..2828 "**"
+          TEXT@2828..2844 " dialog, select "
+          STRONG@2844..2868
+            STRONG_MARKER@2844..2846 "**"
+            TEXT@2846..2866 "From Version Control"
+            STRONG_MARKER@2866..2868 "**"
+          TEXT@2868..2875 ", then "
+          STRONG@2875..2882
+            STRONG_MARKER@2875..2877 "**"
+            TEXT@2877..2880 "Git"
+            STRONG_MARKER@2880..2882 "**"
+          TEXT@2882..2928 ", and copy and paste  ..."
+          NEWLINE@2928..2929 "\n"
+        DIV_FENCE_CLOSE@2929..2937
+          WHITESPACE@2929..2933 "    "
+          TEXT@2933..2936 ":::"
+          NEWLINE@2936..2937 "\n"
+  BLANK_LINE@2937..2938
+    BLANK_LINE@2937..2938 "\n"
+  FENCED_DIV@2938..3329
+    DIV_FENCE_OPEN@2938..2989
+      TEXT@2938..2941 ":::"
+      WHITESPACE@2941..2942 " "
+      DIV_INFO@2942..2988
+        TEXT@2942..2988 "{.content-visible whe ..."
+      NEWLINE@2988..2989 "\n"
+    FIGURE@2989..3325
+      IMAGE_LINK@2989..3324
+        IMAGE_LINK_START@2989..2991
+          IMAGE_LINK_START@2989..2991 "!["
+        IMAGE_ALT@2991..3026
+          TEXT@2991..3026 "Template manuscript o ..."
+        IMAGE_ALT_END@3026..3027 "]"
+        IMAGE_DEST_START@3027..3028 "("
+        LINK_DEST@3028..3051
+          TEXT@3028..3051 "images/rstudio-open.png"
+        IMAGE_DEST_END@3051..3052 ")"
+        ATTRIBUTE@3052..3324
+          ATTRIBUTE@3052..3324 "{fig-alt=\"Screenshot  ..."
+      NEWLINE@3324..3325 "\n"
+    DIV_FENCE_CLOSE@3325..3329
+      TEXT@3325..3328 ":::"
+      NEWLINE@3328..3329 "\n"
+  BLANK_LINE@3329..3330
+    BLANK_LINE@3329..3330 "\n"
+  FENCED_DIV@3330..3914
+    DIV_FENCE_OPEN@3330..3384
+      TEXT@3330..3333 ":::"
+      WHITESPACE@3333..3334 " "
+      DIV_INFO@3334..3383
+        TEXT@3334..3383 "{.content-visible whe ..."
+      NEWLINE@3383..3384 "\n"
+    LIST@3384..3638
+      LIST_ITEM@3384..3638
+        LIST_MARKER@3384..3386 "3."
+        WHITESPACE@3386..3388 "  "
+        PLAIN@3388..3539
+          TEXT@3388..3538 "You'll be working ins ..."
+          NEWLINE@3538..3539 "\n"
+        BLANK_LINE@3539..3540
+          BLANK_LINE@3539..3540 "\n"
+        CODE_BLOCK@3540..3638
+          WHITESPACE@3540..3544 "    "
+          CODE_FENCE_OPEN@3544..3576
+            CODE_FENCE_MARKER@3544..3547 "```"
+            WHITESPACE@3547..3548 " "
+            CODE_INFO@3548..3575
+              TEXT@3548..3549 "{"
+              TEXT@3549..3550 "."
+              CODE_LANGUAGE@3550..3554 "bash"
+              TEXT@3554..3575 " filename=\"Terminal\"}"
+            NEWLINE@3575..3576 "\n"
+          CODE_CONTENT@3576..3630
+            WHITESPACE@3576..3580 "    "
+            TEXT@3580..3602 "cd manuscript-tutorial"
+            NEWLINE@3602..3603 "\n"
+            WHITESPACE@3603..3607 "    "
+            TEXT@3607..3629 "python3 -m jupyter lab"
+            NEWLINE@3629..3630 "\n"
+          WHITESPACE@3630..3634 "    "
+          CODE_FENCE_CLOSE@3634..3638
+            CODE_FENCE_MARKER@3634..3637 "```"
+            NEWLINE@3637..3638 "\n"
+    BLANK_LINE@3638..3639
+      BLANK_LINE@3638..3639 "\n"
+    FIGURE@3639..3910
+      IMAGE_LINK@3639..3909
+        IMAGE_LINK_START@3639..3641
+          IMAGE_LINK_START@3639..3641 "!["
+        IMAGE_ALT@3641..3682
+          TEXT@3641..3682 "Template manuscript o ..."
+        IMAGE_ALT_END@3682..3683 "]"
+        IMAGE_DEST_START@3683..3684 "("
+        LINK_DEST@3684..3707
+          TEXT@3684..3707 "images/jupyter-open.png"
+        IMAGE_DEST_END@3707..3708 ")"
+        ATTRIBUTE@3708..3909
+          ATTRIBUTE@3708..3909 "{.border fig-alt=\"A s ..."
+      NEWLINE@3909..3910 "\n"
+    DIV_FENCE_CLOSE@3910..3914
+      TEXT@3910..3913 ":::"
+      NEWLINE@3913..3914 "\n"
+  BLANK_LINE@3914..3915
+    BLANK_LINE@3914..3915 "\n"
+  FENCED_DIV@3915..4373
+    DIV_FENCE_OPEN@3915..3965
+      TEXT@3915..3918 ":::"
+      WHITESPACE@3918..3919 " "
+      DIV_INFO@3919..3964
+        TEXT@3919..3964 "{.content-visible whe ..."
+      NEWLINE@3964..3965 "\n"
+    LIST@3965..4097
+      LIST_ITEM@3965..4097
+        LIST_MARKER@3965..3967 "3."
+        WHITESPACE@3967..3969 "  "
+        PLAIN@3969..4097
+          TEXT@3969..4096 "You'll be working ins ..."
+          NEWLINE@4096..4097 "\n"
+    BLANK_LINE@4097..4098
+      BLANK_LINE@4097..4098 "\n"
+    FIGURE@4098..4369
+      IMAGE_LINK@4098..4368
+        IMAGE_LINK_START@4098..4100
+          IMAGE_LINK_START@4098..4100 "!["
+        IMAGE_ALT@4100..4135
+          TEXT@4100..4135 "Template manuscript o ..."
+        IMAGE_ALT_END@4135..4136 "]"
+        IMAGE_DEST_START@4136..4137 "("
+        LINK_DEST@4137..4159
+          TEXT@4137..4159 "images/vscode-open.png"
+        IMAGE_DEST_END@4159..4160 ")"
+        ATTRIBUTE@4160..4368
+          ATTRIBUTE@4160..4368 "{fig-alt=\"A screensho ..."
+      NEWLINE@4368..4369 "\n"
+    DIV_FENCE_CLOSE@4369..4373
+      TEXT@4369..4372 ":::"
+      NEWLINE@4372..4373 "\n"

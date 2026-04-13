@@ -1,0 +1,33 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..176
+  PARAGRAPH@0..68
+    TEXT@0..20 "This is a reference "
+    IMAGE_LINK@20..33
+      IMAGE_LINK_START@20..22
+        IMAGE_LINK_START@20..22 "!["
+      IMAGE_ALT@22..27
+        TEXT@22..27 "image"
+      TEXT@27..28 "]"
+      TEXT@28..29 "["
+      LINK_REF@29..32
+        TEXT@29..32 "ref"
+      TEXT@32..33 "]"
+    TEXT@33..67 " with continuation at ..."
+    NEWLINE@67..68 "\n"
+  BLANK_LINE@68..69
+    BLANK_LINE@68..69 "\n"
+  REFERENCE_DEFINITION@69..135
+    LINK@69..74
+      LINK_START@69..70
+        LINK_START@69..70 "["
+      LINK_TEXT@70..73
+        TEXT@70..73 "ref"
+      TEXT@73..74 "]"
+    TEXT@74..134 ": https://path.to/ima ..."
+    NEWLINE@134..135 "\n"
+  PARAGRAPH@135..176
+    TEXT@135..175 "       id=myId class= ..."
+    NEWLINE@175..176 "\n"

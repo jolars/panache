@@ -1,0 +1,46 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..225
+  HTML_BLOCK@0..54
+    HTML_BLOCK_TAG@0..54
+      TEXT@0..53 "<!-- Source: pandoc/t ..."
+      NEWLINE@53..54 "\n"
+  BLANK_LINE@54..55
+    BLANK_LINE@54..55 "\n"
+  HEADING@55..88
+    ATX_HEADING_MARKER@55..56
+      ATX_HEADING_MARKER@55..56 "#"
+    WHITESPACE@56..57 " "
+    HEADING_CONTENT@57..87
+      TEXT@57..87 "Indented code blocks  ..."
+    NEWLINE@87..88 "\n"
+  BLANK_LINE@88..89
+    BLANK_LINE@88..89 "\n"
+  PARAGRAPH@89..95
+    TEXT@89..94 "Code:"
+    NEWLINE@94..95 "\n"
+  BLANK_LINE@95..96
+    BLANK_LINE@95..96 "\n"
+  CODE_BLOCK@96..225
+    CODE_CONTENT@96..225
+      WHITESPACE@96..100 "    "
+      TEXT@100..129 "---- (should be four  ..."
+      NEWLINE@129..130 "\n"
+      TEXT@130..130 ""
+      NEWLINE@130..131 "\n"
+      WHITESPACE@131..135 "    "
+      TEXT@135..147 "sub status {"
+      NEWLINE@147..148 "\n"
+      WHITESPACE@148..156 "        "
+      TEXT@156..172 "print \"working\";"
+      NEWLINE@172..173 "\n"
+      WHITESPACE@173..177 "    "
+      TEXT@177..178 "}"
+      NEWLINE@178..179 "\n"
+      TEXT@179..179 ""
+      NEWLINE@179..180 "\n"
+      WHITESPACE@180..184 "    "
+      TEXT@184..224 "These should not be e ..."
+      NEWLINE@224..225 "\n"

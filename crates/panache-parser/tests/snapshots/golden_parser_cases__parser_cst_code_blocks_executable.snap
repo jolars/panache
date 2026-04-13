@@ -1,0 +1,183 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..397
+  HEADING@0..25
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..24
+      TEXT@2..24 "Executable Code Chunks"
+    NEWLINE@24..25 "\n"
+  BLANK_LINE@25..26
+    BLANK_LINE@25..26 "\n"
+  PARAGRAPH@26..41
+    TEXT@26..40 "Basic R chunk:"
+    NEWLINE@40..41 "\n"
+  BLANK_LINE@41..42
+    BLANK_LINE@41..42 "\n"
+  CODE_BLOCK@42..61
+    CODE_FENCE_OPEN@42..49
+      CODE_FENCE_MARKER@42..45 "```"
+      CODE_INFO@45..48
+        TEXT@45..46 "{"
+        CODE_LANGUAGE@46..47 "r"
+        CHUNK_OPTIONS@47..48
+          TEXT@47..48 "}"
+      NEWLINE@48..49 "\n"
+    CODE_CONTENT@49..57
+      TEXT@49..56 "x <- 42"
+      NEWLINE@56..57 "\n"
+    CODE_FENCE_CLOSE@57..61
+      CODE_FENCE_MARKER@57..60 "```"
+      NEWLINE@60..61 "\n"
+  BLANK_LINE@61..62
+    BLANK_LINE@61..62 "\n"
+  PARAGRAPH@62..76
+    TEXT@62..75 "With options:"
+    NEWLINE@75..76 "\n"
+  BLANK_LINE@76..77
+    BLANK_LINE@76..77 "\n"
+  CODE_BLOCK@77..130
+    CODE_FENCE_OPEN@77..84
+      CODE_FENCE_MARKER@77..80 "```"
+      CODE_INFO@80..83
+        TEXT@80..81 "{"
+        CODE_LANGUAGE@81..82 "r"
+        CHUNK_OPTIONS@82..83
+          TEXT@82..83 "}"
+      NEWLINE@83..84 "\n"
+    CODE_CONTENT@84..126
+      HASHPIPE_YAML_PREAMBLE@84..115
+        HASHPIPE_YAML_CONTENT@84..115
+          CHUNK_OPTION@84..98
+            HASHPIPE_PREFIX@84..86 "#|"
+            WHITESPACE@86..87 " "
+            CHUNK_OPTION_KEY@87..91 "echo"
+            TEXT@91..92 ":"
+            WHITESPACE@92..93 " "
+            CHUNK_OPTION_VALUE@93..98 "false"
+          NEWLINE@98..99 "\n"
+          CHUNK_OPTION@99..114
+            HASHPIPE_PREFIX@99..101 "#|"
+            WHITESPACE@101..102 " "
+            CHUNK_OPTION_KEY@102..111 "fig-width"
+            TEXT@111..112 ":"
+            WHITESPACE@112..113 " "
+            CHUNK_OPTION_VALUE@113..114 "8"
+          NEWLINE@114..115 "\n"
+      TEXT@115..125 "plot(1:10)"
+      NEWLINE@125..126 "\n"
+    CODE_FENCE_CLOSE@126..130
+      CODE_FENCE_MARKER@126..129 "```"
+      NEWLINE@129..130 "\n"
+  BLANK_LINE@130..131
+    BLANK_LINE@130..131 "\n"
+  PARAGRAPH@131..145
+    TEXT@131..144 "Python chunk:"
+    NEWLINE@144..145 "\n"
+  BLANK_LINE@145..146
+    BLANK_LINE@145..146 "\n"
+  CODE_BLOCK@146..196
+    CODE_FENCE_OPEN@146..158
+      CODE_FENCE_MARKER@146..149 "```"
+      CODE_INFO@149..157
+        TEXT@149..150 "{"
+        CODE_LANGUAGE@150..156 "python"
+        CHUNK_OPTIONS@156..157
+          TEXT@156..157 "}"
+      NEWLINE@157..158 "\n"
+    CODE_CONTENT@158..192
+      HASHPIPE_YAML_PREAMBLE@158..172
+        HASHPIPE_YAML_CONTENT@158..172
+          CHUNK_OPTION@158..171
+            HASHPIPE_PREFIX@158..160 "#|"
+            WHITESPACE@160..161 " "
+            CHUNK_OPTION_KEY@161..165 "eval"
+            TEXT@165..166 ":"
+            WHITESPACE@166..167 " "
+            CHUNK_OPTION_VALUE@167..171 "true"
+          NEWLINE@171..172 "\n"
+      TEXT@172..191 "import pandas as pd"
+      NEWLINE@191..192 "\n"
+    CODE_FENCE_CLOSE@192..196
+      CODE_FENCE_MARKER@192..195 "```"
+      NEWLINE@195..196 "\n"
+  BLANK_LINE@196..197
+    BLANK_LINE@196..197 "\n"
+  PARAGRAPH@197..221
+    TEXT@197..220 "Julia chunk with label:"
+    NEWLINE@220..221 "\n"
+  BLANK_LINE@221..222
+    BLANK_LINE@221..222 "\n"
+  CODE_BLOCK@222..283
+    CODE_FENCE_OPEN@222..233
+      CODE_FENCE_MARKER@222..225 "```"
+      CODE_INFO@225..232
+        TEXT@225..226 "{"
+        CODE_LANGUAGE@226..231 "julia"
+        CHUNK_OPTIONS@231..232
+          TEXT@231..232 "}"
+      NEWLINE@232..233 "\n"
+    CODE_CONTENT@233..279
+      HASHPIPE_YAML_PREAMBLE@233..267
+        HASHPIPE_YAML_CONTENT@233..267
+          CHUNK_OPTION@233..251
+            HASHPIPE_PREFIX@233..235 "#|"
+            WHITESPACE@235..236 " "
+            CHUNK_OPTION_KEY@236..241 "label"
+            TEXT@241..242 ":"
+            WHITESPACE@242..243 " "
+            CHUNK_OPTION_VALUE@243..251 "fig-plot"
+          NEWLINE@251..252 "\n"
+          CHUNK_OPTION@252..266
+            HASHPIPE_PREFIX@252..254 "#|"
+            WHITESPACE@254..255 " "
+            CHUNK_OPTION_KEY@255..259 "echo"
+            TEXT@259..260 ":"
+            WHITESPACE@260..261 " "
+            CHUNK_OPTION_VALUE@261..266 "false"
+          NEWLINE@266..267 "\n"
+      TEXT@267..278 "using Plots"
+      NEWLINE@278..279 "\n"
+    CODE_FENCE_CLOSE@279..283
+      CODE_FENCE_MARKER@279..282 "```"
+      NEWLINE@282..283 "\n"
+  BLANK_LINE@283..284
+    BLANK_LINE@283..284 "\n"
+  CODE_BLOCK@284..397
+    CODE_FENCE_OPEN@284..291
+      CODE_FENCE_MARKER@284..287 "```"
+      CODE_INFO@287..290
+        TEXT@287..288 "{"
+        CODE_LANGUAGE@288..289 "r"
+        CHUNK_OPTIONS@289..290
+          TEXT@289..290 "}"
+      NEWLINE@290..291 "\n"
+    CODE_CONTENT@291..393
+      HASHPIPE_YAML_PREAMBLE@291..386
+        HASHPIPE_YAML_CONTENT@291..386
+          CHUNK_OPTION@291..323
+            HASHPIPE_PREFIX@291..293 "#|"
+            WHITESPACE@293..294 " "
+            CHUNK_OPTION_KEY@294..301 "fig-cap"
+            TEXT@301..302 ":"
+            WHITESPACE@302..303 " "
+            CHUNK_OPTION_VALUE@303..323 "\"A multiline caption"
+          NEWLINE@323..324 "\n"
+          CHUNK_OPTION@324..370
+            HASHPIPE_PREFIX@324..326 "#|"
+            WHITESPACE@326..328 "  "
+            CHUNK_OPTION_VALUE@328..370 "that spans multiple l ..."
+          NEWLINE@370..371 "\n"
+          CHUNK_OPTION@371..385
+            HASHPIPE_PREFIX@371..373 "#|"
+            WHITESPACE@373..375 "  "
+            CHUNK_OPTION_VALUE@375..385 "wrapping.\""
+          NEWLINE@385..386 "\n"
+      TEXT@386..392 "a <- 1"
+      NEWLINE@392..393 "\n"
+    CODE_FENCE_CLOSE@393..397
+      CODE_FENCE_MARKER@393..396 "```"
+      NEWLINE@396..397 "\n"

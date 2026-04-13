@@ -1,0 +1,15 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..66
+  BLOCK_QUOTE@0..66
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    PARAGRAPH@2..66
+      TEXT@2..8 "[!TIP]"
+      NEWLINE@8..9 "\n"
+      BLOCK_QUOTE_MARKER@9..10 ">"
+      WHITESPACE@10..11 " "
+      TEXT@11..65 "Helpful advice for do ..."
+      NEWLINE@65..66 "\n"

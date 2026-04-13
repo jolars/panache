@@ -1,0 +1,157 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..496
+  HEADING@0..18
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..17
+      TEXT@2..17 "Raw Blocks Test"
+    NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  PARAGRAPH@19..61
+    TEXT@19..34 "This tests the "
+    INLINE_CODE@34..49
+      INLINE_CODE_MARKER@34..35 "`"
+      INLINE_CODE_CONTENT@35..48 "raw_attribute"
+      INLINE_CODE_MARKER@48..49 "`"
+    TEXT@49..60 " extension."
+    NEWLINE@60..61 "\n"
+  BLANK_LINE@61..62
+    BLANK_LINE@61..62 "\n"
+  HEADING@62..80
+    ATX_HEADING_MARKER@62..64
+      ATX_HEADING_MARKER@62..64 "##"
+    WHITESPACE@64..65 " "
+    HEADING_CONTENT@65..79
+      TEXT@65..79 "HTML Raw Block"
+    NEWLINE@79..80 "\n"
+  BLANK_LINE@80..81
+    BLANK_LINE@80..81 "\n"
+  CODE_BLOCK@81..164
+    CODE_FENCE_OPEN@81..92
+      CODE_FENCE_MARKER@81..84 "```"
+      CODE_INFO@84..91
+        TEXT@84..91 "{=html}"
+      NEWLINE@91..92 "\n"
+    CODE_CONTENT@92..160
+      TEXT@92..112 "<div class=\"custom\">"
+      NEWLINE@112..113 "\n"
+      TEXT@113..152 "  <p>This should stay ..."
+      NEWLINE@152..153 "\n"
+      TEXT@153..159 "</div>"
+      NEWLINE@159..160 "\n"
+    CODE_FENCE_CLOSE@160..164
+      CODE_FENCE_MARKER@160..163 "```"
+      NEWLINE@163..164 "\n"
+  BLANK_LINE@164..165
+    BLANK_LINE@164..165 "\n"
+  HEADING@165..184
+    ATX_HEADING_MARKER@165..167
+      ATX_HEADING_MARKER@165..167 "##"
+    WHITESPACE@167..168 " "
+    HEADING_CONTENT@168..183
+      TEXT@168..183 "LaTeX Raw Block"
+    NEWLINE@183..184 "\n"
+  BLANK_LINE@184..185
+    BLANK_LINE@184..185 "\n"
+  CODE_BLOCK@185..244
+    CODE_FENCE_OPEN@185..197
+      CODE_FENCE_MARKER@185..188 "```"
+      CODE_INFO@188..196
+        TEXT@188..196 "{=latex}"
+      NEWLINE@196..197 "\n"
+    CODE_CONTENT@197..240
+      TEXT@197..213 "\\begin{equation}"
+      NEWLINE@213..214 "\n"
+      TEXT@214..224 "  E = mc^2"
+      NEWLINE@224..225 "\n"
+      TEXT@225..239 "\\end{equation}"
+      NEWLINE@239..240 "\n"
+    CODE_FENCE_CLOSE@240..244
+      CODE_FENCE_MARKER@240..243 "```"
+      NEWLINE@243..244 "\n"
+  BLANK_LINE@244..245
+    BLANK_LINE@244..245 "\n"
+  HEADING@245..266
+    ATX_HEADING_MARKER@245..247
+      ATX_HEADING_MARKER@245..247 "##"
+    WHITESPACE@247..248 " "
+    HEADING_CONTENT@248..265
+      TEXT@248..265 "OpenXML Raw Block"
+    NEWLINE@265..266 "\n"
+  BLANK_LINE@266..267
+    BLANK_LINE@266..267 "\n"
+  CODE_BLOCK@267..341
+    CODE_FENCE_OPEN@267..281
+      CODE_FENCE_MARKER@267..270 "```"
+      CODE_INFO@270..280
+        TEXT@270..280 "{=openxml}"
+      NEWLINE@280..281 "\n"
+    CODE_CONTENT@281..337
+      TEXT@281..286 "<w:p>"
+      NEWLINE@286..287 "\n"
+      TEXT@287..294 "  <w:r>"
+      NEWLINE@294..295 "\n"
+      TEXT@295..320 "    <w:br w:type=\"pag ..."
+      NEWLINE@320..321 "\n"
+      TEXT@321..329 "  </w:r>"
+      NEWLINE@329..330 "\n"
+      TEXT@330..336 "</w:p>"
+      NEWLINE@336..337 "\n"
+    CODE_FENCE_CLOSE@337..341
+      CODE_FENCE_MARKER@337..340 "```"
+      NEWLINE@340..341 "\n"
+  BLANK_LINE@341..342
+    BLANK_LINE@341..342 "\n"
+  HEADING@342..364
+    ATX_HEADING_MARKER@342..344
+      ATX_HEADING_MARKER@342..344 "##"
+    WHITESPACE@344..345 " "
+    HEADING_CONTENT@345..363
+      TEXT@345..363 "Groff MS Raw Block"
+    NEWLINE@363..364 "\n"
+  BLANK_LINE@364..365
+    BLANK_LINE@364..365 "\n"
+  CODE_BLOCK@365..413
+    CODE_FENCE_OPEN@365..374
+      CODE_FENCE_MARKER@365..368 "```"
+      CODE_INFO@368..373
+        TEXT@368..373 "{=ms}"
+      NEWLINE@373..374 "\n"
+    CODE_CONTENT@374..409
+      TEXT@374..382 ".MYMACRO"
+      NEWLINE@382..383 "\n"
+      TEXT@383..392 "blah blah"
+      NEWLINE@392..393 "\n"
+      TEXT@393..398 ".NH 1"
+      NEWLINE@398..399 "\n"
+      TEXT@399..408 "A Section"
+      NEWLINE@408..409 "\n"
+    CODE_FENCE_CLOSE@409..413
+      CODE_FENCE_MARKER@409..412 "```"
+      NEWLINE@412..413 "\n"
+  BLANK_LINE@413..414
+    BLANK_LINE@413..414 "\n"
+  PARAGRAPH@414..449
+    TEXT@414..448 "Regular code block fo ..."
+    NEWLINE@448..449 "\n"
+  BLANK_LINE@449..450
+    BLANK_LINE@449..450 "\n"
+  CODE_BLOCK@450..496
+    CODE_FENCE_OPEN@450..460
+      CODE_FENCE_MARKER@450..453 "```"
+      CODE_INFO@453..459
+        CODE_LANGUAGE@453..459 "python"
+      NEWLINE@459..460 "\n"
+    CODE_CONTENT@460..492
+      TEXT@460..472 "def hello():"
+      NEWLINE@472..473 "\n"
+      TEXT@473..491 "    print(\"world\")"
+      NEWLINE@491..492 "\n"
+    CODE_FENCE_CLOSE@492..496
+      CODE_FENCE_MARKER@492..495 "```"
+      NEWLINE@495..496 "\n"

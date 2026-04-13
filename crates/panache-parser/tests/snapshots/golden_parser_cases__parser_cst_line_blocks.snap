@@ -1,0 +1,23 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..74
+  PARAGRAPH@0..18
+    TEXT@0..17 "Basic line block:"
+    NEWLINE@17..18 "\n"
+  BLANK_LINE@18..19
+    BLANK_LINE@18..19 "\n"
+  LINE_BLOCK@19..74
+    LINE_BLOCK_LINE@19..37
+      LINE_BLOCK_MARKER@19..21 "| "
+      TEXT@21..36 "The first line."
+      NEWLINE@36..37 "\n"
+    LINE_BLOCK_LINE@37..56
+      LINE_BLOCK_MARKER@37..39 "| "
+      TEXT@39..55 "The second line."
+      NEWLINE@55..56 "\n"
+    LINE_BLOCK_LINE@56..74
+      LINE_BLOCK_MARKER@56..58 "| "
+      TEXT@58..73 "The third line."
+      NEWLINE@73..74 "\n"

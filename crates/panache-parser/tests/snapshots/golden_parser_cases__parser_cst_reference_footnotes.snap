@@ -1,0 +1,242 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..1240
+  HEADING@0..22
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..21
+      TEXT@2..21 "Reference Footnotes"
+    NEWLINE@21..22 "\n"
+  BLANK_LINE@22..23
+    BLANK_LINE@22..23 "\n"
+  PARAGRAPH@23..52
+    TEXT@23..38 "Simple footnote"
+    FOOTNOTE_REFERENCE@38..42
+      FOOTNOTE_LABEL_START@38..40 "[^"
+      FOOTNOTE_LABEL_ID@40..41 "1"
+      FOOTNOTE_LABEL_END@41..42 "]"
+    TEXT@42..51 " in text."
+    NEWLINE@51..52 "\n"
+  BLANK_LINE@52..53
+    BLANK_LINE@52..53 "\n"
+  PARAGRAPH@53..98
+    TEXT@53..71 "Multiple footnotes"
+    FOOTNOTE_REFERENCE@71..75
+      FOOTNOTE_LABEL_START@71..73 "[^"
+      FOOTNOTE_LABEL_ID@73..74 "2"
+      FOOTNOTE_LABEL_END@74..75 "]"
+    TEXT@75..82 " in one"
+    FOOTNOTE_REFERENCE@82..86
+      FOOTNOTE_LABEL_START@82..84 "[^"
+      FOOTNOTE_LABEL_ID@84..85 "3"
+      FOOTNOTE_LABEL_END@85..86 "]"
+    TEXT@86..97 " paragraph."
+    NEWLINE@97..98 "\n"
+  BLANK_LINE@98..99
+    BLANK_LINE@98..99 "\n"
+  PARAGRAPH@99..156
+    TEXT@99..121 "With inline elements: "
+    STRONG@121..129
+      STRONG_MARKER@121..123 "**"
+      TEXT@123..127 "bold"
+      STRONG_MARKER@127..129 "**"
+    FOOTNOTE_REFERENCE@129..136
+      FOOTNOTE_LABEL_START@129..131 "[^"
+      FOOTNOTE_LABEL_ID@131..135 "bold"
+      FOOTNOTE_LABEL_END@135..136 "]"
+    TEXT@136..141 " and "
+    INLINE_CODE@141..147
+      INLINE_CODE_MARKER@141..142 "`"
+      INLINE_CODE_CONTENT@142..146 "code"
+      INLINE_CODE_MARKER@146..147 "`"
+    FOOTNOTE_REFERENCE@147..154
+      FOOTNOTE_LABEL_START@147..149 "[^"
+      FOOTNOTE_LABEL_ID@149..153 "code"
+      FOOTNOTE_LABEL_END@153..154 "]"
+    TEXT@154..155 "."
+    NEWLINE@155..156 "\n"
+  BLANK_LINE@156..157
+    BLANK_LINE@156..157 "\n"
+  PARAGRAPH@157..207
+    TEXT@157..176 "Multi-line footnote"
+    FOOTNOTE_REFERENCE@176..184
+      FOOTNOTE_LABEL_START@176..178 "[^"
+      FOOTNOTE_LABEL_ID@178..183 "multi"
+      FOOTNOTE_LABEL_END@183..184 "]"
+    TEXT@184..206 " with complex content."
+    NEWLINE@206..207 "\n"
+  BLANK_LINE@207..208
+    BLANK_LINE@207..208 "\n"
+  PARAGRAPH@208..252
+    TEXT@208..239 "Here's one with multi ..."
+    FOOTNOTE_REFERENCE@239..250
+      FOOTNOTE_LABEL_START@239..241 "[^"
+      FOOTNOTE_LABEL_ID@241..249 "longnote"
+      FOOTNOTE_LABEL_END@249..250 "]"
+    TEXT@250..251 "."
+    NEWLINE@251..252 "\n"
+  BLANK_LINE@252..253
+    BLANK_LINE@252..253 "\n"
+  FOOTNOTE_DEFINITION@253..286
+    FOOTNOTE_LABEL_START@253..255 "[^"
+    FOOTNOTE_LABEL_ID@255..256 "1"
+    FOOTNOTE_LABEL_END@256..257 "]"
+    FOOTNOTE_LABEL_COLON@257..258 ":"
+    WHITESPACE@258..259 " "
+    PARAGRAPH@259..286
+      TEXT@259..285 "This is a simple foot ..."
+      NEWLINE@285..286 "\n"
+  BLANK_LINE@286..287
+    BLANK_LINE@286..287 "\n"
+  FOOTNOTE_DEFINITION@287..322
+    FOOTNOTE_LABEL_START@287..289 "[^"
+    FOOTNOTE_LABEL_ID@289..290 "2"
+    FOOTNOTE_LABEL_END@290..291 "]"
+    FOOTNOTE_LABEL_COLON@291..292 ":"
+    WHITESPACE@292..293 " "
+    PARAGRAPH@293..322
+      TEXT@293..321 "This is the second fo ..."
+      NEWLINE@321..322 "\n"
+  BLANK_LINE@322..323
+    BLANK_LINE@322..323 "\n"
+  FOOTNOTE_DEFINITION@323..350
+    FOOTNOTE_LABEL_START@323..325 "[^"
+    FOOTNOTE_LABEL_ID@325..326 "3"
+    FOOTNOTE_LABEL_END@326..327 "]"
+    FOOTNOTE_LABEL_COLON@327..328 ":"
+    WHITESPACE@328..329 " "
+    PARAGRAPH@329..350
+      TEXT@329..349 "Third footnote here."
+      NEWLINE@349..350 "\n"
+  BLANK_LINE@350..351
+    BLANK_LINE@350..351 "\n"
+  FOOTNOTE_DEFINITION@351..386
+    FOOTNOTE_LABEL_START@351..353 "[^"
+    FOOTNOTE_LABEL_ID@353..357 "bold"
+    FOOTNOTE_LABEL_END@357..358 "]"
+    FOOTNOTE_LABEL_COLON@358..359 ":"
+    WHITESPACE@359..360 " "
+    PARAGRAPH@360..386
+      TEXT@360..385 "Footnote after bold t ..."
+      NEWLINE@385..386 "\n"
+  BLANK_LINE@386..387
+    BLANK_LINE@386..387 "\n"
+  FOOTNOTE_DEFINITION@387..422
+    FOOTNOTE_LABEL_START@387..389 "[^"
+    FOOTNOTE_LABEL_ID@389..393 "code"
+    FOOTNOTE_LABEL_END@393..394 "]"
+    FOOTNOTE_LABEL_COLON@394..395 ":"
+    WHITESPACE@395..396 " "
+    PARAGRAPH@396..422
+      TEXT@396..421 "Footnote after code s ..."
+      NEWLINE@421..422 "\n"
+  BLANK_LINE@422..423
+    BLANK_LINE@422..423 "\n"
+  FOOTNOTE_DEFINITION@423..645
+    FOOTNOTE_LABEL_START@423..425 "[^"
+    FOOTNOTE_LABEL_ID@425..430 "multi"
+    FOOTNOTE_LABEL_END@430..431 "]"
+    FOOTNOTE_LABEL_COLON@431..432 ":"
+    WHITESPACE@432..433 " "
+    PARAGRAPH@433..500
+      TEXT@433..462 "This is a multi-line  ..."
+      NEWLINE@462..463 "\n"
+      TEXT@463..499 "    that continues on ..."
+      NEWLINE@499..500 "\n"
+    BLANK_LINE@500..501
+      BLANK_LINE@500..501 "\n"
+    PARAGRAPH@501..571
+      TEXT@501..541 "    It can even have  ..."
+      NEWLINE@541..542 "\n"
+      TEXT@542..570 "    with proper inden ..."
+      NEWLINE@570..571 "\n"
+    BLANK_LINE@571..572
+      BLANK_LINE@571..572 "\n"
+    LIST@572..614
+      WHITESPACE@572..576 "    "
+      LIST_ITEM@576..588
+        LIST_MARKER@576..577 "-"
+        WHITESPACE@577..578 " "
+        PLAIN@578..588
+          TEXT@578..587 "And lists"
+          NEWLINE@587..588 "\n"
+      WHITESPACE@588..592 "    "
+      LIST_ITEM@592..614
+        LIST_MARKER@592..593 "-"
+        WHITESPACE@593..594 " "
+        PLAIN@594..614
+          TEXT@594..613 "With multiple items"
+          NEWLINE@613..614 "\n"
+    BLANK_LINE@614..615
+      BLANK_LINE@614..615 "\n"
+    PARAGRAPH@615..645
+      TEXT@615..644 "    All indented by 4 ..."
+      NEWLINE@644..645 "\n"
+  BLANK_LINE@645..646
+    BLANK_LINE@645..646 "\n"
+  FOOTNOTE_DEFINITION@646..958
+    FOOTNOTE_LABEL_START@646..648 "[^"
+    FOOTNOTE_LABEL_ID@648..656 "longnote"
+    FOOTNOTE_LABEL_END@656..657 "]"
+    FOOTNOTE_LABEL_COLON@657..658 ":"
+    WHITESPACE@658..659 " "
+    PARAGRAPH@659..692
+      TEXT@659..691 "Here's one with multi ..."
+      NEWLINE@691..692 "\n"
+    BLANK_LINE@692..693
+      BLANK_LINE@692..693 "\n"
+    PARAGRAPH@693..783
+      TEXT@693..749 "    Subsequent paragr ..."
+      NEWLINE@749..750 "\n"
+      TEXT@750..782 "belong to the previou ..."
+      NEWLINE@782..783 "\n"
+    BLANK_LINE@783..784
+      BLANK_LINE@783..784 "\n"
+    CODE_BLOCK@784..806
+      CODE_CONTENT@784..806
+        WHITESPACE@784..792 "        "
+        TEXT@792..805 "{ some.code }"
+        NEWLINE@805..806 "\n"
+    BLANK_LINE@806..807
+      BLANK_LINE@806..807 "\n"
+    PARAGRAPH@807..958
+      TEXT@807..865 "    The whole paragra ..."
+      NEWLINE@865..866 "\n"
+      TEXT@866..925 "    line.  In this wa ..."
+      NEWLINE@925..926 "\n"
+      TEXT@926..957 "    multi-paragraph l ..."
+      NEWLINE@957..958 "\n"
+  BLANK_LINE@958..959
+    BLANK_LINE@958..959 "\n"
+  PARAGRAPH@959..1028
+    TEXT@959..1011 "This paragraph won't  ..."
+    NEWLINE@1011..1012 "\n"
+    TEXT@1012..1027 "isn't indented."
+    NEWLINE@1027..1028 "\n"
+  BLANK_LINE@1028..1029
+    BLANK_LINE@1028..1029 "\n"
+  PARAGRAPH@1029..1044
+    TEXT@1029..1039 "A footnote"
+    FOOTNOTE_REFERENCE@1039..1043
+      FOOTNOTE_LABEL_START@1039..1041 "[^"
+      FOOTNOTE_LABEL_ID@1041..1042 "9"
+      FOOTNOTE_LABEL_END@1042..1043 "]"
+    NEWLINE@1043..1044 "\n"
+  BLANK_LINE@1044..1045
+    BLANK_LINE@1044..1045 "\n"
+  FOOTNOTE_DEFINITION@1045..1240
+    FOOTNOTE_LABEL_START@1045..1047 "[^"
+    FOOTNOTE_LABEL_ID@1047..1048 "9"
+    FOOTNOTE_LABEL_END@1048..1049 "]"
+    FOOTNOTE_LABEL_COLON@1049..1050 ":"
+    WHITESPACE@1050..1051 " "
+    PARAGRAPH@1051..1240
+      TEXT@1051..1099 "This is typically the ..."
+      NEWLINE@1099..1100 "\n"
+      TEXT@1100..1176 "    regularization pa ..."
+      NEWLINE@1176..1177 "\n"
+      TEXT@1177..1239 "    every coefficient ..."
+      NEWLINE@1239..1240 "\n"

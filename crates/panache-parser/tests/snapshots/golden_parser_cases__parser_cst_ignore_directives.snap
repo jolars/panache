@@ -1,0 +1,107 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..773
+  HEADING@0..25
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..24
+      TEXT@2..24 "Ignore Directives Test"
+    NEWLINE@24..25 "\n"
+  BLANK_LINE@25..26
+    BLANK_LINE@25..26 "\n"
+  PARAGRAPH@26..92
+    TEXT@26..91 "This document tests i ..."
+    NEWLINE@91..92 "\n"
+  BLANK_LINE@92..93
+    BLANK_LINE@92..93 "\n"
+  HTML_BLOCK@93..130
+    HTML_BLOCK_TAG@93..130
+      TEXT@93..129 "<!-- panache-ignore-f ..."
+      NEWLINE@129..130 "\n"
+  PARAGRAPH@130..216
+    TEXT@130..181 "This    paragraph   h ..."
+    NEWLINE@181..182 "\n"
+    TEXT@182..215 "should  be   preserve ..."
+    NEWLINE@215..216 "\n"
+  HTML_BLOCK@216..251
+    HTML_BLOCK_TAG@216..251
+      TEXT@216..250 "<!-- panache-ignore-f ..."
+      NEWLINE@250..251 "\n"
+  BLANK_LINE@251..252
+    BLANK_LINE@251..252 "\n"
+  PARAGRAPH@252..317
+    TEXT@252..316 "This paragraph should ..."
+    NEWLINE@316..317 "\n"
+  BLANK_LINE@317..318
+    BLANK_LINE@317..318 "\n"
+  HTML_BLOCK@318..353
+    HTML_BLOCK_TAG@318..353
+      TEXT@318..352 "<!-- panache-ignore-l ..."
+      NEWLINE@352..353 "\n"
+  PARAGRAPH@353..398
+    TEXT@353..397 "#### Heading level sk ..."
+    NEWLINE@397..398 "\n"
+  HTML_BLOCK@398..431
+    HTML_BLOCK_TAG@398..431
+      TEXT@398..430 "<!-- panache-ignore-l ..."
+      NEWLINE@430..431 "\n"
+  BLANK_LINE@431..432
+    BLANK_LINE@431..432 "\n"
+  HTML_BLOCK@432..462
+    HTML_BLOCK_TAG@432..462
+      TEXT@432..461 "<!-- panache-ignore-s ..."
+      NEWLINE@461..462 "\n"
+  PARAGRAPH@462..548
+    TEXT@462..514 "Both    formatting    ..."
+    NEWLINE@514..515 "\n"
+    TEXT@515..547 "##### Another heading ..."
+    NEWLINE@547..548 "\n"
+  HTML_BLOCK@548..576
+    HTML_BLOCK_TAG@548..576
+      TEXT@548..575 "<!-- panache-ignore-e ..."
+      NEWLINE@575..576 "\n"
+  BLANK_LINE@576..577
+    BLANK_LINE@576..577 "\n"
+  PARAGRAPH@577..609
+    TEXT@577..608 "Regular content conti ..."
+    NEWLINE@608..609 "\n"
+  BLANK_LINE@609..610
+    BLANK_LINE@609..610 "\n"
+  LIST@610..766
+    LIST_ITEM@610..624
+      LIST_MARKER@610..611 "-"
+      WHITESPACE@611..612 " "
+      PLAIN@612..624
+        TEXT@612..623 "List item 1"
+        NEWLINE@623..624 "\n"
+    LIST_ITEM@624..752
+      LIST_MARKER@624..625 "-"
+      WHITESPACE@625..626 " "
+      PLAIN@626..638
+        TEXT@626..637 "List item 2"
+        NEWLINE@637..638 "\n"
+      HTML_BLOCK@638..677
+        HTML_BLOCK_TAG@638..677
+          TEXT@638..676 "  <!-- panache-ignore ..."
+          NEWLINE@676..677 "\n"
+      PLAIN@677..715
+        TEXT@677..714 "  Nested    content   ..."
+        NEWLINE@714..715 "\n"
+      HTML_BLOCK@715..752
+        HTML_BLOCK_TAG@715..752
+          TEXT@715..751 "  <!-- panache-ignore ..."
+          NEWLINE@751..752 "\n"
+    LIST_ITEM@752..766
+      LIST_MARKER@752..753 "-"
+      WHITESPACE@753..754 " "
+      PLAIN@754..766
+        TEXT@754..765 "List item 3"
+        NEWLINE@765..766 "\n"
+  BLANK_LINE@766..767
+    BLANK_LINE@766..767 "\n"
+  PARAGRAPH@767..773
+    TEXT@767..772 "Done."
+    NEWLINE@772..773 "\n"

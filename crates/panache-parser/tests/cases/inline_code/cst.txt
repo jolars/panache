@@ -1,8 +1,0 @@
-DOCUMENT@0..11
-  PARAGRAPH@0..11
-    INLINE_CODE@0..10
-      INLINE_CODE_MARKER@0..2 "``"
-      INLINE_CODE_CONTENT@2..8 " ```r "
-      INLINE_CODE_MARKER@8..10 "``"
-    NEWLINE@10..11 "\n"
-

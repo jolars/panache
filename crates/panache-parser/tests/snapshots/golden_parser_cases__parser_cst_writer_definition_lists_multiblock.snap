@@ -1,0 +1,116 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..393
+  HTML_BLOCK@0..55
+    HTML_BLOCK_TAG@0..55
+      TEXT@0..54 "<!-- Source: pandoc/t ..."
+      NEWLINE@54..55 "\n"
+  BLANK_LINE@55..56
+    BLANK_LINE@55..56 "\n"
+  HEADING@56..88
+    ATX_HEADING_MARKER@56..57
+      ATX_HEADING_MARKER@56..57 "#"
+    WHITESPACE@57..58 " "
+    HEADING_CONTENT@58..87
+      TEXT@58..87 "Definition Lists (mul ..."
+    NEWLINE@87..88 "\n"
+  BLANK_LINE@88..89
+    BLANK_LINE@88..89 "\n"
+  PARAGRAPH@89..119
+    TEXT@89..118 "Multiple blocks with  ..."
+    NEWLINE@118..119 "\n"
+  BLANK_LINE@119..120
+    BLANK_LINE@119..120 "\n"
+  DEFINITION_LIST@120..274
+    DEFINITION_ITEM@120..189
+      TERM@120..128
+        EMPHASIS@120..127
+          EMPHASIS_MARKER@120..121 "*"
+          TEXT@121..126 "apple"
+          EMPHASIS_MARKER@126..127 "*"
+        NEWLINE@127..128 "\n"
+      BLANK_LINE@128..129
+        BLANK_LINE@128..129 "\n"
+      DEFINITION@129..189
+        DEFINITION_MARKER@129..130 ":"
+        WHITESPACE@130..133 "   "
+        PLAIN@133..143
+          TEXT@133..142 "red fruit"
+          NEWLINE@142..143 "\n"
+        BLANK_LINE@143..144
+          BLANK_LINE@143..144 "\n"
+        PLAIN@144..189
+          TEXT@144..188 "    contains seeds, c ..."
+          NEWLINE@188..189 "\n"
+    BLANK_LINE@189..190
+      BLANK_LINE@189..190 "\n"
+    DEFINITION_ITEM@190..274
+      TERM@190..199
+        EMPHASIS@190..198
+          EMPHASIS_MARKER@190..191 "*"
+          TEXT@191..197 "orange"
+          EMPHASIS_MARKER@197..198 "*"
+        NEWLINE@198..199 "\n"
+      BLANK_LINE@199..200
+        BLANK_LINE@199..200 "\n"
+      DEFINITION@200..274
+        DEFINITION_MARKER@200..201 ":"
+        WHITESPACE@201..204 "   "
+        PLAIN@204..217
+          TEXT@204..216 "orange fruit"
+          NEWLINE@216..217 "\n"
+        BLANK_LINE@217..218
+          BLANK_LINE@217..218 "\n"
+        CODE_BLOCK@218..248
+          CODE_CONTENT@218..248
+            WHITESPACE@218..226 "        "
+            TEXT@226..247 "{ orange code block }"
+            NEWLINE@247..248 "\n"
+        BLANK_LINE@248..249
+          BLANK_LINE@248..249 "\n"
+        BLOCK_QUOTE@249..274
+          WHITESPACE@249..253 "    "
+          BLOCK_QUOTE_MARKER@253..254 ">"
+          WHITESPACE@254..255 " "
+          PARAGRAPH@255..274
+            TEXT@255..273 "orange block quote"
+            NEWLINE@273..274 "\n"
+  BLANK_LINE@274..275
+    BLANK_LINE@274..275 "\n"
+  PARAGRAPH@275..334
+    TEXT@275..333 "Blank line after term ..."
+    NEWLINE@333..334 "\n"
+  BLANK_LINE@334..335
+    BLANK_LINE@334..335 "\n"
+  DEFINITION_LIST@335..393
+    DEFINITION_ITEM@335..393
+      TERM@335..342
+        TEXT@335..341 "orange"
+        NEWLINE@341..342 "\n"
+      BLANK_LINE@342..343
+        BLANK_LINE@342..343 "\n"
+      DEFINITION@343..393
+        DEFINITION_MARKER@343..344 ":"
+        WHITESPACE@344..347 "   "
+        PLAIN@347..360
+          TEXT@347..359 "orange fruit"
+          NEWLINE@359..360 "\n"
+        BLANK_LINE@360..361
+          BLANK_LINE@360..361 "\n"
+        LIST@361..393
+          WHITESPACE@361..365 "    "
+          LIST_ITEM@365..377
+            LIST_MARKER@365..367 "1."
+            WHITESPACE@367..369 "  "
+            PLAIN@369..377
+              TEXT@369..376 "sublist"
+              NEWLINE@376..377 "\n"
+          WHITESPACE@377..381 "    "
+          LIST_ITEM@381..393
+            LIST_MARKER@381..383 "2."
+            WHITESPACE@383..385 "  "
+            PLAIN@385..393
+              TEXT@385..392 "sublist"
+              NEWLINE@392..393 "\n"

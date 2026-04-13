@@ -1,0 +1,18 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..101
+  LIST@0..101
+    LIST_ITEM@0..52
+      LIST_MARKER@0..2 "1."
+      WHITESPACE@2..3 " "
+      PLAIN@3..52
+        TEXT@3..51 "First sentence. Secon ..."
+        NEWLINE@51..52 "\n"
+    LIST_ITEM@52..101
+      LIST_MARKER@52..54 "2."
+      WHITESPACE@54..55 " "
+      PLAIN@55..101
+        TEXT@55..100 "Item two sentence one ..."
+        NEWLINE@100..101 "\n"

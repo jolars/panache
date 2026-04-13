@@ -1,0 +1,196 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..491
+  HEADING@0..10
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..9
+      TEXT@2..9 "Unicode"
+    NEWLINE@9..10 "\n"
+  BLANK_LINE@10..11
+    BLANK_LINE@10..11 "\n"
+  PARAGRAPH@11..42
+    TEXT@11..41 "Quotes: “Hi” and  ..."
+    NEWLINE@41..42 "\n"
+  BLANK_LINE@42..43
+    BLANK_LINE@42..43 "\n"
+  HEADING@43..64
+    ATX_HEADING_MARKER@43..45
+      ATX_HEADING_MARKER@43..45 "##"
+    WHITESPACE@45..46 " "
+    HEADING_CONTENT@46..63
+      TEXT@46..63 "Multilingual URLs"
+    NEWLINE@63..64 "\n"
+  BLANK_LINE@64..65
+    BLANK_LINE@64..65 "\n"
+  PARAGRAPH@65..90
+    AUTO_LINK@65..89
+      AUTO_LINK_MARKER@65..66
+        AUTO_LINK_MARKER@65..66 "<"
+      TEXT@66..88 "http://测.com?测=测"
+      AUTO_LINK_MARKER@88..89
+        AUTO_LINK_MARKER@88..89 ">"
+    NEWLINE@89..90 "\n"
+  BLANK_LINE@90..91
+    BLANK_LINE@90..91 "\n"
+  PARAGRAPH@91..121
+    LINK@91..120
+      LINK_START@91..92
+        LINK_START@91..92 "["
+      LINK_TEXT@92..95
+        TEXT@92..95 "foo"
+      LINK_TEXT_END@95..96 "]"
+      LINK_DEST_START@96..97 "("
+      LINK_DEST@97..119
+        TEXT@97..119 "/bar/测?x=测 \"title\""
+      LINK_DEST_END@119..120 ")"
+    NEWLINE@120..121 "\n"
+  BLANK_LINE@121..122
+    BLANK_LINE@121..122 "\n"
+  PARAGRAPH@122..140
+    AUTO_LINK@122..139
+      AUTO_LINK_MARKER@122..123
+        AUTO_LINK_MARKER@122..123 "<"
+      TEXT@123..138 "测@foo.测.baz"
+      AUTO_LINK_MARKER@138..139
+        AUTO_LINK_MARKER@138..139 ">"
+    NEWLINE@139..140 "\n"
+  BLANK_LINE@140..141
+    BLANK_LINE@140..141 "\n"
+  PARAGRAPH@141..163
+    TEXT@141..162 "Here is some unicode:"
+    NEWLINE@162..163 "\n"
+  BLANK_LINE@163..164
+    BLANK_LINE@163..164 "\n"
+  LIST@164..243
+    LIST_ITEM@164..176
+      LIST_MARKER@164..165 "-"
+      WHITESPACE@165..166 " "
+      PLAIN@166..176
+        TEXT@166..175 "I hat: Î"
+        NEWLINE@175..176 "\n"
+    LIST_ITEM@176..191
+      LIST_MARKER@176..177 "-"
+      WHITESPACE@177..178 " "
+      PLAIN@178..191
+        TEXT@178..190 "o umlaut: ö"
+        NEWLINE@190..191 "\n"
+    LIST_ITEM@191..205
+      LIST_MARKER@191..192 "-"
+      WHITESPACE@192..193 " "
+      PLAIN@193..205
+        TEXT@193..204 "section: §"
+        NEWLINE@204..205 "\n"
+    LIST_ITEM@205..227
+      LIST_MARKER@205..206 "-"
+      WHITESPACE@206..207 " "
+      PLAIN@207..227
+        TEXT@207..226 "set membership: ∈"
+        NEWLINE@226..227 "\n"
+    LIST_ITEM@227..243
+      LIST_MARKER@227..228 "-"
+      WHITESPACE@228..229 " "
+      PLAIN@229..243
+        TEXT@229..242 "copyright: ©"
+        NEWLINE@242..243 "\n"
+  BLANK_LINE@243..244
+    BLANK_LINE@243..244 "\n"
+  DEFINITION_LIST@244..337
+    DEFINITION_ITEM@244..337
+      TERM@244..249
+        TEXT@244..248 "Term"
+        NEWLINE@248..249 "\n"
+      DEFINITION@249..337
+        DEFINITION_MARKER@249..250 ":"
+        WHITESPACE@250..251 " "
+        CODE_BLOCK@251..337
+          CODE_FENCE_OPEN@251..255
+            CODE_FENCE_MARKER@251..254 "```"
+            NEWLINE@254..255 "\n"
+          CODE_CONTENT@255..331
+            WHITESPACE@255..257 "  "
+            TEXT@257..281 "├── pyproject.toml"
+            NEWLINE@281..282 "\n"
+            WHITESPACE@282..284 "  "
+            TEXT@284..309 "├── .python-ver ..."
+            NEWLINE@309..310 "\n"
+            WHITESPACE@310..312 "  "
+            TEXT@312..330 "└── hello.py"
+            NEWLINE@330..331 "\n"
+          WHITESPACE@331..333 "  "
+          CODE_FENCE_CLOSE@333..337
+            CODE_FENCE_MARKER@333..336 "```"
+            NEWLINE@336..337 "\n"
+  BLANK_LINE@337..338
+    BLANK_LINE@337..338 "\n"
+  PIPE_TABLE@338..409
+    TABLE_HEADER@338..362
+      TEXT@338..339 "|"
+      WHITESPACE@339..340 " "
+      TABLE_CELL@340..345
+        TEXT@340..345 "Greek"
+      WHITESPACE@345..346 " "
+      TEXT@346..347 "|"
+      WHITESPACE@347..348 " "
+      TABLE_CELL@348..353
+        TEXT@348..353 "Emoji"
+      WHITESPACE@353..354 " "
+      TEXT@354..355 "|"
+      WHITESPACE@355..356 " "
+      TABLE_CELL@356..359
+        TEXT@356..359 "CJK"
+      WHITESPACE@359..360 " "
+      TEXT@360..361 "|"
+      NEWLINE@361..362 "\n"
+    TABLE_SEPARATOR@362..382
+      TEXT@362..381 "| --- | --- | --- |"
+      NEWLINE@381..382 "\n"
+    TABLE_ROW@382..409
+      TEXT@382..383 "|"
+      WHITESPACE@383..384 " "
+      TABLE_CELL@384..390
+        TEXT@384..390 "αβγ"
+      WHITESPACE@390..391 " "
+      TEXT@391..392 "|"
+      WHITESPACE@392..393 " "
+      TABLE_CELL@393..397
+        TEXT@393..397 "😀"
+      WHITESPACE@397..398 " "
+      TEXT@398..399 "|"
+      WHITESPACE@399..400 " "
+      TABLE_CELL@400..406
+        TEXT@400..406 "測試"
+      WHITESPACE@406..407 " "
+      TEXT@407..408 "|"
+      NEWLINE@408..409 "\n"
+  BLANK_LINE@409..410
+    BLANK_LINE@409..410 "\n"
+  BLOCK_QUOTE@410..491
+    BLOCK_QUOTE_MARKER@410..411 ">"
+    WHITESPACE@411..412 " "
+    PARAGRAPH@412..462
+      TEXT@412..461 "Blockquote with unico ..."
+      NEWLINE@461..462 "\n"
+    BLOCK_QUOTE_MARKER@462..463 ">"
+    BLANK_LINE@463..464
+      BLANK_LINE@463..464 "\n"
+    BLOCK_QUOTE_MARKER@464..465 ">"
+    WHITESPACE@465..466 " "
+    LIST@466..491
+      LIST_ITEM@466..478
+        LIST_MARKER@466..467 "-"
+        WHITESPACE@467..468 " "
+        PLAIN@468..478
+          TEXT@468..477 "子項目"
+          NEWLINE@477..478 "\n"
+      BLOCK_QUOTE_MARKER@478..479 ">"
+      WHITESPACE@479..480 " "
+      LIST_ITEM@480..491
+        LIST_MARKER@480..481 "-"
+        WHITESPACE@481..482 " "
+        PLAIN@482..491
+          TEXT@482..490 "عنصر"
+          NEWLINE@490..491 "\n"

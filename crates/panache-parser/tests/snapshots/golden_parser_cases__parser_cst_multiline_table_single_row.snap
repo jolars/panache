@@ -1,0 +1,45 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..334
+  MULTILINE_TABLE@0..334
+    TABLE_SEPARATOR@0..62
+      TEXT@0..61 "--------------------- ..."
+      NEWLINE@61..62 "\n"
+    TABLE_HEADER@62..106
+      TABLE_CELL@62..73
+        TEXT@62..73 "   Header  "
+      WHITESPACE@73..74 " "
+      TABLE_CELL@74..81
+        TEXT@74..81 " One   "
+      WHITESPACE@81..82 " "
+      TABLE_CELL@82..97
+        TEXT@82..97 "     Two       "
+      WHITESPACE@97..98 " "
+      TABLE_CELL@98..105
+        TEXT@98..105 "  Three"
+      NEWLINE@105..106 "\n"
+    TABLE_SEPARATOR@106..168
+      TEXT@106..167 "----------- ------- - ..."
+      NEWLINE@167..168 "\n"
+    TABLE_ROW@168..271
+      TABLE_CELL@168..179
+        TEXT@168..179 "   First   "
+      WHITESPACE@179..180 " "
+      TABLE_CELL@180..187
+        TEXT@180..187 "row    "
+      WHITESPACE@187..188 " "
+      TABLE_CELL@188..203
+        TEXT@188..203 "           12.0"
+      WHITESPACE@203..204 " "
+      TABLE_CELL@204..227
+        TEXT@204..227 "Example of a single row"
+      NEWLINE@227..228 "\n"
+      TEXT@228..270 "                      ..."
+      NEWLINE@270..271 "\n"
+    BLANK_LINE@271..272
+      BLANK_LINE@271..272 "\n"
+    TABLE_SEPARATOR@272..334
+      TEXT@272..333 "--------------------- ..."
+      NEWLINE@333..334 "\n"

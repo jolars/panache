@@ -1,0 +1,20 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..36
+  YAML_METADATA@0..26
+    YAML_METADATA_DELIM@0..3 "---"
+    NEWLINE@3..4 "\n"
+    YAML_METADATA_CONTENT@4..22
+      TEXT@4..21 "title: Dot closer"
+      NEWLINE@21..22 "\n"
+    YAML_METADATA_DELIM@22..25 "..."
+    NEWLINE@25..26 "\n"
+  HEADING@26..36
+    ATX_HEADING_MARKER@26..27
+      ATX_HEADING_MARKER@26..27 "#"
+    WHITESPACE@27..28 " "
+    HEADING_CONTENT@28..35
+      TEXT@28..35 "Heading"
+    NEWLINE@35..36 "\n"

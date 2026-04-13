@@ -1,0 +1,19 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..119
+  LIST@0..119
+    LIST_ITEM@0..119
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      PLAIN@2..74
+        TEXT@2..27 "Item line continues h ..."
+        NEWLINE@27..28 "\n"
+        TEXT@28..73 "  Still same paragrap ..."
+        NEWLINE@73..74 "\n"
+      BLANK_LINE@74..75
+        BLANK_LINE@74..75 "\n"
+      PLAIN@75..119
+        TEXT@75..118 "  New paragraph sente ..."
+        NEWLINE@118..119 "\n"

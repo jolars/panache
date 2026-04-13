@@ -1,5 +1,0 @@
-flavor = "quarto"
-line-width = 80
-
-[format]
-wrap = "reflow"

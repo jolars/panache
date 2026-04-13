@@ -1,0 +1,47 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..591
+  PARAGRAPH@0..142
+    TEXT@0..15 "Black-Scholes ("
+    CROSSREF@15..32
+      CROSSREF_MARKER@15..16 "@"
+      CROSSREF_KEY@16..32 "eq-black-scholes"
+    TEXT@32..79 ") is a mathematical m ..."
+    NEWLINE@79..80 "\n"
+    TEXT@80..141 "the behavior of finan ..."
+    NEWLINE@141..142 "\n"
+  BLANK_LINE@142..143
+    BLANK_LINE@142..143 "\n"
+  PARAGRAPH@143..399
+    DISPLAY_MATH@143..378
+      DISPLAY_MATH_MARKER@143..145 "$$"
+      TEXT@145..376 "\n\\frac{\\partial \\math ..."
+      DISPLAY_MATH_MARKER@376..378 "$$"
+    WHITESPACE@378..379 " "
+    ATTRIBUTE@379..398
+      ATTRIBUTE@379..398 "{#eq-black-scholes}"
+    NEWLINE@398..399 "\n"
+  BLANK_LINE@399..400
+    BLANK_LINE@399..400 "\n"
+  PARAGRAPH@400..444
+    TEXT@400..413 "Reference to "
+    CROSSREF@413..430
+      CROSSREF_MARKER@413..414 "@"
+      CROSSREF_KEY@414..430 "eq-black-scholes"
+    TEXT@430..443 " in the text."
+    NEWLINE@443..444 "\n"
+  BLANK_LINE@444..445
+    BLANK_LINE@444..445 "\n"
+  PARAGRAPH@445..591
+    TEXT@445..508 "An equation with text ..."
+    NEWLINE@508..509 "\n"
+    DISPLAY_MATH@509..523
+      DISPLAY_MATH_MARKER@509..511 "$$"
+      TEXT@511..521 "\nf(x) = 1\n"
+      DISPLAY_MATH_MARKER@521..523 "$$"
+    TEXT@523..537 " {#eq-problem}"
+    NEWLINE@537..538 "\n"
+    TEXT@538..590 "Let's hope the attrib ..."
+    NEWLINE@590..591 "\n"

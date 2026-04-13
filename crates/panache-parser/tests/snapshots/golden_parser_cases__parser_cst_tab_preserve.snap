@@ -1,0 +1,37 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..135
+  PARAGRAPH@0..48
+    TEXT@0..47 "This paragraph has a\t ..."
+    NEWLINE@47..48 "\n"
+  BLANK_LINE@48..49
+    BLANK_LINE@48..49 "\n"
+  PARAGRAPH@49..104
+    TEXT@49..77 "Inline code preserves ..."
+    INLINE_CODE@77..87
+      INLINE_CODE_MARKER@77..78 "`"
+      INLINE_CODE_CONTENT@78..86 "tab\tcode"
+      INLINE_CODE_MARKER@86..87 "`"
+    TEXT@87..92 " and "
+    INLINE_CODE@92..102
+      INLINE_CODE_MARKER@92..93 "`"
+      INLINE_CODE_CONTENT@93..101 "code\tend"
+      INLINE_CODE_MARKER@101..102 "`"
+    TEXT@102..103 "."
+    NEWLINE@103..104 "\n"
+  BLANK_LINE@104..105
+    BLANK_LINE@104..105 "\n"
+  CODE_BLOCK@105..135
+    CODE_FENCE_OPEN@105..109
+      CODE_FENCE_MARKER@105..108 "```"
+      NEWLINE@108..109 "\n"
+    CODE_CONTENT@109..131
+      TEXT@109..123 "line1\tindented"
+      NEWLINE@123..124 "\n"
+      TEXT@124..130 "\tline2"
+      NEWLINE@130..131 "\n"
+    CODE_FENCE_CLOSE@131..135
+      CODE_FENCE_MARKER@131..134 "```"
+      NEWLINE@134..135 "\n"

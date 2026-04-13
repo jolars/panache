@@ -1,0 +1,46 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..337
+  HTML_BLOCK@0..53
+    HTML_BLOCK_TAG@0..53
+      TEXT@0..52 "<!-- Source: pandoc/t ..."
+      NEWLINE@52..53 "\n"
+  BLANK_LINE@53..54
+    BLANK_LINE@53..54 "\n"
+  HEADING@54..67
+    ATX_HEADING_MARKER@54..55
+      ATX_HEADING_MARKER@54..55 "#"
+    WHITESPACE@55..56 " "
+    HEADING_CONTENT@56..66
+      TEXT@56..66 "Paragraphs"
+    NEWLINE@66..67 "\n"
+  BLANK_LINE@67..68
+    BLANK_LINE@67..68 "\n"
+  PARAGRAPH@68..96
+    TEXT@68..95 "Here's a regular para ..."
+    NEWLINE@95..96 "\n"
+  BLANK_LINE@96..97
+    BLANK_LINE@96..97 "\n"
+  PARAGRAPH@97..255
+    TEXT@97..172 "In Markdown 1.0.0 and ..."
+    NEWLINE@172..173 "\n"
+    TEXT@173..248 "Because a hard-wrappe ..."
+    NEWLINE@248..249 "\n"
+    TEXT@249..254 "item."
+    NEWLINE@254..255 "\n"
+  BLANK_LINE@255..256
+    BLANK_LINE@255..256 "\n"
+  PARAGRAPH@256..295
+    TEXT@256..282 "Here's one with a bul ..."
+    ESCAPED_CHAR@282..284 "\\*"
+    TEXT@284..294 " criminey."
+    NEWLINE@294..295 "\n"
+  BLANK_LINE@295..296
+    BLANK_LINE@295..296 "\n"
+  PARAGRAPH@296..337
+    TEXT@296..329 "There should be a har ..."
+    HARD_LINE_BREAK@329..331 "\\\n"
+    TEXT@331..336 "here."
+    NEWLINE@336..337 "\n"

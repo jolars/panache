@@ -1,0 +1,262 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..834
+  FENCED_DIV@0..72
+    DIV_FENCE_OPEN@0..19
+      TEXT@0..3 ":::"
+      DIV_INFO@3..18
+        TEXT@3..18 "{.callout-note}"
+      NEWLINE@18..19 "\n"
+    PARAGRAPH@19..68
+      TEXT@19..67 "This is a simple fenc ..."
+      NEWLINE@67..68 "\n"
+    DIV_FENCE_CLOSE@68..72
+      TEXT@68..71 ":::"
+      NEWLINE@71..72 "\n"
+  BLANK_LINE@72..73
+    BLANK_LINE@72..73 "\n"
+  FENCED_DIV@73..171
+    DIV_FENCE_OPEN@73..99
+      TEXT@73..78 ":::::"
+      WHITESPACE@78..79 " "
+      DIV_INFO@79..98
+        TEXT@79..98 "{#special .sidebar}"
+      NEWLINE@98..99 "\n"
+    PARAGRAPH@99..131
+      TEXT@99..130 "This div has an ID an ..."
+      NEWLINE@130..131 "\n"
+    BLANK_LINE@131..132
+      BLANK_LINE@131..132 "\n"
+    PARAGRAPH@132..165
+      TEXT@132..164 "It contains multiple  ..."
+      NEWLINE@164..165 "\n"
+    DIV_FENCE_CLOSE@165..171
+      TEXT@165..170 ":::::"
+      NEWLINE@170..171 "\n"
+  BLANK_LINE@171..172
+    BLANK_LINE@171..172 "\n"
+  FENCED_DIV@172..237
+    DIV_FENCE_OPEN@172..184
+      TEXT@172..175 ":::"
+      WHITESPACE@175..176 " "
+      DIV_INFO@176..183
+        TEXT@176..183 "Warning"
+      NEWLINE@183..184 "\n"
+    PARAGRAPH@184..233
+      TEXT@184..232 "This is a warning div ..."
+      NEWLINE@232..233 "\n"
+    DIV_FENCE_CLOSE@233..237
+      TEXT@233..236 ":::"
+      NEWLINE@236..237 "\n"
+  BLANK_LINE@237..238
+    BLANK_LINE@237..238 "\n"
+  FENCED_DIV@238..327
+    DIV_FENCE_OPEN@238..249
+      TEXT@238..241 ":::"
+      WHITESPACE@241..242 " "
+      DIV_INFO@242..248
+        TEXT@242..248 "Nested"
+      NEWLINE@248..249 "\n"
+    PARAGRAPH@249..268
+      TEXT@249..267 "Outer div content."
+      NEWLINE@267..268 "\n"
+    BLANK_LINE@268..269
+      BLANK_LINE@268..269 "\n"
+    FENCED_DIV@269..303
+      DIV_FENCE_OPEN@269..279
+        TEXT@269..272 ":::"
+        WHITESPACE@272..273 " "
+        DIV_INFO@273..278
+          TEXT@273..278 "Inner"
+        NEWLINE@278..279 "\n"
+      PARAGRAPH@279..299
+        TEXT@279..298 "Nested div content."
+        NEWLINE@298..299 "\n"
+      DIV_FENCE_CLOSE@299..303
+        TEXT@299..302 ":::"
+        NEWLINE@302..303 "\n"
+    BLANK_LINE@303..304
+      BLANK_LINE@303..304 "\n"
+    PARAGRAPH@304..323
+      TEXT@304..322 "Back to outer div."
+      NEWLINE@322..323 "\n"
+    DIV_FENCE_CLOSE@323..327
+      TEXT@323..326 ":::"
+      NEWLINE@326..327 "\n"
+  BLANK_LINE@327..328
+    BLANK_LINE@327..328 "\n"
+  FENCED_DIV@328..437
+    DIV_FENCE_OPEN@328..347
+      TEXT@328..331 ":::"
+      WHITESPACE@331..332 " "
+      DIV_INFO@332..339
+        TEXT@332..339 "Warning"
+      WHITESPACE@339..340 " "
+      TEXT@340..346 "::::::"
+      NEWLINE@346..347 "\n"
+    PARAGRAPH@347..366
+      TEXT@347..365 "This is a warning."
+      NEWLINE@365..366 "\n"
+    BLANK_LINE@366..367
+      BLANK_LINE@366..367 "\n"
+    FENCED_DIV@367..418
+      DIV_FENCE_OPEN@367..378
+        TEXT@367..370 ":::"
+        WHITESPACE@370..371 " "
+        DIV_INFO@371..377
+          TEXT@371..377 "Danger"
+        NEWLINE@377..378 "\n"
+      PARAGRAPH@378..414
+        TEXT@378..413 "This is a warning wit ..."
+        NEWLINE@413..414 "\n"
+      DIV_FENCE_CLOSE@414..418
+        TEXT@414..417 ":::"
+        NEWLINE@417..418 "\n"
+    DIV_FENCE_CLOSE@418..437
+      TEXT@418..436 "::::::::::::::::::"
+      NEWLINE@436..437 "\n"
+  BLANK_LINE@437..438
+    BLANK_LINE@437..438 "\n"
+  PARAGRAPH@438..478
+    TEXT@438..477 "Here's a fenced div w ..."
+    NEWLINE@477..478 "\n"
+  BLANK_LINE@478..479
+    BLANK_LINE@478..479 "\n"
+  FENCED_DIV@479..504
+    DIV_FENCE_OPEN@479..492
+      TEXT@479..482 ":::"
+      WHITESPACE@482..483 " "
+      DIV_INFO@483..491
+        TEXT@483..491 "exercise"
+      NEWLINE@491..492 "\n"
+    LIST@492..500
+      LIST_ITEM@492..496
+        LIST_MARKER@492..493 "-"
+        WHITESPACE@493..494 " "
+        PLAIN@494..496
+          TEXT@494..495 "A"
+          NEWLINE@495..496 "\n"
+      LIST_ITEM@496..500
+        LIST_MARKER@496..497 "-"
+        WHITESPACE@497..498 " "
+        PLAIN@498..500
+          TEXT@498..499 "B"
+          NEWLINE@499..500 "\n"
+    DIV_FENCE_CLOSE@500..504
+      TEXT@500..503 ":::"
+      NEWLINE@503..504 "\n"
+  BLANK_LINE@504..505
+    BLANK_LINE@504..505 "\n"
+  FENCED_DIV@505..531
+    DIV_FENCE_OPEN@505..518
+      TEXT@505..508 ":::"
+      WHITESPACE@508..509 " "
+      DIV_INFO@509..517
+        TEXT@509..517 "exercise"
+      NEWLINE@517..518 "\n"
+    PARAGRAPH@518..526
+      TEXT@518..525 "foo bar"
+      NEWLINE@525..526 "\n"
+    DIV_FENCE_CLOSE@526..531
+      TEXT@526..530 "::: "
+      NEWLINE@530..531 "\n"
+  BLANK_LINE@531..532
+    BLANK_LINE@531..532 "\n"
+  FENCED_DIV@532..616
+    DIV_FENCE_OPEN@532..548
+      TEXT@532..535 ":::"
+      WHITESPACE@535..536 " "
+      DIV_INFO@536..547
+        TEXT@536..547 "mathdeclare"
+      NEWLINE@547..548 "\n"
+    TEX_BLOCK@548..612
+      TEXT@548..577 "\\DeclareMathOperator{ ..."
+      NEWLINE@577..578 "\n"
+      TEXT@578..611 "\\DeclareMathOperator{ ..."
+      NEWLINE@611..612 "\n"
+    DIV_FENCE_CLOSE@612..616
+      TEXT@612..615 ":::"
+      NEWLINE@615..616 "\n"
+  BLANK_LINE@616..617
+    BLANK_LINE@616..617 "\n"
+  FENCED_DIV@617..637
+    DIV_FENCE_OPEN@617..629
+      TEXT@617..620 ":::"
+      WHITESPACE@620..621 " "
+      DIV_INFO@621..628
+        TEXT@621..628 "declare"
+      NEWLINE@628..629 "\n"
+    BLANK_LINE@629..630
+      BLANK_LINE@629..630 "\n"
+    PARAGRAPH@630..632
+      TEXT@630..631 "A"
+      NEWLINE@631..632 "\n"
+    BLANK_LINE@632..633
+      BLANK_LINE@632..633 "\n"
+    DIV_FENCE_CLOSE@633..637
+      TEXT@633..636 ":::"
+      NEWLINE@636..637 "\n"
+  BLANK_LINE@637..638
+    BLANK_LINE@637..638 "\n"
+  PARAGRAPH@638..640
+    TEXT@638..639 "B"
+    NEWLINE@639..640 "\n"
+  BLANK_LINE@640..641
+    BLANK_LINE@640..641 "\n"
+  PARAGRAPH@641..723
+    TEXT@641..717 "Pandoc requires that  ..."
+    NEWLINE@717..718 "\n"
+    TEXT@718..722 "div:"
+    NEWLINE@722..723 "\n"
+  BLANK_LINE@723..724
+    BLANK_LINE@723..724 "\n"
+  PARAGRAPH@724..734
+    TEXT@724..727 ":::"
+    NEWLINE@727..728 "\n"
+    TEXT@728..729 "A"
+    NEWLINE@729..730 "\n"
+    TEXT@730..733 ":::"
+    NEWLINE@733..734 "\n"
+  BLANK_LINE@734..735
+    BLANK_LINE@734..735 "\n"
+  PARAGRAPH@735..768
+    TEXT@735..767 "This is not a fenced  ..."
+    NEWLINE@767..768 "\n"
+  BLANK_LINE@768..769
+    BLANK_LINE@768..769 "\n"
+  PARAGRAPH@769..789
+    TEXT@769..770 "B"
+    NEWLINE@770..771 "\n"
+    TEXT@771..782 "::: declare"
+    NEWLINE@782..783 "\n"
+    TEXT@783..784 "A"
+    NEWLINE@784..785 "\n"
+    TEXT@785..788 ":::"
+    NEWLINE@788..789 "\n"
+  BLANK_LINE@789..790
+    BLANK_LINE@789..790 "\n"
+  PARAGRAPH@790..812
+    TEXT@790..811 "Here is a fenced div:"
+    NEWLINE@811..812 "\n"
+  BLANK_LINE@812..813
+    BLANK_LINE@812..813 "\n"
+  FENCED_DIV@813..832
+    DIV_FENCE_OPEN@813..825
+      TEXT@813..816 ":::"
+      WHITESPACE@816..817 " "
+      DIV_INFO@817..824
+        TEXT@817..824 "declare"
+      NEWLINE@824..825 "\n"
+    BLANK_LINE@825..826
+      BLANK_LINE@825..826 "\n"
+    PARAGRAPH@826..828
+      TEXT@826..827 "A"
+      NEWLINE@827..828 "\n"
+    DIV_FENCE_CLOSE@828..832
+      TEXT@828..831 ":::"
+      NEWLINE@831..832 "\n"
+  PARAGRAPH@832..834
+    TEXT@832..833 "B"
+    NEWLINE@833..834 "\n"

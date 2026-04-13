@@ -1,0 +1,14 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..20
+  BLANK_LINE@0..1
+    BLANK_LINE@0..1 "\n"
+  BLANK_LINE@1..2
+    BLANK_LINE@1..2 "\n"
+  BLANK_LINE@2..3
+    BLANK_LINE@2..3 "\n"
+  PARAGRAPH@3..20
+    TEXT@3..19 "First paragraph."
+    NEWLINE@19..20 "\n"

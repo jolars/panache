@@ -1,0 +1,30 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..138
+  PARAGRAPH@0..138
+    TEXT@0..11 "This has a "
+    LINK@11..63
+      LINK_START@11..12
+        LINK_START@11..12 "["
+      LINK_TEXT@12..41
+        TEXT@12..41 "link text with stop;  ..."
+      LINK_TEXT_END@41..42 "]"
+      LINK_DEST_START@42..43 "("
+      LINK_DEST@43..62
+        TEXT@43..62 "https://example.com"
+      LINK_DEST_END@62..63 ")"
+    TEXT@63..85 " after. And a figure: "
+    IMAGE_LINK@85..122
+      IMAGE_LINK_START@85..87
+        IMAGE_LINK_START@85..87 "!["
+      IMAGE_ALT@87..110
+        TEXT@87..110 "Caption has a stop? yes"
+      IMAGE_ALT_END@110..111 "]"
+      IMAGE_DEST_START@111..112 "("
+      LINK_DEST@112..121
+        TEXT@112..121 "image.png"
+      IMAGE_DEST_END@121..122 ")"
+    TEXT@122..137 " then continue."
+    NEWLINE@137..138 "\n"

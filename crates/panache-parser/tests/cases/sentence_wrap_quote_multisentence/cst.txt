@@ -1,5 +1,0 @@
-DOCUMENT@0..82
-  PARAGRAPH@0..82
-    TEXT@0..81 "\"She knocked on the d ..."
-    NEWLINE@81..82 "\n"
-

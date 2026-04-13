@@ -1,0 +1,51 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..97
+  PARAGRAPH@0..11
+    TEXT@0..10 "Some text:"
+    NEWLINE@10..11 "\n"
+  CODE_BLOCK@11..38
+    CODE_FENCE_OPEN@11..27
+      CODE_FENCE_MARKER@11..14 "```"
+      CODE_INFO@14..26
+        TEXT@14..15 "{"
+        CODE_LANGUAGE@15..16 "r"
+        CHUNK_OPTIONS@16..26
+          TEXT@16..17 " "
+          CHUNK_LABEL@17..25
+            TEXT@17..25 "backbone"
+          TEXT@25..26 "}"
+      NEWLINE@26..27 "\n"
+    CODE_CONTENT@27..34
+      TEXT@27..33 "a <- 1"
+      NEWLINE@33..34 "\n"
+    CODE_FENCE_CLOSE@34..38
+      CODE_FENCE_MARKER@34..37 "```"
+      NEWLINE@37..38 "\n"
+  BLANK_LINE@38..39
+    BLANK_LINE@38..39 "\n"
+  PARAGRAPH@39..69
+    TEXT@39..68 "A code block, with bl ..."
+    NEWLINE@68..69 "\n"
+  BLANK_LINE@69..70
+    BLANK_LINE@69..70 "\n"
+  CODE_BLOCK@70..97
+    CODE_FENCE_OPEN@70..86
+      CODE_FENCE_MARKER@70..73 "```"
+      CODE_INFO@73..85
+        TEXT@73..74 "{"
+        CODE_LANGUAGE@74..75 "r"
+        CHUNK_OPTIONS@75..85
+          TEXT@75..76 " "
+          CHUNK_LABEL@76..84
+            TEXT@76..84 "backbone"
+          TEXT@84..85 "}"
+      NEWLINE@85..86 "\n"
+    CODE_CONTENT@86..93
+      TEXT@86..92 "a <- 1"
+      NEWLINE@92..93 "\n"
+    CODE_FENCE_CLOSE@93..97
+      CODE_FENCE_MARKER@93..96 "```"
+      NEWLINE@96..97 "\n"

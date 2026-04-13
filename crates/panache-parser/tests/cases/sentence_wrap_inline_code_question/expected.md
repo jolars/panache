@@ -1,2 +1,0 @@
-`?` and `help()` look for topic aliases; `?foo` will find any topic that contains the `foo` alias.
-As well as looking in the aliases, `help.search()` and `???` also look in the `@title`, `@keywords`, and `@concept`s tags.
