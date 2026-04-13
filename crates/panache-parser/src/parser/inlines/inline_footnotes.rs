@@ -7,7 +7,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::core::parse_inline_text;
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 
 /// Try to parse an inline footnote starting at the current position.
 /// Returns Some((length, content)) if successful, None otherwise.

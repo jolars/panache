@@ -9,7 +9,7 @@
 //! - Tildes cannot have whitespace immediately inside
 
 use super::core::parse_inline_text;
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 

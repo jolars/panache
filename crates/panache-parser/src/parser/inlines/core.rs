@@ -20,7 +20,7 @@
 //!
 //! This matches Pandoc's behavior exactly.
 
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -1946,7 +1946,7 @@ mod tests {
     /// Test that we can parse a simple emphasis case
     #[test]
     fn test_parse_simple_emphasis() {
-        use crate::config::ParserOptions;
+        use crate::options::ParserOptions;
         use crate::syntax::SyntaxNode;
         use rowan::GreenNode;
 
@@ -1974,7 +1974,7 @@ mod tests {
     /// Test parsing nested emphasis/strong
     #[test]
     fn test_parse_nested_emphasis_strong() {
-        use crate::config::ParserOptions;
+        use crate::options::ParserOptions;
 
         let text = "*foo **bar** baz*";
         let config = ParserOptions::default();
@@ -2002,7 +2002,7 @@ mod tests {
     /// Current bug: Parses as *Strong[foo* bar]
     #[test]
     fn test_triple_emphasis_star_then_double_star() {
-        use crate::config::ParserOptions;
+        use crate::options::ParserOptions;
         use crate::syntax::SyntaxNode;
         use rowan::GreenNode;
 
@@ -2053,7 +2053,7 @@ mod tests {
     /// Expected: Emph[Strong[foo], bar]
     #[test]
     fn test_triple_emphasis_double_star_then_star() {
-        use crate::config::ParserOptions;
+        use crate::options::ParserOptions;
         use crate::syntax::SyntaxNode;
         use rowan::GreenNode;
 
@@ -2102,7 +2102,7 @@ mod tests {
     /// Regression test for equation_attributes_single_line golden test
     #[test]
     fn test_display_math_with_attributes() {
-        use crate::config::ParserOptions;
+        use crate::options::ParserOptions;
         use crate::syntax::SyntaxNode;
         use rowan::GreenNode;
 
@@ -2161,7 +2161,7 @@ fn test_two_with_nested_one_and_triple_closer() {
     // Should parse as: Strong["bold with ", Emph["italic"]]
     // The *** at end is parsed as * (closes Emph) + ** (closes Strong)
 
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
@@ -2196,7 +2196,7 @@ fn test_emphasis_with_trailing_space_before_closer() {
     // *foo * should parse as emphasis (Pandoc behavior)
     // For asterisks, Pandoc doesn't require right-flanking for closers
 
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
@@ -2231,7 +2231,7 @@ fn test_triple_emphasis_all_strong_nested() {
     // ***foo** bar **baz*** should parse as Emph[Strong[foo], " bar ", Strong[baz]]
     // Pandoc output confirms this
 
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
@@ -2278,7 +2278,7 @@ fn test_triple_emphasis_all_emph_nested() {
     // ***foo* bar *baz*** should parse as Strong[Emph[foo], " bar ", Emph[baz]]
     // Pandoc output confirms this
 
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
@@ -2324,7 +2324,7 @@ fn test_triple_emphasis_all_emph_nested() {
 #[test]
 fn test_parse_emphasis_multiline() {
     // Per Pandoc spec, emphasis CAN contain newlines (soft breaks)
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
@@ -2359,7 +2359,7 @@ fn test_parse_emphasis_multiline() {
 #[test]
 fn test_parse_strong_multiline() {
     // Per Pandoc spec, strong emphasis CAN contain newlines
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
@@ -2394,7 +2394,7 @@ fn test_parse_strong_multiline() {
 #[test]
 fn test_parse_triple_emphasis_multiline() {
     // Triple emphasis with newlines
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 

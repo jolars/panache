@@ -4,7 +4,7 @@
 //! emitting them with inline parsing applied.
 
 use super::inline_emission;
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::{GreenNodeBuilder, NodeOrToken};
 

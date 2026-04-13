@@ -8,7 +8,7 @@
 //! before calling builder methods. The inline parser already follows this pattern
 //! (it detects delimiters/patterns before emitting nodes).
 
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::parser::inlines::core;
 use rowan::GreenNodeBuilder;
 
@@ -43,7 +43,7 @@ pub fn emit_inlines(builder: &mut GreenNodeBuilder, text: &str, config: &ParserO
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::{SyntaxKind, SyntaxNode};
     use rowan::GreenNodeBuilder;
 

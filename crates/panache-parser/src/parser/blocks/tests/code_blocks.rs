@@ -2,7 +2,7 @@ use super::helpers::{
     assert_block_kinds, assert_block_kinds_for_node, find_all, find_first, parse_blocks,
     parse_blocks_gfm, parse_blocks_quarto, parse_blocks_with_config,
 };
-use crate::config::{Extensions, Flavor, ParserOptions};
+use crate::options::{Extensions, Flavor, ParserOptions};
 use crate::syntax::SyntaxKind;
 
 fn get_code_content(node: &crate::syntax::SyntaxNode) -> Option<String> {

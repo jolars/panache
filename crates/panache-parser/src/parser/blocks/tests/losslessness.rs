@@ -1,4 +1,4 @@
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::parser::Parser;
 
 #[test]

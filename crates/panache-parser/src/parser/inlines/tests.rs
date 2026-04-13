@@ -138,7 +138,7 @@ mod link_tests {
 
 #[cfg(test)]
 mod citation_tests {
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
@@ -912,7 +912,7 @@ mod raw_inline_tests {
 
 #[cfg(test)]
 mod extension_guard_tests {
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxKind;
 
     fn parse_with_config(input: &str, config: ParserOptions) -> crate::syntax::SyntaxNode {

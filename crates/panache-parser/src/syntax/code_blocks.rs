@@ -266,7 +266,7 @@ impl CodeInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Flavor, ParserOptions};
+    use crate::options::{Flavor, ParserOptions};
     use crate::parse;
 
     #[test]
@@ -287,7 +287,7 @@ mod tests {
     fn code_block_executable_chunk_wrapper() {
         let config = ParserOptions {
             flavor: Flavor::Quarto,
-            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
+            extensions: crate::options::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse("```{r, echo=FALSE}\nx <- 1\n```\n", Some(config));
@@ -309,7 +309,7 @@ mod tests {
     fn code_block_hashpipe_preamble_wrapper() {
         let config = ParserOptions {
             flavor: Flavor::Quarto,
-            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
+            extensions: crate::options::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse(
@@ -328,7 +328,7 @@ mod tests {
     fn code_block_collects_chunk_labels_and_options() {
         let config = ParserOptions {
             flavor: Flavor::Quarto,
-            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
+            extensions: crate::options::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse(
@@ -351,7 +351,7 @@ mod tests {
     fn merged_chunk_options_prefer_inline_over_hashpipe() {
         let config = ParserOptions {
             flavor: Flavor::Quarto,
-            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
+            extensions: crate::options::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse(
@@ -395,7 +395,7 @@ mod tests {
     fn chunk_label_entries_include_ranges() {
         let config = ParserOptions {
             flavor: Flavor::Quarto,
-            extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
+            extensions: crate::options::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
         };
         let tree = parse("```{r chunk_a, label=chunk_b}\n1 + 1\n```\n", Some(config));

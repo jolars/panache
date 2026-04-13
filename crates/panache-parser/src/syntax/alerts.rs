@@ -39,7 +39,7 @@ impl Alert {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Extensions, Flavor, ParserOptions};
+    use crate::options::{Extensions, Flavor, ParserOptions};
     use crate::parse;
 
     #[test]

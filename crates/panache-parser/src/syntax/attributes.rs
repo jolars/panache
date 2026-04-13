@@ -46,7 +46,7 @@ mod tests {
     #[test]
     fn attribute_node_extracts_div_info_id_and_range() {
         let config = crate::ParserOptions {
-            flavor: crate::config::Flavor::RMarkdown,
+            flavor: crate::options::Flavor::RMarkdown,
             ..Default::default()
         };
         let tree = crate::parse("::: {#mu .exercise}\ntext\n:::\n", Some(config));

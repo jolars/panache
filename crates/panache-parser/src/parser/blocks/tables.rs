@@ -1,6 +1,6 @@
 //! Simple table parsing for Pandoc's simple_tables extension.
 
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 use unicode_width::UnicodeWidthChar;

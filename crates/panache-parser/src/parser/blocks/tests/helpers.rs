@@ -1,4 +1,4 @@
-use crate::config::{Extensions, Flavor, ParserOptions};
+use crate::options::{Extensions, Flavor, ParserOptions};
 use crate::parser::Parser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 

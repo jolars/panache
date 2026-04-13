@@ -1,4 +1,4 @@
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 

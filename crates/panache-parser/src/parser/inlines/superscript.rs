@@ -10,7 +10,7 @@
 //! - Must not be confused with ^[...] (inline footnotes)
 
 use super::core::parse_inline_text;
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 

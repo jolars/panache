@@ -3,7 +3,7 @@
 //! This module implements a single-pass parser that constructs a lossless syntax tree (CST) for
 //! Quarto documents.
 
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::range_utils::find_incremental_restart_offset;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::{GreenNode, GreenToken, NodeOrToken};

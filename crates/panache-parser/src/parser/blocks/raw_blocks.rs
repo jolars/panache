@@ -14,7 +14,7 @@
 //! - Blank lines or non-LaTeX content terminate the block
 //! - Only enabled when `raw_tex` extension is active
 
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -304,7 +304,7 @@ fn parse_tex_environment_lines(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::syntax::SyntaxNode;
 
     #[test]

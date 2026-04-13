@@ -218,7 +218,7 @@ pub fn expand_line_range_to_blocks(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
 
     fn parse_test_doc(input: &str) -> SyntaxNode {
         crate::parse(input, Some(ParserOptions::default()))

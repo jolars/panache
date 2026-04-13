@@ -21,12 +21,15 @@
 //! - [`syntax`]: Typed syntax wrappers and syntax kinds.
 //! - [`parser`]: Lower-level parser modules and incremental helpers.
 //!
-pub mod config;
+mod options;
 pub mod parser;
 pub mod range_utils;
 pub mod syntax;
 
-pub use config::BlankLines;
-pub use config::ParserOptions;
+pub use options::Extensions;
+pub use options::Flavor;
+pub use options::PandocCompat;
+pub use options::ParserConfig;
+pub use options::ParserOptions;
 pub use parser::parse;
 pub use syntax::SyntaxNode;

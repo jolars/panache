@@ -1,6 +1,6 @@
 //! ATX heading parsing utilities.
 
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 

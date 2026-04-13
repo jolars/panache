@@ -9,7 +9,7 @@
 //! - Inline parsing still integrated (called from within block parsing)
 //! - Maintains exact CST structure and losslessness
 
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use rowan::GreenNodeBuilder;
 use std::any::Any;
 

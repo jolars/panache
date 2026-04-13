@@ -4,7 +4,7 @@
 //! logic (especially across blank lines). Keeping this logic in one place reduces the
 //! risk of scattered ad-hoc heuristics diverging as blocks move into the dispatcher.
 
-use crate::config::{PandocCompat, ParserOptions};
+use crate::options::{PandocCompat, ParserOptions};
 
 use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
 use crate::parser::blocks::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};

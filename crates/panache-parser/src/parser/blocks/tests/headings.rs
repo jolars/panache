@@ -1,5 +1,5 @@
 use super::helpers::{find_first, parse_blocks};
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::parser::Parser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 

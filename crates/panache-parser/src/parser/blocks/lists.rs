@@ -1,4 +1,4 @@
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -624,7 +624,7 @@ pub(in crate::parser) fn emit_list_item(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
 
     #[test]
     fn detects_bullet_markers() {
@@ -771,7 +771,7 @@ fn detects_example_list_markers() {
 
     // Test with extension disabled
     let disabled_config = ParserOptions {
-        extensions: crate::config::Extensions {
+        extensions: crate::options::Extensions {
             example_lists: false,
             ..Default::default()
         },

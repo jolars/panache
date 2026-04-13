@@ -1,5 +1,5 @@
 use super::helpers::{parse_blocks, parse_blocks_gfm, parse_blocks_with_config};
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 
 fn count_nodes_of_type(root: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
@@ -361,7 +361,7 @@ fn blockquote_with_code_block() {
 
 #[test]
 fn dispatcher_blockquote_detection() {
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::parser::block_dispatcher::BlockContext;
     use crate::parser::block_dispatcher::BlockParserRegistry;
 
@@ -393,7 +393,7 @@ fn dispatcher_blockquote_detection() {
 
 #[test]
 fn dispatcher_blockquote_requires_blank_before() {
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::parser::block_dispatcher::BlockContext;
     use crate::parser::block_dispatcher::BlockParserRegistry;
 
@@ -432,7 +432,7 @@ fn dispatcher_blockquote_requires_blank_before() {
 
 #[test]
 fn dispatcher_blockquote_payload_basic() {
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
 
     let line = "> Quote";
@@ -467,7 +467,7 @@ fn dispatcher_blockquote_payload_basic() {
 
 #[test]
 fn dispatcher_blockquote_payload_nested_requires_blank() {
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
 
     let lines = ["> Outer", ">> Inner"];
@@ -501,7 +501,7 @@ fn dispatcher_blockquote_payload_nested_requires_blank() {
 
 #[test]
 fn dispatcher_blockquote_ignored_inside_blockquote() {
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
 
     let line = "Lazy continuation";
@@ -530,7 +530,7 @@ fn dispatcher_blockquote_ignored_inside_blockquote() {
 
 #[test]
 fn dispatcher_blockquote_payload_nested_with_blank() {
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
 
     let lines = ["> Outer", ">", ">> Inner"];
@@ -564,7 +564,7 @@ fn dispatcher_blockquote_payload_nested_with_blank() {
 
 #[test]
 fn dispatcher_blockquote_payload_nested_after_blank_line() {
-    use crate::config::ParserOptions;
+    use crate::options::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
 
     let lines = ["> Outer", "", ">> Inner"];

@@ -3,7 +3,7 @@
 //! Note: Most paragraph logic is in the main Parser since paragraphs
 //! are tightly integrated with container handling.
 
-use crate::config::ParserOptions;
+use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 

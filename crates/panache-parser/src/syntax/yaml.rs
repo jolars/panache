@@ -581,9 +581,9 @@ mod tests {
     #[test]
     fn parsed_yaml_regions_include_frontmatter_and_hashpipe_cst_roots() {
         let input = "---\ntitle: Test\n---\n\n```{r}\n#| echo: false\n1 + 1\n```\n";
-        let config = crate::config::ParserOptions {
-            flavor: crate::config::Flavor::Quarto,
-            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
+        let config = crate::options::ParserOptions {
+            flavor: crate::options::Flavor::Quarto,
+            extensions: crate::options::Extensions::for_flavor(crate::options::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
@@ -600,9 +600,9 @@ mod tests {
     #[test]
     fn parsed_yaml_region_maps_parse_error_to_host_offset() {
         let input = "```{r}\n#| echo: [\n1 + 1\n```\n";
-        let config = crate::config::ParserOptions {
-            flavor: crate::config::Flavor::Quarto,
-            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
+        let config = crate::options::ParserOptions {
+            flavor: crate::options::Flavor::Quarto,
+            extensions: crate::options::Extensions::for_flavor(crate::options::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
@@ -631,9 +631,9 @@ mod tests {
     #[test]
     fn embedded_yaml_cst_attaches_to_frontmatter_and_hashpipe_hosts() {
         let input = "---\ntitle: Test\n---\n\n```{r}\n#| echo: false\nx <- 1\n```\n";
-        let config = crate::config::ParserOptions {
-            flavor: crate::config::Flavor::Quarto,
-            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
+        let config = crate::options::ParserOptions {
+            flavor: crate::options::Flavor::Quarto,
+            extensions: crate::options::Extensions::for_flavor(crate::options::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
@@ -650,9 +650,9 @@ mod tests {
     #[test]
     fn embedded_yaml_cst_exposes_frontmatter_and_hashpipe_payloads() {
         let input = "---\ntitle: Test\n---\n\n```{r}\n#| fig-cap: |\n#|   A caption\nx <- 1\n```\n";
-        let config = crate::config::ParserOptions {
-            flavor: crate::config::Flavor::Quarto,
-            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
+        let config = crate::options::ParserOptions {
+            flavor: crate::options::Flavor::Quarto,
+            extensions: crate::options::Extensions::for_flavor(crate::options::Flavor::Quarto),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config));
