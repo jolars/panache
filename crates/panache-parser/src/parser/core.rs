@@ -41,11 +41,6 @@ const GITHUB_ALERT_MARKERS: [&str; 5] = [
     "[!NOTE]",
 ];
 
-#[cfg(debug_assertions)]
-fn init_logger() {
-    let _ = env_logger::builder().is_test(true).try_init();
-}
-
 pub struct Parser<'a> {
     lines: Vec<&'a str>,
     pos: usize,
@@ -75,11 +70,6 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(mut self) -> SyntaxNode {
-        #[cfg(debug_assertions)]
-        {
-            init_logger();
-        }
-
         self.parse_document_stack();
 
         SyntaxNode::new_root(self.builder.finish())
