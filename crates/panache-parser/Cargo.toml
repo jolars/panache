@@ -2,7 +2,7 @@
 name = "panache-parser"
 version = "0.1.0"
 edition = "2024"
-readme = "../../README.md"
+readme = "README.md"
 description = "Lossless CST parser and syntax wrappers for Pandoc markdown, Quarto, and RMarkdown"
 license = "MIT"
 repository = "https://github.com/jolars/panache"
