@@ -79,6 +79,7 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   release-please:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [cargo-audit, cargo-deny, test]
     runs-on: ubuntu-latest
     permissions:
