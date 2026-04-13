@@ -1620,6 +1620,25 @@ fn resolve_old_format_definition(
 }
 
 #[derive(Debug, Clone)]
+pub struct ParserOptions {
+    pub flavor: Flavor,
+    pub extensions: Extensions,
+    /// Parser configuration (experimental)
+    pub parser: ParserConfig,
+}
+
+impl Default for ParserOptions {
+    fn default() -> Self {
+        let flavor = Flavor::default();
+        Self {
+            flavor,
+            extensions: Extensions::for_flavor(flavor),
+            parser: ParserConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
     pub flavor: Flavor,
     pub extensions: Extensions,
@@ -1685,6 +1704,16 @@ impl Default for Config {
             include: None,
             extend_include: Vec::new(),
             flavor_overrides: HashMap::new(),
+        }
+    }
+}
+
+impl Config {
+    pub fn parser_options(&self) -> ParserOptions {
+        ParserOptions {
+            flavor: self.flavor,
+            extensions: self.extensions.clone(),
+            parser: self.parser.clone(),
         }
     }
 }

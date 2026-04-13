@@ -2,13 +2,13 @@ use super::helpers::{
     assert_block_kinds, count_children, find_all, find_first, parse_blocks,
     parse_blocks_with_config,
 };
-use crate::config::{Config, Extensions, Flavor};
+use crate::config::{Extensions, Flavor, ParserOptions};
 use crate::syntax::SyntaxKind;
 
 #[test]
 fn simple_bullet_list() {
     let input = "* one\n* two\n* three\n";
-    let config = Config {
+    let config = ParserOptions {
         flavor: Flavor::Quarto,
         extensions: Extensions::for_flavor(Flavor::Quarto),
         ..Default::default()
@@ -140,9 +140,9 @@ fn outdented_item_after_nested_list_returns_to_outer_level() {
 
 #[test]
 fn fancy_list_continuation_with_nested_list_is_not_indented_code() {
-    use crate::config::{Config, Extensions};
+    use crate::config::{Extensions, ParserOptions};
 
-    let config = Config {
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -276,8 +276,8 @@ fn list_item_with_valid_fenced_divs_parses_as_fenced_div_nodes() {
 
 #[test]
 fn fancy_list_lower_alpha_period() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -292,8 +292,8 @@ fn fancy_list_lower_alpha_period() {
 
 #[test]
 fn fancy_list_lower_alpha_right_paren() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -308,8 +308,8 @@ fn fancy_list_lower_alpha_right_paren() {
 
 #[test]
 fn fancy_list_lower_alpha_parens() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -324,8 +324,8 @@ fn fancy_list_lower_alpha_parens() {
 
 #[test]
 fn fancy_list_upper_alpha_period() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -340,8 +340,8 @@ fn fancy_list_upper_alpha_period() {
 
 #[test]
 fn fancy_list_upper_alpha_period_requires_two_spaces() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -362,8 +362,8 @@ fn fancy_list_upper_alpha_period_requires_two_spaces() {
 
 #[test]
 fn fancy_list_lower_roman_period() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -378,8 +378,8 @@ fn fancy_list_lower_roman_period() {
 
 #[test]
 fn fancy_list_lower_roman_right_paren() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -394,8 +394,8 @@ fn fancy_list_lower_roman_right_paren() {
 
 #[test]
 fn fancy_list_lower_roman_parens() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -410,8 +410,8 @@ fn fancy_list_lower_roman_parens() {
 
 #[test]
 fn fancy_list_upper_roman_period() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -426,8 +426,8 @@ fn fancy_list_upper_roman_period() {
 
 #[test]
 fn fancy_list_upper_roman_right_paren() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -443,8 +443,8 @@ fn fancy_list_upper_roman_right_paren() {
 #[test]
 fn fancy_list_disabled_when_extension_off() {
     // With fancy_lists disabled, alphabetic markers should not parse as lists
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: false,
             ..Default::default()
@@ -458,8 +458,8 @@ fn fancy_list_disabled_when_extension_off() {
 
 #[test]
 fn fancy_list_hash_marker_disabled_when_extension_off() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: false,
             ..Default::default()
@@ -473,8 +473,8 @@ fn fancy_list_hash_marker_disabled_when_extension_off() {
 
 #[test]
 fn fancy_list_right_paren_decimal_disabled_when_extension_off() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: false,
             ..Default::default()
@@ -488,8 +488,8 @@ fn fancy_list_right_paren_decimal_disabled_when_extension_off() {
 
 #[test]
 fn fancy_list_parens_decimal_disabled_when_extension_off() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: false,
             ..Default::default()
@@ -503,8 +503,8 @@ fn fancy_list_parens_decimal_disabled_when_extension_off() {
 
 #[test]
 fn fancy_list_complex_roman() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             fancy_lists: true,
             ..Default::default()
@@ -522,8 +522,8 @@ fn fancy_list_complex_roman() {
 
 #[test]
 fn example_list_basic() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             example_lists: true,
             ..Default::default()
@@ -538,8 +538,8 @@ fn example_list_basic() {
 
 #[test]
 fn example_list_with_labels() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             example_lists: true,
             ..Default::default()
@@ -554,8 +554,8 @@ fn example_list_with_labels() {
 
 #[test]
 fn example_list_mixed_labeled_unlabeled() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             example_lists: true,
             ..Default::default()
@@ -570,8 +570,8 @@ fn example_list_mixed_labeled_unlabeled() {
 
 #[test]
 fn example_list_separated_by_text() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             example_lists: true,
             ..Default::default()
@@ -592,8 +592,8 @@ fn example_list_separated_by_text() {
 #[test]
 fn example_list_disabled_when_extension_off() {
     // With example_lists disabled, (@) should not parse as a list
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             example_lists: false,
             ..Default::default()
@@ -607,8 +607,8 @@ fn example_list_disabled_when_extension_off() {
 
 #[test]
 fn example_list_with_underscores_and_hyphens() {
-    use crate::config::{Config, Extensions};
-    let config = Config {
+    use crate::config::{Extensions, ParserOptions};
+    let config = ParserOptions {
         extensions: Extensions {
             example_lists: true,
             ..Default::default()

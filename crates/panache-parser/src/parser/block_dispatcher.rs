@@ -9,7 +9,7 @@
 //! - Inline parsing still integrated (called from within block parsing)
 //! - Maintains exact CST structure and losslessness
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use rowan::GreenNodeBuilder;
 use std::any::Any;
 
@@ -91,7 +91,7 @@ pub(crate) struct BlockContext<'a> {
     pub blockquote_depth: usize,
 
     /// Parser configuration
-    pub config: &'a Config,
+    pub config: &'a ParserOptions,
 
     // NOTE: we intentionally do not store `&ContainerStack` here to avoid
     // long-lived borrows of `self` in the main parser loop.

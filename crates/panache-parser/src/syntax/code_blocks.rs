@@ -266,7 +266,7 @@ impl CodeInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Config, Flavor};
+    use crate::config::{Flavor, ParserOptions};
     use crate::parse;
 
     #[test]
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn code_block_executable_chunk_wrapper() {
-        let config = Config {
+        let config = ParserOptions {
             flavor: Flavor::Quarto,
             extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn code_block_hashpipe_preamble_wrapper() {
-        let config = Config {
+        let config = ParserOptions {
             flavor: Flavor::Quarto,
             extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn code_block_collects_chunk_labels_and_options() {
-        let config = Config {
+        let config = ParserOptions {
             flavor: Flavor::Quarto,
             extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn merged_chunk_options_prefer_inline_over_hashpipe() {
-        let config = Config {
+        let config = ParserOptions {
             flavor: Flavor::Quarto,
             extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn chunk_label_entries_include_ranges() {
-        let config = Config {
+        let config = ParserOptions {
             flavor: Flavor::Quarto,
             extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()

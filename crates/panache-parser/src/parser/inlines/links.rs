@@ -10,7 +10,7 @@
 //! - Reference images: `![alt][ref]`, `![alt][]`, `![alt]`
 
 use super::core::parse_inline_text;
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -126,7 +126,7 @@ pub fn emit_inline_image(
     alt_text: &str,
     dest: &str,
     raw_attributes: Option<&str>,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::IMAGE_LINK.into());
 
@@ -388,7 +388,7 @@ pub fn emit_inline_link(
     link_text: &str,
     dest: &str,
     raw_attributes: Option<&str>,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::LINK.into());
 
@@ -427,7 +427,7 @@ pub fn emit_inline_link(
     builder.finish_node();
 }
 
-pub fn emit_bare_uri_link(builder: &mut GreenNodeBuilder, uri: &str, _config: &Config) {
+pub fn emit_bare_uri_link(builder: &mut GreenNodeBuilder, uri: &str, _config: &ParserOptions) {
     builder.start_node(SyntaxKind::LINK.into());
 
     builder.start_node(SyntaxKind::LINK_START.into());
@@ -569,7 +569,7 @@ pub fn emit_reference_link(
     link_text: &str,
     label: &str,
     is_shortcut: bool,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::LINK.into());
 
@@ -691,7 +691,7 @@ pub fn emit_reference_image(
     alt_text: &str,
     label: &str,
     is_shortcut: bool,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::IMAGE_LINK.into());
 

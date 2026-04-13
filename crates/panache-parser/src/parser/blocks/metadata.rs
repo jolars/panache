@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn test_yaml_block_emits_content_node() {
         let input = "---\ntitle: Test\nlist:\n  - a\n---\n";
-        let tree = crate::parse(input, Some(crate::Config::default()));
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
         let metadata = tree
             .descendants()
             .find(|n| n.kind() == SyntaxKind::YAML_METADATA)
@@ -420,7 +420,7 @@ mod tests {
     #[test]
     fn test_indented_yaml_delimiters_are_lossless() {
         let input = "    ---\n    title: Test\n    ...\n";
-        let tree = crate::parse(input, Some(crate::Config::default()));
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
         assert_eq!(tree.text().to_string(), input);
     }
 }

@@ -328,14 +328,14 @@ mod tests {
     #[test]
     fn test_footnote_definition_body_layout_is_lossless() {
         let input = "[^note-on-refs]:\n    Note that if `--file-scope` is used,\n";
-        let tree = crate::parse(input, Some(crate::Config::default()));
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
         assert_eq!(tree.text().to_string(), input);
     }
 
     #[test]
     fn test_footnote_definition_marker_emits_structural_tokens() {
         let input = "[^note-on-refs]: body\n";
-        let tree = crate::parse(input, Some(crate::Config::default()));
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
         let def = tree
             .descendants()
             .find(|n| n.kind() == SyntaxKind::FOOTNOTE_DEFINITION)

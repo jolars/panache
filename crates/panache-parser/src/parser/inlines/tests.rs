@@ -138,7 +138,7 @@ mod link_tests {
 
 #[cfg(test)]
 mod citation_tests {
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxKind;
 
     fn parse_inline(input: &str) -> crate::syntax::SyntaxNode {
@@ -146,7 +146,7 @@ mod citation_tests {
     }
 
     fn parse_inline_with_bookdown(input: &str) -> crate::syntax::SyntaxNode {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.bookdown_references = true;
         crate::parser::parse(input, Some(config))
     }
@@ -438,7 +438,7 @@ mod escape_tests {
     #[test]
     fn test_hard_line_break_disabled() {
         let input = "line1\\\nline2";
-        let mut config = crate::Config::default();
+        let mut config = crate::ParserOptions::default();
         config.extensions.escaped_line_breaks = false;
 
         let tree = crate::parser::parse(input, Some(config));
@@ -758,7 +758,10 @@ mod raw_inline_tests {
         crate::parser::parse(input, None)
     }
 
-    fn parse_inline_with_config(input: &str, config: crate::Config) -> crate::syntax::SyntaxNode {
+    fn parse_inline_with_config(
+        input: &str,
+        config: crate::ParserOptions,
+    ) -> crate::syntax::SyntaxNode {
         crate::parser::parse(input, Some(config))
     }
 
@@ -825,7 +828,7 @@ mod raw_inline_tests {
     #[test]
     fn test_raw_inline_disabled() {
         let input = "This is `<a>html</a>`{=html} text.";
-        let mut config = crate::Config::default();
+        let mut config = crate::ParserOptions::default();
         config.extensions.raw_attribute = false;
 
         let inline_tree = parse_inline_with_config(input, config);
@@ -909,10 +912,10 @@ mod raw_inline_tests {
 
 #[cfg(test)]
 mod extension_guard_tests {
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxKind;
 
-    fn parse_with_config(input: &str, config: Config) -> crate::syntax::SyntaxNode {
+    fn parse_with_config(input: &str, config: ParserOptions) -> crate::syntax::SyntaxNode {
         crate::parser::parse(input, Some(config))
     }
 
@@ -924,7 +927,7 @@ mod extension_guard_tests {
 
     #[test]
     fn strikeout_disabled_treats_text_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.strikeout = false;
         let tree = parse_with_config("~~strike~~", config);
         assert_eq!(count_kind(&tree, SyntaxKind::STRIKEOUT), 0);
@@ -932,7 +935,7 @@ mod extension_guard_tests {
 
     #[test]
     fn superscript_disabled_treats_text_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.superscript = false;
         let tree = parse_with_config("^sup^", config);
         assert_eq!(count_kind(&tree, SyntaxKind::SUPERSCRIPT), 0);
@@ -940,7 +943,7 @@ mod extension_guard_tests {
 
     #[test]
     fn subscript_disabled_treats_text_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.subscript = false;
         let tree = parse_with_config("~sub~", config);
         assert_eq!(count_kind(&tree, SyntaxKind::SUBSCRIPT), 0);
@@ -948,7 +951,7 @@ mod extension_guard_tests {
 
     #[test]
     fn bracketed_spans_disabled_do_not_parse_span() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.bracketed_spans = false;
         let tree = parse_with_config("[text]{.class}", config);
         assert_eq!(count_kind(&tree, SyntaxKind::BRACKETED_SPAN), 0);
@@ -956,7 +959,7 @@ mod extension_guard_tests {
 
     #[test]
     fn inline_code_attributes_disabled_leaves_attrs_outside_code_span() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.inline_code_attributes = false;
         let tree = parse_with_config("`code`{.lang}", config);
         let code_span = tree
@@ -969,7 +972,7 @@ mod extension_guard_tests {
 
     #[test]
     fn tex_math_dollars_disabled_keeps_dollars_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.tex_math_dollars = false;
         let tree = parse_with_config("$x$", config);
         assert_eq!(count_kind(&tree, SyntaxKind::INLINE_MATH), 0);
@@ -978,7 +981,7 @@ mod extension_guard_tests {
 
     #[test]
     fn tex_math_gfm_enabled_parses_backtick_dollar_inline_math() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.tex_math_dollars = false;
         config.extensions.tex_math_gfm = true;
         let tree = parse_with_config("$`x^2`$", config);
@@ -987,7 +990,7 @@ mod extension_guard_tests {
 
     #[test]
     fn tex_math_gfm_disabled_keeps_backtick_dollar_inline_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.tex_math_dollars = false;
         config.extensions.tex_math_gfm = false;
         let tree = parse_with_config("$`x^2`$", config);
@@ -996,7 +999,7 @@ mod extension_guard_tests {
 
     #[test]
     fn all_symbols_escapable_disabled_stops_symbol_escapes() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.all_symbols_escapable = false;
         let tree = parse_with_config(r"\?", config);
         assert_eq!(count_kind(&tree, SyntaxKind::ESCAPED_CHAR), 0);
@@ -1004,7 +1007,7 @@ mod extension_guard_tests {
 
     #[test]
     fn escaped_line_breaks_still_work_when_symbol_escapes_disabled() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.all_symbols_escapable = false;
         config.extensions.escaped_line_breaks = true;
         let tree = parse_with_config("a\\\nb", config);
@@ -1013,7 +1016,7 @@ mod extension_guard_tests {
 
     #[test]
     fn hard_line_breaks_enabled_turns_single_newline_into_hard_break() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.hard_line_breaks = true;
         let tree = parse_with_config("a\nb", config);
         assert_eq!(count_kind(&tree, SyntaxKind::HARD_LINE_BREAK), 1);
@@ -1022,7 +1025,7 @@ mod extension_guard_tests {
 
     #[test]
     fn hard_line_breaks_disabled_keeps_single_newline_token() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.hard_line_breaks = false;
         let tree = parse_with_config("a\nb", config);
         assert_eq!(count_kind(&tree, SyntaxKind::HARD_LINE_BREAK), 0);
@@ -1031,7 +1034,7 @@ mod extension_guard_tests {
 
     #[test]
     fn raw_tex_disabled_blocks_latex_command_node() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.raw_tex = false;
         let tree = parse_with_config(r"\alpha", config);
         assert_eq!(count_kind(&tree, SyntaxKind::LATEX_COMMAND), 0);
@@ -1039,7 +1042,7 @@ mod extension_guard_tests {
 
     #[test]
     fn inline_footnotes_disabled_keeps_note_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.inline_footnotes = false;
         let tree = parse_with_config("A^[note]", config);
         assert_eq!(count_kind(&tree, SyntaxKind::INLINE_FOOTNOTE), 0);
@@ -1047,7 +1050,7 @@ mod extension_guard_tests {
 
     #[test]
     fn footnotes_disabled_keeps_reference_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.footnotes = false;
         let tree = parse_with_config("[^id]", config);
         assert_eq!(count_kind(&tree, SyntaxKind::FOOTNOTE_REFERENCE), 0);
@@ -1055,7 +1058,7 @@ mod extension_guard_tests {
 
     #[test]
     fn footnote_reference_emits_structural_tokens() {
-        let tree = parse_with_config("[^id]", Config::default());
+        let tree = parse_with_config("[^id]", ParserOptions::default());
         assert_eq!(count_kind(&tree, SyntaxKind::FOOTNOTE_REFERENCE), 1);
         assert_eq!(count_kind(&tree, SyntaxKind::FOOTNOTE_LABEL_START), 1);
         assert_eq!(count_kind(&tree, SyntaxKind::FOOTNOTE_LABEL_ID), 1);
@@ -1064,7 +1067,7 @@ mod extension_guard_tests {
 
     #[test]
     fn autolinks_disabled_keeps_angle_link_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.autolinks = false;
         let tree = parse_with_config("<https://example.com>", config);
         assert_eq!(count_kind(&tree, SyntaxKind::AUTO_LINK), 0);
@@ -1072,7 +1075,7 @@ mod extension_guard_tests {
 
     #[test]
     fn inline_links_disabled_keeps_inline_link_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.inline_links = false;
         let tree = parse_with_config("[text](url)", config);
         assert_eq!(count_kind(&tree, SyntaxKind::LINK), 0);
@@ -1080,7 +1083,7 @@ mod extension_guard_tests {
 
     #[test]
     fn reference_links_disabled_keeps_reference_link_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.reference_links = false;
         let tree = parse_with_config("[text][ref]", config);
         assert_eq!(count_kind(&tree, SyntaxKind::LINK), 0);
@@ -1088,7 +1091,7 @@ mod extension_guard_tests {
 
     #[test]
     fn citations_disabled_keeps_bare_citation_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.citations = false;
         let tree = parse_with_config("@doe99", config);
         assert_eq!(count_kind(&tree, SyntaxKind::CITATION), 0);
@@ -1096,7 +1099,7 @@ mod extension_guard_tests {
 
     #[test]
     fn emoji_enabled_parses_colon_alias() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.emoji = true;
         let tree = parse_with_config("Hello :smile: world", config);
         assert_eq!(count_kind(&tree, SyntaxKind::EMOJI), 1);
@@ -1104,7 +1107,7 @@ mod extension_guard_tests {
 
     #[test]
     fn emoji_disabled_keeps_colon_alias_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.emoji = false;
         let tree = parse_with_config("Hello :smile: world", config);
         assert_eq!(count_kind(&tree, SyntaxKind::EMOJI), 0);
@@ -1112,7 +1115,7 @@ mod extension_guard_tests {
 
     #[test]
     fn crossrefs_enabled_without_citations_still_parse_crossref() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.citations = false;
         config.extensions.quarto_crossrefs = true;
         let tree = parse_with_config("@fig-plot", config);
@@ -1122,7 +1125,7 @@ mod extension_guard_tests {
 
     #[test]
     fn crossrefs_disabled_parse_quarto_key_as_citation() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.citations = true;
         config.extensions.quarto_crossrefs = false;
         let tree = parse_with_config("@fig-plot", config);
@@ -1132,7 +1135,7 @@ mod extension_guard_tests {
 
     #[test]
     fn rmarkdown_inline_code_enabled_parses_classic_form() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.rmarkdown_inline_code = true;
         config.extensions.quarto_inline_code = false;
         let tree = parse_with_config("`3 == `r 2 + 1``", config);
@@ -1141,7 +1144,7 @@ mod extension_guard_tests {
 
     #[test]
     fn rmarkdown_inline_code_disabled_keeps_classic_form_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.rmarkdown_inline_code = false;
         config.extensions.quarto_inline_code = false;
         let tree = parse_with_config("`3 == `r 2 + 1``", config);
@@ -1151,7 +1154,7 @@ mod extension_guard_tests {
 
     #[test]
     fn quarto_inline_code_enabled_parses_braced_form() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.rmarkdown_inline_code = false;
         config.extensions.quarto_inline_code = true;
         let tree = parse_with_config("`3 == `{r} 2 + 1``", config);
@@ -1160,7 +1163,7 @@ mod extension_guard_tests {
 
     #[test]
     fn quarto_inline_code_disabled_keeps_braced_form_literal() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.rmarkdown_inline_code = false;
         config.extensions.quarto_inline_code = false;
         let tree = parse_with_config("`3 == `{r} 2 + 1``", config);
@@ -1170,7 +1173,7 @@ mod extension_guard_tests {
 
     #[test]
     fn classic_form_not_parsed_when_only_quarto_inline_enabled() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.rmarkdown_inline_code = false;
         config.extensions.quarto_inline_code = true;
         let tree = parse_with_config("`3 == `r 2 + 1``", config);
@@ -1179,7 +1182,7 @@ mod extension_guard_tests {
 
     #[test]
     fn braced_form_not_parsed_when_only_rmarkdown_inline_enabled() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.rmarkdown_inline_code = true;
         config.extensions.quarto_inline_code = false;
         let tree = parse_with_config("`3 == `{r} 2 + 1``", config);

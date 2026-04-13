@@ -4,7 +4,7 @@
 //! emitting them with inline parsing applied.
 
 use super::inline_emission;
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::{GreenNodeBuilder, NodeOrToken};
 
@@ -238,7 +238,7 @@ impl ParagraphBuffer {
     pub(crate) fn emit_with_inlines(
         &self,
         builder: &mut GreenNodeBuilder<'static>,
-        config: &Config,
+        config: &ParserOptions,
     ) {
         let text = self.get_text_for_parsing();
         if text.is_empty() && self.segments.is_empty() {
@@ -265,7 +265,7 @@ impl ParagraphBuffer {
         builder: &mut GreenNodeBuilder<'static>,
         text: &str,
         marker_positions: &[(usize, usize, bool)],
-        config: &Config,
+        config: &ParserOptions,
     ) {
         // Parse inlines once into a temporary tree.
         let mut temp_builder = GreenNodeBuilder::new();

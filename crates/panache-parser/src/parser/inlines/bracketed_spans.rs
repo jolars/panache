@@ -3,7 +3,7 @@
 //! Syntax: `[inline content]{.class key="val"}`
 
 use super::core::parse_inline_text;
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -93,7 +93,7 @@ pub(crate) fn emit_bracketed_span(
     builder: &mut GreenNodeBuilder,
     content: &str,
     attributes: &str,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::BRACKETED_SPAN.into());
 

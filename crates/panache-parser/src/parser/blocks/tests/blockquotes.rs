@@ -1,5 +1,5 @@
 use super::helpers::{parse_blocks, parse_blocks_gfm, parse_blocks_with_config};
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 
 fn count_nodes_of_type(root: &crate::syntax::SyntaxNode, kind: SyntaxKind) -> usize {
@@ -240,7 +240,7 @@ fn spec_blank_before_blockquote_required() {
 
 #[test]
 fn blockquote_can_interrupt_when_blank_before_blockquote_disabled() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.blank_before_blockquote = false;
     let input = "Paragraph\n> quote\n";
     let tree = parse_blocks_with_config(input, &config);
@@ -249,7 +249,7 @@ fn blockquote_can_interrupt_when_blank_before_blockquote_disabled() {
 
 #[test]
 fn nested_blockquote_without_blank_when_extension_disabled() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.blank_before_blockquote = false;
     let input = "> outer\n>> inner\n";
     let tree = parse_blocks_with_config(input, &config);
@@ -361,7 +361,7 @@ fn blockquote_with_code_block() {
 
 #[test]
 fn dispatcher_blockquote_detection() {
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::parser::block_dispatcher::BlockContext;
     use crate::parser::block_dispatcher::BlockParserRegistry;
 
@@ -374,7 +374,7 @@ fn dispatcher_blockquote_detection() {
         at_document_start: true,
         in_fenced_div: false,
         blockquote_depth: 0,
-        config: &Config::default(),
+        config: &ParserOptions::default(),
         content_indent: 0,
         indent_to_emit: None,
         list_indent_info: None,
@@ -393,7 +393,7 @@ fn dispatcher_blockquote_detection() {
 
 #[test]
 fn dispatcher_blockquote_requires_blank_before() {
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::parser::block_dispatcher::BlockContext;
     use crate::parser::block_dispatcher::BlockParserRegistry;
 
@@ -406,7 +406,7 @@ fn dispatcher_blockquote_requires_blank_before() {
         at_document_start: false,
         in_fenced_div: false,
         blockquote_depth: 0,
-        config: &Config::default(),
+        config: &ParserOptions::default(),
         content_indent: 0,
         indent_to_emit: None,
         list_indent_info: None,
@@ -432,7 +432,7 @@ fn dispatcher_blockquote_requires_blank_before() {
 
 #[test]
 fn dispatcher_blockquote_payload_basic() {
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
 
     let line = "> Quote";
@@ -444,7 +444,7 @@ fn dispatcher_blockquote_payload_basic() {
         at_document_start: true,
         in_fenced_div: false,
         blockquote_depth: 0,
-        config: &Config::default(),
+        config: &ParserOptions::default(),
         content_indent: 0,
         indent_to_emit: None,
         list_indent_info: None,
@@ -467,7 +467,7 @@ fn dispatcher_blockquote_payload_basic() {
 
 #[test]
 fn dispatcher_blockquote_payload_nested_requires_blank() {
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
 
     let lines = ["> Outer", ">> Inner"];
@@ -479,7 +479,7 @@ fn dispatcher_blockquote_payload_nested_requires_blank() {
         at_document_start: false,
         in_fenced_div: false,
         blockquote_depth: 0,
-        config: &Config::default(),
+        config: &ParserOptions::default(),
         content_indent: 0,
         indent_to_emit: None,
         list_indent_info: None,
@@ -501,7 +501,7 @@ fn dispatcher_blockquote_payload_nested_requires_blank() {
 
 #[test]
 fn dispatcher_blockquote_ignored_inside_blockquote() {
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
 
     let line = "Lazy continuation";
@@ -513,7 +513,7 @@ fn dispatcher_blockquote_ignored_inside_blockquote() {
         at_document_start: false,
         in_fenced_div: false,
         blockquote_depth: 1,
-        config: &Config::default(),
+        config: &ParserOptions::default(),
         content_indent: 0,
         indent_to_emit: None,
         list_indent_info: None,
@@ -530,7 +530,7 @@ fn dispatcher_blockquote_ignored_inside_blockquote() {
 
 #[test]
 fn dispatcher_blockquote_payload_nested_with_blank() {
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
 
     let lines = ["> Outer", ">", ">> Inner"];
@@ -542,7 +542,7 @@ fn dispatcher_blockquote_payload_nested_with_blank() {
         at_document_start: false,
         in_fenced_div: false,
         blockquote_depth: 0,
-        config: &Config::default(),
+        config: &ParserOptions::default(),
         content_indent: 0,
         indent_to_emit: None,
         list_indent_info: None,
@@ -564,7 +564,7 @@ fn dispatcher_blockquote_payload_nested_with_blank() {
 
 #[test]
 fn dispatcher_blockquote_payload_nested_after_blank_line() {
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry, BlockQuotePrepared};
 
     let lines = ["> Outer", "", ">> Inner"];
@@ -576,7 +576,7 @@ fn dispatcher_blockquote_payload_nested_after_blank_line() {
         at_document_start: false,
         in_fenced_div: false,
         blockquote_depth: 0,
-        config: &Config::default(),
+        config: &ParserOptions::default(),
         content_indent: 0,
         indent_to_emit: None,
         list_indent_info: None,

@@ -8,7 +8,7 @@
 //! before calling builder methods. The inline parser already follows this pattern
 //! (it detects delimiters/patterns before emitting nodes).
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::parser::inlines::core;
 use rowan::GreenNodeBuilder;
 
@@ -29,7 +29,7 @@ use rowan::GreenNodeBuilder;
 /// emit_inlines(builder, heading_text, config);
 /// builder.finish_node();
 /// ```
-pub fn emit_inlines(builder: &mut GreenNodeBuilder, text: &str, config: &Config) {
+pub fn emit_inlines(builder: &mut GreenNodeBuilder, text: &str, config: &ParserOptions) {
     log::trace!(
         "emit_inlines: {:?} ({} bytes)",
         &text[..text.len().min(40)],
@@ -43,14 +43,14 @@ pub fn emit_inlines(builder: &mut GreenNodeBuilder, text: &str, config: &Config)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::{SyntaxKind, SyntaxNode};
     use rowan::GreenNodeBuilder;
 
     /// Test that emit_inlines produces correct inline structure.
     #[test]
     fn test_emit_inlines_basic() {
-        let config = Config::default();
+        let config = ParserOptions::default();
         let test_cases = vec![
             "plain text",
             "text with *emphasis*",
@@ -84,7 +84,7 @@ mod tests {
     /// Test that emit_inlines handles empty text correctly.
     #[test]
     fn test_emit_inlines_empty() {
-        let config = Config::default();
+        let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
         builder.start_node(SyntaxKind::HEADING_CONTENT.into());
         emit_inlines(&mut builder, "", &config);
@@ -100,7 +100,7 @@ mod tests {
     /// Test that emit_inlines preserves whitespace.
     #[test]
     fn test_emit_inlines_preserves_whitespace() {
-        let config = Config::default();
+        let config = ParserOptions::default();
         let text = "  leading and trailing  ";
 
         let mut builder = GreenNodeBuilder::new();

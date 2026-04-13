@@ -1,6 +1,6 @@
 //! ATX heading parsing utilities.
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -134,7 +134,7 @@ pub(crate) fn emit_setext_heading(
     text_line: &str,
     underline_line: &str,
     _level: usize,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::HEADING.into());
 
@@ -248,7 +248,7 @@ pub(crate) fn emit_atx_heading(
     builder: &mut GreenNodeBuilder<'static>,
     content: &str,
     level: usize,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::HEADING.into());
 
@@ -418,11 +418,11 @@ mod tests {
 
     #[test]
     fn test_atx_heading_with_attributes_losslessness() {
-        use crate::Config;
+        use crate::ParserOptions;
 
         // Regression test for losslessness bug where space before attributes was dropped
         let input = "# Test {#id}\n";
-        let config = Config::default();
+        let config = ParserOptions::default();
         let tree = crate::parse(input, Some(config));
 
         // Verify losslessness: tree text should exactly match input
@@ -458,7 +458,7 @@ mod tests {
     #[test]
     fn test_atx_heading_closing_hashes_are_lossless() {
         let input = "### Extension: `smart` ###\n";
-        let tree = crate::parse(input, Some(crate::Config::default()));
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
         assert_eq!(tree.text().to_string(), input);
     }
 

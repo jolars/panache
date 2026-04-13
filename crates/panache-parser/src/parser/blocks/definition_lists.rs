@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -39,7 +39,11 @@ pub(crate) fn try_parse_definition_marker(line: &str) -> Option<(char, usize, us
 }
 
 /// Emit a term line into the syntax tree
-pub(crate) fn emit_term(builder: &mut GreenNodeBuilder<'static>, line: &str, config: &Config) {
+pub(crate) fn emit_term(
+    builder: &mut GreenNodeBuilder<'static>,
+    line: &str,
+    config: &ParserOptions,
+) {
     builder.start_node(SyntaxKind::TERM.into());
     // Strip trailing newline from line (it will be emitted separately)
     let (text, newline_str) = strip_newline(line);
@@ -154,7 +158,7 @@ mod tests {
     #[test]
     fn test_definition_list_preserves_first_content_line_losslessly() {
         let input = "[`--reference-doc=`*FILE*]{#option--reference-doc}\n\n:   Use the specified file as a style reference in producing a\n    docx or ODT file.\n\n    Docx\n\n    :   For best results, the reference docx should be a modified\n        version of a docx file produced using pandoc.\n";
-        let tree = crate::parse(input, Some(crate::Config::default()));
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
         assert_eq!(tree.text().to_string(), input);
     }
 }

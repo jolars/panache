@@ -5,7 +5,7 @@
 //! When the `native_spans` extension is enabled, HTML `<span>` tags are
 //! treated as native Pandoc Span elements instead of raw HTML.
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -115,7 +115,7 @@ pub(crate) fn emit_native_span(
     builder: &mut GreenNodeBuilder,
     content: &str,
     attributes: &str,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::BRACKETED_SPAN.into());
 

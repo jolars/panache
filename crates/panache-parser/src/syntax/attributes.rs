@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn attribute_node_extracts_div_info_id_and_range() {
-        let config = crate::Config {
+        let config = crate::ParserOptions {
             flavor: crate::config::Flavor::RMarkdown,
             ..Default::default()
         };

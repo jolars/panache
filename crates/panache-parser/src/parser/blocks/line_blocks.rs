@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -22,7 +22,7 @@ pub fn parse_line_block(
     lines: &[&str],
     start_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
-    config: &Config,
+    config: &ParserOptions,
 ) -> usize {
     log::debug!("Parsing line block at line {}", start_pos + 1);
 
@@ -148,7 +148,7 @@ mod tests {
         let input = vec!["| Line one", "| Line two", "| Line three"];
 
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_line_block(&input, 0, &mut builder, &Config::default());
+        let new_pos = parse_line_block(&input, 0, &mut builder, &ParserOptions::default());
 
         assert_eq!(new_pos, 3);
     }
@@ -162,7 +162,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_line_block(&input, 0, &mut builder, &Config::default());
+        let new_pos = parse_line_block(&input, 0, &mut builder, &ParserOptions::default());
 
         assert_eq!(new_pos, 3);
     }
@@ -172,7 +172,7 @@ mod tests {
         let input = vec!["| First line", "|    Indented line", "| Back to normal"];
 
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_line_block(&input, 0, &mut builder, &Config::default());
+        let new_pos = parse_line_block(&input, 0, &mut builder, &ParserOptions::default());
 
         assert_eq!(new_pos, 3);
     }
@@ -182,7 +182,7 @@ mod tests {
         let input = vec!["| Line one", "| Line two", "Regular paragraph"];
 
         let mut builder = GreenNodeBuilder::new();
-        let new_pos = parse_line_block(&input, 0, &mut builder, &Config::default());
+        let new_pos = parse_line_block(&input, 0, &mut builder, &ParserOptions::default());
 
         assert_eq!(new_pos, 2); // Should stop before "Regular paragraph"
     }

@@ -291,12 +291,12 @@ pub fn collect_option_entries_from_descendants(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Config, Flavor};
+    use crate::config::{Flavor, ParserOptions};
     use crate::parse;
 
     #[test]
     fn test_chunk_option_quoted() {
-        let config = Config {
+        let config = ParserOptions {
             flavor: Flavor::Quarto,
             extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
@@ -323,7 +323,7 @@ x <- 1
 
     #[test]
     fn test_chunk_option_unquoted() {
-        let config = Config {
+        let config = ParserOptions {
             flavor: Flavor::Quarto,
             extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()
@@ -344,7 +344,7 @@ x <- 1
 
     #[test]
     fn test_chunk_label() {
-        let config = Config {
+        let config = ParserOptions {
             flavor: Flavor::Quarto,
             extensions: crate::config::Extensions::for_flavor(Flavor::Quarto),
             ..Default::default()

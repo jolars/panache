@@ -3,7 +3,7 @@
 //! Note: Most paragraph logic is in the main Parser since paragraphs
 //! are tightly integrated with container handling.
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -44,7 +44,7 @@ pub(in crate::parser) fn append_paragraph_line(
     containers: &mut ContainerStack,
     _builder: &mut GreenNodeBuilder<'static>,
     line: &str,
-    _config: &Config,
+    _config: &ParserOptions,
 ) {
     // Buffer the line (with newline for losslessness)
     // Works for ALL paragraphs including those in blockquotes

@@ -10,7 +10,7 @@
 //! - Must not be confused with ^[...] (inline footnotes)
 
 use super::core::parse_inline_text;
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -68,7 +68,7 @@ pub fn try_parse_superscript(text: &str) -> Option<(usize, &str)> {
 }
 
 /// Emit a superscript node with its content
-pub fn emit_superscript(builder: &mut GreenNodeBuilder, inner_text: &str, config: &Config) {
+pub fn emit_superscript(builder: &mut GreenNodeBuilder, inner_text: &str, config: &ParserOptions) {
     builder.start_node(SyntaxKind::SUPERSCRIPT.into());
 
     // Opening marker

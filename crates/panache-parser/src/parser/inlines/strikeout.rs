@@ -9,7 +9,7 @@
 //! - Tildes cannot have whitespace immediately inside
 
 use super::core::parse_inline_text;
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -68,7 +68,7 @@ pub fn try_parse_strikeout(text: &str) -> Option<(usize, &str)> {
 }
 
 /// Emit a strikeout node with its content
-pub fn emit_strikeout(builder: &mut GreenNodeBuilder, inner_text: &str, config: &Config) {
+pub fn emit_strikeout(builder: &mut GreenNodeBuilder, inner_text: &str, config: &ParserOptions) {
     builder.start_node(SyntaxKind::STRIKEOUT.into());
 
     // Opening marker

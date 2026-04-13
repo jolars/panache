@@ -62,11 +62,11 @@ mod tests {
 
     #[test]
     fn test_heading_wrapper() {
-        use crate::Config;
+        use crate::ParserOptions;
         use crate::parser::parse;
 
         let input = "# Hello World\n\nParagraph.";
-        let tree = parse(input, Some(Config::default()));
+        let tree = parse(input, Some(ParserOptions::default()));
 
         let heading = tree
             .children()
@@ -79,11 +79,11 @@ mod tests {
 
     #[test]
     fn test_link_wrapper() {
-        use crate::Config;
+        use crate::ParserOptions;
         use crate::parser::parse;
 
         let input = "Click [here](https://example.com).";
-        let tree = parse(input, Some(Config::default()));
+        let tree = parse(input, Some(ParserOptions::default()));
 
         // Find link using typed wrapper
         let link = tree
@@ -103,11 +103,11 @@ mod tests {
 
     #[test]
     fn test_image_wrapper() {
-        use crate::Config;
+        use crate::ParserOptions;
         use crate::parser::parse;
 
         let input = "![Alt text](image.png)";
-        let tree = parse(input, Some(Config::default()));
+        let tree = parse(input, Some(ParserOptions::default()));
 
         let image = tree
             .descendants()
@@ -119,11 +119,11 @@ mod tests {
 
     #[test]
     fn test_autolink_wrapper() {
-        use crate::Config;
+        use crate::ParserOptions;
         use crate::parser::parse;
 
         let input = "<https://example.com>";
-        let tree = parse(input, Some(Config::default()));
+        let tree = parse(input, Some(ParserOptions::default()));
 
         let autolink = tree
             .descendants()
@@ -135,11 +135,11 @@ mod tests {
 
     #[test]
     fn test_shortcode_wrapper() {
-        use crate::Config;
+        use crate::ParserOptions;
         use crate::parser::parse;
 
         let input = "{{< include \"chapters/part 1.qmd\" >}}";
-        let tree = parse(input, Some(Config::default()));
+        let tree = parse(input, Some(ParserOptions::default()));
 
         let shortcode = tree
             .descendants()
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_table_wrapper() {
-        use crate::Config;
+        use crate::ParserOptions;
         use crate::parser::parse;
 
         let input = r#"| A | B |
@@ -164,7 +164,7 @@ mod tests {
 
 Table: My caption
 "#;
-        let tree = parse(input, Some(Config::default()));
+        let tree = parse(input, Some(ParserOptions::default()));
 
         let table = tree
             .descendants()

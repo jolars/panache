@@ -3,7 +3,7 @@
 //! In Pandoc, a paragraph containing only an image (and optional attributes)
 //! is treated as a Figure block element rather than a paragraph with inline image.
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -16,7 +16,7 @@ use crate::parser::utils::inline_emission::emit_inlines;
 pub(in crate::parser) fn parse_figure(
     builder: &mut GreenNodeBuilder<'static>,
     line: &str,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::FIGURE.into());
 

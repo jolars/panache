@@ -1,6 +1,6 @@
 //! Simple table parsing for Pandoc's simple_tables extension.
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 use unicode_width::UnicodeWidthChar;
@@ -379,7 +379,7 @@ fn emit_table_caption(
     lines: &[&str],
     start: usize,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(SyntaxKind::TABLE_CAPTION.into());
 
@@ -462,7 +462,11 @@ fn emit_table_caption(
 
 /// Emit a table cell with inline content parsing.
 /// This is the core helper for Phase 7.1 table inline parsing migration.
-fn emit_table_cell(builder: &mut GreenNodeBuilder<'static>, cell_text: &str, config: &Config) {
+fn emit_table_cell(
+    builder: &mut GreenNodeBuilder<'static>,
+    cell_text: &str,
+    config: &ParserOptions,
+) {
     builder.start_node(SyntaxKind::TABLE_CELL.into());
 
     // Parse inline content within the cell
@@ -524,7 +528,7 @@ pub(crate) fn try_parse_simple_table(
     lines: &[&str],
     start_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
-    config: &Config,
+    config: &ParserOptions,
 ) -> Option<usize> {
     log::debug!("try_parse_simple_table at line {}", start_pos + 1);
 
@@ -674,7 +678,7 @@ fn emit_table_row(
     line: &str,
     columns: &[Column],
     row_kind: SyntaxKind,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(row_kind.into());
 
@@ -866,7 +870,7 @@ fn emit_pipe_table_row(
     builder: &mut GreenNodeBuilder<'static>,
     line: &str,
     row_kind: SyntaxKind,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     builder.start_node(row_kind.into());
 
@@ -1004,7 +1008,7 @@ pub(crate) fn try_parse_pipe_table(
     lines: &[&str],
     start_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
-    config: &Config,
+    config: &ParserOptions,
 ) -> Option<usize> {
     if start_pos + 1 >= lines.len() {
         return None;
@@ -1165,7 +1169,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 4); // header + sep + 2 rows
@@ -1181,7 +1185,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 3); // sep + 2 rows
@@ -1232,7 +1236,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // Should consume: header + sep + 2 rows + blank + caption
@@ -1252,7 +1256,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 2, &mut builder, &Config::default());
+        let result = try_parse_simple_table(&input, 2, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // Should consume: caption + blank + header + sep + 2 rows
@@ -1271,7 +1275,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 5); // header + sep + row + blank + caption
@@ -1290,7 +1294,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_simple_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // Should consume through end of multi-line caption
@@ -1342,7 +1346,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_pipe_table(&input, 1, &mut builder, &Config::default());
+        let result = try_parse_pipe_table(&input, 1, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 4); // header + sep + 2 rows
@@ -1360,7 +1364,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_pipe_table(&input, 1, &mut builder, &Config::default());
+        let result = try_parse_pipe_table(&input, 1, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 4);
@@ -1379,7 +1383,7 @@ mod tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_pipe_table(&input, 1, &mut builder, &Config::default());
+        let result = try_parse_pipe_table(&input, 1, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 5); // header + sep + row + blank + caption
@@ -1573,7 +1577,7 @@ fn emit_grid_table_row(
     lines: &[&str],
     columns: &[GridColumn],
     row_kind: SyntaxKind,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     if lines.is_empty() {
         return;
@@ -1689,7 +1693,7 @@ pub(crate) fn try_parse_grid_table(
     lines: &[&str],
     start_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
-    config: &Config,
+    config: &ParserOptions,
 ) -> Option<usize> {
     if start_pos >= lines.len() {
         return None;
@@ -1935,7 +1939,7 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 5);
@@ -1957,7 +1961,7 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 9);
@@ -1979,7 +1983,7 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 9);
@@ -1997,7 +2001,7 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 5);
@@ -2017,7 +2021,7 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 2, &mut builder, &Config::default());
+        let result = try_parse_grid_table(&input, 2, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // Should include caption + blank + table
@@ -2038,7 +2042,7 @@ mod grid_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_grid_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_grid_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // table + blank + caption
@@ -2123,7 +2127,7 @@ pub(crate) fn try_parse_multiline_table(
     lines: &[&str],
     start_pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
-    config: &Config,
+    config: &ParserOptions,
 ) -> Option<usize> {
     if start_pos >= lines.len() {
         return None;
@@ -2399,7 +2403,7 @@ fn emit_multiline_table_row(
     lines: &[&str],
     columns: &[Column],
     kind: SyntaxKind,
-    config: &Config,
+    config: &ParserOptions,
 ) {
     if lines.is_empty() {
         return;
@@ -2488,7 +2492,7 @@ mod multiline_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 9);
@@ -2507,7 +2511,7 @@ mod multiline_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 6);
@@ -2525,7 +2529,7 @@ mod multiline_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_none());
     }
@@ -2541,7 +2545,7 @@ mod multiline_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 4);
@@ -2562,7 +2566,7 @@ mod multiline_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         // table (6 lines) + blank + caption
@@ -2582,7 +2586,7 @@ mod multiline_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 6);
@@ -2612,7 +2616,7 @@ mod multiline_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &ParserOptions::default());
 
         assert!(result.is_none());
     }
@@ -2628,7 +2632,7 @@ mod multiline_table_tests {
         ];
 
         let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_multiline_table(&input, 0, &mut builder, &Config::default());
+        let result = try_parse_multiline_table(&input, 0, &mut builder, &ParserOptions::default());
 
         // Should not parse because first line isn't a full-width separator
         assert!(result.is_none());
@@ -2638,7 +2642,7 @@ mod multiline_table_tests {
     #[test]
     fn test_emit_table_cell_plain_text() {
         let mut builder = GreenNodeBuilder::new();
-        emit_table_cell(&mut builder, "Cell", &Config::default());
+        emit_table_cell(&mut builder, "Cell", &ParserOptions::default());
         let green = builder.finish();
         let node = SyntaxNode::new_root(green);
 
@@ -2654,7 +2658,7 @@ mod multiline_table_tests {
     #[test]
     fn test_emit_table_cell_with_emphasis() {
         let mut builder = GreenNodeBuilder::new();
-        emit_table_cell(&mut builder, "*italic*", &Config::default());
+        emit_table_cell(&mut builder, "*italic*", &ParserOptions::default());
         let green = builder.finish();
         let node = SyntaxNode::new_root(green);
 
@@ -2670,7 +2674,7 @@ mod multiline_table_tests {
     #[test]
     fn test_emit_table_cell_with_code() {
         let mut builder = GreenNodeBuilder::new();
-        emit_table_cell(&mut builder, "`code`", &Config::default());
+        emit_table_cell(&mut builder, "`code`", &ParserOptions::default());
         let green = builder.finish();
         let node = SyntaxNode::new_root(green);
 
@@ -2686,7 +2690,7 @@ mod multiline_table_tests {
     #[test]
     fn test_emit_table_cell_with_link() {
         let mut builder = GreenNodeBuilder::new();
-        emit_table_cell(&mut builder, "[text](url)", &Config::default());
+        emit_table_cell(&mut builder, "[text](url)", &ParserOptions::default());
         let green = builder.finish();
         let node = SyntaxNode::new_root(green);
 
@@ -2702,7 +2706,7 @@ mod multiline_table_tests {
     #[test]
     fn test_emit_table_cell_with_strong() {
         let mut builder = GreenNodeBuilder::new();
-        emit_table_cell(&mut builder, "**bold**", &Config::default());
+        emit_table_cell(&mut builder, "**bold**", &ParserOptions::default());
         let green = builder.finish();
         let node = SyntaxNode::new_root(green);
 
@@ -2718,7 +2722,11 @@ mod multiline_table_tests {
     #[test]
     fn test_emit_table_cell_mixed_inline() {
         let mut builder = GreenNodeBuilder::new();
-        emit_table_cell(&mut builder, "Text **bold** and `code`", &Config::default());
+        emit_table_cell(
+            &mut builder,
+            "Text **bold** and `code`",
+            &ParserOptions::default(),
+        );
         let green = builder.finish();
         let node = SyntaxNode::new_root(green);
 
@@ -2737,7 +2745,7 @@ mod multiline_table_tests {
     #[test]
     fn test_emit_table_cell_empty() {
         let mut builder = GreenNodeBuilder::new();
-        emit_table_cell(&mut builder, "", &Config::default());
+        emit_table_cell(&mut builder, "", &ParserOptions::default());
         let green = builder.finish();
         let node = SyntaxNode::new_root(green);
 
@@ -2752,7 +2760,7 @@ mod multiline_table_tests {
     #[test]
     fn test_emit_table_cell_escaped_pipe() {
         let mut builder = GreenNodeBuilder::new();
-        emit_table_cell(&mut builder, r"A \| B", &Config::default());
+        emit_table_cell(&mut builder, r"A \| B", &ParserOptions::default());
         let green = builder.finish();
         let node = SyntaxNode::new_root(green);
 

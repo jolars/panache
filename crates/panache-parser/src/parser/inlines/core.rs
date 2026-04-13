@@ -20,7 +20,7 @@
 //!
 //! This matches Pandoc's behavior exactly.
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -78,7 +78,11 @@ use super::superscript::{emit_superscript, try_parse_superscript};
 /// * `text` - The inline text to parse
 /// * `config` - Configuration for extensions and formatting
 /// * `builder` - The CST builder to emit nodes to
-pub fn parse_inline_text_recursive(builder: &mut GreenNodeBuilder, text: &str, config: &Config) {
+pub fn parse_inline_text_recursive(
+    builder: &mut GreenNodeBuilder,
+    text: &str,
+    config: &ParserOptions,
+) {
     log::debug!(
         "Recursive inline parsing: {:?} ({} bytes)",
         &text[..text.len().min(40)],
@@ -98,7 +102,7 @@ pub fn parse_inline_text_recursive(builder: &mut GreenNodeBuilder, text: &str, c
 pub fn parse_inline_text(
     builder: &mut GreenNodeBuilder,
     text: &str,
-    config: &Config,
+    config: &ParserOptions,
     _allow_reference_links: bool,
 ) {
     log::trace!(
@@ -139,7 +143,7 @@ pub fn try_parse_emphasis(
     text: &str,
     pos: usize,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) -> Option<(usize, usize)> {
     let bytes = text.as_bytes();
@@ -217,7 +221,7 @@ fn try_parse_emphasis_nested(
     text: &str,
     pos: usize,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) -> Option<(usize, usize)> {
     let bytes = text.as_bytes();
@@ -283,7 +287,7 @@ fn try_parse_three(
     pos: usize,
     delim_char: char,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) -> Option<usize> {
     let content_start = pos + 3;
@@ -541,7 +545,7 @@ fn try_parse_two(
     pos: usize,
     delim_char: char,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) -> Option<usize> {
     let content_start = pos + 2;
@@ -587,7 +591,7 @@ fn try_parse_one(
     pos: usize,
     delim_char: char,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) -> Option<usize> {
     let content_start = pos + 1;
@@ -642,7 +646,7 @@ fn parse_until_closer_with_nested_two(
     delim_char: char,
     delim_count: usize,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
 ) -> Option<usize> {
     let bytes = text.as_bytes();
     let mut pos = start;
@@ -851,7 +855,7 @@ fn parse_until_closer_with_nested_one(
     delim_char: char,
     delim_count: usize,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
 ) -> Option<usize> {
     let bytes = text.as_bytes();
     let mut pos = start;
@@ -1069,7 +1073,7 @@ fn parse_inline_range(
     text: &str,
     start: usize,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
     parse_inline_range_impl(text, start, end, config, builder, false)
@@ -1081,7 +1085,7 @@ fn parse_inline_range_nested(
     text: &str,
     start: usize,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
 ) {
     parse_inline_range_impl(text, start, end, config, builder, true)
@@ -1101,7 +1105,7 @@ fn parse_inline_range_impl(
     text: &str,
     start: usize,
     end: usize,
-    config: &Config,
+    config: &ParserOptions,
     builder: &mut GreenNodeBuilder,
     nested_emphasis: bool,
 ) {
@@ -1898,7 +1902,7 @@ mod tests {
     #[test]
     fn test_recursive_simple_emphasis() {
         let text = "*test*";
-        let config = Config::default();
+        let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
 
         parse_inline_text_recursive(&mut builder, text, &config);
@@ -1917,7 +1921,7 @@ mod tests {
     #[test]
     fn test_recursive_nested() {
         let text = "*foo **bar** baz*";
-        let config = Config::default();
+        let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
 
         // Wrap in a PARAGRAPH node (inline content needs a parent)
@@ -1942,12 +1946,12 @@ mod tests {
     /// Test that we can parse a simple emphasis case
     #[test]
     fn test_parse_simple_emphasis() {
-        use crate::config::Config;
+        use crate::config::ParserOptions;
         use crate::syntax::SyntaxNode;
         use rowan::GreenNode;
 
         let text = "*test*";
-        let config = Config::default();
+        let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
 
         // Try to parse emphasis at position 0
@@ -1970,10 +1974,10 @@ mod tests {
     /// Test parsing nested emphasis/strong
     #[test]
     fn test_parse_nested_emphasis_strong() {
-        use crate::config::Config;
+        use crate::config::ParserOptions;
 
         let text = "*foo **bar** baz*";
-        let config = Config::default();
+        let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
 
         // Parse the whole range
@@ -1998,12 +2002,12 @@ mod tests {
     /// Current bug: Parses as *Strong[foo* bar]
     #[test]
     fn test_triple_emphasis_star_then_double_star() {
-        use crate::config::Config;
+        use crate::config::ParserOptions;
         use crate::syntax::SyntaxNode;
         use rowan::GreenNode;
 
         let text = "***foo* bar**";
-        let config = Config::default();
+        let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
 
         builder.start_node(SyntaxKind::DOCUMENT.into());
@@ -2049,12 +2053,12 @@ mod tests {
     /// Expected: Emph[Strong[foo], bar]
     #[test]
     fn test_triple_emphasis_double_star_then_star() {
-        use crate::config::Config;
+        use crate::config::ParserOptions;
         use crate::syntax::SyntaxNode;
         use rowan::GreenNode;
 
         let text = "***foo** bar*";
-        let config = Config::default();
+        let config = ParserOptions::default();
         let mut builder = GreenNodeBuilder::new();
 
         builder.start_node(SyntaxKind::DOCUMENT.into());
@@ -2098,12 +2102,12 @@ mod tests {
     /// Regression test for equation_attributes_single_line golden test
     #[test]
     fn test_display_math_with_attributes() {
-        use crate::config::Config;
+        use crate::config::ParserOptions;
         use crate::syntax::SyntaxNode;
         use rowan::GreenNode;
 
         let text = "$$ E = mc^2 $$ {#eq-einstein}";
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.quarto_crossrefs = true; // Enable Quarto cross-references
 
         let mut builder = GreenNodeBuilder::new();
@@ -2157,12 +2161,12 @@ fn test_two_with_nested_one_and_triple_closer() {
     // Should parse as: Strong["bold with ", Emph["italic"]]
     // The *** at end is parsed as * (closes Emph) + ** (closes Strong)
 
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
     let text = "**bold with *italic***";
-    let config = Config::default();
+    let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
     // parse_inline_range emits inline content directly
@@ -2192,12 +2196,12 @@ fn test_emphasis_with_trailing_space_before_closer() {
     // *foo * should parse as emphasis (Pandoc behavior)
     // For asterisks, Pandoc doesn't require right-flanking for closers
 
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
     let text = "*foo *";
-    let config = Config::default();
+    let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
     // Try to parse emphasis at position 0
@@ -2227,12 +2231,12 @@ fn test_triple_emphasis_all_strong_nested() {
     // ***foo** bar **baz*** should parse as Emph[Strong[foo], " bar ", Strong[baz]]
     // Pandoc output confirms this
 
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
     let text = "***foo** bar **baz***";
-    let config = Config::default();
+    let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
     parse_inline_range(text, 0, text.len(), &config, &mut builder);
@@ -2274,12 +2278,12 @@ fn test_triple_emphasis_all_emph_nested() {
     // ***foo* bar *baz*** should parse as Strong[Emph[foo], " bar ", Emph[baz]]
     // Pandoc output confirms this
 
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
     let text = "***foo* bar *baz***";
-    let config = Config::default();
+    let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
     parse_inline_range(text, 0, text.len(), &config, &mut builder);
@@ -2320,12 +2324,12 @@ fn test_triple_emphasis_all_emph_nested() {
 #[test]
 fn test_parse_emphasis_multiline() {
     // Per Pandoc spec, emphasis CAN contain newlines (soft breaks)
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
     let text = "*text on\nline two*";
-    let config = Config::default();
+    let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
     let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);
@@ -2355,12 +2359,12 @@ fn test_parse_emphasis_multiline() {
 #[test]
 fn test_parse_strong_multiline() {
     // Per Pandoc spec, strong emphasis CAN contain newlines
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
     let text = "**strong on\nline two**";
-    let config = Config::default();
+    let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
     let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);
@@ -2390,12 +2394,12 @@ fn test_parse_strong_multiline() {
 #[test]
 fn test_parse_triple_emphasis_multiline() {
     // Triple emphasis with newlines
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxNode;
     use rowan::GreenNode;
 
     let text = "***both on\nline two***";
-    let config = Config::default();
+    let config = ParserOptions::default();
     let mut builder = GreenNodeBuilder::new();
 
     let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);

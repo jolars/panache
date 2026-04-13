@@ -1,18 +1,18 @@
-use crate::config::{Config, Extensions, Flavor};
+use crate::config::{Extensions, Flavor, ParserOptions};
 use crate::parser::Parser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 pub fn parse_blocks(input: &str) -> SyntaxNode {
-    let config = Config::default();
+    let config = ParserOptions::default();
     Parser::new(input, &config).parse()
 }
 
-pub fn parse_blocks_with_config(input: &str, config: &Config) -> SyntaxNode {
+pub fn parse_blocks_with_config(input: &str, config: &ParserOptions) -> SyntaxNode {
     Parser::new(input, config).parse()
 }
 
 pub fn parse_blocks_quarto(input: &str) -> SyntaxNode {
-    let config = Config {
+    let config = ParserOptions {
         flavor: Flavor::Quarto,
         extensions: Extensions::for_flavor(Flavor::Quarto),
         ..Default::default()
@@ -21,7 +21,7 @@ pub fn parse_blocks_quarto(input: &str) -> SyntaxNode {
 }
 
 pub fn parse_blocks_rmarkdown(input: &str) -> SyntaxNode {
-    let config = Config {
+    let config = ParserOptions {
         flavor: Flavor::RMarkdown,
         extensions: Extensions::for_flavor(Flavor::RMarkdown),
         ..Default::default()
@@ -30,7 +30,7 @@ pub fn parse_blocks_rmarkdown(input: &str) -> SyntaxNode {
 }
 
 pub fn parse_blocks_gfm(input: &str) -> SyntaxNode {
-    let config = Config {
+    let config = ParserOptions {
         flavor: Flavor::Gfm,
         extensions: Extensions::for_flavor(Flavor::Gfm),
         ..Default::default()

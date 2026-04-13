@@ -39,14 +39,14 @@ impl Alert {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Config, Extensions, Flavor};
+    use crate::config::{Extensions, Flavor, ParserOptions};
     use crate::parse;
 
     #[test]
     fn alert_wrapper_extracts_marker_and_paragraphs() {
         let mut extensions = Extensions::for_flavor(Flavor::Gfm);
         extensions.alerts = true;
-        let config = Config {
+        let config = ParserOptions {
             flavor: Flavor::Gfm,
             extensions,
             ..Default::default()

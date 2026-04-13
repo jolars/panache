@@ -2,7 +2,7 @@ use super::helpers::{
     assert_block_kinds, assert_block_kinds_for_node, find_all, find_first, parse_blocks,
     parse_blocks_gfm, parse_blocks_quarto, parse_blocks_with_config,
 };
-use crate::config::{Config, Extensions, Flavor};
+use crate::config::{Extensions, Flavor, ParserOptions};
 use crate::syntax::SyntaxKind;
 
 fn get_code_content(node: &crate::syntax::SyntaxNode) -> Option<String> {
@@ -531,7 +531,7 @@ fn executable_chunk_hashpipe_multiline_scalar_in_list_does_not_gain_indent() {
 #[test]
 fn executable_code_respects_extension_guard() {
     let input = "```{r}\na <- 1\n```\n";
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.executable_code = false;
 
     let disabled = parse_blocks_with_config(input, &config);
@@ -565,7 +565,7 @@ fn display_code_block_keeps_hashpipe_line_as_plain_text() {
 #[test]
 fn backtick_fenced_code_blocks_respect_extension_guard() {
     let input = "```r\na <- 1\n```\n";
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.backtick_code_blocks = false;
 
     let disabled = parse_blocks_with_config(input, &config);
@@ -585,7 +585,7 @@ fn backtick_fenced_code_blocks_respect_extension_guard() {
 #[test]
 fn tilde_fenced_code_blocks_respect_extension_guard() {
     let input = "~~~r\na <- 1\n~~~\n";
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.fenced_code_blocks = false;
 
     let disabled = parse_blocks_with_config(input, &config);
@@ -620,7 +620,7 @@ fn gfm_defaults_allow_backtick_and_tilde_fenced_code_blocks() {
 #[test]
 fn fenced_code_attributes_respect_extension_guard() {
     let input = "```{python}\na <- 1\n```\n";
-    let mut config = Config {
+    let mut config = ParserOptions {
         flavor: Flavor::Quarto,
         extensions: Extensions::for_flavor(Flavor::Quarto),
         ..Default::default()
@@ -644,7 +644,7 @@ fn fenced_code_attributes_respect_extension_guard() {
 #[test]
 fn raw_attribute_respects_extension_guard_for_fenced_code() {
     let input = "```{=html}\n<div>raw</div>\n```\n";
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.raw_attribute = false;
     config.extensions.fenced_code_attributes = false;
 
@@ -665,7 +665,7 @@ fn raw_attribute_respects_extension_guard_for_fenced_code() {
 #[test]
 fn tex_math_gfm_parses_math_fence_as_display_math() {
     let input = "``` math\nx + y\n```\n";
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.tex_math_gfm = true;
 
     let tree = parse_blocks_with_config(input, &config);

@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -155,7 +155,7 @@ fn try_parse_roman_numeral(text: &str, uppercase: bool) -> Option<(String, usize
     Some((numeral.to_string(), count))
 }
 
-pub(crate) fn try_parse_list_marker(line: &str, config: &Config) -> Option<ListMarkerMatch> {
+pub(crate) fn try_parse_list_marker(line: &str, config: &ParserOptions) -> Option<ListMarkerMatch> {
     let (_indent_cols, indent_bytes) = leading_indent(line);
     let trimmed = &line[indent_bytes..];
 
@@ -624,18 +624,18 @@ pub(in crate::parser) fn emit_list_item(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
+    use crate::config::ParserOptions;
 
     #[test]
     fn detects_bullet_markers() {
-        let config = Config::default();
+        let config = ParserOptions::default();
         assert!(try_parse_list_marker("* item", &config).is_some());
         assert!(try_parse_list_marker("*\titem", &config).is_some());
     }
 
     #[test]
     fn detects_fancy_alpha_markers() {
-        let mut config = Config::default();
+        let mut config = ParserOptions::default();
         config.extensions.fancy_lists = true;
 
         // Test lowercase alpha period
@@ -710,7 +710,7 @@ fn markers_match_fancy_lists() {
 
 #[test]
 fn detects_complex_roman_numerals() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.fancy_lists = true;
 
     // Test various Roman numerals
@@ -746,7 +746,7 @@ fn detects_complex_roman_numerals() {
 
 #[test]
 fn detects_example_list_markers() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.example_lists = true;
 
     // Test unlabeled example
@@ -770,7 +770,7 @@ fn detects_example_list_markers() {
     );
 
     // Test with extension disabled
-    let disabled_config = Config {
+    let disabled_config = ParserOptions {
         extensions: crate::config::Extensions {
             example_lists: false,
             ..Default::default()
@@ -788,7 +788,7 @@ fn parses_nested_bullet_list_from_single_marker() {
     use crate::parse;
     use crate::syntax::SyntaxKind;
 
-    let config = Config::default();
+    let config = ParserOptions::default();
 
     // Test all three bullet marker combinations as nested lists
     for (input, desc) in [("- *\n", "- *"), ("- +\n", "- +"), ("- -\n", "- -")] {

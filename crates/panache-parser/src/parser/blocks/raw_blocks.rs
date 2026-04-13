@@ -14,7 +14,7 @@
 //! - Blank lines or non-LaTeX content terminate the block
 //! - Only enabled when `raw_tex` extension is active
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -79,7 +79,7 @@ pub fn extract_environment_name(line: &str) -> Option<String> {
 /// - `raw_tex` extension must be enabled
 /// - Line must start with backslash followed by a letter
 /// - If it's a `\begin{env}`, the environment must NOT be an inline math env
-pub fn can_start_raw_block(content: &str, config: &Config) -> bool {
+pub fn can_start_raw_block(content: &str, config: &ParserOptions) -> bool {
     // Must have raw_tex extension enabled
     if !config.extensions.raw_tex {
         return false;
@@ -304,7 +304,7 @@ fn parse_tex_environment_lines(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
+    use crate::config::ParserOptions;
     use crate::syntax::SyntaxNode;
 
     #[test]
@@ -322,11 +322,11 @@ mod tests {
 
     #[test]
     fn test_can_start_raw_block() {
-        let config = Config::default();
+        let config = ParserOptions::default();
         assert!(can_start_raw_block("\\newcommand{foo}{bar}", &config));
         assert!(!can_start_raw_block("Regular text", &config));
 
-        let mut config_disabled = Config::default();
+        let mut config_disabled = ParserOptions::default();
         config_disabled.extensions.raw_tex = false;
         assert!(!can_start_raw_block(
             "\\newcommand{foo}{bar}",

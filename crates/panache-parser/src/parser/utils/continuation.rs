@@ -4,7 +4,7 @@
 //! logic (especially across blank lines). Keeping this logic in one place reduces the
 //! risk of scattered ad-hoc heuristics diverging as blocks move into the dispatcher.
 
-use crate::config::{Config, PandocCompat};
+use crate::config::{PandocCompat, ParserOptions};
 
 use crate::parser::block_dispatcher::{BlockContext, BlockParserRegistry};
 use crate::parser::blocks::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
@@ -12,12 +12,15 @@ use crate::parser::blocks::{definition_lists, html_blocks, lists, raw_blocks};
 use crate::parser::utils::container_stack::{ContainerStack, leading_indent};
 
 pub(crate) struct ContinuationPolicy<'a, 'cfg> {
-    config: &'cfg Config,
+    config: &'cfg ParserOptions,
     block_registry: &'a BlockParserRegistry,
 }
 
 impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
-    pub(crate) fn new(config: &'cfg Config, block_registry: &'a BlockParserRegistry) -> Self {
+    pub(crate) fn new(
+        config: &'cfg ParserOptions,
+        block_registry: &'a BlockParserRegistry,
+    ) -> Self {
         Self {
             config,
             block_registry,

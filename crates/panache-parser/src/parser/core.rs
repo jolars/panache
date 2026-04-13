@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
@@ -51,7 +51,7 @@ pub struct Parser<'a> {
     pos: usize,
     builder: GreenNodeBuilder<'static>,
     containers: ContainerStack,
-    config: &'a Config,
+    config: &'a ParserOptions,
     block_registry: BlockParserRegistry,
     /// True when the previous block was a metadata block (YAML, Pandoc title, or MMD title).
     /// The first line after a metadata block is treated as if it has a blank line before it,
@@ -60,7 +60,7 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(input: &'a str, config: &'a Config) -> Self {
+    pub fn new(input: &'a str, config: &'a ParserOptions) -> Self {
         // Use split_lines_inclusive to preserve line endings (both LF and CRLF)
         let lines = split_lines_inclusive(input);
         Self {

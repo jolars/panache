@@ -97,13 +97,14 @@ pub fn split_shortcode_args(content: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Config, parser::parse};
+    use crate::ParserOptions;
+    use crate::parser::parse;
 
     #[test]
     fn shortcode_wrapper_extracts_name_and_args() {
         let tree = parse(
             "{{< include \"chapters/part 1.qmd\" >}}",
-            Some(Config::default()),
+            Some(ParserOptions::default()),
         );
         let shortcode = tree
             .descendants()
@@ -119,7 +120,10 @@ mod tests {
 
     #[test]
     fn shortcode_wrapper_detects_escaped_shortcode() {
-        let tree = parse("{{{< include child.qmd >}}}", Some(Config::default()));
+        let tree = parse(
+            "{{{< include child.qmd >}}}",
+            Some(ParserOptions::default()),
+        );
         let shortcode = tree
             .descendants()
             .find_map(Shortcode::cast)

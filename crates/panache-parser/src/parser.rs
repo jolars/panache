@@ -3,7 +3,7 @@
 //! This module implements a single-pass parser that constructs a lossless syntax tree (CST) for
 //! Quarto documents.
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::range_utils::find_incremental_restart_offset;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::{GreenNode, GreenToken, NodeOrToken};
@@ -37,7 +37,7 @@ pub use core::Parser;
 ///
 /// * `input` - The Quarto document content to parse
 /// * `config` - Optional configuration. If None, uses default config.
-pub fn parse(input: &str, config: Option<Config>) -> SyntaxNode {
+pub fn parse(input: &str, config: Option<ParserOptions>) -> SyntaxNode {
     let config = config.unwrap_or_default();
     Parser::new(input, &config).parse()
 }
@@ -52,7 +52,7 @@ pub struct IncrementalParseResult {
 /// window (between top-level headings) or from a safe restart boundary to EOF.
 pub fn parse_incremental_suffix(
     input: &str,
-    config: Option<Config>,
+    config: Option<ParserOptions>,
     old_tree: &SyntaxNode,
     old_edit_range: (usize, usize),
     new_edit_range: (usize, usize),
@@ -124,7 +124,7 @@ fn normalize_range(range: (usize, usize)) -> Option<(usize, usize)> {
     (range.0 <= range.1).then_some(range)
 }
 
-fn full_reparse_result(input: &str, config: &Config) -> IncrementalParseResult {
+fn full_reparse_result(input: &str, config: &ParserOptions) -> IncrementalParseResult {
     let tree = Parser::new(input, config).parse();
     let len: usize = tree.text_range().end().into();
     IncrementalParseResult {
@@ -245,7 +245,7 @@ fn ranges_intersect(a: (usize, usize), b: (usize, usize)) -> bool {
 
 fn reparse_section_window(
     input: &str,
-    config: &Config,
+    config: &ParserOptions,
     old_tree: &SyntaxNode,
     section_window: SectionWindow,
 ) -> Option<IncrementalParseResult> {

@@ -7,7 +7,7 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use super::core::parse_inline_text;
-use crate::config::Config;
+use crate::config::ParserOptions;
 
 /// Try to parse an inline footnote starting at the current position.
 /// Returns Some((length, content)) if successful, None otherwise.
@@ -57,7 +57,11 @@ pub(crate) fn try_parse_inline_footnote(text: &str) -> Option<(usize, &str)> {
 }
 
 /// Emit an inline footnote node to the builder.
-pub(crate) fn emit_inline_footnote(builder: &mut GreenNodeBuilder, content: &str, config: &Config) {
+pub(crate) fn emit_inline_footnote(
+    builder: &mut GreenNodeBuilder,
+    content: &str,
+    config: &ParserOptions,
+) {
     builder.start_node(SyntaxKind::INLINE_FOOTNOTE.into());
 
     // Opening marker

@@ -1,5 +1,5 @@
 use super::helpers::{find_first, parse_blocks};
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::parser::Parser;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
@@ -56,7 +56,7 @@ fn requires_blank_line_before_heading() {
 
 #[test]
 fn parses_heading_without_blank_line_when_extension_disabled() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.blank_before_header = false;
     let node = Parser::new("text\n# Heading\n", &config).parse();
     let headings: Vec<_> = node
@@ -68,7 +68,7 @@ fn parses_heading_without_blank_line_when_extension_disabled() {
 
 #[test]
 fn parses_setext_heading_without_blank_line_when_extension_disabled() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.blank_before_header = false;
     let node = Parser::new("text\nHeading\n---\n", &config).parse();
     let headings: Vec<_> = node
@@ -97,7 +97,7 @@ fn parses_multiple_headings() {
 
 #[test]
 fn parses_mmd_header_identifier_in_atx_when_enabled() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.mmd_header_identifiers = true;
     let node = Parser::new("# Heading [my id]\n", &config).parse();
 
@@ -111,7 +111,7 @@ fn parses_mmd_header_identifier_in_atx_when_enabled() {
 
 #[test]
 fn does_not_parse_mmd_header_identifier_in_atx_when_disabled() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.mmd_header_identifiers = false;
     let node = Parser::new("# Heading [my id]\n", &config).parse();
 
@@ -126,7 +126,7 @@ fn does_not_parse_mmd_header_identifier_in_atx_when_disabled() {
 
 #[test]
 fn parses_mmd_header_identifier_in_setext_when_enabled() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.mmd_header_identifiers = true;
     let node = Parser::new("Heading [setext id]\n---\n", &config).parse();
 
@@ -142,7 +142,7 @@ fn parses_mmd_header_identifier_in_setext_when_enabled() {
 fn atx_heading_immediately_after_yaml_frontmatter() {
     // Pandoc allows a heading directly after YAML frontmatter without a blank line.
     let input = "---\ntitle: Test\n---\n# Heading\n";
-    let node = Parser::new(input, &Config::default()).parse();
+    let node = Parser::new(input, &ParserOptions::default()).parse();
     assert!(
         find_first(&node, SyntaxKind::HEADING).is_some(),
         "heading directly after YAML frontmatter should be parsed as a heading"
@@ -153,7 +153,7 @@ fn atx_heading_immediately_after_yaml_frontmatter() {
 fn atx_heading_with_id_immediately_after_yaml_frontmatter() {
     // Heading IDs must be extractable when heading follows YAML directly.
     let input = "---\ntitle: Test\n---\n# One {#one}\n";
-    let node = Parser::new(input, &Config::default()).parse();
+    let node = Parser::new(input, &ParserOptions::default()).parse();
     assert!(
         find_first(&node, SyntaxKind::HEADING).is_some(),
         "heading with ID directly after YAML frontmatter should be parsed as a heading"
@@ -162,7 +162,7 @@ fn atx_heading_with_id_immediately_after_yaml_frontmatter() {
 
 #[test]
 fn parses_mmd_header_identifier_before_atx_closing_hashes() {
-    let mut config = Config::default();
+    let mut config = ParserOptions::default();
     config.extensions.mmd_header_identifiers = true;
     let input = "## Title [my id] ###\n";
     let node = Parser::new(input, &config).parse();

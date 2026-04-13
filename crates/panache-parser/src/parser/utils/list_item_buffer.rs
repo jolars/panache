@@ -3,7 +3,7 @@
 //! This module provides infrastructure for buffering list item content during parsing,
 //! allowing us to determine tight vs loose lists and parse inline elements correctly.
 
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::parser::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
 use crate::parser::utils::inline_emission;
 use crate::syntax::SyntaxKind;
@@ -87,7 +87,7 @@ impl ListItemBuffer {
         &self,
         builder: &mut GreenNodeBuilder<'static>,
         use_paragraph: bool,
-        config: &Config,
+        config: &ParserOptions,
     ) {
         if self.is_empty() {
             return;

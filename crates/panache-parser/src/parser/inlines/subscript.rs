@@ -10,7 +10,7 @@
 //! - Must not be confused with ~~ (strikeout)
 
 use super::core::parse_inline_text;
-use crate::config::Config;
+use crate::config::ParserOptions;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -72,7 +72,7 @@ pub fn try_parse_subscript(text: &str) -> Option<(usize, &str)> {
 }
 
 /// Emit a subscript node with its content
-pub fn emit_subscript(builder: &mut GreenNodeBuilder, inner_text: &str, config: &Config) {
+pub fn emit_subscript(builder: &mut GreenNodeBuilder, inner_text: &str, config: &ParserOptions) {
     builder.start_node(SyntaxKind::SUBSCRIPT.into());
 
     // Opening marker
