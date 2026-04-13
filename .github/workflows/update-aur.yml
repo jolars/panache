@@ -67,7 +67,8 @@ jobs:
         if: ${{ inputs.version != '' || steps.latest.outputs.version != '' || steps.release_version.outputs.version != '' }}
         run: |
           VERSION="${{ inputs.version || steps.latest.outputs.version || steps.release_version.outputs.version }}"
-          VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+          VERSION="${VERSION#panache-v}"  # Remove monorepo tag prefix if present
+          VERSION="${VERSION#v}"  # Remove plain 'v' prefix if present
           gh api repos/jolars/panache-aur/dispatches \
             -f event_type=new-release \
             -f client_payload[version]="$VERSION"
