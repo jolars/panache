@@ -154,28 +154,60 @@ export async function resolvePanacheBinary(
   tag: string,
 ): Promise<string> {
   const target = detectTargetAsset();
-  const releasesUrl =
+  const tagCandidates =
     tag === "latest"
-      ? `https://api.github.com/repos/${repo}/releases/latest`
-      : `https://api.github.com/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`;
-  const { release, asset } = await withRetries(
-    async () => {
-      const releaseBody = await httpGet(releasesUrl);
-      const release = JSON.parse(releaseBody.toString("utf8")) as ReleaseResponse;
-      const asset = target.archiveNames
-        .map((archiveName) =>
-          release.assets.find((item) => item.name === archiveName),
-        )
-        .find((item): item is ReleaseAsset => item !== undefined);
-      if (!asset) {
-        throw new Error(
-          `No release asset '${target.archiveNames.join("' or '")}' found for ${repo}@${tag}`,
-        );
-      }
-      return { release, asset };
-    },
-    `Fetching release metadata from ${releasesUrl}`,
-  );
+      ? ["latest"]
+      : [
+          tag,
+          ...(tag.startsWith("v")
+            ? [`panache-${tag}`]
+            : tag.startsWith("panache-v")
+              ? [tag.replace(/^panache-/, "")]
+              : []),
+        ];
+  const uniqueTagCandidates = [...new Set(tagCandidates)];
+
+  let selectedRelease: { release: ReleaseResponse; asset: ReleaseAsset } | undefined;
+  const candidateErrors: string[] = [];
+
+  for (const candidateTag of uniqueTagCandidates) {
+    const releasesUrl =
+      candidateTag === "latest"
+        ? `https://api.github.com/repos/${repo}/releases/latest`
+        : `https://api.github.com/repos/${repo}/releases/tags/${encodeURIComponent(candidateTag)}`;
+    try {
+      selectedRelease = await withRetries(
+        async () => {
+          const releaseBody = await httpGet(releasesUrl);
+          const release = JSON.parse(releaseBody.toString("utf8")) as ReleaseResponse;
+          const asset = target.archiveNames
+            .map((archiveName) =>
+              release.assets.find((item) => item.name === archiveName),
+            )
+            .find((item): item is ReleaseAsset => item !== undefined);
+          if (!asset) {
+            throw new Error(
+              `No release asset '${target.archiveNames.join("' or '")}' found for ${repo}@${candidateTag}`,
+            );
+          }
+          return { release, asset };
+        },
+        `Fetching release metadata from ${releasesUrl}`,
+      );
+      break;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      candidateErrors.push(`${candidateTag}: ${reason}`);
+    }
+  }
+
+  if (!selectedRelease) {
+    throw new Error(
+      `Unable to resolve release '${tag}' for ${repo}. Tried: ${uniqueTagCandidates.join(", ")}. ${candidateErrors.join(" | ")}`,
+    );
+  }
+
+  const { release, asset } = selectedRelease;
 
   const installRoot = path.join(globalStoragePath, "bin", release.tag_name);
   await fs.mkdir(installRoot, { recursive: true });

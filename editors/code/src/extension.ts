@@ -33,6 +33,17 @@ function isDownloadBinaryExplicitlyConfigured(
   );
 }
 
+function isReleaseTagExplicitlyConfigured(
+  config: vscode.WorkspaceConfiguration,
+): boolean {
+  const value = config.inspect<string>("releaseTag");
+  return (
+    value?.globalValue !== undefined ||
+    value?.workspaceValue !== undefined ||
+    value?.workspaceFolderValue !== undefined
+  );
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel(
     "Panache Language Server",
@@ -42,8 +53,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const fallbackCommandPath = config.get<string>("commandPath", "panache");
   const downloadBinary = config.get<boolean>("downloadBinary", true);
   const downloadBinaryExplicit = isDownloadBinaryExplicitlyConfigured(config);
+  const version = config.get<string>("version", "latest");
   const releaseTag = config.get<string>("releaseTag", "latest");
+  const releaseTagExplicit = isReleaseTagExplicitlyConfigured(config);
   const githubRepo = config.get<string>("githubRepo", "jolars/panache");
+  const selectedRelease = releaseTagExplicit ? releaseTag : version;
   let commandPath = fallbackCommandPath;
   const nixOs = await isNixOs();
   const shouldDownloadBinary =
@@ -60,7 +74,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       commandPath = await resolvePanacheBinary(
         context.globalStorageUri.fsPath,
         githubRepo,
-        releaseTag,
+        selectedRelease,
       );
     } catch (error) {
       const message =

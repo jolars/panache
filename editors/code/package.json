@@ -77,10 +77,15 @@
           "default": true,
           "description": "Automatically download a platform-specific Panache binary from GitHub releases."
         },
+        "panache.version": {
+          "type": "string",
+          "default": "latest",
+          "description": "Panache version to install (for example: latest or 2.16.0)."
+        },
         "panache.releaseTag": {
           "type": "string",
           "default": "latest",
-          "description": "Panache release tag to install (for example: latest or v2.16.0)."
+          "description": "Advanced override for exact GitHub release tag (for example: panache-v2.16.0 or v2.16.0). If explicitly set, this takes precedence over panache.version."
         },
         "panache.githubRepo": {
           "type": "string",

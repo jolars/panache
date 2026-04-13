@@ -51,8 +51,16 @@ Pin to a specific release from a specific repository:
 
 ```json
 {
-  "panache.releaseTag": "v2.20.0",
+  "panache.version": "2.20.0",
   "panache.githubRepo": "jolars/panache"
+}
+```
+
+Use `panache.releaseTag` only if you need an exact tag override:
+
+```json
+{
+  "panache.releaseTag": "panache-v2.20.0"
 }
 ```
 
@@ -71,7 +79,9 @@ Pin to a specific release from a specific repository:
 ## Settings
 
 - `panache.downloadBinary`: auto-download Panache binary (default: `true`)
-- `panache.releaseTag`: release tag to install (default: `"latest"`)
+- `panache.version`: version to install (default: `"latest"`)
+- `panache.releaseTag`: advanced exact tag override (takes precedence if
+  explicitly set)
 - `panache.githubRepo`: GitHub repo for downloads (default: `"jolars/panache"`)
 - `panache.commandPath`: fallback command path
 - `panache.serverArgs`: extra args after `panache lsp`
@@ -83,7 +93,8 @@ Pin to a specific release from a specific repository:
 ## Security and trust
 
 When `panache.downloadBinary` is enabled, binaries are downloaded from GitHub
-releases configured by `panache.githubRepo` and `panache.releaseTag`.
+releases configured by `panache.githubRepo` and either `panache.version` or
+`panache.releaseTag` (if explicitly set).
 
 ## Links
 
