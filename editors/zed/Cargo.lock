@@ -751,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "zed_panache"
-version = "2.31.0"
+version = "2.32.0"
 dependencies = [
  "zed_extension_api",
 ]
