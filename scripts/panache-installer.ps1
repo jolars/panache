@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 
 $repo = if ($env:PANACHE_REPO) { $env:PANACHE_REPO } else { 'jolars/panache' }
 $installDir = if ($env:PANACHE_INSTALL_DIR) { $env:PANACHE_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\panache\bin' }
+$tag = if ($env:PANACHE_TAG) { $env:PANACHE_TAG } else { $null }
 
 $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
 switch ($arch) {
@@ -13,7 +14,30 @@ switch ($arch) {
 }
 
 $asset = "panache-$target.zip"
-$url = "https://github.com/$repo/releases/latest/download/$asset"
+
+function Resolve-DownloadUrl {
+    param(
+        [string]$Repository,
+        [string]$AssetName,
+        [string]$Tag
+    )
+
+    if ($Tag) {
+        return "https://github.com/$Repository/releases/download/$Tag/$AssetName"
+    }
+
+    $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases?per_page=100"
+    foreach ($release in $releases) {
+        foreach ($releaseAsset in $release.assets) {
+            if ($releaseAsset.name -eq $AssetName) {
+                return $releaseAsset.browser_download_url
+            }
+        }
+    }
+    throw "Could not find a release asset named $AssetName in $Repository."
+}
+
+$url = Resolve-DownloadUrl -Repository $repo -AssetName $asset -Tag $tag
 
 $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("panache-install-" + [System.Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmpDir | Out-Null
