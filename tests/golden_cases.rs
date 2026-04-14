@@ -170,6 +170,7 @@ golden_test_cases!(
     line_blocks,
     list_alpha_nested_idempotency_143,
     list_deep_roman_idempotency_137,
+    list_nested_roman_idempotency_136,
     line_ending_crlf,
     line_ending_lf,
     links,
