@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.33.1](https://github.com/jolars/panache/compare/panache-v2.33.0...panache-v2.33.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* **formatter:** avoid reflow-induced reparsing ([388b288](https://github.com/jolars/panache/commit/388b28841643b0af9f2e215e482942fe7b40b2b0)), closes [#134](https://github.com/jolars/panache/issues/134)
+* **formatter:** prevent reinterpreting parse avoiding wrap ([fbf7733](https://github.com/jolars/panache/commit/fbf7733cba9d49a47b116e20e3297697bd36f501))
+* **parser:** handle deep indentation and roman nos in list ([04b80f5](https://github.com/jolars/panache/commit/04b80f56f09801a9cfa1449c0f5e39670c9b6cfe)), closes [#143](https://github.com/jolars/panache/issues/143)
+* **parser:** handle deep roman list and quotation ([b7aac81](https://github.com/jolars/panache/commit/b7aac81dc67bd38a04238d047d2b4c23d1214992)), closes [#137](https://github.com/jolars/panache/issues/137)
+* **scripts:** correctly resolve tag in installation scripts ([5b474fc](https://github.com/jolars/panache/commit/5b474fc6abf0de21b3a2a192796297eab3eb88fa))
+
+
+### Reverts
+
+* "chore: don't include component in tag for root release" ([eb9e15f](https://github.com/jolars/panache/commit/eb9e15fd76ec601c1d01100218f804a36fdcdceb))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * panache-parser bumped from 0.2.0 to 0.2.1
+
 ## [2.33.0](https://github.com/jolars/panache/compare/panache-v2.32.0...panache-v2.33.0) (2026-04-13)
 
 
