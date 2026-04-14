@@ -1060,7 +1060,7 @@ fn parse_until_closer_with_nested_one(
 /// - Code spans
 /// - Math (inline and display)
 /// - Emphasis/strong (via try_parse_emphasis)
-/// - Other inline elements (TODO: links, images, citations, etc.)
+/// - Other inline elements
 ///
 /// **Important**: This is where the greedy left-to-right parsing happens.
 /// When we see `**`, we try to parse it as STRONG. If it succeeds, those
