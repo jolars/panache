@@ -1,0 +1,44 @@
+name: Publish Code Extensions
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+jobs:
+  publish:
+    if: ${{ startsWith(github.ref_name, 'panache-code-v') || startsWith(github.event.release.tag_name, 'panache-code-v') }}
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: editors/code
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: editors/code/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile extension
+        run: npm run compile
+
+      - name: Publish to Open VSX Registry
+        uses: HaaLeo/publish-vscode-extension@v2
+        with:
+          pat: ${{ secrets.OVSX_PAT }}
+          packagePath: editors/code
+
+      - name: Publish to Visual Studio Marketplace
+        uses: HaaLeo/publish-vscode-extension@v2
+        with:
+          pat: ${{ secrets.VSCE_PAT }}
+          registryUrl: https://marketplace.visualstudio.com
+          packagePath: editors/code
