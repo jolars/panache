@@ -631,3 +631,28 @@ fn example_list_with_underscores_and_hyphens() {
     let list = find_first(&tree, SyntaxKind::LIST).expect("should find list");
     assert_eq!(count_children(&list, SyntaxKind::LIST_ITEM), 2);
 }
+
+#[test]
+fn nested_lower_roman_with_uneven_marker_width_stays_single_nested_list() {
+    let input = "a. retain.\n\n     i. short;\n    ii. short;\n   iii. short;\n";
+    let tree = parse_blocks(input);
+
+    let outer = find_first(&tree, SyntaxKind::LIST).expect("should find outer list");
+    assert_eq!(count_children(&outer, SyntaxKind::LIST_ITEM), 1);
+
+    let outer_item = outer
+        .children()
+        .find(|n| n.kind() == SyntaxKind::LIST_ITEM)
+        .expect("outer list should contain one item");
+
+    let nested_lists: Vec<_> = outer_item
+        .children()
+        .filter(|n| n.kind() == SyntaxKind::LIST)
+        .collect();
+    assert_eq!(
+        nested_lists.len(),
+        1,
+        "nested roman items should stay in one nested list"
+    );
+    assert_eq!(count_children(&nested_lists[0], SyntaxKind::LIST_ITEM), 3);
+}

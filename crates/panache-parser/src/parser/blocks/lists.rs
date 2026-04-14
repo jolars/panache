@@ -972,8 +972,16 @@ pub(in crate::parser) fn find_matching_list_level(
                     _ => indent_cols >= *base_indent_cols && indent_cols <= base_indent_cols + 3,
                 }
             } else if indent_cols >= 4 || *base_indent_cols >= 4 {
-                // One shallow, one deep - no match
-                false
+                // One shallow, one deep:
+                // - ordered markers still allow symmetric drift so aligned roman
+                //   markers (e.g. 3/4/5 spaces for i./ii./iii.) stay at one level
+                // - bullets remain directional to preserve nesting boundaries
+                match (marker, list_marker) {
+                    (ListMarker::Ordered(_), ListMarker::Ordered(_)) => {
+                        indent_cols.abs_diff(*base_indent_cols) <= 3
+                    }
+                    _ => false,
+                }
             } else {
                 // Both at shallow indentation (0-3)
                 // Allow items within 3 spaces
