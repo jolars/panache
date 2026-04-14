@@ -27,6 +27,10 @@ GitHub releases on first use.
 By default, the extension downloads a platform-specific `panache` binary from
 GitHub releases and uses that binary for the language server.
 
+When `panache.version` is set to `latest`, the extension automatically skips
+component-only tags and selects the most recent stable CLI release that contains
+a matching platform asset.
+
 You can also provide your own binary path:
 
 ```json

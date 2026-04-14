@@ -26,6 +26,10 @@ const MAX_REDIRECTS = 5;
 const DOWNLOAD_RETRIES = 4;
 const RETRY_DELAY_MS = 1_500;
 
+function isCandidatePanacheCliReleaseTag(tag: string): boolean {
+  return /^panache-v\d+\.\d+\.\d+/.test(tag) || /^v\d+\.\d+\.\d+/.test(tag);
+}
+
 function detectTargetAsset(): TargetAsset {
   const binaryName = process.platform === "win32" ? "panache.exe" : "panache";
   if (process.platform === "darwin" && process.arch === "arm64") {
@@ -193,7 +197,10 @@ export async function resolvePanacheBinary(
               if (release.draft || release.prerelease) {
                 continue;
               }
-              if (!release.tag_name.startsWith("panache-v")) {
+              if (!isCandidatePanacheCliReleaseTag(release.tag_name)) {
+                continue;
+              }
+              if (!Array.isArray(release.assets) || release.assets.length === 0) {
                 continue;
               }
               const latestAsset = target.archiveNames
@@ -207,7 +214,7 @@ export async function resolvePanacheBinary(
             }
 
             throw new Error(
-              `No stable panache-v* release asset '${target.archiveNames.join("' or '")}' found for ${repo}@latest`,
+              `No stable Panache CLI release asset '${target.archiveNames.join("' or '")}' found for ${repo}@latest`,
             );
           }
 
