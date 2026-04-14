@@ -1020,8 +1020,6 @@ impl<'a> Parser<'a> {
 
         // Handle blank lines specially (including blank lines inside blockquotes)
         // A line like ">" with nothing after is a blank line inside a blockquote
-        // Note: lines may end with \n from split_inclusive
-        // TODO: Does this handle CLRF correctly?
         let is_blank = line.trim_end_matches('\n').trim().is_empty()
             || (bq_depth > 0 && inner_content.trim_end_matches('\n').trim().is_empty());
 

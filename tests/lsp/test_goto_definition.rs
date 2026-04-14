@@ -191,14 +191,6 @@ async fn test_goto_definition_image_reference() {
         )
         .await;
 
-    // Image references may or may not be supported - document the current behavior
-    // If this fails, it indicates IMAGE_LINK reference resolution needs work
-    if result.is_none() {
-        // TODO: IMAGE_LINK references may need additional implementation
-        // For now, this is a known limitation - skip assertion
-        return;
-    }
-
     if let Some(GotoDefinitionResponse::Scalar(location)) = result {
         assert_eq!(location.range.start.line, 2);
     } else {
