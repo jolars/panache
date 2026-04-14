@@ -240,7 +240,9 @@ Auto-fix
 Description
 :   Flags unused reference definitions (`[label]: ...`) and unused footnote
     definitions (`[^id]: ...`). This helps keep documents tidy and avoids dead
-    references that can accumulate over time.
+    references that can accumulate over time. When project metadata is available
+    (for example in Quarto/Bookdown project lint runs), usage is resolved across
+    project documents to reduce cross-file false positives.
 
 **Example violation:**
 

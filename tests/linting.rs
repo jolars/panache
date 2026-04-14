@@ -473,3 +473,31 @@ unknown-emoji-alias = false
         .collect();
     assert!(emoji_issues.is_empty());
 }
+
+#[test]
+fn test_unused_definitions_resolved_across_project_files() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc1 = root.join("1-one.Rmd");
+    let doc2 = root.join("2-two.Rmd");
+
+    fs::write(root.join("_bookdown.yml"), "").unwrap();
+    fs::write(&doc1, "[shared]: https://example.com\n").unwrap();
+    fs::write(&doc2, "See [x][shared].\n").unwrap();
+
+    let input = fs::read_to_string(&doc1).unwrap();
+    let config = toml::from_str::<Config>("flavor = \"rmarkdown\"").expect("valid config");
+    let tree = panache::parse(&input, Some(config.clone()));
+    let metadata = panache::metadata::extract_project_metadata(&tree, &doc1).ok();
+    let diagnostics =
+        panache::linter::lint_with_metadata(&tree, &input, &config, metadata.as_ref());
+
+    let unused_labels: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "unused-definition-label")
+        .collect();
+    assert!(
+        unused_labels.is_empty(),
+        "Definition used in sibling project document should not be flagged unused"
+    );
+}
