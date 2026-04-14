@@ -591,6 +591,24 @@ fn test_lint_includes_duplicate_reference_definitions() {
 }
 
 #[test]
+fn test_lint_reports_unused_definitions() {
+    let temp_dir = TempDir::new().unwrap();
+    let doc_path = temp_dir.path().join("unused.qmd");
+    fs::write(
+        &doc_path,
+        "Used note[^1].\n\n[^1]: Used.\n[^2]: Unused.\n\nSee [UsedLabel][].\n[UsedLabel]: https://example.com\n[UnusedLabel]: https://unused.example.com\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["lint", doc_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("unused-footnote-id"))
+        .stdout(predicate::str::contains("unused-definition-label"));
+}
+
+#[test]
 fn test_lint_includes_missing_file_reports_diagnostic() {
     let temp_dir = TempDir::new().unwrap();
     let parent_path = temp_dir.path().join("parent.qmd");
