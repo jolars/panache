@@ -2,9 +2,9 @@ name: Documentation
 
 on:
   workflow_dispatch:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "panache-v*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
