@@ -155,6 +155,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Upload installer scripts to release
+        if: inputs.upload == 'true' && matrix.target == 'x86_64-unknown-linux-gnu'
+        shell: bash
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          gh release upload --clobber "$TAG" scripts/panache-installer.sh scripts/panache-installer.ps1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install cargo-deb and cargo-generate-rpm
         if: matrix.build_packages == true
         run: |
