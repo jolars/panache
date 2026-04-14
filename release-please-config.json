@@ -18,6 +18,17 @@
     "editors/code": {
       "release-type": "node",
       "package-name": "panache-code"
+    },
+    "editors/zed": {
+      "release-type": "rust",
+      "package-name": "panache-zed",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "extension.toml",
+          "jsonpath": "$.version"
+        }
+      ]
     }
   }
 }
