@@ -228,7 +228,10 @@ impl<'a> NodeWrapOptions<'a> {
 impl WrapStrategy {
     fn options<'a>(self, widths: &'a [usize]) -> NodeWrapOptions<'a> {
         match self {
-            Self::ParagraphReflow => NodeWrapOptions::reflow(widths),
+            Self::ParagraphReflow => NodeWrapOptions {
+                avoid_unsafe_line_start: true,
+                ..NodeWrapOptions::reflow(widths)
+            },
             Self::ParagraphSentence => NodeWrapOptions::sentence(),
             Self::ListReflow { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
@@ -281,8 +284,14 @@ fn is_decimal_ordered_list_marker_piece(piece: &str) -> bool {
     false
 }
 
+fn is_definition_marker_piece(piece: &str) -> bool {
+    piece == ":"
+}
+
 fn is_unsafe_line_start_piece(piece: &str) -> bool {
-    is_example_list_marker_piece(piece) || is_decimal_ordered_list_marker_piece(piece)
+    is_example_list_marker_piece(piece)
+        || is_decimal_ordered_list_marker_piece(piece)
+        || is_definition_marker_piece(piece)
 }
 
 struct StreamingCoreSink<'a> {
@@ -1108,8 +1117,8 @@ fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_decimal_ordered_list_marker_piece, is_example_list_marker_piece,
-        is_unsafe_line_start_piece, wrap_text_first_fit,
+        is_decimal_ordered_list_marker_piece, is_definition_marker_piece,
+        is_example_list_marker_piece, is_unsafe_line_start_piece, wrap_text_first_fit,
     };
 
     #[test]
@@ -1119,13 +1128,15 @@ mod tests {
     }
 
     #[test]
-    fn unsafe_line_start_rule_currently_matches_example_marker_only() {
+    fn unsafe_line_start_rule_matches_ambiguous_markers() {
         assert!(is_example_list_marker_piece("(@foo-bar-123)"));
         assert!(is_unsafe_line_start_piece("(@foo-bar-123)"));
         assert!(is_decimal_ordered_list_marker_piece("2018."));
         assert!(is_decimal_ordered_list_marker_piece("2)"));
+        assert!(is_definition_marker_piece(":"));
         assert!(is_unsafe_line_start_piece("2018."));
         assert!(is_unsafe_line_start_piece("2)"));
+        assert!(is_unsafe_line_start_piece(":"));
         assert!(!is_unsafe_line_start_piece(":::"));
         assert!(!is_decimal_ordered_list_marker_piece("v2.0"));
         assert!(!is_decimal_ordered_list_marker_piece("2024.05"));

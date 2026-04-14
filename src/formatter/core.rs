@@ -120,22 +120,6 @@ impl Formatter {
         })
     }
 
-    pub(super) fn wrapped_lines_for_paragraph_with_widths_avoiding_unsafe_starts(
-        &self,
-        node: &SyntaxNode,
-        widths: &[usize],
-    ) -> Vec<String> {
-        inline_layout::wrapped_lines_for_node(
-            &self.config,
-            node,
-            widths,
-            &|n| self.format_inline_node(n),
-            inline_layout::WrapStrategy::ListReflow {
-                in_blockquote: false,
-            },
-        )
-    }
-
     pub(super) fn sentence_lines_for_paragraph(&self, node: &SyntaxNode) -> Vec<String> {
         inline_layout::sentence_lines_for_paragraph(&self.config, node, &|n| {
             self.format_inline_node(n)
@@ -644,10 +628,9 @@ impl Formatter {
                                     let text = child.text().to_string();
                                     text.lines().map(|line| line.to_string()).collect()
                                 }
-                                WrapMode::Reflow => self
-                                    .wrapped_lines_for_paragraph_with_widths_avoiding_unsafe_starts(
-                                        child, &widths,
-                                    ),
+                                WrapMode::Reflow => {
+                                    self.wrapped_lines_for_paragraph_with_widths(child, &widths)
+                                }
                                 WrapMode::Sentence => self.sentence_lines_for_paragraph(child),
                             };
 
