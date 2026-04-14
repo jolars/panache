@@ -24,7 +24,7 @@ categories = [
 authors.workspace = true
 
 [workspace]
-members = ["crates/panache-parser", "crates/panache-wasm"]
+members = ["crates/panache-parser", "crates/panache-wasm", "editors/zed"]
 
 [lib]
 doctest = false
@@ -35,7 +35,9 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [dependencies]
-panache-parser = { path = "crates/panache-parser", version = "0.2.0", features = ["serde"] }
+panache-parser = { path = "crates/panache-parser", version = "0.2.0", features = [
+    "serde",
+] }
 annotate-snippets = "0.12.15"
 clap = { version = "4.6.0", features = ["derive", "env"], optional = true }
 dirs = "6.0.0"
