@@ -124,11 +124,13 @@ pub enum SyntaxKind {
     EMPHASIS,           // *text* or _text_
     STRONG,             // **text** or __text__
     STRIKEOUT,          // ~~text~~
+    MARK,               // ==text==
     SUPERSCRIPT,        // ^text^
     SUBSCRIPT,          // ~text~
     EMPHASIS_MARKER,    // * or _ (for emphasis)
     STRONG_MARKER,      // ** or __ (for strong)
     STRIKEOUT_MARKER,   // ~~ (for strikeout)
+    MARK_MARKER,        // == (for mark/highlight)
     SUPERSCRIPT_MARKER, // ^ (for superscript)
     SUBSCRIPT_MARKER,   // ~ (for subscript)
 

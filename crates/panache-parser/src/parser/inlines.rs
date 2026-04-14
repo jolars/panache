@@ -26,6 +26,8 @@ pub mod inline_footnotes;
 pub mod latex;
 #[path = "inlines/links.rs"]
 pub mod links; // Public for try_parse_inline_image used by blocks/figures
+#[path = "inlines/mark.rs"]
+pub mod mark;
 #[path = "inlines/math.rs"]
 pub mod math;
 #[path = "inlines/native_spans.rs"]

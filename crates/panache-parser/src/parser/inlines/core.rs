@@ -47,6 +47,7 @@ use super::links::{
     emit_reference_link, try_parse_autolink, try_parse_bare_uri, try_parse_inline_image,
     try_parse_inline_link, try_parse_reference_image, try_parse_reference_link,
 };
+use super::mark::{emit_mark, try_parse_mark};
 use super::math::{
     emit_display_math, emit_display_math_environment, emit_double_backslash_display_math,
     emit_double_backslash_inline_math, emit_gfm_inline_math, emit_inline_math,
@@ -1420,6 +1421,21 @@ fn parse_inline_range_impl(
             }
             log::debug!("Matched strikeout at pos {}", pos);
             emit_strikeout(builder, content, config);
+            pos += len;
+            text_start = pos;
+            continue;
+        }
+
+        // Try mark/highlight: ==text==
+        if byte == b'='
+            && config.extensions.mark
+            && let Some((len, content)) = try_parse_mark(&text[pos..])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            log::debug!("Matched mark at pos {}", pos);
+            emit_mark(builder, content, config);
             pos += len;
             text_start = pos;
             continue;

@@ -30,6 +30,16 @@ mod emphasis_tests {
         strong
     }
 
+    fn find_mark(node: &crate::syntax::SyntaxNode) -> Vec<String> {
+        let mut marked = Vec::new();
+        for child in node.descendants() {
+            if child.kind() == SyntaxKind::MARK {
+                marked.push(child.to_string());
+            }
+        }
+        marked
+    }
+
     #[test]
     fn test_simple_emphasis() {
         let input = "This is *italic* text.";
@@ -128,6 +138,15 @@ mod emphasis_tests {
 
         let emphasis = find_emphasis(&inline_tree);
         assert_eq!(emphasis.len(), 0);
+    }
+
+    #[test]
+    fn test_mark_with_extension_enabled() {
+        let mut config = crate::options::ParserOptions::default();
+        config.extensions.mark = true;
+        let inline_tree = crate::parser::parse("This is ==marked== text.", Some(config));
+        let marked = find_mark(&inline_tree);
+        assert_eq!(marked, vec!["==marked=="]);
     }
 }
 
@@ -942,6 +961,27 @@ mod extension_guard_tests {
         config.extensions.subscript = false;
         let tree = parse_with_config("~sub~", config);
         assert_eq!(count_kind(&tree, SyntaxKind::SUBSCRIPT), 0);
+    }
+
+    #[test]
+    fn mark_disabled_treats_text_literal() {
+        let mut config = ParserOptions::default();
+        config.extensions.mark = false;
+        let tree = parse_with_config("==mark==", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::MARK), 0);
+    }
+
+    #[test]
+    fn mark_enabled_parses_highlight() {
+        let mut config = ParserOptions::default();
+        config.extensions.mark = true;
+        let tree = parse_with_config("==mark==", config);
+        assert_eq!(count_kind(&tree, SyntaxKind::MARK), 1);
+        let marker_nodes = tree
+            .descendants()
+            .filter(|node| node.kind() == SyntaxKind::MARK_MARKER)
+            .count();
+        assert_eq!(marker_nodes, 2);
     }
 
     #[test]
