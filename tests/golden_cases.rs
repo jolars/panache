@@ -148,6 +148,7 @@ golden_test_cases!(
     fenced_div_close_grid_table,
     footnote_continuation_idempotency,
     footnote_continuation_idempotency_reflow,
+    footnote_numeric_continuation_idempotency_134,
     footnote_def_paragraph,
     footnote_definition_list,
     headings,

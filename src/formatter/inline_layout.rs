@@ -257,8 +257,32 @@ fn is_example_list_marker_piece(piece: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
+fn is_decimal_ordered_list_marker_piece(piece: &str) -> bool {
+    let mut chars = piece.chars();
+    let mut digit_count = 0usize;
+
+    while let Some(ch) = chars.next() {
+        if ch.is_ascii_digit() {
+            digit_count += 1;
+            continue;
+        }
+
+        if digit_count == 0 {
+            return false;
+        }
+
+        if matches!(ch, '.' | ')') {
+            return chars.next().is_none();
+        }
+
+        return false;
+    }
+
+    false
+}
+
 fn is_unsafe_line_start_piece(piece: &str) -> bool {
-    is_example_list_marker_piece(piece)
+    is_example_list_marker_piece(piece) || is_decimal_ordered_list_marker_piece(piece)
 }
 
 struct StreamingCoreSink<'a> {
@@ -1083,7 +1107,10 @@ fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_example_list_marker_piece, is_unsafe_line_start_piece, wrap_text_first_fit};
+    use super::{
+        is_decimal_ordered_list_marker_piece, is_example_list_marker_piece,
+        is_unsafe_line_start_piece, wrap_text_first_fit,
+    };
 
     #[test]
     fn wrap_text_first_fit_wraps_normally_when_marker_like_piece_isnt_forbidden() {
@@ -1095,6 +1122,12 @@ mod tests {
     fn unsafe_line_start_rule_currently_matches_example_marker_only() {
         assert!(is_example_list_marker_piece("(@foo-bar-123)"));
         assert!(is_unsafe_line_start_piece("(@foo-bar-123)"));
+        assert!(is_decimal_ordered_list_marker_piece("2018."));
+        assert!(is_decimal_ordered_list_marker_piece("2)"));
+        assert!(is_unsafe_line_start_piece("2018."));
+        assert!(is_unsafe_line_start_piece("2)"));
         assert!(!is_unsafe_line_start_piece(":::"));
+        assert!(!is_decimal_ordered_list_marker_piece("v2.0"));
+        assert!(!is_decimal_ordered_list_marker_piece("2024.05"));
     }
 }
