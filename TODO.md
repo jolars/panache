@@ -662,7 +662,7 @@ for initial implementation.
 
 #### Non-Default: Emphasis & Formatting
 
-- [ ] Extension: `mark` - `==highlighted==` text (non-default)
+- [x] Extension: `mark` - `==highlighted==` text (non-default)
 
 #### Non-Default: Links
 
