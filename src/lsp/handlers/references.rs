@@ -121,11 +121,19 @@ pub(crate) async fn references(
                 SymbolTarget::Reference { label, is_footnote } => {
                     let norm = normalize_label(label);
                     if *is_footnote {
-                        if let Some(ranges) = symbol_index
-                            .footnote_definition_entries()
-                            .find_map(|(id, ranges)| (id == &norm).then_some(ranges))
+                        let mut ranges = symbol_index.footnote_rename_ranges(&norm);
+                        if !include_declaration
+                            && let Some(definition_ranges) =
+                                symbol_index.footnote_definitions(&norm)
                         {
-                            add_locations(&mut locations, &doc_uri, &text, ranges);
+                            ranges.retain(|range| {
+                                !definition_ranges.iter().any(|def| {
+                                    def.start() <= range.start() && range.end() <= def.end()
+                                })
+                            });
+                        }
+                        if !ranges.is_empty() {
+                            add_locations(&mut locations, &doc_uri, &text, &ranges);
                         }
                     } else if let Some(ranges) = symbol_index
                         .reference_definition_entries()

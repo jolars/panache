@@ -8,8 +8,9 @@ use crate::Config;
 use crate::lsp::DocumentState;
 use crate::salsa::Db;
 use crate::syntax::{
-    AstNode, AttributeNode, Citation, CodeBlock, CodeSpan, Crossref, FootnoteReference, ImageLink,
-    InlineMath, Link, LinkRef, ParsedYamlRegionSnapshot, SyntaxKind, SyntaxNode,
+    AstNode, AttributeNode, Citation, CodeBlock, CodeSpan, Crossref, FootnoteDefinition,
+    FootnoteReference, ImageLink, InlineMath, Link, LinkRef, ParsedYamlRegionSnapshot,
+    ReferenceDefinition, SyntaxKind, SyntaxNode,
 };
 use crate::utils::{normalize_anchor_label, normalize_label};
 use rowan::{NodeOrToken, TextRange, TextSize};
@@ -213,6 +214,37 @@ pub(crate) fn extract_reference_target(node: &SyntaxNode) -> Option<(String, boo
     }
 
     None
+}
+
+pub(crate) fn extract_definition_target(node: &SyntaxNode) -> Option<(String, bool)> {
+    if let Some(reference_def) = ReferenceDefinition::cast(node.clone()) {
+        let label = normalize_label(&reference_def.label());
+        if !label.is_empty() {
+            return Some((label, false));
+        }
+    }
+
+    if let Some(footnote_def) = FootnoteDefinition::cast(node.clone()) {
+        let id = normalize_label(&footnote_def.id());
+        if !id.is_empty() {
+            return Some((id, true));
+        }
+    }
+
+    None
+}
+
+pub(crate) fn extract_definition_target_at_offset(
+    root: &SyntaxNode,
+    offset: usize,
+) -> Option<(String, bool)> {
+    let mut node = find_node_at_offset(root, offset)?;
+    loop {
+        if let Some(target) = extract_definition_target(&node) {
+            return Some(target);
+        }
+        node = node.parent()?;
+    }
 }
 
 pub(crate) fn extract_citation_key(node: &SyntaxNode) -> Option<String> {

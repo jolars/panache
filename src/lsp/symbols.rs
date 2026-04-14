@@ -17,6 +17,10 @@ pub(crate) fn resolve_symbol_target_at_offset(
     root: &SyntaxNode,
     offset: usize,
 ) -> Option<SymbolTarget> {
+    if let Some((label, is_footnote)) = helpers::extract_definition_target_at_offset(root, offset) {
+        return Some(SymbolTarget::Reference { label, is_footnote });
+    }
+
     if let Some(key) = helpers::extract_example_label_target_at_offset(root, offset) {
         return Some(SymbolTarget::ExampleLabel(key));
     }

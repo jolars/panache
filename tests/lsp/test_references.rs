@@ -365,3 +365,22 @@ async fn test_references_heading_hash_link_and_id_are_consistent() {
     assert!(hash_locations.iter().any(|loc| loc.range.start.line == 0));
     assert!(hash_locations.iter().any(|loc| loc.range.start.line == 2));
 }
+
+#[tokio::test]
+async fn test_references_footnote_definition_finds_all_footnote_occurrences() {
+    let server = TestLspServer::new();
+    let content = "A footnote[^1] first.\nAnother[^1] second.\n\n[^1]: Footnote content.\n";
+    server
+        .open_document("file:///test.md", content, "markdown")
+        .await;
+
+    let refs = server
+        .references("file:///test.md", 3, 3, true)
+        .await
+        .expect("references");
+
+    assert_eq!(refs.len(), 3);
+    assert!(refs.iter().any(|loc| loc.range.start.line == 0));
+    assert!(refs.iter().any(|loc| loc.range.start.line == 1));
+    assert!(refs.iter().any(|loc| loc.range.start.line == 3));
+}
