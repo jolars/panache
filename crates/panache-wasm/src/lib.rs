@@ -1,6 +1,8 @@
 use wasm_bindgen::prelude::*;
 
-use panache::config::{BlankLines, Flavor, LineEnding, MathDelimiterStyle, TabStopMode, WrapMode};
+use panache_formatter::config::{
+    BlankLines, Flavor, LineEnding, MathDelimiterStyle, TabStopMode, WrapMode,
+};
 
 fn parse_flavor(value: &str) -> Option<Flavor> {
     match value.to_ascii_lowercase().as_str() {
@@ -59,10 +61,10 @@ fn parse_tab_stops(value: &str) -> Option<TabStopMode> {
 
 #[wasm_bindgen]
 pub fn format_qmd(input: &str, line_width: Option<usize>) -> String {
-    let cfg = panache::ConfigBuilder::default()
+    let cfg = panache_formatter::ConfigBuilder::default()
         .line_width(line_width.unwrap_or(80))
         .build();
-    panache::format(input, Some(cfg), None)
+    panache_formatter::format(input, Some(cfg), None)
 }
 
 #[wasm_bindgen]
@@ -79,7 +81,7 @@ pub fn format_qmd_with_options(
     tab_width: Option<usize>,
     math_indent: Option<usize>,
 ) -> Result<String, JsValue> {
-    let mut cfg = panache::Config::default();
+    let mut cfg = panache_formatter::Config::default();
 
     if let Some(width) = line_width {
         cfg.line_width = width;
@@ -89,7 +91,7 @@ pub fn format_qmd_with_options(
         let parsed = parse_flavor(&flavor)
             .ok_or_else(|| JsValue::from_str(&format!("Unsupported flavor: {flavor}")))?;
         cfg.flavor = parsed;
-        cfg.extensions = panache::config::Extensions::for_flavor(parsed);
+        cfg.extensions = panache_formatter::config::Extensions::for_flavor(parsed);
     }
 
     if let Some(wrap) = wrap {
@@ -136,13 +138,13 @@ pub fn format_qmd_with_options(
         cfg.math_indent = math_indent;
     }
 
-    Ok(panache::format(input, Some(cfg), None))
+    Ok(panache_formatter::format(input, Some(cfg), None))
 }
 
 // Optional: expose tokenizer/AST for debugging
 #[wasm_bindgen]
 pub fn tokenize_debug(input: &str) -> String {
     // return a simple debug string; or serialize to JSON if you add serde
-    let tree = panache::parse(input, None);
+    let tree = panache_parser::parse(input, None);
     format!("{tree:#?}")
 }

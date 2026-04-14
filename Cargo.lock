@@ -1067,6 +1067,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "panache-formatter"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "log",
+ "panache-parser",
+ "pretty_yaml",
+ "rowan",
+ "unicode-width",
+ "yaml_parser",
+]
+
+[[package]]
 name = "panache-parser"
 version = "0.2.1"
 dependencies = [
@@ -1084,7 +1097,8 @@ dependencies = [
 name = "panache-wasm"
 version = "0.1.2"
 dependencies = [
- "panache",
+ "panache-formatter",
+ "panache-parser",
  "wasm-bindgen",
 ]
 

@@ -147,7 +147,7 @@ pub fn format(input: &str, config: Option<Config>, range: Option<(usize, usize)>
         result
     });
 
-    // Step 3: Format the final CST (synchronously, no external formatters)
+    // Step 3: Format the final CST (synchronously, includes external formatter support)
     let out = formatter::format_tree(&tree, &config, expanded_range);
 
     // Step 4: Apply line ending normalization if needed

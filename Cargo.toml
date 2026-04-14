@@ -24,7 +24,12 @@ categories = [
 authors.workspace = true
 
 [workspace]
-members = ["crates/panache-parser", "crates/panache-wasm", "editors/zed"]
+members = [
+    "crates/panache-parser",
+    "crates/panache-formatter",
+    "crates/panache-wasm",
+    "editors/zed",
+]
 
 [lib]
 doctest = false

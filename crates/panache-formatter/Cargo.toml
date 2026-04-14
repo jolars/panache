@@ -1,0 +1,20 @@
+[package]
+name = "panache-formatter"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[dependencies]
+panache-parser = { path = "../panache-parser" }
+log = { version = "0.4.28", features = ["release_max_level_info"] }
+rowan = "0.16.1"
+yaml_parser = "0.3.0"
+pretty_yaml = "0.6.0"
+unicode-width = "0.2"
+
+[dev-dependencies]
+insta = { version = "1.47.2", features = ["json"] }
