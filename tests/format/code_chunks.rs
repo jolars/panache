@@ -133,14 +133,34 @@ fn inline_options_override_existing_hashpipe_options() {
 }
 
 #[test]
+fn complex_inline_option_overrides_hashpipe_option_and_stays_inline() {
+    let input = "```{r, fig.cap=knitr::current_input(), echo=TRUE}\n#| fig-cap: \"from-content\"\n#| warning: false\nx <- 1\n```\n";
+    let output = format(input, Some(quarto_config()), None);
+
+    assert!(output.contains("```{r, fig.cap=knitr::current_input()}"));
+    assert!(output.contains("#| echo: true"));
+    assert!(output.contains("#| warning: false"));
+    assert!(!output.contains("#| fig-cap:"));
+}
+
+#[test]
+fn complex_inline_option_remains_inline_when_hashpipe_header_exists() {
+    let input = "```{r, results=knitr::asis_output(\"ok\")}\n#| echo: false\nx <- 1\n```\n";
+    let output = format(input, Some(quarto_config()), None);
+
+    assert!(output.contains("```{r, results=knitr::asis_output(\"ok\")}"));
+    assert!(output.contains("#| echo: false"));
+    assert!(!output.contains("#| results:"));
+}
+
+#[test]
 fn multiline_hashpipe_value_continuation_is_not_dropped() {
     let input = "```{r}\n#| fig-cap: \"A multiline caption\n#|  that spans multiple lines and demonstrates\n#|  wrapping.\"\na <- 1\n```\n";
     let output = format(input, Some(quarto_config()), None);
 
-    assert!(output.contains(
-        "#| fig-cap: \"A multiline caption that spans multiple lines and demonstrates wrapping.\""
-    ));
-    assert!(!output.contains("#|  that spans multiple lines and demonstrates"));
+    assert!(output.contains("#| fig-cap: \"A multiline caption"));
+    assert!(output.contains("#|   that spans multiple lines and demonstrates"));
+    assert!(output.contains("#|   wrapping.\""));
     assert!(output.contains("a <- 1"));
 }
 
@@ -175,7 +195,7 @@ fn hashpipe_indented_yaml_value_is_preserved_as_hashpipe_header() {
 
     assert!(output.contains("#| list:"));
     assert!(output.contains("#|   - a"));
-    assert!(output.contains("#|   - b"));
+    assert!(output.contains("#|     - b"));
     assert!(output.contains("a <- 1"));
 }
 
@@ -231,7 +251,7 @@ fn hashpipe_fig_cap_list_value_is_idempotent() {
 
     assert_eq!(output1, output2, "Formatting should be idempotent");
     assert_eq!(output2.matches("#|   - A").count(), 1);
-    assert_eq!(output2.matches("#|   - B").count(), 1);
+    assert_eq!(output2.matches("#|     - B").count(), 1);
 }
 
 #[test]
@@ -241,4 +261,58 @@ fn hashpipe_long_quoted_fig_cap_stays_idempotent() {
     let output2 = format(&output1, Some(quarto_config()), None);
 
     assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
+fn hashpipe_multiline_flow_collection_is_preserved_and_idempotent() {
+    let input = "```{r}\n#| categories: [\n#|   \"alpha\",\n#|   \"beta\"\n#| ]\nx <- 1\n```\n";
+    let output1 = format(input, Some(quarto_config()), None);
+    let output2 = format(&output1, Some(quarto_config()), None);
+
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+    assert!(output2.contains("#| categories: ["));
+    assert!(output2.contains("#|   \"alpha\","));
+    assert!(output2.contains("#|   \"beta\""));
+    assert!(output2.contains("#| ]"));
+    assert!(output2.contains("x <- 1"));
+}
+
+#[test]
+fn hashpipe_indented_map_continuation_for_empty_value_is_preserved() {
+    let input = "```{r}\n#| metadata:\n#|   author: Jane Doe\n#|   topic: YAML\nx <- 1\n```\n";
+    let output1 = format(input, Some(quarto_config()), None);
+    let output2 = format(&output1, Some(quarto_config()), None);
+
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+    assert!(output2.contains("#| metadata:"));
+    assert!(output2.contains("author: Jane Doe"));
+    assert!(output2.contains("topic: YAML"));
+    assert!(output2.contains("x <- 1"));
+}
+
+#[test]
+fn hashpipe_prefix_variants_are_used_for_executable_chunk_languages() {
+    let input = "```{r, echo=FALSE}\n1 + 1\n```\n\n```{cpp, echo=FALSE}\nint x = 1;\n```\n\n```{sql, echo=FALSE}\nSELECT 1;\n```\n";
+    let output = format(input, Some(quarto_config()), None);
+
+    assert!(output.contains("```{r}"));
+    assert!(output.contains("#| echo: false"));
+    assert!(output.contains("```{cpp}"));
+    assert!(output.contains("//| echo: false"));
+    assert!(output.contains("```{sql}"));
+    assert!(output.contains("--| echo: false"));
+}
+
+#[test]
+fn cpp_hashpipe_block_scalar_continuation_is_idempotent() {
+    let input =
+        "```{cpp}\n//| fig-cap: |\n//|   A caption line\n//|   Continued line\nint x = 1;\n```\n";
+    let output1 = format(input, Some(quarto_config()), None);
+    let output2 = format(&output1, Some(quarto_config()), None);
+
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+    assert!(output2.contains("//| fig-cap: |"));
+    assert!(output2.contains("//|   A caption line"));
+    assert!(output2.contains("//|   Continued line"));
+    assert!(output2.contains("int x = 1;"));
 }

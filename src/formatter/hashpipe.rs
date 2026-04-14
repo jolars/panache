@@ -6,6 +6,7 @@
 use crate::config::WrapMode;
 use crate::parser::utils::chunk_options::ChunkOptionValue;
 use crate::parser::utils::chunk_options::hashpipe_comment_prefix;
+use crate::parser::utils::hashpipe_normalizer::normalize_hashpipe_header;
 use crate::syntax::{AstNode, ChunkInfoItem, CodeInfo, SyntaxNode};
 use crate::yaml_engine;
 
@@ -278,9 +279,13 @@ pub fn split_options_from_cst_with_content(
 
     // 2) Existing leading hashpipe options from CODE_CONTENT text (lower precedence).
     // Parse multiline quoted values so rewrapping can normalize them.
-    for (key, value) in extract_leading_hashpipe_options(content, prefix) {
+    if let Some(normalized) = normalize_hashpipe_header(content, prefix)
+        && let Some(options) = extract_options_from_normalized_yaml(&normalized.normalized_yaml)
+    {
         had_content_hashpipe = true;
-        push_content_option(&mut entries, key, value, false);
+        for (key, value) in options {
+            push_content_option(&mut entries, key, value, false);
+        }
     }
 
     let mut simple = Vec::new();
@@ -295,170 +300,103 @@ pub fn split_options_from_cst_with_content(
     ((simple, complex), had_content_hashpipe)
 }
 
-fn extract_leading_hashpipe_options(content: &str, prefix: &str) -> Vec<(String, String)> {
-    fn is_unclosed_flow_collection(value: &str) -> bool {
-        let trimmed = value.trim_start();
-        if !trimmed.starts_with('[') && !trimmed.starts_with('{') {
-            return false;
-        }
-
-        let mut stack: Vec<char> = Vec::new();
-        let mut in_single = false;
-        let mut in_double = false;
-        let mut escaped = false;
-
-        for ch in value.chars() {
-            if escaped {
-                escaped = false;
-                continue;
-            }
-            match ch {
-                '\\' if in_double => {
-                    escaped = true;
-                }
-                '\'' if !in_double => in_single = !in_single,
-                '"' if !in_single => in_double = !in_double,
-                '[' | '{' if !in_single && !in_double => stack.push(ch),
-                ']' if !in_single && !in_double => {
-                    if stack.pop() != Some('[') {
-                        return false;
-                    }
-                }
-                '}' if !in_single && !in_double => {
-                    if stack.pop() != Some('{') {
-                        return false;
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        !stack.is_empty() || in_single || in_double
-    }
-
-    fn is_flow_collection_continuation_line(after_prefix: &str) -> bool {
-        if is_block_scalar_continuation_line(after_prefix) {
-            return true;
-        }
-        let trimmed = after_prefix
-            .trim_end_matches(['\n', '\r'])
-            .trim_start_matches([' ', '\t']);
-        trimmed.starts_with(']') || trimmed.starts_with('}')
-    }
+fn extract_options_from_normalized_yaml(normalized_yaml: &str) -> Option<Vec<(String, String)>> {
+    let yaml_syntax = yaml_parser::parse(normalized_yaml).ok()?;
+    let root = yaml_parser::ast::Root::cast(yaml_syntax)?;
+    let map = root
+        .documents()
+        .next()
+        .and_then(|doc| doc.block())
+        .and_then(|block| block.block_map())?;
 
     let mut options = Vec::new();
-    let lines: Vec<&str> = content.lines().collect();
-    let mut i = 0usize;
-
-    while i < lines.len() {
-        let trimmed = lines[i].trim_start();
-        if !trimmed.starts_with(prefix) {
-            break;
-        }
-        let after_prefix = &trimmed[prefix.len()..];
-        let rest = after_prefix.trim_start_matches([' ', '\t']);
-        let Some(colon_idx) = rest.find(':') else {
-            break;
-        };
-        let key = rest[..colon_idx].trim_end_matches([' ', '\t']);
-        if key.is_empty() {
-            break;
-        }
-        let value = rest[colon_idx + 1..]
-            .trim_start_matches([' ', '\t'])
-            .trim_end_matches([' ', '\t']);
-
-        let mut merged_value = value.to_string();
-        i += 1;
-
-        if is_unclosed_double_quoted(&merged_value) {
-            while i < lines.len() {
-                let next_trimmed = lines[i].trim_start();
-                if !next_trimmed.starts_with(prefix) {
-                    break;
-                }
-                let next_after_prefix = &next_trimmed[prefix.len()..];
-                if !next_after_prefix.starts_with([' ', '\t']) {
-                    break;
-                }
-                let continuation = next_after_prefix.trim_start_matches([' ', '\t']);
-                if continuation.is_empty() {
-                    break;
-                }
-                if !merged_value.ends_with(' ') {
-                    merged_value.push(' ');
-                }
-                merged_value.push_str(continuation);
-                i += 1;
-                if !is_unclosed_double_quoted(&merged_value) {
-                    break;
-                }
-            }
-        } else if is_unclosed_flow_collection(&merged_value)
-            && (merged_value.contains('\n')
-                || merged_value.starts_with('[')
-                || merged_value.starts_with('{'))
-        {
-            while i < lines.len() {
-                let next_trimmed = lines[i].trim_start();
-                if !next_trimmed.starts_with(prefix) {
-                    break;
-                }
-                let next_after_prefix = &next_trimmed[prefix.len()..];
-                if !is_flow_collection_continuation_line(next_after_prefix) {
-                    break;
-                }
-                merged_value.push('\n');
-                merged_value.push_str(next_after_prefix);
-                i += 1;
-                if !is_unclosed_flow_collection(&merged_value) {
-                    break;
-                }
-            }
-        } else if is_yaml_block_scalar_indicator(&merged_value) {
-            while i < lines.len() {
-                let next_trimmed = lines[i].trim_start();
-                if !next_trimmed.starts_with(prefix) {
-                    break;
-                }
-                let next_after_prefix = &next_trimmed[prefix.len()..];
-                if !is_block_scalar_continuation_line(next_after_prefix) {
-                    break;
-                }
-                merged_value.push('\n');
-                merged_value.push_str(next_after_prefix);
-                i += 1;
-            }
-        } else if merged_value.is_empty() {
-            while i < lines.len() {
-                let next_trimmed = lines[i].trim_start();
-                if !next_trimmed.starts_with(prefix) {
-                    break;
-                }
-                let next_after_prefix = &next_trimmed[prefix.len()..];
-                if !is_block_scalar_continuation_line(next_after_prefix) {
-                    break;
-                }
-                merged_value.push('\n');
-                merged_value.push_str(strip_single_yaml_prefix_space(next_after_prefix));
-                i += 1;
-            }
-        }
-
-        options.push((key.to_string(), merged_value));
+    for entry in map.entries() {
+        let key = hashpipe_map_entry_key(&entry)?;
+        let value = hashpipe_map_entry_value_text(normalized_yaml, &entry);
+        options.push((key, value));
     }
-
-    options
+    Some(options)
 }
 
-fn strip_single_yaml_prefix_space(after_prefix: &str) -> &str {
-    if let Some(rest) = after_prefix.strip_prefix(' ') {
-        rest
-    } else if let Some(rest) = after_prefix.strip_prefix('\t') {
-        rest
-    } else {
-        after_prefix
+fn hashpipe_map_entry_key(entry: &yaml_parser::ast::BlockMapEntry) -> Option<String> {
+    let key = entry.key()?;
+    if let Some(flow) = key.flow() {
+        return hashpipe_flow_scalar_text(&flow);
     }
+    let block = key.block()?;
+    let flow = hashpipe_block_to_flow_scalar(&block)?;
+    hashpipe_flow_scalar_text(&flow)
+}
+
+fn hashpipe_map_entry_value_text(
+    normalized_yaml: &str,
+    entry: &yaml_parser::ast::BlockMapEntry,
+) -> String {
+    let Some(value) = entry.value() else {
+        return String::new();
+    };
+
+    if let Some(flow) = value.flow() {
+        return hashpipe_flow_value_text(&flow).unwrap_or_else(|| {
+            let range = flow.syntax().text_range();
+            let start: usize = range.start().into();
+            let end: usize = range.end().into();
+            normalized_yaml[start..end].trim().to_string()
+        });
+    }
+
+    if let Some(block) = value.block() {
+        let range = block.syntax().text_range();
+        let start: usize = range.start().into();
+        let end: usize = range.end().into();
+        return normalized_yaml[start..end].to_string();
+    }
+
+    let range = value.syntax().text_range();
+    let start: usize = range.start().into();
+    let end: usize = range.end().into();
+    normalized_yaml[start..end].to_string()
+}
+
+fn hashpipe_block_to_flow_scalar(
+    block: &yaml_parser::ast::Block,
+) -> Option<yaml_parser::ast::Flow> {
+    block
+        .syntax()
+        .children()
+        .find_map(yaml_parser::ast::Flow::cast)
+}
+
+fn hashpipe_flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
+    let token = if let Some(token) = flow.plain_scalar() {
+        token
+    } else if let Some(token) = flow.single_quoted_scalar() {
+        token
+    } else if let Some(token) = flow.double_qouted_scalar() {
+        token
+    } else {
+        return None;
+    };
+    let mut value = token.text().to_string();
+    if token.kind() == yaml_parser::SyntaxKind::SINGLE_QUOTED_SCALAR {
+        value = value.trim_matches('\'').to_string();
+    } else if token.kind() == yaml_parser::SyntaxKind::DOUBLE_QUOTED_SCALAR {
+        value = value.trim_matches('"').to_string();
+    }
+    Some(value)
+}
+
+fn hashpipe_flow_value_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
+    if let Some(token) = flow.plain_scalar() {
+        return Some(token.text().to_string());
+    }
+    if let Some(token) = flow.single_quoted_scalar() {
+        return Some(token.text().to_string());
+    }
+    if let Some(token) = flow.double_qouted_scalar() {
+        return Some(token.text().to_string());
+    }
+    None
 }
 
 fn is_yaml_block_scalar_indicator(value: &str) -> bool {
@@ -474,40 +412,6 @@ fn is_yaml_block_scalar_indicator(value: &str) -> bool {
         return false;
     }
     chars.all(|ch| ch == '+' || ch == '-' || ch.is_ascii_digit())
-}
-
-fn leading_ws_count(text: &str) -> usize {
-    text.chars().take_while(|c| matches!(c, ' ' | '\t')).count()
-}
-
-fn is_block_scalar_continuation_line(after_prefix: &str) -> bool {
-    let text = after_prefix.trim_end_matches(['\n', '\r']);
-    if text.trim().is_empty() {
-        return true;
-    }
-    leading_ws_count(text) >= 2
-}
-
-fn is_unclosed_double_quoted(value: &str) -> bool {
-    if !value.starts_with('"') {
-        return false;
-    }
-    let mut escaped = false;
-    let mut quote_count = 0usize;
-    for ch in value.chars() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            escaped = true;
-            continue;
-        }
-        if ch == '"' {
-            quote_count += 1;
-        }
-    }
-    quote_count % 2 == 1
 }
 
 /// Classify an option value for hashpipe conversion.
@@ -698,7 +602,17 @@ pub fn format_as_hashpipe(
     if !yaml_entries.is_empty() {
         let yaml_text = yaml_entries
             .iter()
-            .map(|(key, value)| format!("{}: {}\n", key, value))
+            .map(|(key, value)| {
+                if value.starts_with('\n') {
+                    if value.ends_with('\n') {
+                        format!("{key}:{value}")
+                    } else {
+                        format!("{key}:{value}\n")
+                    }
+                } else {
+                    format!("{key}: {value}\n")
+                }
+            })
             .collect::<String>();
         // pretty_yaml wraps to the width of raw YAML text. Hashpipe output adds
         // a comment prefix (`#| `, `//| `, `--| `) before every rendered line,

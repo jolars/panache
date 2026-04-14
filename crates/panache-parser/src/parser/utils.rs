@@ -11,6 +11,8 @@ pub mod chunk_options; // Public for hashpipe formatter
 pub mod container_stack;
 #[path = "utils/continuation.rs"]
 pub mod continuation;
+#[path = "utils/hashpipe_normalizer.rs"]
+pub mod hashpipe_normalizer;
 #[path = "utils/helpers.rs"]
 pub mod helpers;
 #[path = "utils/inline_emission.rs"]
