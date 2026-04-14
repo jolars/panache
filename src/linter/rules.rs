@@ -10,6 +10,7 @@ pub mod figure_crossref_captions;
 pub mod heading_hierarchy;
 pub mod missing_chunk_labels;
 pub mod undefined_references;
+pub mod unused_definitions;
 
 pub trait Rule {
     fn name(&self) -> &str;

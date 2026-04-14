@@ -172,6 +172,51 @@ undefined-references = false
 }
 
 #[test]
+fn test_unused_definitions() {
+    let diagnostics = lint_file("unused_definitions.md");
+    let unused_labels: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "unused-definition-label")
+        .collect();
+    let unused_footnotes: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "unused-footnote-id")
+        .collect();
+
+    assert_eq!(
+        unused_labels.len(),
+        1,
+        "Should flag one unused reference label"
+    );
+    assert_eq!(unused_footnotes.len(), 1, "Should flag one unused footnote");
+    assert!(unused_labels[0].message.contains("[unusedlabel]"));
+    assert!(unused_footnotes[0].message.contains("[^2]"));
+}
+
+#[test]
+fn test_unused_definitions_can_be_disabled() {
+    let diagnostics = lint_file_with_config(
+        "unused_definitions.md",
+        r#"
+[lint.rules]
+unused-definitions = false
+"#,
+    );
+
+    let unused_labels: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "unused-definition-label")
+        .collect();
+    let unused_footnotes: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "unused-footnote-id")
+        .collect();
+
+    assert!(unused_labels.is_empty());
+    assert!(unused_footnotes.is_empty());
+}
+
+#[test]
 fn test_bookdown_chunk_crossref_is_resolved() {
     let diagnostics = lint_file_with_config(
         "bookdown_chunk_crossref.Rmd",

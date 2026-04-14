@@ -226,6 +226,43 @@ warning[undefined-footnote-id]: Footnote '[^missing]' not found
   --> document.qmd:1:31
 ```
 
+### `unused-definitions`
+
+Detects reference labels and footnote definitions that are declared but never
+referenced.
+
+Severity
+:   Warning
+
+Auto-fix
+:   No
+
+Description
+:   Flags unused reference definitions (`[label]: ...`) and unused footnote
+    definitions (`[^id]: ...`). This helps keep documents tidy and avoids dead
+    references that can accumulate over time.
+
+**Example violation:**
+
+```markdown
+Text with one note[^1].
+
+[^1]: Used note.
+[^2]: Unused note.
+
+[used]: https://example.com
+[unused]: https://unused.example.com
+```
+
+**Diagnostic:**
+
+```
+warning[unused-footnote-id]: Footnote '[^2]' is never used
+  --> document.qmd:4:1
+warning[unused-definition-label]: Reference definition '[unused]' is never used
+  --> document.qmd:7:1
+```
+
 ### `citation-keys`
 
 Validates citation keys against loaded bibliographies and detects conflicts in
@@ -613,6 +650,7 @@ file. Each key is a rule name and each value is a boolean (`true`/`false`).
 heading-hierarchy = true
 duplicate-reference-labels = true
 undefined-references = true
+unused-definitions = true
 citation-keys = true
 chunk-label-spaces = true
 missing-chunk-labels = true

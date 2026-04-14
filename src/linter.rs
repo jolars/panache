@@ -100,6 +100,9 @@ fn default_registry(config: &Config) -> RuleRegistry {
             rules::undefined_references::UndefinedReferencesRule,
         ));
     }
+    if config.lint.is_rule_enabled("unused-definitions") {
+        registry.register(Box::new(rules::unused_definitions::UnusedDefinitionsRule));
+    }
     if config.lint.is_rule_enabled("citation-keys") {
         registry.register(Box::new(rules::citation_keys::CitationKeysRule));
     }
