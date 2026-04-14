@@ -12,6 +12,8 @@ interface ReleaseAsset {
 interface ReleaseResponse {
   tag_name: string;
   assets: ReleaseAsset[];
+  prerelease?: boolean;
+  draft?: boolean;
 }
 
 interface TargetAsset {
@@ -173,12 +175,42 @@ export async function resolvePanacheBinary(
   for (const candidateTag of uniqueTagCandidates) {
     const releasesUrl =
       candidateTag === "latest"
-        ? `https://api.github.com/repos/${repo}/releases/latest`
+        ? `https://api.github.com/repos/${repo}/releases?per_page=100`
         : `https://api.github.com/repos/${repo}/releases/tags/${encodeURIComponent(candidateTag)}`;
     try {
       selectedRelease = await withRetries(
         async () => {
           const releaseBody = await httpGet(releasesUrl);
+          if (candidateTag === "latest") {
+            const releases = JSON.parse(releaseBody.toString("utf8")) as ReleaseResponse[];
+            if (!Array.isArray(releases)) {
+              throw new Error(
+                `Expected release list array for ${repo}@latest, received non-array response`,
+              );
+            }
+
+            for (const release of releases) {
+              if (release.draft || release.prerelease) {
+                continue;
+              }
+              if (!release.tag_name.startsWith("panache-v")) {
+                continue;
+              }
+              const latestAsset = target.archiveNames
+                .map((archiveName) =>
+                  release.assets.find((item) => item.name === archiveName),
+                )
+                .find((item): item is ReleaseAsset => item !== undefined);
+              if (latestAsset) {
+                return { release, asset: latestAsset };
+              }
+            }
+
+            throw new Error(
+              `No stable panache-v* release asset '${target.archiveNames.join("' or '")}' found for ${repo}@latest`,
+            );
+          }
+
           const release = JSON.parse(releaseBody.toString("utf8")) as ReleaseResponse;
           const asset = target.archiveNames
             .map((archiveName) =>
