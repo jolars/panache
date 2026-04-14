@@ -1,0 +1,1 @@
+[^13-comparing-several-means-one-way-anova-4]: In order to quantify the extent of this variation, what we do is calculate the between-group sum of squares: $$\begin{aligned} SS_{b} &= \sum_{k=1}^{G} \sum_{i=1}^{N_k} ( \bar{Y}_{k} - \bar{Y} )^2 \\ &= \sum_{k=1}^{G} N_k ( \bar{Y}_{k} - \bar{Y} )^2 \end{aligned}$$
