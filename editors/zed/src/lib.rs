@@ -1,5 +1,6 @@
 use std::fs;
 use zed::LanguageServerId;
+use zed_extension_api::http_client::{HttpMethod, HttpRequest};
 use zed_extension_api::{self as zed, settings::LspSettings, Result};
 
 struct PanacheBinary {
@@ -20,6 +21,86 @@ struct GithubReleaseDetails {
 }
 
 impl PanacheExtension {
+    fn latest_panache_release() -> Result<zed::GithubRelease> {
+        let request = HttpRequest::builder()
+            .method(HttpMethod::Get)
+            .url("https://api.github.com/repos/jolars/panache/releases?per_page=100")
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "panache-zed-extension")
+            .build()?;
+
+        let response = request
+            .fetch()
+            .map_err(|error| format!("Failed to fetch releases from GitHub: {error}"))?;
+
+        Self::latest_panache_release_from_json(&response.body)
+    }
+
+    fn latest_panache_release_from_json(body: &[u8]) -> Result<zed::GithubRelease> {
+        let releases: zed::serde_json::Value = zed::serde_json::from_slice(body)
+            .map_err(|error| format!("Failed to parse GitHub releases response: {error}"))?;
+        let releases = releases
+            .as_array()
+            .ok_or_else(|| "GitHub releases response was not an array".to_string())?;
+
+        for release in releases {
+            if release
+                .get("prerelease")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            let Some(tag_name) = release.get("tag_name").and_then(|value| value.as_str()) else {
+                continue;
+            };
+            let Some(version) = tag_name.strip_prefix("panache-v") else {
+                continue;
+            };
+
+            let assets = release
+                .get("assets")
+                .and_then(|value| value.as_array())
+                .ok_or_else(|| {
+                    format!("GitHub release {tag_name} did not include an assets array")
+                })?;
+            if assets.is_empty() {
+                continue;
+            }
+
+            let assets = assets
+                .iter()
+                .map(|asset| {
+                    let name = asset
+                        .get("name")
+                        .and_then(|value| value.as_str())
+                        .ok_or_else(|| format!("GitHub release {tag_name} has an asset without a name"))?;
+                    let download_url = asset
+                        .get("browser_download_url")
+                        .and_then(|value| value.as_str())
+                        .ok_or_else(|| {
+                            format!(
+                                "GitHub release {tag_name} has an asset without browser_download_url"
+                            )
+                        })?;
+
+                    Ok(zed::GithubReleaseAsset {
+                        name: name.to_string(),
+                        download_url: download_url.to_string(),
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            return Ok(zed::GithubRelease {
+                version: version.to_string(),
+                assets,
+            });
+        }
+
+        Err("No stable GitHub release matching panache-v* with assets found".to_string())
+    }
+
     fn language_server_binary(
         &mut self,
         language_server_id: &LanguageServerId,
@@ -60,13 +141,7 @@ impl PanacheExtension {
             language_server_id,
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
-        let release = zed::latest_github_release(
-            "jolars/panache",
-            zed::GithubReleaseOptions {
-                require_assets: true,
-                pre_release: false,
-            },
-        )?;
+        let release = Self::latest_panache_release()?;
 
         let (platform, arch) = zed::current_platform();
         let release_details = GithubReleaseDetails::new(platform, arch, release.version);
@@ -214,7 +289,7 @@ zed::register_extension!(PanacheExtension);
 
 #[cfg(test)]
 mod test {
-    use crate::GithubReleaseDetails;
+    use crate::{GithubReleaseDetails, PanacheExtension};
 
     #[test]
     fn test_github_release_details() {
@@ -258,6 +333,66 @@ mod test {
                 downloaded_directory: String::from("panache-0.1.0"),
                 downloaded_binary_path: String::from("panache-0.1.0/panache.exe")
             }
+        );
+    }
+
+    #[test]
+    fn test_latest_panache_release_skips_non_panache_packages() {
+        let body = r#"
+[
+  {
+    "tag_name": "panache-parser-v0.2.0",
+    "prerelease": false,
+    "assets": [
+      { "name": "parser-asset.tgz", "browser_download_url": "https://example.com/parser.tgz" }
+    ]
+  },
+  {
+    "tag_name": "panache-v2.33.0",
+    "prerelease": false,
+    "assets": [
+      { "name": "panache-x86_64-unknown-linux-gnu.tar.gz", "browser_download_url": "https://example.com/panache.tar.gz" }
+    ]
+  }
+]
+"#;
+
+        let release = PanacheExtension::latest_panache_release_from_json(body.as_bytes()).unwrap();
+
+        assert_eq!(release.version, "2.33.0");
+        assert_eq!(release.assets.len(), 1);
+        assert_eq!(
+            release.assets[0].name,
+            "panache-x86_64-unknown-linux-gnu.tar.gz"
+        );
+    }
+
+    #[test]
+    fn test_latest_panache_release_skips_prerelease() {
+        let body = r#"
+[
+  {
+    "tag_name": "panache-v2.34.0-rc1",
+    "prerelease": true,
+    "assets": [
+      { "name": "panache-x86_64-unknown-linux-gnu.tar.gz", "browser_download_url": "https://example.com/rc.tar.gz" }
+    ]
+  },
+  {
+    "tag_name": "panache-v2.33.0",
+    "prerelease": false,
+    "assets": [
+      { "name": "panache-x86_64-unknown-linux-gnu.tar.gz", "browser_download_url": "https://example.com/stable.tar.gz" }
+    ]
+  }
+]
+"#;
+
+        let release = PanacheExtension::latest_panache_release_from_json(body.as_bytes()).unwrap();
+        assert_eq!(release.version, "2.33.0");
+        assert_eq!(
+            release.assets[0].download_url,
+            "https://example.com/stable.tar.gz"
         );
     }
 }
