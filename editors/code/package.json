@@ -108,6 +108,14 @@
           "default": {},
           "description": "Environment variables merged into the Panache language server process."
         },
+        "panache.extraPath": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra PATH entries prepended for the Panache language server process (useful for external tools like air, ruff, or black)."
+        },
         "panache.trace.server": {
           "type": "string",
           "enum": [

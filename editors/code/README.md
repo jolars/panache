@@ -86,9 +86,21 @@ Use `panache.releaseTag` only if you need an exact tag override:
 - `panache.commandPath`: fallback command path
 - `panache.serverArgs`: extra args after `panache lsp`
 - `panache.serverEnv`: extra environment variables
+- `panache.extraPath`: extra PATH entries prepended for the language server
+  process
 - `panache.trace.server`: LSP trace level (`off`, `messages`, `verbose`)
 - `panache.experimental.incrementalParsing`: enable experimental incremental
   parsing in LSP (default: `false`)
+
+If external tools (for example `air` for R code chunks) work in your terminal
+but not inside the editor, set `panache.extraPath` to include their install
+directory:
+
+```json
+{
+  "panache.extraPath": ["C:\\Users\\<you>\\.local\\bin"]
+}
+```
 
 ## Security and trust
 

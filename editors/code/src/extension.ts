@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -42,6 +43,39 @@ function isReleaseTagExplicitlyConfigured(
     value?.workspaceValue !== undefined ||
     value?.workspaceFolderValue !== undefined
   );
+}
+
+function mergeServerEnvironment(
+  baseEnv: NodeJS.ProcessEnv,
+  overrides: Record<string, string>,
+  extraPathEntries: string[],
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...baseEnv, ...overrides };
+  const normalizedExtraPath = extraPathEntries
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  if (normalizedExtraPath.length === 0) {
+    return env;
+  }
+
+  const pathKey =
+    process.platform === "win32"
+      ? Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "Path"
+      : "PATH";
+
+  for (const key of Object.keys(env)) {
+    if (key !== pathKey && key.toLowerCase() === "path") {
+      delete env[key];
+    }
+  }
+
+  const existingPath = env[pathKey]?.trim() ?? "";
+  env[pathKey] =
+    normalizedExtraPath.join(path.delimiter) +
+    (existingPath ? `${path.delimiter}${existingPath}` : "");
+
+  return env;
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -87,6 +121,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const serverArgs = config.get<string[]>("serverArgs", []);
   const serverEnv = config.get<Record<string, string>>("serverEnv", {});
+  const extraPath = config.get<string[]>("extraPath", []);
   const traceLevel = config.get<"off" | "messages" | "verbose">(
     "trace.server",
     "off",
@@ -99,7 +134,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const serverOptions: ServerOptions = {
     command: commandPath,
     args: ["lsp", ...serverArgs],
-    options: { env: { ...process.env, ...serverEnv } },
+    options: {
+      env: mergeServerEnvironment(process.env, serverEnv, extraPath),
+    },
   };
 
   const clientOptions: LanguageClientOptions = {
