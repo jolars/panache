@@ -2,13 +2,12 @@ name: Publish Code Extensions
 
 on:
   workflow_dispatch:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "panache-code-v*"
 
 jobs:
   publish:
-    if: ${{ startsWith(github.ref_name, 'panache-code-v') || startsWith(github.event.release.tag_name, 'panache-code-v') }}
     runs-on: ubuntu-latest
 
     defaults:
