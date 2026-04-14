@@ -146,12 +146,22 @@ markers. Formatter applies formatting rules, not the parser.
 
 ### Formatter Architecture
 
-Located in `src/formatter/`:
+Formatter core now lives in `crates/panache-formatter/`:
 
-- `core.rs`: Orchestration via `format_node_sync`
-- `wrapping.rs`: Word-breaking and line-wrapping logic
-- Specialized modules: `paragraphs.rs`, `inline.rs`, `headings.rs`, `lists.rs`,
-  `tables.rs`, etc.
+- `crates/panache-formatter/src/formatter/`: Core formatting implementation
+  (paragraphs, inline, headings, lists, tables, etc.)
+- `crates/panache-formatter/src/formatter.rs`: Core orchestration and YAML
+  frontmatter formatting integration
+- `crates/panache-formatter/src/config.rs`: Formatter-local config surface
+  (dependency-lean, no config file parsing concerns)
+
+Host/runtime integrations remain in top-level `panache` crate:
+
+- `src/formatter.rs`: host-facing bridge used by CLI/LSP/public API
+- external formatter process execution and runtime orchestration remain in
+  top-level modules
+- top-level `lsp` feature gating is intentional and should stay there, not in
+  `crates/panache-formatter`
 
 **Formatting must be idempotent**: format(format(x)) == format(x)
 
@@ -307,11 +317,12 @@ Instead of listing every file, understand the patterns:
 - `utils/`: Shared utilities (attributes, text buffers, inline emission helpers)
 - `list_postprocessor.rs`: Post-processing for list item content wrapping
 
-**Formatter modules** (`src/formatter/`):
+**Formatter modules** (`crates/panache-formatter/src/formatter/`):
 
 - Split by concern: wrapping, inline, paragraphs, headings, lists, tables, etc.
-- Core orchestration in `core.rs`
-- Public API limited to `format_tree()` and `format_tree_async()`
+- Core orchestration in `crates/panache-formatter/src/formatter.rs`
+- Keep formatter-core logic in this crate; keep host-only process/runtime paths
+  in top-level `src/` modules
 
 **Syntax modules** (`crates/panache-parser/src/syntax/`):
 
