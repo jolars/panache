@@ -1,7 +1,8 @@
 {
-  ".": "2.33.1",
-  "crates/panache-parser": "0.2.1",
-  "crates/panache-wasm": "0.1.2",
-  "editors/code": "2.33.0",
-  "editors/zed": "2.32.1"
+  ".": "2.34.0",
+  "crates/panache-parser": "0.3.0",
+  "crates/panache-wasm": "0.1.3",
+  "editors/code": "2.34.0",
+  "editors/zed": "2.32.1",
+  "crates/panache-formatter": "0.1.1"
 }

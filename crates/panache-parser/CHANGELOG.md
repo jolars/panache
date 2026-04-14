@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/jolars/panache/compare/panache-parser-v0.2.1...panache-parser-v0.3.0) (2026-04-14)
+
+
+### Features
+
+* **parser:** add support for `mark` extension ([888c810](https://github.com/jolars/panache/commit/888c8103fa46425909f37bf7e94401135bf29731))
+
 ## [0.2.1](https://github.com/jolars/panache/compare/panache-parser-v0.2.0...panache-parser-v0.2.1) (2026-04-14)
 
 

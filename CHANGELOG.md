@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.34.0](https://github.com/jolars/panache/compare/panache-v2.33.1...panache-v2.34.0) (2026-04-14)
+
+
+### Features
+
+* allow auto-flavor for `.{R,r}markdown` ([27f3877](https://github.com/jolars/panache/commit/27f38777974426077937d91755be6c5cd9802f82))
+* **linter:** add rule for unused labels ([a9d88d1](https://github.com/jolars/panache/commit/a9d88d150ddee9c3c9ef93516f88fb205e0d4430))
+* **linter:** consider references across project ([2b687dc](https://github.com/jolars/panache/commit/2b687dc137db986710214eb6735ad9dcc4ae7e70))
+* **lsp:** support go-to-references for footnote definition ([3d6e9f8](https://github.com/jolars/panache/commit/3d6e9f8a133dd4577effb11ba6a408bec3c1b599))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * panache-parser bumped from 0.2.1 to 0.3.0
+
 ## [2.33.1](https://github.com/jolars/panache/compare/panache-v2.33.0...panache-v2.33.1) (2026-04-14)
 
 
