@@ -11,6 +11,36 @@ use crate::parser::blocks::raw_blocks::{extract_environment_name, is_inline_math
 use crate::parser::utils::container_stack::{Container, ContainerStack};
 use crate::parser::utils::text_buffer::ParagraphBuffer;
 
+fn update_display_math_dollar_state(
+    line_no_newline: &str,
+    open_display_math_dollar_count: &mut Option<usize>,
+) {
+    let trimmed = line_no_newline.trim();
+    if trimmed.len() < 2 || !trimmed.as_bytes().iter().all(|b| *b == b'$') {
+        return;
+    }
+
+    let run_len = trimmed.len();
+    if run_len < 2 {
+        return;
+    }
+
+    if let Some(open_len) = *open_display_math_dollar_count {
+        if run_len >= open_len {
+            *open_display_math_dollar_count = None;
+        }
+    } else {
+        *open_display_math_dollar_count = Some(run_len);
+    }
+}
+
+fn is_inside_footnote_definition(containers: &ContainerStack) -> bool {
+    containers
+        .stack
+        .iter()
+        .any(|c| matches!(c, Container::FootnoteDefinition { .. }))
+}
+
 fn extract_end_environment_name(line: &str) -> Option<&str> {
     let trimmed = line.trim_start();
     if !trimmed.starts_with("\\end{") {
@@ -35,6 +65,7 @@ pub(in crate::parser) fn start_paragraph_if_needed(
         containers.push(Container::Paragraph {
             buffer: ParagraphBuffer::new(),
             open_inline_math_envs: Vec::new(),
+            open_display_math_dollar_count: None,
         });
     }
 }
@@ -46,16 +77,24 @@ pub(in crate::parser) fn append_paragraph_line(
     line: &str,
     _config: &ParserOptions,
 ) {
+    let in_footnote = is_inside_footnote_definition(containers);
+
     // Buffer the line (with newline for losslessness)
     // Works for ALL paragraphs including those in blockquotes
     if let Some(Container::Paragraph {
         buffer,
         open_inline_math_envs,
+        open_display_math_dollar_count,
     }) = containers.stack.last_mut()
     {
         buffer.push_text(line);
 
         let line_no_newline = line.trim_end_matches(&['\r', '\n'][..]);
+        if in_footnote {
+            update_display_math_dollar_state(line_no_newline, open_display_math_dollar_count);
+        } else {
+            *open_display_math_dollar_count = None;
+        }
         if let Some(env_name) = extract_environment_name(line_no_newline)
             && is_inline_math_environment(&env_name)
         {
@@ -93,8 +132,9 @@ pub(in crate::parser) fn has_open_inline_math_environment(containers: &Container
         containers.last(),
         Some(Container::Paragraph {
             open_inline_math_envs,
+            open_display_math_dollar_count,
             ..
-        }) if !open_inline_math_envs.is_empty()
+        }) if !open_inline_math_envs.is_empty() || open_display_math_dollar_count.is_some()
     )
 }
 

@@ -352,6 +352,33 @@ mod tests {
     }
 
     #[test]
+    fn footnote_multiline_dollar_math_parses_as_display_math_not_tex_block() {
+        let input = "[^note]: Intro line before math:\n    $$\n    \\begin{aligned} a &= b \\\\ c &= d \\end{aligned}\n    $$\n";
+        let tree = crate::parse(input, Some(crate::ParserOptions::default()));
+
+        let def = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::FOOTNOTE_DEFINITION)
+            .expect("footnote definition");
+
+        let has_display_math = def
+            .descendants()
+            .any(|n| n.kind() == SyntaxKind::DISPLAY_MATH);
+        let has_tex_block = def.descendants().any(|n| n.kind() == SyntaxKind::TEX_BLOCK);
+
+        assert!(
+            has_display_math,
+            "Expected DISPLAY_MATH in footnote definition, got:\n{}",
+            tree
+        );
+        assert!(
+            !has_tex_block,
+            "Did not expect TEX_BLOCK in footnote definition for $$...$$ math, got:\n{}",
+            tree
+        );
+    }
+
+    #[test]
     fn test_reference_definition_with_up_to_three_leading_spaces() {
         assert!(try_parse_reference_definition("   [foo]: #bar").is_some());
         assert!(try_parse_reference_definition("    [foo]: #bar").is_none());
