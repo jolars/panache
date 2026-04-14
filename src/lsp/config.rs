@@ -5,7 +5,7 @@ use tower_lsp_server::ls_types::{MessageType, Uri};
 /// Load config from workspace root, falling back to default
 ///
 /// If `document_uri` is provided, the file extension will be used to auto-detect
-/// the flavor (.qmd → Quarto, .Rmd → RMarkdown)
+/// the flavor (.qmd → Quarto, .Rmd/.Rmarkdown → RMarkdown)
 pub(crate) async fn load_config(
     client: &Client,
     workspace_root: &Option<PathBuf>,
@@ -48,7 +48,7 @@ pub(crate) async fn load_config(
         if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
             let detected_flavor = match ext.to_lowercase().as_str() {
                 "qmd" => Some(crate::config::Flavor::Quarto),
-                "rmd" => Some(crate::config::Flavor::RMarkdown),
+                "rmd" | "rmarkdown" => Some(crate::config::Flavor::RMarkdown),
                 _ => None,
             };
             if let Some(flavor) = detected_flavor {

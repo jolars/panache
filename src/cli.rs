@@ -116,7 +116,7 @@ pub enum Commands {
         #[arg(help = "Input file path(s) or directories")]
         #[arg(
             long_help = "Path(s) to the input file(s) or directories to format. If not provided, reads from stdin. \
-            Supports .qmd, .md, .Rmd, and other Markdown-based formats. When file paths are \
+            Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. When file paths are \
             provided, the files are formatted in place by default. Stdin input always outputs \
             to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). \
             Directories are traversed recursively, respecting .gitignore files."
@@ -238,7 +238,7 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         #[arg(help = "Input file path(s) or directories")]
         #[arg(
             long_help = "Path(s) to the input file(s) or directories to check. If not provided, reads from stdin. \
-            Supports .qmd, .md, .Rmd, and other Markdown-based formats. Supports glob patterns \
+            Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. Supports glob patterns \
             (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, \
             respecting .gitignore files."
         )]

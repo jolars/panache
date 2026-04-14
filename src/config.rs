@@ -60,8 +60,17 @@ pub const DEFAULT_EXCLUDE_PATTERNS: &[&str] = &[
     "**/LICENSE.md",
 ];
 
-pub const DEFAULT_INCLUDE_PATTERNS: &[&str] =
-    &["*.md", "*.qmd", "*.Rmd", "*.markdown", "*.mdown", "*.mkd"];
+pub const DEFAULT_INCLUDE_PATTERNS: &[&str] = &[
+    "*.md",
+    "*.qmd",
+    "*.Rmd",
+    "*.rmd",
+    "*.Rmarkdown",
+    "*.rmarkdown",
+    "*.markdown",
+    "*.mdown",
+    "*.mkd",
+];
 
 const CANDIDATE_NAMES: &[&str] = &[".panache.toml", "panache.toml"];
 const MARKDOWN_FAMILY_EXTENSIONS: &[&str] = &["md", "markdown", "mdown", "mkd"];
@@ -359,7 +368,7 @@ fn detect_flavor(
 
     match ext_lower.as_str() {
         "qmd" => Some(Flavor::Quarto),
-        "rmd" => Some(Flavor::RMarkdown),
+        "rmd" | "rmarkdown" => Some(Flavor::RMarkdown),
         _ if MARKDOWN_FAMILY_EXTENSIONS.contains(&ext_lower.as_str()) => {
             let base_dir = cfg_path.and_then(Path::parent);
             let override_flavor =
@@ -436,4 +445,23 @@ fn glob_matches_path(pattern: &str, candidate: &str) -> bool {
         return false;
     };
     glob.compile_matcher().is_match(candidate)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detect_flavor_maps_rmarkdown_extension() {
+        let cfg = Config::default();
+        let detected = detect_flavor(Some(Path::new("doc.rmarkdown")), None, &cfg);
+        assert_eq!(detected, Some(Flavor::RMarkdown));
+    }
+
+    #[test]
+    fn detect_flavor_maps_mixed_case_rmarkdown_extension() {
+        let cfg = Config::default();
+        let detected = detect_flavor(Some(Path::new("doc.Rmarkdown")), None, &cfg);
+        assert_eq!(detected, Some(Flavor::RMarkdown));
+    }
 }

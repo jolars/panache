@@ -41,7 +41,16 @@ pub fn markdown_extensions() -> &'static [&'static str] {
 
 pub fn all_document_extensions() -> &'static [&'static str] {
     &[
-        "qmd", "Rmd", "rmd", "md", "markdown", "mdown", "mkd", "mkdn",
+        "qmd",
+        "Rmd",
+        "rmd",
+        "Rmarkdown",
+        "rmarkdown",
+        "md",
+        "markdown",
+        "mdown",
+        "mkd",
+        "mkdn",
     ]
 }
 

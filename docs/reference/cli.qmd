@@ -49,7 +49,7 @@ Format a Quarto, Pandoc, or R Markdown document according to Panache's formattin
 
 ###### **Arguments:**
 
-* `<FILES>` — Path(s) to the input file(s) or directories to format. If not provided, reads from stdin. Supports .qmd, .md, .Rmd, and other Markdown-based formats. When file paths are provided, the files are formatted in place by default. Stdin input always outputs to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
+* `<FILES>` — Path(s) to the input file(s) or directories to format. If not provided, reads from stdin. Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. When file paths are provided, the files are formatted in place by default. Stdin input always outputs to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
 
 ###### **Options:**
 
@@ -110,7 +110,7 @@ Configure rules in panache.toml with [lint] section.
 
 ###### **Arguments:**
 
-* `<FILES>` — Path(s) to the input file(s) or directories to check. If not provided, reads from stdin. Supports .qmd, .md, .Rmd, and other Markdown-based formats. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
+* `<FILES>` — Path(s) to the input file(s) or directories to check. If not provided, reads from stdin. Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, respecting .gitignore files.
 
 ###### **Options:**
 

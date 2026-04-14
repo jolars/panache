@@ -16,7 +16,17 @@ use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands};
 use diagnostic_renderer::print_diagnostics;
 
 /// Supported file extensions for formatting
-const SUPPORTED_EXTENSIONS: &[&str] = &["md", "qmd", "Rmd", "markdown", "mdown", "mkd"];
+const SUPPORTED_EXTENSIONS: &[&str] = &[
+    "md",
+    "qmd",
+    "Rmd",
+    "rmd",
+    "Rmarkdown",
+    "rmarkdown",
+    "markdown",
+    "mdown",
+    "mkd",
+];
 
 fn init_logger(debug_log: Option<&Path>) {
     if let Some(path) = debug_log {
@@ -292,7 +302,7 @@ fn load_config_for_cli(
         {
             let detected_flavor = match ext.to_lowercase().as_str() {
                 "qmd" => Some(panache::config::Flavor::Quarto),
-                "rmd" => Some(panache::config::Flavor::RMarkdown),
+                "rmd" | "rmarkdown" => Some(panache::config::Flavor::RMarkdown),
                 "md" => Some(cfg.flavor),
                 _ => None,
             };
