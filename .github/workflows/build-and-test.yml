@@ -95,7 +95,7 @@ jobs:
           fetch-tags: true
 
       - id: versionary
-        uses: jolars/versionary@v0.5.0
+        uses: jolars/versionary@v0
         with:
           github-token: ${{ secrets.RELEASE_TOKEN }}
 
