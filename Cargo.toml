@@ -56,7 +56,7 @@ rowan = "0.16.1"
 salsa = "0.26.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"
-wincode = { version = "0.5.1", features = ["derive"] }
+wincode = { version = "0.5.2", features = ["derive"] }
 yaml_parser = "0.3.0"
 pretty_yaml = "0.6.0"
 similar = { version = "3.0.0", features = ["text"] }

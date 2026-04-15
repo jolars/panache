@@ -2097,9 +2097,9 @@ dependencies = [
 
 [[package]]
 name = "wincode"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a61f8f0a55eb6cae5d7b7ad2eca536a944deb9722a948525181069064ecd1abc"
+checksum = "b2f42dd20febad683d07044c5f543e57f822512ebebaf2c827705c99a0ad4575"
 dependencies = [
  "pastey",
  "proc-macro2",
