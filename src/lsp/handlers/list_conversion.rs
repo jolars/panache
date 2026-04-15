@@ -217,6 +217,9 @@ pub fn convert_to_bullet(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
 }
 
 /// Convert a non-task list to a task list by inserting an unchecked checkbox after each marker.
+///
+/// Ordered lists are converted to bullet task lists (`- [ ]`) to match canonical
+/// Pandoc/GFM task-list form.
 pub fn convert_to_task(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
     let list_type = detect_list_type(list_node);
     if !matches!(list_type, Some(ListKind::Bullet | ListKind::Ordered)) {
@@ -228,17 +231,34 @@ pub fn convert_to_task(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
     };
 
     list.items()
-        .filter_map(|item| {
+        .flat_map(|item| {
+            let mut edits = Vec::new();
             let marker = first_item_marker_token(item.syntax())?;
+
+            if list_type == Some(ListKind::Ordered) {
+                let marker_start = offset_to_position(text, marker.text_range().start().into());
+                let marker_end = offset_to_position(text, marker.text_range().end().into());
+                edits.push(TextEdit {
+                    range: Range {
+                        start: marker_start,
+                        end: marker_end,
+                    },
+                    new_text: "-".to_string(),
+                });
+            }
+
             let insert_at = offset_to_position(text, marker.text_range().end().into());
-            Some(TextEdit {
+            edits.push(TextEdit {
                 range: Range {
                     start: insert_at,
                     end: insert_at,
                 },
                 new_text: " [ ]".to_string(),
-            })
+            });
+
+            Some(edits)
         })
+        .flatten()
         .collect()
 }
 
@@ -476,8 +496,11 @@ mod tests {
             .expect("Should find list");
 
         let edits = convert_to_task(&list_node, input);
-        assert_eq!(edits.len(), 2);
-        assert!(edits.iter().all(|edit| edit.new_text == " [ ]"));
+        assert_eq!(edits.len(), 4, "marker + checkbox edit per item");
+        assert_eq!(edits[0].new_text, "-");
+        assert_eq!(edits[1].new_text, " [ ]");
+        assert_eq!(edits[2].new_text, "-");
+        assert_eq!(edits[3].new_text, " [ ]");
     }
 
     #[test]

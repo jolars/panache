@@ -460,8 +460,11 @@ async fn test_code_action_convert_ordered_list_to_task() {
     let edits = changes
         .get(&"file:///test.qmd".parse::<Uri>().expect("uri"))
         .expect("edits for document");
-    assert_eq!(edits.len(), 2);
-    assert!(edits.iter().all(|edit| edit.new_text == " [ ]"));
+    assert_eq!(edits.len(), 4, "marker + checkbox edit per item");
+    assert_eq!(edits[0].new_text, "-");
+    assert_eq!(edits[1].new_text, " [ ]");
+    assert_eq!(edits[2].new_text, "-");
+    assert_eq!(edits[3].new_text, " [ ]");
 }
 
 #[tokio::test]
