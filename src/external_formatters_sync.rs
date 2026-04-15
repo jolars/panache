@@ -12,7 +12,9 @@ use std::time::Duration;
 use crate::config::FormatterConfig;
 pub use crate::external_formatters_common::FormatterError;
 use crate::external_formatters_common::{
-    find_missing_formatter_commands, log_missing_formatter_commands, resolve_stdin_args,
+    FormatterIoMode, find_missing_formatter_commands, log_formatter_invocation,
+    log_formatter_nonzero_exit, log_formatter_spawn_failed, log_formatter_success,
+    log_formatter_timeout, log_missing_formatter_commands, resolve_stdin_args,
     temp_file_extension_for_language,
 };
 use crate::formatter::code_blocks::{ExternalCodeBlock, FormattedCodeMap};
@@ -48,10 +50,11 @@ fn format_with_stdin(
     timeout: Duration,
 ) -> Result<String, FormatterError> {
     let resolved_args = resolve_stdin_args(&config.args, language);
-    log::debug!(
-        "Invoking formatter (stdin): {} {}",
-        config.cmd,
-        resolved_args.join(" ")
+    log_formatter_invocation(
+        &config.cmd,
+        language,
+        FormatterIoMode::Stdin,
+        &resolved_args,
     );
 
     // Build command
@@ -63,7 +66,7 @@ fn format_with_stdin(
 
     // Spawn process
     let mut child = cmd.spawn().map_err(|e| {
-        log::error!("Failed to spawn formatter '{}': {}", config.cmd, e);
+        log_formatter_spawn_failed(&config.cmd, language, FormatterIoMode::Stdin, &e);
         FormatterError::SpawnFailed(format!("{}: {}", config.cmd, e))
     })?;
 
@@ -91,23 +94,25 @@ fn format_with_stdin(
         Ok(Ok(output)) => {
             if output.status.success() {
                 let formatted = String::from_utf8_lossy(&output.stdout).to_string();
-                log::debug!(
-                    "Formatter succeeded: {} bytes output in {:?}",
+                log_formatter_success(
+                    &config.cmd,
+                    language,
+                    FormatterIoMode::Stdin,
                     formatted.len(),
-                    start.elapsed()
+                    start.elapsed(),
                 );
                 Ok(formatted)
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                log::warn!(
-                    "Formatter exited with code {:?}: {}",
-                    output.status.code(),
-                    stderr
+                let code = output.status.code().unwrap_or(-1);
+                log_formatter_nonzero_exit(
+                    &config.cmd,
+                    language,
+                    FormatterIoMode::Stdin,
+                    code,
+                    &stderr,
                 );
-                Err(FormatterError::NonZeroExit {
-                    code: output.status.code().unwrap_or(-1),
-                    stderr,
-                })
+                Err(FormatterError::NonZeroExit { code, stderr })
             }
         }
         Ok(Err(e)) => {
@@ -115,7 +120,7 @@ fn format_with_stdin(
             Err(FormatterError::IoError(e))
         }
         Err(_) => {
-            log::warn!("Formatter timed out after {:?}", timeout);
+            log_formatter_timeout(&config.cmd, language, FormatterIoMode::Stdin);
             Err(FormatterError::Timeout)
         }
     }
@@ -129,12 +134,6 @@ fn format_with_file(
     timeout: Duration,
 ) -> Result<String, FormatterError> {
     use std::fs;
-
-    log::debug!(
-        "Invoking formatter (file): {} {}",
-        config.cmd,
-        config.args.join(" ")
-    );
 
     // Create a temporary file
     let temp_dir = std::env::temp_dir();
@@ -160,12 +159,19 @@ fn format_with_file(
         args
     };
 
+    log_formatter_invocation(&config.cmd, language, FormatterIoMode::File, &args);
+    log::trace!(
+        "External formatter temp path ({}): {}",
+        config.cmd,
+        temp_path.display()
+    );
+
     // Spawn the formatter process
     let mut cmd = Command::new(&config.cmd);
     cmd.args(&args).stderr(Stdio::piped());
 
     let child = cmd.spawn().map_err(|e| {
-        log::error!("Failed to spawn formatter '{}': {}", config.cmd, e);
+        log_formatter_spawn_failed(&config.cmd, language, FormatterIoMode::File, &e);
         FormatterError::SpawnFailed(format!("{}: {}", config.cmd, e))
     })?;
 
@@ -190,23 +196,25 @@ fn format_with_file(
 
             // Check exit status
             if output.status.success() {
-                log::debug!(
-                    "Formatter succeeded: {} bytes output in {:?}",
+                log_formatter_success(
+                    &config.cmd,
+                    language,
+                    FormatterIoMode::File,
                     formatted.len(),
-                    start.elapsed()
+                    start.elapsed(),
                 );
                 Ok(formatted)
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                log::warn!(
-                    "Formatter exited with code {:?}: {}",
-                    output.status.code(),
-                    stderr
+                let code = output.status.code().unwrap_or(-1);
+                log_formatter_nonzero_exit(
+                    &config.cmd,
+                    language,
+                    FormatterIoMode::File,
+                    code,
+                    &stderr,
                 );
-                Err(FormatterError::NonZeroExit {
-                    code: output.status.code().unwrap_or(-1),
-                    stderr,
-                })
+                Err(FormatterError::NonZeroExit { code, stderr })
             }
         }
         Ok(Err(e)) => {
@@ -214,7 +222,7 @@ fn format_with_file(
             Err(FormatterError::IoError(e))
         }
         Err(_) => {
-            log::warn!("Formatter timed out after {:?}", timeout);
+            log_formatter_timeout(&config.cmd, language, FormatterIoMode::File);
             Err(FormatterError::Timeout)
         }
     };
@@ -292,7 +300,7 @@ pub fn run_formatters_parallel(
                         }
                         Err(e) => {
                             log::warn!(
-                                "{} formatter '{}' failed: {}. Using original code.",
+                                "{} formatter '{}' failed: {}. Falling back to original code block unchanged.",
                                 lang,
                                 formatter_cfg.cmd,
                                 e

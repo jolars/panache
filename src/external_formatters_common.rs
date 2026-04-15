@@ -1,11 +1,27 @@
 //! Common types and utilities for external formatter integration.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, OnceLock};
 
 use crate::config::FormatterConfig;
-use crate::external_tools_common::{
-    find_missing_commands, log_warning_once, missing_commands_warning_message,
-};
+use crate::external_tools_common::{find_missing_commands, missing_commands_warning_message};
+
+static MISSING_FORMATTER_MESSAGES_LOGGED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+#[derive(Debug, Clone, Copy)]
+pub enum FormatterIoMode {
+    Stdin,
+    File,
+}
+
+impl FormatterIoMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Stdin => "stdin",
+            Self::File => "file",
+        }
+    }
+}
 
 /// Errors that can occur when invoking external formatters.
 #[derive(Debug)]
@@ -61,12 +77,26 @@ pub fn find_missing_formatter_commands(
     HashSet::new()
 }
 
-/// Log one consolidated warning for missing external formatter commands.
+/// Log one consolidated info message for missing external formatter commands.
+///
+/// Missing commands are a common optional configuration scenario and should not
+/// emit warnings by default. We log once at info level so release builds can
+/// still surface actionable diagnostics without warning noise.
 pub fn log_missing_formatter_commands(missing: &HashSet<String>) {
     let Some(message) = missing_formatter_warning_message(missing) else {
         return;
     };
-    log_warning_once(&message);
+
+    let logged_messages =
+        MISSING_FORMATTER_MESSAGES_LOGGED.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut logged = logged_messages
+        .lock()
+        .expect("missing formatter message mutex poisoned");
+    if !logged.insert(message.clone()) {
+        return;
+    }
+
+    log::info!("{}", message);
 }
 
 /// Resolve stdin argument placeholders against a language-aware virtual filename.
@@ -78,6 +108,92 @@ pub fn resolve_stdin_args(args: &[String], language: &str) -> Vec<String> {
     args.iter()
         .map(|arg| arg.replace("{}", &virtual_filename))
         .collect()
+}
+
+pub fn log_formatter_invocation(
+    command: &str,
+    language: &str,
+    mode: FormatterIoMode,
+    args: &[String],
+) {
+    log::debug!(
+        "External formatter start: cmd='{}', language='{}', mode='{}', args={}",
+        command,
+        language,
+        mode.as_str(),
+        args.len()
+    );
+    log::trace!("External formatter args ({}): {:?}", command, args);
+}
+
+pub fn log_formatter_spawn_failed(
+    command: &str,
+    language: &str,
+    mode: FormatterIoMode,
+    error: &std::io::Error,
+) {
+    if error.kind() == std::io::ErrorKind::NotFound {
+        log::debug!(
+            "External formatter unavailable: cmd='{}', language='{}', mode='{}', error={}",
+            command,
+            language,
+            mode.as_str(),
+            error
+        );
+    } else {
+        log::warn!(
+            "External formatter spawn failed: cmd='{}', language='{}', mode='{}', error={}",
+            command,
+            language,
+            mode.as_str(),
+            error
+        );
+    }
+}
+
+pub fn log_formatter_nonzero_exit(
+    command: &str,
+    language: &str,
+    mode: FormatterIoMode,
+    exit_code: i32,
+    stderr: &str,
+) {
+    let summary = stderr.lines().next().unwrap_or("").trim();
+    log::warn!(
+        "External formatter failed: cmd='{}', language='{}', mode='{}', exit_code={}, stderr='{}'",
+        command,
+        language,
+        mode.as_str(),
+        exit_code,
+        summary
+    );
+    log::trace!("External formatter stderr ({}): {}", command, stderr);
+}
+
+pub fn log_formatter_timeout(command: &str, language: &str, mode: FormatterIoMode) {
+    log::warn!(
+        "External formatter timed out: cmd='{}', language='{}', mode='{}'",
+        command,
+        language,
+        mode.as_str()
+    );
+}
+
+pub fn log_formatter_success(
+    command: &str,
+    language: &str,
+    mode: FormatterIoMode,
+    output_len: usize,
+    elapsed: std::time::Duration,
+) {
+    log::debug!(
+        "External formatter succeeded: cmd='{}', language='{}', mode='{}', output_bytes={}, elapsed_ms={}",
+        command,
+        language,
+        mode.as_str(),
+        output_len,
+        elapsed.as_millis()
+    );
 }
 
 pub(crate) fn temp_file_extension_for_language(language: &str) -> &'static str {

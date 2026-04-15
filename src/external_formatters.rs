@@ -7,10 +7,15 @@ use std::time::Duration;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
+use tokio::time::Instant;
 
 use crate::config::FormatterConfig;
 pub use crate::external_formatters_common::FormatterError;
-use crate::external_formatters_common::{resolve_stdin_args, temp_file_extension_for_language};
+use crate::external_formatters_common::{
+    FormatterIoMode, log_formatter_invocation, log_formatter_nonzero_exit,
+    log_formatter_spawn_failed, log_formatter_success, log_formatter_timeout, resolve_stdin_args,
+    temp_file_extension_for_language,
+};
 
 /// Format a code block using an external formatter.
 ///
@@ -43,11 +48,13 @@ async fn format_with_stdin(
     timeout: Duration,
 ) -> Result<String, FormatterError> {
     let resolved_args = resolve_stdin_args(&config.args, language);
-    log::debug!(
-        "Invoking formatter (stdin): {} {}",
-        config.cmd,
-        resolved_args.join(" ")
+    log_formatter_invocation(
+        &config.cmd,
+        language,
+        FormatterIoMode::Stdin,
+        &resolved_args,
     );
+    let start = Instant::now();
 
     // Spawn the formatter process
     let mut child = Command::new(&config.cmd)
@@ -56,7 +63,10 @@ async fn format_with_stdin(
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .map_err(|e| FormatterError::SpawnFailed(format!("{}: {}", config.cmd, e)))?;
+        .map_err(|e| {
+            log_formatter_spawn_failed(&config.cmd, language, FormatterIoMode::Stdin, &e);
+            FormatterError::SpawnFailed(format!("{}: {}", config.cmd, e))
+        })?;
 
     // Write code to stdin
     let mut stdin = child.stdin.take().expect("stdin was piped");
@@ -69,19 +79,17 @@ async fn format_with_stdin(
     // Wait for process with timeout
     let output = tokio::time::timeout(timeout, child.wait_with_output())
         .await
-        .map_err(|_| FormatterError::Timeout)?
+        .map_err(|_| {
+            log_formatter_timeout(&config.cmd, language, FormatterIoMode::Stdin);
+            FormatterError::Timeout
+        })?
         .map_err(FormatterError::IoError)?;
 
     // Check exit status
     if !output.status.success() {
         let code = output.status.code().unwrap_or(-1);
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        log::warn!(
-            "Formatter '{}' failed with exit code {}: {}",
-            config.cmd,
-            code,
-            stderr
-        );
+        log_formatter_nonzero_exit(&config.cmd, language, FormatterIoMode::Stdin, code, &stderr);
         return Err(FormatterError::NonZeroExit { code, stderr });
     }
 
@@ -93,11 +101,12 @@ async fn format_with_stdin(
         ))
     })?;
 
-    log::debug!(
-        "Formatter '{}' succeeded ({} bytes -> {} bytes)",
-        config.cmd,
-        code.len(),
-        formatted.len()
+    log_formatter_success(
+        &config.cmd,
+        language,
+        FormatterIoMode::Stdin,
+        formatted.len(),
+        start.elapsed(),
     );
 
     Ok(formatted)
@@ -110,11 +119,7 @@ async fn format_with_file(
     config: &FormatterConfig,
     timeout: Duration,
 ) -> Result<String, FormatterError> {
-    log::debug!(
-        "Invoking formatter (file): {} {}",
-        config.cmd,
-        config.args.join(" ")
-    );
+    let start = Instant::now();
 
     // Create a temporary file using tempfile crate
     let mut temp_file = tempfile::Builder::new()
@@ -143,18 +148,30 @@ async fn format_with_file(
         args.push(temp_path.to_str().unwrap().to_string());
         args
     };
+    log_formatter_invocation(&config.cmd, language, FormatterIoMode::File, &args);
+    log::trace!(
+        "External formatter temp path ({}): {}",
+        config.cmd,
+        temp_path.display()
+    );
 
     // Spawn the formatter process
     let child = Command::new(&config.cmd)
         .args(&args)
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .map_err(|e| FormatterError::SpawnFailed(format!("{}: {}", config.cmd, e)))?;
+        .map_err(|e| {
+            log_formatter_spawn_failed(&config.cmd, language, FormatterIoMode::File, &e);
+            FormatterError::SpawnFailed(format!("{}: {}", config.cmd, e))
+        })?;
 
     // Wait for process with timeout
     let output = tokio::time::timeout(timeout, child.wait_with_output())
         .await
-        .map_err(|_| FormatterError::Timeout)?
+        .map_err(|_| {
+            log_formatter_timeout(&config.cmd, language, FormatterIoMode::File);
+            FormatterError::Timeout
+        })?
         .map_err(FormatterError::IoError)?;
 
     // Read formatted content from file (async read)
@@ -168,20 +185,16 @@ async fn format_with_file(
     if !output.status.success() {
         let code = output.status.code().unwrap_or(-1);
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        log::warn!(
-            "Formatter '{}' failed with exit code {}: {}",
-            config.cmd,
-            code,
-            stderr
-        );
+        log_formatter_nonzero_exit(&config.cmd, language, FormatterIoMode::File, code, &stderr);
         return Err(FormatterError::NonZeroExit { code, stderr });
     }
 
-    log::debug!(
-        "Formatter '{}' succeeded ({} bytes -> {} bytes)",
-        config.cmd,
-        code.len(),
-        formatted.len()
+    log_formatter_success(
+        &config.cmd,
+        language,
+        FormatterIoMode::File,
+        formatted.len(),
+        start.elapsed(),
     );
 
     Ok(formatted)
