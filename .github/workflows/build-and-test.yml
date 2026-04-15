@@ -86,71 +86,26 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-      release_created: ${{ steps.detect.outputs.release_created }}
-      tag_name: ${{ steps.detect.outputs.tag_name }}
+      release_created: ${{ steps.versionary.outputs.release_created }}
+      tag_name: ${{ steps.versionary.outputs.tag_name }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
 
-      - uses: actions/setup-node@v6
+      - id: versionary
+        uses: jolars/versionary@v1
         with:
-          node-version: 24
-
-      - name: Run Versionary
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          npx --yes versionary run
-
-      - id: detect
-        name: Detect release tag
-        shell: bash
-        run: |
-          TAG="$(git tag --points-at HEAD --list 'v*' --sort=-v:refname | head -n 1)"
-          if [[ -n "$TAG" ]]; then
-            echo "release_created=true" >> "$GITHUB_OUTPUT"
-            echo "tag_name=$TAG" >> "$GITHUB_OUTPUT"
-          else
-            echo "release_created=false" >> "$GITHUB_OUTPUT"
-            echo "tag_name=" >> "$GITHUB_OUTPUT"
-          fi
-
-  alias-root-tag:
-    name: Create v* compatibility tag
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' && startsWith(needs.release-please.outputs.tag_name, 'panache-v') }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Create compatibility tag
-        run: |
-          SOURCE_TAG="${{ needs.release-please.outputs.tag_name }}"
-          ALIAS_TAG="v${SOURCE_TAG#panache-v}"
-
-          if git ls-remote --tags origin "refs/tags/$ALIAS_TAG" | grep -q "$ALIAS_TAG"; then
-            echo "Compatibility tag already exists: $ALIAS_TAG"
-            exit 0
-          fi
-
-          git tag "$ALIAS_TAG" "${{ github.sha }}"
-          git push origin "$ALIAS_TAG"
+          github-token: ${{ secrets.RELEASE_TOKEN }}
 
   build-release-assets:
     name: Build & Upload Release Assets
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: versionary
+    if: ${{ needs.versionary.outputs.release_created == 'true' }}
     uses: ./.github/workflows/packages.yml
     with:
       upload: "true"
-      tag: ${{ needs.release-please.outputs.tag_name }}
+      tag: ${{ needs.versionary.outputs.tag_name }}
     permissions:
       contents: write
