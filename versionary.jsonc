@@ -1,26 +1,37 @@
 {
   "$schema": "https://raw.githubusercontent.com/jolars/versionary/main/schemas/config.json",
   "version": 1,
-  "review-mode": "review",
   "release-type": "rust",
-  "version-file": "Cargo.toml",
-  "changelog-file": "CHANGELOG.md",
-  "release-branch": "versionary/release",
-  "baseline-file": ".versionary-manifest.json",
   "bootstrap-sha": "073a42037348a9b2421b26d799e0cab4cd4b3d18",
   "bump-minor-pre-major": true,
   "include-commit-authors": true,
   "packages": {
     ".": {
+      "exclude-paths": [
+        "crates",
+        "editors"
+      ]
+    },
+    "crates/panache-parser": {
+      "release-type": "rust"
+    },
+    "crates/panache-formatter": {
+      "release-type": "rust"
+    },
+    "crates/panache-wasm": {
+      "release-type": "rust"
+    },
+    "editors/code": {
+      "release-type": "node",
+      "package-name": "panache-code"
+    },
+    "editors/zed": {
+      "release-type": "rust",
+      "package-name": "panache-zed",
       "extra-files": [
         {
-          "type": "json",
-          "path": "editors/code/package.json",
-          "jsonpath": "$.version"
-        },
-        {
           "type": "toml",
-          "path": "editors/zed/extension.toml",
+          "path": "extension.toml",
           "jsonpath": "$.version"
         }
       ]
