@@ -127,7 +127,7 @@ jobs:
           echo "- Scanned extensions: \`.md\`, \`.qmd\`, \`.Rmd\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload scan results artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: debug-format-repo-scan-results
           path: ${{ runner.temp }}/panache-debug-format-scan
