@@ -201,7 +201,10 @@ pub fn convert_to_bullet(list_node: &SyntaxNode, text: &str) -> Vec<TextEdit> {
 
             if let Some(checkbox) = task_checkbox_token(item.syntax()) {
                 let checkbox_start = offset_to_position(text, checkbox.text_range().start().into());
-                let checkbox_end = offset_to_position(text, checkbox.text_range().end().into());
+                let checkbox_end = offset_to_position(
+                    text,
+                    checkbox_removal_end_offset(text, checkbox.text_range().end().into()),
+                );
                 edits.push(TextEdit {
                     range: Range {
                         start: checkbox_start,
@@ -292,7 +295,10 @@ pub fn convert_task_to_ordered(list_node: &SyntaxNode, text: &str) -> Vec<TextEd
 
             if let Some(checkbox) = task_checkbox_token(item.syntax()) {
                 let checkbox_start = offset_to_position(text, checkbox.text_range().start().into());
-                let checkbox_end = offset_to_position(text, checkbox.text_range().end().into());
+                let checkbox_end = offset_to_position(
+                    text,
+                    checkbox_removal_end_offset(text, checkbox.text_range().end().into()),
+                );
                 edits.push(TextEdit {
                     range: Range {
                         start: checkbox_start,
@@ -322,10 +328,65 @@ fn task_checkbox_token(item_node: &SyntaxNode) -> Option<SyntaxToken> {
     })
 }
 
+fn checkbox_removal_end_offset(text: &str, checkbox_end: usize) -> usize {
+    match text.as_bytes().get(checkbox_end) {
+        Some(b' ' | b'\t') => checkbox_end + 1,
+        _ => checkbox_end,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::parse;
+    use tower_lsp_server::ls_types::Position;
+
+    fn apply_text_edits(input: &str, edits: &[TextEdit]) -> String {
+        fn position_to_offset(text: &str, position: Position) -> usize {
+            let target_line = position.line as usize;
+            let target_char = position.character as usize;
+            let mut line = 0usize;
+            let mut col = 0usize;
+
+            for (idx, ch) in text.char_indices() {
+                if line == target_line && col == target_char {
+                    return idx;
+                }
+                if ch == '\n' {
+                    line += 1;
+                    col = 0;
+                } else {
+                    col += 1;
+                }
+            }
+            text.len()
+        }
+
+        let mut result = input.to_string();
+        let mut sorted = edits.to_vec();
+        sorted.sort_by(|a, b| {
+            let key_a = (
+                a.range.start.line,
+                a.range.start.character,
+                a.range.end.line,
+                a.range.end.character,
+            );
+            let key_b = (
+                b.range.start.line,
+                b.range.start.character,
+                b.range.end.line,
+                b.range.end.character,
+            );
+            key_b.cmp(&key_a)
+        });
+
+        for edit in sorted {
+            let start = position_to_offset(&result, edit.range.start);
+            let end = position_to_offset(&result, edit.range.end);
+            result.replace_range(start..end, &edit.new_text);
+        }
+        result
+    }
 
     #[test]
     fn find_list_at_position_finds_innermost() {
@@ -518,6 +579,8 @@ mod tests {
         assert_eq!(edits[1].new_text, "");
         assert_eq!(edits[2].new_text, "-");
         assert_eq!(edits[3].new_text, "");
+        let output = apply_text_edits(input, &edits);
+        assert_eq!(output, "- First\n- Second\n");
     }
 
     #[test]
@@ -535,5 +598,7 @@ mod tests {
         assert_eq!(edits[1].new_text, "");
         assert_eq!(edits[2].new_text, "2.");
         assert_eq!(edits[3].new_text, "");
+        let output = apply_text_edits(input, &edits);
+        assert_eq!(output, "1. First\n2. Second\n");
     }
 }
