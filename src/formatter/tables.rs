@@ -1136,21 +1136,17 @@ fn extract_simple_table_columns(separator_text: &str) -> Vec<SimpleColumn> {
 
     for (i, ch) in trimmed.char_indices() {
         match ch {
-            '-' => {
-                if !in_dashes {
-                    col_start = i + leading_spaces;
-                    in_dashes = true;
-                }
+            '-' if !in_dashes => {
+                col_start = i + leading_spaces;
+                in_dashes = true;
             }
-            ' ' => {
-                if in_dashes {
-                    columns.push(SimpleColumn {
-                        start: col_start,
-                        end: i + leading_spaces,
-                        alignment: Alignment::Default,
-                    });
-                    in_dashes = false;
-                }
+            ' ' if in_dashes => {
+                columns.push(SimpleColumn {
+                    start: col_start,
+                    end: i + leading_spaces,
+                    alignment: Alignment::Default,
+                });
+                in_dashes = false;
             }
             _ => {}
         }
@@ -1300,39 +1296,38 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                     header_cells = None;
                 }
             }
-            SyntaxKind::TABLE_ROW => {
+            SyntaxKind::TABLE_ROW if !columns.is_empty() => {
                 // Data rows come after separator
-                if !columns.is_empty() {
-                    // Try to extract from TABLE_CELL nodes first
-                    let cells = extract_row_cells(&child, config);
+                // Try to extract from TABLE_CELL nodes first
+                let cells = extract_row_cells(&child, config);
 
-                    if !cells.is_empty() {
-                        // Check if this is actually a separator line (all cells are dashes/whitespace)
-                        let is_separator = cells
-                            .iter()
-                            .all(|cell| cell.trim().chars().all(|c| c == '-'));
+                if !cells.is_empty() {
+                    // Check if this is actually a separator line (all cells are dashes/whitespace)
+                    let is_separator = cells
+                        .iter()
+                        .all(|cell| cell.trim().chars().all(|c| c == '-'));
 
-                        if !is_separator {
-                            // Successfully extracted from TABLE_CELL nodes
-                            rows.push(cells);
-                        }
-                    } else {
-                        // Fall back to old approach (for backwards compatibility)
-                        let row_content = format_cell_content(&child, config);
+                    if !is_separator {
+                        // Successfully extracted from TABLE_CELL nodes
+                        rows.push(cells);
+                    }
+                } else {
+                    // Fall back to old approach (for backwards compatibility)
+                    let row_content = format_cell_content(&child, config);
 
-                        // Skip rows that are actually separator lines (for headerless tables)
-                        let is_separator = row_content
-                            .trim()
-                            .chars()
-                            .all(|c| c == '-' || c.is_whitespace());
+                    // Skip rows that are actually separator lines (for headerless tables)
+                    let is_separator = row_content
+                        .trim()
+                        .chars()
+                        .all(|c| c == '-' || c.is_whitespace());
 
-                        if !is_separator {
-                            let cells = split_simple_table_row(&row_content, &columns);
-                            rows.push(cells);
-                        }
+                    if !is_separator {
+                        let cells = split_simple_table_row(&row_content, &columns);
+                        rows.push(cells);
                     }
                 }
             }
+            SyntaxKind::TABLE_ROW => {}
             _ => {}
         }
     }
@@ -1685,17 +1680,13 @@ fn extract_multiline_columns(separator_line: &str) -> Vec<(usize, usize)> {
 
     for (i, ch) in line.char_indices() {
         match ch {
-            '-' => {
-                if !in_dashes {
-                    col_start = i;
-                    in_dashes = true;
-                }
+            '-' if !in_dashes => {
+                col_start = i;
+                in_dashes = true;
             }
-            ' ' => {
-                if in_dashes {
-                    columns.push((col_start, i));
-                    in_dashes = false;
-                }
+            ' ' if in_dashes => {
+                columns.push((col_start, i));
+                in_dashes = false;
             }
             _ => {}
         }

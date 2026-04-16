@@ -19,11 +19,9 @@ pub(crate) fn format_shortcode(node: &SyntaxNode) -> String {
 
     for child in node.children_with_tokens() {
         match child {
-            NodeOrToken::Token(t) => {
-                if t.kind() == SyntaxKind::SHORTCODE_MARKER_OPEN {
-                    // Determine if escaped based on marker
-                    is_escaped = t.text() == "{{{<";
-                }
+            NodeOrToken::Token(t) if t.kind() == SyntaxKind::SHORTCODE_MARKER_OPEN => {
+                // Determine if escaped based on marker
+                is_escaped = t.text() == "{{{<";
             }
             NodeOrToken::Node(n) if n.kind() == SyntaxKind::SHORTCODE_CONTENT => {
                 // Content is a node containing TEXT tokens

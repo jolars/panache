@@ -196,7 +196,7 @@ pub(crate) async fn code_action(
     }
 
     if !fix_all_edits.is_empty() {
-        fix_all_edits.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        fix_all_edits.sort_by_key(|a| (a.0, a.1));
         let mut selected_edits: Vec<(usize, usize, String)> = Vec::new();
         for edit in fix_all_edits {
             if selected_edits

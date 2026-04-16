@@ -322,12 +322,11 @@ impl Formatter {
                     seen_marker = true;
                 }
                 rowan::NodeOrToken::Node(n)
-                    if matches!(n.kind(), SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH) =>
+                    if matches!(n.kind(), SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH)
+                        && seen_marker =>
                 {
                     // Only return Plain/PARAGRAPH nodes that come after the marker
-                    if seen_marker {
-                        return Some(n);
-                    }
+                    return Some(n);
                 }
                 _ => {}
             }

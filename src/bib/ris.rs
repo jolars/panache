@@ -225,16 +225,14 @@ fn extract_full_entry(record: &RisRecord) -> Result<Option<ParsedEntry>, String>
             "ER" => {
                 has_er = true;
             }
-            "ID" => {
-                if id_value.is_none() && !tag.value.is_empty() {
-                    id_value = Some((
-                        tag.value.clone(),
-                        Span {
-                            start: tag.value_start,
-                            end: tag.value_end,
-                        },
-                    ));
-                }
+            "ID" if id_value.is_none() && !tag.value.is_empty() => {
+                id_value = Some((
+                    tag.value.clone(),
+                    Span {
+                        start: tag.value_start,
+                        end: tag.value_end,
+                    },
+                ));
             }
             _ => {
                 // Store other fields

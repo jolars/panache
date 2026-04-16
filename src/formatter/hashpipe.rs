@@ -372,10 +372,8 @@ fn hashpipe_flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
         token
     } else if let Some(token) = flow.single_quoted_scalar() {
         token
-    } else if let Some(token) = flow.double_qouted_scalar() {
-        token
     } else {
-        return None;
+        flow.double_qouted_scalar()?
     };
     let mut value = token.text().to_string();
     if token.kind() == yaml_parser::SyntaxKind::SINGLE_QUOTED_SCALAR {
