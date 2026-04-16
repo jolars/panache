@@ -15,3 +15,5 @@ updates:
     directory: "/editors/code"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "@types/vscode"
