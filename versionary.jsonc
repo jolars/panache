@@ -10,6 +10,7 @@
     ".": {
       "exclude-paths": [
         "crates/panache-parser",
+        "crates/panache-wasm",
         "editors"
       ]
     },
