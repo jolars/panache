@@ -3,7 +3,7 @@
   "version": 1,
   "review-mode": "review",
   "release-type": "rust",
-  "bootstrap-sha": "073a42037348a9b2421b26d799e0cab4cd4b3d18",
+  "bootstrap-sha": "8b9e8a5caceb441e00b6593bd8ea87d9b60ae92b",
   "bump-minor-pre-major": true,
   "include-commit-authors": true,
   "packages": {
