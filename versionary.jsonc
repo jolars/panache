@@ -15,10 +15,6 @@
     },
     "crates/panache-parser": {
     },
-    "crates/panache-formatter": {
-    },
-    "crates/panache-wasm": {
-    },
     "editors/code": {
       "release-type": "node",
       "package-name": "panache-code"
