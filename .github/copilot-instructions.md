@@ -330,9 +330,9 @@ Instead of listing every file, understand the patterns:
 - `ast.rs`: AstNode trait
 - Typed wrappers: `{headings,links,tables,references}.rs`
 
-**Tests** (`tests/`):
+**Top-level tests** (`tests/`):
 
-- `cases/*/`: Golden test scenarios (use `view` to explore)
+- `cases/*/`: Formatter golden scenarios (use `view` to explore)
 - `cli/`: CLI integration tests
 - `format/`: Feature-specific unit tests
 - YAML suite groundwork uses vendored fixtures under
@@ -344,6 +344,11 @@ Instead of listing every file, understand the patterns:
   shadow-mode-first effort toward full CST/LSP/formatting integration.
 - This YAML work is intentionally long-horizon (many months). Do not frame it as
   a near-term replacement for the existing `yaml_parser` dependency.
+
+**Parser-crate tests** (`crates/panache-parser/tests/`):
+
+- `fixtures/cases/*/` + `golden_parser_cases.rs`: parser golden scenarios
+  (losslessness + CST snapshots), separate from formatter golden cases.
 
 **Editor extension** (`editors/code/`):
 
