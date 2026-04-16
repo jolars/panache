@@ -241,6 +241,7 @@ golden_test_cases!(
     trailing_blanklines,
     umlauts,
     unicode,
+    issue_164_unicode_autolink_panic,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

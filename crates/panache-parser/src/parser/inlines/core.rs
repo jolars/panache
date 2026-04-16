@@ -722,7 +722,7 @@ fn parse_until_closer_with_nested_two(
                     "First * at pos {} is escaped, skipping to check second *",
                     pos
                 );
-                pos += 1;
+                pos = advance_char_boundary(text, pos, end);
                 continue;
             }
 
@@ -808,7 +808,7 @@ fn parse_until_closer_with_nested_two(
                             pos
                         );
                         // Not a valid closer, continue searching
-                        pos += 1;
+                        pos = advance_char_boundary(text, pos, end);
                         continue;
                     }
 
@@ -823,9 +823,8 @@ fn parse_until_closer_with_nested_two(
             }
         }
 
-        // Not a closer, move to next position
-        // TODO: Should skip entire characters (UTF-8), not just bytes
-        pos += 1;
+        // Not a closer, move to next UTF-8 boundary.
+        pos = advance_char_boundary(text, pos, end);
     }
 
     None
@@ -931,7 +930,7 @@ fn parse_until_closer_with_nested_one(
                 if is_escaped {
                     // Escaped delimiter - just literal text, skip it
                     log::trace!("* at pos {} is escaped, skipping", pos);
-                    pos += 1;
+                    pos = advance_char_boundary(text, pos, end);
                     continue;
                 }
 
@@ -950,7 +949,7 @@ fn parse_until_closer_with_nested_one(
                         "* at pos {} followed by whitespace, not an opener, skipping",
                         pos
                     );
-                    pos += 1;
+                    pos = advance_char_boundary(text, pos, end);
                     continue;
                 }
 
@@ -1031,7 +1030,7 @@ fn parse_until_closer_with_nested_one(
                             pos
                         );
                         // Not a valid closer, continue searching
-                        pos += 1;
+                        pos = advance_char_boundary(text, pos, end);
                         continue;
                     }
 
@@ -1046,9 +1045,8 @@ fn parse_until_closer_with_nested_one(
             }
         }
 
-        // Not a closer, move to next position
-        // TODO: Should skip entire characters (UTF-8), not just bytes
-        pos += 1;
+        // Not a closer, move to next UTF-8 boundary.
+        pos = advance_char_boundary(text, pos, end);
     }
 
     None
@@ -1100,6 +1098,18 @@ fn is_emoji_boundary(text: &str, pos: usize) -> bool {
         }
     }
     true
+}
+
+#[inline]
+fn advance_char_boundary(text: &str, pos: usize, end: usize) -> usize {
+    if pos >= end || pos >= text.len() {
+        return pos;
+    }
+    let ch_len = text[pos..]
+        .chars()
+        .next()
+        .map_or(1, std::primitive::char::len_utf8);
+    (pos + ch_len).min(end)
 }
 
 fn parse_inline_range_impl(
@@ -1220,7 +1230,7 @@ fn parse_inline_range_impl(
                 if !escape_enabled {
                     // Don't treat as hard line break - skip the escape and continue
                     // The backslash will be included in the next TEXT token
-                    pos += 1;
+                    pos = advance_char_boundary(text, pos, end);
                     continue;
                 }
 
@@ -1541,7 +1551,7 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
             builder.token(SyntaxKind::TEXT.into(), "$");
-            pos += 1;
+            pos = advance_char_boundary(text, pos, end);
             text_start = pos;
             continue;
         }
@@ -1897,7 +1907,7 @@ fn parse_inline_range_impl(
         }
 
         // Regular character, keep accumulating
-        pos += 1;
+        pos = advance_char_boundary(text, pos, end);
     }
 
     // Emit any remaining text
@@ -2168,6 +2178,37 @@ mod tests {
             !math_followed_by_text,
             "Attributes should not be parsed as TEXT"
         );
+    }
+
+    #[test]
+    fn test_autolink_bare_uri_utf8_boundary_safe() {
+        let text = "§";
+        let mut config = ParserOptions::default();
+        config.extensions.autolink_bare_uris = true;
+        let mut builder = GreenNodeBuilder::new();
+
+        builder.start_node(SyntaxKind::DOCUMENT.into());
+        parse_inline_text_recursive(&mut builder, text, &config);
+        builder.finish_node();
+
+        let green: GreenNode = builder.finish();
+        let node = SyntaxNode::new_root(green);
+        assert_eq!(node.text().to_string(), text);
+    }
+
+    #[test]
+    fn test_parse_emphasis_unicode_content_no_panic() {
+        let text = "*§*";
+        let config = ParserOptions::default();
+        let mut builder = GreenNodeBuilder::new();
+
+        let result = try_parse_emphasis(text, 0, text.len(), &config, &mut builder);
+        assert_eq!(result, Some((text.len(), 1)));
+
+        let green: GreenNode = builder.finish();
+        let node = SyntaxNode::new_root(green);
+        assert_eq!(node.kind(), SyntaxKind::EMPHASIS);
+        assert_eq!(node.text().to_string(), text);
     }
 }
 
