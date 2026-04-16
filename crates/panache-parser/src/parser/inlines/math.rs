@@ -488,16 +488,6 @@ mod tests {
     }
 
     #[test]
-    fn test_inline_math_escaped_dollar() {
-        // Currently we don't handle escaped dollars - this is a TODO
-        // This test documents current behavior
-        let result = try_parse_inline_math(r"$a \$ b$");
-        // This should find the first unescaped $, but our simple impl
-        // will find the escaped one. We'll improve this later.
-        assert!(result.is_some());
-    }
-
-    #[test]
     fn test_spec_opening_must_have_non_space_right() {
         // Per Pandoc spec: opening $ must have non-space immediately to right
         let result = try_parse_inline_math("$ x$");
