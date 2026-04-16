@@ -30,23 +30,16 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-          targets: wasm32-unknown-unknown
 
-      - name: Cache cargo registry
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
 
-      - name: Build
-        run: cargo build --verbose
+      - name: Install wasm target
+        if: matrix.os == 'ubuntu-latest'
+        run: rustup target add wasm32-unknown-unknown
 
       - name: Build panache-wasm
+        if: matrix.os == 'ubuntu-latest'
         run: cargo build -p panache-wasm --target wasm32-unknown-unknown --verbose
 
       - name: Install shfmt for external formatter tests
