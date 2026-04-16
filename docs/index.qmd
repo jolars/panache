@@ -72,8 +72,8 @@ to do that.
 ## Where to Go Next
 
 - [Getting Started](getting-started.qmd): A slightly more detailed guide on how
-  to get up and running with Panache, including setting up the language server
-  in your editor.
+  to get up and running with Panache, including integrating the language server
+  into your editor.
 - [User Guide](guide/index.qmd): detailed docs for formatting, linting, CLI, and
   editor integration.
 - [Configuration](guide/configuration.qmd): tune behavior with `panache.toml`.
