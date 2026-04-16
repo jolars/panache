@@ -1029,7 +1029,7 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "panache"
-version = "2.34.0"
+version = "2.35.0"
 dependencies = [
  "annotate-snippets",
  "assert_cmd",
@@ -1068,7 +1068,7 @@ dependencies = [
 
 [[package]]
 name = "panache-formatter"
-version = "0.1.1"
+version = "2.35.0"
 dependencies = [
  "insta",
  "log",
@@ -1081,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "panache-parser"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "insta",
  "log",
@@ -1095,7 +1095,7 @@ dependencies = [
 
 [[package]]
 name = "panache-wasm"
-version = "0.1.3"
+version = "2.35.0"
 dependencies = [
  "panache-formatter",
  "panache-parser",
@@ -1905,9 +1905,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.23.0"
+version = "1.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ac8b6f42ead25368cf5b098aeb3dc8a1a2c05a3eee8a9a1a68c640edbfc79d9"
+checksum = "ddd74a9687298c6858e9b88ec8935ec45d22e8fd5e6394fa1bd4e99a87789c76"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",
@@ -2390,7 +2390,7 @@ dependencies = [
 
 [[package]]
 name = "zed_panache"
-version = "2.34.0"
+version = "2.34.1"
 dependencies = [
  "zed_extension_api",
 ]

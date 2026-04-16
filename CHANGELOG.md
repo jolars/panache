@@ -1,4 +1,16 @@
-# Changelog
+## [2.35.0](https://github.com/jolars/panache/compare/v2.34.0...v2.35.0) (2026-04-16)
+
+### Features
+- add info-level debugging logs for external formatters ([`6228b55`](https://github.com/jolars/panache/commit/6228b5528121b2c2c27f51f1778b7a3e7bf024e4))
+
+### Bug Fixes
+- switch back to `v*` tagging for main program ([`9adc923`](https://github.com/jolars/panache/commit/9adc923ba70f396464cacf90dcaf50678a8c03b7))
+- **parser:** handle utf-8 properly ([`92da1cd`](https://github.com/jolars/panache/commit/92da1cd74108f1576a846287ee3c098c04614b1d)), closes [#164](https://github.com/jolars/panache/issues/164)
+- **lsp:** remove extra space in tasklist-bullet list action ([`6cc80b3`](https://github.com/jolars/panache/commit/6cc80b3eb8dd52a3b6e97a09133a8f54e905fb72))
+- **lsp:** convert to actual task list ([`233f47c`](https://github.com/jolars/panache/commit/233f47c9bd73f4b6db6bcbe0ea52cd10da75ddb3))
+- **parser:** handle utf-8 properly ([`92da1cd`](https://github.com/jolars/panache/commit/92da1cd74108f1576a846287ee3c098c04614b1d)), closes [#164](https://github.com/jolars/panache/issues/164)
+- switch back to `v*` tagging for main program ([`9adc923`](https://github.com/jolars/panache/commit/9adc923ba70f396464cacf90dcaf50678a8c03b7))
+- switch back to `v*` tagging for main program ([`9adc923`](https://github.com/jolars/panache/commit/9adc923ba70f396464cacf90dcaf50678a8c03b7))
 
 ## [2.34.0](https://github.com/jolars/panache/compare/panache-v2.33.1...panache-v2.34.0) (2026-04-14)
 

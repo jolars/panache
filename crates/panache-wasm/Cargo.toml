@@ -1,6 +1,6 @@
 [package]
 name = "panache-wasm"
-version = "0.1.3"
+version = "2.35.0"
 edition = "2024"
 publish = false
 
