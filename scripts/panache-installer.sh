@@ -39,8 +39,25 @@ asset="panache-${target}.tar.gz"
 
 resolve_download_url() {
   if [ -n "$TAG" ]; then
-    printf '%s\n' "https://github.com/${REPO}/releases/download/${TAG}/${asset}"
-    return 0
+    case "$TAG" in
+    v* | panache-v*)
+      tag_candidates="$TAG"
+      ;;
+    *)
+      tag_candidates="v${TAG} panache-v${TAG}"
+      ;;
+    esac
+
+    for tag_candidate in $tag_candidates; do
+      candidate_url="https://github.com/${REPO}/releases/download/${tag_candidate}/${asset}"
+      if curl --proto '=https' --tlsv1.2 -fsSLI "$candidate_url" >/dev/null 2>&1; then
+        printf '%s\n' "$candidate_url"
+        return 0
+      fi
+    done
+
+    echo "Could not find release asset ${asset} for PANACHE_TAG='${TAG}' in ${REPO}" >&2
+    exit 1
   fi
 
   api_url="https://api.github.com/repos/${REPO}/releases?per_page=100"

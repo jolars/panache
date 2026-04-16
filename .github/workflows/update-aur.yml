@@ -15,14 +15,14 @@ jobs:
   trigger-aur-update:
     name: Trigger AUR Update
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'panache-v')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')) }}
 
     steps:
       - name: Get latest release
         if: github.event_name == 'workflow_dispatch' && inputs.version == ''
         id: latest
         run: |
-          LATEST=$(gh api repos/${{ github.repository }}/releases --jq '[.[] | select(.tag_name | startswith("panache-v"))][0].tag_name')
+          LATEST=$(gh api repos/${{ github.repository }}/releases --jq '[.[] | select(.tag_name | startswith("v"))][0].tag_name')
           echo "version=$LATEST" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -67,7 +67,6 @@ jobs:
         if: ${{ inputs.version != '' || steps.latest.outputs.version != '' || steps.release_version.outputs.version != '' }}
         run: |
           VERSION="${{ inputs.version || steps.latest.outputs.version || steps.release_version.outputs.version }}"
-          VERSION="${VERSION#panache-v}"  # Remove monorepo tag prefix if present
           VERSION="${VERSION#v}"  # Remove plain 'v' prefix if present
           gh api repos/jolars/panache-aur/dispatches \
             -f event_type=new-release \

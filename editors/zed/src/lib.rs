@@ -55,7 +55,10 @@ impl PanacheExtension {
             let Some(tag_name) = release.get("tag_name").and_then(|value| value.as_str()) else {
                 continue;
             };
-            let Some(version) = tag_name.strip_prefix("panache-v") else {
+            let Some(version) = tag_name
+                .strip_prefix("v")
+                .or_else(|| tag_name.strip_prefix("panache-v"))
+            else {
                 continue;
             };
 
@@ -98,7 +101,10 @@ impl PanacheExtension {
             });
         }
 
-        Err("No stable GitHub release matching panache-v* with assets found".to_string())
+        Err(
+            "No stable GitHub release matching v* (or legacy panache-v*) with assets found"
+                .to_string(),
+        )
     }
 
     fn language_server_binary(
@@ -393,6 +399,28 @@ mod test {
         assert_eq!(
             release.assets[0].download_url,
             "https://example.com/stable.tar.gz"
+        );
+    }
+
+    #[test]
+    fn test_latest_panache_release_supports_plain_v_tags() {
+        let body = r#"
+[
+  {
+    "tag_name": "v2.35.0",
+    "prerelease": false,
+    "assets": [
+      { "name": "panache-x86_64-unknown-linux-gnu.tar.gz", "browser_download_url": "https://example.com/v-tag.tar.gz" }
+    ]
+  }
+]
+"#;
+
+        let release = PanacheExtension::latest_panache_release_from_json(body.as_bytes()).unwrap();
+        assert_eq!(release.version, "2.35.0");
+        assert_eq!(
+            release.assets[0].download_url,
+            "https://example.com/v-tag.tar.gz"
         );
     }
 }

@@ -85,7 +85,7 @@
         "panache.releaseTag": {
           "type": "string",
           "default": "latest",
-          "description": "Advanced override for exact GitHub release tag (for example: panache-v2.16.0 or v2.16.0). If explicitly set, this takes precedence over panache.version."
+          "description": "Advanced override for exact GitHub release tag (for example: v2.16.0; legacy panache-v2.16.0 also supported). If explicitly set, this takes precedence over panache.version."
         },
         "panache.githubRepo": {
           "type": "string",

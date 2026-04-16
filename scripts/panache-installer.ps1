@@ -23,7 +23,24 @@ function Resolve-DownloadUrl {
     )
 
     if ($Tag) {
-        return "https://github.com/$Repository/releases/download/$Tag/$AssetName"
+        if ($Tag -match '^(v|panache-v)') {
+            $tagCandidates = @($Tag)
+        } else {
+            $tagCandidates = @("v$Tag", "panache-v$Tag")
+        }
+
+        foreach ($tagCandidate in $tagCandidates) {
+            $candidateUrl = "https://github.com/$Repository/releases/download/$tagCandidate/$AssetName"
+            try {
+                Invoke-WebRequest -Method Head -Uri $candidateUrl | Out-Null
+                return $candidateUrl
+            }
+            catch {
+                continue
+            }
+        }
+
+        throw "Could not find release asset $AssetName for PANACHE_TAG='$Tag' in $Repository."
     }
 
     $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases?per_page=100"

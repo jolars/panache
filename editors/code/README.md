@@ -64,7 +64,7 @@ Use `panache.releaseTag` only if you need an exact tag override:
 
 ```json
 {
-  "panache.releaseTag": "panache-v2.20.0"
+  "panache.releaseTag": "v2.20.0"
 }
 ```
 
