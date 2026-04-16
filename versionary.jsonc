@@ -9,7 +9,7 @@
   "packages": {
     ".": {
       "exclude-paths": [
-        "crates",
+        "crates/panache-parser",
         "editors"
       ]
     },
