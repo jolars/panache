@@ -95,6 +95,8 @@ jobs:
           fetch-tags: true
           token: ${{ secrets.RELEASE_TOKEN }}
 
+      - uses: dtolnay/rust-toolchain@master
+
       - id: versionary
         uses: jolars/versionary@v0
         with:
