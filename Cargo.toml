@@ -28,7 +28,6 @@ members = [
     "crates/panache-parser",
     "crates/panache-formatter",
     "crates/panache-wasm",
-    "editors/zed",
 ]
 
 [lib]
