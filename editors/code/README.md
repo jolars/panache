@@ -115,4 +115,4 @@ releases configured by `panache.githubRepo` and either `panache.version` or
 ## Links
 
 - Main repository: <https://github.com/jolars/panache>
-- Documentation: <https://jolars.github.io/panache/>
+- Documentation: <https://panache.bz>
