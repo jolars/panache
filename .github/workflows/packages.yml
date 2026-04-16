@@ -86,7 +86,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           targets: ${{ matrix.target }}
-          toolchain: 1.94
+          toolchain: 1.94.1
 
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@v2

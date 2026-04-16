@@ -28,7 +28,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.94
+          toolchain: 1.94.1
 
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@v2
@@ -89,7 +89,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.94
+          toolchain: 1.94.1
 
       - id: versionary
         uses: jolars/versionary@v0

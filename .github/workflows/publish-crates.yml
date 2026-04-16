@@ -27,7 +27,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.94
+          toolchain: 1.94.1
 
       - run: cargo publish --workspace --locked
         env:
