@@ -1,0 +1,26 @@
+{
+  "manifest-version": 1,
+  "baseline-sha": "0291473726f830dda789d93508405180c43948d6",
+  "release-targets": [
+    {
+      "path": ".",
+      "version": "2.35.0",
+      "tag": "v2.35.0"
+    },
+    {
+      "path": "crates/panache-parser",
+      "version": "0.3.1",
+      "tag": "panache-parser-v0.3.1"
+    },
+    {
+      "path": "editors/code",
+      "version": "2.34.1",
+      "tag": "panache-code-v2.34.1"
+    },
+    {
+      "path": "editors/zed",
+      "version": "2.34.1",
+      "tag": "panache-zed-v2.34.1"
+    }
+  ]
+}
