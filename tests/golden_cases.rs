@@ -235,6 +235,7 @@ golden_test_cases!(
     trailing_blanklines,
     umlauts,
     unicode,
+    issue_171_gfm_inline_links,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,
