@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/jolars/versionary/main/schemas/config.json",
   "version": 1,
+  "review-mode": "review",
   "release-type": "rust",
   "bootstrap-sha": "073a42037348a9b2421b26d799e0cab4cd4b3d18",
   "bump-minor-pre-major": true,
