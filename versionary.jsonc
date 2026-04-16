@@ -13,8 +13,7 @@
         "editors"
       ]
     },
-    "crates/panache-parser": {
-    },
+    "crates/panache-parser": {},
     "editors/code": {
       "release-type": "node",
       "package-name": "panache-code"
