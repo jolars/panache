@@ -24,5 +24,3 @@
 
 * **editors:** update config for new tag scheme ([31378e2](https://github.com/jolars/panache/commit/31378e2fac045072e1f1ccbbeeeebc8601903d35))
 * refine tag handling when finding release binaries ([aa086bd](https://github.com/jolars/panache/commit/aa086bd8a7d88f59bd8a3161c3f6a526c2a0f05b))
-
-## Changelog
