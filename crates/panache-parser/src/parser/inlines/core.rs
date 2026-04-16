@@ -2181,6 +2181,53 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_inline_text_gfm_inline_link_destination_not_autolinked() {
+        use crate::options::{Extensions, Flavor};
+
+        let config = ParserOptions {
+            flavor: Flavor::Gfm,
+            extensions: Extensions::for_flavor(Flavor::Gfm),
+            ..ParserOptions::default()
+        };
+
+        let mut builder = GreenNodeBuilder::new();
+        builder.start_node(SyntaxKind::PARAGRAPH.into());
+        parse_inline_text_recursive(
+            &mut builder,
+            "Second Link [link_text](https://link.com)",
+            &config,
+        );
+        builder.finish_node();
+        let green = builder.finish();
+        let root = SyntaxNode::new_root(green);
+
+        let links: Vec<_> = root
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::LINK)
+            .collect();
+        assert_eq!(
+            links.len(),
+            1,
+            "Expected exactly one LINK node for inline link, not nested bare URI autolink"
+        );
+
+        let link = links[0].clone();
+        let mut link_text = None::<String>;
+        let mut link_dest = None::<String>;
+
+        for child in link.children() {
+            match child.kind() {
+                SyntaxKind::LINK_TEXT => link_text = Some(child.text().to_string()),
+                SyntaxKind::LINK_DEST => link_dest = Some(child.text().to_string()),
+                _ => {}
+            }
+        }
+
+        assert_eq!(link_text.as_deref(), Some("link_text"));
+        assert_eq!(link_dest.as_deref(), Some("https://link.com"));
+    }
+
+    #[test]
     fn test_autolink_bare_uri_utf8_boundary_safe() {
         let text = "§";
         let mut config = ParserOptions::default();

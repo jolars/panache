@@ -490,6 +490,7 @@ impl Extensions {
         ext.fenced_code_blocks = true;
         ext.footnotes = true;
         ext.gfm_auto_identifiers = true;
+        ext.inline_links = true;
         ext.pipe_tables = true;
         ext.raw_html = true;
         ext.strikeout = true;
