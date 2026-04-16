@@ -22,7 +22,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.version == ''
         id: latest
         run: |
-          LATEST=$(gh api repos/${{ github.repository }}/releases --jq '[.[] | select(.tag_name | startswith("v"))][0].tag_name')
+          LATEST=$(gh api repos/${{ github.repository }}/releases --jq '[.[] | select(.draft == false and .prerelease == false and (.tag_name | startswith("v")))] | .[0].tag_name')
           echo "version=$LATEST" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
