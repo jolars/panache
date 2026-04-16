@@ -31,7 +31,7 @@ When `panache.version` is set to `latest`, the extension automatically skips
 component-only tags and selects the most recent stable CLI release that contains
 a matching platform asset.
 
-You can also provide your own binary path:
+You can also provide your own path to the binary:
 
 ```json
 {
