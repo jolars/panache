@@ -99,15 +99,15 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                     }
                     content_indent_so_far += *content_col;
                 }
-                crate::parser::utils::container_stack::Container::DefinitionItem { .. } => {
-                    if next_is_definition_marker {
-                        keep_level = i + 1;
-                    }
+                crate::parser::utils::container_stack::Container::DefinitionItem { .. }
+                    if next_is_definition_marker =>
+                {
+                    keep_level = i + 1;
                 }
-                crate::parser::utils::container_stack::Container::DefinitionList { .. } => {
-                    if next_is_definition_marker || next_is_definition_term {
-                        keep_level = i + 1;
-                    }
+                crate::parser::utils::container_stack::Container::DefinitionList { .. }
+                    if next_is_definition_marker || next_is_definition_term =>
+                {
+                    keep_level = i + 1;
                 }
                 crate::parser::utils::container_stack::Container::List {
                     marker,

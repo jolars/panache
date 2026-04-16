@@ -79,21 +79,17 @@ fn extract_columns(separator: &str, offset: usize) -> Vec<Column> {
 
     for (i, ch) in separator.char_indices() {
         match ch {
-            '-' => {
-                if !in_dashes {
-                    col_start = i + offset;
-                    in_dashes = true;
-                }
+            '-' if !in_dashes => {
+                col_start = i + offset;
+                in_dashes = true;
             }
-            ' ' => {
-                if in_dashes {
-                    columns.push(Column {
-                        start: col_start,
-                        end: i + offset,
-                        alignment: Alignment::Default, // Will be determined later
-                    });
-                    in_dashes = false;
-                }
+            ' ' if in_dashes => {
+                columns.push(Column {
+                    start: col_start,
+                    end: i + offset,
+                    alignment: Alignment::Default, // Will be determined later
+                });
+                in_dashes = false;
             }
             _ => {}
         }

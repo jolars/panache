@@ -1081,15 +1081,11 @@ fn emit_chunk_options(builder: &mut GreenNodeBuilder<'static>, content: &str) {
                                     break; // End of chunk options
                                 }
                             }
-                            ',' => {
-                                if depth == 0 {
-                                    break; // Next option
-                                }
+                            ',' if depth == 0 => {
+                                break; // Next option
                             }
-                            ' ' | '\t' => {
-                                if depth == 0 {
-                                    break; // Space separator
-                                }
+                            ' ' | '\t' if depth == 0 => {
+                                break; // Space separator
                             }
                             _ => {}
                         }

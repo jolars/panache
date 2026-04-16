@@ -367,15 +367,11 @@ fn is_unclosed_flow_collection(value: &str) -> bool {
             '\'' if !in_double => in_single = !in_single,
             '"' if !in_single => in_double = !in_double,
             '[' | '{' if !in_single && !in_double => stack.push(ch),
-            ']' if !in_single && !in_double => {
-                if stack.pop() != Some('[') {
-                    return false;
-                }
+            ']' if !in_single && !in_double && stack.pop() != Some('[') => {
+                return false;
             }
-            '}' if !in_single && !in_double => {
-                if stack.pop() != Some('{') {
-                    return false;
-                }
+            '}' if !in_single && !in_double && stack.pop() != Some('{') => {
+                return false;
             }
             _ => {}
         }
