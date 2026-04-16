@@ -21,7 +21,6 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [stable]
 
     steps:
       - uses: actions/checkout@v6
@@ -29,7 +28,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: 1.94
 
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@v2
@@ -88,7 +87,9 @@ jobs:
           fetch-tags: true
           token: ${{ secrets.RELEASE_TOKEN }}
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94
 
       - id: versionary
         uses: jolars/versionary@v0

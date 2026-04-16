@@ -83,9 +83,10 @@ jobs:
           ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           targets: ${{ matrix.target }}
+          toolchain: 1.94
 
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@v2

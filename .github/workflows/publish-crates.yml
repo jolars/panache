@@ -25,7 +25,9 @@ jobs:
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94
 
       - run: cargo publish --workspace --locked
         env:

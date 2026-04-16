@@ -81,11 +81,11 @@
         "nixpkgs-src": "nixpkgs-src"
       },
       "locked": {
-        "lastModified": 1776097194,
-        "narHash": "sha256-XD4DsgNcfXC5nlCxlAcCP5hSjTYlgLXEIoTj7fKkQg4=",
+        "lastModified": 1776348333,
+        "narHash": "sha256-ZyrYhlLGGuN5ieW7pE65meJJYnNz5el9vJtGBEJyDMQ=",
         "owner": "cachix",
         "repo": "devenv-nixpkgs",
-        "rev": "6e8a07b02f6f8557ffab71274feac9827bcc2532",
+        "rev": "efff47329167854ce48541c7ef731bf120753c7e",
         "type": "github"
       },
       "original": {
