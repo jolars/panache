@@ -77,7 +77,10 @@ pub(crate) fn try_parse_native_span(text: &str) -> Option<(usize, &str, String)>
 
     while pos < text.len() && depth > 0 {
         // Check for nested <span>
-        if text[pos..].starts_with("<span") {
+        if bytes
+            .get(pos..)
+            .is_some_and(|tail| tail.starts_with(b"<span"))
+        {
             // Make sure it's actually a span tag (space or > follows)
             let check_pos = pos + 5;
             if check_pos < text.len() {
@@ -91,7 +94,10 @@ pub(crate) fn try_parse_native_span(text: &str) -> Option<(usize, &str, String)>
         }
 
         // Check for closing </span>
-        if text[pos..].starts_with("</span>") {
+        if bytes
+            .get(pos..)
+            .is_some_and(|tail| tail.starts_with(b"</span>"))
+        {
             depth -= 1;
             if depth == 0 {
                 // Found the matching closing tag
@@ -103,7 +109,9 @@ pub(crate) fn try_parse_native_span(text: &str) -> Option<(usize, &str, String)>
             continue;
         }
 
-        pos += 1;
+        // Advance by UTF-8 char length so subsequent string slicing stays on
+        // char boundaries.
+        pos += text[pos..].chars().next().map_or(1, char::len_utf8);
     }
 
     // No matching closing tag found
@@ -226,5 +234,14 @@ mod tests {
     fn test_parse_span_trailing_text() {
         let result = try_parse_native_span("<span>text</span> more");
         assert_eq!(result, Some((17, "text", String::new())));
+    }
+
+    #[test]
+    fn test_parse_span_with_non_ascii_content() {
+        let result = try_parse_native_span(r#"<span class="rtl">(شربنا من النيل)</span>"#);
+        assert_eq!(
+            result,
+            Some((53, "(شربنا من النيل)", r#"class="rtl""#.to_string()))
+        );
     }
 }

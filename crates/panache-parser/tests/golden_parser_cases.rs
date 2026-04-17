@@ -243,6 +243,7 @@ golden_test_cases!(
     unicode,
     issue_164_unicode_autolink_panic,
     issue_174_blockquote_list_reorder_losslessness,
+    issue_175_native_span_unicode_panic,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

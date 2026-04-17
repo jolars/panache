@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 96
+expression: cst_output
+---
+DOCUMENT@0..122
+  PARAGRAPH@0..122
+    BRACKETED_SPAN@0..53
+      SPAN_BRACKET_OPEN@0..5 "<span"
+      WHITESPACE@5..6 " "
+      SPAN_ATTRIBUTES@6..17 "class=\"rtl\""
+      SPAN_BRACKET_OPEN@17..18 ">"
+      SPAN_CONTENT@18..46
+        TEXT@18..46 "(شربنا من ال ..."
+      SPAN_BRACKET_CLOSE@46..53 "</span>"
+    TEXT@53..121 " and feel part of it. ..."
+    NEWLINE@121..122 "\n"
