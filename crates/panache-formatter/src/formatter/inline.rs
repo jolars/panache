@@ -51,8 +51,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                             result.push_str(
                                 normalize_smart_punctuation(
                                     tok.text(),
-                                    config.extensions.smart,
-                                    config.extensions.smart_quotes,
+                                    config.formatter_extensions.smart,
+                                    config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );
@@ -87,8 +87,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                             content.push_str(
                                 normalize_smart_punctuation(
                                     t.text(),
-                                    config.extensions.smart,
-                                    config.extensions.smart_quotes,
+                                    config.formatter_extensions.smart,
+                                    config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );
@@ -191,8 +191,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                             content.push_str(
                                 normalize_smart_punctuation(
                                     t.text(),
-                                    config.extensions.smart,
-                                    config.extensions.smart_quotes,
+                                    config.formatter_extensions.smart,
+                                    config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );
@@ -233,8 +233,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                             content.push_str(
                                 normalize_smart_punctuation(
                                     t.text(),
-                                    config.extensions.smart,
-                                    config.extensions.smart_quotes,
+                                    config.formatter_extensions.smart,
+                                    config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );
@@ -295,8 +295,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         result.push_str(
                             normalize_smart_punctuation(
                                 t.text(),
-                                config.extensions.smart,
-                                config.extensions.smart_quotes,
+                                config.formatter_extensions.smart,
+                                config.formatter_extensions.smart_quotes,
                             )
                             .as_ref(),
                         );
@@ -322,8 +322,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                                         result.push_str(
                                             normalize_smart_punctuation(
                                                 t.text(),
-                                                config.extensions.smart,
-                                                config.extensions.smart_quotes,
+                                                config.formatter_extensions.smart,
+                                                config.formatter_extensions.smart_quotes,
                                             )
                                             .as_ref(),
                                         );
@@ -520,7 +520,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
         SyntaxKind::HARD_LINE_BREAK => {
             // Normalize hard line breaks to backslash-newline when escaped_line_breaks is enabled
             // Otherwise preserve original format (trailing spaces)
-            if config.extensions.escaped_line_breaks {
+            if config.formatter_extensions.escaped_line_breaks {
                 "\\\n".to_string()
             } else {
                 node.text().to_string()
@@ -544,8 +544,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                             content.push_str(
                                 normalize_smart_punctuation(
                                     t.text(),
-                                    config.extensions.smart,
-                                    config.extensions.smart_quotes,
+                                    config.formatter_extensions.smart,
+                                    config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );
@@ -577,8 +577,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         result.push_str(
                             normalize_smart_punctuation(
                                 tok.text(),
-                                config.extensions.smart,
-                                config.extensions.smart_quotes,
+                                config.formatter_extensions.smart,
+                                config.formatter_extensions.smart_quotes,
                             )
                             .as_ref(),
                         );
@@ -609,8 +609,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         result.push_str(
                             normalize_smart_punctuation(
                                 tok.text(),
-                                config.extensions.smart,
-                                config.extensions.smart_quotes,
+                                config.formatter_extensions.smart,
+                                config.formatter_extensions.smart_quotes,
                             )
                             .as_ref(),
                         );

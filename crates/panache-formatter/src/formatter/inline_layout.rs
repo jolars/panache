@@ -517,8 +517,8 @@ fn append_link_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
                         | SyntaxKind::TEXT => out.push_str(
                             normalize_smart_punctuation(
                                 t.text(),
-                                config.extensions.smart,
-                                config.extensions.smart_quotes,
+                                config.formatter_extensions.smart,
+                                config.formatter_extensions.smart_quotes,
                             )
                             .as_ref(),
                         ),
@@ -557,8 +557,8 @@ fn append_image_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
                         | SyntaxKind::TEXT => out.push_str(
                             normalize_smart_punctuation(
                                 t.text(),
-                                config.extensions.smart,
-                                config.extensions.smart_quotes,
+                                config.formatter_extensions.smart,
+                                config.formatter_extensions.smart_quotes,
                             )
                             .as_ref(),
                         ),
@@ -711,7 +711,7 @@ fn process_node_recursive(
             NodeOrToken::Token(t) => match t.kind() {
                 SyntaxKind::HARD_LINE_BREAK => {
                     skip_marker_whitespace = false;
-                    let marker = if config.extensions.escaped_line_breaks {
+                    let marker = if config.formatter_extensions.escaped_line_breaks {
                         "\\"
                     } else {
                         t.text().trim_end_matches(['\r', '\n'])
@@ -754,8 +754,8 @@ fn process_node_recursive(
                     skip_marker_whitespace = false;
                     let raw = normalize_smart_punctuation(
                         t.text(),
-                        config.extensions.smart,
-                        config.extensions.smart_quotes,
+                        config.formatter_extensions.smart,
+                        config.formatter_extensions.smart_quotes,
                     );
                     let text = expand_tabs_with_width(raw.as_ref(), config.tab_width);
                     if text.as_ref().contains("[@") && text.as_ref().contains("]:") {
@@ -958,7 +958,7 @@ fn process_node_recursive(
                     skip_marker_whitespace = false;
                     let mut trailing_attrs = None;
                     let mut consumed_interstitial_whitespace = false;
-                    if config.extensions.quarto_crossrefs {
+                    if config.formatter_extensions.quarto_crossrefs {
                         if let Some(NodeOrToken::Token(t)) = children.peek()
                             && t.kind() == SyntaxKind::WHITESPACE
                         {

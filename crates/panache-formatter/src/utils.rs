@@ -1,4 +1,4 @@
-use crate::config::Extensions;
+use crate::config::FormatterExtensions;
 use crate::syntax::{AstNode, Heading, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::collections::HashMap;
@@ -208,7 +208,10 @@ pub struct ImplicitHeadingId {
     pub heading: SyntaxNode,
 }
 
-pub fn implicit_heading_ids(tree: &SyntaxNode, extensions: &Extensions) -> Vec<ImplicitHeadingId> {
+pub fn implicit_heading_ids(
+    tree: &SyntaxNode,
+    extensions: &FormatterExtensions,
+) -> Vec<ImplicitHeadingId> {
     let mut out = Vec::new();
     let mut seen: HashMap<String, usize> = HashMap::new();
 
@@ -245,7 +248,7 @@ pub fn implicit_heading_ids(tree: &SyntaxNode, extensions: &Extensions) -> Vec<I
 }
 
 /// Generate an auto identifier from heading text based on extension settings.
-pub fn heading_slugify(text: &str, extensions: &Extensions) -> String {
+pub fn heading_slugify(text: &str, extensions: &FormatterExtensions) -> String {
     if extensions.gfm_auto_identifiers {
         gfm_slugify(text)
     } else {
@@ -314,6 +317,7 @@ pub fn pandoc_slugify(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{crossref_resolution_labels, implicit_heading_ids};
+    use crate::config::FormatterExtensions;
 
     #[test]
     fn crossref_resolution_labels_keep_exact_match() {
@@ -330,7 +334,7 @@ mod tests {
     #[test]
     fn implicit_heading_ids_use_pandoc_duplicate_suffixes() {
         let tree = crate::parser::parse("# Heading\n\n# Heading\n\n# Heading\n", None);
-        let ids = implicit_heading_ids(&tree, &crate::config::Extensions::default())
+        let ids = implicit_heading_ids(&tree, &FormatterExtensions::default())
             .into_iter()
             .map(|entry| entry.id)
             .collect::<Vec<_>>();
@@ -340,9 +344,9 @@ mod tests {
     #[test]
     fn implicit_heading_ids_use_gfm_slug_algorithm_when_enabled() {
         let tree = crate::parser::parse("# 3. Applications\n", None);
-        let ext = crate::config::Extensions {
+        let ext = FormatterExtensions {
             gfm_auto_identifiers: true,
-            ..crate::config::Extensions::default()
+            ..FormatterExtensions::default()
         };
         let ids = implicit_heading_ids(&tree, &ext)
             .into_iter()

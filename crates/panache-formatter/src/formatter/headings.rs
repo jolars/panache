@@ -32,8 +32,8 @@ pub(super) fn format_heading(node: &SyntaxNode, config: &Config) -> String {
                 }
                 content = normalize_smart_punctuation(
                     t.trim(),
-                    config.extensions.smart,
-                    config.extensions.smart_quotes,
+                    config.formatter_extensions.smart,
+                    config.formatter_extensions.smart_quotes,
                 )
                 .to_string();
                 saw_content = true;

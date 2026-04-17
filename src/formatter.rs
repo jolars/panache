@@ -38,6 +38,17 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         crate::config::BlankLines::Preserve => panache_formatter::BlankLines::Preserve,
         crate::config::BlankLines::Collapse => panache_formatter::BlankLines::Collapse,
     };
+    let formatter_extensions = panache_formatter::config::FormatterExtensions {
+        // Keep shared extension behavior aligned with parser-facing extensions.
+        blank_before_header: config.extensions.blank_before_header,
+        bookdown_references: config.extensions.bookdown_references,
+        escaped_line_breaks: config.extensions.escaped_line_breaks,
+        gfm_auto_identifiers: config.extensions.gfm_auto_identifiers,
+        quarto_crossrefs: config.extensions.quarto_crossrefs,
+        // Formatter-only smart toggles are owned separately.
+        smart: config.formatter_extensions.smart,
+        smart_quotes: config.formatter_extensions.smart_quotes,
+    };
 
     let formatters: HashMap<String, Vec<panache_formatter::config::FormatterConfig>> = config
         .formatters
@@ -58,7 +69,8 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
 
     panache_formatter::Config {
         flavor: config.flavor,
-        extensions: config.extensions.clone(),
+        parser_extensions: config.extensions.clone(),
+        formatter_extensions,
         line_ending,
         line_width: config.line_width,
         math_indent: config.math_indent,

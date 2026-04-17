@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
+use panache_formatter::config::FormatterExtensions;
 use panache_parser::{Extensions, Flavor, PandocCompat, ParserOptions};
 
 use super::formatter_presets;
@@ -646,6 +647,10 @@ impl RawConfig {
 
         Config {
             extensions: super::resolve_extensions_for_flavor(self.extensions.as_ref(), self.flavor),
+            formatter_extensions: super::resolve_formatter_extensions_for_flavor(
+                self.extensions.as_ref(),
+                self.flavor,
+            ),
             line_ending: self.line_ending.or(Some(LineEnding::Auto)),
             flavor: self.flavor,
             line_width: self.line_width,
@@ -860,6 +865,7 @@ fn resolve_old_format_definition(
 pub struct Config {
     pub flavor: Flavor,
     pub extensions: Extensions,
+    pub formatter_extensions: FormatterExtensions,
     pub line_ending: Option<LineEnding>,
     pub line_width: usize,
     pub math_indent: usize,
@@ -902,6 +908,7 @@ impl Default for Config {
         Self {
             flavor,
             extensions: Extensions::for_flavor(flavor),
+            formatter_extensions: FormatterExtensions::for_flavor(flavor),
             line_ending: Some(LineEnding::Auto),
             line_width: 80,
             math_indent: 0,

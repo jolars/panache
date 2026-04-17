@@ -91,7 +91,9 @@ pub fn format_qmd_with_options(
         let parsed = parse_flavor(&flavor)
             .ok_or_else(|| JsValue::from_str(&format!("Unsupported flavor: {flavor}")))?;
         cfg.flavor = parsed;
-        cfg.extensions = panache_formatter::config::Extensions::for_flavor(parsed);
+        cfg.parser_extensions = panache_formatter::config::ParserExtensions::for_flavor(parsed);
+        cfg.formatter_extensions =
+            panache_formatter::config::FormatterExtensions::for_flavor(parsed);
     }
 
     if let Some(wrap) = wrap {

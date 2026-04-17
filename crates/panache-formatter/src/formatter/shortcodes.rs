@@ -145,14 +145,15 @@ mod tests {
 
     #[test]
     fn end_to_end_formatting_with_quotes() {
-        use crate::config::{Extensions, Flavor};
+        use crate::config::{Flavor, FormatterExtensions, ParserExtensions};
         use crate::{Config, format};
 
         let input = "{{< video src=\"https://example.com/video.mp4\" >}}";
         let flavor = Flavor::Quarto;
         let config = Config {
             flavor,
-            extensions: Extensions::for_flavor(flavor),
+            parser_extensions: ParserExtensions::for_flavor(flavor),
+            formatter_extensions: FormatterExtensions::for_flavor(flavor),
             ..Default::default()
         };
 
@@ -165,14 +166,15 @@ mod tests {
 
     #[test]
     fn end_to_end_formatting_without_spaces() {
-        use crate::config::{Extensions, Flavor};
+        use crate::config::{Flavor, FormatterExtensions, ParserExtensions};
         use crate::{Config, format};
 
         let input = "{{<meta title>}}";
         let flavor = Flavor::Quarto;
         let config = Config {
             flavor,
-            extensions: Extensions::for_flavor(flavor),
+            parser_extensions: ParserExtensions::for_flavor(flavor),
+            formatter_extensions: FormatterExtensions::for_flavor(flavor),
             ..Default::default()
         };
 

@@ -517,7 +517,7 @@ impl Formatter {
 
                 if let Some(next) = node.next_sibling()
                     && (is_block_element(next.kind()) || next.kind() == SyntaxKind::HEADING)
-                    && !(self.config.extensions.blank_before_header
+                    && !(self.config.formatter_extensions.blank_before_header
                         && self.paragraph_starts_with_atx_heading_candidate(&next))
                     && !self.output.ends_with("\n\n")
                 {
@@ -631,8 +631,8 @@ impl Formatter {
                                         .map(|line| {
                                             normalize_smart_punctuation(
                                                 line,
-                                                self.config.extensions.smart,
-                                                self.config.extensions.smart_quotes,
+                                                self.config.formatter_extensions.smart,
+                                                self.config.formatter_extensions.smart_quotes,
                                             )
                                             .to_string()
                                         })
@@ -674,8 +674,8 @@ impl Formatter {
                                         self.output.push_str(
                                             normalize_smart_punctuation(
                                                 line.trim_start_matches([' ', '\t']),
-                                                self.config.extensions.smart,
-                                                self.config.extensions.smart_quotes,
+                                                self.config.formatter_extensions.smart,
+                                                self.config.formatter_extensions.smart_quotes,
                                             )
                                             .as_ref(),
                                         );
@@ -1134,8 +1134,8 @@ impl Formatter {
                             self.output.push_str(
                                 normalize_smart_punctuation(
                                     line.trim_start(),
-                                    self.config.extensions.smart,
-                                    self.config.extensions.smart_quotes,
+                                    self.config.formatter_extensions.smart,
+                                    self.config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );
@@ -1144,8 +1144,8 @@ impl Formatter {
                         self.output.push_str(
                             normalize_smart_punctuation(
                                 &text,
-                                self.config.extensions.smart,
-                                self.config.extensions.smart_quotes,
+                                self.config.formatter_extensions.smart,
+                                self.config.formatter_extensions.smart_quotes,
                             )
                             .as_ref(),
                         );
@@ -1156,7 +1156,7 @@ impl Formatter {
                     return;
                 }
 
-                if self.config.extensions.bookdown_references
+                if self.config.formatter_extensions.bookdown_references
                     && paragraphs::is_bookdown_text_reference(node)
                 {
                     if indent > 0 {
@@ -1168,8 +1168,8 @@ impl Formatter {
                             self.output.push_str(
                                 normalize_smart_punctuation(
                                     line.trim_start(),
-                                    self.config.extensions.smart,
-                                    self.config.extensions.smart_quotes,
+                                    self.config.formatter_extensions.smart,
+                                    self.config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );
@@ -1178,8 +1178,8 @@ impl Formatter {
                         self.output.push_str(
                             normalize_smart_punctuation(
                                 &text,
-                                self.config.extensions.smart,
-                                self.config.extensions.smart_quotes,
+                                self.config.formatter_extensions.smart,
+                                self.config.formatter_extensions.smart_quotes,
                             )
                             .as_ref(),
                         );
@@ -1203,8 +1203,8 @@ impl Formatter {
                             self.output.push_str(
                                 normalize_smart_punctuation(
                                     line.trim_start(),
-                                    self.config.extensions.smart,
-                                    self.config.extensions.smart_quotes,
+                                    self.config.formatter_extensions.smart,
+                                    self.config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );
@@ -1213,8 +1213,8 @@ impl Formatter {
                         self.output.push_str(
                             normalize_smart_punctuation(
                                 &text,
-                                self.config.extensions.smart,
-                                self.config.extensions.smart_quotes,
+                                self.config.formatter_extensions.smart,
+                                self.config.formatter_extensions.smart_quotes,
                             )
                             .as_ref(),
                         );
@@ -1241,8 +1241,8 @@ impl Formatter {
                                 self.output.push_str(
                                     normalize_smart_punctuation(
                                         line.trim_start(),
-                                        self.config.extensions.smart,
-                                        self.config.extensions.smart_quotes,
+                                        self.config.formatter_extensions.smart,
+                                        self.config.formatter_extensions.smart_quotes,
                                     )
                                     .as_ref(),
                                 );
@@ -1251,8 +1251,8 @@ impl Formatter {
                             self.output.push_str(
                                 normalize_smart_punctuation(
                                     &text,
-                                    self.config.extensions.smart,
-                                    self.config.extensions.smart_quotes,
+                                    self.config.formatter_extensions.smart,
+                                    self.config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );
@@ -1326,8 +1326,8 @@ impl Formatter {
                                 self.output.push_str(
                                     normalize_smart_punctuation(
                                         line.trim_start(),
-                                        self.config.extensions.smart,
-                                        self.config.extensions.smart_quotes,
+                                        self.config.formatter_extensions.smart,
+                                        self.config.formatter_extensions.smart_quotes,
                                     )
                                     .as_ref(),
                                 );
@@ -1337,8 +1337,8 @@ impl Formatter {
                             self.output.push_str(
                                 normalize_smart_punctuation(
                                     &text,
-                                    self.config.extensions.smart,
-                                    self.config.extensions.smart_quotes,
+                                    self.config.formatter_extensions.smart,
+                                    self.config.formatter_extensions.smart_quotes,
                                 )
                                 .as_ref(),
                             );

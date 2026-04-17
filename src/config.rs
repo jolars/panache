@@ -13,6 +13,7 @@ pub use formatter_presets::formatter_preset_names;
 pub use formatter_presets::formatter_preset_supported_languages;
 pub use formatter_presets::formatter_presets_for_language;
 pub use formatter_presets::get_formatter_preset;
+pub use panache_formatter::config::FormatterExtensions;
 pub use panache_parser::Extensions;
 pub use panache_parser::Flavor;
 pub use panache_parser::PandocCompat;
@@ -273,15 +274,23 @@ pub fn load(
 
     if let Some(flavor) = detect_flavor(input_file, cfg_path.as_deref(), &cfg) {
         cfg.flavor = flavor;
-        cfg.extensions = if let Some(path) = cfg_path.as_deref() {
+        if let Some(path) = cfg_path.as_deref() {
             fs::read_to_string(path)
                 .ok()
                 .and_then(|s| toml::from_str::<toml::Value>(&s).ok())
-                .map(|root| resolve_extensions_for_flavor(root.get("extensions"), flavor))
-                .unwrap_or_else(|| Extensions::for_flavor(flavor))
+                .map(|root| {
+                    cfg.extensions = resolve_extensions_for_flavor(root.get("extensions"), flavor);
+                    cfg.formatter_extensions =
+                        resolve_formatter_extensions_for_flavor(root.get("extensions"), flavor);
+                })
+                .unwrap_or_else(|| {
+                    cfg.extensions = Extensions::for_flavor(flavor);
+                    cfg.formatter_extensions = FormatterExtensions::for_flavor(flavor);
+                });
         } else {
-            Extensions::for_flavor(flavor)
-        };
+            cfg.extensions = Extensions::for_flavor(flavor);
+            cfg.formatter_extensions = FormatterExtensions::for_flavor(flavor);
+        }
     }
 
     Ok((cfg, cfg_path))
@@ -355,6 +364,64 @@ fn resolve_extensions_for_flavor(
 
     global_overrides.extend(flavor_overrides);
     Extensions::merge_with_flavor(global_overrides, flavor)
+}
+
+fn resolve_formatter_extensions_for_flavor(
+    extensions_value: Option<&toml::Value>,
+    flavor: Flavor,
+) -> FormatterExtensions {
+    let Some(value) = extensions_value else {
+        return FormatterExtensions::for_flavor(flavor);
+    };
+
+    let Some(table) = value.as_table() else {
+        eprintln!("Warning: [extensions] must be a table; using flavor defaults.");
+        return FormatterExtensions::for_flavor(flavor);
+    };
+
+    let mut global_overrides = HashMap::new();
+    let mut flavor_overrides = HashMap::new();
+
+    for (key, val) in table {
+        if let Some(enabled) = val.as_bool() {
+            global_overrides.insert(key.clone(), enabled);
+            continue;
+        }
+
+        let Some(flavor_table) = val.as_table() else {
+            eprintln!(
+                "Warning: [extensions] entry '{}' must be a boolean or table; ignoring.",
+                key
+            );
+            continue;
+        };
+
+        let Some(target_flavor) = parse_flavor_key(key) else {
+            eprintln!(
+                "Warning: [extensions.{}] is not a known flavor table; ignoring.",
+                key
+            );
+            continue;
+        };
+
+        if target_flavor != flavor {
+            continue;
+        }
+
+        for (sub_key, sub_val) in flavor_table {
+            let Some(enabled) = sub_val.as_bool() else {
+                eprintln!(
+                    "Warning: [extensions.{}] entry '{}' must be true or false; ignoring.",
+                    key, sub_key
+                );
+                continue;
+            };
+            flavor_overrides.insert(sub_key.clone(), enabled);
+        }
+    }
+
+    global_overrides.extend(flavor_overrides);
+    FormatterExtensions::merge_with_flavor(global_overrides, flavor)
 }
 
 fn detect_flavor(
