@@ -1,10 +1,5 @@
 # Changelog
 
-## [2.35.1](https://github.com/jolars/panache/compare/v2.35.0...v2.35.1) (2026-04-16)
-
-### Bug Fixes
-- **editors:** trigger patch bump ([`388c1d8`](https://github.com/jolars/panache/commit/388c1d8edfdfdd23764e0f2853d33d3a6494c33e))
-
 ## [2.35.0](https://github.com/jolars/panache/compare/v2.34.0...v2.35.0) (2026-04-16)
 
 ### Features
