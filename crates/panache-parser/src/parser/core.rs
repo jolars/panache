@@ -1158,6 +1158,9 @@ impl<'a> Parser<'a> {
                     .unwrap_or_else(|| blockquotes::can_start_blockquote(self.pos, &self.lines))
             {
                 // Can't start blockquote without blank line - treat as paragraph
+                // Flush any pending list-item inline buffer first so this line
+                // stays in source order relative to buffered list text.
+                self.emit_list_item_buffer_if_needed();
                 paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
                 paragraphs::append_paragraph_line(
                     &mut self.containers,
@@ -1230,6 +1233,10 @@ impl<'a> Parser<'a> {
                     return true;
                 }
             }
+
+            // Preserve source order when a deeper blockquote line arrives while
+            // list-item text is still buffered (e.g. issue #174).
+            self.emit_list_item_buffer_if_needed();
 
             // Close paragraph before opening blockquote
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {

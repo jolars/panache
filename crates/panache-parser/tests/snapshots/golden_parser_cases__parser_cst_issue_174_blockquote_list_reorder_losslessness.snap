@@ -1,0 +1,39 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 96
+expression: cst_output
+---
+DOCUMENT@0..432
+  LIST@0..432
+    LIST_ITEM@0..149
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      PLAIN@2..149
+        STRONG@2..38
+          STRONG_MARKER@2..4 "**"
+          TEXT@4..36 "Main binary explanato ..."
+          STRONG_MARKER@36..38 "**"
+        TEXT@38..69 ": Opposition parties  ..."
+        INLINE_CODE@69..81
+          INLINE_CODE_MARKER@69..70 "`"
+          INLINE_CODE_CONTENT@70..80 "v2psoppaut"
+          INLINE_CODE_MARKER@80..81 "`"
+        TEXT@81..148 " in V-Dem). This is a ..."
+        NEWLINE@148..149 "\n"
+    BLANK_LINE@149..150
+      BLANK_LINE@149..150 "\n"
+    LIST_ITEM@150..196
+      LIST_MARKER@150..151 "-"
+      WHITESPACE@151..153 "  "
+      PLAIN@153..196
+        TEXT@153..195 "> - 0: Opposition par ..."
+        NEWLINE@195..196 "\n"
+    LIST_ITEM@196..432
+      LIST_MARKER@196..197 "-"
+      WHITESPACE@197..199 "  "
+      PLAIN@199..336
+        TEXT@199..335 "> - 1: There are no a ..."
+        NEWLINE@335..336 "\n"
+      PARAGRAPH@336..432
+        TEXT@336..431 "   > - 2: At least so ..."
+        NEWLINE@431..432 "\n"
