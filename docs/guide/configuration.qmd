@@ -626,6 +626,8 @@ raw-attribute = true
 all-symbols-escapable = true
 escaped-line-breaks = true
 hard-line-breaks = false
+smart = true
+smart-quotes = false
 emoji = false
 mark = false
 ```
@@ -638,6 +640,16 @@ mark = false
 
 `hard-line-breaks`
 :   Newline creates hard line break (default: disabled, non-default extension)
+
+`smart`
+:   Normalize smart/curly punctuation in formatter output (quotes/apostrophes
+    and en/em dashes, plus ellipsis) to Markdown forms (`'`, `"`, `--`, `---`,
+    `...`). Defaults: enabled for `pandoc`, `quarto`, `rmarkdown`; disabled for
+    `gfm`, `commonmark`, `multimarkdown`.
+
+`smart-quotes`
+:   Normalize smart/curly quotes and apostrophes only (`'`, `"`). Unlike
+    `smart`, this does not normalize dashes or ellipsis. Default: disabled.
 
 `emoji`
 :   Emoji syntax `:emoji:` (default: disabled, non-default extension)
@@ -895,7 +907,7 @@ presets available in Panache.
 
 ## External Code Linters
 
-Panache can invoke external linters for code blocks. Linters are opt-in—you
+Panache can invoke external linters for code blocks. Linters are opt-in---you
 choose which languages to lint.
 
 ### Quick Start

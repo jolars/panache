@@ -1,5 +1,6 @@
 use crate::config::{Config, MathDelimiterStyle};
 use crate::formatter::shortcodes::format_shortcode;
+use crate::formatter::smart::normalize_smart_punctuation;
 use crate::syntax::{DisplayMath, SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
@@ -47,7 +48,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         }
                         SyntaxKind::AUTO_LINK_MARKER | SyntaxKind::TEXT => {
                             skip_marker_whitespace = false;
-                            result.push_str(tok.text());
+                            result.push_str(
+                                normalize_smart_punctuation(
+                                    tok.text(),
+                                    config.extensions.smart,
+                                    config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                         }
                         _ => {}
                     }
@@ -76,7 +84,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                             marker_len = marker_len.max(t.text().len());
                         } else if t.kind() == SyntaxKind::INLINE_CODE_CONTENT {
                             skip_marker_whitespace = false;
-                            content.push_str(t.text());
+                            content.push_str(
+                                normalize_smart_punctuation(
+                                    t.text(),
+                                    config.extensions.smart,
+                                    config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                         }
                     }
                     _ => {}
@@ -173,7 +188,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         if t.kind() == SyntaxKind::RAW_INLINE_MARKER {
                             backtick_count = t.text().len();
                         } else if t.kind() == SyntaxKind::RAW_INLINE_CONTENT {
-                            content.push_str(t.text());
+                            content.push_str(
+                                normalize_smart_punctuation(
+                                    t.text(),
+                                    config.extensions.smart,
+                                    config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                         }
                     }
                     _ => {}
@@ -208,7 +230,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                         }
                         skip_marker_whitespace = false;
                         if t.kind() != SyntaxKind::EMPHASIS_MARKER {
-                            content.push_str(t.text());
+                            content.push_str(
+                                normalize_smart_punctuation(
+                                    t.text(),
+                                    config.extensions.smart,
+                                    config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                         }
                     }
                 }
@@ -263,7 +292,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                             continue;
                         }
                         skip_marker_whitespace = false;
-                        result.push_str(t.text());
+                        result.push_str(
+                            normalize_smart_punctuation(
+                                t.text(),
+                                config.extensions.smart,
+                                config.extensions.smart_quotes,
+                            )
+                            .as_ref(),
+                        );
                     }
                     NodeOrToken::Node(n) => {
                         // Recursively format nested content
@@ -283,7 +319,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                                             continue;
                                         }
                                         skip_marker_whitespace = false;
-                                        result.push_str(t.text());
+                                        result.push_str(
+                                            normalize_smart_punctuation(
+                                                t.text(),
+                                                config.extensions.smart,
+                                                config.extensions.smart_quotes,
+                                            )
+                                            .as_ref(),
+                                        );
                                     }
                                     NodeOrToken::Node(nested) => {
                                         skip_marker_whitespace = false;
@@ -498,7 +541,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                             t.kind(),
                             SyntaxKind::INLINE_FOOTNOTE_START | SyntaxKind::INLINE_FOOTNOTE_END
                         ) {
-                            content.push_str(t.text());
+                            content.push_str(
+                                normalize_smart_punctuation(
+                                    t.text(),
+                                    config.extensions.smart,
+                                    config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                         }
                     }
                 }
@@ -524,7 +574,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                     }
                     NodeOrToken::Token(tok) => {
                         skip_marker_whitespace = false;
-                        result.push_str(tok.text());
+                        result.push_str(
+                            normalize_smart_punctuation(
+                                tok.text(),
+                                config.extensions.smart,
+                                config.extensions.smart_quotes,
+                            )
+                            .as_ref(),
+                        );
                     }
                     NodeOrToken::Node(n) => {
                         skip_marker_whitespace = false;
@@ -549,7 +606,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                     }
                     NodeOrToken::Token(tok) => {
                         skip_marker_whitespace = false;
-                        result.push_str(tok.text());
+                        result.push_str(
+                            normalize_smart_punctuation(
+                                tok.text(),
+                                config.extensions.smart,
+                                config.extensions.smart_quotes,
+                            )
+                            .as_ref(),
+                        );
                     }
                     NodeOrToken::Node(n) => {
                         skip_marker_whitespace = false;

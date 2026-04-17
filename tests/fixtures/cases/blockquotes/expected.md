@@ -45,6 +45,6 @@ block quote in pandoc:
 >
 > - Developing and integrating custom formats to support diverse outputs while
 >   reducing repetition across projects.
-> - Substituting Quarto’s templates with your own to customize formats beyond
+> - Substituting Quarto's templates with your own to customize formats beyond
 >   the built-in options.
 > - Implementing filters to automate and streamline content transformation.

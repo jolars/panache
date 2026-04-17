@@ -12,6 +12,7 @@ use super::headings;
 use super::inline;
 use super::inline_layout;
 use super::paragraphs;
+use super::smart::normalize_smart_punctuation;
 use super::tables;
 use super::utils::{is_block_element, is_structural_block};
 
@@ -128,7 +129,7 @@ impl Formatter {
 
     // Delegate to headings module
     pub(super) fn format_heading(&self, node: &SyntaxNode) -> String {
-        headings::format_heading(node)
+        headings::format_heading(node, &self.config)
     }
 
     fn contains_latex_command(&self, node: &SyntaxNode) -> bool {
@@ -626,7 +627,16 @@ impl Formatter {
                             let lines = match wrap_mode {
                                 WrapMode::Preserve => {
                                     let text = child.text().to_string();
-                                    text.lines().map(|line| line.to_string()).collect()
+                                    text.lines()
+                                        .map(|line| {
+                                            normalize_smart_punctuation(
+                                                line,
+                                                self.config.extensions.smart,
+                                                self.config.extensions.smart_quotes,
+                                            )
+                                            .to_string()
+                                        })
+                                        .collect()
                                 }
                                 WrapMode::Reflow => {
                                     self.wrapped_lines_for_paragraph_with_widths(child, &widths)
@@ -661,7 +671,14 @@ impl Formatter {
                                     let text = child.text().to_string();
                                     for line in text.lines() {
                                         self.output.push_str(&" ".repeat(child_indent));
-                                        self.output.push_str(line.trim_start_matches([' ', '\t']));
+                                        self.output.push_str(
+                                            normalize_smart_punctuation(
+                                                line.trim_start_matches([' ', '\t']),
+                                                self.config.extensions.smart,
+                                                self.config.extensions.smart_quotes,
+                                            )
+                                            .as_ref(),
+                                        );
                                         self.output.push('\n');
                                     }
                                 }
@@ -1114,10 +1131,24 @@ impl Formatter {
                                 self.output.push('\n');
                             }
                             self.output.push_str(&paragraph_indent);
-                            self.output.push_str(line.trim_start());
+                            self.output.push_str(
+                                normalize_smart_punctuation(
+                                    line.trim_start(),
+                                    self.config.extensions.smart,
+                                    self.config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                         }
                     } else {
-                        self.output.push_str(&text);
+                        self.output.push_str(
+                            normalize_smart_punctuation(
+                                &text,
+                                self.config.extensions.smart,
+                                self.config.extensions.smart_quotes,
+                            )
+                            .as_ref(),
+                        );
                     }
                     if !self.output.ends_with('\n') {
                         self.output.push('\n');
@@ -1134,10 +1165,24 @@ impl Formatter {
                                 self.output.push('\n');
                             }
                             self.output.push_str(&paragraph_indent);
-                            self.output.push_str(line.trim_start());
+                            self.output.push_str(
+                                normalize_smart_punctuation(
+                                    line.trim_start(),
+                                    self.config.extensions.smart,
+                                    self.config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                         }
                     } else {
-                        self.output.push_str(&text);
+                        self.output.push_str(
+                            normalize_smart_punctuation(
+                                &text,
+                                self.config.extensions.smart,
+                                self.config.extensions.smart_quotes,
+                            )
+                            .as_ref(),
+                        );
                     }
                     if !self.output.ends_with('\n') {
                         self.output.push('\n');
@@ -1155,10 +1200,24 @@ impl Formatter {
                                 self.output.push('\n');
                             }
                             self.output.push_str(&paragraph_indent);
-                            self.output.push_str(line.trim_start());
+                            self.output.push_str(
+                                normalize_smart_punctuation(
+                                    line.trim_start(),
+                                    self.config.extensions.smart,
+                                    self.config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                         }
                     } else {
-                        self.output.push_str(&text);
+                        self.output.push_str(
+                            normalize_smart_punctuation(
+                                &text,
+                                self.config.extensions.smart,
+                                self.config.extensions.smart_quotes,
+                            )
+                            .as_ref(),
+                        );
                     }
                     if !self.output.ends_with('\n') {
                         self.output.push('\n');
@@ -1179,10 +1238,24 @@ impl Formatter {
                                     self.output.push('\n');
                                 }
                                 self.output.push_str(&paragraph_indent);
-                                self.output.push_str(line.trim_start());
+                                self.output.push_str(
+                                    normalize_smart_punctuation(
+                                        line.trim_start(),
+                                        self.config.extensions.smart,
+                                        self.config.extensions.smart_quotes,
+                                    )
+                                    .as_ref(),
+                                );
                             }
                         } else {
-                            self.output.push_str(&text);
+                            self.output.push_str(
+                                normalize_smart_punctuation(
+                                    &text,
+                                    self.config.extensions.smart,
+                                    self.config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                         }
                         if !self.output.ends_with('\n') {
                             self.output.push('\n');
@@ -1250,11 +1323,25 @@ impl Formatter {
                         if needs_indent {
                             for line in text.lines() {
                                 self.output.push_str(&" ".repeat(indent));
-                                self.output.push_str(line.trim_start());
+                                self.output.push_str(
+                                    normalize_smart_punctuation(
+                                        line.trim_start(),
+                                        self.config.extensions.smart,
+                                        self.config.extensions.smart_quotes,
+                                    )
+                                    .as_ref(),
+                                );
                                 self.output.push('\n');
                             }
                         } else {
-                            self.output.push_str(&text);
+                            self.output.push_str(
+                                normalize_smart_punctuation(
+                                    &text,
+                                    self.config.extensions.smart,
+                                    self.config.extensions.smart_quotes,
+                                )
+                                .as_ref(),
+                            );
                             if !self.output.ends_with('\n') {
                                 self.output.push('\n');
                             }

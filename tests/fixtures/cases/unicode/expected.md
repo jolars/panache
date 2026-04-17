@@ -1,6 +1,6 @@
 # Unicode
 
-Quotes: “Hi” and ‘Hi’.
+Quotes: "Hi" and 'Hi'.
 
 ## Multilingual URLs
 

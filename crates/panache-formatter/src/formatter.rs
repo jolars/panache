@@ -15,6 +15,7 @@ mod metadata;
 mod paragraphs;
 mod sentence_wrap;
 mod shortcodes;
+mod smart;
 mod tables;
 mod utils;
 

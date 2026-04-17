@@ -1,2 +1,2 @@
 He paused... then said, "A full sentence."
-Another one… with unicode.
+Another one... with unicode.

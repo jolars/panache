@@ -3,6 +3,7 @@ use crate::formatter::sentence_wrap::{
     SentenceBoundaryClass, SentenceLanguage, SentenceSegment, is_sentence_boundary_segment,
     resolve_sentence_language,
 };
+use crate::formatter::smart::normalize_smart_punctuation;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 use std::borrow::Cow;
@@ -489,7 +490,7 @@ fn node_starts_with_whitespace(node: &SyntaxNode) -> bool {
     false
 }
 
-fn append_link_closing(node: &SyntaxNode, out: &mut String) {
+fn append_link_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
     let mut past_link_text = false;
     for child in node.children_with_tokens() {
         match child {
@@ -513,7 +514,14 @@ fn append_link_closing(node: &SyntaxNode, out: &mut String) {
                         SyntaxKind::LINK_TEXT_END
                         | SyntaxKind::LINK_DEST_START
                         | SyntaxKind::LINK_DEST_END
-                        | SyntaxKind::TEXT => out.push_str(t.text()),
+                        | SyntaxKind::TEXT => out.push_str(
+                            normalize_smart_punctuation(
+                                t.text(),
+                                config.extensions.smart,
+                                config.extensions.smart_quotes,
+                            )
+                            .as_ref(),
+                        ),
                         _ => {}
                     }
                 }
@@ -522,7 +530,7 @@ fn append_link_closing(node: &SyntaxNode, out: &mut String) {
     }
 }
 
-fn append_image_closing(node: &SyntaxNode, out: &mut String) {
+fn append_image_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
     let mut past_image_alt = false;
     for child in node.children_with_tokens() {
         match child {
@@ -546,7 +554,14 @@ fn append_image_closing(node: &SyntaxNode, out: &mut String) {
                         SyntaxKind::IMAGE_ALT_END
                         | SyntaxKind::IMAGE_DEST_START
                         | SyntaxKind::IMAGE_DEST_END
-                        | SyntaxKind::TEXT => out.push_str(t.text()),
+                        | SyntaxKind::TEXT => out.push_str(
+                            normalize_smart_punctuation(
+                                t.text(),
+                                config.extensions.smart,
+                                config.extensions.smart_quotes,
+                            )
+                            .as_ref(),
+                        ),
                         _ => {}
                     }
                 }
@@ -737,7 +752,12 @@ fn process_node_recursive(
                 SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {}
                 SyntaxKind::TEXT => {
                     skip_marker_whitespace = false;
-                    let text = expand_tabs_with_width(t.text(), config.tab_width);
+                    let raw = normalize_smart_punctuation(
+                        t.text(),
+                        config.extensions.smart,
+                        config.extensions.smart_quotes,
+                    );
+                    let text = expand_tabs_with_width(raw.as_ref(), config.tab_width);
                     if text.as_ref().contains("[@") && text.as_ref().contains("]:") {
                         sink.push_piece(text.as_ref());
                         continue;
@@ -895,7 +915,7 @@ fn process_node_recursive(
                             }
                         }
                         let mut closing = String::new();
-                        append_link_closing(&n, &mut closing);
+                        append_link_closing(&n, &mut closing, config);
                         sink.push_piece(&closing);
                     }
                 }
@@ -923,7 +943,7 @@ fn process_node_recursive(
                             }
                         }
                         let mut closing = String::new();
-                        append_image_closing(&n, &mut closing);
+                        append_image_closing(&n, &mut closing, config);
                         sink.push_piece(&closing);
                     }
                 }

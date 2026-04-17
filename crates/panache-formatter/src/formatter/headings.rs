@@ -1,6 +1,8 @@
+use super::smart::normalize_smart_punctuation;
+use crate::config::Config;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
-pub(super) fn format_heading(node: &SyntaxNode) -> String {
+pub(super) fn format_heading(node: &SyntaxNode, config: &Config) -> String {
     let mut level = 1;
     let mut content = String::new();
     let mut saw_content = false;
@@ -28,7 +30,12 @@ pub(super) fn format_heading(node: &SyntaxNode) -> String {
                 if trimmed_hash.len() != t.len() {
                     t = trimmed_hash.trim_end().to_string();
                 }
-                content = t.trim().to_string();
+                content = normalize_smart_punctuation(
+                    t.trim(),
+                    config.extensions.smart,
+                    config.extensions.smart_quotes,
+                )
+                .to_string();
                 saw_content = true;
             }
             SyntaxKind::ATTRIBUTE => {

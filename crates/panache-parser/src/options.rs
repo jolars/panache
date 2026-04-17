@@ -124,6 +124,11 @@ pub struct Extensions {
     /// Underscores don't trigger emphasis in snake_case
     #[cfg_attr(feature = "serde", serde(alias = "intraword_underscores"))]
     pub intraword_underscores: bool,
+    /// "Smart" punctuation for quotes/apostrophes/ellipses/dashes
+    pub smart: bool,
+    /// "Smart" quotes/apostrophes only
+    #[cfg_attr(feature = "serde", serde(alias = "smart_quotes"))]
+    pub smart_quotes: bool,
     /// Strikethrough ~~text~~
     pub strikeout: bool,
     /// Superscript and subscript ^super^ ~sub~
@@ -298,6 +303,8 @@ impl Extensions {
             inline_images: false,
             inline_links: false,
             intraword_underscores: false,
+            smart: false,
+            smart_quotes: false,
             line_blocks: false,
             link_attributes: false,
             mark: false,
@@ -387,6 +394,8 @@ impl Extensions {
 
             // Inline
             intraword_underscores: true,
+            smart: true,
+            smart_quotes: false,
             strikeout: true,
             subscript: true,
             superscript: true,
@@ -494,6 +503,7 @@ impl Extensions {
         ext.pipe_tables = true;
         ext.raw_html = true;
         ext.strikeout = true;
+        ext.smart = false;
         ext.task_lists = true;
         ext.tex_math_dollars = true;
         ext.tex_math_gfm = true;
@@ -584,6 +594,8 @@ impl Extensions {
                 "native-divs" => base.native_divs = value,
                 "line-blocks" => base.line_blocks = value,
                 "intraword-underscores" => base.intraword_underscores = value,
+                "smart" => base.smart = value,
+                "smart-quotes" => base.smart_quotes = value,
                 "strikeout" => base.strikeout = value,
                 "superscript" => base.superscript = value,
                 "subscript" => base.subscript = value,
@@ -628,6 +640,43 @@ impl Extensions {
             }
         }
         base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Extensions, Flavor};
+    use std::collections::HashMap;
+
+    #[test]
+    fn smart_defaults_match_pandoc_style_flavors() {
+        assert!(Extensions::for_flavor(Flavor::Pandoc).smart);
+        assert!(Extensions::for_flavor(Flavor::Quarto).smart);
+        assert!(Extensions::for_flavor(Flavor::RMarkdown).smart);
+    }
+
+    #[test]
+    fn smart_defaults_match_gfm_commonmark_multimarkdown() {
+        assert!(!Extensions::for_flavor(Flavor::Gfm).smart);
+        assert!(!Extensions::for_flavor(Flavor::CommonMark).smart);
+        assert!(!Extensions::for_flavor(Flavor::MultiMarkdown).smart);
+    }
+
+    #[test]
+    fn merge_with_flavor_applies_smart_override() {
+        let mut overrides = HashMap::new();
+        overrides.insert("smart".to_string(), false);
+        let ext = Extensions::merge_with_flavor(overrides, Flavor::Pandoc);
+        assert!(!ext.smart);
+    }
+
+    #[test]
+    fn merge_with_flavor_applies_smart_quotes_override() {
+        let mut overrides = HashMap::new();
+        overrides.insert("smart-quotes".to_string(), true);
+        let ext = Extensions::merge_with_flavor(overrides, Flavor::Gfm);
+        assert!(ext.smart_quotes);
+        assert!(!ext.smart);
     }
 }
 
