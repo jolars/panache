@@ -162,7 +162,7 @@ Auto-fix
 
 Description
 :   Each reference label and footnote ID must be unique within a document.
-    Duplicate definitions cause ambiguity—only the first definition is used,
+    Duplicate definitions cause ambiguity---only the first definition is used,
     making the others ineffective.
 
 **Example violation**
