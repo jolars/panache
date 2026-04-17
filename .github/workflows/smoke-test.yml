@@ -38,6 +38,7 @@ jobs:
         ddotta/cookbook-rpolars
         r-causal/causal-inference-in-R
         elong0527/r4csr
+        andrewheiss/ath-quarto
     steps:
       - uses: actions/checkout@v6
 
