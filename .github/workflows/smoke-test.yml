@@ -19,28 +19,28 @@ jobs:
       failure_count: ${{ steps.summarize.outputs.failure_count }}
     env:
       TARGET_REPOS: |
-        quarto-dev/quarto-web
-        rstudio/bookdown
-        rstudio/rmarkdown
-        jgm/pandoc
-        wch/rgcookbook
-        rstudio/rmarkdown-cookbook
-        mattiasvillani/BayesianLearningBook
-        nielsrhansen/CSwR
-        hadley/r4ds
-        hadley/adv-r
-        hadley/r-pkgs
-        rstudio-education/hopr
-        kevinheavey/modern-polars
-        mlr-org/mlr3book
-        RohanAlexander/tswd
+        andrewheiss/ath-quarto
         davidfoxcroft/lsj-book
         ddotta/cookbook-rpolars
-        r-causal/causal-inference-in-R
         elong0527/r4csr
-        andrewheiss/ath-quarto
+        hadley/adv-r
+        hadley/r-pkgs
+        hadley/r4ds
+        jgm/pandoc
         jolars/jolars.co
+        kevinheavey/modern-polars
         math-ku/compstat
+        mattiasvillani/BayesianLearningBook
+        mlr-org/mlr3book
+        nielsrhansen/CSwR
+        quarto-dev/quarto-web
+        r-causal/causal-inference-in-R
+        RohanAlexander/tswd
+        rstudio-education/hopr
+        rstudio/bookdown
+        rstudio/rmarkdown
+        rstudio/rmarkdown-cookbook
+        wch/rgcookbook
     steps:
       - uses: actions/checkout@v6
 
