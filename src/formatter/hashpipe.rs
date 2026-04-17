@@ -349,7 +349,18 @@ fn hashpipe_map_entry_value_text(
         let range = block.syntax().text_range();
         let start: usize = range.start().into();
         let end: usize = range.end().into();
-        return normalized_yaml[start..end].to_string();
+        let raw = normalized_yaml[start..end].to_string();
+        // Preserve block values as block values when round-tripping through
+        // hashpipe YAML normalization. Without this, sequence/map values can be
+        // re-emitted as `key: - item` on a second pass (issue #172).
+        if raw.starts_with('\n') {
+            return raw;
+        }
+        let trimmed = raw.trim_start();
+        if trimmed.starts_with('|') || trimmed.starts_with('>') {
+            return raw;
+        }
+        return format!("\n{raw}");
     }
 
     let range = value.syntax().text_range();
@@ -601,12 +612,42 @@ pub fn format_as_hashpipe(
         let yaml_text = yaml_entries
             .iter()
             .map(|(key, value)| {
-                if value.starts_with('\n') {
+                if value.starts_with('\n')
+                    && value
+                        .lines()
+                        .nth(1)
+                        .is_some_and(|line| line.starts_with("- "))
+                {
+                    let mut rendered = String::new();
+                    rendered.push_str(&format!("{key}:\n"));
+                    for line in value.lines().skip(1) {
+                        if line.is_empty() {
+                            rendered.push('\n');
+                        } else if line.starts_with(' ') {
+                            rendered.push_str(line);
+                            rendered.push('\n');
+                        } else {
+                            rendered.push_str("  ");
+                            rendered.push_str(line);
+                            rendered.push('\n');
+                        }
+                    }
+                    rendered
+                } else if value.starts_with('\n') {
                     if value.ends_with('\n') {
                         format!("{key}:{value}")
                     } else {
                         format!("{key}:{value}\n")
                     }
+                } else if value.contains('\n') && value.trim_start().starts_with("- ") {
+                    let mut rendered = String::new();
+                    rendered.push_str(&format!("{key}:\n"));
+                    for line in value.lines() {
+                        rendered.push_str("  ");
+                        rendered.push_str(line);
+                        rendered.push('\n');
+                    }
+                    rendered
                 } else {
                     format!("{key}: {value}\n")
                 }
@@ -803,5 +844,47 @@ mod tests {
         // Unknown language should return None
         let result = format_as_hashpipe("fortran", &options, 80, None);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn extract_yaml_list_value_keeps_leading_newline_for_block_style() {
+        let normalized_yaml = "\
+fig-subcap:
+  - \"The world\"
+  - \"Systematic sampling\"
+  - \"Stratified sampling\"
+  - \"Cluster sampling\"
+";
+
+        let options =
+            extract_options_from_normalized_yaml(normalized_yaml).expect("expected parsed options");
+        let (_, value) = options
+            .into_iter()
+            .find(|(k, _)| k == "fig-subcap")
+            .expect("missing fig-subcap option");
+
+        assert!(
+            value.starts_with('\n'),
+            "expected block-style value to start with newline, got: {value:?}"
+        );
+    }
+
+    #[test]
+    fn format_as_hashpipe_canonicalizes_multiline_sequence_to_block_style() {
+        let options = vec![(
+            "fig-subcap".to_string(),
+            ChunkOptionValue::Simple(
+                "- \"The world\"\n- \"Systematic sampling\"\n- \"Stratified sampling\"\n- \"Cluster sampling\""
+                    .to_string(),
+            ),
+        )];
+
+        let lines = format_as_hashpipe("r", &options, 80, None).expect("expected hashpipe lines");
+
+        assert_eq!(lines.first().map(String::as_str), Some("#| fig-subcap:"));
+        assert_eq!(
+            lines.get(1).map(String::as_str),
+            Some("#|   - \"The world\"")
+        );
     }
 }

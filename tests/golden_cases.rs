@@ -236,6 +236,7 @@ golden_test_cases!(
     umlauts,
     unicode,
     issue_171_gfm_inline_links,
+    issue_172_hashpipe_inline_list_idempotency,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

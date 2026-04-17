@@ -195,7 +195,7 @@ fn hashpipe_indented_yaml_value_is_preserved_as_hashpipe_header() {
 
     assert!(output.contains("#| list:"));
     assert!(output.contains("#|   - a"));
-    assert!(output.contains("#|     - b"));
+    assert!(output.contains("#|   - b"));
     assert!(output.contains("a <- 1"));
 }
 
@@ -251,7 +251,7 @@ fn hashpipe_fig_cap_list_value_is_idempotent() {
 
     assert_eq!(output1, output2, "Formatting should be idempotent");
     assert_eq!(output2.matches("#|   - A").count(), 1);
-    assert_eq!(output2.matches("#|     - B").count(), 1);
+    assert_eq!(output2.matches("#|   - B").count(), 1);
 }
 
 #[test]

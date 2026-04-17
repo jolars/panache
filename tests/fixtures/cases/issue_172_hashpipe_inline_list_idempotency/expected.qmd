@@ -1,0 +1,10 @@
+```{r}
+#| fig-cap: "Illustrative example of simple random sampling, systematic
+#|   sampling, stratified sampling, and cluster sampling across different parts
+#|   of the world"
+#| fig-subcap:
+#|   - "The world"
+#|   - "Systematic sampling"
+#|   - "Stratified sampling"
+#|   - "Cluster sampling"
+```
