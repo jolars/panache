@@ -1,27 +1,234 @@
 use crate::config::Config;
-use crate::syntax::{SyntaxNode, YamlFrontmatterRegion};
+#[cfg(feature = "lsp")]
+use crate::external_formatters_common::{
+    find_missing_formatter_commands, log_missing_formatter_commands,
+};
+use crate::external_formatters_sync;
+use crate::syntax::{SyntaxKind, SyntaxNode, YamlFrontmatterRegion};
+use panache_formatter::FormattedCodeMap;
+use std::collections::HashMap;
 
-mod blockquotes;
-pub mod code_blocks;
-mod core;
-mod fenced_divs;
-mod hashpipe;
-mod headings;
-mod indent_utils;
-mod inline;
-mod inline_layout;
-mod lists;
-mod metadata;
-mod paragraphs;
-mod sentence_wrap;
-mod shortcodes;
-mod tables;
-mod utils;
+fn to_formatter_config(config: &Config) -> panache_formatter::Config {
+    let line_ending = config.line_ending.as_ref().map(|ending| match ending {
+        crate::config::LineEnding::Auto => panache_formatter::LineEnding::Auto,
+        crate::config::LineEnding::Lf => panache_formatter::LineEnding::Lf,
+        crate::config::LineEnding::Crlf => panache_formatter::LineEnding::Crlf,
+    });
+    let math_delimiter_style = match config.math_delimiter_style {
+        crate::config::MathDelimiterStyle::Preserve => {
+            panache_formatter::MathDelimiterStyle::Preserve
+        }
+        crate::config::MathDelimiterStyle::Dollars => {
+            panache_formatter::MathDelimiterStyle::Dollars
+        }
+        crate::config::MathDelimiterStyle::Backslash => {
+            panache_formatter::MathDelimiterStyle::Backslash
+        }
+    };
+    let tab_stops = match config.tab_stops {
+        crate::config::TabStopMode::Normalize => panache_formatter::TabStopMode::Normalize,
+        crate::config::TabStopMode::Preserve => panache_formatter::TabStopMode::Preserve,
+    };
+    let wrap = config.wrap.as_ref().map(|wrap| match wrap {
+        crate::config::WrapMode::Preserve => panache_formatter::WrapMode::Preserve,
+        crate::config::WrapMode::Reflow => panache_formatter::WrapMode::Reflow,
+        crate::config::WrapMode::Sentence => panache_formatter::WrapMode::Sentence,
+    });
+    let blank_lines = match config.blank_lines {
+        crate::config::BlankLines::Preserve => panache_formatter::BlankLines::Preserve,
+        crate::config::BlankLines::Collapse => panache_formatter::BlankLines::Collapse,
+    };
 
-// Re-export the main types
-pub use core::Formatter;
+    let formatters: HashMap<String, Vec<panache_formatter::config::FormatterConfig>> = config
+        .formatters
+        .iter()
+        .map(|(lang, entries)| {
+            let mapped_entries = entries
+                .iter()
+                .map(|entry| panache_formatter::config::FormatterConfig {
+                    cmd: entry.cmd.clone(),
+                    args: entry.args.clone(),
+                    enabled: entry.enabled,
+                    stdin: entry.stdin,
+                })
+                .collect();
+            (lang.clone(), mapped_entries)
+        })
+        .collect();
 
-// Public API functions
+    panache_formatter::Config {
+        flavor: config.flavor,
+        extensions: config.extensions.clone(),
+        line_ending,
+        line_width: config.line_width,
+        math_indent: config.math_indent,
+        math_delimiter_style,
+        tab_stops,
+        tab_width: config.tab_width,
+        wrap,
+        blank_lines,
+        formatters,
+        external_max_parallel: config.external_max_parallel,
+        parser: config.parser,
+    }
+}
+
+fn collect_yaml_frontmatter_region(tree: &SyntaxNode) -> Option<YamlFrontmatterRegion> {
+    let frontmatter = tree
+        .children()
+        .find(|node| node.kind() != SyntaxKind::BLANK_LINE)
+        .filter(|node| node.kind() == SyntaxKind::YAML_METADATA)?;
+
+    let content = frontmatter
+        .children()
+        .find(|child| child.kind() == SyntaxKind::YAML_METADATA_CONTENT)?;
+
+    let host_start: usize = frontmatter.text_range().start().into();
+    let host_end: usize = frontmatter.text_range().end().into();
+    let content_start: usize = content.text_range().start().into();
+    let content_end: usize = content.text_range().end().into();
+
+    Some(YamlFrontmatterRegion {
+        id: format!("frontmatter:{}:{}", content_start, content_end),
+        host_range: host_start..host_end,
+        content_range: content_start..content_end,
+        content: content.text().to_string(),
+    })
+}
+
+#[cfg(feature = "lsp")]
+async fn format_code_blocks_async(
+    blocks: Vec<panache_formatter::ExternalCodeBlock>,
+    config: &Config,
+) -> FormattedCodeMap {
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::sync::Semaphore;
+    use tokio::task::JoinSet;
+
+    let timeout = Duration::from_secs(30);
+    let semaphore = Arc::new(Semaphore::new(config.external_max_parallel.max(1)));
+    let missing_formatters = Arc::new(find_missing_formatter_commands(&config.formatters));
+    log_missing_formatter_commands(&missing_formatters);
+
+    let mut join_set = JoinSet::new();
+
+    for block in blocks {
+        let lang = block.language.clone();
+        let Some(formatter_configs) = config.formatters.get(&lang) else {
+            continue;
+        };
+        if formatter_configs.is_empty() {
+            continue;
+        }
+
+        let permit = semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("semaphore closed");
+
+        let formatter_configs = formatter_configs.clone();
+        let code = block.formatter_input.clone();
+        let original = block.original.clone();
+        let hashpipe_prefix = block.hashpipe_prefix.clone();
+        let missing_formatters = Arc::clone(&missing_formatters);
+
+        join_set.spawn(async move {
+            let _permit = permit;
+            let mut current_code = code;
+
+            for (idx, formatter_cfg) in formatter_configs.iter().enumerate() {
+                let formatter_cmd = formatter_cfg.cmd.trim();
+                if formatter_cmd.is_empty() {
+                    continue;
+                }
+
+                if missing_formatters.contains(formatter_cmd) {
+                    return (lang, original, hashpipe_prefix, Ok(current_code));
+                }
+
+                log::debug!(
+                    "Formatting {} code with {} ({}/{} in chain)",
+                    lang,
+                    formatter_cfg.cmd,
+                    idx + 1,
+                    formatter_configs.len()
+                );
+
+                match crate::external_formatters::format_code_async(
+                    &current_code,
+                    &lang,
+                    formatter_cfg,
+                    timeout,
+                )
+                .await
+                {
+                    Ok(formatted) => {
+                        current_code = formatted;
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Warning: {} formatter '{}' failed: {}. Using original code.",
+                            lang, formatter_cfg.cmd, e
+                        );
+                        return (lang, original, hashpipe_prefix, Err(e));
+                    }
+                }
+            }
+
+            (lang, original, hashpipe_prefix, Ok(current_code))
+        });
+    }
+
+    let mut formatted = FormattedCodeMap::new();
+
+    while let Some(res) = join_set.join_next().await {
+        if let Ok((lang, original_code, hashpipe_prefix, result)) = res {
+            match result {
+                Ok(formatted_code) => {
+                    if formatted_code != original_code {
+                        let combined = if let Some(prefix) = hashpipe_prefix {
+                            format!("{}{}", prefix, formatted_code)
+                        } else {
+                            formatted_code
+                        };
+                        formatted.insert((lang, original_code), combined);
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to format code: {}", e);
+                }
+            }
+        }
+    }
+
+    formatted
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn format_code_blocks_sync(
+    blocks: Vec<panache_formatter::ExternalCodeBlock>,
+    config: &Config,
+) -> FormattedCodeMap {
+    use std::time::Duration;
+    let timeout = Duration::from_secs(30);
+    external_formatters_sync::run_formatters_parallel(
+        blocks,
+        &config.formatters,
+        timeout,
+        config.external_max_parallel,
+    )
+}
+
+#[cfg(target_arch = "wasm32")]
+fn format_code_blocks_sync(
+    _blocks: Vec<panache_formatter::ExternalCodeBlock>,
+    _config: &Config,
+) -> FormattedCodeMap {
+    FormattedCodeMap::new()
+}
+
 #[cfg(feature = "lsp")]
 pub async fn format_tree_async(
     tree: &SyntaxNode,
@@ -35,29 +242,28 @@ pub async fn format_tree_async(
     );
 
     let input = tree.text().to_string();
-    let frontmatter_region = metadata::collect_yaml_frontmatter_region(tree);
+    let frontmatter_region = collect_yaml_frontmatter_region(tree);
+    let formatter_config = to_formatter_config(config);
     #[cfg(not(target_arch = "wasm32"))]
     let frontmatter_yaml = frontmatter_region
         .as_ref()
         .map(|region| region.content.trim_end().to_string());
 
-    // Step 1: Run external formatters and apply inline by block identity.
     let formatted_code = if !config.formatters.is_empty() {
-        let code_blocks = code_blocks::collect_code_blocks(tree, &input, config);
+        let code_blocks = panache_formatter::collect_code_blocks(tree, &input, &formatter_config);
         if !code_blocks.is_empty() {
             log::debug!(
                 "Found {} code blocks, spawning formatters...",
                 code_blocks.len()
             );
-            code_blocks::spawn_and_await_formatters(code_blocks, config).await
+            format_code_blocks_async(code_blocks, config).await
         } else {
-            code_blocks::FormattedCodeMap::new()
+            FormattedCodeMap::new()
         }
     } else {
-        code_blocks::FormattedCodeMap::new()
+        FormattedCodeMap::new()
     };
 
-    // Step 1b: Format YAML frontmatter with built-in YAML engine
     let yaml_config = config.clone();
     let formatted_yaml_future = frontmatter_yaml.clone().map(|yaml_content| {
         tokio::spawn(async move {
@@ -65,10 +271,10 @@ pub async fn format_tree_async(
         })
     });
 
-    // Step 2: Format markdown with external code substitutions applied inline.
-    let mut output = Formatter::new(config.clone(), formatted_code, range).format(tree);
+    let mut output =
+        panache_formatter::formatter::Formatter::new(formatter_config, formatted_code, range)
+            .format(tree);
 
-    // Step 3: Await YAML formatter result and apply if available
     if let Some(handle) = formatted_yaml_future
         && let Ok(Ok(formatted_yaml)) = handle.await
     {
@@ -92,8 +298,6 @@ pub async fn format_tree_async(
     }
 
     log::info!("Formatting complete: {} bytes output", output.len());
-
-    // Ensure exactly one trailing newline
     output.trim_end().to_string() + "\n"
 }
 
@@ -105,29 +309,28 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     );
 
     let input = tree.text().to_string();
-    let frontmatter_region = metadata::collect_yaml_frontmatter_region(tree);
+    let frontmatter_region = collect_yaml_frontmatter_region(tree);
+    let formatter_config = to_formatter_config(config);
     #[cfg(not(target_arch = "wasm32"))]
     let frontmatter_yaml = frontmatter_region
         .as_ref()
         .map(|region| region.content.trim_end().to_string());
 
-    // Step 1: Run external formatters synchronously if configured
     let formatted_code = if !config.formatters.is_empty() {
-        let code_blocks = code_blocks::collect_code_blocks(tree, &input, config);
+        let code_blocks = panache_formatter::collect_code_blocks(tree, &input, &formatter_config);
         if !code_blocks.is_empty() {
             log::debug!(
                 "Found {} code blocks, spawning formatters...",
                 code_blocks.len()
             );
-            code_blocks::spawn_and_await_formatters_sync(code_blocks, config)
+            format_code_blocks_sync(code_blocks, config)
         } else {
-            code_blocks::FormattedCodeMap::new()
+            FormattedCodeMap::new()
         }
     } else {
-        code_blocks::FormattedCodeMap::new()
+        FormattedCodeMap::new()
     };
 
-    // Step 1b: Run YAML frontmatter formatter synchronously with built-in YAML engine
     #[cfg(not(target_arch = "wasm32"))]
     let formatted_yaml = if let Some(yaml_content) = frontmatter_yaml.clone() {
         match crate::yaml_engine::format_yaml_with_config(&yaml_content, config) {
@@ -141,10 +344,10 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     #[cfg(target_arch = "wasm32")]
     let formatted_yaml: Option<(String, String)> = None;
 
-    // Step 2: Format markdown, applying externally formatted code blocks inline
-    let mut output = Formatter::new(config.clone(), formatted_code, range).format(tree);
+    let mut output =
+        panache_formatter::formatter::Formatter::new(formatter_config, formatted_code, range)
+            .format(tree);
 
-    // Step 3: Apply formatted YAML if available
     if let Some((original_yaml, formatted_yaml)) = formatted_yaml {
         log::debug!(
             "Applying formatted YAML: {} bytes -> {} bytes",
@@ -165,8 +368,6 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     }
 
     log::debug!("Formatting complete: {} bytes output", output.len());
-
-    // Ensure exactly one trailing newline
     output.trim_end().to_string() + "\n"
 }
 

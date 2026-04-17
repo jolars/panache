@@ -22,37 +22,6 @@ pub fn is_block_element(kind: SyntaxKind) -> bool {
     )
 }
 
-/// Check if a syntax kind represents a block-level element for range filtering.
-/// This is more comprehensive than is_block_element and includes all structural blocks.
-pub fn is_structural_block(kind: SyntaxKind) -> bool {
-    matches!(
-        kind,
-        SyntaxKind::PARAGRAPH
-            | SyntaxKind::FIGURE
-            | SyntaxKind::HEADING
-            | SyntaxKind::CODE_BLOCK
-            | SyntaxKind::BLOCK_QUOTE
-            | SyntaxKind::LIST
-            | SyntaxKind::LIST_ITEM
-            | SyntaxKind::DEFINITION_LIST
-            | SyntaxKind::DEFINITION_ITEM
-            | SyntaxKind::LINE_BLOCK
-            | SyntaxKind::SIMPLE_TABLE
-            | SyntaxKind::MULTILINE_TABLE
-            | SyntaxKind::PIPE_TABLE
-            | SyntaxKind::GRID_TABLE
-            | SyntaxKind::FENCED_DIV
-            | SyntaxKind::HORIZONTAL_RULE
-            | SyntaxKind::YAML_METADATA
-            | SyntaxKind::PANDOC_TITLE_BLOCK
-            | SyntaxKind::MMD_TITLE_BLOCK
-            | SyntaxKind::HTML_BLOCK
-            | SyntaxKind::BLANK_LINE
-            | SyntaxKind::REFERENCE_DEFINITION
-            | SyntaxKind::FOOTNOTE_DEFINITION
-    )
-}
-
 /// A code block with its location in the document.
 #[derive(Debug, Clone)]
 pub struct CodeBlock {

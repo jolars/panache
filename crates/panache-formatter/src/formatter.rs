@@ -19,10 +19,22 @@ mod tables;
 mod utils;
 
 // Re-export the main types
+pub use code_blocks::ExternalCodeBlock;
+pub use code_blocks::FormattedCodeMap;
+pub use code_blocks::collect_code_blocks;
 pub use core::Formatter;
 
 // Public API functions
 pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usize)>) -> String {
+    format_tree_with_formatted_code(tree, config, range, FormattedCodeMap::new())
+}
+
+pub fn format_tree_with_formatted_code(
+    tree: &SyntaxNode,
+    config: &Config,
+    range: Option<(usize, usize)>,
+    formatted_code: FormattedCodeMap,
+) -> String {
     log::debug!(
         "Formatting document with config: line_width={}, wrap={:?}",
         config.line_width,
@@ -34,8 +46,6 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     let frontmatter_yaml = frontmatter_region
         .as_ref()
         .map(|region| region.content.trim_end().to_string());
-
-    let formatted_code = code_blocks::FormattedCodeMap::new();
 
     // Step 1: Run YAML frontmatter formatter synchronously with built-in YAML engine
     #[cfg(not(target_arch = "wasm32"))]

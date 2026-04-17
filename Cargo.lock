@@ -856,6 +856,7 @@ dependencies = [
  "ignore",
  "insta",
  "log",
+ "panache-formatter",
  "panache-parser",
  "predicates",
  "pretty_yaml",

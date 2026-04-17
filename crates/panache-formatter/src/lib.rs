@@ -14,7 +14,11 @@ pub use config::MathDelimiterStyle;
 pub use config::ParserOptions;
 pub use config::TabStopMode;
 pub use config::WrapMode;
+pub use formatter::ExternalCodeBlock;
+pub use formatter::FormattedCodeMap;
+pub use formatter::collect_code_blocks;
 pub use formatter::format_tree;
+pub use formatter::format_tree_with_formatted_code;
 pub use syntax::SyntaxNode;
 
 fn detect_line_ending(input: &str) -> &str {

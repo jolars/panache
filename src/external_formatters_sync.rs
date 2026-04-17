@@ -17,7 +17,7 @@ use crate::external_formatters_common::{
     log_formatter_timeout, log_missing_formatter_commands, resolve_stdin_args,
     temp_file_extension_for_language,
 };
-use crate::formatter::code_blocks::{ExternalCodeBlock, FormattedCodeMap};
+use panache_formatter::{ExternalCodeBlock, FormattedCodeMap};
 
 /// Format a code block using an external formatter (synchronous).
 ///
