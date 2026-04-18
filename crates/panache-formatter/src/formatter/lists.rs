@@ -459,7 +459,11 @@ impl Formatter {
             && wrap_source.is_none_or(|source| source.text().to_string().trim().is_empty());
 
         let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
-        let in_blockquote = BlockQuote::contains_node(node);
+        let content_starts_with_blockquote = content_node
+            .as_ref()
+            .map(|content| content.text().to_string().trim_start().starts_with('>'))
+            .unwrap_or(false);
+        let in_blockquote = BlockQuote::contains_node(node) && !content_starts_with_blockquote;
         let line_widths = [available_width];
         let lines = match wrap_mode {
             WrapMode::Preserve => Vec::new(),
@@ -506,10 +510,6 @@ impl Formatter {
         let heading_with_remainder = content_node
             .as_ref()
             .and_then(|content| self.leading_atx_heading_with_remainder(content));
-        let content_starts_with_blockquote = content_node
-            .as_ref()
-            .map(|content| content.text().to_string().trim_start().starts_with('>'))
-            .unwrap_or(false);
 
         log::trace!(
             "ListItem wrapping: {} lines, hanging indent={}",

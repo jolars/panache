@@ -179,6 +179,26 @@ impl Formatter {
         "-".repeat(available_width.max(3))
     }
 
+    fn starts_with_list_marker(text: &str) -> bool {
+        text.starts_with("- ")
+            || text.starts_with("* ")
+            || text.starts_with("+ ")
+            || text.starts_with("(@")
+            || {
+                let mut chars = text.chars().peekable();
+                let mut saw_digit = false;
+                while let Some(ch) = chars.peek().copied() {
+                    if ch.is_ascii_digit() {
+                        saw_digit = true;
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                saw_digit && matches!(chars.peek().copied(), Some('.') | Some(')'))
+            }
+    }
+
     fn paragraph_starts_with_atx_heading_candidate(&self, node: &SyntaxNode) -> bool {
         if node.kind() != SyntaxKind::PARAGRAPH {
             return false;
@@ -1056,20 +1076,50 @@ impl Formatter {
                             self.output.clear();
                             self.config.line_width =
                                 self.config.line_width.saturating_sub(content_prefix.len());
-                            self.format_node_sync(&child, indent);
+                            // We trim list-temp indentation before re-prefixing with `content_prefix`.
+                            // Format at indent 0 here to avoid double-accounting indentation width.
+                            self.format_node_sync(&child, 0);
                             let list_output = self.output.clone();
                             self.config.line_width = saved_line_width;
                             self.output = saved_output;
 
+                            let mut in_list_item_continuation = false;
                             for line in list_output.lines() {
+                                let trimmed_line = line.trim_start();
+                                let starts_with_list_marker =
+                                    Self::starts_with_list_marker(trimmed_line);
                                 if line.is_empty() {
                                     self.output.push_str(&blank_prefix);
+                                    in_list_item_continuation = false;
                                 } else if line.starts_with("> ") {
-                                    self.output.push_str(&base_indent);
-                                    self.output.push_str(line);
+                                    let rest = line.trim_start_matches("> ");
+                                    let trimmed_rest = rest.trim_start();
+                                    let starts_with_marker_after_quote =
+                                        Self::starts_with_list_marker(trimmed_rest);
+                                    if starts_with_marker_after_quote {
+                                        self.output.push_str(&base_indent);
+                                        self.output.push_str("> ");
+                                        self.output.push_str(trimmed_rest);
+                                        in_list_item_continuation = true;
+                                    } else {
+                                        self.output.push_str(&base_indent);
+                                        self.output.push_str(line);
+                                        in_list_item_continuation = false;
+                                    }
+                                } else if starts_with_list_marker {
+                                    self.output.push_str(&content_prefix);
+                                    self.output.push_str(trimmed_line);
+                                    in_list_item_continuation = true;
+                                } else if in_list_item_continuation
+                                    && line.starts_with(char::is_whitespace)
+                                {
+                                    self.output.push_str(&content_prefix);
+                                    self.output.push_str("  ");
+                                    self.output.push_str(trimmed_line);
                                 } else {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(line);
+                                    in_list_item_continuation = false;
                                 }
                                 self.output.push('\n');
                             }
