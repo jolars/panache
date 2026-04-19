@@ -1,6 +1,7 @@
 ```{r}
 #| fig-cap: "The DAGs for the Causal Quartet."
-#| fig-subcap: - "The DAG for dataset 1, where `covariate` (c) is a collider."
+#| fig-subcap: 
+#|   - "The DAG for dataset 1, where `covariate` (c) is a collider."
 #|   - "The DAG for dataset 2, where `covariate` (c) is a confounder."
 #|   - "The DAG for dataset 3, where `covariate` (c) is a mediator."
 #|   - "The DAG for dataset 4, where `covariate` (c) is a collider via M-Bias."
