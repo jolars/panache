@@ -237,6 +237,7 @@ golden_test_cases!(
     unicode,
     issue_171_gfm_inline_links,
     issue_172_hashpipe_inline_list_idempotency,
+    issue_hashpipe_nested_list_indent,
     issue_181_hashpipe_fig_subcap_idempotency,
     issue_177_list_blockquote_idempotency,
     writer_autolinks,

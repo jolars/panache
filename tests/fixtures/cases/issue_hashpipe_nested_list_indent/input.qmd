@@ -1,0 +1,11 @@
+```{r}
+#| label: fig-basics-rocpr-ranger
+#| layout-ncol: 2
+#| fig-subcap:
+#| - ROC
+#|  - PR Curve
+#| fig-cap: 'Comparing ROC (left) and PR curve (right) for a random forest
+#|   trained on `tsk("german_credit")`.'
+#| echo: false
+x <- 1
+```

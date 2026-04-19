@@ -606,55 +606,11 @@ pub(crate) fn compute_hashpipe_preamble_line_count(
         let preview_after_indent =
             strip_content_line_prefixes(content_lines[line_idx], bq_depth, base_indent);
         let (preview_without_newline, _) = strip_newline(preview_after_indent);
-        if !is_hashpipe_option_line(preview_without_newline, prefix) {
+        let trimmed = preview_without_newline.trim_start_matches([' ', '\t']);
+        if !trimmed.starts_with(prefix) {
             break;
         }
         line_idx += 1;
-
-        let option_value = hashpipe_option_value(preview_without_newline, prefix);
-        let mut multiline_value = option_value
-            .as_ref()
-            .filter(|value| is_unclosed_double_quoted(value))
-            .cloned();
-        let in_block_scalar = option_value
-            .as_ref()
-            .is_some_and(|value| is_yaml_block_scalar_indicator(value));
-        let in_indented_value = option_value.as_ref().is_some_and(|value| value.is_empty());
-
-        while multiline_value.is_some() || in_block_scalar || in_indented_value {
-            if line_idx >= content_lines.len() {
-                break;
-            }
-            let continuation_without_prefixes =
-                strip_content_line_prefixes(content_lines[line_idx], bq_depth, base_indent);
-            let (continuation_without_newline, _) = strip_newline(continuation_without_prefixes);
-
-            if in_block_scalar || in_indented_value {
-                if !is_hashpipe_block_scalar_continuation_line(continuation_without_newline, prefix)
-                {
-                    break;
-                }
-                line_idx += 1;
-                continue;
-            }
-
-            if let Some(mut current_value) = multiline_value.take() {
-                let Some(continuation_value) =
-                    hashpipe_continuation_value(continuation_without_newline, prefix)
-                else {
-                    break;
-                };
-                line_idx += 1;
-
-                if !current_value.ends_with(' ') {
-                    current_value.push(' ');
-                }
-                current_value.push_str(&continuation_value);
-                if is_unclosed_double_quoted(&current_value) {
-                    multiline_value = Some(current_value);
-                }
-            }
-        }
     }
 
     line_idx
@@ -826,88 +782,6 @@ fn is_hashpipe_continuation_line(line_without_newline: &str, prefix: &str) -> bo
         return false;
     }
     !after_prefix.trim_start_matches([' ', '\t']).is_empty()
-}
-
-fn hashpipe_option_value(line_without_newline: &str, prefix: &str) -> Option<String> {
-    if !is_hashpipe_option_line(line_without_newline, prefix) {
-        return None;
-    }
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
-    let after_prefix = &trimmed_start[prefix.len()..];
-    let rest = after_prefix.trim_start_matches([' ', '\t']);
-    let colon_idx = rest.find(':')?;
-    let value = rest[colon_idx + 1..]
-        .trim_start_matches([' ', '\t'])
-        .trim_end_matches(['\r', '\n']);
-    Some(value.to_string())
-}
-
-fn hashpipe_continuation_value(line_without_newline: &str, prefix: &str) -> Option<String> {
-    if !is_hashpipe_continuation_line(line_without_newline, prefix) {
-        return None;
-    }
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
-    let after_prefix = &trimmed_start[prefix.len()..];
-    Some(
-        after_prefix
-            .trim_start_matches([' ', '\t'])
-            .trim_end_matches(['\r', '\n'])
-            .to_string(),
-    )
-}
-
-fn is_yaml_block_scalar_indicator(value: &str) -> bool {
-    let s = value.trim();
-    if s.is_empty() {
-        return false;
-    }
-    let mut chars = s.chars();
-    let Some(style) = chars.next() else {
-        return false;
-    };
-    if style != '|' && style != '>' {
-        return false;
-    }
-    chars.all(|ch| ch == '+' || ch == '-' || ch.is_ascii_digit())
-}
-
-fn leading_ws_count(text: &str) -> usize {
-    text.chars().take_while(|c| matches!(c, ' ' | '\t')).count()
-}
-
-fn is_hashpipe_block_scalar_continuation_line(line_without_newline: &str, prefix: &str) -> bool {
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
-    if !trimmed_start.starts_with(prefix) {
-        return false;
-    }
-    let after_prefix = &trimmed_start[prefix.len()..];
-    let text = after_prefix.trim_end_matches([' ', '\t']);
-    if text.is_empty() {
-        return true;
-    }
-    leading_ws_count(after_prefix) >= 2
-}
-
-fn is_unclosed_double_quoted(value: &str) -> bool {
-    if !value.starts_with('"') {
-        return false;
-    }
-    let mut escaped = false;
-    let mut quote_count = 0usize;
-    for ch in value.chars() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            escaped = true;
-            continue;
-        }
-        if ch == '"' {
-            quote_count += 1;
-        }
-    }
-    quote_count % 2 == 1
 }
 
 /// Check if a line is a valid closing fence for the given fence info.
@@ -1305,108 +1179,17 @@ pub(crate) fn parse_fenced_code_block(
                 builder.start_node(SyntaxKind::HASHPIPE_YAML_CONTENT.into());
                 while line_idx < prepared_hashpipe_lines {
                     let content_line = content_lines[line_idx];
-                    let preview_after_indent =
-                        strip_content_line_prefixes(content_line, bq_depth, base_indent);
-                    let (preview_without_newline, _) = strip_newline(preview_after_indent);
-                    if !is_hashpipe_option_line(preview_without_newline, prefix) {
-                        break;
-                    }
-
                     let after_indent =
                         emit_content_line_prefixes(builder, content_line, bq_depth, base_indent);
                     let (line_without_newline, newline_str) = strip_newline(after_indent);
-                    let _ = emit_hashpipe_option_line(builder, line_without_newline, prefix);
+                    if !emit_hashpipe_option_line(builder, line_without_newline, prefix) {
+                        let _ =
+                            emit_hashpipe_continuation_line(builder, line_without_newline, prefix);
+                    }
                     if !newline_str.is_empty() {
                         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
                     }
                     line_idx += 1;
-
-                    let option_value = hashpipe_option_value(line_without_newline, prefix);
-                    let mut multiline_value = option_value
-                        .as_ref()
-                        .filter(|value| is_unclosed_double_quoted(value))
-                        .cloned();
-                    let in_block_scalar = option_value
-                        .as_ref()
-                        .is_some_and(|value| is_yaml_block_scalar_indicator(value));
-                    let in_indented_value =
-                        option_value.as_ref().is_some_and(|value| value.is_empty());
-
-                    while multiline_value.is_some() || in_block_scalar || in_indented_value {
-                        if line_idx >= prepared_hashpipe_lines || line_idx >= content_lines.len() {
-                            break;
-                        }
-                        let continuation_line = content_lines[line_idx];
-                        let continuation_preview =
-                            strip_content_line_prefixes(continuation_line, bq_depth, base_indent);
-                        let (continuation_without_newline, _continuation_newline) =
-                            strip_newline(continuation_preview);
-
-                        if in_block_scalar || in_indented_value {
-                            if !is_hashpipe_block_scalar_continuation_line(
-                                continuation_without_newline,
-                                prefix,
-                            ) {
-                                break;
-                            }
-                            let continuation_after_indent = emit_content_line_prefixes(
-                                builder,
-                                continuation_line,
-                                bq_depth,
-                                base_indent,
-                            );
-                            let (continuation_without_newline, continuation_newline) =
-                                strip_newline(continuation_after_indent);
-                            if !emit_hashpipe_continuation_line(
-                                builder,
-                                continuation_without_newline,
-                                prefix,
-                            ) {
-                                break;
-                            }
-                            if !continuation_newline.is_empty() {
-                                builder.token(SyntaxKind::NEWLINE.into(), continuation_newline);
-                            }
-                            line_idx += 1;
-                            continue;
-                        }
-
-                        if let Some(mut current_value) = multiline_value.take() {
-                            let Some(continuation_value) =
-                                hashpipe_continuation_value(continuation_without_newline, prefix)
-                            else {
-                                break;
-                            };
-                            let continuation_after_indent = emit_content_line_prefixes(
-                                builder,
-                                continuation_line,
-                                bq_depth,
-                                base_indent,
-                            );
-                            let (continuation_without_newline, continuation_newline) =
-                                strip_newline(continuation_after_indent);
-
-                            if !emit_hashpipe_continuation_line(
-                                builder,
-                                continuation_without_newline,
-                                prefix,
-                            ) {
-                                break;
-                            }
-                            if !continuation_newline.is_empty() {
-                                builder.token(SyntaxKind::NEWLINE.into(), continuation_newline);
-                            }
-                            line_idx += 1;
-
-                            if !current_value.ends_with(' ') {
-                                current_value.push(' ');
-                            }
-                            current_value.push_str(&continuation_value);
-                            if is_unclosed_double_quoted(&current_value) {
-                                multiline_value = Some(current_value);
-                            }
-                        }
-                    }
                 }
                 builder.finish_node(); // HASHPIPE_YAML_CONTENT
                 builder.finish_node(); // HASHPIPE_YAML_PREAMBLE

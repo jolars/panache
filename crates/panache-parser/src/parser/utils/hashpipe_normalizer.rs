@@ -49,8 +49,8 @@ struct LineSlice<'a> {
 
 /// Normalize a contiguous leading hashpipe header into YAML text.
 ///
-/// Returns `None` when the input does not start with a valid hashpipe option
-/// line for the provided prefix.
+/// Returns `None` when the input does not start with a hashpipe-prefixed line
+/// for the provided prefix.
 pub fn normalize_hashpipe_header(
     content: &str,
     prefix: &str,
@@ -66,77 +66,13 @@ pub fn normalize_hashpipe_header(
 
     let mut consumed = 0usize;
     let mut saw_prefix = false;
-    let mut open_quoted: Option<String> = None;
-    let mut open_block_scalar = false;
-    let mut open_flow_collection = false;
-    let mut open_indented_yaml_value = false;
 
     while consumed < lines.len() {
         let line = lines[consumed];
         let trimmed = line.line_without_newline.trim_start_matches([' ', '\t']);
 
-        if let Some(mut value) = open_quoted.take()
-            && let Some(fragment) = continuation_value(trimmed, prefix)
-        {
-            if !value.ends_with(' ') {
-                value.push(' ');
-            }
-            value.push_str(&fragment);
-            consumed += 1;
-            if is_unclosed_double_quoted(&value) {
-                open_quoted = Some(value);
-            }
-            continue;
-        }
-
-        if open_block_scalar {
-            if let Some(after_prefix) = trimmed.strip_prefix(prefix)
-                && is_block_scalar_continuation_line(after_prefix)
-            {
-                consumed += 1;
-                continue;
-            }
-            open_block_scalar = false;
-        }
-
-        if open_flow_collection {
-            if let Some(after_prefix) = trimmed.strip_prefix(prefix)
-                && is_flow_collection_continuation_line(after_prefix)
-            {
-                consumed += 1;
-                if let Some(value) = option_value(trimmed, prefix)
-                    && !is_unclosed_flow_collection(&value)
-                {
-                    open_flow_collection = false;
-                }
-                continue;
-            }
-            open_flow_collection = false;
-        }
-
-        if open_indented_yaml_value {
-            if let Some(after_prefix) = trimmed.strip_prefix(prefix)
-                && is_block_scalar_continuation_line(after_prefix)
-            {
-                consumed += 1;
-                continue;
-            }
-            open_indented_yaml_value = false;
-        }
-
-        if is_hashpipe_option_line(trimmed, prefix) {
+        if trimmed.starts_with(prefix) {
             saw_prefix = true;
-            if let Some(value) = option_value(trimmed, prefix) {
-                if is_unclosed_double_quoted(&value) {
-                    open_quoted = Some(value);
-                } else if is_yaml_block_scalar_indicator(&value) {
-                    open_block_scalar = true;
-                } else if is_unclosed_flow_collection(&value) {
-                    open_flow_collection = true;
-                } else if value.is_empty() {
-                    open_indented_yaml_value = true;
-                }
-            }
             consumed += 1;
             continue;
         }
@@ -239,147 +175,6 @@ fn strip_hashpipe_prefix_once<'a>(line_without_newline: &'a str, prefix: &str) -
     Some(after_prefix)
 }
 
-fn is_hashpipe_option_line(line_without_newline: &str, prefix: &str) -> bool {
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
-    if !trimmed_start.starts_with(prefix) {
-        return false;
-    }
-    let after_prefix = &trimmed_start[prefix.len()..];
-    let rest = after_prefix.trim_start_matches([' ', '\t']);
-    let Some(colon_idx) = rest.find(':') else {
-        return false;
-    };
-    let key = rest[..colon_idx].trim_end_matches([' ', '\t']);
-    !key.is_empty()
-}
-
-fn option_value(line_without_newline: &str, prefix: &str) -> Option<String> {
-    if !is_hashpipe_option_line(line_without_newline, prefix) {
-        return None;
-    }
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
-    let after_prefix = &trimmed_start[prefix.len()..];
-    let rest = after_prefix.trim_start_matches([' ', '\t']);
-    let colon_idx = rest.find(':')?;
-    let value = rest[colon_idx + 1..]
-        .trim_start_matches([' ', '\t'])
-        .trim_end_matches([' ', '\t']);
-    Some(value.to_string())
-}
-
-fn continuation_value(line_without_newline: &str, prefix: &str) -> Option<String> {
-    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
-    if !trimmed_start.starts_with(prefix) {
-        return None;
-    }
-    let after_prefix = &trimmed_start[prefix.len()..];
-    let first = after_prefix.chars().next()?;
-    if first != ' ' && first != '\t' {
-        return None;
-    }
-    let value = after_prefix
-        .trim_start_matches([' ', '\t'])
-        .trim_end_matches([' ', '\t']);
-    if value.is_empty() {
-        None
-    } else {
-        Some(value.to_string())
-    }
-}
-
-fn is_yaml_block_scalar_indicator(value: &str) -> bool {
-    let s = value.trim();
-    if s.is_empty() {
-        return false;
-    }
-    let mut chars = s.chars();
-    let Some(style) = chars.next() else {
-        return false;
-    };
-    if style != '|' && style != '>' {
-        return false;
-    }
-    chars.all(|ch| ch == '+' || ch == '-' || ch.is_ascii_digit())
-}
-
-fn leading_ws_count(text: &str) -> usize {
-    text.chars().take_while(|c| matches!(c, ' ' | '\t')).count()
-}
-
-fn is_block_scalar_continuation_line(after_prefix: &str) -> bool {
-    let text = after_prefix.trim_end_matches(['\n', '\r']);
-    if text.trim().is_empty() {
-        return true;
-    }
-    leading_ws_count(text) >= 2
-}
-
-fn is_flow_collection_continuation_line(after_prefix: &str) -> bool {
-    if is_block_scalar_continuation_line(after_prefix) {
-        return true;
-    }
-    let trimmed = after_prefix
-        .trim_end_matches(['\n', '\r'])
-        .trim_start_matches([' ', '\t']);
-    trimmed.starts_with(']') || trimmed.starts_with('}')
-}
-
-fn is_unclosed_double_quoted(value: &str) -> bool {
-    if !value.starts_with('"') {
-        return false;
-    }
-    let mut escaped = false;
-    let mut quote_count = 0usize;
-    for ch in value.chars() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            escaped = true;
-            continue;
-        }
-        if ch == '"' {
-            quote_count += 1;
-        }
-    }
-    quote_count % 2 == 1
-}
-
-fn is_unclosed_flow_collection(value: &str) -> bool {
-    let trimmed = value.trim_start();
-    if !trimmed.starts_with('[') && !trimmed.starts_with('{') {
-        return false;
-    }
-
-    let mut stack: Vec<char> = Vec::new();
-    let mut in_single = false;
-    let mut in_double = false;
-    let mut escaped = false;
-
-    for ch in value.chars() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        match ch {
-            '\\' if in_double => escaped = true,
-            '\'' if !in_double => in_single = !in_single,
-            '"' if !in_single => in_double = !in_double,
-            '[' | '{' if !in_single && !in_double => stack.push(ch),
-            ']' if !in_single && !in_double && stack.pop() != Some('[') => {
-                return false;
-            }
-            '}' if !in_single && !in_double && stack.pop() != Some('{') => {
-                return false;
-            }
-            _ => {}
-        }
-    }
-
-    !stack.is_empty() || in_single || in_double
-}
-
 #[cfg(test)]
 mod tests {
     use super::normalize_hashpipe_header;
@@ -431,6 +226,17 @@ mod tests {
             normalize_hashpipe_header(indented, "#|").expect("expected indented header");
         assert_eq!(indented_norm.header_line_count, 3);
         assert_eq!(indented_norm.normalized_yaml, "fig-cap:\n  - A\n  - B\n");
+    }
+
+    #[test]
+    fn keeps_contiguous_prefixed_lines_even_when_not_option_shaped() {
+        let input = "#| fig-subcap:\n#| - ROC\n#|  - PR Curve\nx <- 1\n";
+        let normalized = normalize_hashpipe_header(input, "#|").expect("expected header");
+        assert_eq!(normalized.header_line_count, 3);
+        assert_eq!(
+            normalized.normalized_yaml,
+            "fig-subcap:\n- ROC\n - PR Curve\n"
+        );
     }
 
     #[test]

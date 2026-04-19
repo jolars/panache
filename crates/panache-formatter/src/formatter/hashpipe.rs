@@ -349,7 +349,8 @@ fn hashpipe_map_entry_value_text(
         let range = block.syntax().text_range();
         let start: usize = range.start().into();
         let end: usize = range.end().into();
-        let raw = normalized_yaml[start..end].to_string();
+        let raw =
+            restore_omitted_first_line_indent(normalized_yaml, start, &normalized_yaml[start..end]);
         // Preserve block values as block values when round-tripping through
         // hashpipe YAML normalization. Without this, sequence/map values can be
         // re-emitted as `key: - item` on a second pass (issue #172).
@@ -423,6 +424,63 @@ fn is_yaml_block_scalar_indicator(value: &str) -> bool {
         return false;
     }
     chars.all(|ch| ch == '+' || ch == '-' || ch.is_ascii_digit())
+}
+
+fn trim_minimum_indentation(text: &str) -> Vec<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let min_indent = lines
+        .iter()
+        .filter_map(|line| {
+            if line.trim().is_empty() {
+                return None;
+            }
+            Some(line.chars().take_while(|c| matches!(c, ' ' | '\t')).count())
+        })
+        .min()
+        .unwrap_or(0);
+
+    lines
+        .into_iter()
+        .map(|line| {
+            if line.trim().is_empty() {
+                String::new()
+            } else {
+                line.chars().skip(min_indent).collect()
+            }
+        })
+        .collect()
+}
+
+fn restore_omitted_first_line_indent(source: &str, value_start: usize, raw: &str) -> String {
+    let line_start = source[..value_start].rfind('\n').map_or(0, |idx| idx + 1);
+    let omitted_indent = &source[line_start..value_start];
+    if omitted_indent.is_empty() || !omitted_indent.chars().all(|ch| matches!(ch, ' ' | '\t')) {
+        return raw.to_string();
+    }
+
+    let mut out = String::with_capacity(raw.len() + omitted_indent.len());
+    let mut applied = false;
+    for line in raw.split_inclusive('\n') {
+        let (line_content, has_newline) = if let Some(content) = line.strip_suffix('\n') {
+            (content, true)
+        } else {
+            (line, false)
+        };
+
+        if !applied && !line_content.is_empty() {
+            out.push_str(omitted_indent);
+            applied = true;
+        }
+        out.push_str(line_content);
+        if has_newline {
+            out.push('\n');
+        }
+    }
+
+    if !applied && !raw.is_empty() {
+        return raw.to_string();
+    }
+    out
 }
 
 /// Classify an option value for hashpipe conversion.
@@ -618,19 +676,17 @@ pub fn format_as_hashpipe(
                     && value
                         .lines()
                         .nth(1)
-                        .is_some_and(|line| line.starts_with("- "))
+                        .is_some_and(|line| line.trim_start_matches([' ', '\t']).starts_with("- "))
                 {
                     let mut rendered = String::new();
                     rendered.push_str(&format!("{key}:\n"));
-                    for line in value.lines().skip(1) {
+                    let dedented = trim_minimum_indentation(value.trim_start_matches('\n'));
+                    for line in dedented {
                         if line.is_empty() {
-                            rendered.push('\n');
-                        } else if line.starts_with(' ') {
-                            rendered.push_str(line);
                             rendered.push('\n');
                         } else {
                             rendered.push_str("  ");
-                            rendered.push_str(line);
+                            rendered.push_str(&line);
                             rendered.push('\n');
                         }
                     }
@@ -797,6 +853,21 @@ mod tests {
         let value = "\n  - a\n  - b";
         let lines = format_hashpipe_option_with_wrap("#|", "list", value, 80);
         assert_eq!(lines, vec!["#| list:", "#|   - a", "#|   - b"]);
+    }
+
+    #[test]
+    fn trim_minimum_indentation_preserves_relative_structure() {
+        let lines = trim_minimum_indentation("   - ROC\n     - PR Curve");
+        assert_eq!(lines, vec!["- ROC", "  - PR Curve"]);
+    }
+
+    #[test]
+    fn restore_omitted_first_line_indent_for_block_sequence_values() {
+        let source = "fig-cap:\n  - A\n  - B\n";
+        let start = source.find("- A").expect("expected list item");
+        let raw = &source[start..];
+        let restored = restore_omitted_first_line_indent(source, start, raw);
+        assert_eq!(restored, "  - A\n  - B\n");
     }
 
     #[test]

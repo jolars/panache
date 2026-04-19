@@ -522,6 +522,25 @@ fn executable_chunk_hashpipe_continuation_preserves_trailing_space() {
 }
 
 #[test]
+fn executable_chunk_hashpipe_preamble_captures_non_option_prefixed_lines() {
+    let input = "```{r}\n#| fig-subcap: - \"A\"\n#|   - \"B\"\nx <- 1\n```\n";
+    let node = parse_blocks_quarto(input);
+    let code_block = find_first(&node, SyntaxKind::CODE_BLOCK).expect("expected code block");
+    let code_content = code_block
+        .children()
+        .find(|n| n.kind() == SyntaxKind::CODE_CONTENT)
+        .expect("expected code content");
+    let preamble = code_content
+        .children()
+        .find(|n| n.kind() == SyntaxKind::HASHPIPE_YAML_PREAMBLE)
+        .expect("expected hashpipe preamble node");
+    assert_eq!(
+        preamble.text().to_string(),
+        "#| fig-subcap: - \"A\"\n#|   - \"B\"\n"
+    );
+}
+
+#[test]
 fn executable_chunk_hashpipe_multiline_scalar_in_list_does_not_gain_indent() {
     let input = "-   Press Ctrl + `.` to open tool.\n\n    ```{r}\n    #| fig-cap: >\n    #|   Go to File/Function in RStudio.\n    #| fig-alt: >\n    #|   Screenshot of the \"Go to File/Function\" tool in the\n    #|   RStudio IDE. It is a text box with the cursor in it.\n    knitr::include_graphics(\"images/file-finder.png\", dpi = 220)\n    ```\n";
     let node = parse_blocks_quarto(input);

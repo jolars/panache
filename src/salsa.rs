@@ -2255,6 +2255,28 @@ mod tests {
     }
 
     #[test]
+    fn built_in_lint_plan_reports_hashpipe_yaml_parse_error_for_prefixed_continuation_line() {
+        let mut db = SalsaDb::default();
+        let cfg = crate::Config {
+            flavor: crate::config::Flavor::Quarto,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Quarto),
+            ..Default::default()
+        };
+        let config = FileConfig::new(&db, cfg);
+        let path = PathBuf::from("/tmp/lint_hashpipe_yaml_error_continuation.qmd");
+        let input = "```{r}\n#| fig-subcap: - \"A\"\n#|   - \"B\"\n1 + 1\n```\n".to_string();
+        let file = db.update_file_text(path.clone(), input);
+
+        let plan = built_in_lint_plan(&db, file, config, path).clone();
+        assert!(
+            plan.diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "yaml-parse-error"),
+            "expected yaml parse diagnostic from invalid hashpipe YAML continuation line"
+        );
+    }
+
+    #[test]
     fn yaml_embedded_regions_in_host_range_resolves_regions_with_stable_ids() {
         let mut db = SalsaDb::default();
         let cfg = crate::Config {

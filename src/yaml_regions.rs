@@ -153,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn hashpipe_region_requires_option_header_line() {
+    fn hashpipe_region_allows_contiguous_prefixed_lines() {
         let input = "```{r}\n#|   not-an-option\nx <- 1\n```\n";
         let config = crate::config::Config {
             flavor: crate::config::Flavor::Quarto,
@@ -162,10 +162,8 @@ mod tests {
         };
         let tree = crate::parser::parse(input, Some(config));
         let regions = collect_hashpipe_regions(&tree);
-        assert!(
-            regions.is_empty(),
-            "continuation-only hashpipe lines should not form YAML regions"
-        );
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].content, "  not-an-option\n");
     }
 
     #[test]
