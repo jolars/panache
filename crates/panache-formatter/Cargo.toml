@@ -2,6 +2,7 @@
 name = "panache-formatter"
 version = "0.1.0"
 edition.workspace = true
+description = "Core formatting engine for Pandoc markdown, Quarto, and RMarkdown"
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
