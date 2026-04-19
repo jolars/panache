@@ -39,7 +39,7 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [dependencies]
-panache-formatter = { path = "crates/panache-formatter" }
+panache-formatter = { path = "crates/panache-formatter", version = "0.1.0" }
 panache-parser = { path = "crates/panache-parser", version = "0.4.0", features = [
     "serde",
 ] }

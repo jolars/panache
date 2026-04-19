@@ -9,6 +9,7 @@
   "packages": {
     ".": {
       "exclude-paths": [
+        "crates/panache-formatter",
         "crates/panache-parser",
         "crates/panache-wasm",
         "editors"

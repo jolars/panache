@@ -1,15 +1,19 @@
 [package]
 name = "panache-formatter"
-version = "2.35.0"
+version = "0.1.0"
 edition.workspace = true
 publish = false
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/panache-formatter"
+keywords = ["quarto", "pandoc", "markdown", "formatter"]
+categories = ["text-processing"]
 
 [dependencies]
-panache-parser = { path = "../panache-parser" }
+panache-parser = { path = "../panache-parser", version = "0.4.0" }
 log = { version = "0.4.28", features = ["release_max_level_info"] }
 rowan = "0.16.1"
 yaml_parser = "0.3.0"
