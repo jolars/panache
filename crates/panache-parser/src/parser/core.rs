@@ -1741,7 +1741,8 @@ impl<'a> Parser<'a> {
         let content = stripped_content;
 
         if self.is_paragraph_open()
-            && paragraphs::has_open_inline_math_environment(&self.containers)
+            && (paragraphs::has_open_inline_math_environment(&self.containers)
+                || paragraphs::has_open_display_math_dollars(&self.containers))
         {
             paragraphs::append_paragraph_line(
                 &mut self.containers,

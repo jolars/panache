@@ -16,29 +16,29 @@ fn update_display_math_dollar_state(
     open_display_math_dollar_count: &mut Option<usize>,
 ) {
     let trimmed = line_no_newline.trim();
-    if trimmed.len() < 2 || !trimmed.as_bytes().iter().all(|b| *b == b'$') {
+    if trimmed.len() < 2 {
         return;
     }
 
-    let run_len = trimmed.len();
+    let run_len = trimmed.bytes().take_while(|b| *b == b'$').count();
     if run_len < 2 {
         return;
     }
 
+    let rest = &trimmed[run_len..];
+    let is_pure_dollars = rest.is_empty();
+    let is_quarto_equation_attr_closer = rest.starts_with(char::is_whitespace) && {
+        let attr = rest.trim_start();
+        attr.starts_with('{') && attr.ends_with('}')
+    };
+
     if let Some(open_len) = *open_display_math_dollar_count {
-        if run_len >= open_len {
+        if (is_pure_dollars || is_quarto_equation_attr_closer) && run_len >= open_len {
             *open_display_math_dollar_count = None;
         }
-    } else {
+    } else if is_pure_dollars {
         *open_display_math_dollar_count = Some(run_len);
     }
-}
-
-fn is_inside_footnote_definition(containers: &ContainerStack) -> bool {
-    containers
-        .stack
-        .iter()
-        .any(|c| matches!(c, Container::FootnoteDefinition { .. }))
 }
 
 fn extract_end_environment_name(line: &str) -> Option<&str> {
@@ -77,8 +77,6 @@ pub(in crate::parser) fn append_paragraph_line(
     line: &str,
     _config: &ParserOptions,
 ) {
-    let in_footnote = is_inside_footnote_definition(containers);
-
     // Buffer the line (with newline for losslessness)
     // Works for ALL paragraphs including those in blockquotes
     if let Some(Container::Paragraph {
@@ -90,11 +88,11 @@ pub(in crate::parser) fn append_paragraph_line(
         buffer.push_text(line);
 
         let line_no_newline = line.trim_end_matches(&['\r', '\n'][..]);
-        if in_footnote {
-            update_display_math_dollar_state(line_no_newline, open_display_math_dollar_count);
-        } else {
-            *open_display_math_dollar_count = None;
-        }
+        // Track standalone `$$` delimiter lines for all paragraphs so we keep
+        // multi-line display math in a single paragraph parse context.
+        // This prevents `$$` + `\begin{...}` forms from being split into
+        // PARAGRAPH + TEX_BLOCK across parse passes.
+        update_display_math_dollar_state(line_no_newline, open_display_math_dollar_count);
         if let Some(env_name) = extract_environment_name(line_no_newline)
             && is_inline_math_environment(&env_name)
         {
@@ -132,9 +130,18 @@ pub(in crate::parser) fn has_open_inline_math_environment(containers: &Container
         containers.last(),
         Some(Container::Paragraph {
             open_inline_math_envs,
+            ..
+        }) if !open_inline_math_envs.is_empty()
+    )
+}
+
+pub(in crate::parser) fn has_open_display_math_dollars(containers: &ContainerStack) -> bool {
+    matches!(
+        containers.last(),
+        Some(Container::Paragraph {
             open_display_math_dollar_count,
             ..
-        }) if !open_inline_math_envs.is_empty() || open_display_math_dollar_count.is_some()
+        }) if open_display_math_dollar_count.is_some()
     )
 }
 

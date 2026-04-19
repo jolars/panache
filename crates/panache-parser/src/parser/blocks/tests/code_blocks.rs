@@ -694,6 +694,17 @@ fn tex_math_gfm_parses_math_fence_as_display_math() {
     );
 }
 
+#[test]
+fn standalone_dollar_math_delimiters_do_not_split_into_tex_block() {
+    let input = "And so now our between group sum of squares is obtained by summing these\n\"weighted squared deviations\" over all three groups in the study:\n$$\n\\begin{aligned} SS_b & = 1.14 + 0.18 + 2.16 \\\\ &= 3.48 \\end{aligned}\n$$\n";
+    let tree = parse_blocks(input);
+
+    assert!(
+        find_first(&tree, SyntaxKind::TEX_BLOCK).is_none(),
+        "display math delimited by standalone $$ lines should stay paragraph-inline, not TEX_BLOCK"
+    );
+}
+
 // Indented code block tests
 
 #[test]
