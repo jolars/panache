@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.35.0](https://github.com/jolars/panache/compare/panache-zed-v2.34.1...panache-zed-v2.35.0) (2026-04-19)
+
+### Features
+- fallback to latest available release ([`008fe36`](https://github.com/jolars/panache/commit/008fe36721b32b92650fc79f441d5b867d7ea24d))
+
+### Bug Fixes
+- update cargo lock file ([`3fc4d9b`](https://github.com/jolars/panache/commit/3fc4d9bf9c6a33af44de24fbcfc92e0843345a84))
+
 ## [2.32.1](https://github.com/jolars/panache/compare/panache-zed-v2.32.0...panache-zed-v2.32.1) (2026-04-14)
 
 
