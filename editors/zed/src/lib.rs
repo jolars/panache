@@ -107,6 +107,103 @@ impl PanacheExtension {
         )
     }
 
+    fn latest_panache_release_with_asset_for_platform(
+        body: &[u8],
+        platform: zed_extension_api::Os,
+        arch: zed_extension_api::Architecture,
+    ) -> Result<(zed::GithubRelease, GithubReleaseDetails)> {
+        let releases: zed::serde_json::Value = zed::serde_json::from_slice(body)
+            .map_err(|error| format!("Failed to parse GitHub releases response: {error}"))?;
+        let releases = releases
+            .as_array()
+            .ok_or_else(|| "GitHub releases response was not an array".to_string())?;
+
+        let mut latest_stable_release: Option<zed::GithubRelease> = None;
+
+        for release in releases {
+            if release
+                .get("prerelease")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            let Some(tag_name) = release.get("tag_name").and_then(|value| value.as_str()) else {
+                continue;
+            };
+            let Some(version) = tag_name
+                .strip_prefix("v")
+                .or_else(|| tag_name.strip_prefix("panache-v"))
+            else {
+                continue;
+            };
+
+            let assets = release
+                .get("assets")
+                .and_then(|value| value.as_array())
+                .ok_or_else(|| {
+                    format!("GitHub release {tag_name} did not include an assets array")
+                })?;
+            if assets.is_empty() {
+                continue;
+            }
+
+            let assets = assets
+                .iter()
+                .map(|asset| {
+                    let name = asset
+                        .get("name")
+                        .and_then(|value| value.as_str())
+                        .ok_or_else(|| format!("GitHub release {tag_name} has an asset without a name"))?;
+                    let download_url = asset
+                        .get("browser_download_url")
+                        .and_then(|value| value.as_str())
+                        .ok_or_else(|| {
+                            format!(
+                                "GitHub release {tag_name} has an asset without browser_download_url"
+                            )
+                        })?;
+
+                    Ok(zed::GithubReleaseAsset {
+                        name: name.to_string(),
+                        download_url: download_url.to_string(),
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            let parsed_release = zed::GithubRelease {
+                version: version.to_string(),
+                assets,
+            };
+
+            if latest_stable_release.is_none() {
+                latest_stable_release = Some(zed::GithubRelease {
+                    version: parsed_release.version.clone(),
+                    assets: parsed_release.assets.clone(),
+                });
+            }
+
+            let release_details = GithubReleaseDetails::new(platform, arch, parsed_release.version.clone());
+            if parsed_release
+                .assets
+                .iter()
+                .any(|asset| asset.name == release_details.asset_name)
+            {
+                return Ok((parsed_release, release_details));
+            }
+        }
+
+        let latest_version = latest_stable_release.map(|release| release.version);
+        Err(match latest_version {
+            Some(version) => format!(
+                "No stable release asset found for platform in release stream; latest stable version is {version}"
+            ),
+            None => "No stable GitHub release matching v* (or legacy panache-v*) with assets found"
+                .to_string(),
+        })
+    }
+
     fn language_server_binary(
         &mut self,
         language_server_id: &LanguageServerId,
@@ -147,21 +244,26 @@ impl PanacheExtension {
             language_server_id,
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
-        let release = Self::latest_panache_release()?;
-
         let (platform, arch) = zed::current_platform();
-        let release_details = GithubReleaseDetails::new(platform, arch, release.version);
+        let request = HttpRequest::builder()
+            .method(HttpMethod::Get)
+            .url("https://api.github.com/repos/jolars/panache/releases?per_page=100")
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "panache-zed-extension")
+            .build()?;
+
+        let response = request
+            .fetch()
+            .map_err(|error| format!("Failed to fetch releases from GitHub: {error}"))?;
+
+        let (release, release_details) =
+            Self::latest_panache_release_with_asset_for_platform(&response.body, platform, arch)?;
 
         let asset = release
             .assets
             .iter()
             .find(|asset| asset.name == release_details.asset_name)
-            .ok_or_else(|| {
-                format!(
-                    "No asset found matching {asset_name:?}",
-                    asset_name = release_details.asset_name
-                )
-            })?;
+            .ok_or_else(|| format!("No asset found matching {:?}", release_details.asset_name))?;
 
         if !fs::metadata(&release_details.downloaded_binary_path).is_ok_and(|stat| stat.is_file()) {
             zed::set_language_server_installation_status(
@@ -422,5 +524,37 @@ mod test {
             release.assets[0].download_url,
             "https://example.com/v-tag.tar.gz"
         );
+    }
+
+    #[test]
+    fn test_latest_panache_release_falls_back_to_older_release_with_platform_asset() {
+        let body = r#"
+[
+  {
+    "tag_name": "v2.36.0",
+    "prerelease": false,
+    "assets": [
+      { "name": "panache-x86_64-apple-darwin.tar.gz", "browser_download_url": "https://example.com/macos-only.tar.gz" }
+    ]
+  },
+  {
+    "tag_name": "v2.35.0",
+    "prerelease": false,
+    "assets": [
+      { "name": "panache-x86_64-unknown-linux-gnu.tar.gz", "browser_download_url": "https://example.com/linux.tar.gz" }
+    ]
+  }
+]
+"#;
+
+        let (release, details) = PanacheExtension::latest_panache_release_with_asset_for_platform(
+            body.as_bytes(),
+            zed_extension_api::Os::Linux,
+            zed_extension_api::Architecture::X8664,
+        )
+        .unwrap();
+
+        assert_eq!(release.version, "2.35.0");
+        assert_eq!(details.asset_name, "panache-x86_64-unknown-linux-gnu.tar.gz");
     }
 }
