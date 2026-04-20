@@ -606,8 +606,9 @@ pub(crate) fn compute_hashpipe_preamble_line_count(
         let preview_after_indent =
             strip_content_line_prefixes(content_lines[line_idx], bq_depth, base_indent);
         let (preview_without_newline, _) = strip_newline(preview_after_indent);
-        let trimmed = preview_without_newline.trim_start_matches([' ', '\t']);
-        if !trimmed.starts_with(prefix) {
+        if !is_hashpipe_option_line(preview_without_newline, prefix)
+            && !is_hashpipe_continuation_line(preview_without_newline, prefix)
+        {
             break;
         }
         line_idx += 1;
@@ -1925,6 +1926,13 @@ mod tests {
     #[test]
     fn test_compute_hashpipe_preamble_line_count_stops_at_non_option() {
         let content_lines = vec!["#| label: fig-plot\n", "plot(1:10)\n", "#| echo: false\n"];
+        let count = compute_hashpipe_preamble_line_count(&content_lines, "#|", 0, 0);
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_compute_hashpipe_preamble_line_count_stops_at_standalone_prefix() {
+        let content_lines = vec!["#| label: fig-plot\n", "#|\n", "plot(1:10)\n"];
         let count = compute_hashpipe_preamble_line_count(&content_lines, "#|", 0, 0);
         assert_eq!(count, 1);
     }

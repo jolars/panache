@@ -69,14 +69,11 @@ pub fn normalize_hashpipe_header(
 
     while consumed < lines.len() {
         let line = lines[consumed];
-        let trimmed = line.line_without_newline.trim_start_matches([' ', '\t']);
-
-        if trimmed.starts_with(prefix) {
+        if is_hashpipe_option_or_continuation_line(line.line_without_newline, prefix) {
             saw_prefix = true;
             consumed += 1;
             continue;
         }
-
         break;
     }
 
@@ -175,6 +172,30 @@ fn strip_hashpipe_prefix_once<'a>(line_without_newline: &'a str, prefix: &str) -
     Some(after_prefix)
 }
 
+fn is_hashpipe_option_or_continuation_line(line_without_newline: &str, prefix: &str) -> bool {
+    let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
+    if !trimmed_start.starts_with(prefix) {
+        return false;
+    }
+    let after_prefix = &trimmed_start[prefix.len()..];
+    let rest = after_prefix.trim_start_matches([' ', '\t']);
+
+    if rest.is_empty() {
+        return false;
+    }
+
+    if rest.contains(':') {
+        let key = rest
+            .split_once(':')
+            .map(|(k, _)| k)
+            .unwrap_or("")
+            .trim_end();
+        return !key.is_empty();
+    }
+
+    after_prefix.starts_with([' ', '\t'])
+}
+
 #[cfg(test)]
 mod tests {
     use super::normalize_hashpipe_header;
@@ -245,6 +266,15 @@ mod tests {
 
         let input = "#| echo: true\nplot(1:3)\n#| warning: false\n";
         let normalized = normalize_hashpipe_header(input, "#|").expect("expected leading header");
+        assert_eq!(normalized.header_line_count, 1);
+        assert_eq!(normalized.normalized_yaml, "echo: true\n");
+        assert_eq!(normalized.header_byte_span.end, "#| echo: true\n".len());
+    }
+
+    #[test]
+    fn does_not_consume_standalone_prefix_line() {
+        let input = "#| echo: true\n#|\nbody\n";
+        let normalized = normalize_hashpipe_header(input, "#|").expect("expected header");
         assert_eq!(normalized.header_line_count, 1);
         assert_eq!(normalized.normalized_yaml, "echo: true\n");
         assert_eq!(normalized.header_byte_span.end, "#| echo: true\n".len());
