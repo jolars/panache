@@ -1,0 +1,82 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..556
+  LIST@0..556
+    LIST_ITEM@0..556
+      LIST_MARKER@0..2 "1."
+      WHITESPACE@2..4 "  "
+      PLAIN@4..47
+        TEXT@4..26 "The documentation for "
+        INLINE_CODE@26..40
+          INLINE_CODE_MARKER@26..27 "`"
+          INLINE_CODE_CONTENT@27..39 "substitute()"
+          INLINE_CODE_MARKER@39..40 "`"
+        TEXT@40..46 " says:"
+        NEWLINE@46..47 "\n"
+      BLANK_LINE@47..48
+        BLANK_LINE@47..48 "\n"
+      BLOCK_QUOTE@48..494
+        WHITESPACE@48..52 "    "
+        BLOCK_QUOTE_MARKER@52..53 ">"
+        WHITESPACE@53..54 " "
+        PARAGRAPH@54..143
+          TEXT@54..124 "Substitution takes pl ..."
+          NEWLINE@124..125 "\n"
+          WHITESPACE@125..129 "    "
+          BLOCK_QUOTE_MARKER@129..130 ">"
+          WHITESPACE@130..131 " "
+          TEXT@131..142 "as follows:"
+          NEWLINE@142..143 "\n"
+        WHITESPACE@143..147 "    "
+        BLOCK_QUOTE_MARKER@147..148 ">"
+        BLANK_LINE@148..149
+          BLANK_LINE@148..149 "\n"
+        WHITESPACE@149..153 "    "
+        BLOCK_QUOTE_MARKER@153..154 ">"
+        WHITESPACE@154..155 " "
+        LIST@155..494
+          LIST_ITEM@155..212
+            LIST_MARKER@155..156 "*"
+            WHITESPACE@156..157 " "
+            PLAIN@157..212
+              TEXT@157..188 "If it is not a bound  ..."
+              INLINE_CODE@188..193
+                INLINE_CODE_MARKER@188..189 "`"
+                INLINE_CODE_CONTENT@189..192 "env"
+                INLINE_CODE_MARKER@192..193 "`"
+              TEXT@193..211 ", it is unchanged."
+              NEWLINE@211..212 "\n"
+          WHITESPACE@212..216 "    "
+          BLOCK_QUOTE_MARKER@216..217 ">"
+          WHITESPACE@217..218 " "
+          LIST_ITEM@218..350
+            LIST_MARKER@218..219 "*"
+            WHITESPACE@219..220 " "
+            PLAIN@220..350
+              TEXT@220..285 "If it is a promise ob ..."
+              NEWLINE@285..286 "\n"
+              TEXT@286..349 "    >   the expressio ..."
+              NEWLINE@349..350 "\n"
+          WHITESPACE@350..354 "    "
+          BLOCK_QUOTE_MARKER@354..355 ">"
+          WHITESPACE@355..356 " "
+          LIST_ITEM@356..494
+            LIST_MARKER@356..357 "*"
+            WHITESPACE@357..358 " "
+            PLAIN@358..494
+              TEXT@358..421 "If it is an ordinary  ..."
+              NEWLINE@421..422 "\n"
+              TEXT@422..430 "    >   "
+              INLINE_CODE@430..435
+                INLINE_CODE_MARKER@430..431 "`"
+                INLINE_CODE_CONTENT@431..434 "env"
+                INLINE_CODE_MARKER@434..435 "`"
+              TEXT@435..493 " is .GlobalEnv in whi ..."
+              NEWLINE@493..494 "\n"
+      BLANK_LINE@494..495
+        BLANK_LINE@494..495 "\n"
+      PLAIN@495..556
+        TEXT@495..555 "    Create examples t ..."
+        NEWLINE@555..556 "\n"

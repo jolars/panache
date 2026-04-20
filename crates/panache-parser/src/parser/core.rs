@@ -899,6 +899,66 @@ impl<'a> Parser<'a> {
             .unwrap_or_else(|| parse_blockquote_marker_info(line))
     }
 
+    /// Build blockquote marker metadata for the current source line.
+    ///
+    /// When a blockquote marker is detected at a shifted list content column
+    /// (e.g. `    > ...` inside a list item), the prefix indentation must be
+    /// folded into the first marker's leading spaces for lossless emission.
+    fn marker_info_for_line(
+        &self,
+        payload: Option<&BlockQuotePrepared>,
+        raw_line: &str,
+        marker_line: &str,
+        shifted_prefix: &str,
+        used_shifted: bool,
+    ) -> Vec<marker_utils::BlockQuoteMarkerInfo> {
+        let mut marker_info = if used_shifted {
+            parse_blockquote_marker_info(marker_line)
+        } else {
+            self.blockquote_marker_info(payload, raw_line)
+        };
+        if used_shifted && !shifted_prefix.is_empty() {
+            let (prefix_cols, _) = leading_indent(shifted_prefix);
+            if let Some(first) = marker_info.first_mut() {
+                first.leading_spaces += prefix_cols;
+            }
+        }
+        marker_info
+    }
+
+    /// Detect blockquote markers that begin at list-content indentation instead
+    /// of column 0 on the physical line.
+    fn shifted_blockquote_from_list<'b>(
+        &self,
+        line: &'b str,
+    ) -> Option<(usize, &'b str, &'b str, &'b str)> {
+        if !lists::in_list(&self.containers) {
+            return None;
+        }
+        let list_content_col = paragraphs::current_content_col(&self.containers);
+        if list_content_col == 0 {
+            return None;
+        }
+
+        let (indent_cols, _) = leading_indent(line);
+        if indent_cols < list_content_col {
+            return None;
+        }
+
+        let idx = byte_index_at_column(line, list_content_col);
+        if idx > line.len() {
+            return None;
+        }
+
+        let candidate = &line[idx..];
+        let (candidate_depth, candidate_inner) = count_blockquote_markers(candidate);
+        if candidate_depth == 0 {
+            return None;
+        }
+
+        Some((candidate_depth, candidate_inner, candidate, &line[..idx]))
+    }
+
     fn emit_blockquote_markers(
         &mut self,
         marker_info: &[marker_utils::BlockQuoteMarkerInfo],
@@ -970,8 +1030,22 @@ impl<'a> Parser<'a> {
 
     /// Returns true if the line was consumed.
     fn parse_line(&mut self, line: &str) -> bool {
-        // Count blockquote markers on this line
-        let (bq_depth, inner_content) = count_blockquote_markers(line);
+        // Count blockquote markers on this line. Inside list items, blockquotes can begin
+        // at the list content column (e.g. `    > ...` after `1. `), not at column 0.
+        let (mut bq_depth, mut inner_content) = count_blockquote_markers(line);
+        let mut bq_marker_line = line;
+        let mut shifted_bq_prefix = "";
+        let mut used_shifted_bq = false;
+        if bq_depth == 0
+            && let Some((candidate_depth, candidate_inner, candidate_line, candidate_prefix)) =
+                self.shifted_blockquote_from_list(line)
+        {
+            bq_depth = candidate_depth;
+            inner_content = candidate_inner;
+            bq_marker_line = candidate_line;
+            shifted_bq_prefix = candidate_prefix;
+            used_shifted_bq = true;
+        }
         let current_bq_depth = self.current_blockquote_depth();
 
         let has_blank_before = self.pos == 0 || self.lines[self.pos - 1].trim().is_empty();
@@ -1059,7 +1133,9 @@ impl<'a> Parser<'a> {
             // Note: Blank lines between terms and definitions are now preserved
             // and emitted as part of the term parsing logic
 
-            // For blank lines inside blockquotes, we need to handle them at the right depth
+            // For blank lines inside blockquotes, we need to handle them at the right depth.
+            // If a shifted blockquote marker was detected in list-item content, preserve the
+            // leading shifted indentation before the first marker for losslessness.
             // First, adjust blockquote depth if needed
             if bq_depth > current_bq_depth {
                 // Open blockquotes
@@ -1144,7 +1220,13 @@ impl<'a> Parser<'a> {
 
             // Emit blockquote markers for this blank line if inside blockquotes
             if bq_depth > 0 {
-                let marker_info = self.blockquote_marker_info(blockquote_payload.as_ref(), line);
+                let marker_info = self.marker_info_for_line(
+                    blockquote_payload.as_ref(),
+                    line,
+                    bq_marker_line,
+                    shifted_bq_prefix,
+                    used_shifted_bq,
+                );
                 self.emit_blockquote_markers(&marker_info, bq_depth);
             }
 
@@ -1211,7 +1293,13 @@ impl<'a> Parser<'a> {
                     blockquotes::strip_n_blockquote_markers(line, current_bq_depth);
 
                 // Emit blockquote markers for current depth (for losslessness)
-                let marker_info = self.blockquote_marker_info(blockquote_payload.as_ref(), line);
+                let marker_info = self.marker_info_for_line(
+                    blockquote_payload.as_ref(),
+                    line,
+                    bq_marker_line,
+                    shifted_bq_prefix,
+                    used_shifted_bq,
+                );
                 for i in 0..current_bq_depth {
                     if let Some(info) = marker_info.get(i) {
                         self.emit_or_buffer_blockquote_marker(
@@ -1255,7 +1343,13 @@ impl<'a> Parser<'a> {
             }
 
             // Parse marker information for all levels
-            let marker_info = self.blockquote_marker_info(blockquote_payload.as_ref(), line);
+            let marker_info = self.marker_info_for_line(
+                blockquote_payload.as_ref(),
+                line,
+                bq_marker_line,
+                shifted_bq_prefix,
+                used_shifted_bq,
+            );
 
             if let (Some(dispatcher_ctx), Some(prepared)) =
                 (dispatcher_ctx.as_ref(), blockquote_match.as_ref())
@@ -1392,7 +1486,13 @@ impl<'a> Parser<'a> {
             // Parse the inner content at the new depth
             if bq_depth > 0 {
                 // Emit markers at current depth before parsing content
-                let marker_info = parse_blockquote_marker_info(line);
+                let marker_info = self.marker_info_for_line(
+                    blockquote_payload.as_ref(),
+                    line,
+                    bq_marker_line,
+                    shifted_bq_prefix,
+                    used_shifted_bq,
+                );
                 for i in 0..bq_depth {
                     if let Some(info) = marker_info.get(i) {
                         self.emit_or_buffer_blockquote_marker(
@@ -1463,7 +1563,13 @@ impl<'a> Parser<'a> {
             }
 
             if !list_item_continuation {
-                let marker_info = parse_blockquote_marker_info(line);
+                let marker_info = self.marker_info_for_line(
+                    blockquote_payload.as_ref(),
+                    line,
+                    bq_marker_line,
+                    shifted_bq_prefix,
+                    used_shifted_bq,
+                );
                 for i in 0..bq_depth {
                     if let Some(info) = marker_info.get(i) {
                         self.emit_or_buffer_blockquote_marker(
