@@ -400,7 +400,13 @@ fn hashpipe_flow_scalar_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
 
 fn hashpipe_flow_value_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
     if let Some(token) = flow.plain_scalar() {
-        return Some(token.text().to_string());
+        let text = token.text().to_string();
+        if text.contains('\n') {
+            // Normalize wrapped plain scalars to a single logical line so
+            // re-emission uses deterministic hashpipe wrapping.
+            return Some(text.split_ascii_whitespace().collect::<Vec<_>>().join(" "));
+        }
+        return Some(text);
     }
     if let Some(token) = flow.single_quoted_scalar() {
         return Some(token.text().to_string());
