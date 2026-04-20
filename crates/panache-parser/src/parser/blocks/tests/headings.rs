@@ -75,6 +75,25 @@ fn parses_heading_after_code_block_without_blank_line() {
 }
 
 #[test]
+fn parses_empty_atx_heading_before_table_caption_table() {
+    let input = "##\n\n: Example After One Iteration\n\n| Experiment | Heads | $\\gamma$ |\n|------------|-------|----------|\n| 1          |     7 |     0.78 |\n";
+    let node = parse_blocks(input);
+    let blocks: Vec<_> = node
+        .children()
+        .filter(|n| n.kind() != SyntaxKind::BLANK_LINE)
+        .collect();
+    assert_eq!(blocks.first().map(|n| n.kind()), Some(SyntaxKind::HEADING));
+    assert_eq!(
+        blocks.get(1).map(|n| n.kind()),
+        Some(SyntaxKind::PIPE_TABLE)
+    );
+    assert!(
+        find_first(&node, SyntaxKind::DEFINITION_LIST).is_none(),
+        "empty ATX heading should not be parsed as a definition-list term"
+    );
+}
+
+#[test]
 fn parses_heading_without_blank_line_when_extension_disabled() {
     let mut config = ParserOptions::default();
     config.extensions.blank_before_header = false;

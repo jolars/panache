@@ -240,6 +240,7 @@ golden_test_cases!(
     issue_hashpipe_nested_list_indent,
     issue_176_display_math_colon_idempotency,
     issue_181_hashpipe_fig_subcap_idempotency,
+    issue_189_table_caption_heading_idempotency,
     issue_190_hashpipe_blank_line_losslessness,
     issue_177_list_blockquote_idempotency,
     writer_autolinks,
