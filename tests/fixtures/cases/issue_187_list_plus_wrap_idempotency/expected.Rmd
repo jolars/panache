@@ -1,0 +1,2 @@
+- Install this package, perhaps using `devtools::install()` or via Ctrl + Shift +
+  B (Windows & Linux) or Cmd + Shift + B in RStudio.

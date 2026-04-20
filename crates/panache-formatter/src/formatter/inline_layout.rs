@@ -289,9 +289,14 @@ fn is_definition_marker_piece(piece: &str) -> bool {
     piece == ":"
 }
 
+fn is_bullet_list_marker_piece(piece: &str) -> bool {
+    matches!(piece, "+" | "-" | "*")
+}
+
 fn is_unsafe_line_start_piece(piece: &str) -> bool {
     is_example_list_marker_piece(piece)
         || is_decimal_ordered_list_marker_piece(piece)
+        || is_bullet_list_marker_piece(piece)
         || is_definition_marker_piece(piece)
 }
 
@@ -1137,8 +1142,9 @@ fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_decimal_ordered_list_marker_piece, is_definition_marker_piece,
-        is_example_list_marker_piece, is_unsafe_line_start_piece, wrap_text_first_fit,
+        is_bullet_list_marker_piece, is_decimal_ordered_list_marker_piece,
+        is_definition_marker_piece, is_example_list_marker_piece, is_unsafe_line_start_piece,
+        wrap_text_first_fit,
     };
 
     #[test]
@@ -1153,11 +1159,18 @@ mod tests {
         assert!(is_unsafe_line_start_piece("(@foo-bar-123)"));
         assert!(is_decimal_ordered_list_marker_piece("2018."));
         assert!(is_decimal_ordered_list_marker_piece("2)"));
+        assert!(is_bullet_list_marker_piece("+"));
+        assert!(is_bullet_list_marker_piece("-"));
+        assert!(is_bullet_list_marker_piece("*"));
         assert!(is_definition_marker_piece(":"));
         assert!(is_unsafe_line_start_piece("2018."));
         assert!(is_unsafe_line_start_piece("2)"));
+        assert!(is_unsafe_line_start_piece("+"));
+        assert!(is_unsafe_line_start_piece("-"));
+        assert!(is_unsafe_line_start_piece("*"));
         assert!(is_unsafe_line_start_piece(":"));
         assert!(!is_unsafe_line_start_piece(":::"));
+        assert!(!is_bullet_list_marker_piece("+foo"));
         assert!(!is_decimal_ordered_list_marker_piece("v2.0"));
         assert!(!is_decimal_ordered_list_marker_piece("2024.05"));
     }

@@ -239,6 +239,7 @@ golden_test_cases!(
     issue_172_hashpipe_inline_list_idempotency,
     issue_hashpipe_nested_list_indent,
     issue_176_display_math_colon_idempotency,
+    issue_187_list_plus_wrap_idempotency,
     issue_181_hashpipe_fig_subcap_idempotency,
     issue_189_hashpipe_figcap_idempotency,
     issue_189_table_caption_heading_idempotency,
