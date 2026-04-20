@@ -41,8 +41,12 @@ DOCUMENT@0..773
     HTML_BLOCK_TAG@318..353
       TEXT@318..352 "<!-- panache-ignore-l ..."
       NEWLINE@352..353 "\n"
-  PARAGRAPH@353..398
-    TEXT@353..397 "#### Heading level sk ..."
+  HEADING@353..398
+    ATX_HEADING_MARKER@353..357
+      ATX_HEADING_MARKER@353..357 "####"
+    WHITESPACE@357..358 " "
+    HEADING_CONTENT@358..397
+      TEXT@358..397 "Heading level skip sh ..."
     NEWLINE@397..398 "\n"
   HTML_BLOCK@398..431
     HTML_BLOCK_TAG@398..431

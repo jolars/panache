@@ -55,6 +55,26 @@ fn requires_blank_line_before_heading() {
 }
 
 #[test]
+fn parses_heading_after_horizontal_rule_without_blank_line() {
+    let node = parse_blocks("---\n# Heading\n");
+    let headings: Vec<_> = node
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::HEADING)
+        .collect();
+    assert_eq!(headings.len(), 1);
+}
+
+#[test]
+fn parses_heading_after_code_block_without_blank_line() {
+    let node = parse_blocks("```r\nx\n```\n# Heading\n");
+    let headings: Vec<_> = node
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::HEADING)
+        .collect();
+    assert_eq!(headings.len(), 1);
+}
+
+#[test]
 fn parses_heading_without_blank_line_when_extension_disabled() {
     let mut config = ParserOptions::default();
     config.extensions.blank_before_header = false;

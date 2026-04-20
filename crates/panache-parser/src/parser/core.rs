@@ -289,6 +289,17 @@ impl<'a> Parser<'a> {
         self.active_alert_blockquote_depth().is_some()
     }
 
+    fn previous_block_requires_blank_before_heading(&self) -> bool {
+        matches!(
+            self.containers.last(),
+            Some(Container::Paragraph { .. })
+                | Some(Container::ListItem { .. })
+                | Some(Container::Definition { .. })
+                | Some(Container::DefinitionItem { .. })
+                | Some(Container::FootnoteDefinition { .. })
+        )
+    }
+
     fn alert_marker_from_content(content: &str) -> Option<&'static str> {
         let (without_newline, _) = strip_newline(content);
         let trimmed = without_newline.trim();
@@ -1830,9 +1841,11 @@ impl<'a> Parser<'a> {
                 )
                 .is_some();
 
-            prev_line.trim().is_empty()
+            let prev_line_blank = prev_line.trim().is_empty();
+            prev_line_blank
                 || prev_is_fenced_div_open
                 || matches!(self.containers.last(), Some(Container::BlockQuote { .. }))
+                || !self.previous_block_requires_blank_before_heading()
         };
 
         // For indented code blocks, we need a stricter condition - only actual blank lines count
