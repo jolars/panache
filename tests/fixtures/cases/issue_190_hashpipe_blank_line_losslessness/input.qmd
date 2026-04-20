@@ -1,0 +1,6 @@
+```{r}
+#| fig-cap: "Two scatterplots of the relationship between `x` and `y`."
+#|
+### x
+x <- rnorm(n)
+```
