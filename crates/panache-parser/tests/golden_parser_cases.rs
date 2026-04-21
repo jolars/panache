@@ -282,6 +282,7 @@ golden_test_cases!(
     issue_175_native_span_unicode_panic,
     issue_186_list_blockquote_lazy_idempotency,
     issue_195_blockquote_lazy_continuation_shape,
+    issue_197_gfm_non_idempotent_bare_uri_escape,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

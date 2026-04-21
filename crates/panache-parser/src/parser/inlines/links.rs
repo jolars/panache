@@ -276,6 +276,12 @@ pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
         return None;
     }
 
+    // If trimming terminal punctuation leaves a dangling backslash, the match
+    // came from escaped punctuation (e.g., `a:\]`) and should stay literal.
+    if text[..trimmed].ends_with('\\') {
+        return None;
+    }
+
     Some((trimmed, &text[..trimmed]))
 }
 
@@ -838,6 +844,13 @@ mod tests {
         let input = "![outer [inner] alt](image.jpg)";
         let result = try_parse_inline_image(input);
         assert_eq!(result, Some((31, "outer [inner] alt", "image.jpg", None)));
+    }
+
+    #[test]
+    fn test_parse_bare_uri_rejects_dangling_backslash_after_trim() {
+        let input = r"a:\]";
+        let result = try_parse_bare_uri(input);
+        assert_eq!(result, None);
     }
 
     #[test]

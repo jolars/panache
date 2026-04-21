@@ -1,0 +1,11 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 96
+expression: cst_output
+---
+DOCUMENT@0..6
+  PARAGRAPH@0..6
+    TEXT@0..2 "a:"
+    ESCAPED_CHAR@2..4 "\\\\"
+    TEXT@4..5 "]"
+    NEWLINE@5..6 "\n"
