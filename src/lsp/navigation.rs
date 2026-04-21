@@ -164,7 +164,11 @@ pub(crate) async fn indexed_documents_from_inputs(
 
         let symbol_index =
             crate::salsa::symbol_usage_index(&*db, file, salsa_config, path.clone()).clone();
-        let uri = Uri::from_file_path(&path).unwrap_or_else(|| current_uri.clone());
+        let uri = if path == doc_path {
+            current_uri.clone()
+        } else {
+            Uri::from_file_path(&path).unwrap_or_else(|| current_uri.clone())
+        };
         docs.push(IndexedDocument {
             uri,
             text,
