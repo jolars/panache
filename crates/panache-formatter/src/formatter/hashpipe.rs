@@ -680,12 +680,25 @@ pub fn format_as_hashpipe(
             let norm_key = normalize_option_name(key);
             let norm_val = normalize_value(v);
 
-            // Handle bare options (no value)
-            let value_str = if norm_val.is_empty() {
-                "true".to_string() // Bare option means true
+            // Handle bare options (no value).
+            // `label` is a string field; keep empty as an empty string instead of
+            // coercing to boolean true.
+            let mut value_str = if norm_val.is_empty() {
+                if norm_key == "label" {
+                    String::new()
+                } else {
+                    "true".to_string() // Bare option means true
+                }
             } else {
                 norm_val
             };
+
+            // Quote labels only when needed to keep YAML parsing stable across
+            // passes (e.g., `label: warning: false ...`), while preserving
+            // existing plain-label output for normal labels.
+            if norm_key == "label" && label_needs_yaml_quotes(&value_str) {
+                value_str = canonicalize_label_yaml_value(&value_str);
+            }
 
             yaml_entries.push((norm_key.clone(), value_str.clone()));
             let lines = format_hashpipe_option_with_wrap(prefix, &norm_key, &value_str, line_width);
@@ -761,6 +774,33 @@ pub fn format_as_hashpipe(
     }
 
     Some(output)
+}
+
+fn escape_for_double_quotes(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn canonicalize_label_yaml_value(value: &str) -> String {
+    if (value.starts_with('"') && value.ends_with('"'))
+        || (value.starts_with('\'') && value.ends_with('\''))
+    {
+        return value.to_string();
+    }
+    format!("\"{}\"", escape_for_double_quotes(value))
+}
+
+fn label_needs_yaml_quotes(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+    if (trimmed.starts_with('"') && trimmed.ends_with('"'))
+        || (trimmed.starts_with('\'') && trimmed.ends_with('\''))
+    {
+        return false;
+    }
+    // YAML plain scalars become ambiguous for this case.
+    trimmed.contains(':')
 }
 
 #[cfg(test)]
