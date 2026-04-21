@@ -1,0 +1,6 @@
+```{r}
+#| tbl-cap: Type II tests for the sugar x  milk interaction term where this
+#|   deliberately long caption should wrap across lines in hashpipe output and
+#|   preserve double spaces near x  milk
+huxtabs[[14]][[28]]
+```

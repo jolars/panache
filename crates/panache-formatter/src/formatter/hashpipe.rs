@@ -404,7 +404,7 @@ fn hashpipe_flow_value_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
         if text.contains('\n') {
             // Normalize wrapped plain scalars to a single logical line so
             // re-emission uses deterministic hashpipe wrapping.
-            return Some(text.split_ascii_whitespace().collect::<Vec<_>>().join(" "));
+            return Some(fold_multiline_plain_scalar(&text));
         }
         return Some(text);
     }
@@ -415,6 +415,25 @@ fn hashpipe_flow_value_text(flow: &yaml_parser::ast::Flow) -> Option<String> {
         return Some(token.text().to_string());
     }
     None
+}
+
+fn fold_multiline_plain_scalar(text: &str) -> String {
+    let mut lines = text
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line));
+    let Some(first) = lines.next() else {
+        return String::new();
+    };
+
+    let mut out = first.trim_end_matches([' ', '\t']).to_string();
+    for line in lines {
+        if line.trim().is_empty() {
+            continue;
+        }
+        out.push(' ');
+        out.push_str(line.trim_start_matches([' ', '\t']));
+    }
+    out
 }
 
 fn is_yaml_block_scalar_indicator(value: &str) -> bool {
@@ -874,6 +893,17 @@ mod tests {
         let raw = &source[start..];
         let restored = restore_omitted_first_line_indent(source, start, raw);
         assert_eq!(restored, "  - A\n  - B\n");
+    }
+
+    #[test]
+    fn fold_multiline_plain_scalar_preserves_internal_double_spaces() {
+        let folded = fold_multiline_plain_scalar(
+            "Type II tests for the sugar\n  x  milk interaction term where this\n  preserves x  milk",
+        );
+        assert_eq!(
+            folded,
+            "Type II tests for the sugar x  milk interaction term where this preserves x  milk"
+        );
     }
 
     #[test]
