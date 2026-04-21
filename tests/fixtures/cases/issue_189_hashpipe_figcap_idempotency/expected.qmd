@@ -5,5 +5,6 @@
 #| fig-height: 4.5
 #| fig-cap: Tangent plane approximation of the function $t(x,y) = x/y$ at the
 #|   point $(2,3)$.
+
 library(plot3D)
 ```

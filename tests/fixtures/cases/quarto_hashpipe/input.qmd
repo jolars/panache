@@ -28,6 +28,8 @@ result <- analyze_data()
 
 ```{r mylabel}
 #| echo: false
+
+
 summary(data)
 ```
 

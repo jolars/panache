@@ -291,6 +291,44 @@ fn hashpipe_indented_map_continuation_for_empty_value_is_preserved() {
 }
 
 #[test]
+fn hashpipe_options_have_exactly_one_blank_line_before_code() {
+    let input = "```{r}\n#| include: false\n\n1 + 2\n```\n";
+    let output1 = format(input, Some(quarto_config()), None);
+    let output2 = format(&output1, Some(quarto_config()), None);
+
+    assert!(
+        output1.contains("#| include: false\n\n1 + 2"),
+        "expected exactly one blank line between options and code:\n{output1}"
+    );
+    assert!(
+        !output1.contains("#| include: false\n1 + 2"),
+        "expected code not to follow options immediately:\n{output1}"
+    );
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
+fn hashpipe_continuation_marker_stays_attached_to_header() {
+    let input = "```{r}\n#| fig-cap: \"Two scatterplots of the relationship between `x` and `y`.\"\n#|\n### x\nx <- rnorm(n)\n```\n";
+    let output1 = format(input, Some(quarto_config()), None);
+    let output2 = format(&output1, Some(quarto_config()), None);
+
+    assert!(
+        output1.contains(
+            "#| fig-cap: \"Two scatterplots of the relationship between `x` and `y`.\"\n\n### x"
+        ),
+        "expected marker-only separator to normalize to one blank line:\n{output1}"
+    );
+    assert!(
+        !output1.contains(
+            "#| fig-cap: \"Two scatterplots of the relationship between `x` and `y`.\"\n#|"
+        ),
+        "expected marker-only separator line to be removed:\n{output1}"
+    );
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
 fn hashpipe_prefix_variants_are_used_for_executable_chunk_languages() {
     let input = "```{r, echo=FALSE}\n1 + 1\n```\n\n```{cpp, echo=FALSE}\nint x = 1;\n```\n\n```{sql, echo=FALSE}\nSELECT 1;\n```\n";
     let output = format(input, Some(quarto_config()), None);

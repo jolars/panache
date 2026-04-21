@@ -543,24 +543,38 @@ fn format_code_block_hashpipe(
     output.push('\n');
 
     // Add hashpipe options
-    for line in hashpipe_lines {
-        output.push_str(&line);
+    for line in &hashpipe_lines {
+        output.push_str(line);
         output.push('\n');
     }
 
     // Add content, dropping already-parsed leading hashpipe header lines to avoid duplication.
-    if had_content_hashpipe {
+    let body = if had_content_hashpipe {
         if let Some(prefix) = hashpipe::get_comment_prefix(language) {
             if let Some((_header, body)) = split_hashpipe_header(content, prefix) {
-                output.push_str(&body);
+                body
             } else {
-                output.push_str(content);
+                content.to_string()
             }
         } else {
-            output.push_str(content);
+            content.to_string()
         }
     } else {
-        output.push_str(content);
+        content.to_string()
+    };
+
+    if !hashpipe_lines.is_empty() {
+        let body_without_leading_blanks = strip_leading_blank_lines(&body);
+        let (body_without_marker_separators, had_marker_separator) =
+            strip_leading_hashpipe_blank_markers(body_without_leading_blanks, comment_prefix);
+        if !body_without_marker_separators.trim().is_empty()
+            && (had_marker_separator || !body_without_marker_separators.starts_with(comment_prefix))
+        {
+            output.push('\n');
+        }
+        output.push_str(body_without_marker_separators);
+    } else {
+        output.push_str(&body);
     }
 
     // Close fence
@@ -570,6 +584,59 @@ fn format_code_block_hashpipe(
     output.push('\n');
 
     true // Successfully formatted as hashpipe
+}
+
+fn strip_leading_blank_lines(content: &str) -> &str {
+    let mut idx = 0usize;
+
+    while idx < content.len() {
+        let rest = &content[idx..];
+        let Some(line_end) = rest.find('\n') else {
+            if rest.trim().is_empty() {
+                return "";
+            }
+            break;
+        };
+
+        let line = &rest[..=line_end];
+        let line_without_newline = line.trim_end_matches(['\r', '\n']);
+        if line_without_newline.trim().is_empty() {
+            idx += line_end + 1;
+            continue;
+        }
+
+        break;
+    }
+
+    &content[idx..]
+}
+
+fn strip_leading_hashpipe_blank_markers<'a>(content: &'a str, prefix: &str) -> (&'a str, bool) {
+    let mut idx = 0usize;
+    let mut consumed = false;
+
+    while idx < content.len() {
+        let rest = &content[idx..];
+        let Some(line_end) = rest.find('\n') else {
+            let trimmed = rest.trim_start_matches([' ', '\t']).trim_end_matches('\r');
+            if trimmed == prefix {
+                consumed = true;
+                idx = content.len();
+            }
+            break;
+        };
+
+        let line = &rest[..line_end];
+        let trimmed = line.trim_start_matches([' ', '\t']).trim_end_matches('\r');
+        if trimmed == prefix {
+            consumed = true;
+            idx += line_end + 1;
+            continue;
+        }
+        break;
+    }
+
+    (&content[idx..], consumed)
 }
 
 /// Format attribute key-value pairs

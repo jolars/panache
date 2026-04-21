@@ -7,5 +7,6 @@
 #| fig-cap: 'Comparing ROC (left) and PR curve (right) for a random forest
 #|   trained on `tsk("german_credit")`.'
 #| echo: false
+
 x <- 1
 ```

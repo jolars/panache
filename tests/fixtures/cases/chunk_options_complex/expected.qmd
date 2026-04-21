@@ -8,6 +8,7 @@ Test parsing and formatting of complex R expressions in chunk options.
 #| label: simple-chunk
 #| echo: true
 #| warning: false
+
 # Simple options should convert to hashpipe
 plot(1:10)
 ```
@@ -16,6 +17,7 @@ plot(1:10)
 
 ```{r, dependson=c("foo", "bar")}
 #| label: deps-chunk
+
 # Complex R function calls with commas inside should stay inline
 result <- combine_data(foo, bar)
 ```
@@ -24,6 +26,7 @@ result <- combine_data(foo, bar)
 
 ```{r, cache.path=file.path("cache", "subdir")}
 #| label: cache-chunk
+
 # Function calls with nested strings
 expensive_computation()
 ```
@@ -32,6 +35,7 @@ expensive_computation()
 
 ```{r, data=list(a=c(1,2), b=c(3,4))}
 #| label: nested-chunk
+
 # Multiple levels of nesting
 process_data(data)
 ```
@@ -43,6 +47,7 @@ process_data(data)
 #| echo: true
 #| eval: false
 #| warning: false
+
 # Mix of simple (hashpipe) and complex (inline) options
 final_result <- analyze(result)
 ```
@@ -51,6 +56,7 @@ final_result <- analyze(result)
 
 ```{r, rows=df[1:10, ], config=list(timeout=30, retries=3)}
 #| label: bracket-chunk
+
 # Different bracket types: indexing and list construction
 subset_analysis(rows, config)
 ```

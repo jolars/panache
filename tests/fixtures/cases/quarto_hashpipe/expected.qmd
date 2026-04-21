@@ -5,6 +5,7 @@
 ```{r}
 #| echo: false
 #| warning: true
+
 x <- 1 + 1
 print(x)
 ```
@@ -15,6 +16,7 @@ print(x)
 #| fig-cap: "A nice plot"
 #| fig-width: 7
 #| fig-height: 5
+
 plot(1:10, main="Test")
 ```
 
@@ -23,6 +25,7 @@ plot(1:10, main="Test")
 ```{r, label=analysis-chunk, cache=my_cache_var}
 #| echo: false
 #| message: true
+
 # This has a complex expression that stays inline
 result <- analyze_data()
 ```
@@ -32,6 +35,7 @@ result <- analyze_data()
 ```{r}
 #| label: mylabel
 #| echo: false
+
 summary(data)
 ```
 
@@ -39,6 +43,7 @@ summary(data)
 
 ```{r, echo=1:2}
 #| label: vMsim
+
 x <- 1
 a <- 2
 b <- 3

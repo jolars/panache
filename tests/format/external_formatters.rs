@@ -233,3 +233,51 @@ a=1
     let output = format(input, Some(config), None);
     assert!(output.contains("a = 1"));
 }
+
+#[test]
+fn r_air_preserves_single_blank_line_between_hashpipe_options_and_code() {
+    if which::which("air").is_err() {
+        println!("Skipping air test - air not installed");
+        return;
+    }
+
+    let mut formatters = HashMap::new();
+    formatters.insert(
+        "r".to_string(),
+        vec![panache::config::FormatterConfig {
+            cmd: "air".to_string(),
+            args: vec!["format".to_string(), "{}".to_string()],
+            enabled: true,
+            stdin: false,
+        }],
+    );
+
+    let config = Config {
+        flavor: Flavor::Quarto,
+        extensions: Extensions::for_flavor(Flavor::Quarto),
+        formatters,
+        ..Default::default()
+    };
+
+    let input = r#"
+```{r}
+#| include: false
+
+1+2
+```
+"#
+    .trim_start();
+
+    let output = format(input, Some(config.clone()), None);
+    assert!(
+        output.contains("#| include: false\n\n1 + 2"),
+        "expected exactly one blank line between options and code:\n{output}"
+    );
+    assert!(
+        !output.contains("#| include: false\n1 + 2"),
+        "expected code not to follow options immediately:\n{output}"
+    );
+
+    let output_twice = format(&output, Some(config), None);
+    assert_eq!(output, output_twice, "Formatting should be idempotent");
+}
