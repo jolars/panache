@@ -16,6 +16,7 @@
       ]
     },
     "crates/panache-parser": {},
+    "crates/panache-formatter": {},
     "editors/code": {
       "release-type": "node",
       "package-name": "panache-code"
