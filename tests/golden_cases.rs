@@ -247,6 +247,7 @@ golden_test_cases!(
     issue_186_list_blockquote_lazy_idempotency,
     issue_177_list_blockquote_idempotency,
     issue_185_hashpipe_double_space_idempotency,
+    issue_193_cluster_b_inline_footnote_citation_spacing,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

@@ -1,0 +1,3 @@
+Researchers should be aware of seed dependence.^[@BaoBindschaedler:2025 run
+their machine learning-based analyses across 500 randomly selected seeds, which
+sounds like a neat way to reduce variability.]

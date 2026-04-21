@@ -1009,6 +1009,14 @@ fn process_node_recursive(
                         sink.push_verbatim_block(verbatim);
                     }
                 }
+                SyntaxKind::CITATION => {
+                    skip_marker_whitespace = false;
+                    if in_inline_footnote && sink.skip_next_leading_whitespace() {
+                        sink.set_skip_next_leading_whitespace(false);
+                    }
+                    let text = format_inline_fn(&n);
+                    sink.push_piece(&text);
+                }
                 _ => {
                     let text = format_inline_fn(&n);
                     sink.push_piece(&text);
