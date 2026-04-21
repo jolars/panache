@@ -70,7 +70,7 @@ jobs:
 
           FAILURES_TSV="$RESULTS_DIR/failures.tsv"
           {
-            printf 'repo\tfailure_type\tfile\tlog_path\treport_path\trepo_sha\tpanache_sha\tpanache_version\n'
+            printf 'repo\tfailure_type\tfile\tlog_path\treport_path\trepo_sha\tpanache_sha\tpanache_version\tidempotency_input_path\tidempotency_once_path\tidempotency_twice_path\n'
           } > "$FAILURES_TSV"
 
           while IFS= read -r repo; do
@@ -85,12 +85,27 @@ jobs:
               file_key="$(printf '%s' "${repo}:${rel_file}" | sha256sum | awk '{print $1}')"
               log_path="$LOGS_DIR/$file_key.log"
               report_path="$LOGS_DIR/$file_key.report.md"
+              pass_dir="$LOGS_DIR/$file_key.passes"
 
-              if ! (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all "$rel_file") >"$log_path" 2>&1; then
+              if ! (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all --dump-dir "$pass_dir" --dump-passes "$rel_file") >"$log_path" 2>&1; then
                 # Generate human-friendly markdown report for issue snippets.
                 (cd "$repo_dir" && "$PANACHE_BIN" debug format --checks all --report "$rel_file") >"$report_path" 2>&1 || true
                 matched=0
                 failure_types=""
+                idempotency_input_rel=""
+                idempotency_once_rel=""
+                idempotency_twice_rel=""
+
+                safe_rel_file="$(printf '%s' "$rel_file" | sed 's/[^[:alnum:]._-]/_/g')"
+                if [ -f "$pass_dir/$safe_rel_file.idempotency.input.txt" ]; then
+                  idempotency_input_rel="logs/$file_key.passes/$safe_rel_file.idempotency.input.txt"
+                fi
+                if [ -f "$pass_dir/$safe_rel_file.idempotency.once.txt" ]; then
+                  idempotency_once_rel="logs/$file_key.passes/$safe_rel_file.idempotency.once.txt"
+                fi
+                if [ -f "$pass_dir/$safe_rel_file.idempotency.twice.txt" ]; then
+                  idempotency_twice_rel="logs/$file_key.passes/$safe_rel_file.idempotency.twice.txt"
+                fi
 
                 add_failure_type() {
                   local candidate="$1"
@@ -119,7 +134,7 @@ jobs:
                   matched=1
                   while IFS= read -r failure_type; do
                     [ -z "$failure_type" ] && continue
-                    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                       "$repo" \
                       "$failure_type" \
                       "$rel_file" \
@@ -128,12 +143,15 @@ jobs:
                       "$repo_sha" \
                       "$PANACHE_SHA" \
                       "$PANACHE_VERSION" \
+                      "$idempotency_input_rel" \
+                      "$idempotency_once_rel" \
+                      "$idempotency_twice_rel" \
                       >> "$FAILURES_TSV"
                   done <<< "$failure_types"
                 fi
 
                 if [ "$matched" -eq 0 ]; then
-                  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                     "$repo" \
                     "unknown" \
                     "$rel_file" \
@@ -142,6 +160,9 @@ jobs:
                     "$repo_sha" \
                     "$PANACHE_SHA" \
                     "$PANACHE_VERSION" \
+                    "$idempotency_input_rel" \
+                    "$idempotency_once_rel" \
+                    "$idempotency_twice_rel" \
                     >> "$FAILURES_TSV"
                 fi
               fi
@@ -233,6 +254,9 @@ jobs:
             sample_repo_sha="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {print $6; exit}' "$FAILURES_TSV")"
             sample_panache_sha="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {print $7; exit}' "$FAILURES_TSV")"
             sample_panache_version="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {print $8; exit}' "$FAILURES_TSV")"
+            sample_idempotency_input_rel="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {print $9; exit}' "$FAILURES_TSV")"
+            sample_idempotency_once_rel="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {print $10; exit}' "$FAILURES_TSV")"
+            sample_idempotency_twice_rel="$(awk -F '\t' -v r="$repo" -v t="$failure_type" '$1 == r && $2 == t {print $11; exit}' "$FAILURES_TSV")"
             if [ -n "$sample_report_rel" ]; then
               sample_report_path="$RESULTS_DIR/$sample_report_rel"
             else
@@ -272,6 +296,15 @@ jobs:
                 fi
                 if [ -n "$sample_report_rel" ]; then
                   echo "- Sample report path: \`$sample_report_rel\`"
+                fi
+                if [ -n "$sample_idempotency_input_rel" ]; then
+                  echo "- Sample idempotency input artifact: \`$sample_idempotency_input_rel\`"
+                fi
+                if [ -n "$sample_idempotency_once_rel" ]; then
+                  echo "- Sample idempotency pass1 artifact: \`$sample_idempotency_once_rel\`"
+                fi
+                if [ -n "$sample_idempotency_twice_rel" ]; then
+                  echo "- Sample idempotency pass2 artifact: \`$sample_idempotency_twice_rel\`"
                 fi
                 if [ -n "$sample_diff_line" ]; then
                   echo "- Approx. diff start line: $sample_diff_line"
@@ -330,6 +363,15 @@ jobs:
                 fi
                 if [ -n "$sample_report_rel" ]; then
                   echo "- Sample report path: \`$sample_report_rel\`"
+                fi
+                if [ -n "$sample_idempotency_input_rel" ]; then
+                  echo "- Sample idempotency input artifact: \`$sample_idempotency_input_rel\`"
+                fi
+                if [ -n "$sample_idempotency_once_rel" ]; then
+                  echo "- Sample idempotency pass1 artifact: \`$sample_idempotency_once_rel\`"
+                fi
+                if [ -n "$sample_idempotency_twice_rel" ]; then
+                  echo "- Sample idempotency pass2 artifact: \`$sample_idempotency_twice_rel\`"
                 fi
                 if [ -n "$sample_diff_line" ]; then
                   echo "- Approx. diff start line: $sample_diff_line"
