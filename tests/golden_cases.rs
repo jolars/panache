@@ -283,6 +283,7 @@ golden_test_cases!(
     issue_193_cluster_b_inline_footnote_citation_spacing,
     issue_194_idempotency_lsj_tbl_cap,
     issue_195_blockquote_wrapping_idempotency,
+    issue_198_blockquote_chunk_header_idempotency,
     issue_197_gfm_non_idempotent_bare_uri_escape,
     writer_autolinks,
     writer_blockquote_not,
