@@ -427,49 +427,6 @@ impl Formatter {
             .collect::<String>()
     }
 
-    fn blockquote_prev_significant_kind(children: &[SyntaxNode], idx: usize) -> Option<SyntaxKind> {
-        children[..idx]
-            .iter()
-            .rev()
-            .find(|child| {
-                !matches!(
-                    child.kind(),
-                    SyntaxKind::BLOCK_QUOTE_MARKER | SyntaxKind::BLANK_LINE
-                )
-            })
-            .map(SyntaxNode::kind)
-    }
-
-    fn blockquote_next_significant_kind(children: &[SyntaxNode], idx: usize) -> Option<SyntaxKind> {
-        children[idx + 1..]
-            .iter()
-            .find(|child| {
-                !matches!(
-                    child.kind(),
-                    SyntaxKind::BLOCK_QUOTE_MARKER | SyntaxKind::BLANK_LINE
-                )
-            })
-            .map(SyntaxNode::kind)
-    }
-
-    fn should_preserve_blockquote_blank_suffix(
-        prev_significant_kind: Option<SyntaxKind>,
-        next_significant_kind: Option<SyntaxKind>,
-        blank_suffix: &str,
-        in_list_continuation: bool,
-    ) -> bool {
-        if blank_suffix.is_empty() || !blank_suffix.chars().all(|ch| ch == ' ') {
-            return false;
-        }
-
-        matches!(next_significant_kind, Some(SyntaxKind::CODE_BLOCK))
-            && (in_list_continuation
-                || matches!(
-                    prev_significant_kind,
-                    Some(SyntaxKind::LIST | SyntaxKind::LIST_ITEM)
-                ))
-    }
-
     fn append_blockquote_prefixed_block(
         &mut self,
         rendered: &str,
@@ -1049,11 +1006,7 @@ impl Formatter {
                     in_list_continuation: false,
                 });
 
-                for (child_idx, child) in blockquote_children.iter().enumerate() {
-                    let prev_significant_kind =
-                        Self::blockquote_prev_significant_kind(&blockquote_children, child_idx);
-                    let next_significant_kind =
-                        Self::blockquote_next_significant_kind(&blockquote_children, child_idx);
+                for child in &blockquote_children {
                     match child.kind() {
                         // Skip BlockQuoteMarker tokens - we add prefixes dynamically
                         SyntaxKind::BLOCK_QUOTE_MARKER => continue,
@@ -1196,25 +1149,7 @@ impl Formatter {
                             }
                         }
                         SyntaxKind::BLANK_LINE => {
-                            let blank_suffix = child.text().to_string();
-                            let blank_suffix = blank_suffix.trim_end_matches(['\r', '\n']);
-                            if blank_suffix.is_empty() {
-                                self.output.push_str(&blank_prefix);
-                            } else {
-                                if Self::should_preserve_blockquote_blank_suffix(
-                                    prev_significant_kind,
-                                    next_significant_kind,
-                                    blank_suffix,
-                                    self.blockquote_context
-                                        .as_ref()
-                                        .is_some_and(|ctx| ctx.in_list_continuation),
-                                ) {
-                                    self.output.push_str(&content_prefix);
-                                    self.output.push_str(blank_suffix);
-                                } else {
-                                    self.output.push_str(&blank_prefix);
-                                }
-                            }
+                            self.output.push_str(&blank_prefix);
                             self.output.push('\n');
                         }
                         SyntaxKind::HORIZONTAL_RULE => {

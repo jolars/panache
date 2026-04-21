@@ -7,6 +7,37 @@ use rowan::NodeOrToken;
 use super::Formatter;
 
 impl Formatter {
+    fn is_marker_only_blockquote_continuation(node: &SyntaxNode) -> bool {
+        if !matches!(node.kind(), SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH) {
+            return false;
+        }
+
+        let mut has_blockquote_marker = false;
+        let mut has_meaningful_content = false;
+
+        for element in node.children_with_tokens() {
+            match element {
+                NodeOrToken::Token(token) => match token.kind() {
+                    SyntaxKind::BLOCK_QUOTE_MARKER => has_blockquote_marker = true,
+                    SyntaxKind::WHITESPACE | SyntaxKind::NEWLINE => {}
+                    _ => {
+                        if !token.text().trim().is_empty() {
+                            has_meaningful_content = true;
+                        }
+                    }
+                },
+                NodeOrToken::Node(child) => {
+                    if child.kind() != SyntaxKind::WHITESPACE && child.kind() != SyntaxKind::NEWLINE
+                    {
+                        has_meaningful_content = true;
+                    }
+                }
+            }
+        }
+
+        has_blockquote_marker && !has_meaningful_content
+    }
+
     fn has_open_only_fenced_div(item: &SyntaxNode) -> bool {
         item.descendants().any(|node| {
             let Some(fenced_div) = FencedDiv::cast(node) else {
@@ -658,6 +689,10 @@ impl Formatter {
         for child in node.children() {
             match child.kind() {
                 SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH => {
+                    if Self::is_marker_only_blockquote_continuation(&child) {
+                        continue;
+                    }
+
                     // These blocks are already handled by word wrapping above if they're
                     // direct children. Only process Plain/PARAGRAPH if it comes after a BlankLine
                     // (indicating it's a true continuation paragraph, not the first content).
@@ -742,8 +777,10 @@ impl Formatter {
                     }
                 }
                 SyntaxKind::BLANK_LINE => {
-                    // Blank lines within list items
-                    self.output.push('\n');
+                    // Normalize consecutive blank lines within list-item continuation content.
+                    if !self.output.ends_with("\n\n") {
+                        self.output.push('\n');
+                    }
                 }
                 _ => {
                     // Other block elements - format with proper indentation

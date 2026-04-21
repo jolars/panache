@@ -284,6 +284,7 @@ golden_test_cases!(
     issue_194_idempotency_lsj_tbl_cap,
     issue_195_blockquote_wrapping_idempotency,
     issue_198_blockquote_chunk_header_idempotency,
+    issue_198_cookbook_chunk_hooks_idempotency,
     issue_197_gfm_non_idempotent_bare_uri_escape,
     writer_autolinks,
     writer_blockquote_not,

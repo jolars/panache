@@ -1,7 +1,3 @@
-## Show the chunk header in the output {#show-header}
-
-The output of the bullet list at the end of the above example will be like this:
-
 > - One bullet.
 >
 >   ````

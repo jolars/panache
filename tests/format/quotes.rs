@@ -247,7 +247,7 @@ fn blockquote_lazy_continuation_after_citation_stays_idempotent() {
 }
 
 #[test]
-fn blockquote_list_code_continuation_preserves_blank_suffix_idempotent() {
+fn blockquote_list_code_continuation_normalizes_blank_suffix_idempotent() {
     let input = r#"> - Item
 >
 >   
@@ -266,8 +266,8 @@ fn blockquote_list_code_continuation_preserves_blank_suffix_idempotent() {
     let output2 = format(&output1, Some(config), None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
     assert!(
-        output1.contains("\n>   \n>   ```r\n"),
-        "Expected structure-significant blank line before fenced code block in list continuation.\nOutput:\n{output1}"
+        output1.contains("\n>\n>   ```r\n"),
+        "Expected normalized quoted blank line before fenced code block in list continuation.\nOutput:\n{output1}"
     );
 }
 
