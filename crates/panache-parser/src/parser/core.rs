@@ -988,6 +988,11 @@ impl<'a> Parser<'a> {
         leading_spaces: usize,
         has_trailing_space: bool,
     ) {
+        if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+            buffer.push_blockquote_marker(leading_spaces, has_trailing_space);
+            return;
+        }
+
         // If paragraph is open, buffer the marker (it will be emitted at correct position)
         if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
             // Buffer the marker in the paragraph
@@ -1510,6 +1515,14 @@ impl<'a> Parser<'a> {
         } else if bq_depth > 0 {
             // Same blockquote depth - emit markers and continue parsing inner content
             let mut list_item_continuation = false;
+            let same_depth_marker_info = self.marker_info_for_line(
+                blockquote_payload.as_ref(),
+                line,
+                bq_marker_line,
+                shifted_bq_prefix,
+                used_shifted_bq,
+            );
+            let has_explicit_same_depth_marker = same_depth_marker_info.len() >= bq_depth;
 
             // Check if we should close the ListItem
             // ListItem should continue if the line is properly indented for continuation
@@ -1536,7 +1549,9 @@ impl<'a> Parser<'a> {
                 // Close ListItem if:
                 // 1. It's a new list item at an outer (or same) level, OR
                 // 2. The line is not indented enough to continue the current item
-                if is_new_item_at_outer_level || effective_indent < content_col {
+                if is_new_item_at_outer_level
+                    || (effective_indent < content_col && !has_explicit_same_depth_marker)
+                {
                     log::debug!(
                         "Closing ListItem: is_new_item={}, effective_indent={} < content_col={}",
                         is_new_item_at_outer_level,
@@ -1562,6 +1577,22 @@ impl<'a> Parser<'a> {
                 list_item_continuation = false;
             }
 
+            let continuation_has_explicit_marker = list_item_continuation && {
+                if has_explicit_same_depth_marker {
+                    for i in 0..bq_depth {
+                        if let Some(info) = same_depth_marker_info.get(i) {
+                            self.emit_or_buffer_blockquote_marker(
+                                info.leading_spaces,
+                                info.has_trailing_space,
+                            );
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            };
+
             if !list_item_continuation {
                 let marker_info = self.marker_info_for_line(
                     blockquote_payload.as_ref(),
@@ -1579,10 +1610,12 @@ impl<'a> Parser<'a> {
                     }
                 }
             }
-            // When continuing a list item inside a blockquote, keep original line bytes in the
-            // list-item buffer and avoid emitting separate marker tokens here.
             let line_to_append = if list_item_continuation {
-                Some(line)
+                if continuation_has_explicit_marker {
+                    Some(inner_content)
+                } else {
+                    Some(line)
+                }
             } else {
                 Some(inner_content)
             };

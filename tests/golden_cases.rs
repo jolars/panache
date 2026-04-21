@@ -250,6 +250,7 @@ golden_test_cases!(
     issue_185_hashpipe_double_space_idempotency,
     issue_193_cluster_a_fancy_markers_idempotency,
     issue_193_cluster_b_inline_footnote_citation_spacing,
+    issue_195_blockquote_wrapping_idempotency,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

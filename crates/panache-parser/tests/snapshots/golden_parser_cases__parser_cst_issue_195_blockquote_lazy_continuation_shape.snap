@@ -1,0 +1,83 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..485
+  LIST@0..485
+    LIST_ITEM@0..485
+      LIST_MARKER@0..2 "1."
+      WHITESPACE@2..3 " "
+      PLAIN@3..46
+        TEXT@3..25 "The documentation for "
+        INLINE_CODE@25..39
+          INLINE_CODE_MARKER@25..26 "`"
+          INLINE_CODE_CONTENT@26..38 "substitute()"
+          INLINE_CODE_MARKER@38..39 "`"
+        TEXT@39..45 " says:"
+        NEWLINE@45..46 "\n"
+      BLANK_LINE@46..47
+        BLANK_LINE@46..47 "\n"
+      BLOCK_QUOTE@47..485
+        WHITESPACE@47..50 "   "
+        BLOCK_QUOTE_MARKER@50..51 ">"
+        WHITESPACE@51..52 " "
+        PARAGRAPH@52..140
+          TEXT@52..125 "Substitution takes pl ..."
+          NEWLINE@125..126 "\n"
+          WHITESPACE@126..129 "   "
+          BLOCK_QUOTE_MARKER@129..130 ">"
+          WHITESPACE@130..131 " "
+          TEXT@131..139 "follows:"
+          NEWLINE@139..140 "\n"
+        WHITESPACE@140..143 "   "
+        BLOCK_QUOTE_MARKER@143..144 ">"
+        BLANK_LINE@144..145
+          BLANK_LINE@144..145 "\n"
+        WHITESPACE@145..148 "   "
+        BLOCK_QUOTE_MARKER@148..149 ">"
+        WHITESPACE@149..150 " "
+        LIST@150..485
+          LIST_ITEM@150..207
+            LIST_MARKER@150..151 "-"
+            WHITESPACE@151..152 " "
+            PLAIN@152..207
+              TEXT@152..183 "If it is not a bound  ..."
+              INLINE_CODE@183..188
+                INLINE_CODE_MARKER@183..184 "`"
+                INLINE_CODE_CONTENT@184..187 "env"
+                INLINE_CODE_MARKER@187..188 "`"
+              TEXT@188..206 ", it is unchanged."
+              NEWLINE@206..207 "\n"
+          WHITESPACE@207..210 "   "
+          BLOCK_QUOTE_MARKER@210..211 ">"
+          WHITESPACE@211..212 " "
+          LIST_ITEM@212..343
+            LIST_MARKER@212..213 "-"
+            WHITESPACE@213..214 " "
+            PLAIN@214..343
+              TEXT@214..283 "If it is a promise ob ..."
+              NEWLINE@283..284 "\n"
+              WHITESPACE@284..287 "   "
+              BLOCK_QUOTE_MARKER@287..288 ">"
+              WHITESPACE@288..289 " "
+              TEXT@289..342 "  expression slot of  ..."
+              NEWLINE@342..343 "\n"
+          WHITESPACE@343..346 "   "
+          BLOCK_QUOTE_MARKER@346..347 ">"
+          WHITESPACE@347..348 " "
+          LIST_ITEM@348..485
+            LIST_MARKER@348..349 "-"
+            WHITESPACE@349..350 " "
+            PLAIN@350..485
+              TEXT@350..413 "If it is an ordinary  ..."
+              NEWLINE@413..414 "\n"
+              WHITESPACE@414..417 "   "
+              BLOCK_QUOTE_MARKER@417..418 ">"
+              WHITESPACE@418..419 " "
+              TEXT@419..421 "  "
+              INLINE_CODE@421..426
+                INLINE_CODE_MARKER@421..422 "`"
+                INLINE_CODE_CONTENT@422..425 "env"
+                INLINE_CODE_MARKER@425..426 "`"
+              TEXT@426..484 " is .GlobalEnv in whi ..."
+              NEWLINE@484..485 "\n"

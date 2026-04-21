@@ -96,6 +96,42 @@ fn run_golden_case(case_name: &str) {
     insta::assert_snapshot!(format!("parser_cst_{}", case_name), cst_output);
 }
 
+#[test]
+fn issue_195_canonical_shape_delta() {
+    let once_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("cases")
+        .join("issue_195_blockquote_lazy_continuation_shape")
+        .join("input.Rmd");
+    let canonical_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("tests")
+        .join("fixtures")
+        .join("cases")
+        .join("issue_177_list_blockquote_idempotency")
+        .join("expected.Rmd");
+
+    let once_input = fs::read_to_string(once_path).unwrap();
+    let canonical_input = fs::read_to_string(canonical_path).unwrap();
+
+    let once_tree = parse(&once_input, None);
+    let canonical_tree = parse(&canonical_input, None);
+
+    let once_cst = format!("{:#?}\n", once_tree);
+    let canonical_cst = format!("{:#?}\n", canonical_tree);
+
+    assert!(
+        once_cst.contains("BLOCK_QUOTE_MARKER@417..418 \">\""),
+        "expected issue_195 CST to keep shifted continuation marker as a structural token"
+    );
+    assert!(
+        canonical_cst.contains("INLINE_CODE_CONTENT") && canonical_cst.contains("\"env\""),
+        "expected canonical CST to retain inline-code content for env"
+    );
+}
+
 macro_rules! golden_test_cases {
     ($($case:ident),+ $(,)?) => {
         $(
@@ -245,6 +281,7 @@ golden_test_cases!(
     issue_174_blockquote_list_reorder_losslessness,
     issue_175_native_span_unicode_panic,
     issue_186_list_blockquote_lazy_idempotency,
+    issue_195_blockquote_lazy_continuation_shape,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

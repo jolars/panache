@@ -57,7 +57,10 @@ DOCUMENT@0..556
             PLAIN@220..350
               TEXT@220..285 "If it is a promise ob ..."
               NEWLINE@285..286 "\n"
-              TEXT@286..349 "    >   the expressio ..."
+              WHITESPACE@286..290 "    "
+              BLOCK_QUOTE_MARKER@290..291 ">"
+              WHITESPACE@291..292 " "
+              TEXT@292..349 "  the expression slot ..."
               NEWLINE@349..350 "\n"
           WHITESPACE@350..354 "    "
           BLOCK_QUOTE_MARKER@354..355 ">"
@@ -68,7 +71,10 @@ DOCUMENT@0..556
             PLAIN@358..494
               TEXT@358..421 "If it is an ordinary  ..."
               NEWLINE@421..422 "\n"
-              TEXT@422..430 "    >   "
+              WHITESPACE@422..426 "    "
+              BLOCK_QUOTE_MARKER@426..427 ">"
+              WHITESPACE@427..428 " "
+              TEXT@428..430 "  "
               INLINE_CODE@430..435
                 INLINE_CODE_MARKER@430..431 "`"
                 INLINE_CODE_CONTENT@431..434 "env"

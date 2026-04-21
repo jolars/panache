@@ -207,7 +207,9 @@ DOCUMENT@0..1749
         PLAIN@1447..1563
           TEXT@1447..1515 "Developing and integr ..."
           NEWLINE@1515..1516 "\n"
-          TEXT@1516..1562 ">   while reducing re ..."
+          BLOCK_QUOTE_MARKER@1516..1517 ">"
+          WHITESPACE@1517..1518 " "
+          TEXT@1518..1562 "  while reducing repe ..."
           NEWLINE@1562..1563 "\n"
       BLOCK_QUOTE_MARKER@1563..1564 ">"
       WHITESPACE@1564..1565 " "
@@ -217,7 +219,9 @@ DOCUMENT@0..1749
         PLAIN@1567..1669
           TEXT@1567..1635 "Substituting Quarto’ ..."
           NEWLINE@1635..1636 "\n"
-          TEXT@1636..1668 ">   beyond the built- ..."
+          BLOCK_QUOTE_MARKER@1636..1637 ">"
+          WHITESPACE@1637..1638 " "
+          TEXT@1638..1668 "  beyond the built-in ..."
           NEWLINE@1668..1669 "\n"
       BLOCK_QUOTE_MARKER@1669..1670 ">"
       WHITESPACE@1670..1671 " "
@@ -227,5 +231,7 @@ DOCUMENT@0..1749
         PLAIN@1673..1749
           TEXT@1673..1728 "Implementing filters  ..."
           NEWLINE@1728..1729 "\n"
-          TEXT@1729..1748 ">   transformation."
+          BLOCK_QUOTE_MARKER@1729..1730 ">"
+          WHITESPACE@1730..1731 " "
+          TEXT@1731..1748 "  transformation."
           NEWLINE@1748..1749 "\n"

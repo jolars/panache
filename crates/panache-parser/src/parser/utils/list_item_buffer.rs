@@ -6,6 +6,7 @@
 use crate::options::ParserOptions;
 use crate::parser::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
 use crate::parser::utils::inline_emission;
+use crate::parser::utils::text_buffer::ParagraphBuffer;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -14,6 +15,11 @@ use rowan::GreenNodeBuilder;
 pub(crate) enum ListItemContent {
     /// Text content (includes newlines for losslessness)
     Text(String),
+    /// Structural blockquote marker emitted inside buffered list-item text.
+    BlockquoteMarker {
+        leading_spaces: usize,
+        has_trailing_space: bool,
+    },
 }
 
 /// Buffer for accumulating list item content before emission.
@@ -46,6 +52,17 @@ impl ListItemBuffer {
         self.segments.push(ListItemContent::Text(text));
     }
 
+    pub(crate) fn push_blockquote_marker(
+        &mut self,
+        leading_spaces: usize,
+        has_trailing_space: bool,
+    ) {
+        self.segments.push(ListItemContent::BlockquoteMarker {
+            leading_spaces,
+            has_trailing_space,
+        });
+    }
+
     /// Check if buffer is empty.
     pub(crate) fn is_empty(&self) -> bool {
         self.segments.is_empty()
@@ -73,10 +90,25 @@ impl ListItemBuffer {
     fn get_text_for_parsing(&self) -> String {
         let mut result = String::new();
         for segment in &self.segments {
-            let ListItemContent::Text(text) = segment;
-            result.push_str(text);
+            if let ListItemContent::Text(text) = segment {
+                result.push_str(text);
+            }
         }
         result
+    }
+
+    fn to_paragraph_buffer(&self) -> ParagraphBuffer {
+        let mut paragraph_buffer = ParagraphBuffer::new();
+        for segment in &self.segments {
+            match segment {
+                ListItemContent::Text(text) => paragraph_buffer.push_text(text),
+                ListItemContent::BlockquoteMarker {
+                    leading_spaces,
+                    has_trailing_space,
+                } => paragraph_buffer.push_marker(*leading_spaces, *has_trailing_space),
+            }
+        }
+        paragraph_buffer
     }
 
     /// Emit the buffered content as a Plain or PARAGRAPH block.
@@ -118,7 +150,10 @@ impl ListItemBuffer {
 
         builder.start_node(block_kind.into());
 
-        if !text.is_empty() {
+        let paragraph_buffer = self.to_paragraph_buffer();
+        if !paragraph_buffer.is_empty() {
+            paragraph_buffer.emit_with_inlines(builder, config);
+        } else if !text.is_empty() {
             inline_emission::emit_inlines(builder, &text, config);
         }
 
