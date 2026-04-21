@@ -1,4 +1,4 @@
 See note.[^getting-started-with-jamovi-2]
 
-[^getting-started-with-jamovi-2]: At the time of first writing this in August 2018.
-    Later versions of this book will use later versions of jamovi.
+[^getting-started-with-jamovi-2]: At the time of first writing this in August
+    2018. Later versions of this book will use later versions of jamovi.

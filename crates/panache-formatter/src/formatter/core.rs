@@ -624,8 +624,9 @@ impl Formatter {
                         continue;
                     }
 
-                    // Emit exactly one normalized blank line between child blocks.
-                    if !first && !self.output.ends_with("\n\n") {
+                    // Preserve explicit blank-line separators between footnote child blocks,
+                    // but do not invent one when source had only a soft continuation.
+                    if !first && pending_blank_lines > 0 && !self.output.ends_with("\n\n") {
                         self.output.push('\n');
                     }
                     pending_blank_lines = 0;

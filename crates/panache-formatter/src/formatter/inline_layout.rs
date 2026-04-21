@@ -227,10 +227,12 @@ impl<'a> NodeWrapOptions<'a> {
 }
 
 impl WrapStrategy {
-    fn options<'a>(self, widths: &'a [usize]) -> NodeWrapOptions<'a> {
+    fn options<'a>(self, config: &Config, widths: &'a [usize]) -> NodeWrapOptions<'a> {
+        let avoid_unsafe_in_paragraph_reflow =
+            config.parser_extensions.lists_without_preceding_blankline;
         match self {
             Self::ParagraphReflow => NodeWrapOptions {
-                avoid_unsafe_line_start: true,
+                avoid_unsafe_line_start: avoid_unsafe_in_paragraph_reflow,
                 ..NodeWrapOptions::reflow(widths)
             },
             Self::ParagraphSentence => NodeWrapOptions::sentence(),
@@ -293,11 +295,71 @@ fn is_bullet_list_marker_piece(piece: &str) -> bool {
     matches!(piece, "+" | "-" | "*")
 }
 
-fn is_unsafe_line_start_piece(piece: &str) -> bool {
+fn is_fancy_alpha_marker_piece(piece: &str) -> bool {
+    let mut chars = piece.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    let Some(last) = chars.next_back() else {
+        return false;
+    };
+    if chars.next().is_some() {
+        return false;
+    }
+    first.is_ascii_alphabetic() && matches!(last, '.' | ')')
+}
+
+fn is_roman_numeral_text(text: &str) -> bool {
+    !text.is_empty()
+        && text.chars().all(|c| {
+            matches!(
+                c.to_ascii_uppercase(),
+                'I' | 'V' | 'X' | 'L' | 'C' | 'D' | 'M'
+            )
+        })
+}
+
+fn is_fancy_roman_marker_piece(piece: &str) -> bool {
+    let mut chars = piece.chars();
+    let Some(last) = chars.next_back() else {
+        return false;
+    };
+    if !matches!(last, '.' | ')') {
+        return false;
+    }
+    let head = chars.as_str();
+    !head.is_empty() && is_roman_numeral_text(head)
+}
+
+fn is_fancy_paren_decimal_marker_piece(piece: &str) -> bool {
+    let Some(body) = piece
+        .strip_prefix('(')
+        .and_then(|rest| rest.strip_suffix(')'))
+    else {
+        return false;
+    };
+    !body.is_empty() && body.chars().all(|c| c.is_ascii_digit())
+}
+
+fn is_fancy_paren_alpha_or_roman_marker_piece(piece: &str) -> bool {
+    let Some(body) = piece
+        .strip_prefix('(')
+        .and_then(|rest| rest.strip_suffix(')'))
+    else {
+        return false;
+    };
+    (body.len() == 1 && body.chars().all(|c| c.is_ascii_alphabetic()))
+        || is_roman_numeral_text(body)
+}
+
+fn is_unsafe_list_line_start_piece(piece: &str) -> bool {
     is_example_list_marker_piece(piece)
         || is_decimal_ordered_list_marker_piece(piece)
+        || is_fancy_alpha_marker_piece(piece)
+        || is_fancy_roman_marker_piece(piece)
+        || is_fancy_paren_decimal_marker_piece(piece)
+        || is_fancy_paren_alpha_or_roman_marker_piece(piece)
         || is_bullet_list_marker_piece(piece)
-        || is_definition_marker_piece(piece)
 }
 
 struct StreamingCoreSink<'a> {
@@ -356,9 +418,10 @@ impl<'a> StreamingCoreSink<'a> {
                 .copied()
                 .unwrap_or(self.default_line_width);
             let spacer_width = usize::from(self.line_has_piece && self.prev_ws_after);
-            let would_start_line_with_unsafe_piece = self.avoid_unsafe_line_start
-                && self.prev_ws_after
-                && is_unsafe_line_start_piece(segment.text.as_str());
+            let would_start_line_with_unsafe_piece = self.prev_ws_after
+                && (is_definition_marker_piece(segment.text.as_str())
+                    || (self.avoid_unsafe_line_start
+                        && is_unsafe_list_line_start_piece(segment.text.as_str())));
             if self.line_has_piece
                 && self.line_width + spacer_width + piece_width > width_limit
                 && !would_start_line_with_unsafe_piece
@@ -1101,7 +1164,7 @@ pub(super) fn wrapped_lines_for_node(
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
     strategy: WrapStrategy,
 ) -> Vec<String> {
-    let options = strategy.options(widths);
+    let options = strategy.options(config, widths);
     let sentence_mode = matches!(options.mode, NodeWrapMode::Sentence);
     let line_widths = if sentence_mode || !options.widths.is_empty() {
         options.widths
@@ -1150,9 +1213,10 @@ fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_bullet_list_marker_piece, is_decimal_ordered_list_marker_piece,
-        is_definition_marker_piece, is_example_list_marker_piece, is_unsafe_line_start_piece,
-        wrap_text_first_fit,
+        WrapStrategy, is_bullet_list_marker_piece, is_decimal_ordered_list_marker_piece,
+        is_definition_marker_piece, is_example_list_marker_piece, is_fancy_alpha_marker_piece,
+        is_fancy_paren_alpha_or_roman_marker_piece, is_fancy_paren_decimal_marker_piece,
+        is_fancy_roman_marker_piece, is_unsafe_list_line_start_piece, wrap_text_first_fit,
     };
 
     #[test]
@@ -1164,22 +1228,54 @@ mod tests {
     #[test]
     fn unsafe_line_start_rule_matches_ambiguous_markers() {
         assert!(is_example_list_marker_piece("(@foo-bar-123)"));
-        assert!(is_unsafe_line_start_piece("(@foo-bar-123)"));
+        assert!(is_unsafe_list_line_start_piece("(@foo-bar-123)"));
         assert!(is_decimal_ordered_list_marker_piece("2018."));
         assert!(is_decimal_ordered_list_marker_piece("2)"));
+        assert!(is_fancy_alpha_marker_piece("a."));
+        assert!(is_fancy_alpha_marker_piece("Z)"));
+        assert!(is_fancy_roman_marker_piece("iv."));
+        assert!(is_fancy_roman_marker_piece("X)"));
+        assert!(is_fancy_paren_decimal_marker_piece("(2)"));
+        assert!(is_fancy_paren_alpha_or_roman_marker_piece("(a)"));
+        assert!(is_fancy_paren_alpha_or_roman_marker_piece("(iv)"));
         assert!(is_bullet_list_marker_piece("+"));
         assert!(is_bullet_list_marker_piece("-"));
         assert!(is_bullet_list_marker_piece("*"));
         assert!(is_definition_marker_piece(":"));
-        assert!(is_unsafe_line_start_piece("2018."));
-        assert!(is_unsafe_line_start_piece("2)"));
-        assert!(is_unsafe_line_start_piece("+"));
-        assert!(is_unsafe_line_start_piece("-"));
-        assert!(is_unsafe_line_start_piece("*"));
-        assert!(is_unsafe_line_start_piece(":"));
-        assert!(!is_unsafe_line_start_piece(":::"));
+        assert!(is_unsafe_list_line_start_piece("2018."));
+        assert!(is_unsafe_list_line_start_piece("2)"));
+        assert!(is_unsafe_list_line_start_piece("a."));
+        assert!(is_unsafe_list_line_start_piece("iv."));
+        assert!(is_unsafe_list_line_start_piece("(2)"));
+        assert!(is_unsafe_list_line_start_piece("(a)"));
+        assert!(is_unsafe_list_line_start_piece("(iv)"));
+        assert!(is_unsafe_list_line_start_piece("+"));
+        assert!(is_unsafe_list_line_start_piece("-"));
+        assert!(is_unsafe_list_line_start_piece("*"));
+        assert!(!is_unsafe_list_line_start_piece(":"));
+        assert!(!is_unsafe_list_line_start_piece(":::"));
         assert!(!is_bullet_list_marker_piece("+foo"));
         assert!(!is_decimal_ordered_list_marker_piece("v2.0"));
         assert!(!is_decimal_ordered_list_marker_piece("2024.05"));
+    }
+
+    #[test]
+    fn paragraph_reflow_unsafe_start_guard_is_gated_by_extension() {
+        let parser_cfg = crate::config::ParserExtensions::for_flavor(crate::config::Flavor::Pandoc);
+        let config_disabled = crate::config::Config {
+            parser_extensions: parser_cfg.clone(),
+            ..crate::config::Config::default()
+        };
+        let options_disabled = WrapStrategy::ParagraphReflow.options(&config_disabled, &[80]);
+        assert!(!options_disabled.avoid_unsafe_line_start);
+
+        let mut parser_cfg_enabled = parser_cfg;
+        parser_cfg_enabled.lists_without_preceding_blankline = true;
+        let config_enabled = crate::config::Config {
+            parser_extensions: parser_cfg_enabled,
+            ..crate::config::Config::default()
+        };
+        let options_enabled = WrapStrategy::ParagraphReflow.options(&config_enabled, &[80]);
+        assert!(options_enabled.avoid_unsafe_line_start);
     }
 }

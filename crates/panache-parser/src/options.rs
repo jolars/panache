@@ -67,6 +67,9 @@ pub struct Extensions {
     /// Term/definition syntax
     #[cfg_attr(feature = "serde", serde(alias = "definition_lists"))]
     pub definition_lists: bool,
+    /// Allow lists without a preceding blank line
+    #[cfg_attr(feature = "serde", serde(alias = "lists_without_preceding_blankline"))]
+    pub lists_without_preceding_blankline: bool,
 
     // Code blocks
     /// Fenced code blocks with backticks
@@ -276,6 +279,7 @@ impl Extensions {
             bracketed_spans: false,
             citations: false,
             definition_lists: false,
+            lists_without_preceding_blankline: false,
             emoji: false,
             escaped_line_breaks: false,
             example_lists: false,
@@ -359,6 +363,7 @@ impl Extensions {
             definition_lists: true,
             example_lists: true,
             fancy_lists: true,
+            lists_without_preceding_blankline: false,
             startnum: true,
             task_lists: true,
 
@@ -568,6 +573,9 @@ impl Extensions {
                 "example-lists" => base.example_lists = value,
                 "task-lists" => base.task_lists = value,
                 "definition-lists" => base.definition_lists = value,
+                "lists-without-preceding-blankline" => {
+                    base.lists_without_preceding_blankline = value
+                }
                 "backtick-code-blocks" => base.backtick_code_blocks = value,
                 "fenced-code-blocks" => base.fenced_code_blocks = value,
                 "fenced-code-attributes" => base.fenced_code_attributes = value,
@@ -651,6 +659,20 @@ mod tests {
         overrides.insert("smart-quotes".to_string(), true);
         let ext = Extensions::merge_with_flavor(overrides, Flavor::Gfm);
         assert!(ext.strikeout, "known defaults should remain intact");
+    }
+
+    #[test]
+    fn lists_without_preceding_blankline_defaults_false_for_pandoc_and_gfm() {
+        assert!(!Extensions::for_flavor(Flavor::Pandoc).lists_without_preceding_blankline);
+        assert!(!Extensions::for_flavor(Flavor::Gfm).lists_without_preceding_blankline);
+    }
+
+    #[test]
+    fn merge_with_flavor_accepts_lists_without_preceding_blankline_override() {
+        let mut overrides = HashMap::new();
+        overrides.insert("lists-without-preceding-blankline".to_string(), true);
+        let ext = Extensions::merge_with_flavor(overrides, Flavor::Pandoc);
+        assert!(ext.lists_without_preceding_blankline);
     }
 }
 
