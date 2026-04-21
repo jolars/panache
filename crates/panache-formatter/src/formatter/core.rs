@@ -30,6 +30,13 @@ pub struct Formatter {
     pub(super) directive_tracker: DirectiveTracker,
     /// Depth of ignore region (for preserving content exactly)
     ignore_region_start: Option<usize>,
+    /// Structured rendering context for nested blockquote containers.
+    blockquote_context: Option<BlockquoteContext>,
+}
+
+#[derive(Clone, Debug)]
+struct BlockquoteContext {
+    in_list_continuation: bool,
 }
 
 impl Formatter {
@@ -48,6 +55,7 @@ impl Formatter {
             range,
             directive_tracker: DirectiveTracker::new(),
             ignore_region_start: None,
+            blockquote_context: None,
         }
     }
     pub fn format(mut self, node: &SyntaxNode) -> String {
@@ -405,6 +413,143 @@ impl Formatter {
         if !self.output.ends_with('\n') {
             self.output.push('\n');
         }
+    }
+
+    fn code_block_leading_indent(node: &SyntaxNode) -> String {
+        node.children_with_tokens()
+            .take_while(
+                |item| matches!(item, NodeOrToken::Token(t) if t.kind() == SyntaxKind::WHITESPACE),
+            )
+            .filter_map(|item| match item {
+                NodeOrToken::Token(t) => Some(t.text().to_string()),
+                _ => None,
+            })
+            .collect::<String>()
+    }
+
+    fn blockquote_prev_significant_kind(children: &[SyntaxNode], idx: usize) -> Option<SyntaxKind> {
+        children[..idx]
+            .iter()
+            .rev()
+            .find(|child| {
+                !matches!(
+                    child.kind(),
+                    SyntaxKind::BLOCK_QUOTE_MARKER | SyntaxKind::BLANK_LINE
+                )
+            })
+            .map(SyntaxNode::kind)
+    }
+
+    fn blockquote_next_significant_kind(children: &[SyntaxNode], idx: usize) -> Option<SyntaxKind> {
+        children[idx + 1..]
+            .iter()
+            .find(|child| {
+                !matches!(
+                    child.kind(),
+                    SyntaxKind::BLOCK_QUOTE_MARKER | SyntaxKind::BLANK_LINE
+                )
+            })
+            .map(SyntaxNode::kind)
+    }
+
+    fn should_preserve_blockquote_blank_suffix(
+        prev_significant_kind: Option<SyntaxKind>,
+        next_significant_kind: Option<SyntaxKind>,
+        blank_suffix: &str,
+        in_list_continuation: bool,
+    ) -> bool {
+        if blank_suffix.is_empty() || !blank_suffix.chars().all(|ch| ch == ' ') {
+            return false;
+        }
+
+        matches!(next_significant_kind, Some(SyntaxKind::CODE_BLOCK))
+            && (in_list_continuation
+                || matches!(
+                    prev_significant_kind,
+                    Some(SyntaxKind::LIST | SyntaxKind::LIST_ITEM)
+                ))
+    }
+
+    fn append_blockquote_prefixed_block(
+        &mut self,
+        rendered: &str,
+        content_prefix: &str,
+        blank_prefix: &str,
+        leading_indent: Option<&str>,
+    ) {
+        for line in rendered.lines() {
+            if line.is_empty() {
+                self.output.push_str(blank_prefix);
+            } else {
+                self.output.push_str(content_prefix);
+                if let Some(indent) = leading_indent
+                    && !indent.is_empty()
+                    && !line.starts_with([' ', '\t'])
+                {
+                    self.output.push_str(indent);
+                }
+                self.output.push_str(line);
+            }
+            self.output.push('\n');
+        }
+    }
+
+    fn append_blockquote_prefixed_list_output(
+        &mut self,
+        list_output: &str,
+        base_indent: &str,
+        content_prefix: &str,
+        blank_prefix: &str,
+    ) -> bool {
+        let mut in_list_item_continuation = false;
+        for line in list_output.lines() {
+            let trimmed_line = line.trim_start();
+            let starts_with_list_marker = Self::starts_with_list_marker(trimmed_line);
+            if line.is_empty() {
+                self.output.push_str(blank_prefix);
+                in_list_item_continuation = false;
+            } else if line.starts_with("> ") {
+                let rest = line.trim_start_matches("> ");
+                let trimmed_rest = rest.trim_start();
+                if trimmed_rest.is_empty() {
+                    self.output.push_str(blank_prefix);
+                    in_list_item_continuation = false;
+                    self.output.push('\n');
+                    continue;
+                }
+                let starts_with_marker_after_quote = Self::starts_with_list_marker(trimmed_rest);
+                if starts_with_marker_after_quote {
+                    self.output.push_str(base_indent);
+                    self.output.push_str("> ");
+                    self.output.push_str(trimmed_rest);
+                    in_list_item_continuation = true;
+                } else {
+                    self.output.push_str(base_indent);
+                    self.output.push_str(line);
+                    in_list_item_continuation = false;
+                }
+            } else if starts_with_list_marker {
+                self.output.push_str(content_prefix);
+                self.output.push_str(trimmed_line);
+                in_list_item_continuation = true;
+            } else if in_list_item_continuation && line.starts_with(char::is_whitespace) {
+                if trimmed_line.is_empty() {
+                    self.output.push_str(blank_prefix);
+                    in_list_item_continuation = false;
+                } else {
+                    self.output.push_str(content_prefix);
+                    self.output.push_str("  ");
+                    self.output.push_str(trimmed_line);
+                }
+            } else {
+                self.output.push_str(content_prefix);
+                self.output.push_str(line);
+                in_list_item_continuation = false;
+            }
+            self.output.push('\n');
+        }
+
+        in_list_item_continuation
     }
 
     // The large format_node_sync method - keeping it here for now, can extract later
@@ -898,8 +1043,17 @@ impl Formatter {
                 // NOTE: BlockQuoteMarker tokens are in the tree for losslessness, but we ignore
                 // them during formatting and add prefixes dynamically instead.
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
+                let blockquote_children: Vec<_> = node.children().collect();
+                let saved_blockquote_context = self.blockquote_context.clone();
+                self.blockquote_context = Some(BlockquoteContext {
+                    in_list_continuation: false,
+                });
 
-                for child in node.children() {
+                for (child_idx, child) in blockquote_children.iter().enumerate() {
+                    let prev_significant_kind =
+                        Self::blockquote_prev_significant_kind(&blockquote_children, child_idx);
+                    let next_significant_kind =
+                        Self::blockquote_next_significant_kind(&blockquote_children, child_idx);
                     match child.kind() {
                         // Skip BlockQuoteMarker tokens - we add prefixes dynamically
                         SyntaxKind::BLOCK_QUOTE_MARKER => continue,
@@ -946,7 +1100,7 @@ impl Formatter {
                             WrapMode::Reflow => {
                                 let width =
                                     self.config.line_width.saturating_sub(content_prefix.len());
-                                let lines = self.wrapped_lines_for_paragraph(&child, width);
+                                let lines = self.wrapped_lines_for_paragraph(child, width);
                                 for line in lines {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(&line);
@@ -954,7 +1108,7 @@ impl Formatter {
                                 }
                             }
                             WrapMode::Sentence => {
-                                let lines = self.sentence_lines_for_paragraph(&child);
+                                let lines = self.sentence_lines_for_paragraph(child);
                                 for line in lines {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(&line);
@@ -1047,15 +1201,14 @@ impl Formatter {
                             if blank_suffix.is_empty() {
                                 self.output.push_str(&blank_prefix);
                             } else {
-                                let preserve_spaces_for_fenced_continuation =
-                                    blank_suffix.chars().all(|ch| ch == ' ')
-                                        && child.next_sibling().is_some_and(|next| {
-                                            next.kind() == SyntaxKind::CODE_BLOCK
-                                                && next.children().any(|n| {
-                                                    n.kind() == SyntaxKind::CODE_FENCE_OPEN
-                                                })
-                                        });
-                                if preserve_spaces_for_fenced_continuation {
+                                if Self::should_preserve_blockquote_blank_suffix(
+                                    prev_significant_kind,
+                                    next_significant_kind,
+                                    blank_suffix,
+                                    self.blockquote_context
+                                        .as_ref()
+                                        .is_some_and(|ctx| ctx.in_list_continuation),
+                                ) {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(blank_suffix);
                                 } else {
@@ -1074,7 +1227,7 @@ impl Formatter {
                         }
                         SyntaxKind::HEADING => {
                             // Format heading with blockquote prefix
-                            let heading_text = self.format_heading(&child);
+                            let heading_text = self.format_heading(child);
                             for line in heading_text.lines() {
                                 self.output.push_str(&content_prefix);
                                 self.output.push_str(line);
@@ -1098,119 +1251,70 @@ impl Formatter {
                                 self.config.line_width.saturating_sub(content_prefix.len());
                             // We trim list-temp indentation before re-prefixing with `content_prefix`.
                             // Format at indent 0 here to avoid double-accounting indentation width.
-                            self.format_node_sync(&child, 0);
+                            self.format_node_sync(child, 0);
                             let list_output = self.output.clone();
                             self.config.line_width = saved_line_width;
                             self.output = saved_output;
 
-                            let mut in_list_item_continuation = false;
-                            for line in list_output.lines() {
-                                let trimmed_line = line.trim_start();
-                                let starts_with_list_marker =
-                                    Self::starts_with_list_marker(trimmed_line);
-                                if line.is_empty() {
-                                    self.output.push_str(&blank_prefix);
-                                    in_list_item_continuation = false;
-                                } else if line.starts_with("> ") {
-                                    let rest = line.trim_start_matches("> ");
-                                    let trimmed_rest = rest.trim_start();
-                                    if trimmed_rest.is_empty() {
-                                        self.output.push_str(&blank_prefix);
-                                        in_list_item_continuation = false;
-                                        self.output.push('\n');
-                                        continue;
-                                    }
-                                    let starts_with_marker_after_quote =
-                                        Self::starts_with_list_marker(trimmed_rest);
-                                    if starts_with_marker_after_quote {
-                                        self.output.push_str(&base_indent);
-                                        self.output.push_str("> ");
-                                        self.output.push_str(trimmed_rest);
-                                        in_list_item_continuation = true;
-                                    } else {
-                                        self.output.push_str(&base_indent);
-                                        self.output.push_str(line);
-                                        in_list_item_continuation = false;
-                                    }
-                                } else if starts_with_list_marker {
-                                    self.output.push_str(&content_prefix);
-                                    self.output.push_str(trimmed_line);
-                                    in_list_item_continuation = true;
-                                } else if in_list_item_continuation
-                                    && line.starts_with(char::is_whitespace)
-                                {
-                                    if trimmed_line.is_empty() {
-                                        self.output.push_str(&blank_prefix);
-                                        in_list_item_continuation = false;
-                                    } else {
-                                        self.output.push_str(&content_prefix);
-                                        self.output.push_str("  ");
-                                        self.output.push_str(trimmed_line);
-                                    }
-                                } else {
-                                    self.output.push_str(&content_prefix);
-                                    self.output.push_str(line);
-                                    in_list_item_continuation = false;
-                                }
-                                self.output.push('\n');
+                            let ends_in_list_continuation = self
+                                .append_blockquote_prefixed_list_output(
+                                    &list_output,
+                                    &base_indent,
+                                    &content_prefix,
+                                    &blank_prefix,
+                                );
+                            if let Some(ctx) = self.blockquote_context.as_mut() {
+                                ctx.in_list_continuation = ends_in_list_continuation;
                             }
                         }
                         SyntaxKind::CODE_BLOCK => {
                             // Format code block with blockquote prefix
                             // Save current output, format code block to temp, then prefix each line
-                            let code_block_leading_indent = child
-                                .children_with_tokens()
-                                .take_while(|item| matches!(item, NodeOrToken::Token(t) if t.kind() == SyntaxKind::WHITESPACE))
-                                .filter_map(|item| match item {
-                                    NodeOrToken::Token(t) => Some(t.text().to_string()),
-                                    _ => None,
-                                })
-                                .collect::<String>();
+                            let code_block_leading_indent = Self::code_block_leading_indent(child);
                             let saved_output = self.output.clone();
                             self.output.clear();
-                            self.format_node_sync(&child, indent);
+                            self.format_node_sync(child, indent);
                             let code_output = self.output.clone();
                             self.output = saved_output;
 
-                            for line in code_output.lines() {
-                                if line.is_empty() {
-                                    self.output.push_str(&blank_prefix);
-                                } else {
-                                    self.output.push_str(&content_prefix);
-                                    if !code_block_leading_indent.is_empty()
-                                        && !line.starts_with([' ', '\t'])
-                                    {
-                                        self.output.push_str(&code_block_leading_indent);
-                                    }
-                                    self.output.push_str(line);
-                                }
-                                self.output.push('\n');
+                            self.append_blockquote_prefixed_block(
+                                &code_output,
+                                &content_prefix,
+                                &blank_prefix,
+                                Some(&code_block_leading_indent),
+                            );
+                            if let Some(ctx) = self.blockquote_context.as_mut() {
+                                ctx.in_list_continuation = false;
                             }
                         }
                         SyntaxKind::TEX_BLOCK => {
                             // Keep raw TeX content verbatim, but preserve blockquote prefixes.
                             let saved_output = self.output.clone();
                             self.output.clear();
-                            self.format_node_sync(&child, indent);
+                            self.format_node_sync(child, indent);
                             let tex_output = self.output.clone();
                             self.output = saved_output;
 
-                            for line in tex_output.lines() {
-                                if line.is_empty() {
-                                    self.output.push_str(&blank_prefix);
-                                } else {
-                                    self.output.push_str(&content_prefix);
-                                    self.output.push_str(line);
-                                }
-                                self.output.push('\n');
-                            }
+                            self.append_blockquote_prefixed_block(
+                                &tex_output,
+                                &content_prefix,
+                                &blank_prefix,
+                                None,
+                            );
                         }
                         _ => {
                             // Handle other content within block quotes
-                            self.format_node_sync(&child, indent);
+                            self.format_node_sync(child, indent);
+                            if let Some(ctx) = self.blockquote_context.as_mut() {
+                                ctx.in_list_continuation = matches!(
+                                    child.kind(),
+                                    SyntaxKind::LIST | SyntaxKind::LIST_ITEM
+                                );
+                            }
                         }
                     }
                 }
+                self.blockquote_context = saved_blockquote_context;
             }
 
             SyntaxKind::PARAGRAPH => {

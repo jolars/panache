@@ -245,3 +245,43 @@ fn blockquote_lazy_continuation_after_citation_stays_idempotent() {
     let output2 = format(&output1, None, None);
     assert_eq!(output1, output2, "Formatting should be idempotent");
 }
+
+#[test]
+fn blockquote_list_code_continuation_preserves_blank_suffix_idempotent() {
+    let input = r#"> - Item
+>
+>   
+>   ```r
+>   2 + 2
+>   ```
+"#;
+    let flavor = Flavor::RMarkdown;
+    let config = Config {
+        flavor,
+        extensions: Extensions::for_flavor(flavor),
+        ..Default::default()
+    };
+
+    let output1 = format(input, Some(config.clone()), None);
+    let output2 = format(&output1, Some(config), None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+    assert!(
+        output1.contains("\n>   \n>   ```r\n"),
+        "Expected structure-significant blank line before fenced code block in list continuation.\nOutput:\n{output1}"
+    );
+}
+
+#[test]
+fn blockquote_list_continuation_not_preserved_before_paragraph() {
+    let input = r#"> - Item
+>
+>   
+> paragraph
+"#;
+
+    let output = format(input, None, None);
+    assert!(
+        !output.contains("\n>   \n> paragraph\n"),
+        "Blank suffix should not be preserved when next significant block is not code.\nOutput:\n{output}"
+    );
+}
