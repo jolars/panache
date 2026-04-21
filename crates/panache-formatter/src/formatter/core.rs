@@ -1042,7 +1042,26 @@ impl Formatter {
                             }
                         }
                         SyntaxKind::BLANK_LINE => {
-                            self.output.push_str(&blank_prefix);
+                            let blank_suffix = child.text().to_string();
+                            let blank_suffix = blank_suffix.trim_end_matches(['\r', '\n']);
+                            if blank_suffix.is_empty() {
+                                self.output.push_str(&blank_prefix);
+                            } else {
+                                let preserve_spaces_for_fenced_continuation =
+                                    blank_suffix.chars().all(|ch| ch == ' ')
+                                        && child.next_sibling().is_some_and(|next| {
+                                            next.kind() == SyntaxKind::CODE_BLOCK
+                                                && next.children().any(|n| {
+                                                    n.kind() == SyntaxKind::CODE_FENCE_OPEN
+                                                })
+                                        });
+                                if preserve_spaces_for_fenced_continuation {
+                                    self.output.push_str(&content_prefix);
+                                    self.output.push_str(blank_suffix);
+                                } else {
+                                    self.output.push_str(&blank_prefix);
+                                }
+                            }
                             self.output.push('\n');
                         }
                         SyntaxKind::HORIZONTAL_RULE => {
@@ -1095,6 +1114,12 @@ impl Formatter {
                                 } else if line.starts_with("> ") {
                                     let rest = line.trim_start_matches("> ");
                                     let trimmed_rest = rest.trim_start();
+                                    if trimmed_rest.is_empty() {
+                                        self.output.push_str(&blank_prefix);
+                                        in_list_item_continuation = false;
+                                        self.output.push('\n');
+                                        continue;
+                                    }
                                     let starts_with_marker_after_quote =
                                         Self::starts_with_list_marker(trimmed_rest);
                                     if starts_with_marker_after_quote {
@@ -1114,9 +1139,14 @@ impl Formatter {
                                 } else if in_list_item_continuation
                                     && line.starts_with(char::is_whitespace)
                                 {
-                                    self.output.push_str(&content_prefix);
-                                    self.output.push_str("  ");
-                                    self.output.push_str(trimmed_line);
+                                    if trimmed_line.is_empty() {
+                                        self.output.push_str(&blank_prefix);
+                                        in_list_item_continuation = false;
+                                    } else {
+                                        self.output.push_str(&content_prefix);
+                                        self.output.push_str("  ");
+                                        self.output.push_str(trimmed_line);
+                                    }
                                 } else {
                                     self.output.push_str(&content_prefix);
                                     self.output.push_str(line);
@@ -1128,6 +1158,14 @@ impl Formatter {
                         SyntaxKind::CODE_BLOCK => {
                             // Format code block with blockquote prefix
                             // Save current output, format code block to temp, then prefix each line
+                            let code_block_leading_indent = child
+                                .children_with_tokens()
+                                .take_while(|item| matches!(item, NodeOrToken::Token(t) if t.kind() == SyntaxKind::WHITESPACE))
+                                .filter_map(|item| match item {
+                                    NodeOrToken::Token(t) => Some(t.text().to_string()),
+                                    _ => None,
+                                })
+                                .collect::<String>();
                             let saved_output = self.output.clone();
                             self.output.clear();
                             self.format_node_sync(&child, indent);
@@ -1139,6 +1177,11 @@ impl Formatter {
                                     self.output.push_str(&blank_prefix);
                                 } else {
                                     self.output.push_str(&content_prefix);
+                                    if !code_block_leading_indent.is_empty()
+                                        && !line.starts_with([' ', '\t'])
+                                    {
+                                        self.output.push_str(&code_block_leading_indent);
+                                    }
                                     self.output.push_str(line);
                                 }
                                 self.output.push('\n');

@@ -13,6 +13,7 @@ mod image_attributes;
 mod inline_code_attributes;
 mod inline_executable_code;
 mod inline_footnotes;
+mod issue_198_rmd_blockquote_chunk_header;
 mod line_blocks;
 mod links;
 mod lists_unordered;
