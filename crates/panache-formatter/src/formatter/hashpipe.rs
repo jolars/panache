@@ -762,6 +762,7 @@ pub fn format_as_hashpipe(
             let lines = formatted_yaml
                 .lines()
                 .map(|line| {
+                    let line = line.trim_end_matches([' ', '\t']);
                     if line.is_empty() {
                         prefix.to_string()
                     } else {

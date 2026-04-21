@@ -7,7 +7,11 @@
 //!
 //! Run with `UPDATE_EXPECTED=1 cargo test` to regenerate expected outputs.
 
-use panache::{Config, format};
+use panache::{
+    Config,
+    config::{Extensions, Flavor, FormatterExtensions},
+    format,
+};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -35,6 +39,19 @@ fn load_test_config(dir: &Path) -> Option<Config> {
     }
 }
 
+fn detect_fixture_flavor(input_path: &Path, fallback: Flavor) -> Flavor {
+    let ext = input_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase());
+
+    match ext.as_deref() {
+        Some("qmd") => Flavor::Quarto,
+        Some("rmd") | Some("rmarkdown") => Flavor::RMarkdown,
+        _ => fallback,
+    }
+}
+
 /// Run a single golden test case.
 fn run_golden_case(case_name: &str) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -55,8 +72,22 @@ fn run_golden_case(case_name: &str) {
         .unwrap_or("qmd");
     let expected_path = dir.join(format!("expected.{}", input_ext));
 
-    // Load optional config
-    let config = load_test_config(&dir);
+    // Load optional config, then apply extension-based flavor detection for
+    // config-less fixtures (matching CLI behavior for qmd/Rmd inputs).
+    let config = match load_test_config(&dir) {
+        Some(mut config) => {
+            config.flavor = detect_fixture_flavor(&input_path, config.flavor);
+            Some(config)
+        }
+        None => {
+            let mut config = Config::default();
+            let flavor = detect_fixture_flavor(&input_path, config.flavor);
+            config.flavor = flavor;
+            config.extensions = Extensions::for_flavor(flavor);
+            config.formatter_extensions = FormatterExtensions::for_flavor(flavor);
+            Some(config)
+        }
+    };
 
     // Read input file - preserve line endings exactly
     let input = fs::read_to_string(&input_path).unwrap();
@@ -250,6 +281,7 @@ golden_test_cases!(
     issue_185_hashpipe_double_space_idempotency,
     issue_193_cluster_a_fancy_markers_idempotency,
     issue_193_cluster_b_inline_footnote_citation_spacing,
+    issue_194_idempotency_lsj_tbl_cap,
     issue_195_blockquote_wrapping_idempotency,
     writer_autolinks,
     writer_blockquote_not,
