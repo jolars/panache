@@ -204,6 +204,21 @@ mod tests {
     }
 
     #[test]
+    fn splits_mapping_on_colon_outside_flow_key() {
+        let input = "{a: b}: 23\n";
+        let tree = parse_basic_mapping_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let keys: Vec<String> = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_KEY)
+            .map(|tok| tok.text().to_string())
+            .collect();
+        assert_eq!(keys, vec!["{a: b}".to_string()]);
+    }
+
+    #[test]
     fn keeps_colon_inside_escaped_double_quoted_key() {
         let input = "\"foo\\\":bar\": 23\n";
         let tree = parse_basic_mapping_tree(input).expect("tree");
@@ -308,6 +323,57 @@ mod tests {
         let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
         assert!(kinds.contains(&YamlShadowTokenKind::Indent));
         assert!(kinds.contains(&YamlShadowTokenKind::Dedent));
+    }
+
+    #[test]
+    fn lexer_emits_document_start_marker_token() {
+        let input = "---\n";
+        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                YamlShadowTokenKind::DocumentStart,
+                YamlShadowTokenKind::Newline,
+            ]
+        );
+    }
+
+    #[test]
+    fn lexer_emits_flow_tokens_for_standalone_flow_mapping() {
+        let input = "{foo: bar}\n";
+        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                YamlShadowTokenKind::FlowMapStart,
+                YamlShadowTokenKind::Scalar,
+                YamlShadowTokenKind::FlowMapEnd,
+                YamlShadowTokenKind::Newline,
+            ]
+        );
+    }
+
+    #[test]
+    fn lexer_emits_flow_sequence_tokens_in_mapping_value() {
+        let input = "a: [b, c]\n";
+        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                YamlShadowTokenKind::Key,
+                YamlShadowTokenKind::Colon,
+                YamlShadowTokenKind::Whitespace,
+                YamlShadowTokenKind::FlowSeqStart,
+                YamlShadowTokenKind::Scalar,
+                YamlShadowTokenKind::Comma,
+                YamlShadowTokenKind::Scalar,
+                YamlShadowTokenKind::FlowSeqEnd,
+                YamlShadowTokenKind::Newline,
+            ]
+        );
     }
 
     #[test]

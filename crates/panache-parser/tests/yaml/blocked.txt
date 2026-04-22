@@ -5,5 +5,4 @@
 58MP: flow mapping syntax not implemented
 6H3V: single-quoted scalar parsing not implemented
 CXX2: document markers and anchors not implemented
-D88J: sequence parsing not implemented
 ZCZ6: invalid plain scalar containing mapping indicator sequence

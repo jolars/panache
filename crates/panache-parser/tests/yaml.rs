@@ -138,6 +138,64 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         }
     }
 
+    fn simple_flow_sequence_items(text: &str) -> Option<Vec<String>> {
+        let trimmed = text.trim();
+        let inner = trimmed.strip_prefix('[')?.strip_suffix(']')?;
+        let inner = inner.trim();
+        if inner.is_empty() {
+            return Some(Vec::new());
+        }
+
+        let mut items = Vec::new();
+        let mut start = 0usize;
+        let mut in_single = false;
+        let mut in_double = false;
+        let mut escaped_double = false;
+
+        for (idx, ch) in inner.char_indices() {
+            if in_double {
+                if escaped_double {
+                    escaped_double = false;
+                    continue;
+                }
+                match ch {
+                    '\\' => escaped_double = true,
+                    '"' => in_double = false,
+                    _ => {}
+                }
+                continue;
+            }
+
+            if in_single {
+                if ch == '\'' {
+                    in_single = false;
+                }
+                continue;
+            }
+
+            match ch {
+                '\'' => in_single = true,
+                '"' => in_double = true,
+                ',' => {
+                    let item = inner[start..idx].trim();
+                    if item.is_empty() {
+                        return None;
+                    }
+                    items.push(item.to_string());
+                    start = idx + 1;
+                }
+                _ => {}
+            }
+        }
+
+        let last = inner[start..].trim();
+        if last.is_empty() {
+            return None;
+        }
+        items.push(last.to_string());
+        Some(items)
+    }
+
     let Some(tree) = parse_basic_mapping_tree(input) else {
         return Vec::new();
     };
@@ -176,9 +234,11 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         let value_text = value_node
             .children_with_tokens()
             .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
+            .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
             .map(|tok| tok.text().to_string())
-            .expect("value token");
+            .collect::<Vec<_>>()
+            .join("");
+        assert!(!value_text.is_empty(), "value token");
 
         let key_event = if let Some(tag) = key_tag {
             if let Some(long) = long_tag(&tag) {
@@ -201,29 +261,43 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         };
         values.push(key_event);
 
-        let value_event = if let Some(tag) = value_tag {
-            if let Some(long) = long_tag(&tag) {
-                format!("=VAL {long} :{value_text}")
+        if value_tag.is_none()
+            && let Some(items) = simple_flow_sequence_items(&value_text)
+        {
+            values.push("+SEQ []".to_string());
+            for item in items {
+                if item.starts_with('"') || item.starts_with('\'') {
+                    values.push(quoted_val_event(&item));
+                } else {
+                    values.push(format!("=VAL :{item}"));
+                }
+            }
+            values.push("-SEQ".to_string());
+        } else {
+            let value_event = if let Some(tag) = value_tag {
+                if let Some(long) = long_tag(&tag) {
+                    format!("=VAL {long} :{value_text}")
+                } else {
+                    format!("=VAL :{value_text}")
+                }
+            } else if value_text.starts_with('"') || value_text.starts_with('\'') {
+                quoted_val_event(&value_text)
+            } else if let Some(rest) = value_text.strip_prefix("!local &") {
+                let (anchor, value) = rest.split_once(' ').expect("local tag anchor/value split");
+                format!("=VAL &{} <!local> :{}", anchor, value)
+            } else if let Some(rest) = value_text.strip_prefix('&') {
+                if let Some((anchor, value)) = rest.split_once(' ') {
+                    format!("=VAL &{} :{}", anchor, value)
+                } else {
+                    format!("=VAL &{} :", rest)
+                }
+            } else if value_text.starts_with('*') {
+                format!("=ALI {value_text}")
             } else {
                 format!("=VAL :{value_text}")
-            }
-        } else if value_text.starts_with('"') || value_text.starts_with('\'') {
-            quoted_val_event(&value_text)
-        } else if let Some(rest) = value_text.strip_prefix("!local &") {
-            let (anchor, value) = rest.split_once(' ').expect("local tag anchor/value split");
-            format!("=VAL &{} <!local> :{}", anchor, value)
-        } else if let Some(rest) = value_text.strip_prefix('&') {
-            if let Some((anchor, value)) = rest.split_once(' ') {
-                format!("=VAL &{} :{}", anchor, value)
-            } else {
-                format!("=VAL &{} :", rest)
-            }
-        } else if value_text.starts_with('*') {
-            format!("=ALI {value_text}")
-        } else {
-            format!("=VAL :{value_text}")
-        };
-        values.push(value_event);
+            };
+            values.push(value_event);
+        }
     }
 
     let mut events = Vec::with_capacity(values.len() + 6);

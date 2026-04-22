@@ -106,11 +106,19 @@ impl<'a> YamlLexer<'a> {
     }
 }
 
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+enum QuoteMode {
+    #[default]
+    Plain,
+    Single,
+    Double,
+}
+
 #[derive(Default)]
-struct QuotedScanState {
-    in_single: bool,
-    in_double: bool,
+struct LexerState {
+    quote_mode: QuoteMode,
     escaped_in_double: bool,
+    flow_depth: usize,
 }
 
 fn leading_indent(text: &str) -> usize {
@@ -120,7 +128,7 @@ fn leading_indent(text: &str) -> usize {
 }
 
 fn split_once_unquoted(text: &str, separator: char) -> Option<(&str, &str)> {
-    let mut state = QuotedScanState::default();
+    let mut state = LexerState::default();
     let idx = find_unquoted_char_with_state(text, separator, &mut state)?;
     let rhs_start = idx + separator.len_utf8();
     Some((&text[..idx], &text[rhs_start..]))
@@ -135,7 +143,7 @@ fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
 }
 
 fn split_value_and_comment(raw_value: &str) -> (&str, Option<&str>) {
-    let mut state = QuotedScanState::default();
+    let mut state = LexerState::default();
     if let Some(idx) = find_unquoted_char_with_state(raw_value, '#', &mut state) {
         let (before, after) = raw_value.split_at(idx);
         let starts_comment = before.chars().next_back().is_none_or(char::is_whitespace);
@@ -150,14 +158,14 @@ fn split_value_and_comment(raw_value: &str) -> (&str, Option<&str>) {
 fn find_unquoted_char_with_state(
     text: &str,
     target: char,
-    state: &mut QuotedScanState,
+    state: &mut LexerState,
 ) -> Option<usize> {
     let mut chars = text.char_indices().peekable();
 
     while let Some((idx, ch)) = chars.next() {
         let next_char = chars.peek().map(|(_, next)| *next);
 
-        if state.in_double {
+        if state.quote_mode == QuoteMode::Double {
             if state.escaped_in_double {
                 state.escaped_in_double = false;
                 continue;
@@ -168,28 +176,34 @@ fn find_unquoted_char_with_state(
                     continue;
                 }
                 '"' => {
-                    state.in_double = false;
+                    state.quote_mode = QuoteMode::Plain;
                     continue;
                 }
                 _ => continue,
             }
         }
 
-        if state.in_single {
+        if state.quote_mode == QuoteMode::Single {
             if ch == '\'' {
                 if next_char == Some('\'') {
                     chars.next();
                     continue;
                 }
-                state.in_single = false;
+                state.quote_mode = QuoteMode::Plain;
             }
             continue;
         }
 
         match ch {
-            '\'' => state.in_single = true,
-            '"' => state.in_double = true,
-            _ if ch == target => return Some(idx),
+            '\'' => state.quote_mode = QuoteMode::Single,
+            '"' => state.quote_mode = QuoteMode::Double,
+            '{' | '[' => {
+                state.flow_depth = state.flow_depth.saturating_add(1);
+            }
+            '}' | ']' => {
+                state.flow_depth = state.flow_depth.saturating_sub(1);
+            }
+            _ if ch == target && (target != ':' || state.flow_depth == 0) => return Some(idx),
             _ => {}
         }
     }
@@ -217,6 +231,74 @@ fn split_tag_prefix(text: &str) -> (Option<&str>, &str) {
     let tag = &text[rel_start..tag_end];
     let value = &text[tag_end..];
     (Some(tag), value)
+}
+
+fn flow_token_kind(ch: char) -> Option<YamlShadowTokenKind> {
+    match ch {
+        '{' => Some(YamlShadowTokenKind::FlowMapStart),
+        '}' => Some(YamlShadowTokenKind::FlowMapEnd),
+        '[' => Some(YamlShadowTokenKind::FlowSeqStart),
+        ']' => Some(YamlShadowTokenKind::FlowSeqEnd),
+        ',' => Some(YamlShadowTokenKind::Comma),
+        _ => None,
+    }
+}
+
+fn emit_scalar_like_tokens<'a>(text: &'a str, out: &mut Vec<YamlShadowToken<'a>>) {
+    if text.is_empty() {
+        return;
+    }
+
+    let mut state = LexerState::default();
+    let mut chunk_start = 0usize;
+    for (idx, ch) in text.char_indices() {
+        if state.quote_mode == QuoteMode::Double {
+            if state.escaped_in_double {
+                state.escaped_in_double = false;
+                continue;
+            }
+            match ch {
+                '\\' => state.escaped_in_double = true,
+                '"' => state.quote_mode = QuoteMode::Plain,
+                _ => {}
+            }
+            continue;
+        }
+
+        if state.quote_mode == QuoteMode::Single {
+            if ch == '\'' {
+                state.quote_mode = QuoteMode::Plain;
+            }
+            continue;
+        }
+
+        match ch {
+            '\'' => state.quote_mode = QuoteMode::Single,
+            '"' => state.quote_mode = QuoteMode::Double,
+            _ => {
+                if let Some(kind) = flow_token_kind(ch) {
+                    if chunk_start < idx {
+                        out.push(YamlShadowToken {
+                            kind: YamlShadowTokenKind::Scalar,
+                            text: &text[chunk_start..idx],
+                        });
+                    }
+                    out.push(YamlShadowToken {
+                        kind,
+                        text: &text[idx..idx + ch.len_utf8()],
+                    });
+                    chunk_start = idx + ch.len_utf8();
+                }
+            }
+        }
+    }
+
+    if chunk_start < text.len() {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Scalar,
+            text: &text[chunk_start..],
+        });
+    }
 }
 
 fn lex_mapping_line_tokens<'a>(
@@ -269,7 +351,57 @@ fn lex_mapping_line_tokens<'a>(
         });
     }
 
-    let (raw_key, raw_value) = parse_raw_mapping_line(content)?;
+    let trimmed = content.trim();
+    if trimmed == "---" {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::DocumentStart,
+            text: content,
+        });
+        if !newline.is_empty() {
+            out.push(YamlShadowToken {
+                kind: YamlShadowTokenKind::Newline,
+                text: newline,
+            });
+        }
+        return Some(());
+    }
+    if trimmed == "..." {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::DocumentEnd,
+            text: content,
+        });
+        if !newline.is_empty() {
+            out.push(YamlShadowToken {
+                kind: YamlShadowTokenKind::Newline,
+                text: newline,
+            });
+        }
+        return Some(());
+    }
+    if trimmed.starts_with('%') {
+        out.push(YamlShadowToken {
+            kind: YamlShadowTokenKind::Directive,
+            text: content,
+        });
+        if !newline.is_empty() {
+            out.push(YamlShadowToken {
+                kind: YamlShadowTokenKind::Newline,
+                text: newline,
+            });
+        }
+        return Some(());
+    }
+
+    let Some((raw_key, raw_value)) = parse_raw_mapping_line(content) else {
+        emit_scalar_like_tokens(content, out);
+        if !newline.is_empty() {
+            out.push(YamlShadowToken {
+                kind: YamlShadowTokenKind::Newline,
+                text: newline,
+            });
+        }
+        return Some(());
+    };
 
     let (key_tag, key_text) = split_tag_prefix(raw_key);
     if let Some(tag) = key_tag {
@@ -328,10 +460,7 @@ fn lex_mapping_line_tokens<'a>(
             text: &value_text[ws_len..],
         });
     } else {
-        out.push(YamlShadowToken {
-            kind: YamlShadowTokenKind::Scalar,
-            text: scalar_part,
-        });
+        emit_scalar_like_tokens(scalar_part, out);
     }
 
     if let Some(comment) = comment_part {
@@ -450,6 +579,18 @@ fn emit_block_map<'a>(
                 while *i < tokens.len() {
                     match tokens[*i].kind {
                         YamlShadowTokenKind::Scalar => {
+                            builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                            *i += 1;
+                        }
+                        YamlShadowTokenKind::FlowMapStart
+                        | YamlShadowTokenKind::FlowMapEnd
+                        | YamlShadowTokenKind::FlowSeqStart
+                        | YamlShadowTokenKind::FlowSeqEnd
+                        | YamlShadowTokenKind::Comma
+                        | YamlShadowTokenKind::Anchor
+                        | YamlShadowTokenKind::Alias
+                        | YamlShadowTokenKind::BlockScalarHeader
+                        | YamlShadowTokenKind::BlockScalarContent => {
                             builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                             *i += 1;
                         }
