@@ -101,7 +101,8 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     fn quoted_val_event(text: &str) -> String {
         if text.starts_with('\'') {
             let trimmed = text.trim_end_matches('\'');
-            format!("=VAL {}", trimmed.replace('\\', "\\\\"))
+            let normalized = trimmed.replace("''", "'").replace('\\', "\\\\");
+            format!("=VAL {normalized}")
         } else {
             let trimmed = text.trim_end_matches('"');
             let mut normalized = String::with_capacity(trimmed.len());

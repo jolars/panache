@@ -1,0 +1,7 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: 4GC6
+input: "'here''s to \"quotes\"'\n"
+parsed_mapping_tree: true
