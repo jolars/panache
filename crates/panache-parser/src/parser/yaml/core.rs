@@ -83,23 +83,7 @@ fn leading_indent(text: &str) -> usize {
 }
 
 fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
-    let mut in_single = false;
-    let mut in_double = false;
-    let mut split_idx = None;
-
-    for (idx, ch) in line.char_indices() {
-        match ch {
-            '\'' if !in_double => in_single = !in_single,
-            '"' if !in_single => in_double = !in_double,
-            ':' if !in_single && !in_double => {
-                split_idx = Some(idx);
-                break;
-            }
-            _ => {}
-        }
-    }
-
-    let idx = split_idx?;
+    let idx = find_unquoted_char(line, ':')?;
     let raw_key = &line[..idx];
     let raw_value = &line[idx + ':'.len_utf8()..];
     if raw_key.trim().is_empty() || raw_value.trim().is_empty() {
@@ -109,13 +93,72 @@ fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
 }
 
 fn split_value_and_comment(raw_value: &str) -> (&str, Option<&str>) {
-    if let Some(idx) = raw_value.find('#') {
+    if let Some(idx) = find_unquoted_char(raw_value, '#') {
         let (before, after) = raw_value.split_at(idx);
-        if !before.trim().is_empty() {
+        let starts_comment = before.chars().next_back().is_none_or(char::is_whitespace);
+        if starts_comment {
             return (before.trim_end_matches([' ', '\t']), Some(after));
         }
     }
     (raw_value, None)
+}
+
+fn find_unquoted_char(text: &str, target: char) -> Option<usize> {
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    let mut i = 0usize;
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut escaped_in_double = false;
+
+    while i < chars.len() {
+        let (idx, ch) = chars[i];
+
+        if in_double {
+            if escaped_in_double {
+                escaped_in_double = false;
+                i += 1;
+                continue;
+            }
+            match ch {
+                '\\' => {
+                    escaped_in_double = true;
+                    i += 1;
+                    continue;
+                }
+                '"' => {
+                    in_double = false;
+                    i += 1;
+                    continue;
+                }
+                _ => {
+                    i += 1;
+                    continue;
+                }
+            }
+        }
+
+        if in_single {
+            if ch == '\'' {
+                if i + 1 < chars.len() && chars[i + 1].1 == '\'' {
+                    i += 2;
+                    continue;
+                }
+                in_single = false;
+            }
+            i += 1;
+            continue;
+        }
+
+        match ch {
+            '\'' => in_single = true,
+            '"' => in_double = true,
+            _ if ch == target => return Some(idx),
+            _ => {}
+        }
+        i += 1;
+    }
+
+    None
 }
 
 fn split_tag_prefix(text: &str) -> (Option<&str>, &str) {

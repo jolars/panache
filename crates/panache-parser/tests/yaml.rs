@@ -103,7 +103,29 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
             let trimmed = text.trim_end_matches('\'');
             format!("=VAL {}", trimmed.replace('\\', "\\\\"))
         } else {
-            format!("=VAL {}", text.trim_end_matches('"'))
+            let trimmed = text.trim_end_matches('"');
+            let mut normalized = String::with_capacity(trimmed.len());
+            let mut chars = trimmed.chars().peekable();
+            while let Some(ch) = chars.next() {
+                if ch != '\\' {
+                    normalized.push(ch);
+                    continue;
+                }
+
+                let Some(next) = chars.next() else {
+                    normalized.push('\\');
+                    break;
+                };
+
+                match next {
+                    '/' => normalized.push('/'),
+                    other => {
+                        normalized.push('\\');
+                        normalized.push(other);
+                    }
+                }
+            }
+            format!("=VAL {normalized}")
         }
     }
 

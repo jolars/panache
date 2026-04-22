@@ -204,6 +204,42 @@ mod tests {
     }
 
     #[test]
+    fn keeps_colon_inside_escaped_double_quoted_key() {
+        let input = "\"foo\\\":bar\": 23\n";
+        let tree = parse_basic_mapping_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let keys: Vec<String> = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_KEY)
+            .map(|tok| tok.text().to_string())
+            .collect();
+        assert_eq!(keys, vec!["\"foo\\\":bar\"".to_string()]);
+    }
+
+    #[test]
+    fn keeps_hash_in_double_quoted_scalar_value() {
+        let input = "foo: \"a#b\"\n";
+        let tree = parse_basic_mapping_tree(input).expect("tree");
+
+        let comment_count = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_COMMENT)
+            .count();
+        assert_eq!(comment_count, 0);
+
+        let scalar_values: Vec<String> = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+            .map(|tok| tok.text().to_string())
+            .collect();
+        assert_eq!(scalar_values, vec!["\"a#b\"".to_string()]);
+    }
+
+    #[test]
     fn preserves_explicit_tag_tokens_in_key_and_value() {
         let input = "!!str a: !!int 42\n";
         let tree = parse_basic_mapping_tree(input).expect("tree");

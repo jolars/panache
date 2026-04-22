@@ -1,6 +1,5 @@
 # yaml-test-suite cases known to be unsupported by current parser prototype.
 # Format: CASE_ID: reason
-3UYS: quoted scalar and escape handling not implemented
 4UYU: quoted scalar parsing not implemented
 54T7: flow mapping syntax not implemented
 58MP: flow mapping syntax not implemented
