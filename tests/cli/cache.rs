@@ -16,7 +16,11 @@ fn workspace_namespace(path: &std::path::Path) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-fn expected_global_cache_base(xdg_cache_home: &Path, _home: &Path) -> PathBuf {
+fn expected_global_cache_base(
+    xdg_cache_home: &Path,
+    _home: &Path,
+    _local_app_data: &Path,
+) -> PathBuf {
     #[cfg(target_os = "macos")]
     {
         _home
@@ -28,6 +32,12 @@ fn expected_global_cache_base(xdg_cache_home: &Path, _home: &Path) -> PathBuf {
 
     #[cfg(not(target_os = "macos"))]
     {
+        #[cfg(target_os = "windows")]
+        {
+            return _local_app_data.join("panache").join("cli-cache");
+        }
+
+        #[cfg(not(target_os = "windows"))]
         xdg_cache_home.join("panache").join("cli-cache")
     }
 }
@@ -37,22 +47,25 @@ fn test_cache_clean_removes_current_workspace_bucket() {
     let temp_dir = TempDir::new().unwrap();
     let cache_home = temp_dir.path().join("cache-home");
     let home_dir = temp_dir.path().join("home");
+    let local_app_data = temp_dir.path().join("local-app-data");
     let workspace = temp_dir.path().join("workspace");
     let test_file = workspace.join("test.qmd");
     fs::create_dir_all(&workspace).unwrap();
     fs::create_dir_all(&cache_home).unwrap();
     fs::create_dir_all(&home_dir).unwrap();
+    fs::create_dir_all(&local_app_data).unwrap();
     fs::write(&test_file, "# Heading\n\nParagraph.\n").unwrap();
 
     cargo_bin_cmd!("panache")
         .current_dir(&workspace)
         .env("XDG_CACHE_HOME", &cache_home)
         .env("HOME", &home_dir)
+        .env("LOCALAPPDATA", &local_app_data)
         .args(["format", "--check", test_file.to_str().unwrap()])
         .assert()
         .success();
 
-    let global_base = expected_global_cache_base(&cache_home, &home_dir);
+    let global_base = expected_global_cache_base(&cache_home, &home_dir, &local_app_data);
     let cache_file = global_base
         .join(workspace_namespace(&workspace))
         .join("cli-cache-v1.bin");
@@ -62,6 +75,7 @@ fn test_cache_clean_removes_current_workspace_bucket() {
         .current_dir(&workspace)
         .env("XDG_CACHE_HOME", &cache_home)
         .env("HOME", &home_dir)
+        .env("LOCALAPPDATA", &local_app_data)
         .args(["cache", "clean"])
         .assert()
         .success()
@@ -75,12 +89,14 @@ fn test_cache_clean_all_removes_all_buckets() {
     let temp_dir = TempDir::new().unwrap();
     let cache_home = temp_dir.path().join("cache-home");
     let home_dir = temp_dir.path().join("home");
+    let local_app_data = temp_dir.path().join("local-app-data");
     let workspace_one = temp_dir.path().join("workspace-one");
     let workspace_two = temp_dir.path().join("workspace-two");
     fs::create_dir_all(&workspace_one).unwrap();
     fs::create_dir_all(&workspace_two).unwrap();
     fs::create_dir_all(&cache_home).unwrap();
     fs::create_dir_all(&home_dir).unwrap();
+    fs::create_dir_all(&local_app_data).unwrap();
     fs::write(workspace_one.join("one.qmd"), "# One\n").unwrap();
     fs::write(workspace_two.join("two.qmd"), "# Two\n").unwrap();
 
@@ -88,6 +104,7 @@ fn test_cache_clean_all_removes_all_buckets() {
         .current_dir(&workspace_one)
         .env("XDG_CACHE_HOME", &cache_home)
         .env("HOME", &home_dir)
+        .env("LOCALAPPDATA", &local_app_data)
         .args(["format", "--check", "one.qmd"])
         .assert()
         .success();
@@ -96,17 +113,19 @@ fn test_cache_clean_all_removes_all_buckets() {
         .current_dir(&workspace_two)
         .env("XDG_CACHE_HOME", &cache_home)
         .env("HOME", &home_dir)
+        .env("LOCALAPPDATA", &local_app_data)
         .args(["format", "--check", "two.qmd"])
         .assert()
         .success();
 
-    let global_base = expected_global_cache_base(&cache_home, &home_dir);
+    let global_base = expected_global_cache_base(&cache_home, &home_dir, &local_app_data);
     assert!(global_base.exists(), "expected global cache base to exist");
 
     cargo_bin_cmd!("panache")
         .current_dir(&workspace_one)
         .env("XDG_CACHE_HOME", &cache_home)
         .env("HOME", &home_dir)
+        .env("LOCALAPPDATA", &local_app_data)
         .args(["cache", "clean", "--all"])
         .assert()
         .success()
