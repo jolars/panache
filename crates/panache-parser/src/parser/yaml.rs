@@ -377,6 +377,59 @@ mod tests {
     }
 
     #[test]
+    fn lexer_tokens_round_trip_input_bytes_for_supported_cases() {
+        let cases = [
+            "foo: bar\n",
+            "a: [b, c]\n",
+            "---\nfoo: bar\n...\n",
+            "%YAML 1.2\nfoo: \"a#b\"\n",
+        ];
+
+        for input in cases {
+            let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+            let rebuilt = tokens.iter().map(|t| t.text).collect::<String>();
+            assert_eq!(rebuilt, input);
+        }
+    }
+
+    #[test]
+    fn parser_preserves_document_markers_and_directives() {
+        let input = "%YAML 1.2\n---\nfoo: bar\n...\n";
+        let tree = parse_basic_mapping_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let scalar_tokens: Vec<String> = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+            .map(|tok| tok.text().to_string())
+            .collect();
+
+        assert!(scalar_tokens.contains(&"%YAML 1.2".to_string()));
+        assert!(scalar_tokens.contains(&"---".to_string()));
+        assert!(scalar_tokens.contains(&"...".to_string()));
+        assert!(scalar_tokens.contains(&"bar".to_string()));
+    }
+
+    #[test]
+    fn parser_preserves_standalone_flow_mapping_lines() {
+        let input = "{foo: bar}\n";
+        let tree = parse_basic_mapping_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let scalar_tokens: Vec<String> = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+            .map(|tok| tok.text().to_string())
+            .collect();
+        assert_eq!(
+            scalar_tokens,
+            vec!["{".to_string(), "foo: bar".to_string(), "}".to_string()]
+        );
+    }
+
+    #[test]
     fn parser_builds_nested_block_map_from_indent_tokens() {
         let input = "root: 1\n  child: 2\n";
         let tree = parse_basic_mapping_tree(input).expect("tree");

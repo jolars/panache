@@ -393,6 +393,9 @@ fn lex_mapping_line_tokens<'a>(
     }
 
     let Some((raw_key, raw_value)) = parse_raw_mapping_line(content) else {
+        if split_once_unquoted(content, ':').is_some() {
+            return None;
+        }
         emit_scalar_like_tokens(content, out);
         if !newline.is_empty() {
             out.push(YamlShadowToken {
@@ -533,6 +536,35 @@ fn emit_block_map<'a>(
                 builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
                 *i += 1;
             }
+            YamlShadowTokenKind::DocumentStart
+            | YamlShadowTokenKind::DocumentEnd
+            | YamlShadowTokenKind::Directive
+            | YamlShadowTokenKind::FlowMapEnd
+            | YamlShadowTokenKind::FlowSeqEnd
+            | YamlShadowTokenKind::Comma => {
+                builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlShadowTokenKind::FlowMapStart | YamlShadowTokenKind::FlowSeqStart => {
+                while *i < tokens.len() && tokens[*i].kind != YamlShadowTokenKind::Newline {
+                    let kind = match tokens[*i].kind {
+                        YamlShadowTokenKind::Whitespace => SyntaxKind::WHITESPACE,
+                        YamlShadowTokenKind::Comment => SyntaxKind::YAML_COMMENT,
+                        YamlShadowTokenKind::Tag => SyntaxKind::YAML_TAG,
+                        _ => SyntaxKind::YAML_SCALAR,
+                    };
+                    builder.token(kind.into(), tokens[*i].text);
+                    *i += 1;
+                }
+            }
+            YamlShadowTokenKind::Anchor
+            | YamlShadowTokenKind::Alias
+            | YamlShadowTokenKind::BlockScalarHeader
+            | YamlShadowTokenKind::BlockScalarContent => {
+                builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlShadowTokenKind::Indent => return None,
             YamlShadowTokenKind::Dedent => {
                 if stop_on_dedent {
                     *i += 1;
@@ -541,7 +573,6 @@ fn emit_block_map<'a>(
                 }
                 return None;
             }
-            YamlShadowTokenKind::Indent => return None,
             _ => {
                 builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
                 builder.start_node(SyntaxKind::YAML_BLOCK_MAP_KEY.into());
