@@ -1,0 +1,196 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..356
+  FENCED_DIV@0..356
+    DIV_FENCE_OPEN@0..33
+      TEXT@0..3 ":::"
+      WHITESPACE@3..4 " "
+      DIV_INFO@4..32
+        TEXT@4..32 "{#tbl:panel layout.nr ..."
+      NEWLINE@32..33 "\n"
+    PIPE_TABLE@33..187
+      TABLE_CAPTION@33..61
+        WHITESPACE@33..35 "  "
+        TABLE_CAPTION_PREFIX@35..37 ": "
+        TEXT@37..60 "My Caption {#tbl:foo-1}"
+        NEWLINE@60..61 "\n"
+      BLANK_LINE@61..62
+        BLANK_LINE@61..62 "\n"
+      TABLE_HEADER@62..87
+        WHITESPACE@62..64 "  "
+        TEXT@64..65 "|"
+        WHITESPACE@65..66 " "
+        TABLE_CELL@66..70
+          TEXT@66..70 "Col1"
+        WHITESPACE@70..71 " "
+        TEXT@71..72 "|"
+        WHITESPACE@72..73 " "
+        TABLE_CELL@73..77
+          TEXT@73..77 "Col2"
+        WHITESPACE@77..78 " "
+        TEXT@78..79 "|"
+        WHITESPACE@79..80 " "
+        TABLE_CELL@80..84
+          TEXT@80..84 "Col3"
+        WHITESPACE@84..85 " "
+        TEXT@85..86 "|"
+        NEWLINE@86..87 "\n"
+      TABLE_SEPARATOR@87..112
+        TEXT@87..111 "  | ---- | ---- | ---- |"
+        NEWLINE@111..112 "\n"
+      TABLE_ROW@112..137
+        WHITESPACE@112..114 "  "
+        TEXT@114..115 "|"
+        WHITESPACE@115..116 " "
+        TABLE_CELL@116..117
+          TEXT@116..117 "A"
+        WHITESPACE@117..121 "    "
+        TEXT@121..122 "|"
+        WHITESPACE@122..123 " "
+        TABLE_CELL@123..124
+          TEXT@123..124 "B"
+        WHITESPACE@124..128 "    "
+        TEXT@128..129 "|"
+        WHITESPACE@129..130 " "
+        TABLE_CELL@130..131
+          TEXT@130..131 "C"
+        WHITESPACE@131..135 "    "
+        TEXT@135..136 "|"
+        NEWLINE@136..137 "\n"
+      TABLE_ROW@137..162
+        WHITESPACE@137..139 "  "
+        TEXT@139..140 "|"
+        WHITESPACE@140..141 " "
+        TABLE_CELL@141..142
+          TEXT@141..142 "E"
+        WHITESPACE@142..146 "    "
+        TEXT@146..147 "|"
+        WHITESPACE@147..148 " "
+        TABLE_CELL@148..149
+          TEXT@148..149 "F"
+        WHITESPACE@149..153 "    "
+        TEXT@153..154 "|"
+        WHITESPACE@154..155 " "
+        TABLE_CELL@155..156
+          TEXT@155..156 "G"
+        WHITESPACE@156..160 "    "
+        TEXT@160..161 "|"
+        NEWLINE@161..162 "\n"
+      TABLE_ROW@162..187
+        WHITESPACE@162..164 "  "
+        TEXT@164..165 "|"
+        WHITESPACE@165..166 " "
+        TABLE_CELL@166..167
+          TEXT@166..167 "A"
+        WHITESPACE@167..171 "    "
+        TEXT@171..172 "|"
+        WHITESPACE@172..173 " "
+        TABLE_CELL@173..174
+          TEXT@173..174 "G"
+        WHITESPACE@174..178 "    "
+        TEXT@178..179 "|"
+        WHITESPACE@179..180 " "
+        TABLE_CELL@180..181
+          TEXT@180..181 "G"
+        WHITESPACE@181..185 "    "
+        TEXT@185..186 "|"
+        NEWLINE@186..187 "\n"
+    BLANK_LINE@187..188
+      BLANK_LINE@187..188 "\n"
+    PIPE_TABLE@188..343
+      TABLE_CAPTION@188..217
+        WHITESPACE@188..190 "  "
+        TABLE_CAPTION_PREFIX@190..192 ": "
+        TEXT@192..216 "My Caption2 {#tbl:foo-2}"
+        NEWLINE@216..217 "\n"
+      BLANK_LINE@217..218
+        BLANK_LINE@217..218 "\n"
+      TABLE_HEADER@218..243
+        WHITESPACE@218..220 "  "
+        TEXT@220..221 "|"
+        WHITESPACE@221..222 " "
+        TABLE_CELL@222..226
+          TEXT@222..226 "Col1"
+        WHITESPACE@226..227 " "
+        TEXT@227..228 "|"
+        WHITESPACE@228..229 " "
+        TABLE_CELL@229..233
+          TEXT@229..233 "Col2"
+        WHITESPACE@233..234 " "
+        TEXT@234..235 "|"
+        WHITESPACE@235..236 " "
+        TABLE_CELL@236..240
+          TEXT@236..240 "Col3"
+        WHITESPACE@240..241 " "
+        TEXT@241..242 "|"
+        NEWLINE@242..243 "\n"
+      TABLE_SEPARATOR@243..268
+        TEXT@243..267 "  | ---- | ---- | ---- |"
+        NEWLINE@267..268 "\n"
+      TABLE_ROW@268..293
+        WHITESPACE@268..270 "  "
+        TEXT@270..271 "|"
+        WHITESPACE@271..272 " "
+        TABLE_CELL@272..273
+          TEXT@272..273 "A"
+        WHITESPACE@273..277 "    "
+        TEXT@277..278 "|"
+        WHITESPACE@278..279 " "
+        TABLE_CELL@279..280
+          TEXT@279..280 "B"
+        WHITESPACE@280..284 "    "
+        TEXT@284..285 "|"
+        WHITESPACE@285..286 " "
+        TABLE_CELL@286..287
+          TEXT@286..287 "C"
+        WHITESPACE@287..291 "    "
+        TEXT@291..292 "|"
+        NEWLINE@292..293 "\n"
+      TABLE_ROW@293..318
+        WHITESPACE@293..295 "  "
+        TEXT@295..296 "|"
+        WHITESPACE@296..297 " "
+        TABLE_CELL@297..298
+          TEXT@297..298 "E"
+        WHITESPACE@298..302 "    "
+        TEXT@302..303 "|"
+        WHITESPACE@303..304 " "
+        TABLE_CELL@304..305
+          TEXT@304..305 "F"
+        WHITESPACE@305..309 "    "
+        TEXT@309..310 "|"
+        WHITESPACE@310..311 " "
+        TABLE_CELL@311..312
+          TEXT@311..312 "G"
+        WHITESPACE@312..316 "    "
+        TEXT@316..317 "|"
+        NEWLINE@317..318 "\n"
+      TABLE_ROW@318..343
+        WHITESPACE@318..320 "  "
+        TEXT@320..321 "|"
+        WHITESPACE@321..322 " "
+        TABLE_CELL@322..323
+          TEXT@322..323 "A"
+        WHITESPACE@323..327 "    "
+        TEXT@327..328 "|"
+        WHITESPACE@328..329 " "
+        TABLE_CELL@329..330
+          TEXT@329..330 "G"
+        WHITESPACE@330..334 "    "
+        TEXT@334..335 "|"
+        WHITESPACE@335..336 " "
+        TABLE_CELL@336..337
+          TEXT@336..337 "G"
+        WHITESPACE@337..341 "    "
+        TEXT@341..342 "|"
+        NEWLINE@342..343 "\n"
+    BLANK_LINE@343..344
+      BLANK_LINE@343..344 "\n"
+    PARAGRAPH@344..352
+      TEXT@344..351 "Caption"
+      NEWLINE@351..352 "\n"
+    DIV_FENCE_CLOSE@352..356
+      TEXT@352..355 ":::"
+      NEWLINE@355..356 "\n"

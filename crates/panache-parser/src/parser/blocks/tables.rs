@@ -154,6 +154,16 @@ fn bare_colon_caption_looks_like_definition_code_block(line: &str) -> bool {
     trimmed.starts_with("```") || trimmed.starts_with("~~~")
 }
 
+fn line_is_fenced_div_fence(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    let colon_count = trimmed.chars().take_while(|&c| c == ':').count();
+    if colon_count < 3 {
+        return false;
+    }
+    let rest = &trimmed[colon_count..];
+    rest.is_empty() || rest.starts_with(char::is_whitespace)
+}
+
 fn is_valid_caption_start_before_table(lines: &[&str], pos: usize) -> bool {
     if !is_table_caption_start(lines[pos]) {
         return false;
@@ -166,7 +176,11 @@ fn is_valid_caption_start_before_table(lines: &[&str], pos: usize) -> bool {
     }
 
     // Avoid stealing definition-list definitions (":   ...") as table captions.
-    if is_bare_colon_caption_start(lines[pos]) && pos > 0 && !lines[pos - 1].trim().is_empty() {
+    if is_bare_colon_caption_start(lines[pos])
+        && pos > 0
+        && !lines[pos - 1].trim().is_empty()
+        && !line_is_fenced_div_fence(lines[pos - 1])
+    {
         return false;
     }
     true
@@ -1229,6 +1243,27 @@ mod tests {
                 .descendants()
                 .any(|node| node.kind() == SyntaxKind::TABLE_CAPTION),
             "fenced code definition should not be parsed as table caption"
+        );
+    }
+
+    #[test]
+    fn bare_colon_caption_after_div_opening_is_table_caption() {
+        let input = "::: {#tbl:panel layout.nrow=\"1\"}\n  : My Caption {#tbl:foo-1}\n\n  | Col1 | Col2 | Col3 |\n  | ---- | ---- | ---- |\n  | A    | B    | C    |\n  | E    | F    | G    |\n  | A    | G    | G    |\n\n  : My Caption2 {#tbl:foo-2}\n\n  | Col1 | Col2 | Col3 |\n  | ---- | ---- | ---- |\n  | A    | B    | C    |\n  | E    | F    | G    |\n  | A    | G    | G    |\n\nCaption\n:::\n";
+        let tree = crate::parse(input, None);
+
+        let caption_count = tree
+            .descendants()
+            .filter(|node| node.kind() == SyntaxKind::TABLE_CAPTION)
+            .count();
+        assert_eq!(
+            caption_count, 2,
+            "expected both captions to attach to tables"
+        );
+        assert!(
+            !tree
+                .descendants()
+                .any(|node| node.kind() == SyntaxKind::DEFINITION_LIST),
+            "caption lines in this fenced div table layout should not parse as definition list"
         );
     }
 

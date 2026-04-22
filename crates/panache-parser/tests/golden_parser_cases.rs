@@ -273,6 +273,7 @@ golden_test_cases!(
     sentence_wrap_table_caption,
     table_with_caption,
     tables_adjacent,
+    tables_in_divs,
     tab_handling,
     tab_preserve,
     trailing_blanklines,
