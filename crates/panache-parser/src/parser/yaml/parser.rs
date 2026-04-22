@@ -64,6 +64,122 @@ fn strip_hashpipe_prefix(line: &str) -> &str {
     line
 }
 
+fn emit_token_as_yaml(builder: &mut GreenNodeBuilder<'_>, token: &YamlTokenSpan<'_>) {
+    let kind = match token.kind {
+        YamlToken::Whitespace => SyntaxKind::WHITESPACE,
+        YamlToken::Comment => SyntaxKind::YAML_COMMENT,
+        YamlToken::Tag => SyntaxKind::YAML_TAG,
+        YamlToken::Colon => SyntaxKind::YAML_COLON,
+        _ => SyntaxKind::YAML_SCALAR,
+    };
+    builder.token(kind.into(), token.text);
+}
+
+fn emit_flow_sequence<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Option<()> {
+    if *i >= tokens.len() || tokens[*i].kind != YamlToken::FlowSeqStart {
+        return None;
+    }
+
+    builder.start_node(SyntaxKind::YAML_FLOW_SEQUENCE.into());
+    emit_token_as_yaml(builder, &tokens[*i]); // [
+    *i += 1;
+
+    let mut open_item = false;
+    while *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlToken::FlowSeqEnd => {
+                if open_item {
+                    builder.finish_node(); // YAML_FLOW_SEQUENCE_ITEM
+                }
+                emit_token_as_yaml(builder, &tokens[*i]); // ]
+                *i += 1;
+                builder.finish_node(); // YAML_FLOW_SEQUENCE
+                return Some(());
+            }
+            YamlToken::Comma => {
+                if open_item {
+                    builder.finish_node(); // YAML_FLOW_SEQUENCE_ITEM
+                    open_item = false;
+                }
+                emit_token_as_yaml(builder, &tokens[*i]);
+                *i += 1;
+            }
+            _ => {
+                if !open_item {
+                    builder.start_node(SyntaxKind::YAML_FLOW_SEQUENCE_ITEM.into());
+                    open_item = true;
+                }
+                emit_token_as_yaml(builder, &tokens[*i]);
+                *i += 1;
+            }
+        }
+    }
+
+    None
+}
+
+fn emit_flow_map<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Option<()> {
+    if *i >= tokens.len() || tokens[*i].kind != YamlToken::FlowMapStart {
+        return None;
+    }
+
+    builder.start_node(SyntaxKind::YAML_FLOW_MAP.into());
+    emit_token_as_yaml(builder, &tokens[*i]); // {
+    *i += 1;
+
+    let mut entry_start = *i;
+    while *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlToken::Comma | YamlToken::FlowMapEnd => {
+                let entry_text = tokens[entry_start..*i]
+                    .iter()
+                    .map(|tok| tok.text)
+                    .collect::<String>();
+                if !entry_text.trim().is_empty() {
+                    if let Some(colon_idx) = entry_text.find(':') {
+                        builder.start_node(SyntaxKind::YAML_FLOW_MAP_ENTRY.into());
+
+                        builder.start_node(SyntaxKind::YAML_FLOW_MAP_KEY.into());
+                        builder.token(SyntaxKind::YAML_SCALAR.into(), &entry_text[..colon_idx]);
+                        builder.token(SyntaxKind::YAML_COLON.into(), ":");
+                        builder.finish_node(); // YAML_FLOW_MAP_KEY
+
+                        builder.start_node(SyntaxKind::YAML_FLOW_MAP_VALUE.into());
+                        builder.token(SyntaxKind::YAML_SCALAR.into(), &entry_text[colon_idx + 1..]);
+                        builder.finish_node(); // YAML_FLOW_MAP_VALUE
+
+                        builder.finish_node(); // YAML_FLOW_MAP_ENTRY
+                    } else {
+                        builder.token(SyntaxKind::YAML_SCALAR.into(), &entry_text);
+                    }
+                }
+
+                emit_token_as_yaml(builder, &tokens[*i]);
+                *i += 1;
+                entry_start = *i;
+
+                if tokens[*i - 1].kind == YamlToken::FlowMapEnd {
+                    builder.finish_node(); // YAML_FLOW_MAP
+                    return Some(());
+                }
+            }
+            _ => {
+                *i += 1;
+            }
+        }
+    }
+
+    None
+}
+
 fn emit_block_map<'a>(
     builder: &mut GreenNodeBuilder<'_>,
     tokens: &[YamlTokenSpan<'a>],
@@ -87,15 +203,10 @@ fn emit_block_map<'a>(
                 *i += 1;
             }
             YamlToken::FlowMapStart | YamlToken::FlowSeqStart => {
-                while *i < tokens.len() && tokens[*i].kind != YamlToken::Newline {
-                    let kind = match tokens[*i].kind {
-                        YamlToken::Whitespace => SyntaxKind::WHITESPACE,
-                        YamlToken::Comment => SyntaxKind::YAML_COMMENT,
-                        YamlToken::Tag => SyntaxKind::YAML_TAG,
-                        _ => SyntaxKind::YAML_SCALAR,
-                    };
-                    builder.token(kind.into(), tokens[*i].text);
-                    *i += 1;
+                if tokens[*i].kind == YamlToken::FlowMapStart {
+                    emit_flow_map(builder, tokens, i)?;
+                } else {
+                    emit_flow_sequence(builder, tokens, i)?;
                 }
             }
             YamlToken::Anchor
@@ -154,17 +265,21 @@ fn emit_block_map<'a>(
                             builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                             *i += 1;
                         }
-                        YamlToken::FlowMapStart
-                        | YamlToken::FlowMapEnd
-                        | YamlToken::FlowSeqStart
-                        | YamlToken::FlowSeqEnd
-                        | YamlToken::Comma
-                        | YamlToken::Anchor
+                        YamlToken::FlowMapStart => {
+                            emit_flow_map(builder, tokens, i)?;
+                        }
+                        YamlToken::FlowSeqStart => {
+                            emit_flow_sequence(builder, tokens, i)?;
+                        }
+                        YamlToken::Anchor
                         | YamlToken::Alias
                         | YamlToken::BlockScalarHeader
                         | YamlToken::BlockScalarContent => {
                             builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                             *i += 1;
+                        }
+                        YamlToken::FlowMapEnd | YamlToken::FlowSeqEnd | YamlToken::Comma => {
+                            break;
                         }
                         YamlToken::Tag => {
                             builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);

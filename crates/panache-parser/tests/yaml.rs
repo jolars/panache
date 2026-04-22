@@ -201,6 +201,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     };
 
     let mut values = Vec::new();
+    let mut map_header = "+MAP".to_string();
     for entry in tree
         .descendants()
         .filter(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP_ENTRY)
@@ -232,7 +233,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
             .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_TAG)
             .map(|tok| tok.text().to_string());
         let value_text = value_node
-            .children_with_tokens()
+            .descendants_with_tokens()
             .filter_map(|el| el.into_token())
             .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
             .map(|tok| tok.text().to_string())
@@ -300,10 +301,49 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         }
     }
 
+    if values.is_empty() {
+        for entry in tree
+            .descendants()
+            .filter(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP_ENTRY)
+        {
+            map_header = "+MAP {}".to_string();
+            let key_node = entry
+                .children()
+                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP_KEY)
+                .expect("flow key node");
+            let value_node = entry
+                .children()
+                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP_VALUE)
+                .expect("flow value node");
+
+            let key_text = key_node
+                .descendants_with_tokens()
+                .filter_map(|el| el.into_token())
+                .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
+                .map(|tok| tok.text().to_string())
+                .collect::<Vec<_>>()
+                .join("")
+                .trim()
+                .to_string();
+            let value_text = value_node
+                .descendants_with_tokens()
+                .filter_map(|el| el.into_token())
+                .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
+                .map(|tok| tok.text().to_string())
+                .collect::<Vec<_>>()
+                .join("")
+                .trim()
+                .to_string();
+
+            values.push(format!("=VAL :{key_text}"));
+            values.push(format!("=VAL :{value_text}"));
+        }
+    }
+
     let mut events = Vec::with_capacity(values.len() + 6);
     events.push("+STR".to_string());
     events.push("+DOC".to_string());
-    events.push("+MAP".to_string());
+    events.push(map_header);
     events.append(&mut values);
     events.push("-MAP".to_string());
     events.push("-DOC".to_string());

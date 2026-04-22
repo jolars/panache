@@ -335,16 +335,35 @@ mod tests {
         let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
 
-        let scalar_tokens: Vec<String> = tree
-            .descendants_with_tokens()
-            .filter_map(|el| el.into_token())
-            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
-            .map(|tok| tok.text().to_string())
+        let flow_entry_count = tree
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_ENTRY)
+            .count();
+        assert_eq!(flow_entry_count, 1);
+
+        let flow_values: Vec<String> = tree
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_VALUE)
+            .map(|n| n.text().to_string())
             .collect();
-        assert_eq!(
-            scalar_tokens,
-            vec!["{".to_string(), "foo: bar".to_string(), "}".to_string()]
-        );
+        assert_eq!(flow_values, vec![" bar".to_string()]);
+    }
+
+    #[test]
+    fn parser_builds_flow_sequence_nodes_in_mapping_value() {
+        let input = "a: [b, c]\n";
+        let tree = parse_yaml_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let seq = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
+            .expect("flow sequence node");
+        let item_count = seq
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE_ITEM)
+            .count();
+        assert_eq!(item_count, 2);
     }
 
     #[test]

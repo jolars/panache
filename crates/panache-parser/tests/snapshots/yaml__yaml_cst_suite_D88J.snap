@@ -48,44 +48,71 @@ expression: snapshot_json
                         "text": " "
                       },
                       {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 4,
-                          "start": 3
-                        },
-                        "text": "["
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 5,
-                          "start": 4
-                        },
-                        "text": "b"
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 6,
-                          "start": 5
-                        },
-                        "text": ","
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 8,
-                          "start": 6
-                        },
-                        "text": " c"
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
+                        "children": [
+                          {
+                            "kind": "YAML_SCALAR",
+                            "range": {
+                              "end": 4,
+                              "start": 3
+                            },
+                            "text": "["
+                          },
+                          {
+                            "children": [
+                              {
+                                "kind": "YAML_SCALAR",
+                                "range": {
+                                  "end": 5,
+                                  "start": 4
+                                },
+                                "text": "b"
+                              }
+                            ],
+                            "kind": "YAML_FLOW_SEQUENCE_ITEM",
+                            "range": {
+                              "end": 5,
+                              "start": 4
+                            }
+                          },
+                          {
+                            "kind": "YAML_SCALAR",
+                            "range": {
+                              "end": 6,
+                              "start": 5
+                            },
+                            "text": ","
+                          },
+                          {
+                            "children": [
+                              {
+                                "kind": "YAML_SCALAR",
+                                "range": {
+                                  "end": 8,
+                                  "start": 6
+                                },
+                                "text": " c"
+                              }
+                            ],
+                            "kind": "YAML_FLOW_SEQUENCE_ITEM",
+                            "range": {
+                              "end": 8,
+                              "start": 6
+                            }
+                          },
+                          {
+                            "kind": "YAML_SCALAR",
+                            "range": {
+                              "end": 9,
+                              "start": 8
+                            },
+                            "text": "]"
+                          }
+                        ],
+                        "kind": "YAML_FLOW_SEQUENCE",
                         "range": {
                           "end": 9,
-                          "start": 8
-                        },
-                        "text": "]"
+                          "start": 3
+                        }
                       }
                     ],
                     "kind": "YAML_BLOCK_MAP_VALUE",
