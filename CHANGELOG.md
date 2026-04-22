@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.37.0](https://github.com/jolars/panache/compare/v2.36.0...v2.37.0) (2026-04-22)
+
+### Features
+- **formatter:** place table captions after the table ([`7d38d60`](https://github.com/jolars/panache/commit/7d38d604b314d2fb5645aea77fc34b1c2d23bdc7))
+- **formatter:** use hanging indent for table captions ([`1234626`](https://github.com/jolars/panache/commit/1234626bce03c7e725426934ef5c289867e53137))
+- **formatter:** use `:` as table caption prefix ([`618326a`](https://github.com/jolars/panache/commit/618326a97a5f1c2c178a2e2f508516f15b3d58d0))
+- **formatter:** force one blankline after hashpipe options ([`68bba1b`](https://github.com/jolars/panache/commit/68bba1bec56cb0473a1de4b86c0f26f698a5f3fb)), closes [#115](https://github.com/jolars/panache/issues/115)
+
+### Bug Fixes
+- **parser:** don't parse caption as definition ([`e542c1f`](https://github.com/jolars/panache/commit/e542c1f59c3917feb885153590574eb22677818d))
+- greedily consume table captions ([`58afc1c`](https://github.com/jolars/panache/commit/58afc1c2c27182a7e9768a1ff3f3b2b6e82531d5))
+- **parser:** handle empty lines in hashpipe normalizer ([`51e6146`](https://github.com/jolars/panache/commit/51e614637bcd003f9970a546c540eaa92e0c3ea1)), closes [#201](https://github.com/jolars/panache/issues/201)
+- **parser:** don't drop adjacent table caption ([`9144d63`](https://github.com/jolars/panache/commit/9144d636480e422378b929d0e03dd60cd31a719a)), closes [#200](https://github.com/jolars/panache/issues/200)
+- **lsp:** handle nagivation URI correctly on windows ([`63f317e`](https://github.com/jolars/panache/commit/63f317e754e7362266a45cb9479d2e7c9536fdb1))
+- **formatter:** correctly handle blanklines in blockquote ([`834757c`](https://github.com/jolars/panache/commit/834757c21a2844c27b46312a5a0ee0a7a003cc0d)), fixes [#199](https://github.com/jolars/panache/issues/199)
+- **formatter:** handle blank line before fenced code ([`e7337fd`](https://github.com/jolars/panache/commit/e7337fdb4cece3a1cab45047b910cb43ac51efbc)), closes [#198](https://github.com/jolars/panache/issues/198)
+- **formatter:** strip trailing whitespace in hashpipe flow ([`9757c2f`](https://github.com/jolars/panache/commit/9757c2fd16542f777e28c1cce3ce2b07e4f98d4d)), fixes [#194](https://github.com/jolars/panache/issues/194)
+- **parser:** correctly parse deep list in blockquote ([`51484ac`](https://github.com/jolars/panache/commit/51484ac9b640278ea9eff860db6857cdcf07a931)), closes [#195](https://github.com/jolars/panache/issues/195)
+- **formatter:** quote ambiguous labels in hashpipe conversion ([`e473944`](https://github.com/jolars/panache/commit/e4739441e3443dc8f6f50174bea14897a6b16f9a)), closes [#192](https://github.com/jolars/panache/issues/192)
+- avoid wrapping on fancy markers in unsafe contexts ([`4de13dd`](https://github.com/jolars/panache/commit/4de13dd0fe44b9bb728d7aa22b772a2267cf060b)), closes [#193](https://github.com/jolars/panache/issues/193)
+- **formatter:** handle citation spacing correctly ([`543aa46`](https://github.com/jolars/panache/commit/543aa46cc0ebbe3073e1eeda01b04bb058cd9d66)), ref [#193](https://github.com/jolars/panache/issues/193)
+- **formatter:** don't collapse whitespace in hashpipe yaml ([`5d4b5d2`](https://github.com/jolars/panache/commit/5d4b5d2f60ef85a0ba557c62804795bd22f6f378)), closes [#185](https://github.com/jolars/panache/issues/185)
+- **parser:** handle varying indentation for blockquotes ([`cdd3eec`](https://github.com/jolars/panache/commit/cdd3eec2c4b555476ed96d5c02dfd3a056876e86)), closes [#186](https://github.com/jolars/panache/issues/186)
+- **formatter:** add list markers to unsafe wrappers ([`a7f1ed5`](https://github.com/jolars/panache/commit/a7f1ed514e33d956ca6892f9e6bf005f7c08ce6a)), closes [#187](https://github.com/jolars/panache/issues/187)
+- **formatter:** normalize scalars to avoid idempotency issue ([`da9e3a0`](https://github.com/jolars/panache/commit/da9e3a0117bd152a1bb5407212168f0ed0640b17)), closes [#189](https://github.com/jolars/panache/issues/189)
+- **parser:** accept empty headings ([`d081dd7`](https://github.com/jolars/panache/commit/d081dd72b5537b55ccb047879732ebf51df6ee4c))
+- **parser:** properly handle adjacent tables ([`6206623`](https://github.com/jolars/panache/commit/6206623319b1a545fceedc67f5f6fa2596d9c1d8))
+- **parser:** don't treat `:` table caption as def list ([`a287631`](https://github.com/jolars/panache/commit/a287631f90a0707b337f1d4438bb4bb9f8a28475))
+- **parser:** handle bare URI in gfm flavor properly ([`2559a99`](https://github.com/jolars/panache/commit/2559a9958f70b4ba17abedc20a4c20bc85779053)), closes [#197](https://github.com/jolars/panache/issues/197)
+- **parser:** fix logic around `blank_before_header` ([`c8f48c9`](https://github.com/jolars/panache/commit/c8f48c9ad69d3a3780a1a6ef2b300af203960eed))
+- **parser:** handle bare `#|` comments ([`1a7d009`](https://github.com/jolars/panache/commit/1a7d009e08a964b059aae40241f70e28b30c5639)), fixes [#188](https://github.com/jolars/panache/issues/188) and [#190](https://github.com/jolars/panache/issues/190)
 ## [2.36.0](https://github.com/jolars/panache/compare/v2.35.0...v2.36.0) (2026-04-19)
 
 ### Features
