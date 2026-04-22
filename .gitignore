@@ -34,3 +34,5 @@ crates/panache-wasm/pkg/
 docs/playground/pkg/
 
 .panache-cache/
+/test.Rmd
+/test.qmd
