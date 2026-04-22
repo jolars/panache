@@ -78,7 +78,7 @@ fn test_pipe_table_caption_reflow_wraps() {
 
     let result = format(input, Some(config), None);
     assert!(result.contains("  : A long caption that should wrap over multiple lines"));
-    assert!(result.contains("\n  when reflow mode is enabled for formatting."));
+    assert!(result.contains("\n    when reflow mode is enabled for formatting."));
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn test_pipe_table_caption_sentence_wraps() {
     };
 
     let result = format(input, Some(config), None);
-    assert!(result.contains("  : First caption sentence.\n  Second caption sentence."));
+    assert!(result.contains("  : First caption sentence.\n    Second caption sentence."));
 }
 
 #[test]

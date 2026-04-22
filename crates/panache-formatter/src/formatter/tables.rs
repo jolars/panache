@@ -112,6 +112,9 @@ fn format_table_caption_with_language(
     config: &Config,
     sentence_language: SentenceLanguage,
 ) -> String {
+    const CAPTION_PREFIX: &str = ": ";
+    const CAPTION_HANGING_INDENT: &str = "  ";
+
     let Some(rest) = caption_text
         .strip_prefix(':')
         .or_else(|| caption_text.strip_prefix("Table:"))
@@ -135,16 +138,22 @@ fn format_table_caption_with_language(
         WrapMode::Reflow => {
             let normalized = collapse_ascii_whitespace(body);
             let words: Vec<&str> = normalized.split_ascii_whitespace().collect();
-            let first_width = available_width.saturating_sub(": ".width()).max(1);
-            let wrapped = wrap_words_with_widths(&words, first_width, available_width);
+            let first_width = available_width
+                .saturating_sub(CAPTION_PREFIX.width())
+                .max(1);
+            let rest_width = available_width
+                .saturating_sub(CAPTION_HANGING_INDENT.width())
+                .max(1);
+            let wrapped = wrap_words_with_widths(&words, first_width, rest_width);
             if wrapped.is_empty() {
                 ":".to_string()
             } else {
                 let mut out = String::new();
-                out.push_str(": ");
+                out.push_str(CAPTION_PREFIX);
                 out.push_str(&wrapped[0]);
                 for line in wrapped.iter().skip(1) {
                     out.push('\n');
+                    out.push_str(CAPTION_HANGING_INDENT);
                     out.push_str(line);
                 }
                 out
@@ -157,10 +166,11 @@ fn format_table_caption_with_language(
                 ":".to_string()
             } else {
                 let mut out = String::new();
-                out.push_str(": ");
+                out.push_str(CAPTION_PREFIX);
                 out.push_str(&lines[0]);
                 for line in lines.iter().skip(1) {
                     out.push('\n');
+                    out.push_str(CAPTION_HANGING_INDENT);
                     out.push_str(line);
                 }
                 out

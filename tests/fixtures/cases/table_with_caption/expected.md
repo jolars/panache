@@ -5,4 +5,4 @@
         1     1          1        1
 
   : Demonstration of simple table syntax, with a very long caption that should
-  be wrapped across multiple lines.
+    be wrapped across multiple lines.
