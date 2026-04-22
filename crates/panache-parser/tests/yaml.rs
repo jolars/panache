@@ -119,6 +119,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
 
                 match next {
                     '/' => normalized.push('/'),
+                    '"' => normalized.push('"'),
                     other => {
                         normalized.push('\\');
                         normalized.push(other);
@@ -338,6 +339,34 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
             values.push(format!("=VAL :{key_text}"));
             values.push(format!("=VAL :{value_text}"));
         }
+    }
+
+    let scalar_document_value = if values.is_empty() {
+        let text = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
+            .map(|tok| tok.text().to_string())
+            .collect::<Vec<_>>()
+            .join("");
+        (!text.is_empty()).then_some(text)
+    } else {
+        None
+    };
+
+    if let Some(text) = scalar_document_value {
+        let scalar_event = if text.starts_with('"') || text.starts_with('\'') {
+            quoted_val_event(&text)
+        } else {
+            format!("=VAL :{text}")
+        };
+        return vec![
+            "+STR".to_string(),
+            "+DOC".to_string(),
+            scalar_event,
+            "-DOC".to_string(),
+            "-STR".to_string(),
+        ];
     }
 
     let mut events = Vec::with_capacity(values.len() + 6);

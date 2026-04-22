@@ -1,0 +1,51 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "4UYU",
+  "cst": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "kind": "YAML_SCALAR",
+                "range": {
+                  "end": 17,
+                  "start": 0
+                },
+                "text": "\"foo: bar\\\": baz\""
+              },
+              {
+                "kind": "NEWLINE",
+                "range": {
+                  "end": 18,
+                  "start": 17
+                },
+                "text": "\n"
+              }
+            ],
+            "kind": "YAML_BLOCK_MAP",
+            "range": {
+              "end": 18,
+              "start": 0
+            }
+          }
+        ],
+        "kind": "YAML_METADATA_CONTENT",
+        "range": {
+          "end": 18,
+          "start": 0
+        }
+      }
+    ],
+    "kind": "DOCUMENT",
+    "range": {
+      "end": 18,
+      "start": 0
+    }
+  },
+  "input": "\"foo: bar\\\": baz\"\n"
+}

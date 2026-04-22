@@ -350,6 +350,13 @@ mod tests {
     }
 
     #[test]
+    fn parser_preserves_top_level_quoted_scalar_document() {
+        let input = "\"foo: bar\\\": baz\"\n";
+        let tree = parse_yaml_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
     fn parser_builds_flow_sequence_nodes_in_mapping_value() {
         let input = "a: [b, c]\n";
         let tree = parse_yaml_tree(input).expect("tree");

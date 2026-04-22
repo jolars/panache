@@ -216,6 +216,12 @@ fn emit_block_map<'a>(
                 builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                 *i += 1;
             }
+            YamlToken::Scalar | YamlToken::Comment => {
+                while *i < tokens.len() && tokens[*i].kind != YamlToken::Newline {
+                    emit_token_as_yaml(builder, &tokens[*i]);
+                    *i += 1;
+                }
+            }
             YamlToken::Indent => return None,
             YamlToken::Dedent => {
                 if stop_on_dedent {
