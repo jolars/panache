@@ -82,10 +82,14 @@ fn leading_indent(text: &str) -> usize {
         .count()
 }
 
+fn split_once_unquoted(text: &str, separator: char) -> Option<(&str, &str)> {
+    let idx = find_unquoted_char(text, separator)?;
+    let rhs_start = idx + separator.len_utf8();
+    Some((&text[..idx], &text[rhs_start..]))
+}
+
 fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
-    let idx = find_unquoted_char(line, ':')?;
-    let raw_key = &line[..idx];
-    let raw_value = &line[idx + ':'.len_utf8()..];
+    let (raw_key, raw_value) = split_once_unquoted(line, ':')?;
     if raw_key.trim().is_empty() || raw_value.trim().is_empty() {
         return None;
     }
@@ -97,55 +101,48 @@ fn split_value_and_comment(raw_value: &str) -> (&str, Option<&str>) {
         let (before, after) = raw_value.split_at(idx);
         let starts_comment = before.chars().next_back().is_none_or(char::is_whitespace);
         if starts_comment {
-            return (before.trim_end_matches([' ', '\t']), Some(after));
+            let trimmed_before = before.trim_end_matches([' ', '\t']);
+            return (trimmed_before, Some(after));
         }
     }
     (raw_value, None)
 }
 
 fn find_unquoted_char(text: &str, target: char) -> Option<usize> {
-    let chars: Vec<(usize, char)> = text.char_indices().collect();
-    let mut i = 0usize;
+    let mut chars = text.char_indices().peekable();
     let mut in_single = false;
     let mut in_double = false;
     let mut escaped_in_double = false;
 
-    while i < chars.len() {
-        let (idx, ch) = chars[i];
+    while let Some((idx, ch)) = chars.next() {
+        let next_char = chars.peek().map(|(_, next)| *next);
 
         if in_double {
             if escaped_in_double {
                 escaped_in_double = false;
-                i += 1;
                 continue;
             }
             match ch {
                 '\\' => {
                     escaped_in_double = true;
-                    i += 1;
                     continue;
                 }
                 '"' => {
                     in_double = false;
-                    i += 1;
                     continue;
                 }
-                _ => {
-                    i += 1;
-                    continue;
-                }
+                _ => continue,
             }
         }
 
         if in_single {
             if ch == '\'' {
-                if i + 1 < chars.len() && chars[i + 1].1 == '\'' {
-                    i += 2;
+                if next_char == Some('\'') {
+                    chars.next();
                     continue;
                 }
                 in_single = false;
             }
-            i += 1;
             continue;
         }
 
@@ -155,7 +152,6 @@ fn find_unquoted_char(text: &str, target: char) -> Option<usize> {
             _ if ch == target => return Some(idx),
             _ => {}
         }
-        i += 1;
     }
 
     None

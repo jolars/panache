@@ -240,6 +240,21 @@ mod tests {
     }
 
     #[test]
+    fn keeps_colon_inside_single_quoted_key_with_escaped_quote() {
+        let input = "'foo'':bar': 23\n";
+        let tree = parse_basic_mapping_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let keys: Vec<String> = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_KEY)
+            .map(|tok| tok.text().to_string())
+            .collect();
+        assert_eq!(keys, vec!["'foo'':bar'".to_string()]);
+    }
+
+    #[test]
     fn preserves_explicit_tag_tokens_in_key_and_value() {
         let input = "!!str a: !!int 42\n";
         let tree = parse_basic_mapping_tree(input).expect("tree");
