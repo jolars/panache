@@ -6,6 +6,7 @@
   "bootstrap-sha": "8b9e8a5caceb441e00b6593bd8ea87d9b60ae92b",
   "bump-minor-pre-major": true,
   "include-commit-authors": true,
+  "release-reference-comments": "best-effort",
   "packages": {
     ".": {
       "exclude-paths": [
