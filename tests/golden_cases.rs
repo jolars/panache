@@ -288,6 +288,7 @@ golden_test_cases!(
     issue_198_cookbook_chunk_hooks_idempotency,
     issue_197_gfm_non_idempotent_bare_uri_escape,
     issue_200_adjacent_pipe_table_captions,
+    issue_201_hashpipe_literal_blank_line_idempotency,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

@@ -69,7 +69,19 @@ pub fn normalize_hashpipe_header(
 
     while consumed < lines.len() {
         let line = lines[consumed];
-        if is_hashpipe_option_or_continuation_line(line.line_without_newline, prefix) {
+        let has_following_prefixed_line = lines
+            .get(consumed + 1)
+            .map(|next| {
+                next.line_without_newline
+                    .trim_start_matches([' ', '\t'])
+                    .starts_with(prefix)
+            })
+            .unwrap_or(false);
+        if is_hashpipe_option_or_continuation_line(
+            line.line_without_newline,
+            prefix,
+            has_following_prefixed_line,
+        ) {
             saw_prefix = true;
             consumed += 1;
             continue;
@@ -172,7 +184,11 @@ fn strip_hashpipe_prefix_once<'a>(line_without_newline: &'a str, prefix: &str) -
     Some(after_prefix)
 }
 
-fn is_hashpipe_option_or_continuation_line(line_without_newline: &str, prefix: &str) -> bool {
+fn is_hashpipe_option_or_continuation_line(
+    line_without_newline: &str,
+    prefix: &str,
+    has_following_prefixed_line: bool,
+) -> bool {
     let trimmed_start = line_without_newline.trim_start_matches([' ', '\t']);
     if !trimmed_start.starts_with(prefix) {
         return false;
@@ -181,7 +197,7 @@ fn is_hashpipe_option_or_continuation_line(line_without_newline: &str, prefix: &
     let rest = after_prefix.trim_start_matches([' ', '\t']);
 
     if rest.is_empty() {
-        return false;
+        return has_following_prefixed_line;
     }
 
     if rest.contains(':') {
@@ -278,6 +294,18 @@ mod tests {
         assert_eq!(normalized.header_line_count, 1);
         assert_eq!(normalized.normalized_yaml, "echo: true\n");
         assert_eq!(normalized.header_byte_span.end, "#| echo: true\n".len());
+    }
+
+    #[test]
+    fn consumes_standalone_prefix_line_when_followed_by_prefixed_continuation() {
+        let input = "#| fig-alt: |\n#|   one\n#|\n#|   two\nplot(1)\n";
+        let normalized = normalize_hashpipe_header(input, "#|").expect("expected header");
+        assert_eq!(normalized.header_line_count, 4);
+        assert_eq!(normalized.normalized_yaml, "fig-alt: |\n  one\n\n  two\n");
+        assert_eq!(
+            normalized.header_byte_span.end,
+            "#| fig-alt: |\n#|   one\n#|\n#|   two\n".len()
+        );
     }
 
     #[test]

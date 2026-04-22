@@ -1,0 +1,8 @@
+```{r}
+#| fig-alt: |
+#|   First paragraph.
+#|
+#|   Second paragraph.
+
+plot(1)
+```
