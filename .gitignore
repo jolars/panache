@@ -36,3 +36,5 @@ docs/playground/pkg/
 .panache-cache/
 /test.Rmd
 /test.qmd
+/out.md
+/out.native
