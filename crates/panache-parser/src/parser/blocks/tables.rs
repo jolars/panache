@@ -247,6 +247,17 @@ pub(crate) fn is_caption_followed_by_table(lines: &[&str], caption_pos: usize) -
     false
 }
 
+fn caption_range_starting_at(lines: &[&str], start: usize) -> Option<(usize, usize)> {
+    if start >= lines.len() || !is_table_caption_start(lines[start]) {
+        return None;
+    }
+    let mut end = start + 1;
+    while end < lines.len() && !lines[end].trim().is_empty() {
+        end += 1;
+    }
+    Some((start, end))
+}
+
 /// Find caption before table (if any).
 /// Returns (caption_start, caption_end) positions, or None.
 fn find_caption_before_table(lines: &[&str], table_start: usize) -> Option<(usize, usize)> {
@@ -1012,16 +1023,15 @@ pub(crate) fn try_parse_pipe_table(
 
     // Check if this line is a caption followed by a table
     // If so, the actual table starts after the caption and blank line
-    let (actual_start, has_caption_before) = if is_caption_followed_by_table(lines, start_pos) {
-        // Skip caption line
-        let mut pos = start_pos + 1;
-        // Skip blank line if present
+    let (actual_start, caption_before) = if is_caption_followed_by_table(lines, start_pos) {
+        let (cap_start, cap_end) = caption_range_starting_at(lines, start_pos)?;
+        let mut pos = cap_end;
         while pos < lines.len() && lines[pos].trim().is_empty() {
             pos += 1;
         }
-        (pos, true)
+        (pos, Some((cap_start, cap_end)))
     } else {
-        (start_pos, false)
+        (start_pos, None)
     };
 
     if actual_start + 1 >= lines.len() {
@@ -1069,11 +1079,7 @@ pub(crate) fn try_parse_pipe_table(
     }
 
     // Check for caption before table (only if we didn't already detect it)
-    let caption_before = if has_caption_before {
-        Some((start_pos, start_pos + 1)) // Single-line caption detected earlier
-    } else {
-        find_caption_before_table(lines, actual_start)
-    };
+    let caption_before = caption_before.or_else(|| find_caption_before_table(lines, actual_start));
 
     // Check for caption after table
     let caption_after = find_caption_after_table(lines, end_pos);
@@ -1383,6 +1389,26 @@ mod tests {
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), 5); // header + sep + row + blank + caption
+    }
+
+    #[test]
+    fn test_pipe_table_with_multiline_caption_before() {
+        let input = vec![
+            ": (#tab:base) base R quoting",
+            "functions",
+            "",
+            "| C | D |",
+            "|---|---|",
+            "| 3 | 4 |",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_pipe_table(&input, 0, &mut builder, &ParserOptions::default());
+
+        assert!(result.is_some());
+        // caption(2) + blank(1) + header + sep + row
+        assert_eq!(result.unwrap(), 6);
     }
 }
 
@@ -1697,16 +1723,15 @@ pub(crate) fn try_parse_grid_table(
 
     // Check if this line is a caption followed by a table
     // If so, the actual table starts after the caption and blank line
-    let (actual_start, has_caption_before) = if is_caption_followed_by_table(lines, start_pos) {
-        // Skip caption line
-        let mut pos = start_pos + 1;
-        // Skip blank line if present
+    let (actual_start, caption_before) = if is_caption_followed_by_table(lines, start_pos) {
+        let (cap_start, cap_end) = caption_range_starting_at(lines, start_pos)?;
+        let mut pos = cap_end;
         while pos < lines.len() && lines[pos].trim().is_empty() {
             pos += 1;
         }
-        (pos, true)
+        (pos, Some((cap_start, cap_end)))
     } else {
-        (start_pos, false)
+        (start_pos, None)
     };
 
     if actual_start >= lines.len() {
@@ -1766,11 +1791,7 @@ pub(crate) fn try_parse_grid_table(
     // But we'll be lenient and accept tables ending with content rows
 
     // Check for caption before table (only if we didn't already detected it)
-    let caption_before = if has_caption_before {
-        Some((start_pos, start_pos + 1)) // Single-line caption detected earlier
-    } else {
-        find_caption_before_table(lines, actual_start)
-    };
+    let caption_before = caption_before.or_else(|| find_caption_before_table(lines, actual_start));
 
     // Check for caption after table
     let caption_after = find_caption_after_table(lines, end_pos);
