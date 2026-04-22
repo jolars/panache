@@ -1,7 +1,5 @@
 # yaml-test-suite cases known to be unsupported by current parser prototype.
 # Format: CASE_ID: reason
 4UYU: quoted scalar parsing not implemented
-58MP: flow mapping syntax not implemented
-6H3V: single-quoted scalar parsing not implemented
 CXX2: document markers and anchors not implemented
 ZCZ6: invalid plain scalar containing mapping indicator sequence

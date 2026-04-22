@@ -1,0 +1,7 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: 58MP
+input: "{x: :x}\n"
+parsed_mapping_tree: true
