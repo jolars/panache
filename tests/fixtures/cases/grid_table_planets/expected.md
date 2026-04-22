@@ -1,5 +1,3 @@
-  : Data about the planets of our solar system.
-
   +------------------+---------+------------+----------+-----------+----------+---------+-----------+-------------+--------+--------------+
   |                  | Name    |       Mass | Diameter |   Density |  Gravity |  Length |  Distance |        Mean | Number | Notes        |
   |                  |         | (10\^24kg) |     (km) | (kg/m\^3) | (m/s\^2) |  of day |  from Sun | temperature |     of |              |
@@ -29,3 +27,5 @@
   |                  |         |            |          |           |          |         |           |             |        | as a planet  |
   |                  |         |            |          |           |          |         |           |             |        | in 2006.     |
   +------------------+---------+------------+----------+-----------+----------+---------+-----------+-------------+--------+--------------+
+
+  : Data about the planets of our solar system.

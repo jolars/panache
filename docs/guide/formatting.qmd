@@ -588,8 +588,8 @@ Output
 
 ### Table Captions
 
-Table captions are normalized to be on a separate line **above** the table,
-prefixed with `:`. Wrapped continuation lines use a hanging indent.
+Table captions are normalized to be on a separate line from the table, prefixed
+with `:`. Wrapped continuation lines use a hanging indent.
 
 Captions also follow the configured wrapping mode (`reflow`, `preserve`, or
 `sentence`). In `reflow` mode, long captions wrap to the configured
