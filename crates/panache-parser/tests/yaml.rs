@@ -1,5 +1,5 @@
 use panache_parser::parser::yaml::{
-    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_basic_mapping_tree, parse_shadow,
+    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_shadow, parse_yaml_tree,
 };
 use panache_parser::syntax::SyntaxNode as ParserSyntaxNode;
 use serde_json::json;
@@ -196,7 +196,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         Some(items)
     }
 
-    let Some(tree) = parse_basic_mapping_tree(input) else {
+    let Some(tree) = parse_yaml_tree(input) else {
         return Vec::new();
     };
 
@@ -391,7 +391,7 @@ fn yaml_allowlist_cases_snapshot() {
             )
         });
 
-        let parsed = parse_basic_mapping_tree(&input).is_some();
+        let parsed = parse_yaml_tree(&input).is_some();
         let snapshot =
             format!("case_id: {case_id}\ninput: {input:?}\nparsed_mapping_tree: {parsed}\n");
 
@@ -417,7 +417,7 @@ fn yaml_allowlist_cases_cst_snapshot() {
             )
         });
 
-        let tree = parse_basic_mapping_tree(&input);
+        let tree = parse_yaml_tree(&input);
         let snapshot_json = json!({
             "case_id": case_id,
             "input": input,
@@ -433,7 +433,7 @@ fn yaml_allowlist_losslessness_raw_input() {
         let input_path = case_path.join("in.yaml");
         let input = fs::read_to_string(&input_path)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
-        let tree = parse_basic_mapping_tree(&input)
+        let tree = parse_yaml_tree(&input)
             .unwrap_or_else(|| panic!("failed to parse raw input for {}", case_id));
         let tree_text = tree.text().to_string();
         assert_eq!(
@@ -467,7 +467,7 @@ fn yaml_shadow_defaults_to_noop_and_does_not_replace_pipeline() {
     assert_eq!(report.shadow_reason, "shadow-disabled");
     assert!(report.normalized_input.is_none());
 
-    let parsed = parse_basic_mapping_tree("title: Shadow");
+    let parsed = parse_yaml_tree("title: Shadow");
     assert!(parsed.is_some());
 }
 

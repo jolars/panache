@@ -37,14 +37,8 @@ pub struct ShadowYamlReport {
     pub normalized_input: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BasicYamlEntry<'a> {
-    pub key: &'a str,
-    pub value: &'a str,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum YamlShadowTokenKind {
+pub enum YamlToken {
     Indent,
     Dedent,
     DocumentStart,
@@ -69,7 +63,20 @@ pub enum YamlShadowTokenKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct YamlShadowToken<'a> {
-    pub kind: YamlShadowTokenKind,
+pub struct YamlTokenSpan<'a> {
+    pub kind: YamlToken,
     pub text: &'a str,
+    pub byte_start: usize,
+    pub byte_end: usize,
+}
+
+impl<'a> YamlTokenSpan<'a> {
+    pub fn new(kind: YamlToken, text: &'a str) -> Self {
+        Self {
+            kind,
+            text,
+            byte_start: 0,
+            byte_end: 0,
+        }
+    }
 }

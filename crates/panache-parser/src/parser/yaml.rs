@@ -8,19 +8,18 @@
 //! - enable shadow-mode comparison against the existing YAML engine before rollout.
 //! - prepare for first-class YAML formatting support once parser parity is proven.
 
-#[path = "yaml/core.rs"]
-mod core;
+#[path = "yaml/lexer.rs"]
+mod lexer;
 #[path = "yaml/model.rs"]
 mod model;
+#[path = "yaml/parser.rs"]
+mod parser;
 
-pub use core::{
-    lex_basic_mapping_tokens, parse_basic_entry, parse_basic_entry_tree, parse_basic_mapping_tree,
-    parse_shadow,
-};
+pub use lexer::lex_mapping_tokens;
 pub use model::{
-    BasicYamlEntry, ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlInputKind,
-    YamlShadowToken, YamlShadowTokenKind,
+    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlInputKind, YamlToken, YamlTokenSpan,
 };
+pub use parser::{parse_shadow, parse_yaml_tree};
 
 #[cfg(test)]
 mod tests {
@@ -28,104 +27,8 @@ mod tests {
     use crate::syntax::SyntaxKind;
 
     #[test]
-    fn parses_basic_title_entry() {
-        let parsed = parse_basic_entry("title: My Title");
-        assert_eq!(
-            parsed,
-            Some(BasicYamlEntry {
-                key: "title",
-                value: "My Title"
-            })
-        );
-    }
-
-    #[test]
-    fn parses_single_line_with_multiple_colons() {
-        let parsed = parse_basic_entry("a: b: c: d");
-        assert_eq!(
-            parsed,
-            Some(BasicYamlEntry {
-                key: "a",
-                value: "b: c: d"
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_missing_value() {
-        assert_eq!(parse_basic_entry("title:"), None);
-    }
-
-    #[test]
-    fn rejects_multiline_input() {
-        assert_eq!(parse_basic_entry("title: My Title\nauthor: Me"), None);
-    }
-
-    #[test]
-    fn accepts_single_line_with_crlf_terminator() {
-        let parsed = parse_basic_entry("title: My Title\r");
-        assert_eq!(
-            parsed,
-            Some(BasicYamlEntry {
-                key: "title",
-                value: "My Title"
-            })
-        );
-    }
-
-    #[test]
-    fn builds_basic_rowan_tree() {
-        let tree = parse_basic_entry_tree("title: My Title").expect("tree");
-        assert_eq!(tree.kind(), SyntaxKind::DOCUMENT);
-        assert_eq!(tree.text().to_string(), "title: My Title");
-
-        let content = tree
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_METADATA_CONTENT)
-            .expect("yaml metadata content");
-        assert_eq!(content.text().to_string(), "title: My Title");
-
-        let mapping = content
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
-            .expect("yaml block map");
-        let entry = mapping
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
-            .expect("yaml block map entry");
-        let key = entry
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
-            .expect("yaml block map key");
-        let value = entry
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
-            .expect("yaml block map value");
-
-        let key_token_kinds: Vec<_> = key
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .map(|tok| tok.kind())
-            .collect();
-        assert_eq!(
-            key_token_kinds,
-            vec![SyntaxKind::YAML_KEY, SyntaxKind::YAML_COLON,]
-        );
-
-        let value_token_kinds: Vec<_> = value
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .map(|tok| tok.kind())
-            .collect();
-        assert_eq!(
-            value_token_kinds,
-            vec![SyntaxKind::WHITESPACE, SyntaxKind::YAML_SCALAR,]
-        );
-    }
-
-    #[test]
     fn builds_basic_rowan_tree_for_multiline_mapping() {
-        let tree = parse_basic_mapping_tree("title: My Title\nauthor: Me\n").expect("tree");
+        let tree = parse_yaml_tree("title: My Title\nauthor: Me\n").expect("tree");
         assert_eq!(tree.kind(), SyntaxKind::DOCUMENT);
         assert_eq!(tree.text().to_string(), "title: My Title\nauthor: Me\n");
 
@@ -167,7 +70,7 @@ mod tests {
 
     #[test]
     fn mapping_nodes_preserve_entry_text_boundaries() {
-        let tree = parse_basic_mapping_tree("title: A\nauthor: B\n").expect("tree");
+        let tree = parse_yaml_tree("title: A\nauthor: B\n").expect("tree");
         let content = tree
             .children()
             .find(|n| n.kind() == SyntaxKind::YAML_METADATA_CONTENT)
@@ -191,7 +94,7 @@ mod tests {
     #[test]
     fn splits_mapping_on_colon_outside_quoted_key() {
         let input = "\"foo:bar\": 23\n'x:y': 24\n";
-        let tree = parse_basic_mapping_tree(input).expect("tree");
+        let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
 
         let keys: Vec<String> = tree
@@ -206,7 +109,7 @@ mod tests {
     #[test]
     fn splits_mapping_on_colon_outside_flow_key() {
         let input = "{a: b}: 23\n";
-        let tree = parse_basic_mapping_tree(input).expect("tree");
+        let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
 
         let keys: Vec<String> = tree
@@ -221,7 +124,7 @@ mod tests {
     #[test]
     fn keeps_colon_inside_escaped_double_quoted_key() {
         let input = "\"foo\\\":bar\": 23\n";
-        let tree = parse_basic_mapping_tree(input).expect("tree");
+        let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
 
         let keys: Vec<String> = tree
@@ -236,7 +139,7 @@ mod tests {
     #[test]
     fn keeps_hash_in_double_quoted_scalar_value() {
         let input = "foo: \"a#b\"\n";
-        let tree = parse_basic_mapping_tree(input).expect("tree");
+        let tree = parse_yaml_tree(input).expect("tree");
 
         let comment_count = tree
             .descendants_with_tokens()
@@ -257,7 +160,7 @@ mod tests {
     #[test]
     fn keeps_colon_inside_single_quoted_key_with_escaped_quote() {
         let input = "'foo'':bar': 23\n";
-        let tree = parse_basic_mapping_tree(input).expect("tree");
+        let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
 
         let keys: Vec<String> = tree
@@ -272,7 +175,7 @@ mod tests {
     #[test]
     fn preserves_explicit_tag_tokens_in_key_and_value() {
         let input = "!!str a: !!int 42\n";
-        let tree = parse_basic_mapping_tree(input).expect("tree");
+        let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
 
         let tag_tokens: Vec<_> = tree
@@ -287,30 +190,30 @@ mod tests {
     #[test]
     fn lexer_emits_tokens_for_quoted_keys_and_inline_comments() {
         let input = "\"foo:bar\": 23 # note\n'x:y': 'z' # ok\n";
-        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let tokens = lex_mapping_tokens(input).expect("tokens");
         let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
         assert_eq!(
             kinds,
             vec![
-                YamlShadowTokenKind::Key,
-                YamlShadowTokenKind::Colon,
-                YamlShadowTokenKind::Whitespace,
-                YamlShadowTokenKind::Scalar,
-                YamlShadowTokenKind::Whitespace,
-                YamlShadowTokenKind::Comment,
-                YamlShadowTokenKind::Newline,
-                YamlShadowTokenKind::Key,
-                YamlShadowTokenKind::Colon,
-                YamlShadowTokenKind::Whitespace,
-                YamlShadowTokenKind::Scalar,
-                YamlShadowTokenKind::Whitespace,
-                YamlShadowTokenKind::Comment,
-                YamlShadowTokenKind::Newline,
+                YamlToken::Key,
+                YamlToken::Colon,
+                YamlToken::Whitespace,
+                YamlToken::Scalar,
+                YamlToken::Whitespace,
+                YamlToken::Comment,
+                YamlToken::Newline,
+                YamlToken::Key,
+                YamlToken::Colon,
+                YamlToken::Whitespace,
+                YamlToken::Scalar,
+                YamlToken::Whitespace,
+                YamlToken::Comment,
+                YamlToken::Newline,
             ]
         );
         let comments: Vec<_> = tokens
             .iter()
-            .filter(|t| t.kind == YamlShadowTokenKind::Comment)
+            .filter(|t| t.kind == YamlToken::Comment)
             .map(|t| t.text)
             .collect();
         assert_eq!(comments, vec!["# note", "# ok"]);
@@ -319,38 +222,32 @@ mod tests {
     #[test]
     fn lexer_emits_indent_and_dedent_for_indented_entries() {
         let input = "root: 1\n  child: 2\n";
-        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let tokens = lex_mapping_tokens(input).expect("tokens");
         let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert!(kinds.contains(&YamlShadowTokenKind::Indent));
-        assert!(kinds.contains(&YamlShadowTokenKind::Dedent));
+        assert!(kinds.contains(&YamlToken::Indent));
+        assert!(kinds.contains(&YamlToken::Dedent));
     }
 
     #[test]
     fn lexer_emits_document_start_marker_token() {
         let input = "---\n";
-        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let tokens = lex_mapping_tokens(input).expect("tokens");
         let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
-        assert_eq!(
-            kinds,
-            vec![
-                YamlShadowTokenKind::DocumentStart,
-                YamlShadowTokenKind::Newline,
-            ]
-        );
+        assert_eq!(kinds, vec![YamlToken::DocumentStart, YamlToken::Newline,]);
     }
 
     #[test]
     fn lexer_emits_flow_tokens_for_standalone_flow_mapping() {
         let input = "{foo: bar}\n";
-        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let tokens = lex_mapping_tokens(input).expect("tokens");
         let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
         assert_eq!(
             kinds,
             vec![
-                YamlShadowTokenKind::FlowMapStart,
-                YamlShadowTokenKind::Scalar,
-                YamlShadowTokenKind::FlowMapEnd,
-                YamlShadowTokenKind::Newline,
+                YamlToken::FlowMapStart,
+                YamlToken::Scalar,
+                YamlToken::FlowMapEnd,
+                YamlToken::Newline,
             ]
         );
     }
@@ -358,20 +255,20 @@ mod tests {
     #[test]
     fn lexer_emits_flow_sequence_tokens_in_mapping_value() {
         let input = "a: [b, c]\n";
-        let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+        let tokens = lex_mapping_tokens(input).expect("tokens");
         let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
         assert_eq!(
             kinds,
             vec![
-                YamlShadowTokenKind::Key,
-                YamlShadowTokenKind::Colon,
-                YamlShadowTokenKind::Whitespace,
-                YamlShadowTokenKind::FlowSeqStart,
-                YamlShadowTokenKind::Scalar,
-                YamlShadowTokenKind::Comma,
-                YamlShadowTokenKind::Scalar,
-                YamlShadowTokenKind::FlowSeqEnd,
-                YamlShadowTokenKind::Newline,
+                YamlToken::Key,
+                YamlToken::Colon,
+                YamlToken::Whitespace,
+                YamlToken::FlowSeqStart,
+                YamlToken::Scalar,
+                YamlToken::Comma,
+                YamlToken::Scalar,
+                YamlToken::FlowSeqEnd,
+                YamlToken::Newline,
             ]
         );
     }
@@ -386,16 +283,37 @@ mod tests {
         ];
 
         for input in cases {
-            let tokens = lex_basic_mapping_tokens(input).expect("tokens");
+            let tokens = lex_mapping_tokens(input).expect("tokens");
             let rebuilt = tokens.iter().map(|t| t.text).collect::<String>();
             assert_eq!(rebuilt, input);
         }
     }
 
     #[test]
+    fn lexer_emits_monotonic_byte_ranges() {
+        let input = "root: 1\n  child: 2\n";
+        let tokens = lex_mapping_tokens(input).expect("tokens");
+
+        let mut offset = 0usize;
+        for token in tokens {
+            if token.text.is_empty() {
+                assert_eq!(token.byte_start, offset);
+                assert_eq!(token.byte_end, offset);
+                continue;
+            }
+
+            assert_eq!(token.byte_start, offset);
+            assert_eq!(&input[token.byte_start..token.byte_end], token.text);
+            offset = token.byte_end;
+        }
+
+        assert_eq!(offset, input.len());
+    }
+
+    #[test]
     fn parser_preserves_document_markers_and_directives() {
         let input = "%YAML 1.2\n---\nfoo: bar\n...\n";
-        let tree = parse_basic_mapping_tree(input).expect("tree");
+        let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
 
         let scalar_tokens: Vec<String> = tree
@@ -414,7 +332,7 @@ mod tests {
     #[test]
     fn parser_preserves_standalone_flow_mapping_lines() {
         let input = "{foo: bar}\n";
-        let tree = parse_basic_mapping_tree(input).expect("tree");
+        let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
 
         let scalar_tokens: Vec<String> = tree
@@ -432,7 +350,7 @@ mod tests {
     #[test]
     fn parser_builds_nested_block_map_from_indent_tokens() {
         let input = "root: 1\n  child: 2\n";
-        let tree = parse_basic_mapping_tree(input).expect("tree");
+        let tree = parse_yaml_tree(input).expect("tree");
 
         let outer_map = tree
             .descendants()
@@ -456,11 +374,6 @@ mod tests {
             .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
             .count();
         assert_eq!(nested_entry_count, 1);
-    }
-
-    #[test]
-    fn rejects_tree_for_invalid_input() {
-        assert!(parse_basic_entry_tree("title:").is_none());
     }
 
     #[test]
