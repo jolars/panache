@@ -1,16 +1,21 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "008fe36721b32b92650fc79f441d5b867d7ea24d",
+  "baseline-sha": "833ae2257f0acce213cd197f3639737ab57d515e",
   "release-targets": [
     {
       "path": ".",
-      "version": "2.36.0",
-      "tag": "v2.36.0"
+      "version": "2.37.0",
+      "tag": "v2.37.0"
+    },
+    {
+      "path": "crates/panache-formatter",
+      "version": "0.2.0",
+      "tag": "panache-formatter-v0.2.0"
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.4.0",
-      "tag": "panache-parser-v0.4.0"
+      "version": "0.4.1",
+      "tag": "panache-parser-v0.4.1"
     },
     {
       "path": "editors/code",
