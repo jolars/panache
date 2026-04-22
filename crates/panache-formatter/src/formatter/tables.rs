@@ -196,10 +196,22 @@ struct TableData {
     rows: Vec<Vec<String>>,                        // All rows including header
     alignments: Vec<Alignment>,                    // Column alignments
     caption: Option<String>,                       // Optional caption text
-    caption_after: bool,                           // True if caption comes after table
     column_widths: Option<Vec<usize>>, // For simple tables: preserve separator dash lengths
     column_positions: Option<Vec<(usize, usize)>>, // For simple tables: preserve (start, end) positions
     has_header: bool,                              // True if table has a header row
+}
+
+fn emit_caption_before(
+    output: &mut String,
+    caption_text: Option<&String>,
+    config: &Config,
+    node: &SyntaxNode,
+) {
+    if let Some(caption_text) = caption_text {
+        let formatted_caption = format_table_caption(caption_text, config, node);
+        output.push_str(&formatted_caption);
+        output.push_str("\n\n");
+    }
 }
 
 /// Format cell content, handling both TEXT tokens and inline elements
@@ -303,8 +315,6 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     let mut rows = Vec::new();
     let mut alignments = Vec::new();
     let mut caption = None;
-    let mut caption_after = false;
-    let mut seen_separator = false;
 
     for child in node.children() {
         match child.kind() {
@@ -328,12 +338,10 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                 }
 
                 caption = Some(normalize_table_caption(&caption_body));
-                caption_after = seen_separator; // After if we've seen separator/rows
             }
             SyntaxKind::TABLE_SEPARATOR => {
                 let separator_text = child.text().to_string();
                 alignments = extract_alignments(&separator_text);
-                seen_separator = true;
             }
             SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW => {
                 let row_content = format_cell_content(&child, config);
@@ -348,7 +356,6 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
         rows,
         alignments,
         caption,
-        caption_after,
         column_widths: None,
         column_positions: None,
         has_header: true, // Pipe tables always have headers
@@ -410,14 +417,7 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
 
     let widths = calculate_column_widths(&table_data.rows);
 
-    // Emit caption before if present
-    if let Some(ref caption_text) = table_data.caption
-        && !table_data.caption_after
-    {
-        let formatted_caption = format_table_caption(caption_text, config, node);
-        output.push_str(&formatted_caption);
-        output.push_str("\n\n"); // Blank line between caption and table
-    }
+    emit_caption_before(&mut output, table_data.caption.as_ref(), config, node);
 
     // Format rows
     for (row_idx, row) in table_data.rows.iter().enumerate() {
@@ -496,16 +496,6 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
 
             output.push('\n');
         }
-    }
-
-    // Emit caption after if present
-    if let Some(ref caption_text) = table_data.caption
-        && table_data.caption_after
-    {
-        output.push('\n');
-        let formatted_caption = format_table_caption(caption_text, config, node);
-        output.push_str(&formatted_caption);
-        output.push('\n');
     }
 
     indent_table_block(&output)
@@ -596,7 +586,28 @@ fn format_spanning_grid_table_raw(
     }
 
     let mut caption: Option<String> = None;
-    if let Some(last) = lines.last().copied() {
+    if let Some(first) = lines.first().copied() {
+        let trimmed = first.trim_start();
+        if let Some(rest) = trimmed.strip_prefix(':') {
+            caption = Some(format!(": {}", rest.trim()));
+            lines.remove(0);
+            while lines.first().is_some_and(|l| l.trim().is_empty()) {
+                lines.remove(0);
+            }
+        } else if let Some(rest) = trimmed
+            .strip_prefix("Table:")
+            .or_else(|| trimmed.strip_prefix("table:"))
+        {
+            caption = Some(format!(": {}", rest.trim()));
+            lines.remove(0);
+            while lines.first().is_some_and(|l| l.trim().is_empty()) {
+                lines.remove(0);
+            }
+        }
+    }
+    if caption.is_none()
+        && let Some(last) = lines.last().copied()
+    {
         let trimmed = last.trim_start();
         if let Some(rest) = trimmed.strip_prefix(':') {
             caption = Some(format!(": {}", rest.trim()));
@@ -763,9 +774,11 @@ fn format_spanning_grid_table_raw(
 
     if let Some(caption) = caption {
         let caption = format_table_caption_with_language(&caption, config, sentence_language);
-        out.push('\n');
-        out.push_str(&caption);
-        out.push('\n');
+        let mut with_caption = String::new();
+        with_caption.push_str(&caption);
+        with_caption.push_str("\n\n");
+        with_caption.push_str(&out);
+        return indent_table_block(&with_caption);
     }
     indent_table_block(&out)
 }
@@ -783,7 +796,6 @@ struct GridTableData {
     row_groups: Vec<usize>,
     alignments: Vec<Alignment>,
     caption: Option<String>,
-    caption_after: bool,
 }
 
 /// Extract structured data from grid table AST node
@@ -793,8 +805,6 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
     let mut row_groups = Vec::new();
     let mut alignments = Vec::new();
     let mut caption = None;
-    let mut caption_after = false;
-    let mut seen_header = false;
     let mut row_group_index = 0usize;
 
     for child in node.children() {
@@ -817,7 +827,6 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
                 }
 
                 caption = Some(normalize_table_caption(&caption_body));
-                caption_after = seen_header; // After if we've seen table content
             }
             SyntaxKind::TABLE_SEPARATOR => {
                 let separator_text = child.text().to_string();
@@ -833,11 +842,6 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
                 } else if alignments.is_empty() && !extracted.is_empty() {
                     // No alignments yet, save these (even if all Default)
                     alignments = extracted;
-                }
-
-                // Check if this is a header separator (contains =)
-                if separator_text.contains('=') {
-                    seen_header = true;
                 }
             }
             SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW | SyntaxKind::TABLE_FOOTER => {
@@ -933,7 +937,6 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
         row_groups,
         alignments,
         caption,
-        caption_after,
     }
 }
 
@@ -958,14 +961,7 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
 
     let widths = calculate_grid_column_widths(&table_data.rows);
 
-    // Emit caption before if present
-    if let Some(ref caption_text) = table_data.caption
-        && !table_data.caption_after
-    {
-        let formatted_caption = format_table_caption(caption_text, config, node);
-        output.push_str(&formatted_caption);
-        output.push_str("\n\n");
-    }
+    emit_caption_before(&mut output, table_data.caption.as_ref(), config, node);
 
     // Helper to create separator line
     let make_separator = |fill_char: char, with_alignment_markers: bool| -> String {
@@ -1095,16 +1091,6 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
             (_, _) => make_separator('-', false),
         };
         output.push_str(&separator);
-    }
-
-    // Emit caption after if present
-    if let Some(ref caption_text) = table_data.caption
-        && table_data.caption_after
-    {
-        output.push('\n');
-        let formatted_caption = format_table_caption(caption_text, config, node);
-        output.push_str(&formatted_caption);
-        output.push('\n');
     }
 
     indent_table_block(&output)
@@ -1267,11 +1253,9 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     let mut rows = Vec::new();
     let mut columns: Vec<SimpleColumn> = Vec::new();
     let mut caption = None;
-    let mut caption_after = false;
     let mut separator_line = String::new();
     let mut header_line: Option<String> = None;
     let mut header_cells: Option<Vec<String>> = None;
-    let mut seen_separator = false;
 
     for child in node.children() {
         match child.kind() {
@@ -1295,11 +1279,9 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                 }
 
                 caption = Some(normalize_table_caption(&caption_body));
-                caption_after = seen_separator;
             }
             SyntaxKind::TABLE_SEPARATOR => {
                 separator_line = child.text().to_string();
-                seen_separator = true;
 
                 // Extract column positions
                 columns = extract_simple_table_columns(&separator_line);
@@ -1386,7 +1368,6 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
         rows,
         alignments,
         caption,
-        caption_after,
         column_widths: Some(column_widths),
         column_positions: Some(column_positions),
         has_header, // Simple tables may or may not have headers
@@ -1446,14 +1427,7 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
         None
     };
 
-    // Emit caption before if present
-    if let Some(ref caption_text) = table_data.caption
-        && !table_data.caption_after
-    {
-        let formatted_caption = format_table_caption(caption_text, config, node);
-        output.push_str(&formatted_caption);
-        output.push_str("\n\n");
-    }
+    emit_caption_before(&mut output, table_data.caption.as_ref(), config, node);
 
     // For headerless simple tables, emit opening separator first
     if !has_header
@@ -1674,16 +1648,6 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
             }
         }
         output.push_str(&sep_chars.iter().collect::<String>());
-        output.push('\n');
-    }
-
-    // Emit caption after if present
-    if let Some(ref caption_text) = table_data.caption
-        && table_data.caption_after
-    {
-        output.push('\n');
-        let formatted_caption = format_table_caption(caption_text, config, node);
-        output.push_str(&formatted_caption);
         output.push('\n');
     }
 

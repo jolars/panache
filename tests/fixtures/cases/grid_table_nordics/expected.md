@@ -1,3 +1,5 @@
+  : States belonging to the *Nordics.* {#nordics source="wikipedia"}
+
   +---------+------------+-------------+------------+
   |  Name   | Capital    | Population\ | Area\      |
   |         |            | (in 2018)   | (in km^2^) |
@@ -14,5 +16,3 @@
   +=========+============+=============+============+
   |  Total  |            | 27,376,022  | 1,258,336  |
   +=========+============+=============+============+
-
-  : States belonging to the *Nordics.* {#nordics source="wikipedia"}

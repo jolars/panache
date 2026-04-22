@@ -52,7 +52,7 @@ fn test_pipe_table_idempotency() {
 #[test]
 fn test_pipe_table_with_caption_after() {
     let input = "| A | B |\n|---|---|\n| C | D |\n\n: Caption text";
-    let expected = "  | A   | B   |\n  | --- | --- |\n  | C   | D   |\n\n  : Caption text\n";
+    let expected = "  : Caption text\n\n  | A   | B   |\n  | --- | --- |\n  | C   | D   |\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -244,7 +244,7 @@ fn test_grid_table_with_spanning_style_rows_stays_idempotent() {
 fn test_grid_table_with_caption_after() {
     let input = "+-----+-----+\n| A   | B   |\n+=====+=====+\n| C   | D   |\n+-----+-----+\n\nTable: Caption text";
     let expected =
-        "  +---+---+\n  | A | B |\n  +===+===+\n  | C | D |\n  +---+---+\n\n  : Caption text\n";
+        "  : Caption text\n\n  +---+---+\n  | A | B |\n  +===+===+\n  | C | D |\n  +---+---+\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
