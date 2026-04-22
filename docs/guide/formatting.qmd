@@ -360,7 +360,7 @@ marker to the left, and indent following lines to four spaces.
 Panache also normalizes compact vs loose definition items by structure, making
 them
 
-- compact when each definition is a single plain paragraph-like block, and
+- compact when each definition is a single plain paragraph-like block and
 - loose when a definition contains multiple blocks or starts with a
   non-paragraph block.
 
