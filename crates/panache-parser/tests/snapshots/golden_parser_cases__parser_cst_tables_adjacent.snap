@@ -1,0 +1,155 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..460
+  PIPE_TABLE@0..198
+    TABLE_HEADER@0..35
+      TEXT@0..1 "|"
+      WHITESPACE@1..7 "      "
+      TABLE_CELL@7..7
+      TEXT@7..8 "|"
+      WHITESPACE@8..9 " "
+      TABLE_CELL@9..18
+        TEXT@9..18 "Developer"
+      WHITESPACE@18..19 " "
+      TEXT@19..20 "|"
+      WHITESPACE@20..21 " "
+      TABLE_CELL@21..25
+        TEXT@21..25 "User"
+      WHITESPACE@25..33 "        "
+      TEXT@33..34 "|"
+      NEWLINE@34..35 "\n"
+    TABLE_SEPARATOR@35..70
+      TEXT@35..69 "|------|-----------|- ..."
+      NEWLINE@69..70 "\n"
+    TABLE_ROW@70..105
+      TEXT@70..71 "|"
+      WHITESPACE@71..72 " "
+      TABLE_CELL@72..75
+        TEXT@72..75 "One"
+      WHITESPACE@75..77 "  "
+      TEXT@77..78 "|"
+      WHITESPACE@78..79 " "
+      TABLE_CELL@79..87
+        INLINE_CODE@79..87
+          INLINE_CODE_MARKER@79..80 "`"
+          INLINE_CODE_CONTENT@80..86 "expr()"
+          INLINE_CODE_MARKER@86..87 "`"
+      WHITESPACE@87..89 "  "
+      TEXT@89..90 "|"
+      WHITESPACE@90..91 " "
+      TABLE_CELL@91..101
+        INLINE_CODE@91..101
+          INLINE_CODE_MARKER@91..92 "`"
+          INLINE_CODE_CONTENT@92..100 "enexpr()"
+          INLINE_CODE_MARKER@100..101 "`"
+      WHITESPACE@101..103 "  "
+      TEXT@103..104 "|"
+      NEWLINE@104..105 "\n"
+    TABLE_ROW@105..140
+      TEXT@105..106 "|"
+      WHITESPACE@106..107 " "
+      TABLE_CELL@107..111
+        TEXT@107..111 "Many"
+      WHITESPACE@111..112 " "
+      TEXT@112..113 "|"
+      WHITESPACE@113..114 " "
+      TABLE_CELL@114..123
+        INLINE_CODE@114..123
+          INLINE_CODE_MARKER@114..115 "`"
+          INLINE_CODE_CONTENT@115..122 "exprs()"
+          INLINE_CODE_MARKER@122..123 "`"
+      WHITESPACE@123..124 " "
+      TEXT@124..125 "|"
+      WHITESPACE@125..126 " "
+      TABLE_CELL@126..137
+        INLINE_CODE@126..137
+          INLINE_CODE_MARKER@126..127 "`"
+          INLINE_CODE_CONTENT@127..136 "enexprs()"
+          INLINE_CODE_MARKER@136..137 "`"
+      WHITESPACE@137..138 " "
+      TEXT@138..139 "|"
+      NEWLINE@139..140 "\n"
+    TABLE_CAPTION@140..198
+      TABLE_CAPTION_PREFIX@140..147 "Table: "
+      TEXT@147..148 "("
+      ESCAPED_CHAR@148..150 "\\#"
+      TEXT@150..197 "tab:quoting-rlang) rl ..."
+      NEWLINE@197..198 "\n"
+  BLANK_LINE@198..199
+    BLANK_LINE@198..199 "\n"
+  PIPE_TABLE@199..460
+    TABLE_HEADER@199..251
+      TEXT@199..200 "|"
+      WHITESPACE@200..206 "      "
+      TABLE_CELL@206..206
+      TEXT@206..207 "|"
+      WHITESPACE@207..208 " "
+      TABLE_CELL@208..217
+        TEXT@208..217 "Developer"
+      WHITESPACE@217..218 " "
+      TEXT@218..219 "|"
+      WHITESPACE@219..220 " "
+      TABLE_CELL@220..224
+        TEXT@220..224 "User"
+      WHITESPACE@224..249 "                      ..."
+      TEXT@249..250 "|"
+      NEWLINE@250..251 "\n"
+    TABLE_SEPARATOR@251..303
+      TEXT@251..302 "|------|-----------|- ..."
+      NEWLINE@302..303 "\n"
+    TABLE_ROW@303..355
+      TEXT@303..304 "|"
+      WHITESPACE@304..305 " "
+      TABLE_CELL@305..308
+        TEXT@305..308 "One"
+      WHITESPACE@308..310 "  "
+      TEXT@310..311 "|"
+      WHITESPACE@311..312 " "
+      TABLE_CELL@312..321
+        INLINE_CODE@312..321
+          INLINE_CODE_MARKER@312..313 "`"
+          INLINE_CODE_CONTENT@313..320 "quote()"
+          INLINE_CODE_MARKER@320..321 "`"
+      WHITESPACE@321..322 " "
+      TEXT@322..323 "|"
+      WHITESPACE@323..324 " "
+      TABLE_CELL@324..338
+        INLINE_CODE@324..338
+          INLINE_CODE_MARKER@324..325 "`"
+          INLINE_CODE_CONTENT@325..337 "substitute()"
+          INLINE_CODE_MARKER@337..338 "`"
+      WHITESPACE@338..353 "               "
+      TEXT@353..354 "|"
+      NEWLINE@354..355 "\n"
+    TABLE_ROW@355..407
+      TEXT@355..356 "|"
+      WHITESPACE@356..357 " "
+      TABLE_CELL@357..361
+        TEXT@357..361 "Many"
+      WHITESPACE@361..362 " "
+      TEXT@362..363 "|"
+      WHITESPACE@363..364 " "
+      TABLE_CELL@364..373
+        INLINE_CODE@364..373
+          INLINE_CODE_MARKER@364..365 "`"
+          INLINE_CODE_CONTENT@365..372 "alist()"
+          INLINE_CODE_MARKER@372..373 "`"
+      WHITESPACE@373..374 " "
+      TEXT@374..375 "|"
+      WHITESPACE@375..376 " "
+      TABLE_CELL@376..404
+        INLINE_CODE@376..404
+          INLINE_CODE_MARKER@376..377 "`"
+          INLINE_CODE_CONTENT@377..403 "as.list(substitute(.. ..."
+          INLINE_CODE_MARKER@403..404 "`"
+      WHITESPACE@404..405 " "
+      TEXT@405..406 "|"
+      NEWLINE@406..407 "\n"
+    TABLE_CAPTION@407..460
+      TABLE_CAPTION_PREFIX@407..414 "Table: "
+      TEXT@414..415 "("
+      ESCAPED_CHAR@415..417 "\\#"
+      TEXT@417..459 "tab:quoting-base) bas ..."
+      NEWLINE@459..460 "\n"

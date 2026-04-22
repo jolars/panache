@@ -1,0 +1,9 @@
+  | A | B |
+  | - | - |
+  | 1 | 2 |
+
+  : (#tab:quoting-base) base R quoting functions
+
+  | C | D |
+  | - | - |
+  | 3 | 4 |

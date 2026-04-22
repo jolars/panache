@@ -1033,6 +1033,10 @@ impl BlockParser for TableParser {
         lines: &[&str],
         line_pos: usize,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        if !ctx.has_blank_before && !ctx.at_document_start {
+            return None;
+        }
+
         if !(ctx.config.extensions.simple_tables
             || ctx.config.extensions.multiline_tables
             || ctx.config.extensions.grid_tables
@@ -1041,13 +1045,15 @@ impl BlockParser for TableParser {
             return None;
         }
 
-        if !ctx.has_blank_before && !ctx.at_document_start {
-            return None;
-        }
-
         // Correctness first: only claim a match if a real parse would succeed.
         // (Otherwise we can steal list items/paragraphs and drop content.)
         let mut tmp = GreenNodeBuilder::new();
+
+        let detection = if ctx.has_blank_before || ctx.at_document_start {
+            BlockDetectionResult::Yes
+        } else {
+            BlockDetectionResult::YesCanInterrupt
+        };
 
         // Handle caption-before-table lines by matching the *table kind* starting
         // after the caption, but parsing from the caption line so the caption is
@@ -1066,7 +1072,7 @@ impl BlockParser for TableParser {
                 && try_parse_grid_table(lines, table_pos, &mut tmp, ctx.config).is_some()
             {
                 return Some((
-                    BlockDetectionResult::Yes,
+                    detection,
                     Some(Box::new(TablePrepared {
                         kind: TableKind::Grid,
                     })),
@@ -1077,7 +1083,7 @@ impl BlockParser for TableParser {
                 && try_parse_multiline_table(lines, table_pos, &mut tmp, ctx.config).is_some()
             {
                 return Some((
-                    BlockDetectionResult::Yes,
+                    detection,
                     Some(Box::new(TablePrepared {
                         kind: TableKind::Multiline,
                     })),
@@ -1088,7 +1094,7 @@ impl BlockParser for TableParser {
                 && try_parse_pipe_table(lines, table_pos, &mut tmp, ctx.config).is_some()
             {
                 return Some((
-                    BlockDetectionResult::Yes,
+                    detection,
                     Some(Box::new(TablePrepared {
                         kind: TableKind::Pipe,
                     })),
@@ -1099,7 +1105,7 @@ impl BlockParser for TableParser {
                 && try_parse_simple_table(lines, table_pos, &mut tmp, ctx.config).is_some()
             {
                 return Some((
-                    BlockDetectionResult::Yes,
+                    detection,
                     Some(Box::new(TablePrepared {
                         kind: TableKind::Simple,
                     })),
@@ -1168,11 +1174,9 @@ impl BlockParser for TableParser {
         payload: Option<&dyn Any>,
     ) -> usize {
         let prepared = payload.and_then(|p| p.downcast_ref::<TablePrepared>().copied());
-
-        let table_pos = if ctx.config.extensions.table_captions
-            && is_caption_followed_by_table(lines, line_pos)
-        {
-            // Skip caption continuation lines and one optional blank line.
+        let caption_before_table =
+            ctx.config.extensions.table_captions && is_caption_followed_by_table(lines, line_pos);
+        let table_pos = if caption_before_table {
             let mut pos = line_pos + 1;
             while pos < lines.len() && !lines[pos].trim().is_empty() {
                 pos += 1;
@@ -1185,58 +1189,80 @@ impl BlockParser for TableParser {
             line_pos
         };
 
-        let try_kind =
-            |kind: TableKind, builder: &mut GreenNodeBuilder<'static>| -> Option<usize> {
-                match kind {
-                    TableKind::Grid => {
-                        if ctx.config.extensions.grid_tables {
-                            try_parse_grid_table(lines, table_pos, builder, ctx.config)
-                        } else {
-                            None
-                        }
-                    }
-                    TableKind::Multiline => {
-                        if ctx.config.extensions.multiline_tables {
-                            try_parse_multiline_table(lines, table_pos, builder, ctx.config)
-                        } else {
-                            None
-                        }
-                    }
-                    TableKind::Pipe => {
-                        if ctx.config.extensions.pipe_tables {
-                            try_parse_pipe_table(lines, table_pos, builder, ctx.config)
-                        } else {
-                            None
-                        }
-                    }
-                    TableKind::Simple => {
-                        if ctx.config.extensions.simple_tables {
-                            try_parse_simple_table(lines, table_pos, builder, ctx.config)
-                        } else {
-                            None
-                        }
+        let try_kind_at = |kind: TableKind,
+                           pos: usize,
+                           builder: &mut GreenNodeBuilder<'static>|
+         -> Option<usize> {
+            match kind {
+                TableKind::Grid => {
+                    if ctx.config.extensions.grid_tables {
+                        try_parse_grid_table(lines, pos, builder, ctx.config)
+                    } else {
+                        None
                     }
                 }
-            };
+                TableKind::Multiline => {
+                    if ctx.config.extensions.multiline_tables {
+                        try_parse_multiline_table(lines, pos, builder, ctx.config)
+                    } else {
+                        None
+                    }
+                }
+                TableKind::Pipe => {
+                    if ctx.config.extensions.pipe_tables {
+                        try_parse_pipe_table(lines, pos, builder, ctx.config)
+                    } else {
+                        None
+                    }
+                }
+                TableKind::Simple => {
+                    if ctx.config.extensions.simple_tables {
+                        try_parse_simple_table(lines, pos, builder, ctx.config)
+                    } else {
+                        None
+                    }
+                }
+            }
+        };
 
         if let Some(prepared) = prepared
-            && let Some(n) = try_kind(prepared.kind, builder)
+            && let Some(n) = try_kind_at(prepared.kind, line_pos, builder)
+        {
+            return n;
+        }
+        if let Some(prepared) = prepared
+            && caption_before_table
+            && let Some(n) = try_kind_at(prepared.kind, table_pos, builder)
         {
             return n;
         }
 
         // Fallback (should be rare) - match core order.
-        if let Some(n) = try_kind(TableKind::Grid, builder) {
+        if let Some(n) = try_kind_at(TableKind::Grid, line_pos, builder) {
             return n;
         }
-        if let Some(n) = try_kind(TableKind::Multiline, builder) {
+        if let Some(n) = try_kind_at(TableKind::Multiline, line_pos, builder) {
             return n;
         }
-        if let Some(n) = try_kind(TableKind::Pipe, builder) {
+        if let Some(n) = try_kind_at(TableKind::Pipe, line_pos, builder) {
             return n;
         }
-        if let Some(n) = try_kind(TableKind::Simple, builder) {
+        if let Some(n) = try_kind_at(TableKind::Simple, line_pos, builder) {
             return n;
+        }
+        if caption_before_table {
+            if let Some(n) = try_kind_at(TableKind::Grid, table_pos, builder) {
+                return n;
+            }
+            if let Some(n) = try_kind_at(TableKind::Multiline, table_pos, builder) {
+                return n;
+            }
+            if let Some(n) = try_kind_at(TableKind::Pipe, table_pos, builder) {
+                return n;
+            }
+            if let Some(n) = try_kind_at(TableKind::Simple, table_pos, builder) {
+                return n;
+            }
         }
 
         debug_assert!(false, "TableParser::parse called without a matching table");

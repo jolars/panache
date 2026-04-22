@@ -657,7 +657,6 @@ fn find_separator_line(lines: &[&str], start_pos: usize) -> Option<usize> {
     {
         return Some(start_pos + 1);
     }
-
     None
 }
 
