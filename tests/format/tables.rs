@@ -68,6 +68,15 @@ fn test_pipe_table_with_caption_before() {
 }
 
 #[test]
+fn test_pipe_table_with_multiple_captions_preserves_both() {
+    let input = ": A\n\n| a | b |\n|---|---|\n| A | B |\n\nTable: B";
+    let expected = "  | a   | b   |\n  | --- | --- |\n  | A   | B   |\n\n  : A\n\nTable: B\n";
+
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_pipe_table_caption_reflow_wraps() {
     let input = "| A | B |\n|---|---|\n| C | D |\n\n: A long caption that should wrap over multiple lines when reflow mode is enabled for formatting.";
     let config = Config {

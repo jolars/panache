@@ -184,6 +184,28 @@ fn format_table_caption(caption_text: &str, config: &Config, node: &SyntaxNode) 
     format_table_caption_with_language(caption_text, config, language)
 }
 
+fn extract_table_caption_content(caption_node: &SyntaxNode) -> String {
+    let mut caption_body = String::new();
+
+    for caption_child in caption_node.children_with_tokens() {
+        match caption_child {
+            rowan::NodeOrToken::Token(token)
+                if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
+            {
+                // Skip the original prefix
+            }
+            rowan::NodeOrToken::Token(token) => {
+                caption_body.push_str(token.text());
+            }
+            rowan::NodeOrToken::Node(node) => {
+                caption_body.push_str(&node.text().to_string());
+            }
+        }
+    }
+
+    normalize_table_caption(&caption_body)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Alignment {
     Left,
@@ -306,25 +328,10 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                let mut caption_body = String::new();
-
-                for caption_child in child.children_with_tokens() {
-                    match caption_child {
-                        rowan::NodeOrToken::Token(token)
-                            if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
-                        {
-                            // Skip the original prefix - we'll add normalized ": " output.
-                        }
-                        rowan::NodeOrToken::Token(token) => {
-                            caption_body.push_str(token.text());
-                        }
-                        rowan::NodeOrToken::Node(node) => {
-                            caption_body.push_str(&node.text().to_string());
-                        }
-                    }
+                let caption_text = extract_table_caption_content(&child);
+                if caption.is_none() {
+                    caption = Some(caption_text);
                 }
-
-                caption = Some(normalize_table_caption(&caption_body));
             }
             SyntaxKind::TABLE_SEPARATOR => {
                 let separator_text = child.text().to_string();
@@ -489,7 +496,6 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-
     indent_table_block(&output)
 }
 
@@ -800,23 +806,10 @@ fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData 
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                let mut caption_body = String::new();
-
-                for caption_child in child.children_with_tokens() {
-                    match caption_child {
-                        rowan::NodeOrToken::Token(token)
-                            if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
-                        {
-                            // Skip the original prefix
-                        }
-                        rowan::NodeOrToken::Token(token) => caption_body.push_str(token.text()),
-                        rowan::NodeOrToken::Node(node) => {
-                            caption_body.push_str(&node.text().to_string())
-                        }
-                    }
+                let caption_text = extract_table_caption_content(&child);
+                if caption.is_none() {
+                    caption = Some(caption_text);
                 }
-
-                caption = Some(normalize_table_caption(&caption_body));
             }
             SyntaxKind::TABLE_SEPARATOR => {
                 let separator_text = child.text().to_string();
@@ -1087,7 +1080,6 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-
     indent_table_block(&output)
 }
 
@@ -1255,25 +1247,10 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                let mut caption_body = String::new();
-
-                for caption_child in child.children_with_tokens() {
-                    match caption_child {
-                        rowan::NodeOrToken::Token(token)
-                            if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
-                        {
-                            // Skip the original prefix
-                        }
-                        rowan::NodeOrToken::Token(token) => {
-                            caption_body.push_str(token.text());
-                        }
-                        rowan::NodeOrToken::Node(node) => {
-                            caption_body.push_str(&node.text().to_string());
-                        }
-                    }
+                let caption_text = extract_table_caption_content(&child);
+                if caption.is_none() {
+                    caption = Some(caption_text);
                 }
-
-                caption = Some(normalize_table_caption(&caption_body));
             }
             SyntaxKind::TABLE_SEPARATOR => {
                 separator_line = child.text().to_string();
@@ -1650,7 +1627,6 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-
     indent_table_block(&output)
 }
 
@@ -1807,25 +1783,10 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                let mut caption_body = String::new();
-
-                for caption_child in child.children_with_tokens() {
-                    match caption_child {
-                        rowan::NodeOrToken::Token(token)
-                            if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
-                        {
-                            // Skip the original prefix
-                        }
-                        rowan::NodeOrToken::Token(token) => {
-                            caption_body.push_str(token.text());
-                        }
-                        rowan::NodeOrToken::Node(node) => {
-                            caption_body.push_str(&node.text().to_string());
-                        }
-                    }
+                let caption_text = extract_table_caption_content(&child);
+                if caption.is_none() {
+                    caption = Some(caption_text);
                 }
-
-                caption = Some(normalize_table_caption(&caption_body));
             }
             SyntaxKind::TABLE_SEPARATOR => {
                 separator_count += 1;
@@ -2097,6 +2058,5 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config) -> String {
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-
     indent_table_block(&output)
 }

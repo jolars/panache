@@ -575,7 +575,11 @@ pub(crate) fn try_parse_simple_table(
     let caption_before = find_caption_before_table(lines, start_pos);
 
     // Check for caption after table
-    let caption_after = find_caption_after_table(lines, end_pos);
+    let caption_after = if caption_before.is_some() {
+        None
+    } else {
+        find_caption_after_table(lines, end_pos)
+    };
 
     // Build the table
     builder.start_node(SyntaxKind::SIMPLE_TABLE.into());
@@ -1081,7 +1085,11 @@ pub(crate) fn try_parse_pipe_table(
     let caption_before = caption_before.or_else(|| find_caption_before_table(lines, actual_start));
 
     // Check for caption after table
-    let caption_after = find_caption_after_table(lines, end_pos);
+    let caption_after = if caption_before.is_some() {
+        None
+    } else {
+        find_caption_after_table(lines, end_pos)
+    };
 
     // Build the pipe table
     builder.start_node(SyntaxKind::PIPE_TABLE.into());
@@ -1793,7 +1801,11 @@ pub(crate) fn try_parse_grid_table(
     let caption_before = caption_before.or_else(|| find_caption_before_table(lines, actual_start));
 
     // Check for caption after table
-    let caption_after = find_caption_after_table(lines, end_pos);
+    let caption_after = if caption_before.is_some() {
+        None
+    } else {
+        find_caption_after_table(lines, end_pos)
+    };
 
     // Build the grid table
     builder.start_node(SyntaxKind::GRID_TABLE.into());
@@ -2264,7 +2276,11 @@ pub(crate) fn try_parse_multiline_table(
     let caption_before = find_caption_before_table(lines, start_pos);
 
     // Check for caption after table
-    let caption_after = find_caption_after_table(lines, end_pos);
+    let caption_after = if caption_before.is_some() {
+        None
+    } else {
+        find_caption_after_table(lines, end_pos)
+    };
 
     // Build the multiline table
     builder.start_node(SyntaxKind::MULTILINE_TABLE.into());

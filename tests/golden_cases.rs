@@ -261,6 +261,7 @@ golden_test_cases!(
     sentence_wrap_inline_code_question,
     sentence_wrap_table_caption,
     table_with_caption,
+    table_caption_duplicate,
     tables_sequential,
     tab_handling,
     tab_preserve,
