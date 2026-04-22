@@ -264,6 +264,12 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         #[arg(help = "Apply exclude patterns to explicitly provided files")]
         force_exclude: bool,
     },
+    /// Manage Panache CLI cache data
+    #[command(long_about = "Manage Panache's on-disk CLI cache data.")]
+    Cache {
+        #[command(subcommand)]
+        command: CacheCommands,
+    },
     /// Debug utilities for parser/formatter diagnostics
     #[command(
         long_about = "Debugging utilities for parse/format workflows. These commands are intended \
@@ -309,6 +315,18 @@ pub enum DebugCommands {
         #[arg(long)]
         #[arg(help = "Apply exclude patterns to explicitly provided files")]
         force_exclude: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum CacheCommands {
+    /// Delete CLI cache data
+    #[command(name = "clean")]
+    Clean {
+        /// Remove all Panache CLI cache buckets
+        #[arg(long)]
+        #[arg(help = "Remove all Panache CLI cache buckets")]
+        all: bool,
     },
 }
 

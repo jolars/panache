@@ -128,13 +128,26 @@ pub struct CliCache {
     dirty: bool,
 }
 
+pub fn resolve_cache_dir_for_cli(
+    cfg: &panache::Config,
+    explicit_config: Option<&Path>,
+    start_dir: &Path,
+) -> io::Result<PathBuf> {
+    let global_base = global_cache_base_dir();
+    resolve_cache_dir_with_base(cfg, explicit_config, start_dir, global_base.as_deref())
+}
+
+pub fn global_cache_base_dir() -> Option<PathBuf> {
+    dirs::cache_dir().map(|dir| dir.join("panache").join("cli-cache"))
+}
+
 impl CliCache {
     pub fn open(
         cfg: &panache::Config,
         explicit_config: Option<&Path>,
         start_dir: &Path,
     ) -> io::Result<Option<Self>> {
-        let cache_dir = resolve_cache_dir(cfg, explicit_config, start_dir)?;
+        let cache_dir = resolve_cache_dir_for_cli(cfg, explicit_config, start_dir)?;
         fs::create_dir_all(&cache_dir)?;
         let cache_path = cache_dir.join(CACHE_FILE_NAME);
 
@@ -282,10 +295,11 @@ fn mode_to_str(mode: FormatCacheMode) -> &'static str {
     }
 }
 
-fn resolve_cache_dir(
+fn resolve_cache_dir_with_base(
     cfg: &panache::Config,
     explicit_config: Option<&Path>,
     start_dir: &Path,
+    global_cache_base: Option<&Path>,
 ) -> io::Result<PathBuf> {
     if let Some(dir) = &cfg.cache_dir {
         let candidate = PathBuf::from(dir);
@@ -295,6 +309,15 @@ fn resolve_cache_dir(
         return Ok(start_dir.join(candidate));
     }
 
+    if let Some(base) = global_cache_base {
+        let namespace = workspace_cache_namespace(start_dir)?;
+        return Ok(base.join(namespace));
+    }
+
+    default_local_cache_dir(explicit_config)
+}
+
+fn default_local_cache_dir(explicit_config: Option<&Path>) -> io::Result<PathBuf> {
     if let Some(path) = explicit_config
         && let Some(parent) = path.parent()
     {
@@ -303,6 +326,26 @@ fn resolve_cache_dir(
 
     let cwd = std::env::current_dir()?;
     Ok(cwd.join(".panache-cache"))
+}
+
+fn workspace_cache_namespace(start_dir: &Path) -> io::Result<String> {
+    let workspace = normalize_workspace_path(start_dir)?;
+    let workspace_text = workspace.to_string_lossy();
+    let digest = stable_hash(&workspace_text);
+    Ok(format!("{:016x}", digest))
+}
+
+fn normalize_workspace_path(path: &Path) -> io::Result<PathBuf> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(path)
+    };
+
+    match absolute.canonicalize() {
+        Ok(canonical) => Ok(canonical),
+        Err(_) => Ok(absolute),
+    }
 }
 
 fn stable_hash(value: &str) -> u64 {
@@ -393,5 +436,51 @@ mod tests {
                 .get_format(&path, FormatCacheMode::Check, "file", "cfg", "tool")
                 .is_some()
         );
+    }
+
+    #[test]
+    fn default_cache_dir_uses_global_base_with_workspace_namespace() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let workspace = tmp.path().join("workspace");
+        fs::create_dir_all(&workspace).expect("create workspace");
+        let global_base = tmp.path().join("global-cache");
+
+        let cfg = panache::Config::default();
+        let resolved = resolve_cache_dir_with_base(&cfg, None, &workspace, Some(&global_base))
+            .expect("resolve cache dir");
+        let namespace = workspace_cache_namespace(&workspace).expect("workspace namespace");
+
+        assert_eq!(resolved, global_base.join(namespace));
+    }
+
+    #[test]
+    fn default_cache_dir_falls_back_to_local_when_global_base_missing() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config_dir = tmp.path().join("cfg");
+        fs::create_dir_all(&config_dir).expect("create cfg dir");
+        let explicit_config = config_dir.join("panache.toml");
+
+        let cfg = panache::Config::default();
+        let resolved =
+            resolve_cache_dir_with_base(&cfg, Some(explicit_config.as_path()), tmp.path(), None)
+                .expect("resolve cache dir");
+
+        assert_eq!(resolved, config_dir.join(".panache-cache"));
+    }
+
+    #[test]
+    fn explicit_relative_cache_dir_is_resolved_from_start_dir() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let start_dir = tmp.path().join("project");
+        fs::create_dir_all(&start_dir).expect("create start dir");
+        let cfg = panache::Config {
+            cache_dir: Some("cache/custom".to_string()),
+            ..panache::Config::default()
+        };
+
+        let resolved =
+            resolve_cache_dir_with_base(&cfg, None, &start_dir, None).expect("resolve cache dir");
+
+        assert_eq!(resolved, start_dir.join("cache/custom"));
     }
 }

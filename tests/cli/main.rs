@@ -7,6 +7,7 @@
 //! - File I/O operations
 //! - Error handling
 
+mod cache;
 mod common;
 mod debug;
 mod format;

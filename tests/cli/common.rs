@@ -13,7 +13,8 @@ fn test_help() {
         .stdout(predicate::str::contains("Global options:"))
         .stdout(predicate::str::contains("--color <WHEN>"))
         .stdout(predicate::str::contains("--no-color"))
-        .stdout(predicate::str::contains("--isolated"));
+        .stdout(predicate::str::contains("--isolated"))
+        .stdout(predicate::str::contains("cache"));
 }
 
 #[test]
@@ -77,4 +78,14 @@ fn test_lint_help() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Lint a"));
+}
+
+#[test]
+fn test_cache_help() {
+    cargo_bin_cmd!("panache")
+        .args(["cache", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Manage Panache"))
+        .stdout(predicate::str::contains("clean"));
 }
