@@ -1,0 +1,21 @@
+An example Hyperband schedule is given in @tbl-hyperband where $s = 3$ is the most exploratory bracket and $s = 0$ essentially performs a random search using the full budget.
+@tbl-hyperband-eg demonstrates how this schedule may look if we were to tune 20 different hyperparameter configurations; note that each entry in the table is a unique ID referring to a possible configuration of multiple hyperparameters to tune.
+
++-----+-------------------+-------------------+
+|     | $s = 3$           | $s = 2$           |
++-----+---------+---------+---------+---------+
+| $i$ | $m_{i}$ | $r_{i}$ | $m_{i}$ | $r_{i}$ |
++=====+=========+=========+=========+=========+
+| 0   | 8       | 1       | 6       | 2       |
++-----+---------+---------+---------+---------+
+| 1   | 4       | 2       | 3       | 4       |
++-----+---------+---------+---------+---------+
+
+: Hyperband schedule with the number of configurations, $m_{i}$, and resources, $r_{i}$, for each bracket, $s$, and stage, $i$, when $\eta = 2$, $r{_{min}} = 1$ and $r{_{max}} = 8$. {#tbl-hyperband}
+
+|     | $s = 3$ | $s = 2$ |
+|---- | ---------------- | ---------------- |
+| $i = 0$   | $\{1, 2, 3, 4\}$ | $\{9, 10, 11, 12\}$ |
+| $i = 1$   | $\{1, 2\}$ | $\{9, 14\}$ |
+
+: Hyperparameter configurations in each stage and bracket from the schedule in @tbl-hyperband. Entries are unique identifiers for tested hyperparameter configurations (HPCs). $HPC^*_s$ is the optimal hyperparameter configuration in bracket $s$ and $HPC^*$ is the optimal hyperparameter configuration across all brackets. {#tbl-hyperband-eg}
