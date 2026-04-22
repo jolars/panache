@@ -64,16 +64,53 @@ fn strip_hashpipe_prefix(line: &str) -> &str {
     line
 }
 
-fn split_line_and_newline(line: &str) -> (&str, &str) {
-    if let Some(without_lf) = line.strip_suffix('\n') {
-        if let Some(without_crlf) = without_lf.strip_suffix('\r') {
-            (without_crlf, "\r\n")
-        } else {
-            (without_lf, "\n")
-        }
-    } else {
-        (line, "")
+struct YamlLine<'a> {
+    line: &'a str,
+    newline: &'a str,
+}
+
+struct YamlLexer<'a> {
+    input: &'a str,
+    cursor: usize,
+}
+
+impl<'a> YamlLexer<'a> {
+    fn new(input: &'a str) -> Self {
+        Self { input, cursor: 0 }
     }
+
+    fn next_line(&mut self) -> Option<YamlLine<'a>> {
+        if self.cursor >= self.input.len() {
+            return None;
+        }
+
+        let remaining = &self.input[self.cursor..];
+        if let Some(rel_lf_idx) = remaining.find('\n') {
+            let lf_idx = self.cursor + rel_lf_idx;
+            let newline_start =
+                if lf_idx > self.cursor && self.input.as_bytes()[lf_idx - 1] == b'\r' {
+                    lf_idx - 1
+                } else {
+                    lf_idx
+                };
+
+            let line = &self.input[self.cursor..newline_start];
+            let newline = &self.input[newline_start..=lf_idx];
+            self.cursor = lf_idx + 1;
+            return Some(YamlLine { line, newline });
+        }
+
+        let line = &self.input[self.cursor..];
+        self.cursor = self.input.len();
+        Some(YamlLine { line, newline: "" })
+    }
+}
+
+#[derive(Default)]
+struct QuotedScanState {
+    in_single: bool,
+    in_double: bool,
+    escaped_in_double: bool,
 }
 
 fn leading_indent(text: &str) -> usize {
@@ -83,7 +120,8 @@ fn leading_indent(text: &str) -> usize {
 }
 
 fn split_once_unquoted(text: &str, separator: char) -> Option<(&str, &str)> {
-    let idx = find_unquoted_char(text, separator)?;
+    let mut state = QuotedScanState::default();
+    let idx = find_unquoted_char_with_state(text, separator, &mut state)?;
     let rhs_start = idx + separator.len_utf8();
     Some((&text[..idx], &text[rhs_start..]))
 }
@@ -97,7 +135,8 @@ fn parse_raw_mapping_line(line: &str) -> Option<(&str, &str)> {
 }
 
 fn split_value_and_comment(raw_value: &str) -> (&str, Option<&str>) {
-    if let Some(idx) = find_unquoted_char(raw_value, '#') {
+    let mut state = QuotedScanState::default();
+    if let Some(idx) = find_unquoted_char_with_state(raw_value, '#', &mut state) {
         let (before, after) = raw_value.split_at(idx);
         let starts_comment = before.chars().next_back().is_none_or(char::is_whitespace);
         if starts_comment {
@@ -108,47 +147,48 @@ fn split_value_and_comment(raw_value: &str) -> (&str, Option<&str>) {
     (raw_value, None)
 }
 
-fn find_unquoted_char(text: &str, target: char) -> Option<usize> {
+fn find_unquoted_char_with_state(
+    text: &str,
+    target: char,
+    state: &mut QuotedScanState,
+) -> Option<usize> {
     let mut chars = text.char_indices().peekable();
-    let mut in_single = false;
-    let mut in_double = false;
-    let mut escaped_in_double = false;
 
     while let Some((idx, ch)) = chars.next() {
         let next_char = chars.peek().map(|(_, next)| *next);
 
-        if in_double {
-            if escaped_in_double {
-                escaped_in_double = false;
+        if state.in_double {
+            if state.escaped_in_double {
+                state.escaped_in_double = false;
                 continue;
             }
             match ch {
                 '\\' => {
-                    escaped_in_double = true;
+                    state.escaped_in_double = true;
                     continue;
                 }
                 '"' => {
-                    in_double = false;
+                    state.in_double = false;
                     continue;
                 }
                 _ => continue,
             }
         }
 
-        if in_single {
+        if state.in_single {
             if ch == '\'' {
                 if next_char == Some('\'') {
                     chars.next();
                     continue;
                 }
-                in_single = false;
+                state.in_single = false;
             }
             continue;
         }
 
         match ch {
-            '\'' => in_single = true,
-            '"' => in_double = true,
+            '\'' => state.in_single = true,
+            '"' => state.in_double = true,
             _ if ch == target => return Some(idx),
             _ => {}
         }
@@ -327,13 +367,13 @@ pub fn lex_basic_mapping_tokens(input: &str) -> Option<Vec<YamlShadowToken<'_>>>
 
     let mut tokens = Vec::new();
     let mut indent_stack = vec![0usize];
+    let mut lexer = YamlLexer::new(input);
 
-    for raw_line in input.split_inclusive('\n') {
-        let (line, newline) = split_line_and_newline(raw_line);
+    while let Some(yaml_line) = lexer.next_line() {
         let current_indent = indent_stack.last().copied().unwrap_or(0);
         lex_mapping_line_tokens(
-            line,
-            newline,
+            yaml_line.line,
+            yaml_line.newline,
             current_indent,
             &mut indent_stack,
             &mut tokens,
