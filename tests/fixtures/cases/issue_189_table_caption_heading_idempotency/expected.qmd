@@ -1,7 +1,7 @@
 ##
 
-  : Example After One Iteration
-
   | Experiment | Heads | $\gamma$ |
   | ---------- | ----- | -------- |
   | 1          | 7     | 0.78     |
+
+  : Example After One Iteration

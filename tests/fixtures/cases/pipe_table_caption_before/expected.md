@@ -1,5 +1,5 @@
-: My caption
-
 | A   | B   |
 | --- | --- |
 | C   | D   |
+
+: My caption

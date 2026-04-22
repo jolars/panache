@@ -61,7 +61,7 @@ fn test_pipe_table_with_caption_after() {
 #[test]
 fn test_pipe_table_with_caption_before() {
     let input = ": Caption text\n\n| A | B |\n|---|---|\n| C | D |";
-    let expected = "  : Caption text\n\n  | A   | B   |\n  | --- | --- |\n  | C   | D   |\n";
+    let expected = "  | A   | B   |\n  | --- | --- |\n  | C   | D   |\n\n  : Caption text\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -238,6 +238,14 @@ fn test_grid_table_with_spanning_style_rows_stays_idempotent() {
     let first = format(input, None, None);
     let second = format(&first, None, None);
     assert_eq!(first, second);
+}
+
+#[test]
+fn test_grid_table_with_spanning_style_caption_before_normalizes_after() {
+    let input = ": My caption\n\n+-------------+-------+----------+\n|             | min   | -89.2 °C |\n| Temperature +-------+----------+\n| 1961-1990   | mean  | 14 °C    |\n|             +-------+----------+\n|             | min   | 56.7 °C  |\n+-------------+-------+----------+\n";
+    let expected = "  +-------------+-------+----------+\n  |             | min   | -89.2 °C |\n  | Temperature +-------+----------+\n  |  1961-1990  | mean  | 14 °C    |\n  |             +-------+----------+\n  |             | min   | 56.7 °C  |\n  +-------------+-------+----------+\n\n  : My caption\n";
+    let result = format(input, None, None);
+    assert_eq!(result, expected);
 }
 
 #[test]

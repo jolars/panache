@@ -9,11 +9,11 @@ We can refer to it as Equation \@ref(eq:binom).
 
 Here's a table with a reference:
 
-  : (\#tab:mytable) A table with a reference.
-
   | A   | B   | C   |
   | --- | --- | --- |
   | 1   | 2   | 3   |
+
+  : (\#tab:mytable) A table with a reference.
 
 We refer to is as Table \@ref(tab:mytable), not \@ref(mytable)!
 

@@ -1,5 +1,3 @@
-  : Here's the caption. It, too, may span multiple lines.
-
   -------------------------------------------------------------
    Centered   Default           Right Left
     Header    Aligned         Aligned Aligned
@@ -9,3 +7,5 @@
 
     Second    row                 5.0 Here's another one.
   -------------------------------------------------------------
+
+  : Here's the caption. It, too, may span multiple lines.
