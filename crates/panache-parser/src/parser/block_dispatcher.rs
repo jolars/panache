@@ -780,6 +780,15 @@ impl BlockParser for DefinitionListParser {
         if let Some((marker_char, indent, spaces_after_cols, spaces_after_bytes)) =
             try_parse_definition_marker(ctx.content)
         {
+            // If this `:` line is actually a table caption marker and a table
+            // follows, let TableParser claim it instead of starting a definition list.
+            if marker_char == ':'
+                && ctx.config.extensions.table_captions
+                && is_caption_followed_by_table(lines, line_pos)
+            {
+                return None;
+            }
+
             let indent_bytes =
                 super::utils::container_stack::byte_index_at_column(ctx.content, indent);
             let has_content = ctx

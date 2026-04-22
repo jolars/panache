@@ -73,6 +73,7 @@ pub(crate) fn emit_definition_marker(
 
 // Helper functions for definition list management in Parser
 
+use crate::parser::blocks::tables::is_caption_followed_by_table;
 use crate::parser::utils::container_stack::{Container, ContainerStack};
 
 /// Check if we're in a definition list.
@@ -99,6 +100,12 @@ pub(in crate::parser) fn next_line_is_definition_marker(
             continue;
         }
         if try_parse_definition_marker(line).is_some() {
+            if let Some((marker, ..)) = try_parse_definition_marker(line)
+                && marker == ':'
+                && is_caption_followed_by_table(lines, check_pos)
+            {
+                return None;
+            }
             return Some(blank_count);
         } else {
             return None;
@@ -110,6 +117,7 @@ pub(in crate::parser) fn next_line_is_definition_marker(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::blocks::tables::is_caption_followed_by_table;
 
     #[test]
     fn test_parse_definition_marker_colon() {
@@ -153,6 +161,21 @@ mod tests {
     #[test]
     fn test_parse_definition_marker_at_eol() {
         assert_eq!(try_parse_definition_marker(":"), Some((':', 0, 0, 0)));
+    }
+
+    #[test]
+    fn next_line_marker_ignores_colon_table_caption() {
+        let lines = vec![
+            "Here's a table with a reference:",
+            "",
+            ": (\\#tab:mytable) A table with a reference.",
+            "",
+            "| A   | B   | C   |",
+            "| --- | --- | --- |",
+            "| 1   | 2   | 3   |",
+        ];
+        assert!(is_caption_followed_by_table(&lines, 2));
+        assert_eq!(next_line_is_definition_marker(&lines, 0), None);
     }
 
     #[test]

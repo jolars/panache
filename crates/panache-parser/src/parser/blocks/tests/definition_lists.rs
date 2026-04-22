@@ -138,3 +138,22 @@ fn definition_marker_after_list_definition_closes_nested_list() {
         "list content should not capture a nested DEFINITION_ITEM"
     );
 }
+
+#[test]
+fn colon_table_caption_before_table_is_not_definition_list() {
+    let input = "Here's a table with a reference:\n\n: (\\#tab:mytable) A table with a reference.\n\n| A   | B   | C   |\n| --- | --- | --- |\n| 1   | 2   | 3   |\n";
+    let tree = parse_blocks(input);
+
+    assert!(
+        find_first(&tree, SyntaxKind::DEFINITION_LIST).is_none(),
+        "colon table caption before a table should not be parsed as DEFINITION_LIST"
+    );
+    assert!(
+        find_first(&tree, SyntaxKind::PIPE_TABLE).is_some(),
+        "expected PIPE_TABLE to be parsed for colon caption + table"
+    );
+    assert!(
+        find_first(&tree, SyntaxKind::TABLE_CAPTION).is_some(),
+        "expected TABLE_CAPTION node for colon caption"
+    );
+}
