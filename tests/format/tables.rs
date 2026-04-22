@@ -52,7 +52,7 @@ fn test_pipe_table_idempotency() {
 #[test]
 fn test_pipe_table_with_caption_after() {
     let input = "| A | B |\n|---|---|\n| C | D |\n\n: Caption text";
-    let expected = "  | A   | B   |\n  | --- | --- |\n  | C   | D   |\n\n  Table: Caption text\n";
+    let expected = "  | A   | B   |\n  | --- | --- |\n  | C   | D   |\n\n  : Caption text\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -61,7 +61,7 @@ fn test_pipe_table_with_caption_after() {
 #[test]
 fn test_pipe_table_with_caption_before() {
     let input = ": Caption text\n\n| A | B |\n|---|---|\n| C | D |";
-    let expected = "  Table: Caption text\n\n  | A   | B   |\n  | --- | --- |\n  | C   | D   |\n";
+    let expected = "  : Caption text\n\n  | A   | B   |\n  | --- | --- |\n  | C   | D   |\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);
@@ -77,8 +77,8 @@ fn test_pipe_table_caption_reflow_wraps() {
     };
 
     let result = format(input, Some(config), None);
-    assert!(result.contains("  Table: A long caption that should wrap over multiple"));
-    assert!(result.contains("\n  lines when reflow mode is enabled for formatting."));
+    assert!(result.contains("  : A long caption that should wrap over multiple lines"));
+    assert!(result.contains("\n  when reflow mode is enabled for formatting."));
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn test_pipe_table_caption_sentence_wraps() {
     };
 
     let result = format(input, Some(config), None);
-    assert!(result.contains("  Table: First caption sentence.\n  Second caption sentence."));
+    assert!(result.contains("  : First caption sentence.\n  Second caption sentence."));
 }
 
 #[test]
@@ -243,7 +243,8 @@ fn test_grid_table_with_spanning_style_rows_stays_idempotent() {
 #[test]
 fn test_grid_table_with_caption_after() {
     let input = "+-----+-----+\n| A   | B   |\n+=====+=====+\n| C   | D   |\n+-----+-----+\n\nTable: Caption text";
-    let expected = "  +---+---+\n  | A | B |\n  +===+===+\n  | C | D |\n  +---+---+\n\n  Table: Caption text\n";
+    let expected =
+        "  +---+---+\n  | A | B |\n  +===+===+\n  | C | D |\n  +---+---+\n\n  : Caption text\n";
 
     let result = format(input, None, None);
     assert_eq!(result, expected);

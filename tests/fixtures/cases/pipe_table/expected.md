@@ -4,4 +4,4 @@
   |   123 | 123  | 123     |  123   |
   |     1 | 1    | 1       |   1    |
 
-  Table: Demonstration of pipe table syntax.
+  : Demonstration of pipe table syntax.

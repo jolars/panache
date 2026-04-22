@@ -1,6 +1,6 @@
 ##
 
-  Table: Example After One Iteration
+  : Example After One Iteration
 
   | Experiment | Heads | $\gamma$ |
   | ---------- | ----- | -------- |

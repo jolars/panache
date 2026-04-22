@@ -55,9 +55,9 @@ fn normalize_table_caption(caption_body: &str) -> String {
         .to_string();
 
     if normalized_body.is_empty() {
-        "Table:".to_string()
+        ":".to_string()
     } else {
-        format!("Table: {normalized_body}")
+        format!(": {normalized_body}")
     }
 }
 
@@ -112,12 +112,16 @@ fn format_table_caption_with_language(
     config: &Config,
     sentence_language: SentenceLanguage,
 ) -> String {
-    let Some(rest) = caption_text.strip_prefix("Table:") else {
+    let Some(rest) = caption_text
+        .strip_prefix(':')
+        .or_else(|| caption_text.strip_prefix("Table:"))
+        .or_else(|| caption_text.strip_prefix("table:"))
+    else {
         return caption_text.to_string();
     };
     let body = rest.trim();
     if body.is_empty() {
-        return "Table:".to_string();
+        return ":".to_string();
     }
 
     let wrap_mode = config.wrap.clone().unwrap_or(WrapMode::Reflow);
@@ -127,17 +131,17 @@ fn format_table_caption_with_language(
         .max(1);
 
     match wrap_mode {
-        WrapMode::Preserve => caption_text.to_string(),
+        WrapMode::Preserve => format!(": {body}"),
         WrapMode::Reflow => {
             let normalized = collapse_ascii_whitespace(body);
             let words: Vec<&str> = normalized.split_ascii_whitespace().collect();
-            let first_width = available_width.saturating_sub("Table: ".width()).max(1);
+            let first_width = available_width.saturating_sub(": ".width()).max(1);
             let wrapped = wrap_words_with_widths(&words, first_width, available_width);
             if wrapped.is_empty() {
-                "Table:".to_string()
+                ":".to_string()
             } else {
                 let mut out = String::new();
-                out.push_str("Table: ");
+                out.push_str(": ");
                 out.push_str(&wrapped[0]);
                 for line in wrapped.iter().skip(1) {
                     out.push('\n');
@@ -150,10 +154,10 @@ fn format_table_caption_with_language(
             let normalized = collapse_ascii_whitespace(body);
             let lines = split_sentences(&normalized, sentence_language);
             if lines.is_empty() {
-                "Table:".to_string()
+                ":".to_string()
             } else {
                 let mut out = String::new();
-                out.push_str("Table: ");
+                out.push_str(": ");
                 out.push_str(&lines[0]);
                 for line in lines.iter().skip(1) {
                     out.push('\n');
@@ -302,7 +306,7 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                         rowan::NodeOrToken::Token(token)
                             if token.kind() == SyntaxKind::TABLE_CAPTION_PREFIX =>
                         {
-                            // Skip the original prefix - we're adding normalized "Table: " above
+                            // Skip the original prefix - we'll add normalized ": " output.
                         }
                         rowan::NodeOrToken::Token(token) => {
                             caption_body.push_str(token.text());
@@ -585,13 +589,16 @@ fn format_spanning_grid_table_raw(
     if let Some(last) = lines.last().copied() {
         let trimmed = last.trim_start();
         if let Some(rest) = trimmed.strip_prefix(':') {
-            caption = Some(format!("Table: {}", rest.trim()));
+            caption = Some(format!(": {}", rest.trim()));
             lines.pop();
             while lines.last().is_some_and(|l| l.trim().is_empty()) {
                 lines.pop();
             }
-        } else if let Some(rest) = trimmed.strip_prefix("Table:") {
-            caption = Some(format!("Table: {}", rest.trim()));
+        } else if let Some(rest) = trimmed
+            .strip_prefix("Table:")
+            .or_else(|| trimmed.strip_prefix("table:"))
+        {
+            caption = Some(format!(": {}", rest.trim()));
             lines.pop();
             while lines.last().is_some_and(|l| l.trim().is_empty()) {
                 lines.pop();

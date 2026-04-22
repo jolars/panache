@@ -15,4 +15,4 @@
   |  Total  |            | 27,376,022  | 1,258,336  |
   +=========+============+=============+============+
 
-  Table: States belonging to the *Nordics.* {#nordics source="wikipedia"}
+  : States belonging to the *Nordics.* {#nordics source="wikipedia"}

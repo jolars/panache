@@ -1,4 +1,4 @@
-  Table: Here's the caption. It, too, may span multiple lines.
+  : Here's the caption. It, too, may span multiple lines.
 
   -------------------------------------------------------------
    Centered   Default           Right Left

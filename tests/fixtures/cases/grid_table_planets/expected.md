@@ -28,4 +28,4 @@
   |                  |         |            |          |           |          |         |           |             |        | in 2006.     |
   +------------------+---------+------------+----------+-----------+----------+---------+-----------+-------------+--------+--------------+
 
-  Table: Data about the planets of our solar system.
+  : Data about the planets of our solar system.

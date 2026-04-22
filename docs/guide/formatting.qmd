@@ -548,7 +548,7 @@ Output
           123     123       123       123
             1     1          1        1
 
-      Table: A caption
+      : A caption
     ```
 
 ### Multiline Tables
@@ -589,7 +589,7 @@ Output
 ### Table Captions
 
 Table captions are normalized to be on a separate line from the table, prefixed
-with `Table:`, and flush left with the table content.
+with `:`, and flush left with the table content.
 
 Captions also follow the configured wrapping mode (`reflow`, `preserve`, or
 `sentence`). In `reflow` mode, long captions wrap to the configured
@@ -612,7 +612,7 @@ Output
       --- ---
        1   2
 
-      Table: A caption with extra spaces
+      : A caption with extra spaces
     ```
 
 Output (`wrap = "sentence"`)
@@ -622,7 +622,7 @@ Output (`wrap = "sentence"`)
       --- ---
        1   2
 
-      Table: First caption sentence.
+      : First caption sentence.
       Second caption sentence.
     ```
 

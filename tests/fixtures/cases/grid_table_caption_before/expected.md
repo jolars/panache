@@ -1,4 +1,4 @@
-Table: My caption
+: My caption
 
 +---+---+
 | A | B |

@@ -4,7 +4,7 @@
       123     123       123       123
         1     1          1        1
 
-  Table: Demonstration of simple table syntax.
+  : Demonstration of simple table syntax.
 
 Simple table indented two spaces:
 
@@ -14,4 +14,4 @@ Simple table indented two spaces:
       123     123       123       123
         1     1          1        1
 
-  Table: Demonstration of simple table syntax.
+  : Demonstration of simple table syntax.

@@ -9,7 +9,7 @@ We can refer to it as Equation \@ref(eq:binom).
 
 Here's a table with a reference:
 
-  Table: (\#tab:mytable) A table with a reference.
+  : (\#tab:mytable) A table with a reference.
 
   | A   | B   | C   |
   | --- | --- | --- |
