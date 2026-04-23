@@ -123,7 +123,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                                 container,
                                 crate::parser::utils::container_stack::Container::Definition { .. }
                             )
-                            .then_some(keep_level >= idx + 1)
+                            .then_some(keep_level > idx)
                         })
                         .unwrap_or(true);
                     if !definition_ancestor_kept {
@@ -164,7 +164,7 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                                 container,
                                 crate::parser::utils::container_stack::Container::Definition { .. }
                             )
-                            .then_some(keep_level >= idx + 1)
+                            .then_some(keep_level > idx)
                         })
                         .unwrap_or(true);
                     if !definition_ancestor_kept {
