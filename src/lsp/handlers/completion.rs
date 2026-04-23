@@ -73,14 +73,14 @@ pub(crate) async fn completion(
     let mut seen = std::collections::HashSet::new();
     let mut items = Vec::new();
     if let Some(parse) = parse {
-        for key in parse.index.iter_keys() {
-            if !seen.insert(key.to_lowercase()) {
+        for entry in parse.index.entries() {
+            if !seen.insert(entry.key.to_lowercase()) {
                 continue;
             }
             items.push(CompletionItem {
-                label: key.clone(),
+                label: entry.key.clone(),
                 kind: Some(CompletionItemKind::REFERENCE),
-                insert_text: Some(key.clone()),
+                insert_text: Some(entry.key.clone()),
                 insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                 ..Default::default()
             });

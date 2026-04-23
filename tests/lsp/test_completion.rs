@@ -83,6 +83,37 @@ async fn test_completion_with_project_bibliography() {
 }
 
 #[tokio::test]
+async fn test_completion_preserves_bibliography_key_case() {
+    let server = TestLspServer::new();
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+
+    fs::write(root.join("_quarto.yml"), "bibliography: refs.bib\n").unwrap();
+    fs::write(root.join("refs.bib"), "@article{Eddelbuettel:2011,}\n").unwrap();
+
+    let root_uri = Uri::from_file_path(root).expect("temp dir should be absolute");
+    server.initialize(root_uri.as_str()).await;
+
+    let doc_path = root.join("doc.qmd");
+    let doc_uri = Uri::from_file_path(doc_path).expect("doc uri");
+    let content = "Text [@] citation.";
+    server
+        .open_document(doc_uri.as_str(), content, "quarto")
+        .await;
+
+    let result = server.completion(doc_uri.as_str(), 0, 7).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("Expected completion items");
+    };
+
+    assert!(
+        items.iter().any(|item| item.label == "Eddelbuettel:2011"
+            && item.insert_text.as_deref() == Some("Eddelbuettel:2011")),
+        "Expected completion to preserve original bibliography key casing"
+    );
+}
+
+#[tokio::test]
 async fn test_completion_with_inline_references() {
     let server = TestLspServer::new();
     let temp_dir = TempDir::new().unwrap();
