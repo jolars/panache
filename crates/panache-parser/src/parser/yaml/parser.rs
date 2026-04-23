@@ -496,6 +496,28 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         }
     };
 
+    let mut seen_content = false;
+    for token in &tokens {
+        match token.kind {
+            YamlToken::Directive if seen_content => {
+                return YamlParseReport {
+                    tree: None,
+                    diagnostics: vec![diag_at_token(
+                        token,
+                        "YAML_PARSE_DIRECTIVE_AFTER_CONTENT",
+                        "directive requires document end before subsequent directives",
+                    )],
+                };
+            }
+            YamlToken::Directive
+            | YamlToken::Newline
+            | YamlToken::Whitespace
+            | YamlToken::Comment => {}
+            YamlToken::DocumentEnd => seen_content = false,
+            _ => seen_content = true,
+        }
+    }
+
     if let Some(directive) = tokens.iter().find(|t| t.kind == YamlToken::Directive)
         && !tokens.iter().any(|t| t.kind == YamlToken::DocumentStart)
     {

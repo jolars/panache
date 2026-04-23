@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: B63P
+input: "%YAML 1.2\n...\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START:directive requires an explicit document start marker@0..9]

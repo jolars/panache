@@ -280,6 +280,53 @@ fn invalid_double_quote_escape_offset(text: &str) -> Option<usize> {
     None
 }
 
+fn flow_delimiter_delta(text: &str) -> isize {
+    let mut chars = text.char_indices().peekable();
+    let mut state = LexerState::default();
+    let mut delta = 0isize;
+
+    while let Some((_, ch)) = chars.next() {
+        let next_char = chars.peek().map(|(_, next)| *next);
+
+        if state.quote_mode == QuoteMode::Double {
+            if state.escaped_in_double {
+                state.escaped_in_double = false;
+                continue;
+            }
+            match ch {
+                '\\' => {
+                    state.escaped_in_double = true;
+                }
+                '"' => state.quote_mode = QuoteMode::Plain,
+                _ => {}
+            }
+            continue;
+        }
+
+        if state.quote_mode == QuoteMode::Single {
+            if ch == '\'' {
+                if next_char == Some('\'') {
+                    chars.next();
+                    continue;
+                }
+                state.quote_mode = QuoteMode::Plain;
+            }
+            continue;
+        }
+
+        match ch {
+            '\'' => state.quote_mode = QuoteMode::Single,
+            '"' => state.quote_mode = QuoteMode::Double,
+            '#' => break,
+            '[' | '{' => delta += 1,
+            ']' | '}' => delta -= 1,
+            _ => {}
+        }
+    }
+
+    delta
+}
+
 fn flow_token_kind(ch: char) -> Option<YamlToken> {
     match ch {
         '{' => Some(YamlToken::FlowMapStart),
@@ -606,8 +653,26 @@ pub fn lex_mapping_tokens_with_diagnostic(
     let mut indent_stack = vec![0usize];
     let mut lexer = YamlLexer::new(input);
     let mut line_start = 0usize;
+    let mut flow_depth: isize = 0;
+    let mut flow_base_indent: usize = 0;
+    let mut flow_requires_indent = false;
 
     while let Some(yaml_line) = lexer.next_line() {
+        let line_indent = leading_indent(yaml_line.line);
+        let content = &yaml_line.line[line_indent..];
+        if flow_depth > 0
+            && flow_requires_indent
+            && !content.trim().is_empty()
+            && line_indent <= flow_base_indent
+        {
+            return Err(YamlDiagnostic {
+                code: "YAML_LEX_WRONG_INDENTED_FLOW",
+                message: "wrong indentation for continued flow collection",
+                byte_start: line_start,
+                byte_end: line_start + yaml_line.line.len(),
+            });
+        }
+
         let current_indent = indent_stack.last().copied().unwrap_or(0);
         lex_mapping_line_tokens(
             yaml_line.line,
@@ -617,6 +682,22 @@ pub fn lex_mapping_tokens_with_diagnostic(
             &mut indent_stack,
             &mut tokens,
         )?;
+
+        let delta = flow_delimiter_delta(content);
+        if flow_depth == 0 && delta > 0 {
+            flow_base_indent = line_indent;
+            flow_requires_indent = parse_raw_mapping_line(content)
+                .map(|(_, raw_value)| flow_delimiter_delta(raw_value) > 0)
+                .unwrap_or(false);
+        }
+        flow_depth += delta;
+        if flow_depth < 0 {
+            flow_depth = 0;
+        }
+        if flow_depth == 0 {
+            flow_requires_indent = false;
+        }
+
         line_start += yaml_line.line.len() + yaml_line.newline.len();
     }
 

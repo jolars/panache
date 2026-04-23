@@ -454,6 +454,25 @@ mod tests {
     }
 
     #[test]
+    fn parse_yaml_report_detects_directive_after_content() {
+        let report = parse_yaml_report("!foo \"bar\"\n%TAG ! tag:example.com,2000:app/\n---\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            "YAML_PARSE_DIRECTIVE_AFTER_CONTENT"
+        );
+    }
+
+    #[test]
+    fn parse_yaml_report_detects_wrong_indented_flow_continuation() {
+        let report = parse_yaml_report("---\nflow: [a,\nb,\nc]\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(report.diagnostics[0].code, "YAML_LEX_WRONG_INDENTED_FLOW");
+    }
+
+    #[test]
     fn parser_builds_flow_sequence_nodes_in_mapping_value() {
         let input = "a: [b, c]\n";
         let tree = parse_yaml_tree(input).expect("tree");
