@@ -169,6 +169,57 @@ fn split_tag_prefix(text: &str) -> (Option<&str>, &str) {
     (Some(tag), value)
 }
 
+fn contains_unquoted_mapping_indicator(text: &str) -> bool {
+    let mut chars = text.char_indices().peekable();
+    let mut state = LexerState::default();
+
+    while let Some((_, ch)) = chars.next() {
+        let next_char = chars.peek().map(|(_, next)| *next);
+
+        if state.quote_mode == QuoteMode::Double {
+            if state.escaped_in_double {
+                state.escaped_in_double = false;
+                continue;
+            }
+            match ch {
+                '\\' => {
+                    state.escaped_in_double = true;
+                    continue;
+                }
+                '"' => {
+                    state.quote_mode = QuoteMode::Plain;
+                    continue;
+                }
+                _ => continue,
+            }
+        }
+
+        if state.quote_mode == QuoteMode::Single {
+            if ch == '\'' {
+                if next_char == Some('\'') {
+                    chars.next();
+                    continue;
+                }
+                state.quote_mode = QuoteMode::Plain;
+            }
+            continue;
+        }
+
+        match ch {
+            '\'' => state.quote_mode = QuoteMode::Single,
+            '"' => state.quote_mode = QuoteMode::Double,
+            '{' | '[' => state.flow_depth = state.flow_depth.saturating_add(1),
+            '}' | ']' => state.flow_depth = state.flow_depth.saturating_sub(1),
+            ':' if state.flow_depth == 0 && next_char.is_some_and(char::is_whitespace) => {
+                return true;
+            }
+            _ => {}
+        }
+    }
+
+    false
+}
+
 fn flow_token_kind(ch: char) -> Option<YamlToken> {
     match ch {
         '{' => Some(YamlToken::FlowMapStart),
@@ -381,8 +432,25 @@ fn lex_mapping_line_tokens<'a>(
         if ws_len > 0 {
             push_token(out, YamlToken::Whitespace, &value_text[..ws_len]);
         }
-        push_token(out, YamlToken::Scalar, &value_text[ws_len..]);
+        let tagged_scalar = &value_text[ws_len..];
+        if contains_unquoted_mapping_indicator(tagged_scalar) {
+            return Err(YamlDiagnostic {
+                code: "YAML_LEX_ERROR",
+                message: "invalid plain scalar containing mapping indicator sequence",
+                byte_start: line_start + line_indent + raw_key.len() + 1,
+                byte_end: line_start + line.len(),
+            });
+        }
+        push_token(out, YamlToken::Scalar, tagged_scalar);
     } else {
+        if contains_unquoted_mapping_indicator(scalar_part) {
+            return Err(YamlDiagnostic {
+                code: "YAML_LEX_ERROR",
+                message: "invalid plain scalar containing mapping indicator sequence",
+                byte_start: line_start + line_indent + raw_key.len() + 1,
+                byte_end: line_start + line.len(),
+            });
+        }
         emit_scalar_like_tokens(scalar_part, out);
     }
 
