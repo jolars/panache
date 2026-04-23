@@ -319,6 +319,23 @@ mod tests {
     }
 
     #[test]
+    fn accepts_bookdown_equation_crossref_with_mixed_case_label() {
+        let input =
+            "\\begin{equation}\n  1 = 1\n  (\\#eq:solveG)\n\\end{equation}\n\n\\@ref(eq:solveG)\n";
+        let mut config = Config {
+            flavor: Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(Flavor::RMarkdown),
+            ..Default::default()
+        };
+        config.extensions.bookdown_references = true;
+        config.extensions.bookdown_equation_references = true;
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = UndefinedReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
     fn accepts_bookdown_section_crossref_with_hyphenated_slug() {
         let input = "# Heading\n\nA ref to \\@ref(heading).\n\n## Heading 2\n\nA ref to \\@ref(heading-2).\n";
         let mut config = Config {

@@ -128,6 +128,31 @@ async fn test_references_bookdown_equation_crossref_with_declaration() {
 }
 
 #[tokio::test]
+async fn test_references_bookdown_equation_crossref_with_mixed_case_label() {
+    let server = TestLspServer::new();
+    let content = r#"\@ref(eq:solveG)
+\@ref(eq:solveG)
+
+\begin{equation}
+  1 = 1
+  (\#eq:solveG)
+\end{equation}
+"#;
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let refs = server
+        .references("file:///test.Rmd", 0, 7, true)
+        .await
+        .expect("references");
+
+    assert!(refs.iter().filter(|loc| loc.range.start.line == 0).count() == 1);
+    assert!(refs.iter().filter(|loc| loc.range.start.line == 1).count() == 1);
+    assert!(refs.iter().any(|loc| loc.range.start.line == 5));
+}
+
+#[tokio::test]
 async fn test_references_bookdown_theorem_from_div_id_with_declaration() {
     let server = TestLspServer::new();
     let content = r#"Exercise \@ref(exr:mu)

@@ -1245,7 +1245,7 @@ fn collect_bookdown_equation_declarations_from_text_token(
 
         index
             .crossref_declarations
-            .entry(normalize_label(label))
+            .entry(normalize_anchor_label(label))
             .or_default()
             .push(rowan::TextRange::new(
                 rowan::TextSize::from(full_start as u32),
@@ -1253,7 +1253,7 @@ fn collect_bookdown_equation_declarations_from_text_token(
             ));
         index
             .crossref_declaration_value_ranges
-            .entry(normalize_label(label))
+            .entry(normalize_anchor_label(label))
             .or_default()
             .push(rowan::TextRange::new(
                 rowan::TextSize::from(value_start as u32),
@@ -1900,7 +1900,7 @@ mod tests {
     #[test]
     fn symbol_usage_index_collects_bookdown_equation_declarations_when_enabled() {
         let db = SalsaDb::default();
-        let input = "\\begin{align}\n  a (\\#eq:foo)\n\\end{align}\n\n\\@ref(eq:foo)\n";
+        let input = "\\begin{align}\n  a (\\#eq:solveG)\n\\end{align}\n\n\\@ref(eq:solveG)\n";
         let mut config = crate::Config {
             flavor: crate::config::Flavor::RMarkdown,
             extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::RMarkdown),
@@ -1911,17 +1911,18 @@ mod tests {
         let tree = crate::parse(input, Some(config.clone()));
         let index = symbol_usage_index_from_tree(&db, &tree, &config.extensions);
 
-        assert_eq!(index.crossref_usages("eq:foo").map(|v| v.len()), Some(1));
+        assert_eq!(index.crossref_usages("eq:solveG").map(|v| v.len()), Some(1));
         assert_eq!(
-            index.crossref_declarations("eq:foo").map(|v| v.len()),
+            index.crossref_declarations("eq:solveG").map(|v| v.len()),
             Some(1)
         );
         assert_eq!(
             index
-                .crossref_declaration_value_ranges("eq:foo")
+                .crossref_declaration_value_ranges("eq:solveG")
                 .map(|v| v.len()),
             Some(1)
         );
+        assert_eq!(index.crossref_declarations("eq:solveg"), None);
     }
 
     #[test]
