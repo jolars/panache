@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "CTN5",
+  "cst": null,
+  "diagnostics": [
+    {
+      "byte_end": 16,
+      "byte_start": 15,
+      "code": "YAML_PARSE_INVALID_FLOW_SEQUENCE_COMMA",
+      "message": "invalid comma position in flow sequence"
+    }
+  ],
+  "input": "---\n[ a, b, c, , ]\n"
+}

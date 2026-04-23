@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: CML9
+input: "key: [ word1\n#  xxx\n  word2 ]\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_LEX_WRONG_INDENTED_FLOW:wrong indentation for continued flow collection@13..19]

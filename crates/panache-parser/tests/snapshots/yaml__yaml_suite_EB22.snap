@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: EB22
+input: "---\nscalar1 # comment\n%YAML 1.2\n---\nscalar2\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_PARSE_DIRECTIVE_AFTER_CONTENT:directive requires document end before subsequent directives@22..31]

@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: HRE5
+input: "---\ndouble: \"quoted \\' scalar\"\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE:invalid escape in double quoted scalar@20..21]

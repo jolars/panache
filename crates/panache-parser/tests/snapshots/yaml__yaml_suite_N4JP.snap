@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: N4JP
+input: "map:\n  key1: \"quoted1\"\n key2: \"bad indentation\"\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_LEX_ERROR:invalid plain mapping line@0..4]

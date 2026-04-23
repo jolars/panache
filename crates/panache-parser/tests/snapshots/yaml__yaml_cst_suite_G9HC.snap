@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "G9HC",
+  "cst": null,
+  "diagnostics": [
+    {
+      "byte_end": 8,
+      "byte_start": 4,
+      "code": "YAML_LEX_ERROR",
+      "message": "invalid plain mapping line"
+    }
+  ],
+  "input": "---\nseq:\n&anchor\n- a\n- b\n"
+}

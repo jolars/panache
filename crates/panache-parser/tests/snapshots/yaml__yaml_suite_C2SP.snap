@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: C2SP
+input: "[23\n]: 42\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_PARSE_UNTERMINATED_FLOW_SEQUENCE:unterminated flow sequence@0..10]
