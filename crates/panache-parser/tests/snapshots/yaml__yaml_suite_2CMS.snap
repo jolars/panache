@@ -6,4 +6,4 @@ case_id: 2CMS
 input: "this\n is\n  invalid: x\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_PARSE_ERROR:failed to parse YAML token stream@0..22]
+diagnostics: [YAML_PARSE_ERROR:unexpected indent token while parsing block map@5..5]

@@ -7,10 +7,10 @@ expression: snapshot_json
   "cst": null,
   "diagnostics": [
     {
-      "byte_end": 22,
-      "byte_start": 0,
+      "byte_end": 5,
+      "byte_start": 5,
       "code": "YAML_PARSE_ERROR",
-      "message": "failed to parse YAML token stream"
+      "message": "unexpected indent token while parsing block map"
     }
   ],
   "input": "this\n is\n  invalid: x\n"

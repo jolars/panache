@@ -1,7 +1,7 @@
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
-use super::lexer::lex_mapping_tokens;
+use super::lexer::lex_mapping_tokens_with_diagnostic;
 use super::model::{
     ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
     YamlParseReport, YamlToken, YamlTokenSpan,
@@ -76,13 +76,27 @@ fn emit_token_as_yaml(builder: &mut GreenNodeBuilder<'_>, token: &YamlTokenSpan<
     builder.token(kind.into(), token.text);
 }
 
+fn diag_at_token(token: &YamlTokenSpan<'_>, message: &'static str) -> YamlDiagnostic {
+    YamlDiagnostic {
+        code: "YAML_PARSE_ERROR",
+        message,
+        byte_start: token.byte_start,
+        byte_end: token.byte_end,
+    }
+}
+
 fn emit_flow_sequence<'a>(
     builder: &mut GreenNodeBuilder<'_>,
     tokens: &[YamlTokenSpan<'a>],
     i: &mut usize,
-) -> Option<()> {
+) -> Result<(), YamlDiagnostic> {
     if *i >= tokens.len() || tokens[*i].kind != YamlToken::FlowSeqStart {
-        return None;
+        return Err(YamlDiagnostic {
+            code: "YAML_PARSE_ERROR",
+            message: "expected flow sequence start token",
+            byte_start: tokens.get(*i).map(|t| t.byte_start).unwrap_or(0),
+            byte_end: tokens.get(*i).map(|t| t.byte_end).unwrap_or(0),
+        });
     }
 
     builder.start_node(SyntaxKind::YAML_FLOW_SEQUENCE.into());
@@ -99,7 +113,7 @@ fn emit_flow_sequence<'a>(
                 emit_token_as_yaml(builder, &tokens[*i]); // ]
                 *i += 1;
                 builder.finish_node(); // YAML_FLOW_SEQUENCE
-                return Some(());
+                return Ok(());
             }
             YamlToken::Comma => {
                 if open_item {
@@ -120,16 +134,30 @@ fn emit_flow_sequence<'a>(
         }
     }
 
-    None
+    let (byte_start, byte_end) = tokens
+        .last()
+        .map(|t| (t.byte_start, t.byte_end))
+        .unwrap_or((0, 0));
+    Err(YamlDiagnostic {
+        code: "YAML_PARSE_ERROR",
+        message: "unterminated flow sequence",
+        byte_start,
+        byte_end,
+    })
 }
 
 fn emit_flow_map<'a>(
     builder: &mut GreenNodeBuilder<'_>,
     tokens: &[YamlTokenSpan<'a>],
     i: &mut usize,
-) -> Option<()> {
+) -> Result<(), YamlDiagnostic> {
     if *i >= tokens.len() || tokens[*i].kind != YamlToken::FlowMapStart {
-        return None;
+        return Err(YamlDiagnostic {
+            code: "YAML_PARSE_ERROR",
+            message: "expected flow map start token",
+            byte_start: tokens.get(*i).map(|t| t.byte_start).unwrap_or(0),
+            byte_end: tokens.get(*i).map(|t| t.byte_end).unwrap_or(0),
+        });
     }
 
     builder.start_node(SyntaxKind::YAML_FLOW_MAP.into());
@@ -169,7 +197,7 @@ fn emit_flow_map<'a>(
 
                 if tokens[*i - 1].kind == YamlToken::FlowMapEnd {
                     builder.finish_node(); // YAML_FLOW_MAP
-                    return Some(());
+                    return Ok(());
                 }
             }
             _ => {
@@ -178,7 +206,16 @@ fn emit_flow_map<'a>(
         }
     }
 
-    None
+    let (byte_start, byte_end) = tokens
+        .last()
+        .map(|t| (t.byte_start, t.byte_end))
+        .unwrap_or((0, 0));
+    Err(YamlDiagnostic {
+        code: "YAML_PARSE_ERROR",
+        message: "unterminated flow map",
+        byte_start,
+        byte_end,
+    })
 }
 
 fn emit_block_map<'a>(
@@ -186,7 +223,7 @@ fn emit_block_map<'a>(
     tokens: &[YamlTokenSpan<'a>],
     i: &mut usize,
     stop_on_dedent: bool,
-) -> Option<()> {
+) -> Result<(), YamlDiagnostic> {
     let mut closed_by_dedent = false;
     while *i < tokens.len() {
         match tokens[*i].kind {
@@ -223,14 +260,22 @@ fn emit_block_map<'a>(
                     *i += 1;
                 }
             }
-            YamlToken::Indent => return None,
+            YamlToken::Indent => {
+                return Err(diag_at_token(
+                    &tokens[*i],
+                    "unexpected indent token while parsing block map",
+                ));
+            }
             YamlToken::Dedent => {
                 if stop_on_dedent {
                     *i += 1;
                     closed_by_dedent = true;
                     break;
                 }
-                return None;
+                return Err(diag_at_token(
+                    &tokens[*i],
+                    "unexpected dedent token while parsing block map",
+                ));
             }
             _ => {
                 builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
@@ -257,11 +302,19 @@ fn emit_block_map<'a>(
                             saw_colon = true;
                             break;
                         }
-                        _ => return None,
+                        _ => {
+                            return Err(diag_at_token(
+                                &tokens[*i],
+                                "invalid token while parsing block map key",
+                            ));
+                        }
                     }
                 }
                 if !saw_colon {
-                    return None;
+                    return Err(diag_at_token(
+                        &tokens[(*i).saturating_sub(1)],
+                        "missing colon in block map entry",
+                    ));
                 }
                 builder.finish_node(); // YAML_BLOCK_MAP_KEY
 
@@ -327,10 +380,19 @@ fn emit_block_map<'a>(
     }
 
     if stop_on_dedent && !closed_by_dedent {
-        return None;
+        let (byte_start, byte_end) = tokens
+            .last()
+            .map(|t| (t.byte_start, t.byte_end))
+            .unwrap_or((0, 0));
+        return Err(YamlDiagnostic {
+            code: "YAML_PARSE_ERROR",
+            message: "unterminated indented block map",
+            byte_start,
+            byte_end,
+        });
     }
 
-    Some(())
+    Ok(())
 }
 
 /// Parse prototype YAML tree structure from input
@@ -340,16 +402,14 @@ pub fn parse_yaml_tree(input: &str) -> Option<SyntaxNode> {
 
 /// Parse prototype YAML tree structure and include diagnostics on failure.
 pub fn parse_yaml_report(input: &str) -> YamlParseReport {
-    let Some(tokens) = lex_mapping_tokens(input) else {
-        return YamlParseReport {
-            tree: None,
-            diagnostics: vec![YamlDiagnostic {
-                code: "YAML_LEX_ERROR",
-                message: "failed to lex YAML token stream",
-                byte_start: 0,
-                byte_end: input.len(),
-            }],
-        };
+    let tokens = match lex_mapping_tokens_with_diagnostic(input) {
+        Ok(tokens) => tokens,
+        Err(err) => {
+            return YamlParseReport {
+                tree: None,
+                diagnostics: vec![err],
+            };
+        }
     };
 
     let mut builder = GreenNodeBuilder::new();
@@ -357,15 +417,10 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
     builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
     let mut i = 0usize;
-    if emit_block_map(&mut builder, &tokens, &mut i, false).is_none() {
+    if let Err(err) = emit_block_map(&mut builder, &tokens, &mut i, false) {
         return YamlParseReport {
             tree: None,
-            diagnostics: vec![YamlDiagnostic {
-                code: "YAML_PARSE_ERROR",
-                message: "failed to parse YAML token stream",
-                byte_start: 0,
-                byte_end: input.len(),
-            }],
+            diagnostics: vec![err],
         };
     }
 

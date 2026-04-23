@@ -1,4 +1,4 @@
-use super::model::{YamlToken, YamlTokenSpan};
+use super::model::{YamlDiagnostic, YamlToken, YamlTokenSpan};
 
 struct YamlLine<'a> {
     line: &'a str,
@@ -184,7 +184,10 @@ fn push_token<'a>(out: &mut Vec<YamlTokenSpan<'a>>, kind: YamlToken, text: &'a s
     out.push(YamlTokenSpan::new(kind, text));
 }
 
-fn assign_token_byte_ranges(input: &str, tokens: &mut [YamlTokenSpan<'_>]) -> Option<()> {
+fn assign_token_byte_ranges(
+    input: &str,
+    tokens: &mut [YamlTokenSpan<'_>],
+) -> Result<(), YamlDiagnostic> {
     let mut offset = 0usize;
     for token in tokens {
         if token.text.is_empty() {
@@ -194,7 +197,12 @@ fn assign_token_byte_ranges(input: &str, tokens: &mut [YamlTokenSpan<'_>]) -> Op
         }
 
         if !input[offset..].starts_with(token.text) {
-            return None;
+            return Err(YamlDiagnostic {
+                code: "YAML_LEX_ERROR",
+                message: "internal token range reconstruction mismatch",
+                byte_start: offset,
+                byte_end: offset,
+            });
         }
 
         token.byte_start = offset;
@@ -202,7 +210,16 @@ fn assign_token_byte_ranges(input: &str, tokens: &mut [YamlTokenSpan<'_>]) -> Op
         token.byte_end = offset;
     }
 
-    (offset == input.len()).then_some(())
+    if offset == input.len() {
+        Ok(())
+    } else {
+        Err(YamlDiagnostic {
+            code: "YAML_LEX_ERROR",
+            message: "token stream did not cover full input",
+            byte_start: offset,
+            byte_end: input.len(),
+        })
+    }
 }
 
 fn emit_scalar_like_tokens<'a>(text: &'a str, out: &mut Vec<YamlTokenSpan<'a>>) {
@@ -256,10 +273,11 @@ fn emit_scalar_like_tokens<'a>(text: &'a str, out: &mut Vec<YamlTokenSpan<'a>>) 
 fn lex_mapping_line_tokens<'a>(
     line: &'a str,
     newline: &'a str,
+    line_start: usize,
     current_indent: usize,
     indent_stack: &mut Vec<usize>,
     out: &mut Vec<YamlTokenSpan<'a>>,
-) -> Option<()> {
+) -> Result<(), YamlDiagnostic> {
     let line_indent = leading_indent(line);
     let content = &line[line_indent..];
 
@@ -267,7 +285,7 @@ fn lex_mapping_line_tokens<'a>(
         if !newline.is_empty() {
             push_token(out, YamlToken::Newline, newline);
         }
-        return Some(());
+        return Ok(());
     }
 
     if line_indent > current_indent {
@@ -283,7 +301,12 @@ fn lex_mapping_line_tokens<'a>(
             }
         }
         if indent_stack.last().copied().unwrap_or(0) != line_indent {
-            return None;
+            return Err(YamlDiagnostic {
+                code: "YAML_LEX_ERROR",
+                message: "invalid indentation level for YAML block mapping",
+                byte_start: line_start,
+                byte_end: line_start + line.len(),
+            });
         }
     }
 
@@ -297,32 +320,37 @@ fn lex_mapping_line_tokens<'a>(
         if !newline.is_empty() {
             push_token(out, YamlToken::Newline, newline);
         }
-        return Some(());
+        return Ok(());
     }
     if trimmed == "..." {
         push_token(out, YamlToken::DocumentEnd, content);
         if !newline.is_empty() {
             push_token(out, YamlToken::Newline, newline);
         }
-        return Some(());
+        return Ok(());
     }
     if trimmed.starts_with('%') {
         push_token(out, YamlToken::Directive, content);
         if !newline.is_empty() {
             push_token(out, YamlToken::Newline, newline);
         }
-        return Some(());
+        return Ok(());
     }
 
     let Some((raw_key, raw_value)) = parse_raw_mapping_line(content) else {
         if split_once_unquoted(content, ':').is_some() {
-            return None;
+            return Err(YamlDiagnostic {
+                code: "YAML_LEX_ERROR",
+                message: "invalid plain mapping line",
+                byte_start: line_start + line_indent,
+                byte_end: line_start + line.len(),
+            });
         }
         emit_scalar_like_tokens(content, out);
         if !newline.is_empty() {
             push_token(out, YamlToken::Newline, newline);
         }
-        return Some(());
+        return Ok(());
     };
 
     let (key_tag, key_text) = split_tag_prefix(raw_key);
@@ -372,27 +400,37 @@ fn lex_mapping_line_tokens<'a>(
         push_token(out, YamlToken::Newline, newline);
     }
 
-    Some(())
+    Ok(())
 }
 
-pub fn lex_mapping_tokens(input: &str) -> Option<Vec<YamlTokenSpan<'_>>> {
+pub fn lex_mapping_tokens_with_diagnostic(
+    input: &str,
+) -> Result<Vec<YamlTokenSpan<'_>>, YamlDiagnostic> {
     if input.is_empty() {
-        return None;
+        return Err(YamlDiagnostic {
+            code: "YAML_LEX_ERROR",
+            message: "empty YAML input",
+            byte_start: 0,
+            byte_end: 0,
+        });
     }
 
     let mut tokens = Vec::new();
     let mut indent_stack = vec![0usize];
     let mut lexer = YamlLexer::new(input);
+    let mut line_start = 0usize;
 
     while let Some(yaml_line) = lexer.next_line() {
         let current_indent = indent_stack.last().copied().unwrap_or(0);
         lex_mapping_line_tokens(
             yaml_line.line,
             yaml_line.newline,
+            line_start,
             current_indent,
             &mut indent_stack,
             &mut tokens,
         )?;
+        line_start += yaml_line.line.len() + yaml_line.newline.len();
     }
 
     while indent_stack.len() > 1 {
@@ -402,5 +440,9 @@ pub fn lex_mapping_tokens(input: &str) -> Option<Vec<YamlTokenSpan<'_>>> {
 
     assign_token_byte_ranges(input, &mut tokens)?;
 
-    Some(tokens)
+    Ok(tokens)
+}
+
+pub fn lex_mapping_tokens(input: &str) -> Option<Vec<YamlTokenSpan<'_>>> {
+    lex_mapping_tokens_with_diagnostic(input).ok()
 }
