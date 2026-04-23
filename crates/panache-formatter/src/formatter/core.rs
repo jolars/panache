@@ -407,7 +407,7 @@ impl Formatter {
 
         let indent_str = " ".repeat(indent);
 
-        self.format_container_code_block(node, &indent_str, indent, false, false, true);
+        self.format_container_code_block(node, &indent_str, indent, false, false, false);
 
         // Ensure we end with exactly one newline
         if !self.output.ends_with('\n') {

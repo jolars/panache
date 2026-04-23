@@ -1,0 +1,23 @@
+1. B
+
+   ```{r}
+   #| label: foo
+   
+   function(x) {
+     n <- nrow(x)
+   
+     n
+   }
+   ```
+
+2. B
+
+   ```{r}
+   #| label: foo
+
+   function(x) {
+     n <- nrow(x)
+ 
+     n
+   }
+   ```
