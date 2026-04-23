@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: 4H7K
+input: "---\n[ a, b, c ] ]\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_PARSE_UNEXPECTED_FLOW_CLOSER:unexpected flow closing token@16..17]

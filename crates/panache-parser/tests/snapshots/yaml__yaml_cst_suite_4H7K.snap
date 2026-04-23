@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "4H7K",
+  "cst": null,
+  "diagnostics": [
+    {
+      "byte_end": 17,
+      "byte_start": 16,
+      "code": "YAML_PARSE_UNEXPECTED_FLOW_CLOSER",
+      "message": "unexpected flow closing token"
+    }
+  ],
+  "input": "---\n[ a, b, c ] ]\n"
+}

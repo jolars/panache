@@ -120,12 +120,39 @@ fn emit_flow_sequence<'a>(
                 return Ok(());
             }
             YamlToken::Comma => {
-                if open_item {
-                    builder.finish_node(); // YAML_FLOW_SEQUENCE_ITEM
-                    open_item = false;
+                if !open_item {
+                    return Err(diag_at_token(
+                        &tokens[*i],
+                        "YAML_PARSE_INVALID_FLOW_SEQUENCE_COMMA",
+                        "invalid comma position in flow sequence",
+                    ));
                 }
+                builder.finish_node(); // YAML_FLOW_SEQUENCE_ITEM
+                open_item = false;
                 emit_token_as_yaml(builder, &tokens[*i]);
                 *i += 1;
+            }
+            YamlToken::Whitespace if !open_item => {
+                emit_token_as_yaml(builder, &tokens[*i]);
+                *i += 1;
+            }
+            YamlToken::Scalar if !open_item && tokens[*i].text.trim().is_empty() => {
+                emit_token_as_yaml(builder, &tokens[*i]);
+                *i += 1;
+            }
+            YamlToken::FlowSeqStart => {
+                if !open_item {
+                    builder.start_node(SyntaxKind::YAML_FLOW_SEQUENCE_ITEM.into());
+                    open_item = true;
+                }
+                emit_flow_sequence(builder, tokens, i)?;
+            }
+            YamlToken::FlowMapStart => {
+                if !open_item {
+                    builder.start_node(SyntaxKind::YAML_FLOW_SEQUENCE_ITEM.into());
+                    open_item = true;
+                }
+                emit_flow_map(builder, tokens, i)?;
             }
             _ => {
                 if !open_item {
@@ -138,10 +165,18 @@ fn emit_flow_sequence<'a>(
         }
     }
 
-    let (byte_start, byte_end) = tokens
-        .last()
-        .map(|t| (t.byte_start, t.byte_end))
-        .unwrap_or((0, 0));
+    let (byte_start, byte_end) =
+        if let Some(start) = tokens.iter().find(|t| t.kind == YamlToken::FlowSeqStart) {
+            (
+                start.byte_start,
+                tokens.last().map(|t| t.byte_end).unwrap_or(start.byte_end),
+            )
+        } else {
+            tokens
+                .last()
+                .map(|t| (t.byte_start, t.byte_end))
+                .unwrap_or((0, 0))
+        };
     Err(YamlDiagnostic {
         code: "YAML_PARSE_UNTERMINATED_FLOW_SEQUENCE",
         message: "unterminated flow sequence",
@@ -238,11 +273,16 @@ fn emit_block_map<'a>(
             YamlToken::DocumentStart
             | YamlToken::DocumentEnd
             | YamlToken::Directive
-            | YamlToken::FlowMapEnd
-            | YamlToken::FlowSeqEnd
             | YamlToken::Comma => {
                 builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                 *i += 1;
+            }
+            YamlToken::FlowMapEnd | YamlToken::FlowSeqEnd => {
+                return Err(diag_at_token(
+                    &tokens[*i],
+                    "YAML_PARSE_UNEXPECTED_FLOW_CLOSER",
+                    "unexpected flow closing token",
+                ));
             }
             YamlToken::FlowMapStart | YamlToken::FlowSeqStart => {
                 if tokens[*i].kind == YamlToken::FlowMapStart {
@@ -260,6 +300,16 @@ fn emit_block_map<'a>(
             }
             YamlToken::Scalar | YamlToken::Comment => {
                 while *i < tokens.len() && tokens[*i].kind != YamlToken::Newline {
+                    if matches!(
+                        tokens[*i].kind,
+                        YamlToken::FlowMapEnd | YamlToken::FlowSeqEnd
+                    ) {
+                        return Err(diag_at_token(
+                            &tokens[*i],
+                            "YAML_PARSE_UNEXPECTED_FLOW_CLOSER",
+                            "unexpected flow closing token",
+                        ));
+                    }
                     emit_token_as_yaml(builder, &tokens[*i]);
                     *i += 1;
                 }

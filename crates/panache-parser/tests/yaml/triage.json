@@ -1,0 +1,2247 @@
+{
+  "error_contract_ok": [
+    {
+      "case_id": "236B",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "2CMS",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "4EJS",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "4HVU",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "4JVG",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "5LLU",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "5U3A",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "62EZ",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "6S55",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "7LBH",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "7MNF",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "8XDJ",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "9CWY",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "BF9H",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "C2SP",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNTERMINATED_FLOW_SEQUENCE"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "CML9",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_DEDENT"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "D49Q",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "DK4H",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "DMG6",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "G7JE",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "G9HC",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "H7J7",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "HU3P",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "JY7Z",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "N4JP",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "S4GJ",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "S98Z",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "T833",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_DEDENT"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "U44R",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "W9L4",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "X4QW",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "ZCZ6",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "ZL4Z",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "ZVH3",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false
+    },
+    {
+      "case_id": "ZXT5",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false
+    }
+  ],
+  "fails_needs_error_path": [
+    {
+      "case_id": "3HFZ",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "4H7K",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "55WF",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "5TRB",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "6JTT",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9C9N",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9HCY",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9JBA",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9KBC",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9MAG",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9MMA",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "B63P",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "BD7L",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "BS4K",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "CQ3W",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "CTN5",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "CVW2",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "CXX2",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "EB22",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "EW3V",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "G5U8",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "GDY7",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "GT5M",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "H7TQ",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "HRE5",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "JKF3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "KS4U",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "LHL4",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "N782",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "P2EQ",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Q4CL",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "QB6E",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "QLJ7",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "RHX7",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "RXY3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "SF5V",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "SR86",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "SU5Z",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "SU74",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "SY6V",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "TD5N",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "U99R",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "YJV2",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    }
+  ],
+  "fails_needs_feature": [
+    {
+      "case_id": "229Q",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "26DV",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "27NA",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "2AUY",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "2EBW",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "2JQS",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "2LFX",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "2SXE",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "2XXW",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "33X3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "35KP",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "36F6",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "3ALJ",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "3MYT",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "3R3P",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "4ABK",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "4CQQ",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "4FJ6",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "4Q9F",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "4QFQ",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "4RWC",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "4V8U",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "4WA9",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "4ZYM",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "52DL",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "565N",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "57H4",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "5BVJ",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "5C5M",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "5GBF",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "5KJE",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "5MUD",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "5NYZ",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "5T43",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "5TYM",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "5WE3",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "65WH",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "6BCT",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6BFJ",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "6CA3",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6CK3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "6FWR",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6HB6",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6JQW",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6JWB",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6KGN",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "6LVF",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6M2F",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6PBE",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6VJK",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6WLZ",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "6WPF",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "6XDY",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "6ZKB",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "735Y",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "753E",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "7A4E",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "7BMT",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "7BUB",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "7FWL",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "7T8X",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "7TMG",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "7W2P",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "7Z25",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "7ZZ5",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "82AN",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "87E4",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "8CWC",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "8G76",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "8KB6",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "8MK2",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "8QBE",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "8UDB",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_DEDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "8XYN",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "93JH",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "93WF",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "96L6",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "98YD",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9BXH",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "9DXL",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9FMG",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "9J7A",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "9KAX",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9MMW",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9SA2",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "9TFX",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "9U5K",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9WXW",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "9YRD",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "A2M4",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "A6F9",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "A984",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "AB8U",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "AVM7",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "AZ63",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "AZW3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "B3HG",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "BEC7",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "BU8L",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "C2DT",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "C4HZ",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "CC74",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "CFD4",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "CN3R",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "CPZ3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "CT4Q",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "D83L",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "DBG4",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "DC7X",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "DFF7",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "DHP8",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "DK3J",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "DWX9",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "EHF6",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "EX5H",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "EXG3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "F2C7",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "F3CP",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "F6MC",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "F8F9",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "FBC9",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "FH7J",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "FP8R",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "FQ7F",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "FRK4",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "FTA2",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "FUP4",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "G4RS",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "G992",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "GH63",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "H2RW",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "H3Z8",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "HMK4",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "HMQ5",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "HS5T",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "HWV9",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "J3BT",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "J7PZ",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "J9HZ",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "JHB9",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "JQ4R",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "JR7V",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "JTV5",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "K3WX",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "K4SU",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "K527",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "K54U",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "K858",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "KK5P",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "KMK3",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "KSS4",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "L383",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "L94M",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "L9U5",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "LE5A",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "LP6E",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "LQZ7",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "LX3P",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "M29M",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "M5C3",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "M5DY",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "M6YH",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "M7A3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "M7NX",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_DEDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "M9B4",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "MJS9",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "MXS3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "MYW6",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "MZX3",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "NAT4",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "NB6Z",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "NHX8",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "NJ66",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "NKF9",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "NP9H",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "P2AD",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "P76L",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "P94K",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "PBJ2",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "PRH3",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "PUW8",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "PW8X",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "Q5MG",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "Q88A",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Q8AD",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "Q9WF",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "QF4Y",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "QT73",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "R4YG",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "R52L",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "RLU9",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "RR7F",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "RTP8",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "RZP5",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "RZT7",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "S3PD",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "S4JQ",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "S4T7",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "S7BG",
+      "diagnostic_codes": [],
+      "event_parity": null,
+      "tree": true
+    },
+    {
+      "case_id": "S9E8",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "SBG9",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "SKE5",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "SSW6",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "T26H",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "T4YY",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "T5N4",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "TE2A",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "TL85",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "TS54",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "U3C3",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "U3XV",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "U9NS",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "UDM2",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "UDR7",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "UGM3",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "UT92",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNTERMINATED_FLOW_MAP"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "UV7Q",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "V55R",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "V9D5",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "W42U",
+      "diagnostic_codes": [
+        "YAML_PARSE_UNEXPECTED_INDENT"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "W4TN",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "WZ62",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "X38W",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "X8DW",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "XLQ9",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "XV9V",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "XW4D",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "Y2GN",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "YD5X",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "Z67P",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "Z9M4",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    },
+    {
+      "case_id": "ZF4X",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "ZK9H",
+      "diagnostic_codes": [
+        "YAML_LEX_ERROR"
+      ],
+      "event_parity": false,
+      "tree": false
+    },
+    {
+      "case_id": "ZWK4",
+      "diagnostic_codes": [],
+      "event_parity": false,
+      "tree": true
+    }
+  ],
+  "passes_now": [
+    "3GZX",
+    "3UYS",
+    "4GC6",
+    "4UYU",
+    "54T7",
+    "58MP",
+    "652Z",
+    "6H3V",
+    "6SLA",
+    "74H7",
+    "9SHH",
+    "CUP7",
+    "D88J",
+    "D9TU",
+    "E76Z",
+    "J5UC",
+    "J7VC",
+    "JS2J",
+    "SYW4",
+    "W5VH",
+    "ZH7C"
+  ],
+  "summary": {
+    "error_contract_ok_count": 35,
+    "fails_needs_error_path_count": 43,
+    "fails_needs_feature_count": 234,
+    "passes_now_count": 21,
+    "total_cases": 352
+  }
+}

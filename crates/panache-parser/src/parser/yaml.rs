@@ -366,6 +366,50 @@ mod tests {
     }
 
     #[test]
+    fn parse_yaml_report_detects_trailing_content_after_document_end() {
+        let report = parse_yaml_report("---\nkey: value\n... invalid\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END"
+        );
+    }
+
+    #[test]
+    fn parse_yaml_report_detects_unexpected_flow_closer() {
+        let report = parse_yaml_report("---\n[ a, b, c ] ]\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            "YAML_PARSE_UNEXPECTED_FLOW_CLOSER"
+        );
+    }
+
+    #[test]
+    fn parse_yaml_report_detects_unterminated_nested_flow_sequence() {
+        let report = parse_yaml_report("---\n[ [ a, b, c ]\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            "YAML_PARSE_UNTERMINATED_FLOW_SEQUENCE"
+        );
+    }
+
+    #[test]
+    fn parse_yaml_report_detects_invalid_leading_flow_sequence_comma() {
+        let report = parse_yaml_report("---\n[ , a, b, c ]\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            "YAML_PARSE_INVALID_FLOW_SEQUENCE_COMMA"
+        );
+    }
+
+    #[test]
     fn parser_builds_flow_sequence_nodes_in_mapping_value() {
         let input = "a: [b, c]\n";
         let tree = parse_yaml_tree(input).expect("tree");

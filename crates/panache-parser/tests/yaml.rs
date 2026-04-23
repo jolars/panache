@@ -57,6 +57,28 @@ fn allowlisted_case_paths() -> Vec<(String, PathBuf)> {
         .collect()
 }
 
+fn all_case_paths() -> Vec<(String, PathBuf)> {
+    let root = fixture_root();
+    let mut entries: Vec<(String, PathBuf)> = fs::read_dir(&root)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", root.display()))
+        .filter_map(|entry| {
+            let entry = entry.unwrap_or_else(|e| panic!("failed to read dir entry: {e}"));
+            let path = entry.path();
+            if !path.is_dir() {
+                return None;
+            }
+            let case_id = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .expect("valid UTF-8 case id")
+                .to_string();
+            Some((case_id, path))
+        })
+        .collect();
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+    entries
+}
+
 fn fixture_case_events(case_path: &Path) -> Vec<String> {
     let event_path = case_path.join("test.event");
     let event_text = fs::read_to_string(&event_path)
@@ -392,6 +414,99 @@ fn render_shadow_report(
         report.line_count,
         report.normalized_input
     )
+}
+
+#[test]
+#[ignore = "manual triage report generation"]
+fn yaml_suite_generate_triage_report() {
+    let mut passes_now = Vec::new();
+    let mut error_contract_ok = Vec::new();
+    let mut fails_needs_feature = Vec::new();
+    let mut fails_needs_error_path = Vec::new();
+
+    for (case_id, case_path) in all_case_paths() {
+        let in_yaml = case_path.join("in.yaml");
+        if !in_yaml.exists() {
+            continue;
+        }
+
+        let input = fs::read_to_string(&in_yaml)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", in_yaml.display()));
+        let error_contract = case_path.join("error").exists();
+        let has_test_event = case_path.join("test.event").exists();
+        let report = parse_yaml_report(&input);
+
+        let event_parity = if has_test_event {
+            let expected = fixture_case_events(&case_path);
+            let actual = std::panic::catch_unwind(|| cst_yaml_projected_events(&input));
+            actual.ok().map(|events| events == expected)
+        } else {
+            None
+        };
+
+        if !error_contract {
+            if report.tree.is_some() && event_parity == Some(true) {
+                passes_now.push(case_id);
+            } else {
+                fails_needs_feature.push(json!({
+                    "case_id": case_id,
+                    "tree": report.tree.is_some(),
+                    "event_parity": event_parity,
+                    "diagnostic_codes": report
+                        .diagnostics
+                        .iter()
+                        .map(|d| d.code)
+                        .collect::<Vec<_>>(),
+                }));
+            }
+            continue;
+        }
+
+        if report.tree.is_none() && !report.diagnostics.is_empty() {
+            error_contract_ok.push(json!({
+                "case_id": case_id,
+                "diagnostic_codes": report
+                    .diagnostics
+                    .iter()
+                    .map(|d| d.code)
+                    .collect::<Vec<_>>(),
+                "event_parity": event_parity,
+            }));
+        } else {
+            fails_needs_error_path.push(json!({
+                "case_id": case_id,
+                "tree": report.tree.is_some(),
+                "diagnostic_codes": report
+                    .diagnostics
+                    .iter()
+                    .map(|d| d.code)
+                    .collect::<Vec<_>>(),
+                "event_parity": event_parity,
+            }));
+        }
+    }
+
+    let triage = json!({
+        "summary": {
+            "total_cases": all_case_paths().len(),
+            "passes_now_count": passes_now.len(),
+            "error_contract_ok_count": error_contract_ok.len(),
+            "fails_needs_feature_count": fails_needs_feature.len(),
+            "fails_needs_error_path_count": fails_needs_error_path.len(),
+        },
+        "passes_now": passes_now,
+        "error_contract_ok": error_contract_ok,
+        "fails_needs_feature": fails_needs_feature,
+        "fails_needs_error_path": fails_needs_error_path,
+    });
+
+    let out_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/yaml/triage.json");
+    fs::write(
+        &out_path,
+        serde_json::to_string_pretty(&triage)
+            .unwrap_or_else(|e| panic!("failed to serialize triage JSON: {e}")),
+    )
+    .unwrap_or_else(|e| panic!("failed to write {}: {e}", out_path.display()));
 }
 
 #[test]

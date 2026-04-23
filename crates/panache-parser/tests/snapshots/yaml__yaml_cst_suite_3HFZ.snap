@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "3HFZ",
+  "cst": null,
+  "diagnostics": [
+    {
+      "byte_end": 26,
+      "byte_start": 15,
+      "code": "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END",
+      "message": "trailing content after document end marker"
+    }
+  ],
+  "input": "---\nkey: value\n... invalid\n"
+}

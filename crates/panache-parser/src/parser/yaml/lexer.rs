@@ -380,6 +380,14 @@ fn lex_mapping_line_tokens<'a>(
         }
         return Ok(());
     }
+    if trimmed.starts_with("...") {
+        return Err(YamlDiagnostic {
+            code: "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END",
+            message: "trailing content after document end marker",
+            byte_start: line_start + line_indent,
+            byte_end: line_start + line.len(),
+        });
+    }
     if trimmed.starts_with('%') {
         push_token(out, YamlToken::Directive, content);
         if !newline.is_empty() {
