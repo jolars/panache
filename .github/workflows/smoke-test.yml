@@ -27,6 +27,8 @@ jobs:
         hadley/r-pkgs
         hadley/r4ds
         hadley/mastering-shiny
+        hadley/ggplot2-book
+        hadley/r-in-production
         jgm/pandoc
         jolars/jolars.co
         kevinheavey/modern-polars
