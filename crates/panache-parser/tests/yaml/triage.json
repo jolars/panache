@@ -1661,11 +1661,9 @@
     },
     {
       "case_id": "M7NX",
-      "diagnostic_codes": [
-        "YAML_PARSE_UNEXPECTED_DEDENT"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "M9B4",
@@ -1929,9 +1927,11 @@
     },
     {
       "case_id": "SBG9",
-      "diagnostic_codes": [],
+      "diagnostic_codes": [
+        "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
+      ],
       "event_parity": false,
-      "tree": true
+      "tree": false
     },
     {
       "case_id": "SKE5",
@@ -2073,9 +2073,11 @@
     },
     {
       "case_id": "X38W",
-      "diagnostic_codes": [],
+      "diagnostic_codes": [
+        "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
+      ],
       "event_parity": false,
-      "tree": true
+      "tree": false
     },
     {
       "case_id": "X8DW",
