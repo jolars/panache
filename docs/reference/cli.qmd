@@ -22,7 +22,7 @@ For help with a specific command, see: `panache help <command>`.
 * `parse` — Parse and display the CST tree for debugging
 * `lsp` — Start the Language Server Protocol server
 * `lint` — Lint a Quarto, Pandoc, or Markdown document
-* `cache` — Manage Panache CLI cache data
+* `clean` — Delete cache data
 * `debug` — Debug utilities for parser/formatter diagnostics
 
 ###### **Options:**
@@ -127,27 +127,15 @@ Configure rules in panache.toml with [lint] section.
 
 
 
-## `panache cache`
+## `panache clean`
 
-Manage Panache's on-disk CLI cache data.
+Delete Panache's on-disk cache data.
 
-**Usage:** `panache cache <COMMAND>`
-
-###### **Subcommands:**
-
-* `clean` — Delete CLI cache data
-
-
-
-## `panache cache clean`
-
-Delete CLI cache data
-
-**Usage:** `panache cache clean [OPTIONS]`
+**Usage:** `panache clean [OPTIONS]`
 
 ###### **Options:**
 
-* `--all` — Remove all Panache CLI cache buckets
+* `--all` — Remove all Panache cache buckets
 
 
 

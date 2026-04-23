@@ -1,4 +1,4 @@
-//! Cache subcommand tests
+//! Clean command tests
 
 use std::fs;
 
@@ -7,7 +7,7 @@ use predicates::prelude::*;
 use tempfile::TempDir;
 
 #[test]
-fn test_cache_clean_removes_current_workspace_bucket() {
+fn test_clean_removes_current_workspace_bucket() {
     let temp_dir = TempDir::new().unwrap();
     let cache_home = temp_dir.path().join("cache-home");
     let home_dir = temp_dir.path().join("home");
@@ -30,7 +30,7 @@ fn test_cache_clean_removes_current_workspace_bucket() {
         .current_dir(&workspace)
         .env("XDG_CACHE_HOME", &cache_home)
         .env("HOME", &home_dir)
-        .args(["cache", "clean"])
+        .args(["clean"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Removed cache directory"));
@@ -39,14 +39,14 @@ fn test_cache_clean_removes_current_workspace_bucket() {
         .current_dir(&workspace)
         .env("XDG_CACHE_HOME", &cache_home)
         .env("HOME", &home_dir)
-        .args(["cache", "clean"])
+        .args(["clean"])
         .assert()
         .success()
         .stdout(predicate::str::contains("No cache directory found"));
 }
 
 #[test]
-fn test_cache_clean_all_removes_all_buckets() {
+fn test_clean_all_removes_all_buckets() {
     let temp_dir = TempDir::new().unwrap();
     let cache_home = temp_dir.path().join("cache-home");
     let home_dir = temp_dir.path().join("home");
@@ -79,7 +79,7 @@ fn test_cache_clean_all_removes_all_buckets() {
         .current_dir(&workspace_one)
         .env("XDG_CACHE_HOME", &cache_home)
         .env("HOME", &home_dir)
-        .args(["cache", "clean", "--all"])
+        .args(["clean", "--all"])
         .assert()
         .success()
         .stdout(
@@ -91,7 +91,7 @@ fn test_cache_clean_all_removes_all_buckets() {
         .current_dir(&workspace_one)
         .env("XDG_CACHE_HOME", &cache_home)
         .env("HOME", &home_dir)
-        .args(["cache", "clean", "--all"])
+        .args(["clean", "--all"])
         .assert()
         .success()
         .stdout(
@@ -101,7 +101,7 @@ fn test_cache_clean_all_removes_all_buckets() {
 }
 
 #[test]
-fn test_cache_clean_uses_cache_dir_override() {
+fn test_clean_uses_cache_dir_override() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let cache_dir = temp_dir.path().join("custom-cache");
@@ -125,7 +125,7 @@ fn test_cache_clean_uses_cache_dir_override() {
 
     cargo_bin_cmd!("panache")
         .current_dir(&workspace)
-        .args(["--cache-dir", cache_dir.to_str().unwrap(), "cache", "clean"])
+        .args(["--cache-dir", cache_dir.to_str().unwrap(), "clean"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Removed cache directory"));

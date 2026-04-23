@@ -15,7 +15,7 @@ use cache::{
     CachedLintDocument, CliCache, FormatCacheMode, FormatStoreArgs, global_cache_base_dir,
     resolve_cache_dir_for_cli,
 };
-use cli::{CacheCommands, Cli, ColorMode, Commands, DebugChecks, DebugCommands};
+use cli::{Cli, ColorMode, Commands, DebugChecks, DebugCommands};
 use diagnostic_renderer::print_diagnostics;
 
 /// Supported file extensions for formatting
@@ -938,43 +938,32 @@ fn main() -> io::Result<()> {
 
             Ok(())
         }
-        Commands::Cache { command } => match command {
-            CacheCommands::Clean { all } => {
-                let start_dir = start_dir_for(None)?;
-                let (cfg, _) = load_config_for_cli(
-                    cli.config.as_deref(),
-                    cli.isolated,
-                    cli.cache_dir.as_deref(),
-                    &start_dir,
-                    None,
-                )?;
+        Commands::Clean { all } => {
+            let start_dir = start_dir_for(None)?;
+            let (cfg, _) = load_config_for_cli(
+                cli.config.as_deref(),
+                cli.isolated,
+                cli.cache_dir.as_deref(),
+                &start_dir,
+                None,
+            )?;
 
-                if all {
-                    if cfg.cache_dir.is_some() {
-                        let cache_dir =
-                            resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
-                        let removed = remove_dir_if_exists(&cache_dir)?;
-                        if removed {
-                            println!("Removed cache directory {}", cache_dir.display());
-                        } else {
-                            println!("No cache directory found at {}", cache_dir.display());
-                        }
-                    } else if let Some(global_base) = global_cache_base_dir() {
-                        let removed = remove_dir_if_exists(&global_base)?;
-                        if removed {
-                            println!("Removed all cache buckets at {}", global_base.display());
-                        } else {
-                            println!("No cache buckets found at {}", global_base.display());
-                        }
+            if all {
+                if cfg.cache_dir.is_some() {
+                    let cache_dir =
+                        resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
+                    let removed = remove_dir_if_exists(&cache_dir)?;
+                    if removed {
+                        println!("Removed cache directory {}", cache_dir.display());
                     } else {
-                        let cache_dir =
-                            resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
-                        let removed = remove_dir_if_exists(&cache_dir)?;
-                        if removed {
-                            println!("Removed cache directory {}", cache_dir.display());
-                        } else {
-                            println!("No cache directory found at {}", cache_dir.display());
-                        }
+                        println!("No cache directory found at {}", cache_dir.display());
+                    }
+                } else if let Some(global_base) = global_cache_base_dir() {
+                    let removed = remove_dir_if_exists(&global_base)?;
+                    if removed {
+                        println!("Removed all cache buckets at {}", global_base.display());
+                    } else {
+                        println!("No cache buckets found at {}", global_base.display());
                     }
                 } else {
                     let cache_dir =
@@ -986,10 +975,18 @@ fn main() -> io::Result<()> {
                         println!("No cache directory found at {}", cache_dir.display());
                     }
                 }
-
-                Ok(())
+            } else {
+                let cache_dir = resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
+                let removed = remove_dir_if_exists(&cache_dir)?;
+                if removed {
+                    println!("Removed cache directory {}", cache_dir.display());
+                } else {
+                    println!("No cache directory found at {}", cache_dir.display());
+                }
             }
-        },
+
+            Ok(())
+        }
         Commands::Debug { command } => match command {
             DebugCommands::Format {
                 files,

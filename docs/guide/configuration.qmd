@@ -155,15 +155,15 @@ cache-dir = "/absolute/path/to/cache-dir"
 `cache-dir`
 :   Optional cache directory override. Relative paths are resolved from the CLI
     start directory. If unset, Panache uses an OS-specific global cache location
-    (for example `~/.cache/panache/cli-cache/` on Linux).
+    (for example `~/.cache/panache/` on Linux).
 
 Cache validity currently includes file content, effective config, and Panache
 version. When any of these change, Panache recomputes and refreshes entries. Use
 `--cache-dir <CACHE_DIR>` (or `PANACHE_CACHE_DIR`) to override `cache-dir` for
 one invocation. Use `--no-cache` (or `PANACHE_NO_CACHE`) to bypass cache
-reads/writes for a single CLI invocation. Use `panache cache clean` to remove
-the current workspace bucket, or `panache cache clean --all` to clear all global
-Panache CLI cache buckets.
+reads/writes for a single CLI invocation. Use `panache clean` to remove the
+current workspace bucket, or `panache clean --all` to clear all global Panache
+cache buckets.
 
 ## Formatting Style
 

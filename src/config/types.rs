@@ -883,7 +883,7 @@ pub struct Config {
     pub parser: PandocCompat,
     /// Linter rule toggles.
     pub lint: LintConfig,
-    /// Optional CLI cache directory override.
+    /// Optional cache directory override.
     pub cache_dir: Option<String>,
     pub built_in_greedy_wrap: bool,
     pub exclude: Option<Vec<String>>,

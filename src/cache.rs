@@ -138,7 +138,7 @@ pub fn resolve_cache_dir_for_cli(
 }
 
 pub fn global_cache_base_dir() -> Option<PathBuf> {
-    dirs::cache_dir().map(|dir| dir.join("panache").join("cli-cache"))
+    dirs::cache_dir().map(|dir| dir.join("panache"))
 }
 
 impl CliCache {
