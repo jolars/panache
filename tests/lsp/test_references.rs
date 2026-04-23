@@ -367,6 +367,21 @@ async fn test_references_heading_hash_link_and_id_are_consistent() {
 }
 
 #[tokio::test]
+async fn test_references_shortcut_label_matching_explicit_heading_id_returns_none() {
+    let server = TestLspServer::new();
+    let content = "[improving-performance].\n\n# Improving Performance {#improving-performance}\n";
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let refs = server.references("file:///test.Rmd", 0, 2, true).await;
+    assert!(
+        refs.is_none(),
+        "Expected no references for shortcut label matching only a heading id"
+    );
+}
+
+#[tokio::test]
 async fn test_references_footnote_definition_finds_all_footnote_occurrences() {
     let server = TestLspServer::new();
     let content = "A footnote[^1] first.\nAnother[^1] second.\n\n[^1]: Footnote content.\n";

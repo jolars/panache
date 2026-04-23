@@ -8,6 +8,7 @@ use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
+use crate::syntax::{AstNode, Link};
 use crate::utils::{normalize_anchor_label, normalize_label};
 
 use super::super::conversions::{offset_to_position, position_to_offset};
@@ -52,6 +53,13 @@ pub(crate) async fn references(
     };
     let Some(target) = target else {
         return Ok(None);
+    };
+
+    let heading_link_is_explicit_anchor = if matches!(target, SymbolTarget::HeadingLink(_)) {
+        let root = ctx.syntax_root();
+        is_explicit_heading_anchor_at_offset(&root, offset)
+    } else {
+        false
     };
 
     let mut locations = Vec::new();
@@ -108,9 +116,37 @@ pub(crate) async fn references(
                         add_locations(&mut locations, &doc_uri, &text, ranges);
                     }
                 }
-                SymbolTarget::HeadingLink(label) | SymbolTarget::HeadingId(label) => {
+                SymbolTarget::HeadingId(label) => {
                     let ranges = symbol_index.heading_reference_ranges(label, include_declaration);
                     add_locations(&mut locations, &doc_uri, &text, &ranges);
+                }
+                SymbolTarget::HeadingLink(label) => {
+                    if heading_link_is_explicit_anchor {
+                        let ranges = symbol_index.heading_reference_ranges(label, false);
+                        add_locations(&mut locations, &doc_uri, &text, &ranges);
+                        if include_declaration
+                            && let Some(ranges) = symbol_index.heading_id_value_ranges(label)
+                        {
+                            add_locations(&mut locations, &doc_uri, &text, ranges);
+                        }
+                    } else {
+                        if !(config.extensions.implicit_header_references
+                            && config.extensions.auto_identifiers)
+                        {
+                            continue;
+                        }
+
+                        let Some(declaration_ranges) = symbol_index.heading_label_ranges(label)
+                        else {
+                            continue;
+                        };
+
+                        let ranges = symbol_index.heading_reference_ranges(label, false);
+                        add_locations(&mut locations, &doc_uri, &text, &ranges);
+                        if include_declaration {
+                            add_locations(&mut locations, &doc_uri, &text, declaration_ranges);
+                        }
+                    }
                 }
                 SymbolTarget::Citation(key) => {
                     let norm = normalize_label(key);
@@ -206,4 +242,23 @@ fn add_locations(out: &mut Vec<Location>, uri: &Uri, text: &str, ranges: &[rowan
 
 fn crossref_candidates(label: &str, bookdown_references: bool) -> Vec<String> {
     crate::utils::crossref_symbol_labels(&normalize_anchor_label(label), bookdown_references)
+}
+
+fn is_explicit_heading_anchor_at_offset(root: &crate::syntax::SyntaxNode, offset: usize) -> bool {
+    let Some(mut node) = helpers::find_node_at_offset(root, offset) else {
+        return false;
+    };
+
+    loop {
+        if let Some(link) = Link::cast(node.clone()) {
+            return link
+                .dest()
+                .and_then(|dest| dest.hash_anchor_id_range())
+                .is_some();
+        }
+        let Some(parent) = node.parent() else {
+            return false;
+        };
+        node = parent;
+    }
 }

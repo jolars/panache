@@ -567,6 +567,22 @@ async fn test_goto_definition_shortcut_hyphenated_heading_reference_returns_none
 }
 
 #[tokio::test]
+async fn test_goto_definition_shortcut_label_matching_explicit_heading_id_returns_none() {
+    let server = TestLspServer::new();
+
+    let content = "[improving-performance].\n\n# Improving Performance {#improving-performance}\n";
+    server
+        .open_document("file:///test.Rmd", content, "rmarkdown")
+        .await;
+
+    let result = server.goto_definition("file:///test.Rmd", 0, 2).await;
+    assert!(
+        result.is_none(),
+        "Expected no definition for shortcut label matching only a heading id"
+    );
+}
+
+#[tokio::test]
 async fn test_goto_definition_numbered_example_label() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let root = temp_dir.path();

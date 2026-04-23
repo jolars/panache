@@ -69,6 +69,7 @@ pub(crate) async fn goto_definition(
         Crossref(String),
         ChunkLabel(String),
         ExampleLabel(String),
+        HeadingId(String),
         HeadingLink(String),
         Reference { label: String, is_footnote: bool },
     }
@@ -85,9 +86,8 @@ pub(crate) async fn goto_definition(
                 .extensions
                 .example_lists
                 .then_some(PendingDefinition::ExampleLabel(label)),
-            Some(SymbolTarget::HeadingId(label)) | Some(SymbolTarget::HeadingLink(label)) => {
-                Some(PendingDefinition::HeadingLink(label))
-            }
+            Some(SymbolTarget::HeadingId(label)) => Some(PendingDefinition::HeadingId(label)),
+            Some(SymbolTarget::HeadingLink(label)) => Some(PendingDefinition::HeadingLink(label)),
             Some(SymbolTarget::Reference { label, is_footnote }) => {
                 Some(PendingDefinition::Reference { label, is_footnote })
             }
@@ -123,7 +123,7 @@ pub(crate) async fn goto_definition(
     let definition_index =
         helpers::get_definition_index_with_includes(&document_map, &salsa_db, uri).await;
 
-    if let PendingDefinition::HeadingLink(label) = &pending {
+    if let PendingDefinition::HeadingId(label) = &pending {
         for doc in &doc_indices {
             if let Some(ranges) = doc.symbol_index.heading_explicit_definition_ranges(label)
                 && let Some(range) = ranges.first()
@@ -131,6 +131,20 @@ pub(crate) async fn goto_definition(
                 let location =
                     crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
                 return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+            }
+        }
+    }
+
+    if let PendingDefinition::HeadingLink(label) = &pending {
+        if heading_link_is_explicit_anchor {
+            for doc in &doc_indices {
+                if let Some(ranges) = doc.symbol_index.heading_explicit_definition_ranges(label)
+                    && let Some(range) = ranges.first()
+                {
+                    let location =
+                        crate::lsp::navigation::location_from_range(&doc.uri, &doc.text, *range);
+                    return Ok(Some(GotoDefinitionResponse::Scalar(location)));
+                }
             }
         }
 
@@ -252,6 +266,8 @@ pub(crate) async fn goto_definition(
             PendingDefinition::ChunkLabel(label) => definition_index
                 .find_crossref_resolved(&label, config.extensions.bookdown_references),
             PendingDefinition::ExampleLabel(label) => definition_index.find_example_label(&label),
+            PendingDefinition::HeadingId(label) => definition_index
+                .find_crossref_resolved(&label, config.extensions.bookdown_references),
             PendingDefinition::HeadingLink(label) => {
                 if heading_link_is_explicit_anchor {
                     definition_index
