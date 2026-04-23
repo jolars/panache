@@ -24,11 +24,11 @@ jobs:
         ddotta/cookbook-rpolars
         elong0527/r4csr
         hadley/adv-r
+        hadley/ggplot2-book
+        hadley/mastering-shiny
+        hadley/r-in-production
         hadley/r-pkgs
         hadley/r4ds
-        hadley/mastering-shiny
-        hadley/ggplot2-book
-        hadley/r-in-production
         jgm/pandoc
         jolars/jolars.co
         kevinheavey/modern-polars
