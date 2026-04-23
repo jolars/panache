@@ -19,7 +19,7 @@ jobs:
       failure_count: ${{ steps.summarize.outputs.failure_count }}
     env:
       TARGET_REPOS: |
-        aml4td/website/
+        aml4td/website
         andrewheiss/ath-quarto
         clauswilke/dataviz
         csgillespie/efficientR
