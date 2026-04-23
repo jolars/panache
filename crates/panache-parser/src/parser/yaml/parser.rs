@@ -296,10 +296,15 @@ fn emit_block_map<'a>(
                 builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
                 *i += 1;
             }
-            YamlToken::DocumentStart
-            | YamlToken::DocumentEnd
-            | YamlToken::Directive
-            | YamlToken::Comma => {
+            YamlToken::DocumentStart => {
+                builder.token(SyntaxKind::YAML_DOCUMENT_START.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::DocumentEnd => {
+                builder.token(SyntaxKind::YAML_DOCUMENT_END.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Directive | YamlToken::Comma => {
                 builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                 *i += 1;
             }

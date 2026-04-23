@@ -23,6 +23,8 @@ pub enum SyntaxKind {
     YAML_TAG,            // YAML explicit tag token (e.g. !!str)
     YAML_SCALAR,         // YAML scalar value token
     YAML_COMMENT,        // YAML inline comment token
+    YAML_DOCUMENT_START, // YAML document start marker (---) in shadow parser
+    YAML_DOCUMENT_END,   // YAML document end marker (...) in shadow parser
 
     BLOCK_QUOTE_MARKER, // >
     ALERT_MARKER,       // [!NOTE], [!TIP], etc.

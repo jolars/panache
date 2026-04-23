@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: Y2GN
+input: "---\nkey: &an:chor value\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

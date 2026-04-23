@@ -200,6 +200,16 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         return Vec::new();
     };
 
+    let has_explicit_doc_start = tree
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_DOCUMENT_START);
+    let doc_open = if has_explicit_doc_start {
+        "+DOC ---".to_string()
+    } else {
+        "+DOC".to_string()
+    };
+
     let mut values = Vec::new();
     let mut map_header = "+MAP".to_string();
     for entry in tree
@@ -361,7 +371,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         };
         return vec![
             "+STR".to_string(),
-            "+DOC".to_string(),
+            doc_open.clone(),
             scalar_event,
             "-DOC".to_string(),
             "-STR".to_string(),
@@ -370,7 +380,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
 
     let mut events = Vec::with_capacity(values.len() + 6);
     events.push("+STR".to_string());
-    events.push("+DOC".to_string());
+    events.push(doc_open);
     events.push(map_header);
     events.append(&mut values);
     events.push("-MAP".to_string());
@@ -743,4 +753,62 @@ normalized=Some(\"title: Snapshot\\nauthor: Me\")
 ";
 
     assert_eq!(snapshot, expected);
+}
+
+#[test]
+fn yaml_document_start_emitted_as_dedicated_token() {
+    use panache_parser::syntax::SyntaxKind;
+
+    let report = parse_yaml_report("---\ntitle: test\n");
+    let tree = report.tree.expect("should parse");
+
+    let has_doc_start = tree
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|tok| tok.kind() == SyntaxKind::YAML_DOCUMENT_START);
+    assert!(
+        has_doc_start,
+        "tree should contain YAML_DOCUMENT_START token"
+    );
+
+    assert_eq!(
+        tree.text().to_string(),
+        "---\ntitle: test\n",
+        "losslessness"
+    );
+
+    let events = cst_yaml_projected_events("---\ntitle: test\n");
+    assert_eq!(
+        events,
+        vec![
+            "+STR",
+            "+DOC ---",
+            "+MAP",
+            "=VAL :title",
+            "=VAL :test",
+            "-MAP",
+            "-DOC",
+            "-STR"
+        ]
+    );
+}
+
+#[test]
+fn yaml_document_end_emitted_as_dedicated_token() {
+    use panache_parser::syntax::SyntaxKind;
+
+    let report = parse_yaml_report("title: test\n...\n");
+    let tree = report.tree.expect("should parse");
+
+    let has_doc_end = tree
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|tok| tok.kind() == SyntaxKind::YAML_DOCUMENT_END);
+    assert!(has_doc_end, "tree should contain YAML_DOCUMENT_END token");
+
+    assert_eq!(
+        tree.text().to_string(),
+        "title: test\n...\n",
+        "losslessness"
+    );
 }
