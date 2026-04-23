@@ -1,17 +1,9 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "9MMA",
-  "cst": null,
-  "diagnostics": [
-    {
-      "byte_end": 9,
-      "byte_start": 0,
-      "code": "YAML_PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START",
-      "message": "directive requires an explicit document start marker"
-    }
-  ],
-  "input": "%YAML 1.2\n"
-}
+case_id: 9MMA
+input: "%YAML 1.2\n"
+diagnostics:
+YAML_PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START:directive requires an explicit document start marker@0..9
+cst:

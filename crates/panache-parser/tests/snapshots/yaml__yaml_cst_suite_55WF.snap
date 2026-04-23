@@ -1,17 +1,9 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "55WF",
-  "cst": null,
-  "diagnostics": [
-    {
-      "byte_end": 6,
-      "byte_start": 5,
-      "code": "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE",
-      "message": "invalid escape in double quoted scalar"
-    }
-  ],
-  "input": "---\n\"\\.\"\n"
-}
+case_id: 55WF
+input: "---\n\"\\.\"\n"
+diagnostics:
+YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE:invalid escape in double quoted scalar@5..6
+cst:

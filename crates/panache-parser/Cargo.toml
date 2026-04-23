@@ -24,6 +24,6 @@ default = []
 serde = ["dep:serde"]
 
 [dev-dependencies]
-insta = { version = "1.47.2", features = ["json"] }
+insta = "1.47.2"
 serde_json = "1.0"
 toml = "1.1.2"

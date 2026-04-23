@@ -1,170 +1,28 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "JS2J",
-  "cst": {
-    "children": [
-      {
-        "children": [
-          {
-            "children": [
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 16,
-                          "start": 0
-                        },
-                        "text": "First occurrence"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 17,
-                          "start": 16
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 17,
-                      "start": 0
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 18,
-                          "start": 17
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 31,
-                          "start": 18
-                        },
-                        "text": "&anchor Value"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 31,
-                      "start": 17
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 32,
-                      "start": 31
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 32,
-                  "start": 0
-                }
-              },
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 49,
-                          "start": 32
-                        },
-                        "text": "Second occurrence"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 50,
-                          "start": 49
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 50,
-                      "start": 32
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 51,
-                          "start": 50
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 58,
-                          "start": 51
-                        },
-                        "text": "*anchor"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 58,
-                      "start": 50
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 59,
-                      "start": 58
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 59,
-                  "start": 32
-                }
-              }
-            ],
-            "kind": "YAML_BLOCK_MAP",
-            "range": {
-              "end": 59,
-              "start": 0
-            }
-          }
-        ],
-        "kind": "YAML_METADATA_CONTENT",
-        "range": {
-          "end": 59,
-          "start": 0
-        }
-      }
-    ],
-    "kind": "DOCUMENT",
-    "range": {
-      "end": 59,
-      "start": 0
-    }
-  },
-  "diagnostics": [],
-  "input": "First occurrence: &anchor Value\nSecond occurrence: *anchor\n"
-}
+case_id: JS2J
+input: "First occurrence: &anchor Value\nSecond occurrence: *anchor\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..59
+  YAML_METADATA_CONTENT@0..59
+    YAML_BLOCK_MAP@0..59
+      YAML_BLOCK_MAP_ENTRY@0..32
+        YAML_BLOCK_MAP_KEY@0..17
+          YAML_KEY@0..16 "First occurrence"
+          YAML_COLON@16..17 ":"
+        YAML_BLOCK_MAP_VALUE@17..31
+          WHITESPACE@17..18 " "
+          YAML_SCALAR@18..31 "&anchor Value"
+        NEWLINE@31..32 "\n"
+      YAML_BLOCK_MAP_ENTRY@32..59
+        YAML_BLOCK_MAP_KEY@32..50
+          YAML_KEY@32..49 "Second occurrence"
+          YAML_COLON@49..50 ":"
+        YAML_BLOCK_MAP_VALUE@50..58
+          WHITESPACE@50..51 " "
+          YAML_SCALAR@51..58 "*anchor"
+        NEWLINE@58..59 "\n"

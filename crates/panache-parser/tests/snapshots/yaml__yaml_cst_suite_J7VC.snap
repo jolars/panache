@@ -1,186 +1,30 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "J7VC",
-  "cst": {
-    "children": [
-      {
-        "children": [
-          {
-            "children": [
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 3,
-                          "start": 0
-                        },
-                        "text": "one"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 4,
-                          "start": 3
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 4,
-                      "start": 0
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 5,
-                          "start": 4
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 6,
-                          "start": 5
-                        },
-                        "text": "2"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 6,
-                      "start": 4
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 7,
-                      "start": 6
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 7,
-                  "start": 0
-                }
-              },
-              {
-                "kind": "NEWLINE",
-                "range": {
-                  "end": 8,
-                  "start": 7
-                },
-                "text": "\n"
-              },
-              {
-                "kind": "NEWLINE",
-                "range": {
-                  "end": 9,
-                  "start": 8
-                },
-                "text": "\n"
-              },
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 14,
-                          "start": 9
-                        },
-                        "text": "three"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 15,
-                          "start": 14
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 15,
-                      "start": 9
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 16,
-                          "start": 15
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 17,
-                          "start": 16
-                        },
-                        "text": "4"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 17,
-                      "start": 15
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 18,
-                      "start": 17
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 18,
-                  "start": 9
-                }
-              }
-            ],
-            "kind": "YAML_BLOCK_MAP",
-            "range": {
-              "end": 18,
-              "start": 0
-            }
-          }
-        ],
-        "kind": "YAML_METADATA_CONTENT",
-        "range": {
-          "end": 18,
-          "start": 0
-        }
-      }
-    ],
-    "kind": "DOCUMENT",
-    "range": {
-      "end": 18,
-      "start": 0
-    }
-  },
-  "diagnostics": [],
-  "input": "one: 2\n\n\nthree: 4\n"
-}
+case_id: J7VC
+input: "one: 2\n\n\nthree: 4\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..18
+  YAML_METADATA_CONTENT@0..18
+    YAML_BLOCK_MAP@0..18
+      YAML_BLOCK_MAP_ENTRY@0..7
+        YAML_BLOCK_MAP_KEY@0..4
+          YAML_KEY@0..3 "one"
+          YAML_COLON@3..4 ":"
+        YAML_BLOCK_MAP_VALUE@4..6
+          WHITESPACE@4..5 " "
+          YAML_SCALAR@5..6 "2"
+        NEWLINE@6..7 "\n"
+      NEWLINE@7..8 "\n"
+      NEWLINE@8..9 "\n"
+      YAML_BLOCK_MAP_ENTRY@9..18
+        YAML_BLOCK_MAP_KEY@9..15
+          YAML_KEY@9..14 "three"
+          YAML_COLON@14..15 ":"
+        YAML_BLOCK_MAP_VALUE@15..17
+          WHITESPACE@15..16 " "
+          YAML_SCALAR@16..17 "4"
+        NEWLINE@17..18 "\n"

@@ -1,162 +1,27 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "D88J",
-  "cst": {
-    "children": [
-      {
-        "children": [
-          {
-            "children": [
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 1,
-                          "start": 0
-                        },
-                        "text": "a"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 2,
-                          "start": 1
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 2,
-                      "start": 0
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 3,
-                          "start": 2
-                        },
-                        "text": " "
-                      },
-                      {
-                        "children": [
-                          {
-                            "kind": "YAML_SCALAR",
-                            "range": {
-                              "end": 4,
-                              "start": 3
-                            },
-                            "text": "["
-                          },
-                          {
-                            "children": [
-                              {
-                                "kind": "YAML_SCALAR",
-                                "range": {
-                                  "end": 5,
-                                  "start": 4
-                                },
-                                "text": "b"
-                              }
-                            ],
-                            "kind": "YAML_FLOW_SEQUENCE_ITEM",
-                            "range": {
-                              "end": 5,
-                              "start": 4
-                            }
-                          },
-                          {
-                            "kind": "YAML_SCALAR",
-                            "range": {
-                              "end": 6,
-                              "start": 5
-                            },
-                            "text": ","
-                          },
-                          {
-                            "children": [
-                              {
-                                "kind": "YAML_SCALAR",
-                                "range": {
-                                  "end": 8,
-                                  "start": 6
-                                },
-                                "text": " c"
-                              }
-                            ],
-                            "kind": "YAML_FLOW_SEQUENCE_ITEM",
-                            "range": {
-                              "end": 8,
-                              "start": 6
-                            }
-                          },
-                          {
-                            "kind": "YAML_SCALAR",
-                            "range": {
-                              "end": 9,
-                              "start": 8
-                            },
-                            "text": "]"
-                          }
-                        ],
-                        "kind": "YAML_FLOW_SEQUENCE",
-                        "range": {
-                          "end": 9,
-                          "start": 3
-                        }
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 9,
-                      "start": 2
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 10,
-                      "start": 9
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 10,
-                  "start": 0
-                }
-              }
-            ],
-            "kind": "YAML_BLOCK_MAP",
-            "range": {
-              "end": 10,
-              "start": 0
-            }
-          }
-        ],
-        "kind": "YAML_METADATA_CONTENT",
-        "range": {
-          "end": 10,
-          "start": 0
-        }
-      }
-    ],
-    "kind": "DOCUMENT",
-    "range": {
-      "end": 10,
-      "start": 0
-    }
-  },
-  "diagnostics": [],
-  "input": "a: [b, c]\n"
-}
+case_id: D88J
+input: "a: [b, c]\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..10
+  YAML_METADATA_CONTENT@0..10
+    YAML_BLOCK_MAP@0..10
+      YAML_BLOCK_MAP_ENTRY@0..10
+        YAML_BLOCK_MAP_KEY@0..2
+          YAML_KEY@0..1 "a"
+          YAML_COLON@1..2 ":"
+        YAML_BLOCK_MAP_VALUE@2..9
+          WHITESPACE@2..3 " "
+          YAML_FLOW_SEQUENCE@3..9
+            YAML_SCALAR@3..4 "["
+            YAML_FLOW_SEQUENCE_ITEM@4..5
+              YAML_SCALAR@4..5 "b"
+            YAML_SCALAR@5..6 ","
+            YAML_FLOW_SEQUENCE_ITEM@6..8
+              YAML_SCALAR@6..8 " c"
+            YAML_SCALAR@8..9 "]"
+        NEWLINE@9..10 "\n"

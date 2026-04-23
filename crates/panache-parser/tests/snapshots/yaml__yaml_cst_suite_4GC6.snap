@@ -1,52 +1,14 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "4GC6",
-  "cst": {
-    "children": [
-      {
-        "children": [
-          {
-            "children": [
-              {
-                "kind": "YAML_SCALAR",
-                "range": {
-                  "end": 21,
-                  "start": 0
-                },
-                "text": "'here''s to \"quotes\"'"
-              },
-              {
-                "kind": "NEWLINE",
-                "range": {
-                  "end": 22,
-                  "start": 21
-                },
-                "text": "\n"
-              }
-            ],
-            "kind": "YAML_BLOCK_MAP",
-            "range": {
-              "end": 22,
-              "start": 0
-            }
-          }
-        ],
-        "kind": "YAML_METADATA_CONTENT",
-        "range": {
-          "end": 22,
-          "start": 0
-        }
-      }
-    ],
-    "kind": "DOCUMENT",
-    "range": {
-      "end": 22,
-      "start": 0
-    }
-  },
-  "diagnostics": [],
-  "input": "'here''s to \"quotes\"'\n"
-}
+case_id: 4GC6
+input: "'here''s to \"quotes\"'\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..22
+  YAML_METADATA_CONTENT@0..22
+    YAML_BLOCK_MAP@0..22
+      YAML_SCALAR@0..21 "'here''s to \"quotes\"'"
+      NEWLINE@21..22 "\n"

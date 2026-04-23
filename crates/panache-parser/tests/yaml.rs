@@ -92,6 +92,10 @@ fn fixture_case_events(case_path: &Path) -> Vec<String> {
 }
 
 fn cst_yaml_projected_events(input: &str) -> Vec<String> {
+    fn plain_val_event(text: &str) -> String {
+        format!("=VAL :{}", text.replace('\\', "\\\\"))
+    }
+
     fn quoted_val_event(text: &str) -> String {
         if text.starts_with('\'') {
             let trimmed = text.trim_end_matches('\'');
@@ -241,7 +245,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
             if let Some(long) = long_tag(&tag) {
                 format!("=VAL {long} :{key_text}")
             } else {
-                format!("=VAL :{key_text}")
+                plain_val_event(&key_text)
             }
         } else if let Some(rest) = key_text.strip_prefix('&') {
             if let Some((anchor, value)) = rest.split_once(' ') {
@@ -254,7 +258,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         } else if key_text.starts_with('*') {
             format!("=ALI {}", key_text.trim_end())
         } else {
-            format!("=VAL :{key_text}")
+            plain_val_event(&key_text)
         };
         values.push(key_event);
 
@@ -266,7 +270,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
                 if item.starts_with('"') || item.starts_with('\'') {
                     values.push(quoted_val_event(&item));
                 } else {
-                    values.push(format!("=VAL :{item}"));
+                    values.push(plain_val_event(&item));
                 }
             }
             values.push("-SEQ".to_string());
@@ -275,7 +279,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
                 if let Some(long) = long_tag(&tag) {
                     format!("=VAL {long} :{value_text}")
                 } else {
-                    format!("=VAL :{value_text}")
+                    plain_val_event(&value_text)
                 }
             } else if value_text.starts_with('"') || value_text.starts_with('\'') {
                 quoted_val_event(&value_text)
@@ -291,7 +295,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
             } else if value_text.starts_with('*') {
                 format!("=ALI {value_text}")
             } else {
-                format!("=VAL :{value_text}")
+                plain_val_event(&value_text)
             };
             values.push(value_event);
         }
@@ -331,8 +335,8 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
                 .trim()
                 .to_string();
 
-            values.push(format!("=VAL :{key_text}"));
-            values.push(format!("=VAL :{value_text}"));
+            values.push(plain_val_event(&key_text));
+            values.push(plain_val_event(&value_text));
         }
     }
 
@@ -353,7 +357,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         let scalar_event = if text.starts_with('"') || text.starts_with('\'') {
             quoted_val_event(&text)
         } else {
-            format!("=VAL :{text}")
+            plain_val_event(&text)
         };
         return vec![
             "+STR".to_string(),
@@ -375,30 +379,8 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     events
 }
 
-fn cst_to_json(node: &ParserSyntaxNode) -> serde_json::Value {
-    let children: Vec<serde_json::Value> = node
-        .children_with_tokens()
-        .map(|element| match element {
-            rowan::NodeOrToken::Node(child_node) => cst_to_json(&child_node),
-            rowan::NodeOrToken::Token(token) => json!({
-                "kind": format!("{:?}", token.kind()),
-                "range": {
-                    "start": u32::from(token.text_range().start()),
-                    "end": u32::from(token.text_range().end()),
-                },
-                "text": token.text().to_string(),
-            }),
-        })
-        .collect();
-
-    json!({
-        "kind": format!("{:?}", node.kind()),
-        "range": {
-            "start": u32::from(node.text_range().start()),
-            "end": u32::from(node.text_range().end()),
-        },
-        "children": children,
-    })
+fn cst_text(node: &ParserSyntaxNode) -> String {
+    format!("{:#?}\n", node)
 }
 
 fn render_shadow_report(
@@ -571,23 +553,17 @@ fn yaml_allowlist_cases_cst_snapshot() {
         });
 
         let report = parse_yaml_report(&input);
-        let tree = report.tree;
-        let snapshot_json = json!({
-            "case_id": case_id,
-            "input": input,
-            "diagnostics": report
-                .diagnostics
-                .iter()
-                .map(|d| json!({
-                    "code": d.code,
-                    "message": d.message,
-                    "byte_start": d.byte_start,
-                    "byte_end": d.byte_end,
-                }))
-                .collect::<Vec<_>>(),
-            "cst": tree.as_ref().map(cst_to_json),
-        });
-        insta::assert_json_snapshot!(format!("yaml_cst_suite_{}", case_id), snapshot_json);
+        let diagnostics = report
+            .diagnostics
+            .iter()
+            .map(|d| format!("{}:{}@{}..{}", d.code, d.message, d.byte_start, d.byte_end))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let cst = report.tree.as_ref().map(cst_text).unwrap_or_default();
+        let snapshot = format!(
+            "case_id: {case_id}\ninput: {input:?}\ndiagnostics:\n{diagnostics}\ncst:\n{cst}"
+        );
+        insta::assert_snapshot!(format!("yaml_cst_suite_{}", case_id), snapshot);
     }
 }
 

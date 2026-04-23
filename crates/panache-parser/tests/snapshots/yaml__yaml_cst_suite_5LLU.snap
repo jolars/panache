@@ -1,17 +1,9 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "5LLU",
-  "cst": null,
-  "diagnostics": [
-    {
-      "byte_end": 16,
-      "byte_start": 16,
-      "code": "YAML_LEX_ERROR",
-      "message": "internal token range reconstruction mismatch"
-    }
-  ],
-  "input": "block scalar: >\n \n  \n   \n invalid\n"
-}
+case_id: 5LLU
+input: "block scalar: >\n \n  \n   \n invalid\n"
+diagnostics:
+YAML_LEX_ERROR:internal token range reconstruction mismatch@16..16
+cst:

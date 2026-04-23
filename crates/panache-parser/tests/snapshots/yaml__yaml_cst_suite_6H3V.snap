@@ -1,103 +1,20 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "6H3V",
-  "cst": {
-    "children": [
-      {
-        "children": [
-          {
-            "children": [
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 11,
-                          "start": 0
-                        },
-                        "text": "'foo: bar\\'"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 12,
-                          "start": 11
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 12,
-                      "start": 0
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 13,
-                          "start": 12
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 17,
-                          "start": 13
-                        },
-                        "text": "baz'"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 17,
-                      "start": 12
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 18,
-                      "start": 17
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 18,
-                  "start": 0
-                }
-              }
-            ],
-            "kind": "YAML_BLOCK_MAP",
-            "range": {
-              "end": 18,
-              "start": 0
-            }
-          }
-        ],
-        "kind": "YAML_METADATA_CONTENT",
-        "range": {
-          "end": 18,
-          "start": 0
-        }
-      }
-    ],
-    "kind": "DOCUMENT",
-    "range": {
-      "end": 18,
-      "start": 0
-    }
-  },
-  "diagnostics": [],
-  "input": "'foo: bar\\': baz'\n"
-}
+case_id: 6H3V
+input: "'foo: bar\\': baz'\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..18
+  YAML_METADATA_CONTENT@0..18
+    YAML_BLOCK_MAP@0..18
+      YAML_BLOCK_MAP_ENTRY@0..18
+        YAML_BLOCK_MAP_KEY@0..12
+          YAML_KEY@0..11 "'foo: bar\\'"
+          YAML_COLON@11..12 ":"
+        YAML_BLOCK_MAP_VALUE@12..17
+          WHITESPACE@12..13 " "
+          YAML_SCALAR@13..17 "baz'"
+        NEWLINE@17..18 "\n"

@@ -1,17 +1,9 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "S4GJ",
-  "cst": null,
-  "diagnostics": [
-    {
-      "byte_end": 38,
-      "byte_start": 27,
-      "code": "YAML_PARSE_INVALID_KEY_TOKEN",
-      "message": "invalid token while parsing block map key"
-    }
-  ],
-  "input": "---\nfolded: > first line\n  second line\n"
-}
+case_id: S4GJ
+input: "---\nfolded: > first line\n  second line\n"
+diagnostics:
+YAML_PARSE_INVALID_KEY_TOKEN:invalid token while parsing block map key@27..38
+cst:

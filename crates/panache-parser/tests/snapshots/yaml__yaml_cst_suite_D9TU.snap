@@ -1,103 +1,20 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "D9TU",
-  "cst": {
-    "children": [
-      {
-        "children": [
-          {
-            "children": [
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 3,
-                          "start": 0
-                        },
-                        "text": "foo"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 4,
-                          "start": 3
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 4,
-                      "start": 0
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 5,
-                          "start": 4
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 8,
-                          "start": 5
-                        },
-                        "text": "bar"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 8,
-                      "start": 4
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 9,
-                      "start": 8
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 9,
-                  "start": 0
-                }
-              }
-            ],
-            "kind": "YAML_BLOCK_MAP",
-            "range": {
-              "end": 9,
-              "start": 0
-            }
-          }
-        ],
-        "kind": "YAML_METADATA_CONTENT",
-        "range": {
-          "end": 9,
-          "start": 0
-        }
-      }
-    ],
-    "kind": "DOCUMENT",
-    "range": {
-      "end": 9,
-      "start": 0
-    }
-  },
-  "diagnostics": [],
-  "input": "foo: bar\n"
-}
+case_id: D9TU
+input: "foo: bar\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..9
+  YAML_METADATA_CONTENT@0..9
+    YAML_BLOCK_MAP@0..9
+      YAML_BLOCK_MAP_ENTRY@0..9
+        YAML_BLOCK_MAP_KEY@0..4
+          YAML_KEY@0..3 "foo"
+          YAML_COLON@3..4 ":"
+        YAML_BLOCK_MAP_VALUE@4..8
+          WHITESPACE@4..5 " "
+          YAML_SCALAR@5..8 "bar"
+        NEWLINE@8..9 "\n"

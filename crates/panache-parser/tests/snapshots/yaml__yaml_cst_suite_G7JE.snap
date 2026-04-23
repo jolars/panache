@@ -1,17 +1,9 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "G7JE",
-  "cst": null,
-  "diagnostics": [
-    {
-      "byte_end": 10,
-      "byte_start": 10,
-      "code": "YAML_PARSE_UNEXPECTED_INDENT",
-      "message": "unexpected indent token while parsing block map"
-    }
-  ],
-  "input": "a\\nb: 1\nc\n d: 1\n"
-}
+case_id: G7JE
+input: "a\\nb: 1\nc\n d: 1\n"
+diagnostics:
+YAML_PARSE_UNEXPECTED_INDENT:unexpected indent token while parsing block map@10..10
+cst:

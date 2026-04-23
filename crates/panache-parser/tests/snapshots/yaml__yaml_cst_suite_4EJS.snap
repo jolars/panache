@@ -1,17 +1,9 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "4EJS",
-  "cst": null,
-  "diagnostics": [
-    {
-      "byte_end": 6,
-      "byte_start": 4,
-      "code": "YAML_LEX_ERROR",
-      "message": "invalid plain mapping line"
-    }
-  ],
-  "input": "---\na:\n\tb:\n\t\tc: value\n"
-}
+case_id: 4EJS
+input: "---\na:\n\tb:\n\t\tc: value\n"
+diagnostics:
+YAML_LEX_ERROR:invalid plain mapping line@4..6
+cst:

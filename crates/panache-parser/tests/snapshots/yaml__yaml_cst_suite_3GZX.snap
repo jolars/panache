@@ -1,304 +1,44 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "3GZX",
-  "cst": {
-    "children": [
-      {
-        "children": [
-          {
-            "children": [
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 16,
-                          "start": 0
-                        },
-                        "text": "First occurrence"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 17,
-                          "start": 16
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 17,
-                      "start": 0
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 18,
-                          "start": 17
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 29,
-                          "start": 18
-                        },
-                        "text": "&anchor Foo"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 29,
-                      "start": 17
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 30,
-                      "start": 29
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 30,
-                  "start": 0
-                }
-              },
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 47,
-                          "start": 30
-                        },
-                        "text": "Second occurrence"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 48,
-                          "start": 47
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 48,
-                      "start": 30
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 49,
-                          "start": 48
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 56,
-                          "start": 49
-                        },
-                        "text": "*anchor"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 56,
-                      "start": 48
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 57,
-                      "start": 56
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 57,
-                  "start": 30
-                }
-              },
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 72,
-                          "start": 57
-                        },
-                        "text": "Override anchor"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 73,
-                          "start": 72
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 73,
-                      "start": 57
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 74,
-                          "start": 73
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 85,
-                          "start": 74
-                        },
-                        "text": "&anchor Bar"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 85,
-                      "start": 73
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 86,
-                      "start": 85
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 86,
-                  "start": 57
-                }
-              },
-              {
-                "children": [
-                  {
-                    "children": [
-                      {
-                        "kind": "YAML_KEY",
-                        "range": {
-                          "end": 98,
-                          "start": 86
-                        },
-                        "text": "Reuse anchor"
-                      },
-                      {
-                        "kind": "YAML_COLON",
-                        "range": {
-                          "end": 99,
-                          "start": 98
-                        },
-                        "text": ":"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_KEY",
-                    "range": {
-                      "end": 99,
-                      "start": 86
-                    }
-                  },
-                  {
-                    "children": [
-                      {
-                        "kind": "WHITESPACE",
-                        "range": {
-                          "end": 100,
-                          "start": 99
-                        },
-                        "text": " "
-                      },
-                      {
-                        "kind": "YAML_SCALAR",
-                        "range": {
-                          "end": 107,
-                          "start": 100
-                        },
-                        "text": "*anchor"
-                      }
-                    ],
-                    "kind": "YAML_BLOCK_MAP_VALUE",
-                    "range": {
-                      "end": 107,
-                      "start": 99
-                    }
-                  },
-                  {
-                    "kind": "NEWLINE",
-                    "range": {
-                      "end": 108,
-                      "start": 107
-                    },
-                    "text": "\n"
-                  }
-                ],
-                "kind": "YAML_BLOCK_MAP_ENTRY",
-                "range": {
-                  "end": 108,
-                  "start": 86
-                }
-              }
-            ],
-            "kind": "YAML_BLOCK_MAP",
-            "range": {
-              "end": 108,
-              "start": 0
-            }
-          }
-        ],
-        "kind": "YAML_METADATA_CONTENT",
-        "range": {
-          "end": 108,
-          "start": 0
-        }
-      }
-    ],
-    "kind": "DOCUMENT",
-    "range": {
-      "end": 108,
-      "start": 0
-    }
-  },
-  "diagnostics": [],
-  "input": "First occurrence: &anchor Foo\nSecond occurrence: *anchor\nOverride anchor: &anchor Bar\nReuse anchor: *anchor\n"
-}
+case_id: 3GZX
+input: "First occurrence: &anchor Foo\nSecond occurrence: *anchor\nOverride anchor: &anchor Bar\nReuse anchor: *anchor\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..108
+  YAML_METADATA_CONTENT@0..108
+    YAML_BLOCK_MAP@0..108
+      YAML_BLOCK_MAP_ENTRY@0..30
+        YAML_BLOCK_MAP_KEY@0..17
+          YAML_KEY@0..16 "First occurrence"
+          YAML_COLON@16..17 ":"
+        YAML_BLOCK_MAP_VALUE@17..29
+          WHITESPACE@17..18 " "
+          YAML_SCALAR@18..29 "&anchor Foo"
+        NEWLINE@29..30 "\n"
+      YAML_BLOCK_MAP_ENTRY@30..57
+        YAML_BLOCK_MAP_KEY@30..48
+          YAML_KEY@30..47 "Second occurrence"
+          YAML_COLON@47..48 ":"
+        YAML_BLOCK_MAP_VALUE@48..56
+          WHITESPACE@48..49 " "
+          YAML_SCALAR@49..56 "*anchor"
+        NEWLINE@56..57 "\n"
+      YAML_BLOCK_MAP_ENTRY@57..86
+        YAML_BLOCK_MAP_KEY@57..73
+          YAML_KEY@57..72 "Override anchor"
+          YAML_COLON@72..73 ":"
+        YAML_BLOCK_MAP_VALUE@73..85
+          WHITESPACE@73..74 " "
+          YAML_SCALAR@74..85 "&anchor Bar"
+        NEWLINE@85..86 "\n"
+      YAML_BLOCK_MAP_ENTRY@86..108
+        YAML_BLOCK_MAP_KEY@86..99
+          YAML_KEY@86..98 "Reuse anchor"
+          YAML_COLON@98..99 ":"
+        YAML_BLOCK_MAP_VALUE@99..107
+          WHITESPACE@99..100 " "
+          YAML_SCALAR@100..107 "*anchor"
+        NEWLINE@107..108 "\n"

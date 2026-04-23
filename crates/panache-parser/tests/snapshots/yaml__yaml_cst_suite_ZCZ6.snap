@@ -1,17 +1,9 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "ZCZ6",
-  "cst": null,
-  "diagnostics": [
-    {
-      "byte_end": 10,
-      "byte_start": 2,
-      "code": "YAML_LEX_ERROR",
-      "message": "invalid plain scalar containing mapping indicator sequence"
-    }
-  ],
-  "input": "a: b: c: d\n"
-}
+case_id: ZCZ6
+input: "a: b: c: d\n"
+diagnostics:
+YAML_LEX_ERROR:invalid plain scalar containing mapping indicator sequence@2..10
+cst:

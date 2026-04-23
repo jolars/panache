@@ -1,17 +1,9 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-expression: snapshot_json
+expression: snapshot
 ---
-{
-  "case_id": "CML9",
-  "cst": null,
-  "diagnostics": [
-    {
-      "byte_end": 19,
-      "byte_start": 13,
-      "code": "YAML_LEX_WRONG_INDENTED_FLOW",
-      "message": "wrong indentation for continued flow collection"
-    }
-  ],
-  "input": "key: [ word1\n#  xxx\n  word2 ]\n"
-}
+case_id: CML9
+input: "key: [ word1\n#  xxx\n  word2 ]\n"
+diagnostics:
+YAML_LEX_WRONG_INDENTED_FLOW:wrong indentation for continued flow collection@13..19
+cst:
