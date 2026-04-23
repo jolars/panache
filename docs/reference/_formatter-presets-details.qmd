@@ -273,7 +273,7 @@ Homepage
 :   <https://clang.llvm.org/docs/ClangFormat.html>
 
 Supported Languages
-:   `c`, `h`, `cpp`, `c++`, `hpp`, `cc`, `cxx`, `objc`, `objective-c`, `obj-c`, `java`, `csharp`, `c#`
+:   `c`, `h`, `cpp`, `c++`, `hpp`, `cc`, `cxx`, `rcpp`, `objc`, `objective-c`, `obj-c`, `java`, `csharp`, `c#`
 
 Command
 :   `clang-format`

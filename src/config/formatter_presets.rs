@@ -119,6 +119,7 @@ const PRESETS: &[FormatterPresetMetadata] = &[
             "hpp",
             "cc",
             "cxx",
+            "rcpp",
             "objc",
             "objective-c",
             "obj-c",
@@ -614,4 +615,18 @@ pub fn formatter_preset_names() -> &'static [&'static str] {
         "yamlfmt",
         "yq",
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clang_format_is_available_for_rcpp_language() {
+        let presets = formatter_presets_for_language("Rcpp");
+        assert!(
+            presets.iter().any(|preset| preset.name == "clang-format"),
+            "Expected clang-format preset to support Rcpp"
+        );
+    }
 }
