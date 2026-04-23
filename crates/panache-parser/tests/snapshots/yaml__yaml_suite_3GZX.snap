@@ -1,7 +1,8 @@
 ---
-source: tests/yaml.rs
+source: crates/panache-parser/tests/yaml.rs
 expression: snapshot
 ---
 case_id: 3GZX
 input: "First occurrence: &anchor Foo\nSecond occurrence: *anchor\nOverride anchor: &anchor Bar\nReuse anchor: *anchor\n"
+has_error_contract: false
 parsed_mapping_tree: true

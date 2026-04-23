@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 
 const FIXTURE_DIR: &str = "tests/fixtures/yaml-test-suite";
 const ALLOWLIST_PATH: &str = "tests/yaml/allowlist.txt";
-const BLOCKED_PATH: &str = "tests/yaml/blocked.txt";
 
 fn read_lines(path: &Path) -> Vec<String> {
     let content = fs::read_to_string(path)
@@ -45,34 +44,6 @@ fn allowlisted_case_paths() -> Vec<(String, PathBuf)> {
     case_ids
         .into_iter()
         .map(|case_id| {
-            let case_path = fixture_case_path(&case_id);
-            assert!(
-                case_path.exists(),
-                "fixture case directory missing for {} ({})",
-                case_id,
-                case_path.display()
-            );
-            (case_id, case_path)
-        })
-        .collect()
-}
-
-fn blocked_case_paths() -> Vec<(String, PathBuf)> {
-    let blocked = Path::new(env!("CARGO_MANIFEST_DIR")).join(BLOCKED_PATH);
-    assert!(
-        blocked.exists(),
-        "missing blocked file: {}",
-        blocked.display()
-    );
-
-    read_lines(&blocked)
-        .into_iter()
-        .map(|line| {
-            let case_id = line
-                .split_once(':')
-                .map(|(id, _)| id.trim())
-                .unwrap_or(line.as_str())
-                .to_owned();
             let case_path = fixture_case_path(&case_id);
             assert!(
                 case_path.exists(),
@@ -430,13 +401,6 @@ fn yaml_allowlist_cases_snapshot() {
         "yaml-test-suite fixtures missing; run `task update-yaml-fixtures`"
     );
 
-    let blocked = Path::new(env!("CARGO_MANIFEST_DIR")).join(BLOCKED_PATH);
-    assert!(
-        blocked.exists(),
-        "missing blocked file: {}",
-        blocked.display()
-    );
-
     for (case_id, case_path) in allowlisted_case_paths() {
         let in_yaml = case_path.join("in.yaml");
         let test_event = case_path.join("test.event");
@@ -447,12 +411,6 @@ fn yaml_allowlist_cases_snapshot() {
             case_id,
             test_event.display()
         );
-        assert!(
-            !error_file.exists(),
-            "allowlisted case {} must not include error fixture ({})",
-            case_id,
-            error_file.display()
-        );
         let input = fs::read_to_string(&in_yaml).unwrap_or_else(|e| {
             panic!(
                 "failed to read case {} ({}): {e}",
@@ -461,9 +419,11 @@ fn yaml_allowlist_cases_snapshot() {
             )
         });
 
+        let has_error_contract = error_file.exists();
         let parsed = parse_yaml_tree(&input).is_some();
-        let snapshot =
-            format!("case_id: {case_id}\ninput: {input:?}\nparsed_mapping_tree: {parsed}\n");
+        let snapshot = format!(
+            "case_id: {case_id}\ninput: {input:?}\nhas_error_contract: {has_error_contract}\nparsed_mapping_tree: {parsed}\n"
+        );
 
         insta::assert_snapshot!(format!("yaml_suite_{}", case_id), snapshot);
     }
@@ -501,10 +461,21 @@ fn yaml_allowlist_cases_cst_snapshot() {
 fn yaml_allowlist_losslessness_raw_input() {
     for (case_id, case_path) in allowlisted_case_paths() {
         let input_path = case_path.join("in.yaml");
+        let error_file = case_path.join("error");
         let input = fs::read_to_string(&input_path)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
-        let tree = parse_yaml_tree(&input)
-            .unwrap_or_else(|| panic!("failed to parse raw input for {}", case_id));
+        let tree = parse_yaml_tree(&input);
+
+        if error_file.exists() {
+            assert!(
+                tree.is_none(),
+                "error-contract case {} should fail YAML parse",
+                case_id
+            );
+            continue;
+        }
+
+        let tree = tree.unwrap_or_else(|| panic!("failed to parse raw input for {}", case_id));
         let tree_text = tree.text().to_string();
         assert_eq!(
             input, tree_text,
@@ -518,15 +489,30 @@ fn yaml_allowlist_losslessness_raw_input() {
 fn yaml_allowlist_projected_event_parity() {
     for (case_id, case_path) in allowlisted_case_paths() {
         let input_path = case_path.join("in.yaml");
+        let error_file = case_path.join("error");
         let input = fs::read_to_string(&input_path)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
         let expected_events = fixture_case_events(&case_path);
         let actual_events = cst_yaml_projected_events(&input);
-        assert_eq!(
-            actual_events, expected_events,
-            "projected event stream mismatch for {}",
-            case_id
-        );
+
+        if error_file.exists() {
+            assert!(
+                parse_yaml_tree(&input).is_none(),
+                "error-contract case {} should fail YAML parse",
+                case_id
+            );
+            assert_ne!(
+                actual_events, expected_events,
+                "error-contract case {} unexpectedly matches success event parity",
+                case_id
+            );
+        } else {
+            assert_eq!(
+                actual_events, expected_events,
+                "projected event stream mismatch for {}",
+                case_id
+            );
+        }
     }
 }
 
@@ -635,47 +621,4 @@ normalized=Some(\"title: Snapshot\\nauthor: Me\")
 ";
 
     assert_eq!(snapshot, expected);
-}
-
-#[test]
-fn yaml_blocked_error_cases_reject_mapping_tree() {
-    let mut exercised = 0usize;
-    let allowlisted: std::collections::HashSet<_> = allowlisted_case_paths()
-        .into_iter()
-        .map(|(id, _)| id)
-        .collect();
-
-    for (case_id, case_path) in blocked_case_paths() {
-        let error_file = case_path.join("error");
-        if !error_file.exists() {
-            continue;
-        }
-        exercised += 1;
-        assert!(
-            !allowlisted.contains(&case_id),
-            "error-contract case {} must not be allowlisted",
-            case_id
-        );
-
-        let in_yaml = case_path.join("in.yaml");
-        let input = fs::read_to_string(&in_yaml).unwrap_or_else(|e| {
-            panic!(
-                "failed to read blocked case {} ({}): {e}",
-                case_id,
-                in_yaml.display()
-            )
-        });
-        let expected_events = fixture_case_events(&case_path);
-        let actual_events = cst_yaml_projected_events(&input);
-        assert_ne!(
-            actual_events, expected_events,
-            "error-contract case {} unexpectedly matches success event parity",
-            case_id
-        );
-    }
-
-    assert!(
-        exercised > 0,
-        "expected at least one blocked yaml-test-suite case with an error contract"
-    );
 }

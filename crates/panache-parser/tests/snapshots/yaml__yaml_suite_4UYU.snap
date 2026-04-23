@@ -4,4 +4,5 @@ expression: snapshot
 ---
 case_id: 4UYU
 input: "\"foo: bar\\\": baz\"\n"
+has_error_contract: false
 parsed_mapping_tree: true

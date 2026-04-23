@@ -4,4 +4,5 @@ expression: snapshot
 ---
 case_id: 58MP
 input: "{x: :x}\n"
+has_error_contract: false
 parsed_mapping_tree: true
