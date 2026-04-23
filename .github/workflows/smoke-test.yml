@@ -19,30 +19,41 @@ jobs:
       failure_count: ${{ steps.summarize.outputs.failure_count }}
     env:
       TARGET_REPOS: |
+        aml4td/website/
         andrewheiss/ath-quarto
+        clauswilke/dataviz
+        csgillespie/efficientR
         davidfoxcroft/lsj-book
         ddotta/cookbook-rpolars
         elong0527/r4csr
+        geocompx/geocompr
         hadley/adv-r
         hadley/ggplot2-book
         hadley/mastering-shiny
         hadley/r-in-production
         hadley/r-pkgs
         hadley/r4ds
+        jeroenjanssens/data-science-at-the-command-line
         jgm/pandoc
         jolars/jolars.co
+        juliasilge/tidy-text-mining
         kevinheavey/modern-polars
         math-ku/compstat
         mattiasvillani/BayesianLearningBook
         mlr-org/mlr3book
+        moderndive/ModernDive_book
         nielsrhansen/CSwR
         quarto-dev/quarto-web
         r-causal/causal-inference-in-R
+        rdpeng/rprogdatascience
         RohanAlexander/tswd
         rstudio-education/hopr
+        rstudio/blogdown
         rstudio/bookdown
         rstudio/rmarkdown
+        rstudio/rmarkdown-book
         rstudio/rmarkdown-cookbook
+        ThinkR-open/engineering-shiny-book
         wch/rgcookbook
     steps:
       - uses: actions/checkout@v6
