@@ -6,3 +6,4 @@ case_id: 9SHH
 input: "single: 'text'\ndouble: \"text\"\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

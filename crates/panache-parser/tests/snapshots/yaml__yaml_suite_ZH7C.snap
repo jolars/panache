@@ -6,3 +6,4 @@ case_id: ZH7C
 input: "&a a: b\nc: &d d\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

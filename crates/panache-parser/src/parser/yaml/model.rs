@@ -37,6 +37,20 @@ pub struct ShadowYamlReport {
     pub normalized_input: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct YamlDiagnostic {
+    pub code: &'static str,
+    pub message: &'static str,
+    pub byte_start: usize,
+    pub byte_end: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct YamlParseReport {
+    pub tree: Option<crate::syntax::SyntaxNode>,
+    pub diagnostics: Vec<YamlDiagnostic>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum YamlToken {
     Indent,

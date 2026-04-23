@@ -6,3 +6,4 @@ case_id: D88J
 input: "a: [b, c]\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

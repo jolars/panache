@@ -6,3 +6,4 @@ case_id: J5UC
 input: "foo: blue\nbar: arrr\nbaz: jazz\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

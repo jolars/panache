@@ -174,5 +174,6 @@ expression: snapshot_json
       "start": 0
     }
   },
+  "diagnostics": [],
   "input": "{foo: you, bar: far}\n"
 }

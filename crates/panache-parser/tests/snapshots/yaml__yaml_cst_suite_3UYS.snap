@@ -98,5 +98,6 @@ expression: snapshot_json
       "start": 0
     }
   },
+  "diagnostics": [],
   "input": "escaped slash: \"a\\/b\"\n"
 }

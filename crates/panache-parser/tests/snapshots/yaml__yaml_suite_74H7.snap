@@ -6,3 +6,4 @@ case_id: 74H7
 input: "!!str a: b\nc: !!int 42\ne: !!str f\ng: h\n!!str 23: !!bool false\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

@@ -6,3 +6,4 @@ case_id: 4GC6
 input: "'here''s to \"quotes\"'\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

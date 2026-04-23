@@ -6,3 +6,4 @@ case_id: W5VH
 input: "a: &:@*!$\"<foo>: scalar a\nb: *:@*!$\"<foo>:\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

@@ -17,9 +17,10 @@ mod parser;
 
 pub use lexer::lex_mapping_tokens;
 pub use model::{
-    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlInputKind, YamlToken, YamlTokenSpan,
+    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
+    YamlParseReport, YamlToken, YamlTokenSpan,
 };
-pub use parser::{parse_shadow, parse_yaml_tree};
+pub use parser::{parse_shadow, parse_yaml_report, parse_yaml_tree};
 
 #[cfg(test)]
 mod tests {
@@ -354,6 +355,14 @@ mod tests {
         let input = "\"foo: bar\\\": baz\"\n";
         let tree = parse_yaml_tree(input).expect("tree");
         assert_eq!(tree.text().to_string(), input);
+    }
+
+    #[test]
+    fn parse_yaml_report_emits_error_code_for_invalid_yaml() {
+        let report = parse_yaml_report("this\n is\n  invalid: x\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(report.diagnostics[0].code, "YAML_PARSE_ERROR");
     }
 
     #[test]

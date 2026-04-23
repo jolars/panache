@@ -1,5 +1,6 @@
 use panache_parser::parser::yaml::{
-    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_shadow, parse_yaml_tree,
+    ShadowYamlOptions, ShadowYamlOutcome, YamlInputKind, parse_shadow, parse_yaml_report,
+    parse_yaml_tree,
 };
 use panache_parser::syntax::SyntaxNode as ParserSyntaxNode;
 use serde_json::json;
@@ -420,9 +421,16 @@ fn yaml_allowlist_cases_snapshot() {
         });
 
         let has_error_contract = error_file.exists();
-        let parsed = parse_yaml_tree(&input).is_some();
+        let report = parse_yaml_report(&input);
+        let parsed = report.tree.is_some();
+        let diagnostic_snapshot = report
+            .diagnostics
+            .iter()
+            .map(|d| format!("{}:{}@{}..{}", d.code, d.message, d.byte_start, d.byte_end))
+            .collect::<Vec<_>>()
+            .join(", ");
         let snapshot = format!(
-            "case_id: {case_id}\ninput: {input:?}\nhas_error_contract: {has_error_contract}\nparsed_mapping_tree: {parsed}\n"
+            "case_id: {case_id}\ninput: {input:?}\nhas_error_contract: {has_error_contract}\nparsed_mapping_tree: {parsed}\ndiagnostics: [{diagnostic_snapshot}]\n"
         );
 
         insta::assert_snapshot!(format!("yaml_suite_{}", case_id), snapshot);
@@ -447,10 +455,21 @@ fn yaml_allowlist_cases_cst_snapshot() {
             )
         });
 
-        let tree = parse_yaml_tree(&input);
+        let report = parse_yaml_report(&input);
+        let tree = report.tree;
         let snapshot_json = json!({
             "case_id": case_id,
             "input": input,
+            "diagnostics": report
+                .diagnostics
+                .iter()
+                .map(|d| json!({
+                    "code": d.code,
+                    "message": d.message,
+                    "byte_start": d.byte_start,
+                    "byte_end": d.byte_end,
+                }))
+                .collect::<Vec<_>>(),
             "cst": tree.as_ref().map(cst_to_json),
         });
         insta::assert_json_snapshot!(format!("yaml_cst_suite_{}", case_id), snapshot_json);
@@ -464,12 +483,18 @@ fn yaml_allowlist_losslessness_raw_input() {
         let error_file = case_path.join("error");
         let input = fs::read_to_string(&input_path)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
-        let tree = parse_yaml_tree(&input);
+        let report = parse_yaml_report(&input);
+        let tree = report.tree;
 
         if error_file.exists() {
             assert!(
                 tree.is_none(),
                 "error-contract case {} should fail YAML parse",
+                case_id
+            );
+            assert!(
+                !report.diagnostics.is_empty(),
+                "error-contract case {} should provide diagnostics",
                 case_id
             );
             continue;
@@ -494,11 +519,17 @@ fn yaml_allowlist_projected_event_parity() {
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", input_path.display()));
         let expected_events = fixture_case_events(&case_path);
         let actual_events = cst_yaml_projected_events(&input);
+        let report = parse_yaml_report(&input);
 
         if error_file.exists() {
             assert!(
-                parse_yaml_tree(&input).is_none(),
+                report.tree.is_none(),
                 "error-contract case {} should fail YAML parse",
+                case_id
+            );
+            assert!(
+                !report.diagnostics.is_empty(),
+                "error-contract case {} should provide diagnostics",
                 case_id
             );
             assert_ne!(

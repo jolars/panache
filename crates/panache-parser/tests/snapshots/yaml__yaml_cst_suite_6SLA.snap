@@ -1,5 +1,5 @@
 ---
-source: tests/yaml.rs
+source: crates/panache-parser/tests/yaml.rs
 expression: snapshot_json
 ---
 {
@@ -165,5 +165,6 @@ expression: snapshot_json
       "start": 0
     }
   },
+  "diagnostics": [],
   "input": "\"foo\\nbar:baz\\tx \\\\$%^&*()x\": 23\n'x\\ny:z\\tx $%^&*()x': 24\n"
 }

@@ -6,3 +6,4 @@ case_id: 54T7
 input: "{foo: you, bar: far}\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

@@ -157,5 +157,6 @@ expression: snapshot_json
       "start": 0
     }
   },
+  "diagnostics": [],
   "input": "a: [b, c]\n"
 }

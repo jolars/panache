@@ -3,7 +3,8 @@ use rowan::GreenNodeBuilder;
 
 use super::lexer::lex_mapping_tokens;
 use super::model::{
-    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlInputKind, YamlToken, YamlTokenSpan,
+    ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
+    YamlParseReport, YamlToken, YamlTokenSpan,
 };
 
 /// Parse YAML in shadow mode using prototype groundwork only.
@@ -334,17 +335,45 @@ fn emit_block_map<'a>(
 
 /// Parse prototype YAML tree structure from input
 pub fn parse_yaml_tree(input: &str) -> Option<SyntaxNode> {
-    let tokens = lex_mapping_tokens(input)?;
+    parse_yaml_report(input).tree
+}
+
+/// Parse prototype YAML tree structure and include diagnostics on failure.
+pub fn parse_yaml_report(input: &str) -> YamlParseReport {
+    let Some(tokens) = lex_mapping_tokens(input) else {
+        return YamlParseReport {
+            tree: None,
+            diagnostics: vec![YamlDiagnostic {
+                code: "YAML_LEX_ERROR",
+                message: "failed to lex YAML token stream",
+                byte_start: 0,
+                byte_end: input.len(),
+            }],
+        };
+    };
 
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::DOCUMENT.into());
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
     builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
     let mut i = 0usize;
-    emit_block_map(&mut builder, &tokens, &mut i, false)?;
+    if emit_block_map(&mut builder, &tokens, &mut i, false).is_none() {
+        return YamlParseReport {
+            tree: None,
+            diagnostics: vec![YamlDiagnostic {
+                code: "YAML_PARSE_ERROR",
+                message: "failed to parse YAML token stream",
+                byte_start: 0,
+                byte_end: input.len(),
+            }],
+        };
+    }
 
     builder.finish_node(); // YAML_BLOCK_MAP
     builder.finish_node(); // YAML_METADATA_CONTENT
     builder.finish_node(); // DOCUMENT
-    Some(SyntaxNode::new_root(builder.finish()))
+    YamlParseReport {
+        tree: Some(SyntaxNode::new_root(builder.finish())),
+        diagnostics: Vec::new(),
+    }
 }

@@ -6,3 +6,4 @@ case_id: E76Z
 input: "&a a: &b b\n*b : *a\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

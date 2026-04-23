@@ -6,3 +6,4 @@ case_id: CUP7
 input: "anchored: !local &anchor value\nalias: *anchor\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

@@ -6,3 +6,4 @@ case_id: D9TU
 input: "foo: bar\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

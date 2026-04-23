@@ -6,3 +6,4 @@ case_id: JS2J
 input: "First occurrence: &anchor Value\nSecond occurrence: *anchor\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []

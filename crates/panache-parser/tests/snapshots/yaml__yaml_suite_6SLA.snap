@@ -6,3 +6,4 @@ case_id: 6SLA
 input: "\"foo\\nbar:baz\\tx \\\\$%^&*()x\": 23\n'x\\ny:z\\tx $%^&*()x': 24\n"
 has_error_contract: false
 parsed_mapping_tree: true
+diagnostics: []
