@@ -14,14 +14,14 @@ DOCUMENT@0..21
         YAML_SCALAR@0..1 "{"
         YAML_FLOW_MAP_ENTRY@1..9
           YAML_FLOW_MAP_KEY@1..5
-            YAML_SCALAR@1..4 "foo"
+            YAML_KEY@1..4 "foo"
             YAML_COLON@4..5 ":"
           YAML_FLOW_MAP_VALUE@5..9
             YAML_SCALAR@5..9 " you"
         YAML_SCALAR@9..10 ","
         YAML_FLOW_MAP_ENTRY@10..19
           YAML_FLOW_MAP_KEY@10..15
-            YAML_SCALAR@10..14 " bar"
+            YAML_KEY@10..14 " bar"
             YAML_COLON@14..15 ":"
           YAML_FLOW_MAP_VALUE@15..19
             YAML_SCALAR@15..19 " far"

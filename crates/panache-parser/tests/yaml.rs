@@ -379,7 +379,13 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
             let key_text = key_node
                 .descendants_with_tokens()
                 .filter_map(|el| el.into_token())
-                .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
+                .filter(|tok| {
+                    matches!(
+                        tok.kind(),
+                        panache_parser::syntax::SyntaxKind::YAML_SCALAR
+                            | panache_parser::syntax::SyntaxKind::YAML_KEY
+                    )
+                })
                 .map(|tok| tok.text().to_string())
                 .collect::<Vec<_>>()
                 .join("")

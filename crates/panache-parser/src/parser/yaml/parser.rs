@@ -1,7 +1,7 @@
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
-use super::lexer::lex_mapping_tokens_with_diagnostic;
+use super::lexer::{lex_mapping_tokens_with_diagnostic, split_once_unquoted};
 use super::model::{
     ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
     YamlParseReport, YamlToken, YamlTokenSpan, diagnostic_codes,
@@ -216,71 +216,149 @@ fn emit_flow_map<'a>(
     emit_token_as_yaml(builder, &tokens[*i]); // {
     *i += 1;
 
-    let mut entry_start = *i;
-    while *i < tokens.len() {
+    loop {
+        // Skip inter-entry whitespace and newlines
+        while *i < tokens.len()
+            && matches!(tokens[*i].kind, YamlToken::Whitespace | YamlToken::Newline)
+        {
+            emit_token_as_yaml(builder, &tokens[*i]);
+            *i += 1;
+        }
+
+        if *i >= tokens.len() {
+            let (byte_start, byte_end) = tokens
+                .last()
+                .map(|t| (t.byte_start, t.byte_end))
+                .unwrap_or((0, 0));
+            return Err(YamlDiagnostic {
+                code: diagnostic_codes::PARSE_UNTERMINATED_FLOW_MAP,
+                message: "unterminated flow map",
+                byte_start,
+                byte_end,
+            });
+        }
+
         match tokens[*i].kind {
-            YamlToken::Comma | YamlToken::FlowMapEnd => {
-                let entry_text = tokens[entry_start..*i]
-                    .iter()
-                    .map(|tok| tok.text)
-                    .collect::<String>();
-                if !entry_text.trim().is_empty() {
-                    if let Some(colon_idx) = entry_text.find(':') {
-                        builder.start_node(SyntaxKind::YAML_FLOW_MAP_ENTRY.into());
-
-                        builder.start_node(SyntaxKind::YAML_FLOW_MAP_KEY.into());
-                        builder.token(SyntaxKind::YAML_SCALAR.into(), &entry_text[..colon_idx]);
-                        builder.token(SyntaxKind::YAML_COLON.into(), ":");
-                        builder.finish_node(); // YAML_FLOW_MAP_KEY
-
-                        builder.start_node(SyntaxKind::YAML_FLOW_MAP_VALUE.into());
-                        builder.token(SyntaxKind::YAML_SCALAR.into(), &entry_text[colon_idx + 1..]);
-                        builder.finish_node(); // YAML_FLOW_MAP_VALUE
-
-                        builder.finish_node(); // YAML_FLOW_MAP_ENTRY
-                    } else {
-                        builder.token(SyntaxKind::YAML_SCALAR.into(), &entry_text);
-                    }
-                }
-
+            YamlToken::FlowMapEnd => {
                 emit_token_as_yaml(builder, &tokens[*i]);
                 *i += 1;
-                entry_start = *i;
-
-                if tokens[*i - 1].kind == YamlToken::FlowMapEnd {
-                    if *i < tokens.len() {
-                        match tokens[*i].kind {
-                            YamlToken::Newline | YamlToken::Comment => {}
-                            YamlToken::Whitespace if tokens[*i].text.trim().is_empty() => {}
-                            _ => {
-                                return Err(diag_at_token(
-                                    &tokens[*i],
-                                    diagnostic_codes::PARSE_TRAILING_CONTENT_AFTER_FLOW_END,
-                                    "trailing content after flow map end",
-                                ));
-                            }
+                if *i < tokens.len() {
+                    match tokens[*i].kind {
+                        YamlToken::Newline
+                        | YamlToken::Comment
+                        | YamlToken::Whitespace
+                        | YamlToken::FlowMapEnd
+                        | YamlToken::FlowSeqEnd
+                        | YamlToken::Comma => {}
+                        _ => {
+                            return Err(diag_at_token(
+                                &tokens[*i],
+                                diagnostic_codes::PARSE_TRAILING_CONTENT_AFTER_FLOW_END,
+                                "trailing content after flow map end",
+                            ));
                         }
                     }
-                    builder.finish_node(); // YAML_FLOW_MAP
-                    return Ok(());
                 }
+                builder.finish_node(); // YAML_FLOW_MAP
+                return Ok(());
+            }
+            YamlToken::Comma => {
+                emit_token_as_yaml(builder, &tokens[*i]);
+                *i += 1;
             }
             _ => {
+                emit_flow_map_entry(builder, tokens, i)?;
+            }
+        }
+    }
+}
+
+fn emit_flow_map_entry<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Result<(), YamlDiagnostic> {
+    builder.start_node(SyntaxKind::YAML_FLOW_MAP_ENTRY.into());
+    builder.start_node(SyntaxKind::YAML_FLOW_MAP_KEY.into());
+
+    // Emit leading whitespace inside key node
+    while *i < tokens.len() && tokens[*i].kind == YamlToken::Whitespace {
+        emit_token_as_yaml(builder, &tokens[*i]);
+        *i += 1;
+    }
+
+    // Determine key/value split point
+    let value_prefix: Option<&'a str> = match tokens.get(*i).map(|t| t.kind) {
+        Some(YamlToken::Scalar) => {
+            let scalar = tokens[*i];
+            *i += 1;
+            if let Some((key_text, rest_text)) = split_once_unquoted(scalar.text, ':') {
+                builder.token(SyntaxKind::YAML_KEY.into(), key_text);
+                builder.token(
+                    SyntaxKind::YAML_COLON.into(),
+                    &scalar.text[key_text.len()..key_text.len() + 1],
+                );
+                Some(rest_text)
+            } else {
+                // No colon — standalone scalar (implicit key or value-only)
+                builder.token(SyntaxKind::YAML_SCALAR.into(), scalar.text);
+                None
+            }
+        }
+        Some(YamlToken::Key) => {
+            // Already-tokenized key (from multi-line block lexing inside a flow map)
+            builder.token(SyntaxKind::YAML_KEY.into(), tokens[*i].text);
+            *i += 1;
+            while *i < tokens.len() && tokens[*i].kind == YamlToken::Whitespace {
+                emit_token_as_yaml(builder, &tokens[*i]);
+                *i += 1;
+            }
+            if *i < tokens.len() && tokens[*i].kind == YamlToken::Colon {
+                builder.token(SyntaxKind::YAML_COLON.into(), tokens[*i].text);
+                *i += 1;
+            }
+            None
+        }
+        Some(YamlToken::Tag) => {
+            emit_token_as_yaml(builder, &tokens[*i]);
+            *i += 1;
+            None
+        }
+        _ => None,
+    };
+
+    builder.finish_node(); // YAML_FLOW_MAP_KEY
+
+    builder.start_node(SyntaxKind::YAML_FLOW_MAP_VALUE.into());
+    if let Some(prefix) = value_prefix
+        && !prefix.is_empty()
+    {
+        builder.token(SyntaxKind::YAML_SCALAR.into(), prefix);
+    }
+    emit_flow_value_tokens(builder, tokens, i)?;
+    builder.finish_node(); // YAML_FLOW_MAP_VALUE
+
+    builder.finish_node(); // YAML_FLOW_MAP_ENTRY
+    Ok(())
+}
+
+fn emit_flow_value_tokens<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Result<(), YamlDiagnostic> {
+    while *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlToken::Comma | YamlToken::FlowMapEnd | YamlToken::FlowSeqEnd => break,
+            YamlToken::FlowMapStart => emit_flow_map(builder, tokens, i)?,
+            YamlToken::FlowSeqStart => emit_flow_sequence(builder, tokens, i)?,
+            _ => {
+                emit_token_as_yaml(builder, &tokens[*i]);
                 *i += 1;
             }
         }
     }
-
-    let (byte_start, byte_end) = tokens
-        .last()
-        .map(|t| (t.byte_start, t.byte_end))
-        .unwrap_or((0, 0));
-    Err(YamlDiagnostic {
-        code: diagnostic_codes::PARSE_UNTERMINATED_FLOW_MAP,
-        message: "unterminated flow map",
-        byte_start,
-        byte_end,
-    })
+    Ok(())
 }
 
 fn emit_block_seq<'a>(

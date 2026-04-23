@@ -63,7 +63,7 @@ fn leading_indent(text: &str) -> usize {
         .count()
 }
 
-fn split_once_unquoted(text: &str, separator: char) -> Option<(&str, &str)> {
+pub(crate) fn split_once_unquoted(text: &str, separator: char) -> Option<(&str, &str)> {
     let mut state = LexerState::default();
     let idx = find_unquoted_char_with_state(text, separator, &mut state)?;
     let rhs_start = idx + separator.len_utf8();
