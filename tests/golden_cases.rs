@@ -172,6 +172,7 @@ golden_test_cases!(
     equation_attributes,
     equation_attributes_disabled,
     equation_attributes_single_line,
+    escaped_bracket_math_idempotency_213,
     escapes,
     exec_code_in_list,
     fenced_code,

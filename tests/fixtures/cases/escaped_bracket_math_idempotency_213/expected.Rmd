@@ -1,0 +1,6 @@
+As you can see, Drake wants to execute the step again! However, now mentions a
+different reason, namely, that there is no input step *\[no-input-step\]*. Its
+default behavior is to check whether the input has changed by looking at the
+timestamp of the input. However, since we didn't specify any input, Drake
+doesn't know whether or not this step should be run again. We can disable this
+default behavior to check timestamps as follows:
