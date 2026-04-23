@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "RHX7",
+  "cst": null,
+  "diagnostics": [
+    {
+      "byte_end": 24,
+      "byte_start": 15,
+      "code": "YAML_PARSE_DIRECTIVE_AFTER_CONTENT",
+      "message": "directive requires document end before subsequent directives"
+    }
+  ],
+  "input": "---\nkey: value\n%YAML 1.2\n---\n"
+}

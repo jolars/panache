@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "W9L4",
+  "cst": null,
+  "diagnostics": [
+    {
+      "byte_end": 20,
+      "byte_start": 20,
+      "code": "YAML_LEX_ERROR",
+      "message": "internal token range reconstruction mismatch"
+    }
+  ],
+  "input": "---\nblock scalar: |\n     \n  more spaces at the beginning\n  are invalid\n"
+}

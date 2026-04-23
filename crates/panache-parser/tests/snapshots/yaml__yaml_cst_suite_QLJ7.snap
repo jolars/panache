@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot_json
+---
+{
+  "case_id": "QLJ7",
+  "cst": null,
+  "diagnostics": [
+    {
+      "byte_end": 49,
+      "byte_start": 36,
+      "code": "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START",
+      "message": "trailing content after document start marker"
+    }
+  ],
+  "input": "%TAG !prefix! tag:example.com,2011:\n--- !prefix!A\na: b\n--- !prefix!B\nc: d\n--- !prefix!C\ne: f\n"
+}

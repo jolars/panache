@@ -1,0 +1,9 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+expression: snapshot
+---
+case_id: X4QW
+input: "block: ># comment\n  scalar\n"
+has_error_contract: true
+parsed_mapping_tree: false
+diagnostics: [YAML_PARSE_INVALID_KEY_TOKEN:invalid token while parsing block map key@20..26]
