@@ -264,6 +264,20 @@ fn remove_dir_if_exists(path: &Path) -> io::Result<bool> {
     }
 }
 
+fn open_cli_cache_best_effort(
+    cfg: &panache::Config,
+    explicit_config: Option<&Path>,
+    start_dir: &Path,
+) -> Option<CliCache> {
+    match CliCache::open(cfg, explicit_config, start_dir) {
+        Ok(cache) => cache,
+        Err(err) => {
+            log::warn!("Disabling CLI cache for this run: {err}");
+            None
+        }
+    }
+}
+
 fn start_dir_for(input_path: Option<&Path>) -> io::Result<PathBuf> {
     if let Some(p) = input_path {
         Ok(p.parent().unwrap_or(Path::new(".")).to_path_buf())
@@ -769,7 +783,11 @@ fn main() -> io::Result<()> {
             let mut cache = if cli.no_cache {
                 None
             } else {
-                CliCache::open(&traversal_cfg, cli.config.as_deref(), &traversal_start_dir)?
+                open_cli_cache_best_effort(
+                    &traversal_cfg,
+                    cli.config.as_deref(),
+                    &traversal_start_dir,
+                )
             };
 
             if expanded_files.is_empty() {
@@ -1284,7 +1302,11 @@ fn main() -> io::Result<()> {
             let mut cache = if cli.no_cache {
                 None
             } else {
-                CliCache::open(&traversal_cfg, cli.config.as_deref(), &traversal_start_dir)?
+                open_cli_cache_best_effort(
+                    &traversal_cfg,
+                    cli.config.as_deref(),
+                    &traversal_start_dir,
+                )
             };
 
             if expanded_files.is_empty() {

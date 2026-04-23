@@ -3,6 +3,8 @@
 use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::prelude::*;
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -238,6 +240,31 @@ fn test_lint_stdin_shows_source_snippet() {
         .stdout(predicate::str::contains("previous heading is here"))
         .stdout(predicate::str::contains("3 - ### Subheading").not())
         .stdout(predicate::str::contains("3 + ## Subheading").not());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_lint_ignores_unwritable_global_cache_dir() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    let cache_home = temp_dir.path().join("cache-home");
+    fs::create_dir_all(&cache_home).unwrap();
+    fs::write(&test_file, "# Heading\n\n## Subheading\n\nParagraph.\n").unwrap();
+
+    let mut perms = fs::metadata(&cache_home).unwrap().permissions();
+    perms.set_mode(0o500);
+    fs::set_permissions(&cache_home, perms).unwrap();
+
+    cargo_bin_cmd!("panache")
+        .env("XDG_CACHE_HOME", &cache_home)
+        .args(["lint", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No issues found"));
+
+    let mut restore = fs::metadata(&cache_home).unwrap().permissions();
+    restore.set_mode(0o700);
+    fs::set_permissions(&cache_home, restore).unwrap();
 }
 
 #[test]
