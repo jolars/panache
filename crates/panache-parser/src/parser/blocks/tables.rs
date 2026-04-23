@@ -601,6 +601,17 @@ pub(crate) fn try_parse_simple_table(
     // Emit caption before if present
     if let Some((cap_start, cap_end)) = caption_before {
         emit_table_caption(builder, lines, cap_start, cap_end, config);
+
+        // Emit blank line between caption and table if present
+        if cap_end < start_pos {
+            for line in lines.iter().take(start_pos).skip(cap_end) {
+                if line.trim().is_empty() {
+                    builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
+                    builder.finish_node();
+                }
+            }
+        }
     }
 
     // Emit header if present
@@ -628,9 +639,13 @@ pub(crate) fn try_parse_simple_table(
     if let Some((cap_start, cap_end)) = caption_after {
         // Emit blank line before caption if needed
         if cap_start > end_pos {
-            builder.start_node(SyntaxKind::BLANK_LINE.into());
-            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
-            builder.finish_node();
+            for line in lines.iter().take(cap_start).skip(end_pos) {
+                if line.trim().is_empty() {
+                    builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
+                    builder.finish_node();
+                }
+            }
         }
         emit_table_caption(builder, lines, cap_start, cap_end, config);
     }
@@ -1140,9 +1155,13 @@ pub(crate) fn try_parse_pipe_table(
     if let Some((cap_start, cap_end)) = caption_after {
         // Emit blank line before caption if needed
         if cap_start > end_pos {
-            builder.start_node(SyntaxKind::BLANK_LINE.into());
-            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
-            builder.finish_node();
+            for line in lines.iter().take(cap_start).skip(end_pos) {
+                if line.trim().is_empty() {
+                    builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
+                    builder.finish_node();
+                }
+            }
         }
         emit_table_caption(builder, lines, cap_start, cap_end, config);
     }
@@ -1936,9 +1955,13 @@ pub(crate) fn try_parse_grid_table(
     // Emit caption after if present
     if let Some((cap_start, cap_end)) = caption_after {
         if cap_start > end_pos {
-            builder.start_node(SyntaxKind::BLANK_LINE.into());
-            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
-            builder.finish_node();
+            for line in lines.iter().take(cap_start).skip(end_pos) {
+                if line.trim().is_empty() {
+                    builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
+                    builder.finish_node();
+                }
+            }
         }
         emit_table_caption(builder, lines, cap_start, cap_end, config);
     }
@@ -2400,7 +2423,7 @@ pub(crate) fn try_parse_multiline_table(
             }
 
             builder.start_node(SyntaxKind::BLANK_LINE.into());
-            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
+            builder.token(SyntaxKind::BLANK_LINE.into(), line);
             builder.finish_node();
             continue;
         }
@@ -2422,9 +2445,13 @@ pub(crate) fn try_parse_multiline_table(
     // Emit caption after if present
     if let Some((cap_start, cap_end)) = caption_after {
         if cap_start > end_pos {
-            builder.start_node(SyntaxKind::BLANK_LINE.into());
-            builder.token(SyntaxKind::BLANK_LINE.into(), "\n");
-            builder.finish_node();
+            for line in lines.iter().take(cap_start).skip(end_pos) {
+                if line.trim().is_empty() {
+                    builder.start_node(SyntaxKind::BLANK_LINE.into());
+                    builder.token(SyntaxKind::BLANK_LINE.into(), line);
+                    builder.finish_node();
+                }
+            }
         }
         emit_table_caption(builder, lines, cap_start, cap_end, config);
     }
