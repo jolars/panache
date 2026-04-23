@@ -12,6 +12,15 @@ fn quarto_config() -> Config {
     }
 }
 
+fn rmarkdown_config() -> Config {
+    let flavor = Flavor::RMarkdown;
+    Config {
+        flavor,
+        extensions: Extensions::for_flavor(flavor),
+        ..Default::default()
+    }
+}
+
 #[test]
 fn r_chunk_with_comma_separated_options() {
     let input = "```{r, echo=FALSE}\n1 + 1\n```\n";
@@ -91,6 +100,16 @@ fn display_block_vs_executable_chunk() {
 
     // Executable chunks keep braces
     assert!(output_exec.contains("```{python}"));
+}
+
+#[test]
+fn rcpp_chunk_label_is_rendered_as_hashpipe_label_in_rmarkdown() {
+    let input = "```{Rcpp, rcpp-sum-ref}\n// [[Rcpp::export]]\ndouble sum_cpp_ref(Rcpp::NumericVector& x) {\n  return 0.0;\n}\n```\n";
+    let output = format(input, Some(rmarkdown_config()), None);
+
+    assert!(output.contains("```{Rcpp}"));
+    assert!(output.contains("//| label: rcpp-sum-ref"));
+    assert!(!output.contains("```{Rcpp, rcpp-sum-ref}"));
 }
 
 #[test]

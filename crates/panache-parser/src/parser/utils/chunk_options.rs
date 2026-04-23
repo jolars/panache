@@ -20,10 +20,9 @@ pub enum ChunkOptionValue {
 pub fn hashpipe_comment_prefix(language: &str) -> Option<&'static str> {
     match language.to_ascii_lowercase().as_str() {
         "r" | "python" | "julia" | "bash" | "shell" | "sh" | "ruby" | "perl" => Some("#|"),
-        "c" | "cpp" | "c++" | "java" | "javascript" | "js" | "typescript" | "ts" | "rust"
-        | "go" | "swift" | "kotlin" | "scala" | "csharp" | "c#" | "php" | "ojs" | "dot" => {
-            Some("//|")
-        }
+        "c" | "cpp" | "c++" | "rcpp" | "java" | "javascript" | "js" | "typescript" | "ts"
+        | "rust" | "go" | "swift" | "kotlin" | "scala" | "csharp" | "c#" | "php" | "ojs"
+        | "dot" => Some("//|"),
         "sql" | "mysql" | "postgres" | "postgresql" | "sqlite" => Some("--|"),
         "mermaid" => Some("%%|"),
         _ => None,
@@ -247,6 +246,7 @@ mod tests {
     fn test_hashpipe_comment_prefix() {
         assert_eq!(hashpipe_comment_prefix("r"), Some("#|"));
         assert_eq!(hashpipe_comment_prefix("cpp"), Some("//|"));
+        assert_eq!(hashpipe_comment_prefix("Rcpp"), Some("//|"));
         assert_eq!(hashpipe_comment_prefix("sql"), Some("--|"));
         assert_eq!(hashpipe_comment_prefix("mermaid"), Some("%%|"));
         assert_eq!(hashpipe_comment_prefix("fortran"), None);
