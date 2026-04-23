@@ -8,19 +8,21 @@ use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 
 use crate::lsp::DocumentState;
+use crate::utils::normalize_anchor_label;
 
 use super::super::helpers;
 use crate::metadata::inline_reference_map;
 
 pub(crate) async fn completion(
-    _client: &tower_lsp_server::Client,
+    client: &tower_lsp_server::Client,
     document_map: Arc<Mutex<HashMap<String, DocumentState>>>,
     salsa_db: Arc<Mutex<crate::salsa::SalsaDb>>,
-    _workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    workspace_root: Arc<Mutex<Option<PathBuf>>>,
     params: CompletionParams,
 ) -> Result<Option<CompletionResponse>> {
     let uri = &params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
+    let config = helpers::get_config(client, &workspace_root, uri).await;
 
     let Some(text) = helpers::get_document_content(&document_map, &salsa_db, uri).await else {
         return Ok(None);
@@ -30,9 +32,9 @@ pub(crate) async fn completion(
         return Ok(None);
     };
 
-    if !is_citation_context(&text, offset) {
+    let Some(query) = citation_query_prefix(&text, offset) else {
         return Ok(None);
-    }
+    };
 
     let (salsa_file, salsa_config, doc_path, parsed_yaml_regions) = {
         let map = document_map.lock().await;
@@ -63,10 +65,18 @@ pub(crate) async fn completion(
 
     let metadata = {
         let db = salsa_db.lock().await;
-        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path).clone()
+        crate::salsa::metadata(&*db, salsa_file, salsa_config, doc_path.clone()).clone()
     };
     let parse = metadata.bibliography_parse.as_ref();
-    if parse.is_none() && metadata.inline_references.is_empty() {
+    let symbol_index = {
+        let db = salsa_db.lock().await;
+        crate::salsa::symbol_usage_index(&*db, salsa_file, salsa_config, doc_path).clone()
+    };
+
+    let has_crossref_candidates = symbol_index
+        .crossref_declaration_entries()
+        .any(|(key, _)| is_supported_crossref_completion_key(key));
+    if parse.is_none() && metadata.inline_references.is_empty() && !has_crossref_candidates {
         return Ok(None);
     }
 
@@ -75,6 +85,9 @@ pub(crate) async fn completion(
     if let Some(parse) = parse {
         for entry in parse.index.entries() {
             if !seen.insert(entry.key.to_lowercase()) {
+                continue;
+            }
+            if !matches_query(&entry.key, &query) {
                 continue;
             }
             items.push(CompletionItem {
@@ -91,6 +104,9 @@ pub(crate) async fn completion(
             continue;
         }
         let label = entries[0].id.clone();
+        if !matches_query(&label, &query) {
+            continue;
+        }
         items.push(CompletionItem {
             label: label.clone(),
             kind: Some(CompletionItemKind::REFERENCE),
@@ -100,11 +116,60 @@ pub(crate) async fn completion(
         });
     }
 
+    if config.extensions.quarto_crossrefs || config.extensions.bookdown_references {
+        for (label, _) in symbol_index.crossref_declaration_entries() {
+            if !is_supported_crossref_completion_key(label) {
+                continue;
+            }
+            let display = normalize_anchor_label(label);
+            if display.is_empty() || !seen.insert(display.to_lowercase()) {
+                continue;
+            }
+            if !matches_query(&display, &query) {
+                continue;
+            }
+            items.push(CompletionItem {
+                label: display.clone(),
+                kind: Some(CompletionItemKind::REFERENCE),
+                insert_text: Some(display),
+                insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                ..Default::default()
+            });
+        }
+    }
+
+    if items.is_empty() {
+        return Ok(None);
+    }
+
     Ok(Some(CompletionResponse::Array(items)))
 }
 
-fn is_citation_context(text: &str, offset: usize) -> bool {
+fn citation_query_prefix(text: &str, offset: usize) -> Option<String> {
     let start = offset.saturating_sub(8);
     let snippet = &text[start..offset];
-    snippet.contains("@")
+    let at = snippet.rfind('@')?;
+    let query = &snippet[at + 1..];
+    if query
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | ':' | '.'))
+    {
+        Some(query.to_string())
+    } else {
+        None
+    }
+}
+
+fn matches_query(candidate: &str, query: &str) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+    candidate
+        .to_ascii_lowercase()
+        .starts_with(&query.to_ascii_lowercase())
+}
+
+fn is_supported_crossref_completion_key(key: &str) -> bool {
+    panache_parser::parser::inlines::citations::is_quarto_crossref_key(key)
+        || panache_parser::parser::inlines::citations::has_bookdown_prefix(key)
 }

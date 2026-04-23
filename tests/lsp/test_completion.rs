@@ -279,3 +279,27 @@ async fn test_completion_returns_none_inside_yaml_frontmatter() {
         "Expected no citation completion when cursor is inside YAML frontmatter"
     );
 }
+
+#[tokio::test]
+async fn test_completion_includes_only_crossrefable_chunk_labels() {
+    let server = TestLspServer::new();
+
+    let content = "```{r}\n#| label: setup\n1 + 1\n```\n\n```{r}\n#| label: fig-plot\n#| fig-cap: \"Plot\"\nplot(1:10)\n```\n\nSee @\n";
+    server
+        .open_document("file:///test.qmd", content, "quarto")
+        .await;
+
+    let result = server.completion("file:///test.qmd", 11, 6).await;
+    let Some(CompletionResponse::Array(items)) = result else {
+        panic!("Expected completion items");
+    };
+
+    assert!(
+        items.iter().any(|item| item.label == "fig-plot"),
+        "Expected Quarto figure crossref label completion"
+    );
+    assert!(
+        !items.iter().any(|item| item.label == "setup"),
+        "Expected non-crossrefable chunk labels to be excluded"
+    );
+}
