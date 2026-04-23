@@ -496,6 +496,19 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         }
     };
 
+    if let Some(directive) = tokens.iter().find(|t| t.kind == YamlToken::Directive)
+        && !tokens.iter().any(|t| t.kind == YamlToken::DocumentStart)
+    {
+        return YamlParseReport {
+            tree: None,
+            diagnostics: vec![diag_at_token(
+                directive,
+                "YAML_PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START",
+                "directive requires an explicit document start marker",
+            )],
+        };
+    }
+
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::DOCUMENT.into());
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());

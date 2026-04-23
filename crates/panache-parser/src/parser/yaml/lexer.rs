@@ -433,6 +433,14 @@ fn lex_mapping_line_tokens<'a>(
         }
         return Ok(());
     }
+    if trimmed.starts_with("---") {
+        return Err(YamlDiagnostic {
+            code: "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START",
+            message: "trailing content after document start marker",
+            byte_start: line_start + line_indent,
+            byte_end: line_start + line.len(),
+        });
+    }
     if trimmed == "..." {
         push_token(out, YamlToken::DocumentEnd, content);
         if !newline.is_empty() {

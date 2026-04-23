@@ -432,6 +432,28 @@ mod tests {
     }
 
     #[test]
+    fn parse_yaml_report_detects_trailing_content_after_document_start() {
+        let report = parse_yaml_report("--- key1: value1\n    key2: value2\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
+        );
+    }
+
+    #[test]
+    fn parse_yaml_report_detects_directive_without_document_start() {
+        let report = parse_yaml_report("%YAML 1.2\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            "YAML_PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START"
+        );
+    }
+
+    #[test]
     fn parser_builds_flow_sequence_nodes_in_mapping_value() {
         let input = "a: [b, c]\n";
         let tree = parse_yaml_tree(input).expect("tree");
