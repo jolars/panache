@@ -294,6 +294,8 @@ golden_test_cases!(
     issue_202_adjacent_mixed_table_captions,
     issue_203_quarto_layout_tables_idempotency,
     issue_212_license_nested_list_idempotency,
+    issue_214_escaped_display_math_in_strong_idempotency,
+    issue_214_mixed_marker_nested_ordered_idempotency,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,

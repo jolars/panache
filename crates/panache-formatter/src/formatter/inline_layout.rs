@@ -1043,6 +1043,21 @@ fn process_node_recursive(
                 }
                 SyntaxKind::DISPLAY_MATH => {
                     skip_marker_whitespace = false;
+                    let in_inline_container = n.ancestors().skip(1).any(|ancestor| {
+                        matches!(
+                            ancestor.kind(),
+                            SyntaxKind::STRONG
+                                | SyntaxKind::EMPHASIS
+                                | SyntaxKind::STRIKEOUT
+                                | SyntaxKind::SUPERSCRIPT
+                                | SyntaxKind::SUBSCRIPT
+                        )
+                    });
+                    if in_inline_container {
+                        sink.push_piece(&n.text().to_string());
+                        continue;
+                    }
+
                     let mut trailing_attrs = None;
                     let mut consumed_interstitial_whitespace = false;
                     if config.formatter_extensions.quarto_crossrefs {

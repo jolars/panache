@@ -217,7 +217,11 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 match child {
                     NodeOrToken::Node(n) => {
                         skip_marker_whitespace = false;
-                        content.push_str(&format_inline_node(&n, config));
+                        if n.kind() == SyntaxKind::DISPLAY_MATH {
+                            content.push_str(&n.text().to_string());
+                        } else {
+                            content.push_str(&format_inline_node(&n, config));
+                        }
                     }
                     NodeOrToken::Token(t) => {
                         if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {
@@ -253,7 +257,11 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 match child {
                     NodeOrToken::Node(n) => {
                         skip_marker_whitespace = false;
-                        content.push_str(&format_inline_node(&n, config));
+                        if n.kind() == SyntaxKind::DISPLAY_MATH {
+                            content.push_str(&n.text().to_string());
+                        } else {
+                            content.push_str(&format_inline_node(&n, config));
+                        }
                     }
                     NodeOrToken::Token(t) => {
                         if t.kind() == SyntaxKind::BLOCK_QUOTE_MARKER {

@@ -598,30 +598,34 @@ impl BlockParser for ListParser {
             && list_indent.content_col >= 4
             && indent_cols == list_indent.content_col
             && indent_cols <= 4
-            && matches!(
-                marker_match.marker,
+        {
+            let should_suppress = match &marker_match.marker {
                 ListMarker::Ordered(OrderedMarker::Decimal {
-                    style: ListDelimiter::Parens,
-                    ..
-                }) | ListMarker::Ordered(OrderedMarker::Decimal {
-                    style: ListDelimiter::Period,
-                    ..
-                }) | ListMarker::Ordered(OrderedMarker::LowerAlpha {
-                    style: ListDelimiter::Parens,
-                    ..
-                }) | ListMarker::Ordered(OrderedMarker::UpperAlpha {
-                    style: ListDelimiter::Parens,
-                    ..
-                }) | ListMarker::Ordered(OrderedMarker::LowerRoman {
-                    style: ListDelimiter::Parens,
-                    ..
-                }) | ListMarker::Ordered(OrderedMarker::UpperRoman {
+                    number,
+                    style: ListDelimiter::Parens | ListDelimiter::Period,
+                }) => number != "1",
+                ListMarker::Ordered(OrderedMarker::LowerAlpha {
                     style: ListDelimiter::Parens,
                     ..
                 })
-            )
-        {
-            return None;
+                | ListMarker::Ordered(OrderedMarker::UpperAlpha {
+                    style: ListDelimiter::Parens,
+                    ..
+                })
+                | ListMarker::Ordered(OrderedMarker::LowerRoman {
+                    style: ListDelimiter::Parens,
+                    ..
+                })
+                | ListMarker::Ordered(OrderedMarker::UpperRoman {
+                    style: ListDelimiter::Parens,
+                    ..
+                }) => true,
+                _ => false,
+            };
+
+            if should_suppress {
+                return None;
+            }
         }
 
         if indent_cols >= 4 && !ctx.in_list {
