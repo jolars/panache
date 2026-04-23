@@ -202,6 +202,7 @@ pub(super) struct NodeWrapOptions<'a> {
     pub atomic_links_root: bool,
     pub strip_standalone_blockquote_markers: bool,
     pub avoid_unsafe_line_start: bool,
+    pub avoid_blockquote_line_start: bool,
 }
 
 impl<'a> NodeWrapOptions<'a> {
@@ -212,6 +213,7 @@ impl<'a> NodeWrapOptions<'a> {
             atomic_links_root: false,
             strip_standalone_blockquote_markers: false,
             avoid_unsafe_line_start: false,
+            avoid_blockquote_line_start: false,
         }
     }
 
@@ -222,6 +224,7 @@ impl<'a> NodeWrapOptions<'a> {
             atomic_links_root: true,
             strip_standalone_blockquote_markers: false,
             avoid_unsafe_line_start: false,
+            avoid_blockquote_line_start: false,
         }
     }
 }
@@ -230,24 +233,32 @@ impl WrapStrategy {
     fn options<'a>(self, config: &Config, widths: &'a [usize]) -> NodeWrapOptions<'a> {
         let avoid_unsafe_in_paragraph_reflow =
             config.parser_extensions.lists_without_preceding_blankline;
+        let avoid_blockquote_start = !config.parser_extensions.blank_before_blockquote;
         match self {
             Self::ParagraphReflow => NodeWrapOptions {
                 avoid_unsafe_line_start: avoid_unsafe_in_paragraph_reflow,
+                avoid_blockquote_line_start: avoid_blockquote_start,
                 ..NodeWrapOptions::reflow(widths)
             },
             Self::ParagraphSentence => NodeWrapOptions::sentence(),
             Self::ListReflow { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
                 avoid_unsafe_line_start: true,
+                avoid_blockquote_line_start: avoid_blockquote_start,
                 ..NodeWrapOptions::reflow(widths)
             },
             Self::ListSentence { in_blockquote } => NodeWrapOptions {
                 strip_standalone_blockquote_markers: in_blockquote,
                 avoid_unsafe_line_start: true,
+                avoid_blockquote_line_start: avoid_blockquote_start,
                 ..NodeWrapOptions::sentence()
             },
         }
     }
+}
+
+fn is_unsafe_block_line_start_piece(piece: &str) -> bool {
+    piece.starts_with('>')
 }
 
 fn is_example_list_marker_piece(piece: &str) -> bool {
@@ -376,6 +387,7 @@ struct StreamingCoreSink<'a> {
     merge_initialism_year: bool,
     sentence_language: SentenceLanguage,
     avoid_unsafe_line_start: bool,
+    avoid_blockquote_line_start: bool,
 }
 
 impl<'a> StreamingCoreSink<'a> {
@@ -386,6 +398,7 @@ impl<'a> StreamingCoreSink<'a> {
         merge_initialism_year: bool,
         sentence_language: SentenceLanguage,
         avoid_unsafe_line_start: bool,
+        avoid_blockquote_line_start: bool,
     ) -> Self {
         Self {
             default_line_width: line_widths.last().copied().unwrap_or(0),
@@ -401,6 +414,7 @@ impl<'a> StreamingCoreSink<'a> {
             merge_initialism_year,
             sentence_language,
             avoid_unsafe_line_start,
+            avoid_blockquote_line_start,
         }
     }
 
@@ -420,6 +434,8 @@ impl<'a> StreamingCoreSink<'a> {
             let spacer_width = usize::from(self.line_has_piece && self.prev_ws_after);
             let would_start_line_with_unsafe_piece = self.prev_ws_after
                 && (is_definition_marker_piece(segment.text.as_str())
+                    || (self.avoid_blockquote_line_start
+                        && is_unsafe_block_line_start_piece(segment.text.as_str()))
                     || (self.avoid_unsafe_line_start
                         && is_unsafe_list_line_start_piece(segment.text.as_str())));
             if self.line_has_piece
@@ -524,6 +540,7 @@ pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> 
         false,
         false,
         SentenceLanguage::English,
+        false,
         false,
     );
     for (idx, word) in words.iter().enumerate() {
@@ -653,6 +670,7 @@ impl<'a> TraversalBuilder<'a> {
         strip_standalone_blockquote_markers: bool,
         sentence_language: SentenceLanguage,
         avoid_unsafe_line_start: bool,
+        avoid_blockquote_line_start: bool,
     ) -> Self {
         Self {
             sink: StreamingCoreSink::new(
@@ -662,6 +680,7 @@ impl<'a> TraversalBuilder<'a> {
                 true,
                 sentence_language,
                 avoid_unsafe_line_start,
+                avoid_blockquote_line_start,
             ),
             current_piece: None,
             current_piece_boundary_class: SentenceBoundaryClass::Normal,
@@ -1178,6 +1197,7 @@ pub(super) fn wrapped_lines_for_node(
         options.strip_standalone_blockquote_markers,
         sentence_language,
         options.avoid_unsafe_line_start,
+        options.avoid_blockquote_line_start,
     );
     process_node_recursive(
         config,
@@ -1268,14 +1288,17 @@ mod tests {
         };
         let options_disabled = WrapStrategy::ParagraphReflow.options(&config_disabled, &[80]);
         assert!(!options_disabled.avoid_unsafe_line_start);
+        assert!(!options_disabled.avoid_blockquote_line_start);
 
         let mut parser_cfg_enabled = parser_cfg;
         parser_cfg_enabled.lists_without_preceding_blankline = true;
+        parser_cfg_enabled.blank_before_blockquote = false;
         let config_enabled = crate::config::Config {
             parser_extensions: parser_cfg_enabled,
             ..crate::config::Config::default()
         };
         let options_enabled = WrapStrategy::ParagraphReflow.options(&config_enabled, &[80]);
         assert!(options_enabled.avoid_unsafe_line_start);
+        assert!(options_enabled.avoid_blockquote_line_start);
     }
 }

@@ -223,6 +223,14 @@ fn blockquote_autolink_line_stays_idempotent() {
 }
 
 #[test]
+fn footnote_continuation_angle_link_without_space_stays_idempotent() {
+    let input = "Reference.[^1]\n\n[^1]: This can also be done by wrapping a JS libraries inside a package, which will later be used inside an application. See for example `{glouton}` [@R-glouton], which is a wrapper around the \\[`js-cookie` >https://github.com/js-cookie/js-cookie> JavaScript library.\n";
+    let output1 = format(input, None, None);
+    let output2 = format(&output1, None, None);
+    assert_eq!(output1, output2, "Formatting should be idempotent");
+}
+
+#[test]
 fn blockquote_bracketed_span_continuation_stays_idempotent() {
     let input = "> Roses are [red and **bold**]{color=\"red\"} and\n> violets are [blue]{color=\"blue\"}.\n";
     let output1 = format(input, None, None);

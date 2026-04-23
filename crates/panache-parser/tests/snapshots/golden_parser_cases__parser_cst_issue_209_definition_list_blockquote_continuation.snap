@@ -1,0 +1,44 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+assertion_line: 96
+expression: cst_output
+---
+DOCUMENT@0..74
+  DEFINITION_LIST@0..74
+    DEFINITION_ITEM@0..74
+      TERM@0..5
+        TEXT@0..4 "Term"
+        NEWLINE@4..5 "\n"
+      BLANK_LINE@5..6
+        BLANK_LINE@5..6 "\n"
+      DEFINITION@6..74
+        DEFINITION_MARKER@6..7 ":"
+        WHITESPACE@7..10 "   "
+        LIST@10..74
+          LIST_ITEM@10..44
+            LIST_MARKER@10..11 "-"
+            WHITESPACE@11..12 " "
+            PLAIN@12..44
+              TEXT@12..16 "List"
+              NEWLINE@16..17 "\n"
+              TEXT@17..43 "    with lazy continu ..."
+              NEWLINE@43..44 "\n"
+          WHITESPACE@44..48 "    "
+          LIST_ITEM@48..74
+            LIST_MARKER@48..49 "-"
+            WHITESPACE@49..50 " "
+            PLAIN@50..54
+              TEXT@50..53 "> a"
+              NEWLINE@53..54 "\n"
+            BLOCK_QUOTE@54..74
+              WHITESPACE@54..60 "      "
+              BLOCK_QUOTE_MARKER@60..61 ">"
+              WHITESPACE@61..62 " "
+              PARAGRAPH@62..74
+                TEXT@62..63 "b"
+                NEWLINE@63..64 "\n"
+                WHITESPACE@64..70 "      "
+                BLOCK_QUOTE_MARKER@70..71 ">"
+                WHITESPACE@71..72 " "
+                TEXT@72..73 "c"
+                NEWLINE@73..74 "\n"

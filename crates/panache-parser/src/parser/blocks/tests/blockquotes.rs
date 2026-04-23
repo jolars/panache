@@ -248,6 +248,22 @@ fn blockquote_can_interrupt_when_blank_before_blockquote_disabled() {
 }
 
 #[test]
+fn footnote_continuation_blockquote_requires_blank_before_by_default() {
+    let input = "[^1]: A long note line\n    continues here\n    >quoted without blank\n";
+    let tree = parse_blocks(input);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCK_QUOTE), 0);
+}
+
+#[test]
+fn footnote_continuation_blockquote_can_interrupt_when_extension_disabled() {
+    let mut config = ParserOptions::default();
+    config.extensions.blank_before_blockquote = false;
+    let input = "[^1]: A long note line\n    continues here\n    >quoted without blank\n";
+    let tree = parse_blocks_with_config(input, &config);
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCK_QUOTE), 1);
+}
+
+#[test]
 fn nested_blockquote_without_blank_when_extension_disabled() {
     let mut config = ParserOptions::default();
     config.extensions.blank_before_blockquote = false;
@@ -624,6 +640,36 @@ How should the list structure be interpreted?
     assert!(
         count_nodes_of_type(&tree, SyntaxKind::LIST) >= 2,
         "Expected lists inside blockquotes"
+    );
+}
+
+#[test]
+fn definition_list_list_blockquote_continuation_stays_structural() {
+    let input = "Term\n\n:   - List\n    with lazy continuation\n    - > a\n      > b\n      > c\n";
+    let tree = parse_blocks(input);
+
+    assert_eq!(count_nodes_of_type(&tree, SyntaxKind::BLOCK_QUOTE), 1);
+
+    let blockquote = find_nodes_of_type(&tree, SyntaxKind::BLOCK_QUOTE)
+        .into_iter()
+        .next()
+        .expect("expected blockquote node");
+    let marker_count = blockquote
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|token| token.kind() == SyntaxKind::BLOCK_QUOTE_MARKER)
+        .count();
+    assert_eq!(marker_count, 2);
+
+    let has_text_with_raw_marker = blockquote
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|token| token.kind() == SyntaxKind::TEXT)
+        .any(|token| token.text().trim_start().starts_with('>'));
+
+    assert!(
+        !has_text_with_raw_marker,
+        "blockquote should not keep continuation markers as TEXT"
     );
 }
 

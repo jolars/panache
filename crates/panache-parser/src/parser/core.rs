@@ -936,16 +936,18 @@ impl<'a> Parser<'a> {
             return None;
         }
         let list_content_col = paragraphs::current_content_col(&self.containers);
-        if list_content_col == 0 {
+        let content_container_indent = self.content_container_indent_to_strip();
+        let marker_col = list_content_col.saturating_add(content_container_indent);
+        if marker_col == 0 {
             return None;
         }
 
         let (indent_cols, _) = leading_indent(line);
-        if indent_cols < list_content_col {
+        if indent_cols < marker_col {
             return None;
         }
 
-        let idx = byte_index_at_column(line, list_content_col);
+        let idx = byte_index_at_column(line, marker_col);
         if idx > line.len() {
             return None;
         }
@@ -1250,6 +1252,7 @@ impl<'a> Parser<'a> {
             // But first check blank_before_blockquote requirement
             if self.config.extensions.blank_before_blockquote
                 && current_bq_depth == 0
+                && !used_shifted_bq
                 && !blockquote_payload
                     .as_ref()
                     .map(|payload| payload.can_start)
@@ -1840,50 +1843,65 @@ impl<'a> Parser<'a> {
         if content_indent > 0 {
             let (bq_depth, inner_content) = count_blockquote_markers(stripped_content);
             let current_bq_depth = self.current_blockquote_depth();
+            let in_footnote_definition = self
+                .containers
+                .stack
+                .iter()
+                .any(|container| matches!(container, Container::FootnoteDefinition { .. }));
 
             if bq_depth > 0 {
-                // If definition/list plain text is buffered, flush it before opening nested
-                // blockquotes so block order remains lossless and stable across reparse.
-                self.emit_buffered_plain_if_needed();
-                self.emit_list_item_buffer_if_needed();
-
-                // Blockquotes can nest inside content containers; preserve the stripped indentation
-                // as WHITESPACE before the first marker for losslessness.
-                self.close_paragraph_if_open();
-
-                if bq_depth > current_bq_depth {
-                    let marker_info = parse_blockquote_marker_info(stripped_content);
-
-                    // Open new blockquotes and emit their markers.
-                    for level in current_bq_depth..bq_depth {
-                        self.builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
-
-                        if level == current_bq_depth
-                            && let Some(indent_str) = indent_to_emit
-                        {
-                            self.builder
-                                .token(SyntaxKind::WHITESPACE.into(), indent_str);
-                        }
-
-                        if let Some(info) = marker_info.get(level) {
-                            blockquotes::emit_one_blockquote_marker(
-                                &mut self.builder,
-                                info.leading_spaces,
-                                info.has_trailing_space,
-                            );
-                        }
-
-                        self.containers.push(Container::BlockQuote {});
-                    }
-                } else if bq_depth < current_bq_depth {
-                    self.close_blockquotes_to_depth(bq_depth);
+                if in_footnote_definition
+                    && self.config.extensions.blank_before_blockquote
+                    && current_bq_depth == 0
+                    && !blockquotes::can_start_blockquote(self.pos, &self.lines)
+                {
+                    // Respect blank_before_blockquote even when `>` appears only
+                    // after stripping content-container indentation (e.g. footnotes).
+                    // In that case the marker should be treated as paragraph text.
                 } else {
-                    // Same depth: emit markers for losslessness.
-                    let marker_info = parse_blockquote_marker_info(stripped_content);
-                    self.emit_blockquote_markers(&marker_info, bq_depth);
-                }
+                    // If definition/list plain text is buffered, flush it before opening nested
+                    // blockquotes so block order remains lossless and stable across reparse.
+                    self.emit_buffered_plain_if_needed();
+                    self.emit_list_item_buffer_if_needed();
 
-                return self.parse_inner_content(inner_content, Some(inner_content));
+                    // Blockquotes can nest inside content containers; preserve the stripped indentation
+                    // as WHITESPACE before the first marker for losslessness.
+                    self.close_paragraph_if_open();
+
+                    if bq_depth > current_bq_depth {
+                        let marker_info = parse_blockquote_marker_info(stripped_content);
+
+                        // Open new blockquotes and emit their markers.
+                        for level in current_bq_depth..bq_depth {
+                            self.builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
+
+                            if level == current_bq_depth
+                                && let Some(indent_str) = indent_to_emit
+                            {
+                                self.builder
+                                    .token(SyntaxKind::WHITESPACE.into(), indent_str);
+                            }
+
+                            if let Some(info) = marker_info.get(level) {
+                                blockquotes::emit_one_blockquote_marker(
+                                    &mut self.builder,
+                                    info.leading_spaces,
+                                    info.has_trailing_space,
+                                );
+                            }
+
+                            self.containers.push(Container::BlockQuote {});
+                        }
+                    } else if bq_depth < current_bq_depth {
+                        self.close_blockquotes_to_depth(bq_depth);
+                    } else {
+                        // Same depth: emit markers for losslessness.
+                        let marker_info = parse_blockquote_marker_info(stripped_content);
+                        self.emit_blockquote_markers(&marker_info, bq_depth);
+                    }
+
+                    return self.parse_inner_content(inner_content, Some(inner_content));
+                }
             }
         }
 

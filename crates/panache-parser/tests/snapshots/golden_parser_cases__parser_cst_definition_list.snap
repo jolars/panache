@@ -434,12 +434,14 @@ DOCUMENT@0..1703
               TEXT@1679..1682 "> a"
               NEWLINE@1682..1683 "\n"
             BLOCK_QUOTE@1683..1703
-              WHITESPACE@1683..1687 "    "
-              WHITESPACE@1687..1689 "  "
+              WHITESPACE@1683..1689 "      "
               BLOCK_QUOTE_MARKER@1689..1690 ">"
               WHITESPACE@1690..1691 " "
               PARAGRAPH@1691..1703
                 TEXT@1691..1692 "b"
                 NEWLINE@1692..1693 "\n"
-                TEXT@1693..1702 "      > c"
+                WHITESPACE@1693..1699 "      "
+                BLOCK_QUOTE_MARKER@1699..1700 ">"
+                WHITESPACE@1700..1701 " "
+                TEXT@1701..1702 "c"
                 NEWLINE@1702..1703 "\n"
