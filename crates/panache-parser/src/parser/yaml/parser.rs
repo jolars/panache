@@ -76,9 +76,13 @@ fn emit_token_as_yaml(builder: &mut GreenNodeBuilder<'_>, token: &YamlTokenSpan<
     builder.token(kind.into(), token.text);
 }
 
-fn diag_at_token(token: &YamlTokenSpan<'_>, message: &'static str) -> YamlDiagnostic {
+fn diag_at_token(
+    token: &YamlTokenSpan<'_>,
+    code: &'static str,
+    message: &'static str,
+) -> YamlDiagnostic {
     YamlDiagnostic {
-        code: "YAML_PARSE_ERROR",
+        code,
         message,
         byte_start: token.byte_start,
         byte_end: token.byte_end,
@@ -92,7 +96,7 @@ fn emit_flow_sequence<'a>(
 ) -> Result<(), YamlDiagnostic> {
     if *i >= tokens.len() || tokens[*i].kind != YamlToken::FlowSeqStart {
         return Err(YamlDiagnostic {
-            code: "YAML_PARSE_ERROR",
+            code: "YAML_PARSE_EXPECTED_FLOW_SEQUENCE_START",
             message: "expected flow sequence start token",
             byte_start: tokens.get(*i).map(|t| t.byte_start).unwrap_or(0),
             byte_end: tokens.get(*i).map(|t| t.byte_end).unwrap_or(0),
@@ -139,7 +143,7 @@ fn emit_flow_sequence<'a>(
         .map(|t| (t.byte_start, t.byte_end))
         .unwrap_or((0, 0));
     Err(YamlDiagnostic {
-        code: "YAML_PARSE_ERROR",
+        code: "YAML_PARSE_UNTERMINATED_FLOW_SEQUENCE",
         message: "unterminated flow sequence",
         byte_start,
         byte_end,
@@ -153,7 +157,7 @@ fn emit_flow_map<'a>(
 ) -> Result<(), YamlDiagnostic> {
     if *i >= tokens.len() || tokens[*i].kind != YamlToken::FlowMapStart {
         return Err(YamlDiagnostic {
-            code: "YAML_PARSE_ERROR",
+            code: "YAML_PARSE_EXPECTED_FLOW_MAP_START",
             message: "expected flow map start token",
             byte_start: tokens.get(*i).map(|t| t.byte_start).unwrap_or(0),
             byte_end: tokens.get(*i).map(|t| t.byte_end).unwrap_or(0),
@@ -211,7 +215,7 @@ fn emit_flow_map<'a>(
         .map(|t| (t.byte_start, t.byte_end))
         .unwrap_or((0, 0));
     Err(YamlDiagnostic {
-        code: "YAML_PARSE_ERROR",
+        code: "YAML_PARSE_UNTERMINATED_FLOW_MAP",
         message: "unterminated flow map",
         byte_start,
         byte_end,
@@ -263,6 +267,7 @@ fn emit_block_map<'a>(
             YamlToken::Indent => {
                 return Err(diag_at_token(
                     &tokens[*i],
+                    "YAML_PARSE_UNEXPECTED_INDENT",
                     "unexpected indent token while parsing block map",
                 ));
             }
@@ -274,6 +279,7 @@ fn emit_block_map<'a>(
                 }
                 return Err(diag_at_token(
                     &tokens[*i],
+                    "YAML_PARSE_UNEXPECTED_DEDENT",
                     "unexpected dedent token while parsing block map",
                 ));
             }
@@ -305,6 +311,7 @@ fn emit_block_map<'a>(
                         _ => {
                             return Err(diag_at_token(
                                 &tokens[*i],
+                                "YAML_PARSE_INVALID_KEY_TOKEN",
                                 "invalid token while parsing block map key",
                             ));
                         }
@@ -313,6 +320,7 @@ fn emit_block_map<'a>(
                 if !saw_colon {
                     return Err(diag_at_token(
                         &tokens[(*i).saturating_sub(1)],
+                        "YAML_PARSE_MISSING_COLON",
                         "missing colon in block map entry",
                     ));
                 }
@@ -385,7 +393,7 @@ fn emit_block_map<'a>(
             .map(|t| (t.byte_start, t.byte_end))
             .unwrap_or((0, 0));
         return Err(YamlDiagnostic {
-            code: "YAML_PARSE_ERROR",
+            code: "YAML_PARSE_UNTERMINATED_BLOCK_MAP",
             message: "unterminated indented block map",
             byte_start,
             byte_end,

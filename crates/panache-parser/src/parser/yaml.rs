@@ -362,7 +362,7 @@ mod tests {
         let report = parse_yaml_report("this\n is\n  invalid: x\n");
         assert!(report.tree.is_none());
         assert_eq!(report.diagnostics.len(), 1);
-        assert_eq!(report.diagnostics[0].code, "YAML_PARSE_ERROR");
+        assert_eq!(report.diagnostics[0].code, "YAML_PARSE_UNEXPECTED_INDENT");
     }
 
     #[test]

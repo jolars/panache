@@ -9,7 +9,7 @@ expression: snapshot_json
     {
       "byte_end": 5,
       "byte_start": 5,
-      "code": "YAML_PARSE_ERROR",
+      "code": "YAML_PARSE_UNEXPECTED_INDENT",
       "message": "unexpected indent token while parsing block map"
     }
   ],
