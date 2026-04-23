@@ -1,5 +1,11 @@
 ---
-applyTo: "src/linter/**/*.rs,src/linter.rs,src/diagnostic_renderer.rs,tests/linting.rs,tests/cli/lint.rs,docs/guide/linting.qmd"
+paths:
+  - "src/linter/**/*.rs"
+  - "src/linter.rs"
+  - "src/diagnostic_renderer.rs"
+  - "tests/linting.rs"
+  - "tests/cli/lint.rs"
+  - "docs/guide/linting.qmd"
 ---
 
 Linter changes should prioritize diagnostic correctness, actionable fixes, and

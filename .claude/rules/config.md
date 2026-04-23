@@ -1,5 +1,7 @@
 ---
-applyTo: "src/config.rs,docs/guide/configuration.qmd"
+paths:
+  - "src/config.rs"
+  - "docs/guide/configuration.qmd"
 ---
 
 Configuration changes should preserve predictable defaults, compatibility, and

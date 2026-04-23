@@ -1,5 +1,9 @@
 ---
-applyTo: "src/formatter.rs,crates/panache-formatter/**/*.rs,tests/fixtures/cases/**/expected.md,tests/format/**/*.rs"
+paths:
+  - "src/formatter.rs"
+  - "crates/panache-formatter/**/*.rs"
+  - "tests/fixtures/cases/**/expected.md"
+  - "tests/format/**/*.rs"
 ---
 
 Formatter changes should preserve idempotency and avoid parser-side workarounds.

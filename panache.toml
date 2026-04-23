@@ -8,6 +8,8 @@ extend-exclude = [
   "tests/**/*",
   "crates/panache-parser/tests/**/*",
   "CHANGELOG.md",
+  ".claude/**/*",
+  ".agents/**/*",
 ]
 
 [formatters]
