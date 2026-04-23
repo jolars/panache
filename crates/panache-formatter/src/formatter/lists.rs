@@ -310,7 +310,18 @@ impl Formatter {
                     .next_sibling()
                     .map(|n| n.kind() == SyntaxKind::LIST_ITEM)
                     .unwrap_or(false);
-                if !is_loose && prev_is_item && next_is_item && !self.output.ends_with("\n\n") {
+                let next_is_continuation_list = child
+                    .next_sibling()
+                    .map(|n| {
+                        n.kind() == SyntaxKind::LIST
+                            && Self::has_continuation_eligible_predecessor(&n)
+                    })
+                    .unwrap_or(false);
+                if prev_is_item
+                    && (next_is_item || next_is_continuation_list)
+                    && !self.output.ends_with("\n\n")
+                    && (!is_loose || next_is_continuation_list)
+                {
                     self.output.push('\n');
                 }
                 continue;
@@ -325,6 +336,13 @@ impl Formatter {
                 if Self::has_continuation_eligible_predecessor(&child) {
                     // Code blocks that are siblings of ListItems are also continuation content.
                     self.format_indented_code_block(&child, last_item_content_indent);
+                } else {
+                    self.format_node_sync(&child, indent);
+                }
+            } else if child.kind() == SyntaxKind::LIST {
+                if Self::has_continuation_eligible_predecessor(&child) {
+                    // Nested lists emitted as siblings of ListItems should stay continuation content.
+                    self.format_node_sync(&child, last_item_content_indent);
                 } else {
                     self.format_node_sync(&child, indent);
                 }

@@ -293,6 +293,7 @@ golden_test_cases!(
     issue_201_hashpipe_literal_blank_line_idempotency,
     issue_202_adjacent_mixed_table_captions,
     issue_203_quarto_layout_tables_idempotency,
+    issue_212_license_nested_list_idempotency,
     writer_autolinks,
     writer_blockquote_not,
     writer_definition_lists_multiblock,
