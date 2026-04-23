@@ -18,7 +18,7 @@ mod parser;
 pub use lexer::lex_mapping_tokens;
 pub use model::{
     ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
-    YamlParseReport, YamlToken, YamlTokenSpan,
+    YamlParseReport, YamlToken, YamlTokenSpan, diagnostic_codes,
 };
 pub use parser::{parse_shadow, parse_yaml_report, parse_yaml_tree};
 
@@ -362,7 +362,10 @@ mod tests {
         let report = parse_yaml_report("this\n is\n  invalid: x\n");
         assert!(report.tree.is_none());
         assert_eq!(report.diagnostics.len(), 1);
-        assert_eq!(report.diagnostics[0].code, "YAML_PARSE_UNEXPECTED_INDENT");
+        assert_eq!(
+            report.diagnostics[0].code,
+            diagnostic_codes::PARSE_UNEXPECTED_INDENT
+        );
     }
 
     #[test]
@@ -372,7 +375,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END"
+            diagnostic_codes::LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END
         );
     }
 
@@ -383,7 +386,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
+            diagnostic_codes::PARSE_TRAILING_CONTENT_AFTER_FLOW_END
         );
     }
 
@@ -394,7 +397,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_PARSE_UNTERMINATED_FLOW_SEQUENCE"
+            diagnostic_codes::PARSE_UNTERMINATED_FLOW_SEQUENCE
         );
     }
 
@@ -405,7 +408,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_PARSE_INVALID_FLOW_SEQUENCE_COMMA"
+            diagnostic_codes::PARSE_INVALID_FLOW_SEQUENCE_COMMA
         );
     }
 
@@ -416,7 +419,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
+            diagnostic_codes::PARSE_TRAILING_CONTENT_AFTER_FLOW_END
         );
     }
 
@@ -427,7 +430,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE"
+            diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE
         );
     }
 
@@ -438,7 +441,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
+            diagnostic_codes::LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START
         );
     }
 
@@ -449,7 +452,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START"
+            diagnostic_codes::PARSE_DIRECTIVE_WITHOUT_DOCUMENT_START
         );
     }
 
@@ -460,7 +463,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_PARSE_DIRECTIVE_AFTER_CONTENT"
+            diagnostic_codes::PARSE_DIRECTIVE_AFTER_CONTENT
         );
     }
 
@@ -469,7 +472,10 @@ mod tests {
         let report = parse_yaml_report("---\nflow: [a,\nb,\nc]\n");
         assert!(report.tree.is_none());
         assert_eq!(report.diagnostics.len(), 1);
-        assert_eq!(report.diagnostics[0].code, "YAML_LEX_WRONG_INDENTED_FLOW");
+        assert_eq!(
+            report.diagnostics[0].code,
+            diagnostic_codes::LEX_WRONG_INDENTED_FLOW
+        );
     }
 
     #[test]

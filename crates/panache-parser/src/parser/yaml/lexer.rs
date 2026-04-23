@@ -1,4 +1,4 @@
-use super::model::{YamlDiagnostic, YamlToken, YamlTokenSpan};
+use super::model::{YamlDiagnostic, YamlToken, YamlTokenSpan, diagnostic_codes};
 
 struct YamlLine<'a> {
     line: &'a str,
@@ -356,7 +356,7 @@ fn assign_token_byte_ranges(
 
         if !input[offset..].starts_with(token.text) {
             return Err(YamlDiagnostic {
-                code: "YAML_LEX_ERROR",
+                code: diagnostic_codes::LEX_ERROR,
                 message: "internal token range reconstruction mismatch",
                 byte_start: offset,
                 byte_end: offset,
@@ -372,7 +372,7 @@ fn assign_token_byte_ranges(
         Ok(())
     } else {
         Err(YamlDiagnostic {
-            code: "YAML_LEX_ERROR",
+            code: diagnostic_codes::LEX_ERROR,
             message: "token stream did not cover full input",
             byte_start: offset,
             byte_end: input.len(),
@@ -460,7 +460,7 @@ fn lex_mapping_line_tokens<'a>(
         }
         if indent_stack.last().copied().unwrap_or(0) != line_indent {
             return Err(YamlDiagnostic {
-                code: "YAML_LEX_ERROR",
+                code: diagnostic_codes::LEX_ERROR,
                 message: "invalid indentation level for YAML block mapping",
                 byte_start: line_start,
                 byte_end: line_start + line.len(),
@@ -482,7 +482,7 @@ fn lex_mapping_line_tokens<'a>(
     }
     if trimmed.starts_with("---") {
         return Err(YamlDiagnostic {
-            code: "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START",
+            code: diagnostic_codes::LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START,
             message: "trailing content after document start marker",
             byte_start: line_start + line_indent,
             byte_end: line_start + line.len(),
@@ -497,7 +497,7 @@ fn lex_mapping_line_tokens<'a>(
     }
     if trimmed.starts_with("...") {
         return Err(YamlDiagnostic {
-            code: "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END",
+            code: diagnostic_codes::LEX_TRAILING_CONTENT_AFTER_DOCUMENT_END,
             message: "trailing content after document end marker",
             byte_start: line_start + line_indent,
             byte_end: line_start + line.len(),
@@ -514,7 +514,7 @@ fn lex_mapping_line_tokens<'a>(
     let Some((raw_key, raw_value)) = parse_raw_mapping_line(content) else {
         if split_once_unquoted(content, ':').is_some() {
             return Err(YamlDiagnostic {
-                code: "YAML_LEX_ERROR",
+                code: diagnostic_codes::LEX_ERROR,
                 message: "invalid plain mapping line",
                 byte_start: line_start + line_indent,
                 byte_end: line_start + line.len(),
@@ -522,7 +522,7 @@ fn lex_mapping_line_tokens<'a>(
         }
         if let Some(rel_idx) = invalid_double_quote_escape_offset(content) {
             return Err(YamlDiagnostic {
-                code: "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE",
+                code: diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE,
                 message: "invalid escape in double quoted scalar",
                 byte_start: line_start + line_indent + rel_idx,
                 byte_end: line_start + line_indent + rel_idx + 1,
@@ -566,7 +566,7 @@ fn lex_mapping_line_tokens<'a>(
         let tagged_scalar = &value_text[ws_len..];
         if let Some(rel_idx) = invalid_double_quote_escape_offset(tagged_scalar) {
             return Err(YamlDiagnostic {
-                code: "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE",
+                code: diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE,
                 message: "invalid escape in double quoted scalar",
                 byte_start: line_start
                     + line_indent
@@ -587,7 +587,7 @@ fn lex_mapping_line_tokens<'a>(
         }
         if contains_unquoted_mapping_indicator(tagged_scalar) {
             return Err(YamlDiagnostic {
-                code: "YAML_LEX_ERROR",
+                code: diagnostic_codes::LEX_ERROR,
                 message: "invalid plain scalar containing mapping indicator sequence",
                 byte_start: line_start + line_indent + raw_key.len() + 1,
                 byte_end: line_start + line.len(),
@@ -597,7 +597,7 @@ fn lex_mapping_line_tokens<'a>(
     } else {
         if let Some(rel_idx) = invalid_double_quote_escape_offset(scalar_part) {
             return Err(YamlDiagnostic {
-                code: "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE",
+                code: diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE,
                 message: "invalid escape in double quoted scalar",
                 byte_start: line_start + line_indent + raw_key.len() + 1 + leading_ws_len + rel_idx,
                 byte_end: line_start
@@ -611,7 +611,7 @@ fn lex_mapping_line_tokens<'a>(
         }
         if contains_unquoted_mapping_indicator(scalar_part) {
             return Err(YamlDiagnostic {
-                code: "YAML_LEX_ERROR",
+                code: diagnostic_codes::LEX_ERROR,
                 message: "invalid plain scalar containing mapping indicator sequence",
                 byte_start: line_start + line_indent + raw_key.len() + 1,
                 byte_end: line_start + line.len(),
@@ -642,7 +642,7 @@ pub fn lex_mapping_tokens_with_diagnostic(
 ) -> Result<Vec<YamlTokenSpan<'_>>, YamlDiagnostic> {
     if input.is_empty() {
         return Err(YamlDiagnostic {
-            code: "YAML_LEX_ERROR",
+            code: diagnostic_codes::LEX_ERROR,
             message: "empty YAML input",
             byte_start: 0,
             byte_end: 0,
@@ -666,7 +666,7 @@ pub fn lex_mapping_tokens_with_diagnostic(
             && line_indent <= flow_base_indent
         {
             return Err(YamlDiagnostic {
-                code: "YAML_LEX_WRONG_INDENTED_FLOW",
+                code: diagnostic_codes::LEX_WRONG_INDENTED_FLOW,
                 message: "wrong indentation for continued flow collection",
                 byte_start: line_start,
                 byte_end: line_start + yaml_line.line.len(),
