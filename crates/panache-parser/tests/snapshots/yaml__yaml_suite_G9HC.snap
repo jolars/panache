@@ -6,4 +6,4 @@ case_id: G9HC
 input: "---\nseq:\n&anchor\n- a\n- b\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_LEX_ERROR:invalid plain mapping line@4..8]
+diagnostics: [YAML_PARSE_INVALID_KEY_TOKEN:invalid token while parsing block map key@17..18]

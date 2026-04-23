@@ -439,6 +439,16 @@ fn lex_mapping_line_tokens<'a>(
     let line_indent = leading_indent(line);
     let content = &line[line_indent..];
 
+    // YAML spec prohibits tab characters for block indentation (section 8.1)
+    if line_indent > 0 && line[..line_indent].contains('\t') {
+        return Err(YamlDiagnostic {
+            code: diagnostic_codes::LEX_ERROR,
+            message: "tab character used for block indentation (not permitted by YAML spec)",
+            byte_start: line_start,
+            byte_end: line_start + line_indent,
+        });
+    }
+
     if content.trim().is_empty() {
         if !newline.is_empty() {
             push_token(out, YamlToken::Newline, newline);
@@ -527,7 +537,43 @@ fn lex_mapping_line_tokens<'a>(
     }
 
     let Some((raw_key, raw_value)) = parse_raw_mapping_line(content) else {
-        if split_once_unquoted(content, ':').is_some() {
+        if let Some((key_part, rest)) = split_once_unquoted(content, ':') {
+            let key_trimmed = key_part.trim();
+            let rest_no_ws = rest.trim_start_matches([' ', '\t']);
+            if !key_trimmed.is_empty() && (rest_no_ws.is_empty() || rest_no_ws.starts_with('#')) {
+                let (key_tag, key_text) = split_tag_prefix(key_part);
+                if let Some(tag) = key_tag {
+                    push_token(out, YamlToken::Tag, tag);
+                    let ws_len = leading_indent(key_text);
+                    if ws_len > 0 {
+                        push_token(out, YamlToken::Whitespace, &key_text[..ws_len]);
+                    }
+                    push_token(out, YamlToken::Key, &key_text[ws_len..]);
+                } else {
+                    push_token(out, YamlToken::Key, key_part);
+                }
+                push_token(out, YamlToken::Colon, ":");
+                if !rest.is_empty() {
+                    let (value_part, comment_part) = split_value_and_comment(rest);
+                    let leading_ws_len = leading_indent(value_part);
+                    if leading_ws_len > 0 {
+                        push_token(out, YamlToken::Whitespace, &value_part[..leading_ws_len]);
+                    }
+                    if let Some(comment) = comment_part {
+                        let leading_comment_ws_len = rest.len() - comment.len() - value_part.len();
+                        if leading_comment_ws_len > 0 {
+                            let start = value_part.len();
+                            let end = start + leading_comment_ws_len;
+                            push_token(out, YamlToken::Whitespace, &rest[start..end]);
+                        }
+                        push_token(out, YamlToken::Comment, comment);
+                    }
+                }
+                if !newline.is_empty() {
+                    push_token(out, YamlToken::Newline, newline);
+                }
+                return Ok(());
+            }
             return Err(YamlDiagnostic {
                 code: diagnostic_codes::LEX_ERROR,
                 message: "invalid plain mapping line",

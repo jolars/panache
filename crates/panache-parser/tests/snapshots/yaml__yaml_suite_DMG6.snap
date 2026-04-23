@@ -6,4 +6,4 @@ case_id: DMG6
 input: "key:\n  ok: 1\n wrong: 2\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_LEX_ERROR:invalid plain mapping line@0..4]
+diagnostics: [YAML_LEX_ERROR:invalid indentation level for YAML block mapping@13..22]

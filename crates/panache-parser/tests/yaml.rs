@@ -91,111 +91,226 @@ fn fixture_case_events(case_path: &Path) -> Vec<String> {
         .collect()
 }
 
-fn cst_yaml_projected_events(input: &str) -> Vec<String> {
-    fn plain_val_event(text: &str) -> String {
-        format!("=VAL :{}", text.replace('\\', "\\\\"))
-    }
+fn plain_val_event(text: &str) -> String {
+    format!("=VAL :{}", text.replace('\\', "\\\\"))
+}
 
-    fn quoted_val_event(text: &str) -> String {
-        if text.starts_with('\'') {
-            let trimmed = text.trim_end_matches('\'');
-            let normalized = trimmed.replace("''", "'").replace('\\', "\\\\");
-            format!("=VAL {normalized}")
-        } else {
-            let trimmed = text.trim_end_matches('"');
-            let mut normalized = String::with_capacity(trimmed.len());
-            let mut chars = trimmed.chars().peekable();
-            while let Some(ch) = chars.next() {
-                if ch != '\\' {
-                    normalized.push(ch);
-                    continue;
-                }
+fn quoted_val_event(text: &str) -> String {
+    if text.starts_with('\'') {
+        let trimmed = text.trim_end_matches('\'');
+        let normalized = trimmed.replace("''", "'").replace('\\', "\\\\");
+        format!("=VAL {normalized}")
+    } else {
+        let trimmed = text.trim_end_matches('"');
+        let mut normalized = String::with_capacity(trimmed.len());
+        let mut chars = trimmed.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch != '\\' {
+                normalized.push(ch);
+                continue;
+            }
 
-                let Some(next) = chars.next() else {
+            let Some(next) = chars.next() else {
+                normalized.push('\\');
+                break;
+            };
+
+            match next {
+                '/' => normalized.push('/'),
+                '"' => normalized.push('"'),
+                other => {
                     normalized.push('\\');
-                    break;
-                };
-
-                match next {
-                    '/' => normalized.push('/'),
-                    '"' => normalized.push('"'),
-                    other => {
-                        normalized.push('\\');
-                        normalized.push(other);
-                    }
+                    normalized.push(other);
                 }
             }
-            format!("=VAL {normalized}")
         }
+        format!("=VAL {normalized}")
+    }
+}
+
+fn long_tag(tag: &str) -> Option<&'static str> {
+    match tag {
+        "!!str" => Some("<tag:yaml.org,2002:str>"),
+        "!!int" => Some("<tag:yaml.org,2002:int>"),
+        "!!bool" => Some("<tag:yaml.org,2002:bool>"),
+        _ => None,
+    }
+}
+
+fn simple_flow_sequence_items(text: &str) -> Option<Vec<String>> {
+    let trimmed = text.trim();
+    let inner = trimmed.strip_prefix('[')?.strip_suffix(']')?;
+    let inner = inner.trim();
+    if inner.is_empty() {
+        return Some(Vec::new());
     }
 
-    fn long_tag(tag: &str) -> Option<&'static str> {
-        match tag {
-            "!!str" => Some("<tag:yaml.org,2002:str>"),
-            "!!int" => Some("<tag:yaml.org,2002:int>"),
-            "!!bool" => Some("<tag:yaml.org,2002:bool>"),
-            _ => None,
-        }
-    }
+    let mut items = Vec::new();
+    let mut start = 0usize;
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut escaped_double = false;
 
-    fn simple_flow_sequence_items(text: &str) -> Option<Vec<String>> {
-        let trimmed = text.trim();
-        let inner = trimmed.strip_prefix('[')?.strip_suffix(']')?;
-        let inner = inner.trim();
-        if inner.is_empty() {
-            return Some(Vec::new());
-        }
-
-        let mut items = Vec::new();
-        let mut start = 0usize;
-        let mut in_single = false;
-        let mut in_double = false;
-        let mut escaped_double = false;
-
-        for (idx, ch) in inner.char_indices() {
-            if in_double {
-                if escaped_double {
-                    escaped_double = false;
-                    continue;
-                }
-                match ch {
-                    '\\' => escaped_double = true,
-                    '"' => in_double = false,
-                    _ => {}
-                }
+    for (idx, ch) in inner.char_indices() {
+        if in_double {
+            if escaped_double {
+                escaped_double = false;
                 continue;
             }
-
-            if in_single {
-                if ch == '\'' {
-                    in_single = false;
-                }
-                continue;
-            }
-
             match ch {
-                '\'' => in_single = true,
-                '"' => in_double = true,
-                ',' => {
-                    let item = inner[start..idx].trim();
-                    if item.is_empty() {
-                        return None;
-                    }
-                    items.push(item.to_string());
-                    start = idx + 1;
-                }
+                '\\' => escaped_double = true,
+                '"' => in_double = false,
                 _ => {}
             }
+            continue;
         }
 
-        let last = inner[start..].trim();
-        if last.is_empty() {
-            return None;
+        if in_single {
+            if ch == '\'' {
+                in_single = false;
+            }
+            continue;
         }
-        items.push(last.to_string());
-        Some(items)
+
+        match ch {
+            '\'' => in_single = true,
+            '"' => in_double = true,
+            ',' => {
+                let item = inner[start..idx].trim();
+                if item.is_empty() {
+                    return None;
+                }
+                items.push(item.to_string());
+                start = idx + 1;
+            }
+            _ => {}
+        }
     }
 
+    let last = inner[start..].trim();
+    if last.is_empty() {
+        return None;
+    }
+    items.push(last.to_string());
+    Some(items)
+}
+
+fn project_block_map_entries(map_node: &panache_parser::syntax::SyntaxNode, out: &mut Vec<String>) {
+    use panache_parser::syntax::SyntaxKind;
+
+    for entry in map_node
+        .children()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+    {
+        let key_node = entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
+            .expect("key node");
+        let value_node = entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+            .expect("value node");
+
+        let key_tag = key_node
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
+            .map(|tok| tok.text().to_string());
+        let key_text = key_node
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == SyntaxKind::YAML_KEY)
+            .map(|tok| tok.text().to_string())
+            .expect("key token");
+
+        let key_event = if let Some(tag) = key_tag {
+            if let Some(long) = long_tag(&tag) {
+                format!("=VAL {long} :{key_text}")
+            } else {
+                plain_val_event(&key_text)
+            }
+        } else if let Some(rest) = key_text.strip_prefix('&') {
+            if let Some((anchor, value)) = rest.split_once(' ') {
+                format!("=VAL &{} :{}", anchor, value)
+            } else {
+                format!("=VAL &{} :", rest)
+            }
+        } else if key_text.starts_with('"') || key_text.starts_with('\'') {
+            quoted_val_event(&key_text)
+        } else if key_text.starts_with('*') {
+            format!("=ALI {}", key_text.trim_end())
+        } else {
+            plain_val_event(&key_text)
+        };
+        out.push(key_event);
+
+        // Check for nested block map in value
+        if let Some(nested_map) = value_node
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+        {
+            out.push("+MAP".to_string());
+            project_block_map_entries(&nested_map, out);
+            out.push("-MAP".to_string());
+            continue;
+        }
+
+        let value_tag = value_node
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
+            .map(|tok| tok.text().to_string());
+        let value_text = value_node
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+            .map(|tok| tok.text().to_string())
+            .collect::<Vec<_>>()
+            .join("");
+
+        if value_tag.is_none()
+            && let Some(items) = simple_flow_sequence_items(&value_text)
+        {
+            out.push("+SEQ []".to_string());
+            for item in items {
+                if item.starts_with('"') || item.starts_with('\'') {
+                    out.push(quoted_val_event(&item));
+                } else {
+                    out.push(plain_val_event(&item));
+                }
+            }
+            out.push("-SEQ".to_string());
+        } else if value_text.is_empty() {
+            out.push("=VAL :".to_string());
+        } else {
+            let value_event = if let Some(tag) = value_tag {
+                if let Some(long) = long_tag(&tag) {
+                    format!("=VAL {long} :{value_text}")
+                } else {
+                    plain_val_event(&value_text)
+                }
+            } else if value_text.starts_with('"') || value_text.starts_with('\'') {
+                quoted_val_event(&value_text)
+            } else if let Some(rest) = value_text.strip_prefix("!local &") {
+                let (anchor, value) = rest.split_once(' ').expect("local tag anchor/value split");
+                format!("=VAL &{} <!local> :{}", anchor, value)
+            } else if let Some(rest) = value_text.strip_prefix('&') {
+                if let Some((anchor, value)) = rest.split_once(' ') {
+                    format!("=VAL &{} :{}", anchor, value)
+                } else {
+                    format!("=VAL &{} :", rest)
+                }
+            } else if value_text.starts_with('*') {
+                format!("=ALI {value_text}")
+            } else {
+                plain_val_event(&value_text)
+            };
+            out.push(value_event);
+        }
+    }
+}
+
+fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     let Some(tree) = parse_yaml_tree(input) else {
         return Vec::new();
     };
@@ -239,103 +354,11 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
 
     let mut values = Vec::new();
     let mut map_header = "+MAP".to_string();
-    for entry in tree
+    if let Some(root_map) = tree
         .descendants()
-        .filter(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+        .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP)
     {
-        let key_node = entry
-            .children()
-            .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP_KEY)
-            .expect("key node");
-        let value_node = entry
-            .children()
-            .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP_VALUE)
-            .expect("value node");
-
-        let key_tag = key_node
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_TAG)
-            .map(|tok| tok.text().to_string());
-        let key_text = key_node
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_KEY)
-            .map(|tok| tok.text().to_string())
-            .expect("key token");
-
-        let value_tag = value_node
-            .children_with_tokens()
-            .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_TAG)
-            .map(|tok| tok.text().to_string());
-        let value_text = value_node
-            .descendants_with_tokens()
-            .filter_map(|el| el.into_token())
-            .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
-            .map(|tok| tok.text().to_string())
-            .collect::<Vec<_>>()
-            .join("");
-        assert!(!value_text.is_empty(), "value token");
-
-        let key_event = if let Some(tag) = key_tag {
-            if let Some(long) = long_tag(&tag) {
-                format!("=VAL {long} :{key_text}")
-            } else {
-                plain_val_event(&key_text)
-            }
-        } else if let Some(rest) = key_text.strip_prefix('&') {
-            if let Some((anchor, value)) = rest.split_once(' ') {
-                format!("=VAL &{} :{}", anchor, value)
-            } else {
-                format!("=VAL &{} :", rest)
-            }
-        } else if key_text.starts_with('"') || key_text.starts_with('\'') {
-            quoted_val_event(&key_text)
-        } else if key_text.starts_with('*') {
-            format!("=ALI {}", key_text.trim_end())
-        } else {
-            plain_val_event(&key_text)
-        };
-        values.push(key_event);
-
-        if value_tag.is_none()
-            && let Some(items) = simple_flow_sequence_items(&value_text)
-        {
-            values.push("+SEQ []".to_string());
-            for item in items {
-                if item.starts_with('"') || item.starts_with('\'') {
-                    values.push(quoted_val_event(&item));
-                } else {
-                    values.push(plain_val_event(&item));
-                }
-            }
-            values.push("-SEQ".to_string());
-        } else {
-            let value_event = if let Some(tag) = value_tag {
-                if let Some(long) = long_tag(&tag) {
-                    format!("=VAL {long} :{value_text}")
-                } else {
-                    plain_val_event(&value_text)
-                }
-            } else if value_text.starts_with('"') || value_text.starts_with('\'') {
-                quoted_val_event(&value_text)
-            } else if let Some(rest) = value_text.strip_prefix("!local &") {
-                let (anchor, value) = rest.split_once(' ').expect("local tag anchor/value split");
-                format!("=VAL &{} <!local> :{}", anchor, value)
-            } else if let Some(rest) = value_text.strip_prefix('&') {
-                if let Some((anchor, value)) = rest.split_once(' ') {
-                    format!("=VAL &{} :{}", anchor, value)
-                } else {
-                    format!("=VAL &{} :", rest)
-                }
-            } else if value_text.starts_with('*') {
-                format!("=ALI {value_text}")
-            } else {
-                plain_val_event(&value_text)
-            };
-            values.push(value_event);
-        }
+        project_block_map_entries(&root_map, &mut values);
     }
 
     if values.is_empty() {
@@ -890,5 +913,91 @@ fn yaml_block_sequence_single_item() {
     assert_eq!(
         events,
         vec!["+STR", "+DOC", "+SEQ", "=VAL :foo", "-SEQ", "-DOC", "-STR"]
+    );
+}
+
+#[test]
+fn yaml_empty_value_key_only_lossless() {
+    use panache_parser::syntax::SyntaxKind;
+
+    let report = parse_yaml_report("foo:\nbar: baz\n");
+    let tree = report.tree.expect("should parse");
+    assert_eq!(tree.text().to_string(), "foo:\nbar: baz\n", "losslessness");
+
+    let entry_count = tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+        .count();
+    assert_eq!(entry_count, 2, "should have 2 map entries");
+}
+
+#[test]
+fn yaml_nested_map_lossless() {
+    use panache_parser::syntax::SyntaxKind;
+
+    let report = parse_yaml_report("foo:\n  bar: baz\n");
+    let tree = report.tree.expect("should parse");
+    assert_eq!(
+        tree.text().to_string(),
+        "foo:\n  bar: baz\n",
+        "losslessness"
+    );
+
+    let outer = tree
+        .descendants()
+        .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+        .expect("outer entry");
+    let outer_key = outer
+        .children()
+        .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_KEY)
+        .expect("outer key");
+    let key_text = outer_key
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .find(|tok| tok.kind() == SyntaxKind::YAML_KEY)
+        .expect("key token")
+        .text()
+        .to_string();
+    assert_eq!(key_text, "foo");
+}
+
+#[test]
+fn yaml_nested_map_projected_events() {
+    let events = cst_yaml_projected_events("foo:\n  bar: baz\n");
+    assert_eq!(
+        events,
+        vec![
+            "+STR",
+            "+DOC",
+            "+MAP",
+            "=VAL :foo",
+            "+MAP",
+            "=VAL :bar",
+            "=VAL :baz",
+            "-MAP",
+            "-MAP",
+            "-DOC",
+            "-STR"
+        ]
+    );
+}
+
+#[test]
+fn yaml_flat_map_with_empty_value_projected_events() {
+    let events = cst_yaml_projected_events("foo:\nbar: baz\n");
+    assert_eq!(
+        events,
+        vec![
+            "+STR",
+            "+DOC",
+            "+MAP",
+            "=VAL :foo",
+            "=VAL :",
+            "=VAL :bar",
+            "=VAL :baz",
+            "-MAP",
+            "-DOC",
+            "-STR"
+        ]
     );
 }

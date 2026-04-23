@@ -493,6 +493,10 @@ fn emit_block_map<'a>(
 
                 if *i < tokens.len() && tokens[*i].kind == YamlToken::Indent {
                     *i += 1;
+                    // Emit trailing newline before nested content to preserve byte order
+                    if let Some(newline) = trailing_newline.take() {
+                        builder.token(SyntaxKind::NEWLINE.into(), newline);
+                    }
                     builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
                     emit_block_map(builder, tokens, i, true)?;
                     builder.finish_node(); // YAML_BLOCK_MAP

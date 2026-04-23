@@ -5,5 +5,5 @@ expression: snapshot
 case_id: 4EJS
 input: "---\na:\n\tb:\n\t\tc: value\n"
 diagnostics:
-YAML_LEX_ERROR:invalid plain mapping line@4..6
+YAML_LEX_ERROR:tab character used for block indentation (not permitted by YAML spec)@7..8
 cst:

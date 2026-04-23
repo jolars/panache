@@ -6,4 +6,4 @@ case_id: 4EJS
 input: "---\na:\n\tb:\n\t\tc: value\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_LEX_ERROR:invalid plain mapping line@4..6]
+diagnostics: [YAML_LEX_ERROR:tab character used for block indentation (not permitted by YAML spec)@7..8]

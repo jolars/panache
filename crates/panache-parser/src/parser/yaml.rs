@@ -571,8 +571,9 @@ mod tests {
 
     #[test]
     fn shadow_parse_reports_prototype_rejected_when_enabled() {
+        // Tab indentation is prohibited by YAML spec for block structures
         let report = parse_shadow(
-            "title:",
+            "\ttitle: value",
             ShadowYamlOptions {
                 enabled: true,
                 input_kind: YamlInputKind::Plain,

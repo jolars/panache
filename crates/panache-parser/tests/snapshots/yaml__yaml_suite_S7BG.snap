@@ -2,8 +2,8 @@
 source: crates/panache-parser/tests/yaml.rs
 expression: snapshot
 ---
-case_id: U44R
-input: "map:\n  key1: \"quoted1\"\n   key2: \"bad indentation\"\n"
-has_error_contract: true
+case_id: S7BG
+input: "---\n- :,\n"
+has_error_contract: false
 parsed_mapping_tree: true
 diagnostics: []
