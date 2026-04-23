@@ -26,6 +26,7 @@ jobs:
         hadley/adv-r
         hadley/r-pkgs
         hadley/r4ds
+        hadley/mastering-shiny
         jgm/pandoc
         jolars/jolars.co
         kevinheavey/modern-polars
