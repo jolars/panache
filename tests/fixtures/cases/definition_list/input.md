@@ -108,3 +108,10 @@ Term
     - > a
       > b
       > c
+
+Term
+
+:   - List
+    - a
+
+- a

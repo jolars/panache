@@ -114,6 +114,22 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                     base_indent_cols,
                     ..
                 } => {
+                    let definition_ancestor_kept = containers.stack[..i]
+                        .iter()
+                        .enumerate()
+                        .rev()
+                        .find_map(|(idx, container)| {
+                            matches!(
+                                container,
+                                crate::parser::utils::container_stack::Container::Definition { .. }
+                            )
+                            .then_some(keep_level >= idx + 1)
+                        })
+                        .unwrap_or(true);
+                    if !definition_ancestor_kept {
+                        continue;
+                    }
+
                     let effective_indent = raw_indent_cols.saturating_sub(content_indent_so_far);
                     let continues_list = if let Some(ref marker_match) = next_marker {
                         lists::markers_match(marker, &marker_match.marker)
@@ -139,6 +155,22 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
                 crate::parser::utils::container_stack::Container::ListItem {
                     content_col, ..
                 } => {
+                    let definition_ancestor_kept = containers.stack[..i]
+                        .iter()
+                        .enumerate()
+                        .rev()
+                        .find_map(|(idx, container)| {
+                            matches!(
+                                container,
+                                crate::parser::utils::container_stack::Container::Definition { .. }
+                            )
+                            .then_some(keep_level >= idx + 1)
+                        })
+                        .unwrap_or(true);
+                    if !definition_ancestor_kept {
+                        continue;
+                    }
+
                     let effective_indent = if next_bq_depth > current_bq_depth {
                         let after_current_bq =
                             strip_n_blockquote_markers(next_line, current_bq_depth);

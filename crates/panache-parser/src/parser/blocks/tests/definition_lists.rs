@@ -140,6 +140,38 @@ fn definition_marker_after_list_definition_closes_nested_list() {
 }
 
 #[test]
+fn dedented_list_after_blank_line_does_not_continue_definition_list() {
+    let input = "Term\n\n:   - List\n    - a\n\n- b\n";
+    let tree = parse_blocks(input);
+
+    assert_block_kinds(
+        input,
+        &[
+            SyntaxKind::DEFINITION_LIST,
+            SyntaxKind::BLANK_LINE,
+            SyntaxKind::LIST,
+        ],
+    );
+
+    let definition = find_first(&tree, SyntaxKind::DEFINITION).expect("definition");
+    let nested_list = find_first(&definition, SyntaxKind::LIST).expect("nested list");
+    assert_eq!(
+        nested_list
+            .children()
+            .filter(|child| child.kind() == SyntaxKind::LIST_ITEM)
+            .count(),
+        2,
+        "definition list should only contain the indented items"
+    );
+
+    assert_eq!(
+        find_all(&tree, SyntaxKind::LIST).len(),
+        2,
+        "expected one nested list and one top-level list"
+    );
+}
+
+#[test]
 fn colon_table_caption_before_table_is_not_definition_list() {
     let input = "Here's a table with a reference:\n\n: (\\#tab:mytable) A table with a reference.\n\n| A   | B   | C   |\n| --- | --- | --- |\n| 1   | 2   | 3   |\n";
     let tree = parse_blocks(input);

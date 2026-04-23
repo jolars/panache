@@ -104,3 +104,10 @@ Term
 :   - List with lazy continuation
 
     - > a b c
+
+Term
+
+:   - List
+    - a
+
+- a
