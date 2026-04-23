@@ -107,6 +107,17 @@ fn extract_columns(separator: &str, offset: usize) -> Vec<Column> {
     columns
 }
 
+/// Convert a character column offset into a UTF-8 byte index for `line`.
+///
+/// Simple-table column boundaries come from ASCII separator lines where
+/// character and byte offsets are identical. Data rows may contain multibyte
+/// characters, so we must remap offsets before slicing.
+fn column_offset_to_byte_index(line: &str, offset: usize) -> usize {
+    line.char_indices()
+        .nth(offset)
+        .map_or(line.len(), |(byte_idx, _)| byte_idx)
+}
+
 /// Try to parse a table caption from a line.
 /// Returns Some((prefix_len, caption_text)) if it's a caption.
 fn try_parse_caption_prefix(line: &str) -> Option<(usize, &str)> {
@@ -504,11 +515,14 @@ fn determine_alignments(columns: &mut [Column], separator_line: &str, header_lin
         let sep_slice = &separator_line[col.start..col.end];
 
         if let Some(header) = header_line {
+            let header_start = column_offset_to_byte_index(header, col.start);
+            let header_end = column_offset_to_byte_index(header, col.end);
+
             // Extract header text for this column
-            let header_text = if col.end <= header.len() {
-                header[col.start..col.end].trim()
-            } else if col.start < header.len() {
-                header[col.start..].trim()
+            let header_text = if header_start < header_end {
+                header[header_start..header_end].trim()
+            } else if header_start < header.len() {
+                header[header_start..].trim()
             } else {
                 ""
             };
@@ -519,7 +533,7 @@ fn determine_alignments(columns: &mut [Column], separator_line: &str, header_lin
             }
 
             // Find where the header text starts and ends within the column
-            let header_in_col = &header[col.start..col.end.min(header.len())];
+            let header_in_col = &header[header_start..header_end];
             let text_start = header_in_col.len() - header_in_col.trim_start().len();
             let text_end = header_in_col.trim_end().len() + text_start;
 
@@ -740,13 +754,13 @@ fn emit_table_row(
     for col in columns.iter() {
         // Calculate actual positions in the trimmed line (accounting for leading whitespace)
         let cell_start = if col.start >= leading_ws_len {
-            (col.start - leading_ws_len).min(trimmed.len())
+            column_offset_to_byte_index(trimmed, col.start - leading_ws_len)
         } else {
             0
         };
 
         let cell_end = if col.end >= leading_ws_len {
-            (col.end - leading_ws_len).min(trimmed.len())
+            column_offset_to_byte_index(trimmed, col.end - leading_ws_len)
         } else {
             0
         };
@@ -1362,6 +1376,23 @@ mod tests {
         assert!(result.is_some());
         // Should consume through end of multi-line caption
         assert_eq!(result.unwrap(), 6);
+    }
+
+    #[test]
+    fn test_simple_table_with_multibyte_cell_content() {
+        let input = vec![
+            "Name            Hex code     Hue     C, M, Y, K (%)   R, G, B (0-255)   R, G, B (%)",
+            "--------------  ------------ ------- ---------------- ----------------- ------------",
+            "        orange       #E69F00     41° 0, 50, 100, 0    230, 159, 0       90, 60, 0",
+            "      sky blue       #56B4E9    202° 80, 0, 0, 0      86, 180, 233      35, 70, 90",
+            "",
+        ];
+
+        let mut builder = GreenNodeBuilder::new();
+        let result = try_parse_simple_table(&input, 0, &mut builder, &ParserOptions::default());
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 4);
     }
 
     // Pipe table tests
@@ -2476,11 +2507,14 @@ fn extract_first_line_cell_contents(line: &str, columns: &[Column]) -> Vec<Strin
     let mut cells = Vec::new();
 
     for column in columns.iter() {
+        let column_start = column_offset_to_byte_index(line_content, column.start);
+        let column_end = column_offset_to_byte_index(line_content, column.end);
+
         // Extract FULL text for this column (including whitespace)
-        let cell_text = if column.end <= line_content.len() {
-            &line_content[column.start..column.end]
-        } else if column.start < line_content.len() {
-            &line_content[column.start..]
+        let cell_text = if column_start < column_end {
+            &line_content[column_start..column_end]
+        } else if column_start < line_content.len() {
+            &line_content[column_start..]
         } else {
             ""
         };
@@ -2515,8 +2549,8 @@ fn emit_multiline_table_row(
 
     for (col_idx, column) in columns.iter().enumerate() {
         let cell_text = &cell_contents[col_idx];
-        let cell_start = column.start.min(trimmed.len());
-        let cell_end = column.end.min(trimmed.len());
+        let cell_start = column_offset_to_byte_index(trimmed, column.start);
+        let cell_end = column_offset_to_byte_index(trimmed, column.end);
 
         // Emit whitespace before cell
         if current_pos < cell_start {
