@@ -109,6 +109,25 @@ fn test_no_duplicates() {
 }
 
 #[test]
+fn test_chunk_label_and_heading_id_can_share_label() {
+    let diagnostics = lint_file_with_config(
+        "chunk_label_and_heading_id_same_label.Rmd",
+        r#"
+flavor = "rmarkdown"
+"#,
+    );
+    let dup: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "duplicate-reference-labels")
+        .collect();
+
+    assert!(
+        dup.is_empty(),
+        "Heading IDs and chunk labels should not be treated as duplicate cross-reference labels"
+    );
+}
+
+#[test]
 fn test_whitespace_normalization() {
     let diagnostics = lint_file("whitespace_normalization.md");
     let dup: Vec<_> = diagnostics

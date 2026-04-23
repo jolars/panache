@@ -115,6 +115,10 @@ fn check_duplicate_crossref_labels(tree: &SyntaxNode, input: &str) -> Vec<Diagno
             .crossref_declaration_value_ranges(label)
             .cloned()
             .unwrap_or_default();
+        let chunk_label_declaration_ranges = index
+            .chunk_label_declaration_ranges(label)
+            .cloned()
+            .unwrap_or_default();
 
         // Cross-reference labels are case-sensitive in Quarto/Bookdown contexts.
         // The symbol index groups by normalized label for lookup features, so this
@@ -122,20 +126,24 @@ fn check_duplicate_crossref_labels(tree: &SyntaxNode, input: &str) -> Vec<Diagno
         if declaration_value_ranges.len() == ranges.len() {
             use std::collections::HashMap;
 
-            let mut declarations_by_raw_label: HashMap<&str, Vec<rowan::TextRange>> =
+            let mut declarations_by_raw_label: HashMap<(String, bool), Vec<rowan::TextRange>> =
                 HashMap::new();
 
             for (declaration_range, value_range) in
                 ranges.iter().zip(declaration_value_ranges.iter())
             {
-                let raw_label = range_text(input, *value_range);
+                let raw_label = range_text(input, *value_range).to_string();
+                let is_chunk_label_declaration =
+                    chunk_label_declaration_ranges.contains(declaration_range);
                 declarations_by_raw_label
-                    .entry(raw_label)
+                    .entry((raw_label, is_chunk_label_declaration))
                     .or_default()
                     .push(*declaration_range);
             }
 
-            for (raw_label, declaration_ranges) in declarations_by_raw_label {
+            for ((raw_label, _is_chunk_label_declaration), declaration_ranges) in
+                declarations_by_raw_label
+            {
                 if declaration_ranges.len() < 2 {
                     continue;
                 }
@@ -373,6 +381,25 @@ A reference to [Heading](#EM).
         let config = Config {
             flavor: Flavor::Pandoc,
             extensions: crate::config::Extensions::for_flavor(Flavor::Pandoc),
+            ..Default::default()
+        };
+        let tree = crate::parser::parse(input, Some(config.clone()));
+        let rule = DuplicateReferencesRule;
+        let diagnostics = rule.check(&tree, input, &config, None);
+        assert_eq!(diagnostics.len(), 0);
+    }
+
+    #[test]
+    fn test_chunk_labels_do_not_conflict_with_heading_ids() {
+        let input = r#"# A {#gammasim}
+
+```{r}
+#| label: gammasim
+```
+"#;
+        let config = Config {
+            flavor: Flavor::RMarkdown,
+            extensions: crate::config::Extensions::for_flavor(Flavor::RMarkdown),
             ..Default::default()
         };
         let tree = crate::parser::parse(input, Some(config.clone()));

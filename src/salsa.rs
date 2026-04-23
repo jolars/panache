@@ -308,6 +308,7 @@ pub struct SymbolUsageIndex {
     example_label_usages: HashMap<String, Vec<rowan::TextRange>>,
     crossref_declarations: HashMap<String, Vec<rowan::TextRange>>,
     crossref_declaration_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
+    chunk_label_declaration_ranges: HashMap<String, Vec<rowan::TextRange>>,
     chunk_label_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
     heading_id_value_ranges: HashMap<String, Vec<rowan::TextRange>>,
     heading_link_usages: HashMap<String, Vec<rowan::TextRange>>,
@@ -368,6 +369,11 @@ impl SymbolUsageIndex {
 
     pub fn chunk_label_value_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.chunk_label_value_ranges
+            .get(&normalize_anchor_label(key))
+    }
+
+    pub fn chunk_label_declaration_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
+        self.chunk_label_declaration_ranges
             .get(&normalize_anchor_label(key))
     }
 
@@ -746,6 +752,11 @@ pub fn symbol_usage_index_from_tree(
 
             index
                 .crossref_declarations
+                .entry(normalized_anchor.clone())
+                .or_default()
+                .push(label.declaration_range());
+            index
+                .chunk_label_declaration_ranges
                 .entry(normalized_anchor.clone())
                 .or_default()
                 .push(label.declaration_range());

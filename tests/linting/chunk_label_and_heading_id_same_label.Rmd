@@ -1,0 +1,5 @@
+# Heading {#gammasim}
+
+```{r}
+#| label: gammasim
+```
