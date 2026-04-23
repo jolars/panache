@@ -3,15 +3,15 @@ source: crates/panache-parser/tests/yaml.rs
 expression: snapshot_json
 ---
 {
-  "case_id": "4H7K",
+  "case_id": "9JBA",
   "cst": null,
   "diagnostics": [
     {
-      "byte_end": 16,
-      "byte_start": 15,
+      "byte_end": 24,
+      "byte_start": 16,
       "code": "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END",
       "message": "trailing content after flow sequence end"
     }
   ],
-  "input": "---\n[ a, b, c ] ]\n"
+  "input": "---\n[ a, b, c, ]#invalid\n"
 }

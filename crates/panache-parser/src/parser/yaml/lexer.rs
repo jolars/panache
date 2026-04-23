@@ -220,6 +220,66 @@ fn contains_unquoted_mapping_indicator(text: &str) -> bool {
     false
 }
 
+fn is_valid_double_quote_escape(ch: char) -> bool {
+    matches!(
+        ch,
+        '0' | 'a'
+            | 'b'
+            | 't'
+            | 'n'
+            | 'v'
+            | 'f'
+            | 'r'
+            | 'e'
+            | ' '
+            | '"'
+            | '/'
+            | '\\'
+            | 'N'
+            | '_'
+            | 'L'
+            | 'P'
+            | 'x'
+            | 'u'
+            | 'U'
+    )
+}
+
+fn invalid_double_quote_escape_offset(text: &str) -> Option<usize> {
+    let mut chars = text.char_indices().peekable();
+    let mut in_double = false;
+    let mut escape_start: Option<usize> = None;
+
+    while let Some((idx, ch)) = chars.next() {
+        if !in_double {
+            if ch == '"' {
+                in_double = true;
+            }
+            continue;
+        }
+
+        if let Some(start) = escape_start.take() {
+            if !is_valid_double_quote_escape(ch) {
+                return Some(start);
+            }
+            continue;
+        }
+
+        match ch {
+            '\\' => {
+                if chars.peek().is_none() {
+                    return Some(idx);
+                }
+                escape_start = Some(idx);
+            }
+            '"' => in_double = false,
+            _ => {}
+        }
+    }
+
+    None
+}
+
 fn flow_token_kind(ch: char) -> Option<YamlToken> {
     match ch {
         '{' => Some(YamlToken::FlowMapStart),
@@ -405,6 +465,14 @@ fn lex_mapping_line_tokens<'a>(
                 byte_end: line_start + line.len(),
             });
         }
+        if let Some(rel_idx) = invalid_double_quote_escape_offset(content) {
+            return Err(YamlDiagnostic {
+                code: "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE",
+                message: "invalid escape in double quoted scalar",
+                byte_start: line_start + line_indent + rel_idx,
+                byte_end: line_start + line_indent + rel_idx + 1,
+            });
+        }
         emit_scalar_like_tokens(content, out);
         if !newline.is_empty() {
             push_token(out, YamlToken::Newline, newline);
@@ -441,6 +509,27 @@ fn lex_mapping_line_tokens<'a>(
             push_token(out, YamlToken::Whitespace, &value_text[..ws_len]);
         }
         let tagged_scalar = &value_text[ws_len..];
+        if let Some(rel_idx) = invalid_double_quote_escape_offset(tagged_scalar) {
+            return Err(YamlDiagnostic {
+                code: "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE",
+                message: "invalid escape in double quoted scalar",
+                byte_start: line_start
+                    + line_indent
+                    + raw_key.len()
+                    + 1
+                    + leading_ws_len
+                    + ws_len
+                    + rel_idx,
+                byte_end: line_start
+                    + line_indent
+                    + raw_key.len()
+                    + 1
+                    + leading_ws_len
+                    + ws_len
+                    + rel_idx
+                    + 1,
+            });
+        }
         if contains_unquoted_mapping_indicator(tagged_scalar) {
             return Err(YamlDiagnostic {
                 code: "YAML_LEX_ERROR",
@@ -451,6 +540,20 @@ fn lex_mapping_line_tokens<'a>(
         }
         push_token(out, YamlToken::Scalar, tagged_scalar);
     } else {
+        if let Some(rel_idx) = invalid_double_quote_escape_offset(scalar_part) {
+            return Err(YamlDiagnostic {
+                code: "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE",
+                message: "invalid escape in double quoted scalar",
+                byte_start: line_start + line_indent + raw_key.len() + 1 + leading_ws_len + rel_idx,
+                byte_end: line_start
+                    + line_indent
+                    + raw_key.len()
+                    + 1
+                    + leading_ws_len
+                    + rel_idx
+                    + 1,
+            });
+        }
         if contains_unquoted_mapping_indicator(scalar_part) {
             return Err(YamlDiagnostic {
                 code: "YAML_LEX_ERROR",

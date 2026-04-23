@@ -6,4 +6,4 @@ case_id: 4H7K
 input: "---\n[ a, b, c ] ]\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_PARSE_UNEXPECTED_FLOW_CLOSER:unexpected flow closing token@16..17]
+diagnostics: [YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END:trailing content after flow sequence end@15..16]

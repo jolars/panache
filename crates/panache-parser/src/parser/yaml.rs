@@ -383,7 +383,7 @@ mod tests {
         assert_eq!(report.diagnostics.len(), 1);
         assert_eq!(
             report.diagnostics[0].code,
-            "YAML_PARSE_UNEXPECTED_FLOW_CLOSER"
+            "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
         );
     }
 
@@ -406,6 +406,28 @@ mod tests {
         assert_eq!(
             report.diagnostics[0].code,
             "YAML_PARSE_INVALID_FLOW_SEQUENCE_COMMA"
+        );
+    }
+
+    #[test]
+    fn parse_yaml_report_detects_trailing_content_after_flow_end() {
+        let report = parse_yaml_report("---\n[ a, b, c, ]#invalid\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END"
+        );
+    }
+
+    #[test]
+    fn parse_yaml_report_detects_invalid_double_quoted_escape() {
+        let report = parse_yaml_report("---\n\"\\.\"\n");
+        assert!(report.tree.is_none());
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            "YAML_LEX_INVALID_DOUBLE_QUOTED_ESCAPE"
         );
     }
 

@@ -116,6 +116,19 @@ fn emit_flow_sequence<'a>(
                 }
                 emit_token_as_yaml(builder, &tokens[*i]); // ]
                 *i += 1;
+                if *i < tokens.len() {
+                    match tokens[*i].kind {
+                        YamlToken::Newline | YamlToken::Comment => {}
+                        YamlToken::Whitespace if tokens[*i].text.trim().is_empty() => {}
+                        _ => {
+                            return Err(diag_at_token(
+                                &tokens[*i],
+                                "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END",
+                                "trailing content after flow sequence end",
+                            ));
+                        }
+                    }
+                }
                 builder.finish_node(); // YAML_FLOW_SEQUENCE
                 return Ok(());
             }
@@ -235,6 +248,19 @@ fn emit_flow_map<'a>(
                 entry_start = *i;
 
                 if tokens[*i - 1].kind == YamlToken::FlowMapEnd {
+                    if *i < tokens.len() {
+                        match tokens[*i].kind {
+                            YamlToken::Newline | YamlToken::Comment => {}
+                            YamlToken::Whitespace if tokens[*i].text.trim().is_empty() => {}
+                            _ => {
+                                return Err(diag_at_token(
+                                    &tokens[*i],
+                                    "YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END",
+                                    "trailing content after flow map end",
+                                ));
+                            }
+                        }
+                    }
                     builder.finish_node(); // YAML_FLOW_MAP
                     return Ok(());
                 }
