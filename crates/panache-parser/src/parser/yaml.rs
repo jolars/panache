@@ -325,9 +325,19 @@ mod tests {
             .collect();
 
         assert!(scalar_tokens.contains(&"%YAML 1.2".to_string()));
-        assert!(scalar_tokens.contains(&"---".to_string()));
-        assert!(scalar_tokens.contains(&"...".to_string()));
         assert!(scalar_tokens.contains(&"bar".to_string()));
+
+        let has_doc_start = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .any(|tok| tok.kind() == SyntaxKind::YAML_DOCUMENT_START && tok.text() == "---");
+        assert!(has_doc_start, "--- should be a YAML_DOCUMENT_START token");
+
+        let has_doc_end = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .any(|tok| tok.kind() == SyntaxKind::YAML_DOCUMENT_END && tok.text() == "...");
+        assert!(has_doc_end, "... should be a YAML_DOCUMENT_END token");
     }
 
     #[test]

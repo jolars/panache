@@ -98,6 +98,7 @@ pub enum YamlToken {
     Tag,
     BlockScalarHeader,
     BlockScalarContent,
+    BlockSeqEntry,
     Scalar,
     Comment,
     Newline,

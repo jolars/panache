@@ -2,8 +2,8 @@
 source: crates/panache-parser/tests/yaml.rs
 expression: snapshot
 ---
-case_id: ZVH3
-input: "- key: value\n - item1\n"
-has_error_contract: true
+case_id: FQ7F
+input: "- Mark McGwire\n- Sammy Sosa\n- Ken Griffey\n"
+has_error_contract: false
 parsed_mapping_tree: true
 diagnostics: []

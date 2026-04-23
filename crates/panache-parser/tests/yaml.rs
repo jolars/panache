@@ -210,6 +210,33 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         "+DOC".to_string()
     };
 
+    if let Some(seq_node) = tree
+        .descendants()
+        .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_SEQUENCE)
+    {
+        let mut events = Vec::new();
+        events.push("+STR".to_string());
+        events.push(doc_open);
+        events.push("+SEQ".to_string());
+        for item in seq_node
+            .children()
+            .filter(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
+        {
+            let scalar_text = item
+                .descendants_with_tokens()
+                .filter_map(|el| el.into_token())
+                .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
+                .map(|tok| tok.text().to_string())
+                .collect::<Vec<_>>()
+                .join("");
+            events.push(plain_val_event(&scalar_text));
+        }
+        events.push("-SEQ".to_string());
+        events.push("-DOC".to_string());
+        events.push("-STR".to_string());
+        return events;
+    }
+
     let mut values = Vec::new();
     let mut map_header = "+MAP".to_string();
     for entry in tree
@@ -810,5 +837,58 @@ fn yaml_document_end_emitted_as_dedicated_token() {
         tree.text().to_string(),
         "title: test\n...\n",
         "losslessness"
+    );
+}
+
+#[test]
+fn yaml_block_sequence_scalar_items_cst() {
+    use panache_parser::syntax::SyntaxKind;
+
+    let report = parse_yaml_report("- foo\n- bar\n- 42\n");
+    let tree = report.tree.expect("should parse");
+
+    let has_seq = tree
+        .descendants()
+        .any(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE);
+    assert!(has_seq, "tree should contain YAML_BLOCK_SEQUENCE node");
+
+    let item_count = tree
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
+        .count();
+    assert_eq!(item_count, 3, "should have 3 sequence items");
+
+    assert_eq!(
+        tree.text().to_string(),
+        "- foo\n- bar\n- 42\n",
+        "losslessness"
+    );
+}
+
+#[test]
+fn yaml_block_sequence_scalar_projected_events() {
+    let events = cst_yaml_projected_events("- foo\n- bar\n- 42\n");
+    assert_eq!(
+        events,
+        vec![
+            "+STR",
+            "+DOC",
+            "+SEQ",
+            "=VAL :foo",
+            "=VAL :bar",
+            "=VAL :42",
+            "-SEQ",
+            "-DOC",
+            "-STR"
+        ]
+    );
+}
+
+#[test]
+fn yaml_block_sequence_single_item() {
+    let events = cst_yaml_projected_events("- foo\n");
+    assert_eq!(
+        events,
+        vec!["+STR", "+DOC", "+SEQ", "=VAL :foo", "-SEQ", "-DOC", "-STR"]
     );
 }

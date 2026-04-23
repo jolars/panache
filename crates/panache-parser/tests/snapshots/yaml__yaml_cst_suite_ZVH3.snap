@@ -5,5 +5,13 @@ expression: snapshot
 case_id: ZVH3
 input: "- key: value\n - item1\n"
 diagnostics:
-YAML_PARSE_INVALID_KEY_TOKEN:invalid token while parsing block map key@14..21
+
 cst:
+DOCUMENT@0..13
+  YAML_METADATA_CONTENT@0..13
+    YAML_BLOCK_SEQUENCE@0..13
+      YAML_BLOCK_SEQUENCE_ITEM@0..13
+        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+        WHITESPACE@1..2 " "
+        YAML_SCALAR@2..12 "key: value"
+        NEWLINE@12..13 "\n"

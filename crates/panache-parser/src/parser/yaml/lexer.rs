@@ -511,6 +511,21 @@ fn lex_mapping_line_tokens<'a>(
         return Ok(());
     }
 
+    if content == "-" || content.starts_with("- ") || content.starts_with("-\t") {
+        push_token(out, YamlToken::BlockSeqEntry, &content[..1]);
+        if content.len() > 1 {
+            push_token(out, YamlToken::Whitespace, &content[1..2]);
+            let rest = &content[2..];
+            if !rest.is_empty() {
+                emit_scalar_like_tokens(rest, out);
+            }
+        }
+        if !newline.is_empty() {
+            push_token(out, YamlToken::Newline, newline);
+        }
+        return Ok(());
+    }
+
     let Some((raw_key, raw_value)) = parse_raw_mapping_line(content) else {
         if split_once_unquoted(content, ':').is_some() {
             return Err(YamlDiagnostic {

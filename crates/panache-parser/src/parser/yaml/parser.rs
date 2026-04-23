@@ -283,6 +283,45 @@ fn emit_flow_map<'a>(
     })
 }
 
+fn emit_block_seq<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Result<(), YamlDiagnostic> {
+    while *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlToken::Newline => {
+                builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::DocumentStart => {
+                builder.token(SyntaxKind::YAML_DOCUMENT_START.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::DocumentEnd => {
+                builder.token(SyntaxKind::YAML_DOCUMENT_END.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::BlockSeqEntry => {
+                builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM.into());
+                builder.token(SyntaxKind::YAML_BLOCK_SEQ_ENTRY.into(), tokens[*i].text);
+                *i += 1;
+                while *i < tokens.len() && tokens[*i].kind != YamlToken::Newline {
+                    emit_token_as_yaml(builder, &tokens[*i]);
+                    *i += 1;
+                }
+                if *i < tokens.len() && tokens[*i].kind == YamlToken::Newline {
+                    builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+                    *i += 1;
+                }
+                builder.finish_node(); // YAML_BLOCK_SEQUENCE_ITEM
+            }
+            _ => break,
+        }
+    }
+    Ok(())
+}
+
 fn emit_block_map<'a>(
     builder: &mut GreenNodeBuilder<'_>,
     tokens: &[YamlTokenSpan<'a>],
@@ -536,19 +575,44 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         };
     }
 
+    let is_sequence = tokens
+        .iter()
+        .find(|t| {
+            !matches!(
+                t.kind,
+                YamlToken::Newline
+                    | YamlToken::Whitespace
+                    | YamlToken::Comment
+                    | YamlToken::DocumentStart
+                    | YamlToken::DocumentEnd
+                    | YamlToken::Directive
+            )
+        })
+        .is_some_and(|t| t.kind == YamlToken::BlockSeqEntry);
+
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::DOCUMENT.into());
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
-    builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
     let mut i = 0usize;
-    if let Err(err) = emit_block_map(&mut builder, &tokens, &mut i, false) {
-        return YamlParseReport {
-            tree: None,
-            diagnostics: vec![err],
-        };
+    if is_sequence {
+        builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE.into());
+        if let Err(err) = emit_block_seq(&mut builder, &tokens, &mut i) {
+            return YamlParseReport {
+                tree: None,
+                diagnostics: vec![err],
+            };
+        }
+        builder.finish_node(); // YAML_BLOCK_SEQUENCE
+    } else {
+        builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
+        if let Err(err) = emit_block_map(&mut builder, &tokens, &mut i, false) {
+            return YamlParseReport {
+                tree: None,
+                diagnostics: vec![err],
+            };
+        }
+        builder.finish_node(); // YAML_BLOCK_MAP
     }
-
-    builder.finish_node(); // YAML_BLOCK_MAP
     builder.finish_node(); // YAML_METADATA_CONTENT
     builder.finish_node(); // DOCUMENT
     YamlParseReport {
