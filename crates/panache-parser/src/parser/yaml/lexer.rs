@@ -530,26 +530,44 @@ fn lex_mapping_line_tokens<'a>(
     }
 
     if content == "-" || content.starts_with("- ") || content.starts_with("-\t") {
-        push_token(out, YamlToken::BlockSeqEntry, &content[..1]);
-        if content.len() > 1 {
-            push_token(out, YamlToken::Whitespace, &content[1..2]);
-            let rest = &content[2..];
-            if !rest.is_empty() {
-                let (value_tag, after_tag) = split_tag_prefix(rest);
-                if let Some(tag) = value_tag {
-                    push_token(out, YamlToken::Tag, tag);
-                    let ws_len = leading_indent(after_tag);
-                    if ws_len > 0 {
-                        push_token(out, YamlToken::Whitespace, &after_tag[..ws_len]);
-                    }
-                    let scalar = &after_tag[ws_len..];
-                    if !scalar.is_empty() {
-                        emit_scalar_like_tokens(scalar, out);
-                    }
-                } else {
-                    emit_scalar_like_tokens(rest, out);
-                }
+        // A line may pack multiple nested block-sequence entries (`- - x`). The
+        // inner `-` starts a fresh nested YAML block sequence whose column is
+        // the character after the enclosing `- `. Each nested level pushes an
+        // implicit Indent so subsequent continuation lines match the right
+        // sequence.
+        let mut remaining = content;
+        let mut column = line_indent;
+        loop {
+            push_token(out, YamlToken::BlockSeqEntry, &remaining[..1]);
+            column += 1;
+            if remaining.len() == 1 {
+                break;
             }
+            push_token(out, YamlToken::Whitespace, &remaining[1..2]);
+            column += 1;
+            remaining = &remaining[2..];
+
+            if remaining == "-" || remaining.starts_with("- ") || remaining.starts_with("-\t") {
+                indent_stack.push(column);
+                push_token(out, YamlToken::Indent, "");
+                continue;
+            }
+
+            let (value_tag, after_tag) = split_tag_prefix(remaining);
+            if let Some(tag) = value_tag {
+                push_token(out, YamlToken::Tag, tag);
+                let ws_len = leading_indent(after_tag);
+                if ws_len > 0 {
+                    push_token(out, YamlToken::Whitespace, &after_tag[..ws_len]);
+                }
+                let scalar = &after_tag[ws_len..];
+                if !scalar.is_empty() {
+                    emit_scalar_like_tokens(scalar, out);
+                }
+            } else if !remaining.is_empty() {
+                emit_scalar_like_tokens(remaining, out);
+            }
+            break;
         }
         if !newline.is_empty() {
             push_token(out, YamlToken::Newline, newline);
@@ -712,7 +730,11 @@ fn lex_mapping_line_tokens<'a>(
                 byte_end: line_start + line.len(),
             });
         }
-        emit_scalar_like_tokens(scalar_part, out);
+        if scalar_part == "|" || scalar_part == ">" {
+            push_token(out, YamlToken::BlockScalarHeader, scalar_part);
+        } else {
+            emit_scalar_like_tokens(scalar_part, out);
+        }
     }
 
     if let Some(comment) = comment_part {
@@ -751,10 +773,66 @@ pub fn lex_mapping_tokens_with_diagnostic(
     let mut flow_depth: isize = 0;
     let mut flow_base_indent: usize = 0;
     let mut flow_requires_indent = false;
+    // Active literal/folded block scalar started by `key: |` or `key: >` on a
+    // prior line. While active, subsequent lines are captured verbatim as
+    // BlockScalarContent until a non-empty line's indent drops below the
+    // auto-detected content indent (or ≤ the header line's indent).
+    struct BlockScalarState {
+        header_indent: usize,
+        content_indent: Option<usize>,
+        max_leading_blank_indent: usize,
+    }
+    let mut block_scalar: Option<BlockScalarState> = None;
 
     while let Some(yaml_line) = lexer.next_line() {
         let line_indent = leading_indent(yaml_line.line);
         let content = &yaml_line.line[line_indent..];
+        if let Some(bs) = block_scalar.as_mut() {
+            let is_empty = content.trim().is_empty();
+            let exit = if is_empty {
+                false
+            } else {
+                match bs.content_indent {
+                    Some(ci) => line_indent < ci,
+                    None => line_indent <= bs.header_indent,
+                }
+            };
+            if exit {
+                block_scalar = None;
+            } else {
+                if !is_empty {
+                    if bs.content_indent.is_none() {
+                        // Per YAML 1.2 block-scalar rules, the first non-empty
+                        // content line must be at least as indented as the
+                        // most-indented leading blank line. A smaller indent
+                        // means a blank line "escaped" the block scalar.
+                        if line_indent < bs.max_leading_blank_indent {
+                            return Err(YamlDiagnostic {
+                                code: diagnostic_codes::LEX_ERROR,
+                                message: "block scalar content indent smaller than leading blank line indent",
+                                byte_start: line_start,
+                                byte_end: line_start + yaml_line.line.len(),
+                            });
+                        }
+                        bs.content_indent = Some(line_indent);
+                    }
+                } else {
+                    // Blank line: raise max leading indent so a later
+                    // content line can't drop below it.
+                    if bs.content_indent.is_none() && line_indent > bs.max_leading_blank_indent {
+                        bs.max_leading_blank_indent = line_indent;
+                    }
+                }
+                if !yaml_line.line.is_empty() {
+                    push_token(&mut tokens, YamlToken::BlockScalarContent, yaml_line.line);
+                }
+                if !yaml_line.newline.is_empty() {
+                    push_token(&mut tokens, YamlToken::Newline, yaml_line.newline);
+                }
+                line_start += yaml_line.line.len() + yaml_line.newline.len();
+                continue;
+            }
+        }
         if flow_depth > 0
             && flow_requires_indent
             && !content.trim().is_empty()
@@ -823,6 +901,7 @@ pub fn lex_mapping_tokens_with_diagnostic(
             }
         } else {
             let current_indent = indent_stack.last().copied().unwrap_or(0);
+            let tokens_before = tokens.len();
             lex_mapping_line_tokens(
                 yaml_line.line,
                 yaml_line.newline,
@@ -831,6 +910,18 @@ pub fn lex_mapping_tokens_with_diagnostic(
                 &mut indent_stack,
                 &mut tokens,
             )?;
+            // If this line emitted a BlockScalarHeader (`key: |` / `key: >`),
+            // subsequent lines belong to the block scalar's content.
+            let emitted_header = tokens[tokens_before..]
+                .iter()
+                .any(|t| t.kind == YamlToken::BlockScalarHeader);
+            if emitted_header {
+                block_scalar = Some(BlockScalarState {
+                    header_indent: line_indent,
+                    content_indent: None,
+                    max_leading_blank_indent: line_indent,
+                });
+            }
         }
 
         let delta = flow_delimiter_delta(content);

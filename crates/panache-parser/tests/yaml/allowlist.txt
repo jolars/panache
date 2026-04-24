@@ -99,3 +99,7 @@ TE2A
 5KJE
 # Block sequence with multi-line flow maps (implicit key across lines).
 8KB6
+# Nested block sequences (`- - x`) with same-line nested dash.
+3ALJ
+# Literal block scalar (`|`) in block-map value with blank lines.
+M29M

@@ -506,6 +506,88 @@ mod tests {
     }
 
     #[test]
+    fn parser_absorbs_literal_block_scalar_into_map_value() {
+        let input = "a: |\n  line1\n  line2\n";
+        let tree = parse_yaml_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let map = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+            .expect("block map");
+        let entry = map
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            .expect("entry");
+        let value = entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_VALUE)
+            .expect("value");
+        let value_text = value.text().to_string();
+        assert!(
+            value_text.starts_with('|') || value_text.starts_with(" |"),
+            "value should contain the `|` header, got {value_text:?}"
+        );
+        assert!(
+            value_text.contains("line1") && value_text.contains("line2"),
+            "value should absorb block scalar content, got {value_text:?}"
+        );
+    }
+
+    #[test]
+    fn lexer_emits_literal_block_scalar_header_and_content() {
+        let input = "a: |\n  line1\n  line2\n";
+        let tokens = lex_mapping_tokens(input).expect("tokens");
+        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                YamlToken::Key,
+                YamlToken::Colon,
+                YamlToken::Whitespace,
+                YamlToken::BlockScalarHeader,
+                YamlToken::Newline,
+                YamlToken::BlockScalarContent,
+                YamlToken::Newline,
+                YamlToken::BlockScalarContent,
+                YamlToken::Newline,
+            ]
+        );
+        let texts: Vec<_> = tokens.iter().map(|t| t.text).collect();
+        assert_eq!(
+            texts,
+            vec!["a", ":", " ", "|", "\n", "  line1", "\n", "  line2", "\n"]
+        );
+    }
+
+    #[test]
+    fn parser_builds_nested_block_sequence_on_same_line() {
+        let input = "- - a\n  - b\n- c\n";
+        let tree = parse_yaml_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let outer = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
+            .expect("outer block sequence");
+        let outer_items: Vec<_> = outer
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
+            .collect();
+        assert_eq!(outer_items.len(), 2);
+
+        let nested = outer_items[0]
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
+            .expect("nested block sequence inside first item");
+        let nested_items = nested
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
+            .count();
+        assert_eq!(nested_items, 2);
+    }
+
+    #[test]
     fn parser_builds_multiline_flow_map_inside_block_sequence_item() {
         let input = "- { multi\n  line, a: b}\n";
         let tree = parse_yaml_tree(input).expect("tree");

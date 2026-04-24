@@ -209,6 +209,116 @@ fn simple_flow_sequence_items(text: &str) -> Option<Vec<String>> {
     Some(items)
 }
 
+fn escape_block_scalar_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            '\r' => out.push_str("\\r"),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// If `value_node` encodes a literal (`|`) or folded (`>`) block scalar,
+/// return the folded scalar body (no escaping applied yet). Scope: default
+/// clip chomping, auto-detected content indent, no explicit indicators.
+fn extract_block_scalar_body(
+    value_node: &panache_parser::syntax::SyntaxNode,
+) -> Option<(char, String)> {
+    use panache_parser::syntax::SyntaxKind;
+
+    let tokens: Vec<_> = value_node
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::NEWLINE))
+        .collect();
+    let first = tokens.first()?;
+    if first.kind() != SyntaxKind::YAML_SCALAR {
+        return None;
+    }
+    let indicator = match first.text() {
+        "|" => '|',
+        ">" => '>',
+        _ => return None,
+    };
+
+    // Reconstruct raw content after the header's trailing newline.
+    let mut raw = String::new();
+    let mut seen_header = false;
+    let mut skipped_header_newline = false;
+    for tok in tokens.iter().skip(1) {
+        if !seen_header && !skipped_header_newline && tok.kind() == SyntaxKind::NEWLINE {
+            skipped_header_newline = true;
+            seen_header = true;
+            continue;
+        }
+        raw.push_str(tok.text());
+    }
+
+    // Split into lines (preserving blank lines).
+    let mut lines: Vec<&str> = raw.split('\n').collect();
+    // Final '\n' yields a trailing empty element — drop it.
+    if lines.last().is_some_and(|s| s.is_empty()) {
+        lines.pop();
+    }
+
+    // Auto-detect content indent from the first non-empty line.
+    let content_indent = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.chars().take_while(|c| *c == ' ').count())
+        .min()
+        .unwrap_or(0);
+
+    let stripped: Vec<String> = lines
+        .iter()
+        .map(|l| {
+            if l.len() >= content_indent {
+                l[content_indent..].to_string()
+            } else {
+                String::new()
+            }
+        })
+        .collect();
+
+    let folded = match indicator {
+        '|' => stripped.join("\n"),
+        '>' => {
+            // Folded: newlines between non-empty lines become spaces;
+            // blank lines collapse to a single newline.
+            let mut result = String::new();
+            let mut last_blank = false;
+            for (idx, line) in stripped.iter().enumerate() {
+                if line.is_empty() {
+                    result.push('\n');
+                    last_blank = true;
+                } else {
+                    if idx > 0 && !last_blank {
+                        result.push(' ');
+                    }
+                    result.push_str(line);
+                    last_blank = false;
+                }
+            }
+            result
+        }
+        _ => unreachable!(),
+    };
+
+    // Default clip: collapse trailing newlines to exactly one.
+    let trimmed = folded.trim_end_matches('\n');
+    let body = if trimmed.is_empty() {
+        String::new()
+    } else {
+        format!("{trimmed}\n")
+    };
+    Some((indicator, body))
+}
+
 fn fold_plain_scalar(text: &str) -> String {
     let mut pieces = Vec::new();
     for line in text.split('\n') {
@@ -270,6 +380,83 @@ fn project_flow_map_entries(flow_map: &panache_parser::syntax::SyntaxNode, out: 
     }
 }
 
+fn project_block_sequence_items(
+    seq_node: &panache_parser::syntax::SyntaxNode,
+    out: &mut Vec<String>,
+) {
+    use panache_parser::syntax::SyntaxKind;
+
+    for item in seq_node
+        .children()
+        .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
+    {
+        if let Some(nested_seq) = item
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
+        {
+            out.push("+SEQ".to_string());
+            project_block_sequence_items(&nested_seq, out);
+            out.push("-SEQ".to_string());
+            continue;
+        }
+        if let Some(nested_map) = item
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+        {
+            out.push("+MAP".to_string());
+            project_block_map_entries(&nested_map, out);
+            out.push("-MAP".to_string());
+            continue;
+        }
+        if let Some(flow_seq) = item
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
+        {
+            let flow_text = flow_seq.text().to_string();
+            if let Some(flow_items) = simple_flow_sequence_items(&flow_text) {
+                out.push("+SEQ []".to_string());
+                for value in flow_items {
+                    if value.starts_with('"') || value.starts_with('\'') {
+                        out.push(quoted_val_event(&value));
+                    } else {
+                        out.push(plain_val_event(&value));
+                    }
+                }
+                out.push("-SEQ".to_string());
+                continue;
+            }
+        }
+        if let Some(flow_map) = item
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
+        {
+            out.push("+MAP {}".to_string());
+            project_flow_map_entries(&flow_map, out);
+            out.push("-MAP".to_string());
+            continue;
+        }
+        let item_tag = item
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
+            .map(|tok| tok.text().to_string());
+        let scalar_text = item
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+            .map(|tok| tok.text().to_string())
+            .collect::<Vec<_>>()
+            .join("");
+        if let Some(tag) = item_tag
+            && let Some(long) = long_tag(&tag)
+        {
+            out.push(format!("=VAL {long} :{scalar_text}"));
+        } else {
+            out.push(plain_val_event(&scalar_text));
+        }
+    }
+}
+
 fn project_block_map_entries(map_node: &panache_parser::syntax::SyntaxNode, out: &mut Vec<String>) {
     use panache_parser::syntax::SyntaxKind;
 
@@ -327,6 +514,13 @@ fn project_block_map_entries(map_node: &panache_parser::syntax::SyntaxNode, out:
             out.push("+MAP".to_string());
             project_block_map_entries(&nested_map, out);
             out.push("-MAP".to_string());
+            continue;
+        }
+
+        // Literal / folded block scalar value (`key: |` or `key: >`).
+        if let Some((indicator, body)) = extract_block_scalar_body(&value_node) {
+            let escaped = escape_block_scalar_text(&body);
+            out.push(format!("=VAL {indicator}{escaped}"));
             continue;
         }
 
@@ -404,6 +598,15 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     } else {
         "+DOC".to_string()
     };
+    let has_explicit_doc_end = tree
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_DOCUMENT_END);
+    let doc_close = if has_explicit_doc_end {
+        "-DOC ...".to_string()
+    } else {
+        "-DOC".to_string()
+    };
 
     if let Some(seq_node) = tree
         .descendants()
@@ -413,68 +616,9 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         events.push("+STR".to_string());
         events.push(doc_open);
         events.push("+SEQ".to_string());
-        for item in seq_node
-            .children()
-            .filter(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
-        {
-            if let Some(nested_map) = item
-                .children()
-                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP)
-            {
-                events.push("+MAP".to_string());
-                project_block_map_entries(&nested_map, &mut events);
-                events.push("-MAP".to_string());
-                continue;
-            }
-            if let Some(flow_seq) = item
-                .children()
-                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_SEQUENCE)
-            {
-                let flow_text = flow_seq.text().to_string();
-                if let Some(flow_items) = simple_flow_sequence_items(&flow_text) {
-                    events.push("+SEQ []".to_string());
-                    for value in flow_items {
-                        if value.starts_with('"') || value.starts_with('\'') {
-                            events.push(quoted_val_event(&value));
-                        } else {
-                            events.push(plain_val_event(&value));
-                        }
-                    }
-                    events.push("-SEQ".to_string());
-                    continue;
-                }
-            }
-            if let Some(flow_map) = item
-                .children()
-                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP)
-            {
-                events.push("+MAP {}".to_string());
-                project_flow_map_entries(&flow_map, &mut events);
-                events.push("-MAP".to_string());
-                continue;
-            }
-            let item_tag = item
-                .descendants_with_tokens()
-                .filter_map(|el| el.into_token())
-                .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_TAG)
-                .map(|tok| tok.text().to_string());
-            let scalar_text = item
-                .descendants_with_tokens()
-                .filter_map(|el| el.into_token())
-                .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
-                .map(|tok| tok.text().to_string())
-                .collect::<Vec<_>>()
-                .join("");
-            if let Some(tag) = item_tag
-                && let Some(long) = long_tag(&tag)
-            {
-                events.push(format!("=VAL {long} :{scalar_text}"));
-            } else {
-                events.push(plain_val_event(&scalar_text));
-            }
-        }
+        project_block_sequence_items(&seq_node, &mut events);
         events.push("-SEQ".to_string());
-        events.push("-DOC".to_string());
+        events.push(doc_close);
         events.push("-STR".to_string());
         return events;
     }
@@ -529,7 +673,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
             "+STR".to_string(),
             doc_open.clone(),
             scalar_event,
-            "-DOC".to_string(),
+            doc_close,
             "-STR".to_string(),
         ];
     }
@@ -540,7 +684,7 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     events.push(map_header);
     events.append(&mut values);
     events.push("-MAP".to_string());
-    events.push("-DOC".to_string());
+    events.push(doc_close);
     events.push("-STR".to_string());
     events
 }

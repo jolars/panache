@@ -1,0 +1,33 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 750
+expression: snapshot
+---
+case_id: 3ALJ
+input: "- - s1_i1\n  - s1_i2\n- s2\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..25
+  YAML_METADATA_CONTENT@0..25
+    YAML_BLOCK_SEQUENCE@0..25
+      YAML_BLOCK_SEQUENCE_ITEM@0..20
+        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+        WHITESPACE@1..2 " "
+        YAML_BLOCK_SEQUENCE@2..20
+          YAML_BLOCK_SEQUENCE_ITEM@2..10
+            YAML_BLOCK_SEQ_ENTRY@2..3 "-"
+            WHITESPACE@3..4 " "
+            YAML_SCALAR@4..9 "s1_i1"
+            NEWLINE@9..10 "\n"
+          WHITESPACE@10..12 "  "
+          YAML_BLOCK_SEQUENCE_ITEM@12..20
+            YAML_BLOCK_SEQ_ENTRY@12..13 "-"
+            WHITESPACE@13..14 " "
+            YAML_SCALAR@14..19 "s1_i2"
+            NEWLINE@19..20 "\n"
+      YAML_BLOCK_SEQUENCE_ITEM@20..25
+        YAML_BLOCK_SEQ_ENTRY@20..21 "-"
+        WHITESPACE@21..22 " "
+        YAML_SCALAR@22..24 "s2"
+        NEWLINE@24..25 "\n"
