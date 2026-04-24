@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.2](https://github.com/jolars/panache/compare/panache-parser-v0.4.1...panache-parser-v0.4.2) (2026-04-24)
+
+### Bug Fixes
+- **formatter:** don't break display math inside emphasis ([`d2eee34`](https://github.com/jolars/panache/commit/d2eee343d1e5099ca28a7a7dec50fb4aa9ca5f0b)), closes [#214](https://github.com/jolars/panache/issues/214)
+- handle UTF-8 boundary bug in table parsing ([`2c4e20f`](https://github.com/jolars/panache/commit/2c4e20f1039f97468879d083d87a878a09f79d96)), closes [#211](https://github.com/jolars/panache/issues/211)
+- **parser:** don't let definition list adopt trailing list ([`b2fba48`](https://github.com/jolars/panache/commit/b2fba48ab289b077a8d98c55152c61be7c978aa1))
+- properly parse and format blockquote markers in deflist ([`b27eeb7`](https://github.com/jolars/panache/commit/b27eeb77aaf833aba1ab1370504b90b8a6e2d252)), closes [#209](https://github.com/jolars/panache/issues/209)
+- **parser:** correctly emit blanklines in tables/captions ([`0465f45`](https://github.com/jolars/panache/commit/0465f45dc437a7b8e0c751e672bc85e3806320d8)), closes [#210](https://github.com/jolars/panache/issues/210)
+- **parser:** allow Rcpp as known language in hahspipe parse ([`0fd5979`](https://github.com/jolars/panache/commit/0fd5979634810bbe2c42c238657b37b161d237a2))
+
 ## [0.4.1](https://github.com/jolars/panache/compare/panache-parser-v0.4.0...panache-parser-v0.4.1) (2026-04-22)
 
 ### Bug Fixes

@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.38.0](https://github.com/jolars/panache/compare/v2.37.0...v2.38.0) (2026-04-24)
+
+### Features
+- **cli:** default to global cache dir ([`52ed047`](https://github.com/jolars/panache/commit/52ed0470c8e7b8041a907bda5500a99a3acfeb47)), closes [#207](https://github.com/jolars/panache/issues/207)
+
+### Bug Fixes
+- **formatter:** don't break display math inside emphasis ([`d2eee34`](https://github.com/jolars/panache/commit/d2eee343d1e5099ca28a7a7dec50fb4aa9ca5f0b)), closes [#214](https://github.com/jolars/panache/issues/214)
+- **formatter:** handle nested lists with continuation ([`185fa02`](https://github.com/jolars/panache/commit/185fa022db7e4c231bfddbe6efd01062033e948a)), closes [#212](https://github.com/jolars/panache/issues/212)
+- **parser:** don't let definition list adopt trailing list ([`b2fba48`](https://github.com/jolars/panache/commit/b2fba48ab289b077a8d98c55152c61be7c978aa1))
+- properly parse and format blockquote markers in deflist ([`b27eeb7`](https://github.com/jolars/panache/commit/b27eeb77aaf833aba1ab1370504b90b8a6e2d252)), closes [#209](https://github.com/jolars/panache/issues/209)
+- **lsp:** only complete real `@`-type references ([`0419b45`](https://github.com/jolars/panache/commit/0419b45d2d42e2ad9cfe2a2019336d4937df1849))
+- **formatter:** strip whitespace from code in list ([`b1b60c0`](https://github.com/jolars/panache/commit/b1b60c0e6e39b12d3143fee605a68b9057310f23))
+- **parser:** allow Rcpp as known language in hahspipe parse ([`0fd5979`](https://github.com/jolars/panache/commit/0fd5979634810bbe2c42c238657b37b161d237a2))
+- **lsp:** don't lowercase bib entries ([`2ee14d9`](https://github.com/jolars/panache/commit/2ee14d911931ec54cc33c7ac8d0c9efe5533fcbe))
+- **formatter:** allow `Rcpp` as language for clang-format ([`521e087`](https://github.com/jolars/panache/commit/521e087f6dece4d09210249dc96c2db915b4975e))
+- **linter:** correctly normalize bookdown equation label ([`dd7b736`](https://github.com/jolars/panache/commit/dd7b736bece825a27f122d586b9db3af85f74825))
+- **lsp:** harden go-to-definition/reference triggers ([`16a9364`](https://github.com/jolars/panache/commit/16a936414b5425b5e44a6d5654a5cb6d3604ef12))
+- **linter:** don't mix references with chunk labels ([`077db86`](https://github.com/jolars/panache/commit/077db86eac08e8766c200ff9e8b16479632a2743))
+- handle UTF-8 boundary bug in table parsing ([`2c4e20f`](https://github.com/jolars/panache/commit/2c4e20f1039f97468879d083d87a878a09f79d96)), closes [#211](https://github.com/jolars/panache/issues/211)
+- **parser:** correctly emit blanklines in tables/captions ([`0465f45`](https://github.com/jolars/panache/commit/0465f45dc437a7b8e0c751e672bc85e3806320d8)), closes [#210](https://github.com/jolars/panache/issues/210)
 ## [2.37.0](https://github.com/jolars/panache/compare/v2.36.0...v2.37.0) (2026-04-22)
 
 ### Features
