@@ -506,6 +506,35 @@ mod tests {
     }
 
     #[test]
+    fn parser_builds_flow_sequence_inside_block_sequence_item() {
+        let input = "- [a, b]\n- [c, d]\n";
+        let tree = parse_yaml_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let seq = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
+            .expect("block sequence");
+        let items: Vec<_> = seq
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
+            .collect();
+        assert_eq!(items.len(), 2);
+
+        for item in &items {
+            let flow = item
+                .children()
+                .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
+                .expect("flow sequence inside item");
+            let flow_items = flow
+                .children()
+                .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE_ITEM)
+                .count();
+            assert_eq!(flow_items, 2);
+        }
+    }
+
+    #[test]
     fn lexer_recognizes_single_bang_tag_in_top_level_scalar() {
         let tokens = lex_mapping_tokens("! a\n").expect("tokens");
         let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();

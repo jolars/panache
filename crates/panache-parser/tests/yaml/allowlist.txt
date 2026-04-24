@@ -95,3 +95,5 @@ TE2A
 52DL
 # Top-level scalar document with explicit tag (`! a`) — no doc-start marker.
 8MK2
+# Block sequence of flow sequences, including trailing-comma items.
+5KJE

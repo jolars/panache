@@ -418,8 +418,14 @@ fn emit_block_seq<'a>(
                 builder.token(SyntaxKind::YAML_BLOCK_SEQ_ENTRY.into(), tokens[*i].text);
                 *i += 1;
                 while *i < tokens.len() && tokens[*i].kind != YamlToken::Newline {
-                    emit_token_as_yaml(builder, &tokens[*i]);
-                    *i += 1;
+                    match tokens[*i].kind {
+                        YamlToken::FlowSeqStart => emit_flow_sequence(builder, tokens, i)?,
+                        YamlToken::FlowMapStart => emit_flow_map(builder, tokens, i)?,
+                        _ => {
+                            emit_token_as_yaml(builder, &tokens[*i]);
+                            *i += 1;
+                        }
+                    }
                 }
                 if *i < tokens.len() && tokens[*i].kind == YamlToken::Newline {
                     builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);

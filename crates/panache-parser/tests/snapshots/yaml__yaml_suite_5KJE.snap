@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 665
+expression: snapshot
+---
+case_id: 5KJE
+input: "- [ one, two, ]\n- [three ,four]\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

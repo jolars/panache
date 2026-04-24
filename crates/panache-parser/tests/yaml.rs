@@ -203,10 +203,9 @@ fn simple_flow_sequence_items(text: &str) -> Option<Vec<String>> {
     }
 
     let last = inner[start..].trim();
-    if last.is_empty() {
-        return None;
+    if !last.is_empty() {
+        items.push(last.to_string());
     }
-    items.push(last.to_string());
     Some(items)
 }
 
@@ -365,6 +364,24 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
                 project_block_map_entries(&nested_map, &mut events);
                 events.push("-MAP".to_string());
                 continue;
+            }
+            if let Some(flow_seq) = item
+                .children()
+                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_SEQUENCE)
+            {
+                let flow_text = flow_seq.text().to_string();
+                if let Some(flow_items) = simple_flow_sequence_items(&flow_text) {
+                    events.push("+SEQ []".to_string());
+                    for value in flow_items {
+                        if value.starts_with('"') || value.starts_with('\'') {
+                            events.push(quoted_val_event(&value));
+                        } else {
+                            events.push(plain_val_event(&value));
+                        }
+                    }
+                    events.push("-SEQ".to_string());
+                    continue;
+                }
             }
             let item_tag = item
                 .descendants_with_tokens()
