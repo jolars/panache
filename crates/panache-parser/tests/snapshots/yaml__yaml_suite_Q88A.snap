@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 896
+expression: snapshot
+---
+case_id: Q88A
+input: "- [ a, b ]\n- { a: b }\n- \"a\"\n- 'b'\n- c\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

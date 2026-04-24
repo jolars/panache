@@ -996,12 +996,6 @@
       "tree": false
     },
     {
-      "case_id": "8XYN",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "93JH",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_INDENT"
@@ -1245,12 +1239,6 @@
     },
     {
       "case_id": "DFF7",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "DHP8",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -1744,12 +1732,6 @@
       "tree": false
     },
     {
-      "case_id": "Q88A",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "Q8AD",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -1934,12 +1916,6 @@
       "tree": true
     },
     {
-      "case_id": "UDR7",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "UGM3",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
@@ -1960,12 +1936,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "V55R",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "V9D5",
@@ -2094,6 +2064,7 @@
     "74H7",
     "8KB6",
     "8MK2",
+    "8XYN",
     "9FMG",
     "9J7A",
     "9SHH",
@@ -2101,6 +2072,7 @@
     "CUP7",
     "D88J",
     "D9TU",
+    "DHP8",
     "E76Z",
     "FQ7F",
     "H3Z8",
@@ -2112,12 +2084,15 @@
     "KMK3",
     "M29M",
     "MXS3",
+    "Q88A",
     "S4T7",
     "S7BG",
     "SSW6",
     "SYW4",
     "TE2A",
     "UDM2",
+    "UDR7",
+    "V55R",
     "W5VH",
     "Y2GN",
     "YD5X",
@@ -2126,8 +2101,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 206,
-    "passes_now_count": 49,
+    "fails_needs_feature_count": 201,
+    "passes_now_count": 54,
     "total_cases": 352
   }
 }

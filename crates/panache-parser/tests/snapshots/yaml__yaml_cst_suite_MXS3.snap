@@ -1,0 +1,26 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 904
+expression: snapshot
+---
+case_id: MXS3
+input: "- {a: b}\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..9
+  YAML_METADATA_CONTENT@0..9
+    YAML_BLOCK_SEQUENCE@0..9
+      YAML_BLOCK_SEQUENCE_ITEM@0..9
+        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+        WHITESPACE@1..2 " "
+        YAML_FLOW_MAP@2..8
+          YAML_SCALAR@2..3 "{"
+          YAML_FLOW_MAP_ENTRY@3..7
+            YAML_FLOW_MAP_KEY@3..5
+              YAML_KEY@3..4 "a"
+              YAML_COLON@4..5 ":"
+            YAML_FLOW_MAP_VALUE@5..7
+              YAML_SCALAR@5..7 " b"
+          YAML_SCALAR@7..8 "}"
+        NEWLINE@8..9 "\n"

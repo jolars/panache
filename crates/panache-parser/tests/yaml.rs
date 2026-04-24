@@ -447,13 +447,25 @@ fn project_block_sequence_items(
             .map(|tok| tok.text().to_string())
             .collect::<Vec<_>>()
             .join("");
-        if let Some(tag) = item_tag
+        let scalar_trimmed = scalar_text.trim_end();
+        let event = if let Some(tag) = item_tag
             && let Some(long) = long_tag(&tag)
         {
-            out.push(format!("=VAL {long} :{scalar_text}"));
+            format!("=VAL {long} :{scalar_text}")
+        } else if let Some(rest) = scalar_trimmed.strip_prefix('&') {
+            if let Some((anchor, value)) = rest.split_once(' ') {
+                format!("=VAL &{anchor} :{value}")
+            } else {
+                format!("=VAL &{rest} :")
+            }
+        } else if scalar_trimmed.starts_with('*') {
+            format!("=ALI {scalar_trimmed}")
+        } else if scalar_text.starts_with('"') || scalar_text.starts_with('\'') {
+            quoted_val_event(&scalar_text)
         } else {
-            out.push(plain_val_event(&scalar_text));
-        }
+            plain_val_event(&scalar_text)
+        };
+        out.push(event);
     }
 }
 
@@ -513,6 +525,20 @@ fn project_block_map_entries(map_node: &panache_parser::syntax::SyntaxNode, out:
         {
             out.push("+MAP".to_string());
             project_block_map_entries(&nested_map, out);
+            out.push("-MAP".to_string());
+            continue;
+        }
+
+        // Inline flow map as value (`key: { a: b, c: d }`). The flow-seq case
+        // is handled below via the scalar-text round-trip, but flow maps need
+        // dedicated projection because YAML_KEY tokens are excluded from the
+        // YAML_SCALAR text collection.
+        if let Some(flow_map) = value_node
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
+        {
+            out.push("+MAP {}".to_string());
+            project_flow_map_entries(&flow_map, out);
             out.push("-MAP".to_string());
             continue;
         }
@@ -639,6 +665,33 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     {
         map_header = "+MAP {}".to_string();
         project_flow_map_entries(&flow_map, &mut values);
+    }
+
+    if values.is_empty()
+        && let Some(flow_seq) = tree
+            .descendants()
+            .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_SEQUENCE)
+        && let Some(items) = simple_flow_sequence_items(&flow_seq.text().to_string())
+    {
+        let mut seq_events: Vec<String> = items
+            .iter()
+            .map(|item| {
+                if item.starts_with('"') || item.starts_with('\'') {
+                    quoted_val_event(item)
+                } else {
+                    plain_val_event(item)
+                }
+            })
+            .collect();
+        let mut events = Vec::with_capacity(seq_events.len() + 7);
+        events.push("+STR".to_string());
+        events.push(doc_open);
+        events.push("+SEQ []".to_string());
+        events.append(&mut seq_events);
+        events.push("-SEQ".to_string());
+        events.push(doc_close);
+        events.push("-STR".to_string());
+        return events;
     }
 
     let scalar_document_value = if values.is_empty() {

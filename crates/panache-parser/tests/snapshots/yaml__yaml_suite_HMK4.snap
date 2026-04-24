@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 871
+expression: snapshot
+---
+case_id: HMK4
+input: "name: Mark McGwire\naccomplishment: >\n  Mark set a major league\n  home run record in 1998.\nstats: |\n  65 Home Runs\n  0.278 Batting Average\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

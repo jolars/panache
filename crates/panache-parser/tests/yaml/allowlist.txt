@@ -103,3 +103,25 @@ TE2A
 3ALJ
 # Literal block scalar (`|`) in block-map value with blank lines.
 M29M
+# Standalone top-level flow sequence document.
+DHP8
+# Block-sequence item containing an inline flow map.
+MXS3
+# Block-sequence item containing a flow map with colon in URL value.
+UDM2
+# Block map with literal (`|`) and folded (`>`) block scalars side-by-side.
+5BVJ
+# Block map mixing folded and literal block scalars (baseball stats example).
+HMK4
+# Block map followed by explicit document-end marker `...`.
+S4T7
+# Block sequence of flow sequences (baseball stats example).
+YD5X
+# Block map with inline flow-sequence and flow-map values.
+UDR7
+# Block sequence with anchors and aliases.
+V55R
+# Block sequence with mixed flow-seq, flow-map, and quoted scalars.
+Q88A
+# Block sequence with a unicode anchor name.
+8XYN

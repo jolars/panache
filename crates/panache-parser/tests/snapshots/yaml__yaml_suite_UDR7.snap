@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 884
+expression: snapshot
+---
+case_id: UDR7
+input: "sequence: [ one, two, ]\nmapping: { sky: blue, sea: green }\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []

@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 871
+expression: snapshot
+---
+case_id: YD5X
+input: "- [name        , hr, avg  ]\n- [Mark McGwire, 65, 0.278]\n- [Sammy Sosa  , 63, 0.288]\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []
