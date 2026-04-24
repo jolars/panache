@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/jolars/panache/compare/panache-formatter-v0.2.0...panache-formatter-v0.2.1) (2026-04-24)
+
+### Bug Fixes
+- **formatter:** don't break display math inside emphasis ([`d2eee34`](https://github.com/jolars/panache/commit/d2eee343d1e5099ca28a7a7dec50fb4aa9ca5f0b)), closes [#214](https://github.com/jolars/panache/issues/214)
+- **formatter:** handle nested lists with continuation ([`185fa02`](https://github.com/jolars/panache/commit/185fa022db7e4c231bfddbe6efd01062033e948a)), closes [#212](https://github.com/jolars/panache/issues/212)
+- properly parse and format blockquote markers in deflist ([`b27eeb7`](https://github.com/jolars/panache/commit/b27eeb77aaf833aba1ab1370504b90b8a6e2d252)), closes [#209](https://github.com/jolars/panache/issues/209)
+- **formatter:** strip whitespace from code in list ([`b1b60c0`](https://github.com/jolars/panache/commit/b1b60c0e6e39b12d3143fee605a68b9057310f23))
+
 ## [0.2.0](https://github.com/jolars/panache/compare/panache-formatter-v0.1.0...panache-formatter-v0.2.0) (2026-04-22)
 
 ### Features
