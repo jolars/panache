@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 740
 expression: snapshot
 ---
 case_id: C2SP
 input: "[23\n]: 42\n"
 diagnostics:
-YAML_PARSE_UNTERMINATED_FLOW_SEQUENCE:unterminated flow sequence@0..10
+YAML_PARSE_TRAILING_CONTENT_AFTER_FLOW_END:trailing content after flow sequence end@5..9
 cst:

@@ -209,6 +209,67 @@ fn simple_flow_sequence_items(text: &str) -> Option<Vec<String>> {
     Some(items)
 }
 
+fn fold_plain_scalar(text: &str) -> String {
+    let mut pieces = Vec::new();
+    for line in text.split('\n') {
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            pieces.push(trimmed.to_string());
+        }
+    }
+    if pieces.is_empty() {
+        return String::new();
+    }
+    pieces.join(" ")
+}
+
+fn project_flow_map_entries(flow_map: &panache_parser::syntax::SyntaxNode, out: &mut Vec<String>) {
+    use panache_parser::syntax::SyntaxKind;
+
+    for entry in flow_map
+        .children()
+        .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_ENTRY)
+    {
+        let key_node = entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_KEY)
+            .expect("flow map key");
+        let value_node = entry
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_VALUE)
+            .expect("flow map value");
+
+        let has_explicit_colon = key_node
+            .children_with_tokens()
+            .filter_map(|el| el.into_token())
+            .any(|tok| tok.kind() == SyntaxKind::YAML_COLON);
+
+        let raw_key = key_node
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_KEY))
+            .map(|tok| tok.text().to_string())
+            .collect::<Vec<_>>()
+            .join("");
+        let raw_value = value_node
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+            .map(|tok| tok.text().to_string())
+            .collect::<Vec<_>>()
+            .join("");
+
+        if has_explicit_colon {
+            out.push(plain_val_event(&fold_plain_scalar(&raw_key)));
+            out.push(plain_val_event(&fold_plain_scalar(&raw_value)));
+        } else {
+            let combined = format!("{raw_key}{raw_value}");
+            out.push(plain_val_event(&fold_plain_scalar(&combined)));
+            out.push("=VAL :".to_string());
+        }
+    }
+}
+
 fn project_block_map_entries(map_node: &panache_parser::syntax::SyntaxNode, out: &mut Vec<String>) {
     use panache_parser::syntax::SyntaxKind;
 
@@ -383,6 +444,15 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
                     continue;
                 }
             }
+            if let Some(flow_map) = item
+                .children()
+                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP)
+            {
+                events.push("+MAP {}".to_string());
+                project_flow_map_entries(&flow_map, &mut events);
+                events.push("-MAP".to_string());
+                continue;
+            }
             let item_tag = item
                 .descendants_with_tokens()
                 .filter_map(|el| el.into_token())
@@ -418,49 +488,13 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         project_block_map_entries(&root_map, &mut values);
     }
 
-    if values.is_empty() {
-        for entry in tree
+    if values.is_empty()
+        && let Some(flow_map) = tree
             .descendants()
-            .filter(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP_ENTRY)
-        {
-            map_header = "+MAP {}".to_string();
-            let key_node = entry
-                .children()
-                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP_KEY)
-                .expect("flow key node");
-            let value_node = entry
-                .children()
-                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP_VALUE)
-                .expect("flow value node");
-
-            let key_text = key_node
-                .descendants_with_tokens()
-                .filter_map(|el| el.into_token())
-                .filter(|tok| {
-                    matches!(
-                        tok.kind(),
-                        panache_parser::syntax::SyntaxKind::YAML_SCALAR
-                            | panache_parser::syntax::SyntaxKind::YAML_KEY
-                    )
-                })
-                .map(|tok| tok.text().to_string())
-                .collect::<Vec<_>>()
-                .join("")
-                .trim()
-                .to_string();
-            let value_text = value_node
-                .descendants_with_tokens()
-                .filter_map(|el| el.into_token())
-                .filter(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_SCALAR)
-                .map(|tok| tok.text().to_string())
-                .collect::<Vec<_>>()
-                .join("")
-                .trim()
-                .to_string();
-
-            values.push(plain_val_event(&key_text));
-            values.push(plain_val_event(&value_text));
-        }
+            .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP)
+    {
+        map_header = "+MAP {}".to_string();
+        project_flow_map_entries(&flow_map, &mut values);
     }
 
     let scalar_document_value = if values.is_empty() {

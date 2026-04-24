@@ -97,3 +97,5 @@ TE2A
 8MK2
 # Block sequence of flow sequences, including trailing-comma items.
 5KJE
+# Block sequence with multi-line flow maps (implicit key across lines).
+8KB6

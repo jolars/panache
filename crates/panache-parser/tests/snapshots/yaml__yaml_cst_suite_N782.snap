@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 740
 expression: snapshot
 ---
 case_id: N782
 input: "[\n--- ,\n...\n]\n"
 diagnostics:
-YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START:trailing content after document start marker@2..7
+YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START:document marker inside flow collection@2..7
 cst:

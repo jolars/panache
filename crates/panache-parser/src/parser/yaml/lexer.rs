@@ -768,15 +768,70 @@ pub fn lex_mapping_tokens_with_diagnostic(
             });
         }
 
-        let current_indent = indent_stack.last().copied().unwrap_or(0);
-        lex_mapping_line_tokens(
-            yaml_line.line,
-            yaml_line.newline,
-            line_start,
-            current_indent,
-            &mut indent_stack,
-            &mut tokens,
-        )?;
+        if flow_depth > 0 {
+            // Flow collection continuation: emit the line as whitespace + flow
+            // tokens, bypassing block-mapping key/colon extraction (otherwise
+            // `line, a: b}` would be mis-parsed as a block mapping entry).
+            // Preserve Indent/Dedent emission so the parser still observes
+            // block-structure boundaries for malformed inputs (e.g. a flow
+            // collection that fails to close before a block dedent).
+            let trimmed = content.trim();
+            if trimmed.starts_with("---") || trimmed.starts_with("...") {
+                return Err(YamlDiagnostic {
+                    code: diagnostic_codes::LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START,
+                    message: "document marker inside flow collection",
+                    byte_start: line_start + line_indent,
+                    byte_end: line_start + yaml_line.line.len(),
+                });
+            }
+            let current_indent = indent_stack.last().copied().unwrap_or(0);
+            if !content.is_empty() {
+                if line_indent > current_indent {
+                    indent_stack.push(line_indent);
+                    push_token(&mut tokens, YamlToken::Indent, "");
+                } else if line_indent < current_indent {
+                    while let Some(last) = indent_stack.last().copied() {
+                        if line_indent < last {
+                            indent_stack.pop();
+                            push_token(&mut tokens, YamlToken::Dedent, "");
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            if line_indent > 0 {
+                push_token(
+                    &mut tokens,
+                    YamlToken::Whitespace,
+                    &yaml_line.line[..line_indent],
+                );
+            }
+            if !content.is_empty() {
+                if let Some(rel_idx) = invalid_double_quote_escape_offset(content) {
+                    return Err(YamlDiagnostic {
+                        code: diagnostic_codes::LEX_INVALID_DOUBLE_QUOTED_ESCAPE,
+                        message: "invalid escape in double quoted scalar",
+                        byte_start: line_start + line_indent + rel_idx,
+                        byte_end: line_start + line_indent + rel_idx + 1,
+                    });
+                }
+                emit_scalar_like_tokens(content, &mut tokens);
+            }
+            if !yaml_line.newline.is_empty() {
+                push_token(&mut tokens, YamlToken::Newline, yaml_line.newline);
+            }
+        } else {
+            let current_indent = indent_stack.last().copied().unwrap_or(0);
+            lex_mapping_line_tokens(
+                yaml_line.line,
+                yaml_line.newline,
+                line_start,
+                current_indent,
+                &mut indent_stack,
+                &mut tokens,
+            )?;
+        }
 
         let delta = flow_delimiter_delta(content);
         if flow_depth == 0 && delta > 0 {

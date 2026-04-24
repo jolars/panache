@@ -506,6 +506,31 @@ mod tests {
     }
 
     #[test]
+    fn parser_builds_multiline_flow_map_inside_block_sequence_item() {
+        let input = "- { multi\n  line, a: b}\n";
+        let tree = parse_yaml_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let seq = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
+            .expect("block sequence");
+        let item = seq
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
+            .expect("sequence item");
+        let flow_map = item
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
+            .expect("flow map inside sequence item");
+        let entry_count = flow_map
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_ENTRY)
+            .count();
+        assert_eq!(entry_count, 2);
+    }
+
+    #[test]
     fn parser_builds_flow_sequence_inside_block_sequence_item() {
         let input = "- [a, b]\n- [c, d]\n";
         let tree = parse_yaml_tree(input).expect("tree");

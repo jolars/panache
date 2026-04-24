@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 707
 expression: snapshot
 ---
 case_id: ZXT5
 input: "[ \"key\"\n  :value ]\n"
 has_error_contract: true
 parsed_mapping_tree: false
-diagnostics: [YAML_LEX_ERROR:invalid plain mapping line@10..18]
+diagnostics: [YAML_PARSE_UNEXPECTED_DEDENT:unexpected dedent token while parsing block map@19..19]

@@ -1,9 +1,10 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 740
 expression: snapshot
 ---
 case_id: DK4H
 input: "---\n[ key\n  : value ]\n"
 diagnostics:
-YAML_LEX_ERROR:invalid plain mapping line@12..21
+YAML_PARSE_UNEXPECTED_DEDENT:unexpected dedent token while parsing block map@22..22
 cst:
