@@ -128,13 +128,28 @@ fn quoted_val_event(text: &str) -> String {
     }
 }
 
-fn long_tag(tag: &str) -> Option<&'static str> {
-    match tag {
+fn long_tag(tag: &str) -> Option<String> {
+    let builtin: Option<&'static str> = match tag {
         "!!str" => Some("<tag:yaml.org,2002:str>"),
         "!!int" => Some("<tag:yaml.org,2002:int>"),
         "!!bool" => Some("<tag:yaml.org,2002:bool>"),
+        "!!null" => Some("<tag:yaml.org,2002:null>"),
+        "!!float" => Some("<tag:yaml.org,2002:float>"),
+        "!!seq" => Some("<tag:yaml.org,2002:seq>"),
+        "!!map" => Some("<tag:yaml.org,2002:map>"),
         _ => None,
+    };
+    if let Some(s) = builtin {
+        return Some(s.to_string());
     }
+    if tag == "!" {
+        return Some("<!>".to_string());
+    }
+    // Single-bang shorthand (e.g. `!local`) — preserve the tag verbatim inside `<>`.
+    if tag.starts_with('!') && !tag.starts_with("!!") {
+        return Some(format!("<{tag}>"));
+    }
+    None
 }
 
 fn simple_flow_sequence_items(text: &str) -> Option<Vec<String>> {
@@ -285,15 +300,20 @@ fn project_block_map_entries(map_node: &panache_parser::syntax::SyntaxNode, out:
         } else {
             let value_event = if let Some(tag) = value_tag {
                 if let Some(long) = long_tag(&tag) {
-                    format!("=VAL {long} :{value_text}")
+                    if let Some(rest) = value_text.strip_prefix('&') {
+                        if let Some((anchor, tail)) = rest.split_once(' ') {
+                            format!("=VAL &{anchor} {long} :{tail}")
+                        } else {
+                            format!("=VAL &{rest} {long} :")
+                        }
+                    } else {
+                        format!("=VAL {long} :{value_text}")
+                    }
                 } else {
                     plain_val_event(&value_text)
                 }
             } else if value_text.starts_with('"') || value_text.starts_with('\'') {
                 quoted_val_event(&value_text)
-            } else if let Some(rest) = value_text.strip_prefix("!local &") {
-                let (anchor, value) = rest.split_once(' ').expect("local tag anchor/value split");
-                format!("=VAL &{} <!local> :{}", anchor, value)
             } else if let Some(rest) = value_text.strip_prefix('&') {
                 if let Some((anchor, value)) = rest.split_once(' ') {
                     format!("=VAL &{} :{}", anchor, value)
@@ -346,6 +366,11 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
                 events.push("-MAP".to_string());
                 continue;
             }
+            let item_tag = item
+                .descendants_with_tokens()
+                .filter_map(|el| el.into_token())
+                .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_TAG)
+                .map(|tok| tok.text().to_string());
             let scalar_text = item
                 .descendants_with_tokens()
                 .filter_map(|el| el.into_token())
@@ -353,7 +378,13 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
                 .map(|tok| tok.text().to_string())
                 .collect::<Vec<_>>()
                 .join("");
-            events.push(plain_val_event(&scalar_text));
+            if let Some(tag) = item_tag
+                && let Some(long) = long_tag(&tag)
+            {
+                events.push(format!("=VAL {long} :{scalar_text}"));
+            } else {
+                events.push(plain_val_event(&scalar_text));
+            }
         }
         events.push("-SEQ".to_string());
         events.push("-DOC".to_string());
@@ -429,7 +460,16 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
     };
 
     if let Some(text) = scalar_document_value {
-        let scalar_event = if text.starts_with('"') || text.starts_with('\'') {
+        let tag_text = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == panache_parser::syntax::SyntaxKind::YAML_TAG)
+            .map(|tok| tok.text().to_string());
+        let scalar_event = if let Some(tag) = tag_text
+            && let Some(long) = long_tag(&tag)
+        {
+            format!("=VAL {long} :{text}")
+        } else if text.starts_with('"') || text.starts_with('\'') {
             quoted_val_event(&text)
         } else {
             plain_val_event(&text)

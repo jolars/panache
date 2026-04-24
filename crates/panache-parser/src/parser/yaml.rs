@@ -506,6 +506,63 @@ mod tests {
     }
 
     #[test]
+    fn lexer_recognizes_single_bang_tag_in_top_level_scalar() {
+        let tokens = lex_mapping_tokens("! a\n").expect("tokens");
+        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                YamlToken::Tag,
+                YamlToken::Whitespace,
+                YamlToken::Scalar,
+                YamlToken::Newline,
+            ]
+        );
+        let texts: Vec<_> = tokens.iter().map(|t| t.text).collect();
+        assert_eq!(texts, vec!["!", " ", "a", "\n"]);
+    }
+
+    #[test]
+    fn parser_emits_scalar_document_for_tag_without_colon() {
+        let input = "! a\n";
+        let tree = parse_yaml_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let has_block_map = tree
+            .descendants()
+            .any(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP);
+        assert!(
+            !has_block_map,
+            "scalar document should not be wrapped in YAML_BLOCK_MAP"
+        );
+
+        let has_tag = tree
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .any(|tok| tok.kind() == SyntaxKind::YAML_TAG && tok.text() == "!");
+        assert!(has_tag, "tree should contain YAML_TAG '!'");
+    }
+
+    #[test]
+    fn lexer_extracts_explicit_tag_before_block_sequence_scalar() {
+        let tokens = lex_mapping_tokens("- !!int 1\n").expect("tokens");
+        let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                YamlToken::BlockSeqEntry,
+                YamlToken::Whitespace,
+                YamlToken::Tag,
+                YamlToken::Whitespace,
+                YamlToken::Scalar,
+                YamlToken::Newline,
+            ]
+        );
+        let texts: Vec<_> = tokens.iter().map(|t| t.text).collect();
+        assert_eq!(texts, vec!["-", " ", "!!int", " ", "1", "\n"]);
+    }
+
+    #[test]
     fn parser_builds_nested_block_map_inside_block_sequence() {
         let input = "-\n  name: Mark\n  hr: 65\n";
         let tree = parse_yaml_tree(input).expect("tree");

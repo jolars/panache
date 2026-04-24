@@ -361,6 +361,39 @@ fn emit_flow_value_tokens<'a>(
     Ok(())
 }
 
+fn emit_scalar_document<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Result<(), YamlDiagnostic> {
+    while *i < tokens.len() {
+        let kind = match tokens[*i].kind {
+            YamlToken::Newline => SyntaxKind::NEWLINE,
+            YamlToken::DocumentStart => SyntaxKind::YAML_DOCUMENT_START,
+            YamlToken::DocumentEnd => SyntaxKind::YAML_DOCUMENT_END,
+            YamlToken::Tag => SyntaxKind::YAML_TAG,
+            YamlToken::Comment => SyntaxKind::YAML_COMMENT,
+            YamlToken::Whitespace => SyntaxKind::WHITESPACE,
+            YamlToken::Colon => SyntaxKind::YAML_COLON,
+            YamlToken::FlowMapStart
+            | YamlToken::FlowMapEnd
+            | YamlToken::FlowSeqStart
+            | YamlToken::FlowSeqEnd
+            | YamlToken::Comma => {
+                return Err(diag_at_token(
+                    &tokens[*i],
+                    diagnostic_codes::PARSE_UNEXPECTED_FLOW_CLOSER,
+                    "unexpected flow indicator in plain scalar document",
+                ));
+            }
+            _ => SyntaxKind::YAML_SCALAR,
+        };
+        builder.token(kind.into(), tokens[*i].text);
+        *i += 1;
+    }
+    Ok(())
+}
+
 fn emit_block_seq<'a>(
     builder: &mut GreenNodeBuilder<'_>,
     tokens: &[YamlTokenSpan<'a>],
@@ -682,6 +715,14 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         })
         .is_some_and(|t| t.kind == YamlToken::BlockSeqEntry);
 
+    // Scalar document with an explicit tag (e.g. `! a`, `!!str foo`): the token
+    // stream has a Tag but no Colon and no BlockSeqEntry, so emit_block_map's
+    // key/colon expectation would reject it. Tagless scalar documents still go
+    // through emit_block_map to keep existing CST shapes unchanged.
+    let has_colon = tokens.iter().any(|t| t.kind == YamlToken::Colon);
+    let has_tag = tokens.iter().any(|t| t.kind == YamlToken::Tag);
+    let is_scalar_document = !is_sequence && !has_colon && has_tag;
+
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::DOCUMENT.into());
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
@@ -695,6 +736,13 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
             };
         }
         builder.finish_node(); // YAML_BLOCK_SEQUENCE
+    } else if is_scalar_document {
+        if let Err(err) = emit_scalar_document(&mut builder, &tokens, &mut i) {
+            return YamlParseReport {
+                tree: None,
+                diagnostics: vec![err],
+            };
+        }
     } else {
         builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
         if let Err(err) = emit_block_map(&mut builder, &tokens, &mut i, false) {

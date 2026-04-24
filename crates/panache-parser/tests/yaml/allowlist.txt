@@ -89,3 +89,9 @@ KMK3
 TE2A
 # Block sequence of block maps (nested block_map inside sequence item).
 229Q
+# Block sequence with !!int tagged scalars; projects long-form tag events.
+33X3
+# Top-level scalar document with explicit tag (`! a` inside `--- ... `).
+52DL
+# Top-level scalar document with explicit tag (`! a`) — no doc-start marker.
+8MK2

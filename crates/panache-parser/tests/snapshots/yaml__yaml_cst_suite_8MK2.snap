@@ -1,0 +1,16 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 681
+expression: snapshot
+---
+case_id: 8MK2
+input: "! a\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..4
+  YAML_METADATA_CONTENT@0..4
+    YAML_TAG@0..1 "!"
+    WHITESPACE@1..2 " "
+    YAML_SCALAR@2..3 "a"
+    NEWLINE@3..4 "\n"

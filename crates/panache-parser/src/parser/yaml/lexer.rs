@@ -149,21 +149,29 @@ fn find_unquoted_char_with_state(
 
 fn split_tag_prefix(text: &str) -> (Option<&str>, &str) {
     let trimmed = text.trim_start_matches([' ', '\t']);
-    if !trimmed.starts_with("!!") {
+    if !trimmed.starts_with('!') {
         return (None, text);
     }
 
     let rel_start = text.len() - trimmed.len();
-    let rest = &text[rel_start + 2..];
+    let is_double = trimmed.starts_with("!!");
+    let scan_from = if is_double { 2 } else { 1 };
+    let rest = &trimmed[scan_from..];
+    // Per YAML 1.2, tag shorthand names cannot contain whitespace or flow
+    // indicators (`{`, `}`, `[`, `]`, `,`). Stopping here preserves downstream
+    // tokenisation of anything that follows as normal content, which surfaces
+    // as a flow-closer error in plain-scalar context (e.g. `!invalid{}tag`).
     let end_rel = rest
         .char_indices()
-        .find_map(|(i, ch)| (ch == ' ' || ch == '\t').then_some(i))
+        .find_map(|(i, ch)| matches!(ch, ' ' | '\t' | '{' | '}' | '[' | ']' | ',').then_some(i))
         .unwrap_or(rest.len());
-    if end_rel == 0 {
+    // `!!` alone is not a valid tag; require a name after the double-bang.
+    // `!` alone is the YAML non-specific tag and is allowed.
+    if is_double && end_rel == 0 {
         return (None, text);
     }
 
-    let tag_end = rel_start + 2 + end_rel;
+    let tag_end = rel_start + scan_from + end_rel;
     let tag = &text[rel_start..tag_end];
     let value = &text[tag_end..];
     (Some(tag), value)
@@ -527,7 +535,20 @@ fn lex_mapping_line_tokens<'a>(
             push_token(out, YamlToken::Whitespace, &content[1..2]);
             let rest = &content[2..];
             if !rest.is_empty() {
-                emit_scalar_like_tokens(rest, out);
+                let (value_tag, after_tag) = split_tag_prefix(rest);
+                if let Some(tag) = value_tag {
+                    push_token(out, YamlToken::Tag, tag);
+                    let ws_len = leading_indent(after_tag);
+                    if ws_len > 0 {
+                        push_token(out, YamlToken::Whitespace, &after_tag[..ws_len]);
+                    }
+                    let scalar = &after_tag[ws_len..];
+                    if !scalar.is_empty() {
+                        emit_scalar_like_tokens(scalar, out);
+                    }
+                } else {
+                    emit_scalar_like_tokens(rest, out);
+                }
             }
         }
         if !newline.is_empty() {
@@ -589,7 +610,20 @@ fn lex_mapping_line_tokens<'a>(
                 byte_end: line_start + line_indent + rel_idx + 1,
             });
         }
-        emit_scalar_like_tokens(content, out);
+        let (scalar_tag, after_tag) = split_tag_prefix(content);
+        if let Some(tag) = scalar_tag {
+            push_token(out, YamlToken::Tag, tag);
+            let ws_len = leading_indent(after_tag);
+            if ws_len > 0 {
+                push_token(out, YamlToken::Whitespace, &after_tag[..ws_len]);
+            }
+            let scalar = &after_tag[ws_len..];
+            if !scalar.is_empty() {
+                emit_scalar_like_tokens(scalar, out);
+            }
+        } else {
+            emit_scalar_like_tokens(content, out);
+        }
         if !newline.is_empty() {
             push_token(out, YamlToken::Newline, newline);
         }
