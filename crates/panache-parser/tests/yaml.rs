@@ -337,6 +337,15 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
             .children()
             .filter(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
         {
+            if let Some(nested_map) = item
+                .children()
+                .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP)
+            {
+                events.push("+MAP".to_string());
+                project_block_map_entries(&nested_map, &mut events);
+                events.push("-MAP".to_string());
+                continue;
+            }
             let scalar_text = item
                 .descendants_with_tokens()
                 .filter_map(|el| el.into_token())

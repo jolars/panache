@@ -506,6 +506,33 @@ mod tests {
     }
 
     #[test]
+    fn parser_builds_nested_block_map_inside_block_sequence() {
+        let input = "-\n  name: Mark\n  hr: 65\n";
+        let tree = parse_yaml_tree(input).expect("tree");
+        assert_eq!(tree.text().to_string(), input);
+
+        let seq = tree
+            .descendants()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
+            .expect("block sequence");
+        let items: Vec<_> = seq
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
+            .collect();
+        assert_eq!(items.len(), 1);
+
+        let nested_map = items[0]
+            .children()
+            .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
+            .expect("nested block map inside sequence item");
+        let entry_count = nested_map
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
+            .count();
+        assert_eq!(entry_count, 2);
+    }
+
+    #[test]
     fn parser_builds_nested_block_map_from_indent_tokens() {
         let input = "root: 1\n  child: 2\n";
         let tree = parse_yaml_tree(input).expect("tree");

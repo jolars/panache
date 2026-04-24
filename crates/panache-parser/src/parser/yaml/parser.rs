@@ -392,6 +392,16 @@ fn emit_block_seq<'a>(
                     builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
                     *i += 1;
                 }
+                // Nested block map following a bare `-` entry: lexer has emitted
+                // an Indent, then the nested mapping tokens, terminated by a
+                // Dedent. Mirror the nested-map path that emit_block_map uses
+                // after a map value (see the Indent handling below).
+                if *i < tokens.len() && tokens[*i].kind == YamlToken::Indent {
+                    *i += 1;
+                    builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
+                    emit_block_map(builder, tokens, i, true)?;
+                    builder.finish_node(); // YAML_BLOCK_MAP
+                }
                 builder.finish_node(); // YAML_BLOCK_SEQUENCE_ITEM
             }
             _ => break,

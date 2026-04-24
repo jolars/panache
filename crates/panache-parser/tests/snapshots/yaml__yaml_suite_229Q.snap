@@ -1,0 +1,10 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 608
+expression: snapshot
+---
+case_id: 229Q
+input: "-\n  name: Mark McGwire\n  hr:   65\n  avg:  0.278\n-\n  name: Sammy Sosa\n  hr:   63\n  avg:  0.288\n"
+has_error_contract: false
+parsed_mapping_tree: true
+diagnostics: []
