@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{self, IsTerminal, Read};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use clap::Parser;
 use similar::{ChangeTag, TextDiff};
@@ -204,6 +205,32 @@ fn expand_paths(
     }
 
     Ok(files)
+}
+
+/// Effective worker count for processing `n_files` items. Returns 1 when
+/// `n_files <= 1` (no point spinning up rayon for one item) or when the user
+/// explicitly forces serial via `--jobs 1`. A `cli_jobs` of 0 means auto:
+/// fall back to `available_parallelism()`.
+fn effective_parallelism(cli_jobs: usize, n_files: usize) -> usize {
+    if n_files <= 1 || cli_jobs == 1 {
+        return 1;
+    }
+    if cli_jobs > 0 {
+        return cli_jobs.min(n_files);
+    }
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+        .min(n_files)
+}
+
+/// Build a rayon thread pool sized to `n` workers.
+fn build_pool(n: usize) -> rayon::ThreadPool {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(n)
+        .thread_name(|i| format!("panache-worker-{i}"))
+        .build()
+        .expect("failed to build rayon thread pool")
 }
 
 /// Parse a range string like "5:10" into (start_line, end_line)
@@ -802,20 +829,34 @@ fn main() -> io::Result<()> {
                 return Ok(());
             }
 
-            // Handle file(s) case
-            let mut all_formatted = true;
-            let mut reformatted_count = 0usize;
-            let mut unchanged_count = 0usize;
+            // Per-file work runs either serially or across a rayon pool. Inner
+            // external-formatter parallelism is forced to 1 when running multiple
+            // files in parallel — benchmarks showed nested rayon pools over-
+            // subscribe the CPU once the outer loop saturates cores.
+            let workers = effective_parallelism(cli.jobs, expanded_files.len());
+            let parallel = workers > 1;
 
-            for file_path in &expanded_files {
+            struct FormatOutcome {
+                file_path: PathBuf,
+                input: String,
+                output: String,
+            }
+
+            let cache_shared: Option<Arc<Mutex<CliCache>>> =
+                cache.take().map(|c| Arc::new(Mutex::new(c)));
+
+            let process_file = |file_path: &PathBuf| -> io::Result<FormatOutcome> {
                 let start_dir = file_path.parent().unwrap_or(Path::new(".")).to_path_buf();
-                let (cfg, cfg_path) = load_config_for_cli(
+                let (mut cfg, cfg_path) = load_config_for_cli(
                     cli.config.as_deref(),
                     cli.isolated,
                     cli.cache_dir.as_deref(),
                     &start_dir,
                     Some(file_path),
                 )?;
+                if parallel {
+                    cfg.external_max_parallel = 1;
+                }
 
                 if let Some(path) = &cfg_path {
                     log::debug!("Using config from: {}", path.display());
@@ -829,9 +870,7 @@ fn main() -> io::Result<()> {
                 } else {
                     FormatCacheMode::Write
                 };
-                let file_fingerprint = CliCache::file_fingerprint(&input);
-                let config_fingerprint = CliCache::config_fingerprint(&cfg);
-                let tool_fingerprint = CliCache::tool_fingerprint();
+
                 if verify {
                     let tree = parse(&input, Some(cfg.clone()));
                     let tree_text = tree.text().to_string();
@@ -844,45 +883,56 @@ fn main() -> io::Result<()> {
                         std::process::exit(1);
                     }
                 }
+
                 let output = if !verify && parsed_range.is_none() {
-                    if let Some(cache_hit) = cache
-                        .as_ref()
-                        .filter(|cache| cache.supports_format_mode(&cfg, mode))
-                        .and_then(|cache| {
-                            cache.get_format(
-                                file_path,
-                                mode,
-                                &file_fingerprint,
-                                &config_fingerprint,
-                                &tool_fingerprint,
-                            )
-                        })
-                    {
-                        cache_hit.1
-                    } else {
-                        let output = format(&input, Some(cfg.clone()), parsed_range);
-                        if let Some(cache_ref) = cache
-                            .as_mut()
-                            .filter(|cache| cache.supports_format_mode(&cfg, mode))
-                        {
-                            let unchanged = input == output;
-                            cache_ref.put_format(
-                                file_path,
-                                mode,
-                                FormatStoreArgs {
-                                    file_fingerprint: file_fingerprint.clone(),
-                                    config_fingerprint: config_fingerprint.clone(),
-                                    tool_fingerprint: tool_fingerprint.clone(),
-                                    unchanged,
-                                    output: output.clone(),
-                                },
-                            );
+                    if let Some(cache_handle) = cache_shared.as_ref() {
+                        let file_fingerprint = CliCache::file_fingerprint(&input);
+                        let config_fingerprint = CliCache::config_fingerprint(&cfg);
+                        let tool_fingerprint = CliCache::tool_fingerprint();
+                        let cached = {
+                            let guard = cache_handle.lock().unwrap();
+                            if guard.supports_format_mode(&cfg, mode) {
+                                guard
+                                    .get_format(
+                                        file_path,
+                                        mode,
+                                        &file_fingerprint,
+                                        &config_fingerprint,
+                                        &tool_fingerprint,
+                                    )
+                                    .map(|hit| hit.1)
+                            } else {
+                                None
+                            }
+                        };
+                        if let Some(cached) = cached {
+                            cached
+                        } else {
+                            let output = format(&input, Some(cfg.clone()), parsed_range);
+                            let mut guard = cache_handle.lock().unwrap();
+                            if guard.supports_format_mode(&cfg, mode) {
+                                let unchanged = input == output;
+                                guard.put_format(
+                                    file_path,
+                                    mode,
+                                    FormatStoreArgs {
+                                        file_fingerprint,
+                                        config_fingerprint,
+                                        tool_fingerprint,
+                                        unchanged,
+                                        output: output.clone(),
+                                    },
+                                );
+                            }
+                            output
                         }
-                        output
+                    } else {
+                        format(&input, Some(cfg.clone()), parsed_range)
                     }
                 } else {
                     format(&input, Some(cfg.clone()), parsed_range)
                 };
+
                 if verify {
                     let output_twice = format(&output, Some(cfg), parsed_range);
                     if output != output_twice {
@@ -895,20 +945,52 @@ fn main() -> io::Result<()> {
                     }
                 }
 
+                Ok(FormatOutcome {
+                    file_path: file_path.clone(),
+                    input,
+                    output,
+                })
+            };
+
+            let outcomes: Vec<io::Result<FormatOutcome>> = if parallel {
+                use rayon::prelude::*;
+                let pool = build_pool(workers);
+                pool.install(|| expanded_files.par_iter().map(&process_file).collect())
+            } else {
+                expanded_files.iter().map(&process_file).collect()
+            };
+
+            // Recover the cache for the final flush.
+            if let Some(handle) = cache_shared {
+                cache = Some(
+                    Arc::try_unwrap(handle)
+                        .map_err(|_| {
+                            io::Error::other("cache Arc still shared after parallel pass")
+                        })?
+                        .into_inner()
+                        .map_err(|e| io::Error::other(format!("cache mutex poisoned: {e}")))?,
+                );
+            }
+
+            // Sequential post-pass: emit messages, write files, tally counters.
+            // Keeps output deterministic in input order.
+            let mut all_formatted = true;
+            let mut reformatted_count = 0usize;
+            let mut unchanged_count = 0usize;
+            for outcome in outcomes {
+                let o = outcome?;
                 if check {
-                    if input != output {
-                        let file_name = file_path.to_str().unwrap_or("<unknown>");
-                        print_diff(file_name, &input, &output, use_color);
+                    if o.input != o.output {
+                        let file_name = o.file_path.to_str().unwrap_or("<unknown>");
+                        print_diff(file_name, &o.input, &o.output, use_color);
                         all_formatted = false;
                     } else if expanded_files.len() == 1 {
-                        // Only print success for single file
-                        println!("{} is correctly formatted", file_path.display());
+                        println!("{} is correctly formatted", o.file_path.display());
                     }
                 } else if !verify {
-                    if input != output {
-                        // Format in place (default for file paths)
-                        fs::write(file_path, &output)?;
-                        println!("Formatted {}", file_path.display());
+                    if o.input != o.output {
+                        fs::write(&o.file_path, &o.output)?;
+                        println!("Formatted {}", o.file_path.display());
                         reformatted_count += 1;
                     } else {
                         unchanged_count += 1;
@@ -1321,19 +1403,30 @@ fn main() -> io::Result<()> {
                 return Ok(());
             }
 
-            // Lint files
-            let mut any_issues = false;
-            let mut total_issues = 0;
+            let workers = effective_parallelism(cli.jobs, expanded_files.len());
+            let parallel = workers > 1;
 
-            for file_path in &expanded_files {
+            struct LintOutcome {
+                file_path: PathBuf,
+                root_doc: Option<LintedDocument>,
+                included_docs: Vec<LintedDocument>,
+            }
+
+            let cache_shared: Option<Arc<Mutex<CliCache>>> =
+                cache.take().map(|c| Arc::new(Mutex::new(c)));
+
+            let process_file = |file_path: &PathBuf| -> io::Result<LintOutcome> {
                 let start_dir = file_path.parent().unwrap_or(Path::new(".")).to_path_buf();
-                let (cfg, cfg_path) = load_config_for_cli(
+                let (mut cfg, cfg_path) = load_config_for_cli(
                     cli.config.as_deref(),
                     cli.isolated,
                     cli.cache_dir.as_deref(),
                     &start_dir,
                     Some(file_path),
                 )?;
+                if parallel {
+                    cfg.external_max_parallel = 1;
+                }
 
                 if let Some(path) = &cfg_path {
                     log::debug!("Using config from: {}", path.display());
@@ -1342,53 +1435,97 @@ fn main() -> io::Result<()> {
                 }
 
                 let root_input = fs::read_to_string(file_path)?;
-                let file_fingerprint = CliCache::file_fingerprint(&root_input);
-                let config_fingerprint = CliCache::config_fingerprint(&cfg);
-                let tool_fingerprint = CliCache::tool_fingerprint();
-                let documents = if let Some(cached_documents) = cache
-                    .as_ref()
-                    .filter(|cache| cache.supports_lint(&cfg))
-                    .and_then(|cache| {
-                        cache.get_lint(
-                            file_path,
-                            &file_fingerprint,
-                            &config_fingerprint,
-                            &tool_fingerprint,
-                        )
-                    })
-                    .filter(|docs| cached_lint_documents_are_fresh(docs))
-                {
-                    cached_documents
-                        .iter()
-                        .map(linted_document_from_cached)
-                        .collect::<Vec<_>>()
-                } else {
-                    let documents = lint_documents_with_includes(file_path, &root_input, &cfg)?;
-                    if let Some(cache_ref) =
-                        cache.as_mut().filter(|cache| cache.supports_lint(&cfg))
-                    {
-                        let cached_docs = documents
+
+                let documents = if let Some(cache_handle) = cache_shared.as_ref() {
+                    let file_fingerprint = CliCache::file_fingerprint(&root_input);
+                    let config_fingerprint = CliCache::config_fingerprint(&cfg);
+                    let tool_fingerprint = CliCache::tool_fingerprint();
+
+                    let cached_lookup = {
+                        let guard = cache_handle.lock().unwrap();
+                        if guard.supports_lint(&cfg) {
+                            guard
+                                .get_lint(
+                                    file_path,
+                                    &file_fingerprint,
+                                    &config_fingerprint,
+                                    &tool_fingerprint,
+                                )
+                                .filter(|docs| cached_lint_documents_are_fresh(docs))
+                        } else {
+                            None
+                        }
+                    };
+                    if let Some(cached_documents) = cached_lookup {
+                        cached_documents
                             .iter()
-                            .map(cached_lint_document_from_linted)
-                            .collect::<Vec<_>>();
-                        cache_ref.put_lint(
-                            file_path,
-                            file_fingerprint,
-                            config_fingerprint,
-                            tool_fingerprint,
-                            cached_docs,
-                        );
+                            .map(linted_document_from_cached)
+                            .collect::<Vec<_>>()
+                    } else {
+                        let documents = lint_documents_with_includes(file_path, &root_input, &cfg)?;
+                        let mut guard = cache_handle.lock().unwrap();
+                        if guard.supports_lint(&cfg) {
+                            let cached_docs = documents
+                                .iter()
+                                .map(cached_lint_document_from_linted)
+                                .collect::<Vec<_>>();
+                            guard.put_lint(
+                                file_path,
+                                file_fingerprint,
+                                config_fingerprint,
+                                tool_fingerprint,
+                                cached_docs,
+                            );
+                        }
+                        documents
                     }
-                    documents
+                } else {
+                    lint_documents_with_includes(file_path, &root_input, &cfg)?
                 };
-                let mut root_doc = documents.iter().find(|doc| &doc.path == file_path).cloned();
+
+                let root_doc = documents.iter().find(|doc| &doc.path == file_path).cloned();
                 let mut included_docs: Vec<LintedDocument> = documents
                     .into_iter()
                     .filter(|doc| &doc.path != file_path)
                     .collect();
                 included_docs.sort_by(|a, b| a.path.cmp(&b.path));
 
-                let Some(root_doc) = root_doc.take() else {
+                Ok(LintOutcome {
+                    file_path: file_path.clone(),
+                    root_doc,
+                    included_docs,
+                })
+            };
+
+            let outcomes: Vec<io::Result<LintOutcome>> = if parallel {
+                use rayon::prelude::*;
+                let pool = build_pool(workers);
+                pool.install(|| expanded_files.par_iter().map(&process_file).collect())
+            } else {
+                expanded_files.iter().map(&process_file).collect()
+            };
+
+            if let Some(handle) = cache_shared {
+                cache = Some(
+                    Arc::try_unwrap(handle)
+                        .map_err(|_| {
+                            io::Error::other("cache Arc still shared after parallel pass")
+                        })?
+                        .into_inner()
+                        .map_err(|e| io::Error::other(format!("cache mutex poisoned: {e}")))?,
+                );
+            }
+
+            let mut any_issues = false;
+            let mut total_issues = 0;
+            for outcome in outcomes {
+                let LintOutcome {
+                    file_path,
+                    root_doc,
+                    included_docs,
+                } = outcome?;
+
+                let Some(root_doc) = root_doc else {
                     continue;
                 };
 
@@ -1398,7 +1535,7 @@ fn main() -> io::Result<()> {
 
                     if fix {
                         let fixed_output = apply_fixes(&root_doc.input, &root_doc.diagnostics);
-                        fs::write(file_path, fixed_output)?;
+                        fs::write(&file_path, fixed_output)?;
                         println!(
                             "Fixed {} issue(s) in {}",
                             root_doc.diagnostics.len(),

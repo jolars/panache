@@ -39,6 +39,9 @@ For help with a specific command, see: `panache help <command>`.
 * `--isolated` — Ignore all discovered configuration files
 * `--no-cache` — Disable all lint/format cache reads and writes for this run. Can also be enabled with PANACHE_NO_CACHE.
 * `--cache-dir <CACHE_DIR>` — Path to the cache directory for this invocation. Overrides config `cache-dir`. Can also be set with PANACHE_CACHE_DIR.
+* `-j`, `--jobs <N>` — Number of worker threads to use when formatting or linting multiple files. 0 (the default) selects an automatic level based on available CPU cores. 1 forces serial processing. Single-file invocations always run on one thread; the inner external-formatter pool (see external-max-parallel) is only used when this value is 1 or when only one file is being processed. Can also be set with PANACHE_JOBS.
+
+  Default value: `0`
 
 
 

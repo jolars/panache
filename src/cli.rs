@@ -100,6 +100,26 @@ pub struct Cli {
         long_help = "Path to the cache directory for this invocation. Overrides config `cache-dir`. Can also be set with PANACHE_CACHE_DIR."
     )]
     pub cache_dir: Option<PathBuf>,
+
+    /// Number of worker threads for processing multiple files
+    #[arg(
+        short = 'j',
+        long,
+        global = true,
+        value_name = "N",
+        env = "PANACHE_JOBS",
+        help_heading = "Global options"
+    )]
+    #[arg(help = "Worker threads for multi-file format/lint (0 = auto, 1 = serial)")]
+    #[arg(
+        long_help = "Number of worker threads to use when formatting or linting multiple files. \
+        0 (the default) selects an automatic level based on available CPU cores. 1 forces serial \
+        processing. Single-file invocations always run on one thread; the inner external-formatter \
+        pool (see external-max-parallel) is only used when this value is 1 or when only one file is \
+        being processed. Can also be set with PANACHE_JOBS."
+    )]
+    #[arg(default_value_t = 0)]
+    pub jobs: usize,
 }
 
 #[derive(Subcommand)]
