@@ -90,6 +90,8 @@ website:
               text: Configuration
             - href: guide/integrations.qmd
               text: Integrations
+            - href: guide/performance.qmd
+              text: Performance
         - section: "Reference"
           style: floating
           href: reference/index.qmd

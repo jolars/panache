@@ -17,6 +17,7 @@
     pkgs.llvmPackages.bintools
     pkgs.rumdl
     pkgs.prettier
+    pkgs.hyperfine
     pkgs.quartoMinimal
     pkgs.air-formatter
     pkgs.ruff

@@ -105,11 +105,19 @@ valgrind --tool=cachegrind cargo bench --bench formatting
     `PANACHE_CLI_CACHE_BENCH_ITERATIONS`
   - Optional JSON output via `PANACHE_CLI_CACHE_BENCH_OUTPUT_JSON`
 - **`benches/compare_all.sh`**: Multi-formatter comparison
-  - Compares panache vs Prettier vs Pandoc
-
-  - Saves results to `benchmark_results.txt`
-
-  - Use to update `docs/performance.qmd`
+  - Compares panache vs Prettier vs Pandoc vs rumdl across six documents (small,
+    medium, tables, math, large, and the full Pandoc manual)
+  - **Text mode (default)**: prints colored results and appends to
+    `benchmark_results.txt`
+  - **JSON mode**: `bash benches/compare_all.sh --json [--out PATH]` writes
+    structured JSON consumed by `docs/guide/performance.qmd`. Default output
+    path is `docs/guide/performance_data.json`.
+  - Prefers [hyperfine](https://github.com/sharkdp/hyperfine) for stats when
+    available (and `jq` for parsing); otherwise falls back to a simple shell
+    timing loop emitting mean only (`stddev_ms`/`min_ms`/`max_ms` are `null`).
+  - Drives the data-driven `docs/guide/performance.qmd` page; `freeze: true` on
+    that doc means the benchmark only re-runs when you delete
+    `docs/_freeze/guide/performance/` and re-render.
 - **`benches/generate_docs.sh`**: Captures results for documentation
   - Generates `benches/benchmark_results.json` (machine-readable)
   - Renders `docs/benchmarks.qmd` from JSON

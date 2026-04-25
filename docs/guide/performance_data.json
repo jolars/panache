@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "generated_at": "2026-04-25T18:00:20Z",
+    "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor"},
+    "backend": "shell-loop",
+    "tools": {
+      "panache":  {"version": "2.38.0"},
+      "prettier": {"version": "3.6.2"},
+      "pandoc":   {"version": "3.9.0.2"},
+      "rumdl":    {"version": "0.1.67"}
+    }
+  },
+  "documents": [
+    {"id":"small","name":"Small Document (747 bytes)","file":"small.qmd","size_bytes":756,"lines":48,"iterations":50},
+    {"id":"medium","name":"Medium Document (9 KB)","file":"medium_quarto.qmd","size_bytes":8893,"lines":146,"iterations":20},
+    {"id":"tables","name":"Tables Document (19 KB)","file":"tables.qmd","size_bytes":18833,"lines":636,"iterations":20},
+    {"id":"math","name":"Math Document (29 KB)","file":"math.qmd","size_bytes":28562,"lines":664,"iterations":20},
+    {"id":"large","name":"Large Document (30 KB)","file":"large_authoring.qmd","size_bytes":29858,"lines":592,"iterations":10},
+    {"id":"pandoc_manual","name":"Pandoc Manual (large reference doc)","file":"pandoc_manual.md","size_bytes":299536,"lines":8036,"iterations":3}
+  ],
+  "results": [
+    {"document":"small","formatter":"panache","mean_ms":2.2291,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":50},
+    {"document":"small","formatter":"prettier","mean_ms":72.0485,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":50},
+    {"document":"small","formatter":"pandoc","mean_ms":8.1418,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":50},
+    {"document":"small","formatter":"rumdl","mean_ms":8.1297,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":50},
+    {"document":"medium","formatter":"panache","mean_ms":4.6462,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"medium","formatter":"prettier","mean_ms":105.9178,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"medium","formatter":"pandoc","mean_ms":28.0618,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"medium","formatter":"rumdl","mean_ms":10.6261,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"tables","formatter":"panache","mean_ms":6.9931,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"tables","formatter":"prettier","mean_ms":133.3375,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"tables","formatter":"pandoc","mean_ms":54.7275,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"tables","formatter":"rumdl","mean_ms":16.1166,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"math","formatter":"panache","mean_ms":5.2694,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"math","formatter":"prettier","mean_ms":142.9777,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"math","formatter":"pandoc","mean_ms":45.7415,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"math","formatter":"rumdl","mean_ms":22.3629,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":20},
+    {"document":"large","formatter":"panache","mean_ms":3.5578,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":10},
+    {"document":"large","formatter":"prettier","mean_ms":134.1899,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":10},
+    {"document":"large","formatter":"pandoc","mean_ms":50.0545,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":10},
+    {"document":"large","formatter":"rumdl","mean_ms":20.9110,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":10},
+    {"document":"pandoc_manual","formatter":"panache","mean_ms":29.2844,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":3},
+    {"document":"pandoc_manual","formatter":"prettier","mean_ms":474.3138,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":3},
+    {"document":"pandoc_manual","formatter":"pandoc","mean_ms":371.3685,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":3},
+    {"document":"pandoc_manual","formatter":"rumdl","mean_ms":761.5475,"stddev_ms":null,"min_ms":null,"max_ms":null,"runs":3}
+  ]
+}

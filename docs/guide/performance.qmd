@@ -5,6 +5,8 @@ description: >
   speed against popular alternatives like Prettier, Pandoc, and rumdl on real
   Quarto documents. The benchmarks highlight Panache's efficiency and suitability
   for on-save formatting in editors.
+engine: knitr
+freeze: true
 ---
 
 ## Overview
@@ -13,91 +15,165 @@ description: >
 Rust and compiled to native code, it delivers fast formatting with zero startup
 overhead.
 
+The numbers on this page are produced by the script in
+[`benches/compare_all.sh`](https://github.com/jolars/panache/blob/main/benches/compare_all.sh)
+and read from the JSON file written next to this document. Quarto's `freeze`
+caches the benchmark run; to refresh the numbers, delete
+`docs/_freeze/guide/performance/` and re-render.
+
+```{bash}
+#| label: run-benchmarks
+#| echo: false
+#| output: false
+
+cd ../..
+bash benches/compare_all.sh --json --out docs/guide/performance_data.json
+```
+
 ## Benchmark Results
 
-Benchmarks compare panache against popular markdown formatters on real Quarto
-documents.
+```{ojs}
+//| echo: false
 
-::: {.callout-note}
-**Test Environment**
+data = FileAttachment("performance_data.json").json()
+```
 
-- CPU: Modern x86_64 processor
-- panache: v2.38.0 (Rust, native binary)
-- Prettier: v3.6.2 (Node.js)
-- Pandoc: v3.9.0.2 (Haskell, native binary)
-- rumdl: v0.1.67 (Rust, native binary)
-- Documents: Real Quarto files from quarto-dev/quarto-web
-:::
+```{ojs}
+//| echo: false
 
-### Small Document (747 bytes)
+panacheBy = new Map(
+  data.results
+    .filter(r => r.formatter === "panache")
+    .map(r => [r.document, r.mean_ms])
+)
+```
 
-  | Formatter   | Time (ms) | vs panache   |
-  | ----------- | --------- | ------------ |
-  | **panache** | **2.0**   | baseline     |
-  | rumdl       | 7.6       | 3.8x slower  |
-  | Pandoc      | 8.0       | 4.0x slower  |
-  | Prettier    | 70.3      | 35.0x slower |
+```{ojs}
+//| echo: false
 
-### Medium Document (9 KB)
+ratiosByFormatter = {
+  const out = {};
+  for (const r of data.results) {
+    if (r.formatter === "panache") continue;
+    const base = panacheBy.get(r.document);
+    if (!base) continue;
+    (out[r.formatter] ??= []).push(r.mean_ms / base);
+  }
+  return out;
+}
+```
 
-  | Formatter   | Time (ms) | vs panache   |
-  | ----------- | --------- | ------------ |
-  | **panache** | **4.9**   | baseline     |
-  | rumdl       | 9.9       | 2.0x slower  |
-  | Pandoc      | 28.3      | 5.8x slower  |
-  | Prettier    | 101.7     | 21.0x slower |
+```{ojs}
+//| echo: false
 
-### Tables Document (19 KB)
+range = (formatter) => {
+  const xs = ratiosByFormatter[formatter] ?? [];
+  if (!xs.length) return "n/a";
+  const lo = Math.min(...xs), hi = Math.max(...xs);
+  return `${Math.round(lo)}\u2013${Math.round(hi)}x`;
+}
+prettierRange = range("prettier")
+pandocRange = range("pandoc")
+rumdlRange = range("rumdl")
+```
 
-  | Formatter   | Time (ms) | vs panache   |
-  | ----------- | --------- | ------------ |
-  | **panache** | **7.8**   | baseline     |
-  | rumdl       | 15.4      | 2.0x slower  |
-  | Pandoc      | 55.8      | 7.1x slower  |
-  | Prettier    | 129.6     | 16.5x slower |
+```{ojs}
+//| echo: false
 
-### Math Document (29 KB)
+html`<div class="callout-note">
+  <div class="callout-header" style="font-weight: 600">Test Environment</div>
+  <ul style="margin: 0">
+    <li>Generated: ${new Date(data.meta.generated_at).toUTCString()}</li>
+    <li>Host: ${data.meta.host.cpu} (${data.meta.host.os}/${data.meta.host.arch})</li>
+    <li>Backend: <code>${data.meta.backend}</code>${
+      data.meta.backend === "shell-loop"
+        ? html` <span style="opacity:.7">(install <code>hyperfine</code> for stddev/min/max)</span>`
+        : ""
+    }</li>
+    <li>panache ${data.meta.tools.panache.version}, prettier ${data.meta.tools.prettier?.version ?? "n/a"}, pandoc ${data.meta.tools.pandoc?.version ?? "n/a"}, rumdl ${data.meta.tools.rumdl?.version ?? "n/a"}</li>
+    <li>Documents: real Quarto/Markdown files (see <code>benches/documents/download.sh</code>)</li>
+  </ul>
+</div>`
+```
 
-  | Formatter   | Time (ms) | vs panache   |
-  | ----------- | --------- | ------------ |
-  | **panache** | **5.3**   | baseline     |
-  | rumdl       | 22.1      | 4.1x slower  |
-  | Pandoc      | 41.1      | 7.7x slower  |
-  | Prettier    | 140.5     | 26.4x slower |
+```{ojs}
+//| echo: false
 
-### Large Document (30 KB)
+Plot.plot({
+  marginLeft: 60,
+  marginBottom: 60,
+  height: 360,
+  x: {label: null, tickRotate: -20},
+  y: {type: "log", label: "Mean time (ms, log)"},
+  color: {
+    legend: true,
+    domain: ["panache", "rumdl", "pandoc", "prettier"],
+    range: ["#2a9d8f", "#264653", "#e76f51", "#f4a261"]
+  },
+  marks: [
+    Plot.barY(data.results, {
+      x: "formatter",
+      y: "mean_ms",
+      fill: "formatter",
+      fx: "document",
+      sort: {fx: null}
+    }),
+    Plot.ruleY([1])
+  ]
+})
+```
 
-  | Formatter   | Time (ms) | vs panache   |
-  | ----------- | --------- | ------------ |
-  | **panache** | **3.4**   | baseline     |
-  | rumdl       | 20.4      | 6.0x slower  |
-  | Pandoc      | 52.7      | 15.4x slower |
-  | Prettier    | 134.6     | 39.5x slower |
+### Per-document timings
+
+```{ojs}
+//| echo: false
+
+html`${data.documents.map(doc => {
+  const sizeKb = doc.size_bytes >= 1024
+    ? (doc.size_bytes / 1024).toFixed(1) + " KB"
+    : doc.size_bytes + " B";
+  const base = panacheBy.get(doc.id);
+  const rows = data.results
+    .filter(r => r.document === doc.id)
+    .sort((a, b) => a.mean_ms - b.mean_ms)
+    .map(r => ({
+      Formatter: r.formatter,
+      "Mean (ms)": r.mean_ms.toFixed(1),
+      "vs panache": r.formatter === "panache"
+        ? "baseline"
+        : `${(r.mean_ms / base).toFixed(1)}x slower`,
+      Runs: r.runs
+    }));
+  return html`<h4>${doc.name}</h4>
+              <p style="opacity:.7;margin-top:-.5em">
+                ${doc.file} \u2014 ${sizeKb}, ${doc.lines} lines, ${doc.iterations} iterations
+              </p>
+              ${Inputs.table(rows, {
+                rows: rows.length,
+                width: {Formatter: 120, "Mean (ms)": 100, "vs panache": 140, Runs: 80}
+              })}`;
+})}`
+```
 
 ## Key Takeaways
 
 ### 🚀 Faster Than Alternatives
 
-- **17-40x faster than Prettier** - Zero Node.js startup overhead
-- **4-15x faster than Pandoc** - Optimized for formatting (Pandoc is
+- **${prettierRange} faster than Prettier** -- Zero Node.js startup overhead
+- **${pandocRange} faster than Pandoc** -- Optimized for formatting (Pandoc is
   general-purpose)
-- **2-6x faster than rumdl** - Another Rust-native markdown tool, but with a
-  different design focus
-- **Sub-10ms formatting** - Imperceptible latency for on-save formatting
-
-### ⚡ Consistent Performance
-
-panache maintains consistent \~3-8ms formatting time across document sizes (1-30
-KB), suggesting excellent algorithmic efficiency. The parser and formatter scale
-well.
+- **${rumdlRange} faster than rumdl** -- Another Rust-native markdown tool, but
+  with a different design focus
+- **Sub-10ms formatting** for typical documents -- imperceptible latency for
+  on-save formatting
 
 ### 💪 Why So Fast?
 
-1. **Native compilation** - Rust compiles to machine code, no interpreter
+1. **Native compilation** -- Rust compiles to machine code, no interpreter
    overhead
-2. **Zero startup time** - Unlike Node.js/JVM-based tools
-3. **Efficient parsing** - Single-pass parser with integrated inline handling
-4. **Optimized data structures** - Lossless CST built with `rowan` crate
+2. **Zero startup time** -- unlike Node.js/JVM-based tools
+3. **Efficient parsing** -- single-pass parser with integrated inline handling
+4. **Optimized data structures** -- lossless CST built with `rowan` crate
 
 ### 📊 What About Prettier?
 
@@ -111,28 +187,39 @@ panache remains faster.
 Pandoc is a general-purpose document converter supporting 40+ formats. panache
 is specialized for markdown/Quarto formatting, enabling focused optimizations.
 Pandoc remains the gold standard for syntax correctness, but panache delivers
-4-15x faster formatting.
+substantially faster formatting.
 
 ### 🦀 What About rumdl?
 
 [rumdl](https://github.com/rvben/rumdl) is another Rust-native markdown tool,
-primarily a linter that also offers formatting via `rumdl fmt`. Both tools
-benefit from native compilation and zero startup overhead, so the gap is much
-smaller than with Node.js- or Haskell-based alternatives. panache is still 2-6x
-faster on these documents, reflecting its narrower focus on formatting
-Quarto/Pandoc markdown.
+primarily a *linter* whose `rumdl fmt` command is documented as an alias for
+`check --fix`. There is no dedicated formatting code path: every "format" run
+goes through the full lint engine and applies whichever fixes the rules
+produced. Both tools benefit from native compilation and zero startup overhead,
+so the gap is much smaller than with Node.js- or Haskell-based alternatives, but
+panache's narrower focus on formatting Quarto/Pandoc markdown still wins.
 
 ## Reproducing Benchmarks
 
 All benchmarks are reproducible:
 
 ```bash
-# Download test documents
+# Download test documents (idempotent)
 cd benches/documents && ./download.sh && cd ../..
 
-# Run comparison benchmark
-./benches/compare_all.sh
+# Run comparison benchmark and write JSON
+bash benches/compare_all.sh --json --out docs/guide/performance_data.json
 
-# Or run internal benchmarks
-cargo bench --bench formatting
+# Or run the human-readable text variant
+bash benches/compare_all.sh
+
+# Re-render this page (uses freeze cache by default)
+quarto render docs/guide/performance.qmd
+
+# Force the benchmark to re-run by invalidating the freeze cache
+rm -rf docs/_freeze/guide/performance
+quarto render docs/guide/performance.qmd
 ```
+
+For best statistics, install [hyperfine](https://github.com/sharkdp/hyperfine)
+-- the script will detect it and use it for warmup + stddev/min/max.
