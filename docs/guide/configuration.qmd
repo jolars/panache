@@ -8,7 +8,7 @@ description: >
 
 Panache's configuration system is built around a TOML configuration file, which
 allows you to customize a range of options, including formatting preferences,
-linting rules, external linter and formatter integrations>
+linting rules, external linter and formatter integrations.
 
 Panache searches for a configuration file in the following order:
 
