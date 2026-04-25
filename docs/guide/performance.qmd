@@ -19,10 +19,14 @@ Benchmarks compare panache against popular markdown formatters on real Quarto
 documents.
 
 ::: {.callout-note}
-**Test Environment** - CPU: Modern x86_64 processor - panache: v2.38.0 (Rust,
-native binary) - Prettier: v3.6.2 (Node.js) - Pandoc: v3.9.0.2 (Haskell, native
-binary) - rumdl: v0.1.67 (Rust, native binary) - Documents: Real Quarto files
-from quarto-dev/quarto-web
+**Test Environment**
+
+- CPU: Modern x86_64 processor
+- panache: v2.38.0 (Rust, native binary)
+- Prettier: v3.6.2 (Node.js)
+- Pandoc: v3.9.0.2 (Haskell, native binary)
+- rumdl: v0.1.67 (Rust, native binary)
+- Documents: Real Quarto files from quarto-dev/quarto-web
 :::
 
 ### Small Document (747 bytes)
