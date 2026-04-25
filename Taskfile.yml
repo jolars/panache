@@ -48,6 +48,18 @@ tasks:
     cmds:
       - cd docs && quarto preview --no-browser
 
+  benchmarks:
+    desc: Run multi-formatter benchmark and write JSON consumed by docs/guide/performance.qmd
+    cmds:
+      - bash benches/compare_all.sh --json --out docs/guide/performance_data.json
+
+  refresh-benchmarks:
+    desc: Re-run benchmarks and rebuild the performance page (invalidates freeze cache)
+    cmds:
+      - bash benches/compare_all.sh --json --out docs/guide/performance_data.json
+      - rm -rf docs/_freeze/guide/performance
+      - cd docs && quarto render guide/performance.qmd
+
   wasm-build:
     desc: Build and sync panache-wasm for playground
     cmds:
