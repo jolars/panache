@@ -33,12 +33,14 @@ bash benches/compare_all.sh --json --out docs/guide/performance_data.json
 ## Benchmark Results
 
 ```{ojs}
+//| label: load-data
 //| echo: false
 
 data = FileAttachment("performance_data.json").json()
 ```
 
 ```{ojs}
+//| label: prepare-panache-data
 //| echo: false
 
 panacheBy = new Map(
@@ -49,6 +51,7 @@ panacheBy = new Map(
 ```
 
 ```{ojs}
+//| label: compute-ratios-by-formatter
 //| echo: false
 
 ratiosByFormatter = {
@@ -64,6 +67,7 @@ ratiosByFormatter = {
 ```
 
 ```{ojs}
+//| label: compute-ratios
 //| echo: false
 
 range = (formatter) => {
@@ -78,6 +82,7 @@ rumdlRange = range("rumdl")
 ```
 
 ```{ojs}
+//| label: render-environment
 //| echo: false
 
 html`<div class="callout-note">
@@ -97,6 +102,7 @@ html`<div class="callout-note">
 ```
 
 ```{ojs}
+//| label: plot-results
 //| echo: false
 
 Plot.plot({
@@ -126,6 +132,7 @@ Plot.plot({
 ### Per-document timings
 
 ```{ojs}
+//| label: per-document-timings
 //| echo: false
 
 html`${data.documents.map(doc => {
