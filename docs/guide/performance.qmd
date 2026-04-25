@@ -2,9 +2,9 @@
 title: "Performance"
 description: >
   This page presents performance benchmarks for Panache, comparing its formatting
-  speed against popular alternatives like Prettier and Pandoc on real Quarto
-  documents. The benchmarks highlight Panache's efficiency and suitability for
-  on-save formatting in editors.
+  speed against popular alternatives like Prettier, Pandoc, and rumdl on real
+  Quarto documents. The benchmarks highlight Panache's efficiency and suitability
+  for on-save formatting in editors.
 ---
 
 ## Overview
@@ -19,63 +19,71 @@ Benchmarks compare panache against popular markdown formatters on real Quarto
 documents.
 
 ::: {.callout-note}
-**Test Environment** - CPU: Modern x86_64 processor - panache: v2.7.0 (Rust,
-native binary) - Prettier: v3.6.2 (Node.js) - Pandoc: v3.7.0.2 (Haskell, native
-binary) - Documents: Real Quarto files from quarto-dev/quarto-web
+**Test Environment** - CPU: Modern x86_64 processor - panache: v2.38.0 (Rust,
+native binary) - Prettier: v3.6.2 (Node.js) - Pandoc: v3.9.0.2 (Haskell, native
+binary) - rumdl: v0.1.67 (Rust, native binary) - Documents: Real Quarto files
+from quarto-dev/quarto-web
 :::
 
 ### Small Document (747 bytes)
 
   | Formatter   | Time (ms) | vs panache   |
   | ----------- | --------- | ------------ |
-  | **panache** | **4.1**   | baseline     |
-  | Prettier    | 71.8      | 17.7x slower |
-  | Pandoc      | 10.0      | 2.5x slower  |
+  | **panache** | **2.0**   | baseline     |
+  | rumdl       | 7.6       | 3.8x slower  |
+  | Pandoc      | 8.0       | 4.0x slower  |
+  | Prettier    | 70.3      | 35.0x slower |
 
 ### Medium Document (9 KB)
 
   | Formatter   | Time (ms) | vs panache   |
   | ----------- | --------- | ------------ |
-  | **panache** | **8.7**   | baseline     |
-  | Prettier    | 105.0     | 12.1x slower |
-  | Pandoc      | 32.5      | 3.8x slower  |
+  | **panache** | **4.9**   | baseline     |
+  | rumdl       | 9.9       | 2.0x slower  |
+  | Pandoc      | 28.3      | 5.8x slower  |
+  | Prettier    | 101.7     | 21.0x slower |
 
 ### Tables Document (19 KB)
 
   | Formatter   | Time (ms) | vs panache   |
   | ----------- | --------- | ------------ |
-  | **panache** | **8.5**   | baseline     |
-  | Prettier    | 131.5     | 15.5x slower |
-  | Pandoc      | 60.0      | 7.1x slower  |
+  | **panache** | **7.8**   | baseline     |
+  | rumdl       | 15.4      | 2.0x slower  |
+  | Pandoc      | 55.8      | 7.1x slower  |
+  | Prettier    | 129.6     | 16.5x slower |
 
 ### Math Document (29 KB)
 
   | Formatter   | Time (ms) | vs panache   |
   | ----------- | --------- | ------------ |
-  | **panache** | **8.7**   | baseline     |
-  | Prettier    | 143.7     | 16.4x slower |
-  | Pandoc      | 48.1      | 5.5x slower  |
+  | **panache** | **5.3**   | baseline     |
+  | rumdl       | 22.1      | 4.1x slower  |
+  | Pandoc      | 41.1      | 7.7x slower  |
+  | Prettier    | 140.5     | 26.4x slower |
 
 ### Large Document (30 KB)
 
   | Formatter   | Time (ms) | vs panache   |
   | ----------- | --------- | ------------ |
-  | **panache** | **5.8**   | baseline     |
-  | Prettier    | 133.9     | 23.0x slower |
-  | Pandoc      | 56.6      | 9.7x slower  |
+  | **panache** | **3.4**   | baseline     |
+  | rumdl       | 20.4      | 6.0x slower  |
+  | Pandoc      | 52.7      | 15.4x slower |
+  | Prettier    | 134.6     | 39.5x slower |
 
 ## Key Takeaways
 
 ### 🚀 Faster Than Alternatives
 
-- **12-23x faster than Prettier** - Zero Node.js startup overhead
-- **2.5-10x faster than Pandoc** - Optimized for formatting (Pandoc is
+- **17-40x faster than Prettier** - Zero Node.js startup overhead
+- **4-15x faster than Pandoc** - Optimized for formatting (Pandoc is
   general-purpose)
+- **2-6x faster than rumdl** - Another Rust-native markdown tool, but with a
+  different design focus
 - **Sub-10ms formatting** - Imperceptible latency for on-save formatting
 
 ### ⚡ Consistent Performance
 
-panache maintains consistent \~8-9ms formatting time across document sizes (9-30
+panache maintains consistent \~3-8ms formatting time across document sizes (1-30
 KB), suggesting excellent algorithmic efficiency. The parser and formatter scale
 well.
 
@@ -99,7 +107,16 @@ panache remains faster.
 Pandoc is a general-purpose document converter supporting 40+ formats. panache
 is specialized for markdown/Quarto formatting, enabling focused optimizations.
 Pandoc remains the gold standard for syntax correctness, but panache delivers
-3-10x faster formatting.
+4-15x faster formatting.
+
+### 🦀 What About rumdl?
+
+[rumdl](https://github.com/rvben/rumdl) is another Rust-native markdown tool,
+primarily a linter that also offers formatting via `rumdl fmt`. Both tools
+benefit from native compilation and zero startup overhead, so the gap is much
+smaller than with Node.js- or Haskell-based alternatives. panache is still 2-6x
+faster on these documents, reflecting its narrower focus on formatting
+Quarto/Pandoc markdown.
 
 ## Reproducing Benchmarks
 

@@ -17,6 +17,7 @@ NC='\033[0m'
 # Check what formatters are available
 HAVE_PRETTIER=$(command -v prettier >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_PANDOC=$(command -v pandoc >/dev/null 2>&1 && echo "yes" || echo "no")
+HAVE_RUMDL=$(command -v rumdl >/dev/null 2>&1 && echo "yes" || echo "no")
 
 echo "================================"
 echo "Multi-Formatter Benchmark"
@@ -26,6 +27,7 @@ echo "Available formatters:"
 echo "  panache: yes (building...)"
 [ "$HAVE_PRETTIER" = "yes" ] && echo "  prettier: yes ($(prettier --version))"
 [ "$HAVE_PANDOC" = "yes" ] && echo "  pandoc: yes ($(pandoc --version | head -1 | cut -d' ' -f2))"
+[ "$HAVE_RUMDL" = "yes" ] && echo "  rumdl: yes ($(rumdl --version | awk '{print $2}'))"
 echo
 
 # Build panache
@@ -100,6 +102,16 @@ benchmark_document() {
         printf "%8s µs (%6s ms) - panache is %sx faster\n" "$pandoc_time" "$pandoc_ms" "$speedup"
     fi
 
+    # Benchmark rumdl if available
+    if [ "$HAVE_RUMDL" = "yes" ]; then
+        echo -ne "${BLUE}rumdl:${NC}      "
+        local rumdl_time=$(benchmark_formatter "rumdl" "$file" "$iterations" \
+            "rumdl fmt --fix --stdin --no-cache --silent < $DOCS_DIR/$file")
+        local rumdl_ms=$(awk "BEGIN {printf \"%.2f\", $rumdl_time / 1000}")
+        local speedup=$(awk "BEGIN {printf \"%.1f\", $rumdl_time / $panache_time}")
+        printf "%8s µs (%6s ms) - panache is %sx faster\n" "$rumdl_time" "$rumdl_ms" "$speedup"
+    fi
+
     echo
 
     # Save to results file
@@ -108,6 +120,7 @@ benchmark_document() {
         echo "- panache: ${panache_time}µs (${panache_ms}ms)"
         [ "$HAVE_PRETTIER" = "yes" ] && echo "- prettier: ${prettier_time}µs (${prettier_ms}ms)"
         [ "$HAVE_PANDOC" = "yes" ] && echo "- pandoc: ${pandoc_time}µs (${pandoc_ms}ms)"
+        [ "$HAVE_RUMDL" = "yes" ] && echo "- rumdl: ${rumdl_time}µs (${rumdl_ms}ms)"
         echo
     } >> "$RESULTS_FILE"
 }
