@@ -12,7 +12,7 @@ website:
     more efficiently.
 
   site-url: "https://panache.bz"
-  repo-url: "https://github.com/jolars/panache"
+  repo-url: "https://github.com/jolars/panache/docs"
   issue-url: "https://github.com/jolars/panache/issues"
 
   repo-actions: [edit, issue]
