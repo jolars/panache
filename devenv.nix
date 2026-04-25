@@ -11,6 +11,7 @@
     pkgs.cargo-llvm-cov
     pkgs.cargo-audit
     pkgs.cargo-deny
+    pkgs.cargo-machete
     pkgs.cmark
     pkgs.go-task
     pkgs.jarl
@@ -43,7 +44,9 @@
     rust = {
       enable = true;
 
-      toolchainFile = ./rust-toolchain.toml;
+      channel = "stable";
+      version = "1.94.1";
+      targets = [ "wasm32-unknown-unknown" ];
     };
 
     javascript = {
