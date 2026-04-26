@@ -375,17 +375,38 @@ fn load_config_for_cli(
 }
 
 fn color_enabled(mode: ColorMode, no_color: bool) -> bool {
-    if no_color {
+    resolve_color(
+        mode,
+        no_color,
+        std::env::var_os("NO_COLOR").is_some(),
+        std::env::var_os("TERM").as_deref(),
+        io::stdout().is_terminal(),
+    )
+}
+
+fn resolve_color(
+    mode: ColorMode,
+    no_color_flag: bool,
+    no_color_env: bool,
+    term_env: Option<&std::ffi::OsStr>,
+    stdout_is_terminal: bool,
+) -> bool {
+    if no_color_flag {
         return false;
     }
     match mode {
         ColorMode::Always => true,
         ColorMode::Never => false,
         ColorMode::Auto => {
-            if std::env::var_os("NO_COLOR").is_some() {
+            if no_color_env {
                 return false;
             }
-            io::stdout().is_terminal()
+            match term_env {
+                Some(term) if term == "dumb" => return false,
+                None => return false,
+                _ => {}
+            }
+            stdout_is_terminal
         }
     }
 }
@@ -1903,5 +1924,71 @@ fn runtime_diagnostic_from_cached(diag: &cache::CachedDiagnostic) -> panache::li
         origin,
         notes,
         fix,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ColorMode, resolve_color};
+    use std::ffi::OsStr;
+
+    #[test]
+    fn auto_disables_color_when_term_is_dumb() {
+        assert!(!resolve_color(
+            ColorMode::Auto,
+            false,
+            false,
+            Some(OsStr::new("dumb")),
+            true,
+        ));
+    }
+
+    #[test]
+    fn auto_disables_color_when_term_is_unset() {
+        assert!(!resolve_color(ColorMode::Auto, false, false, None, true));
+    }
+
+    #[test]
+    fn auto_enables_color_on_tty_with_real_term() {
+        assert!(resolve_color(
+            ColorMode::Auto,
+            false,
+            false,
+            Some(OsStr::new("xterm-256color")),
+            true,
+        ));
+    }
+
+    #[test]
+    fn auto_disables_color_when_not_a_tty() {
+        assert!(!resolve_color(
+            ColorMode::Auto,
+            false,
+            false,
+            Some(OsStr::new("xterm-256color")),
+            false,
+        ));
+    }
+
+    #[test]
+    fn always_overrides_dumb_term() {
+        assert!(resolve_color(
+            ColorMode::Always,
+            false,
+            false,
+            Some(OsStr::new("dumb")),
+            false,
+        ));
+    }
+
+    #[test]
+    fn no_color_flag_overrides_always() {
+        assert!(!resolve_color(
+            ColorMode::Always,
+            true,
+            false,
+            Some(OsStr::new("xterm-256color")),
+            true,
+        ));
     }
 }
