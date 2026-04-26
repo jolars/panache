@@ -1,0 +1,127 @@
+name: Publish PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "Target repository"
+        required: true
+        default: "pypi"
+        type: choice
+        options:
+          - pypi
+          - testpypi
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-wheels:
+    name: Build wheel ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            manylinux: auto
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            manylinux: auto
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            manylinux: musllinux_1_2
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+            manylinux: musllinux_1_2
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+            manylinux: ""
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            manylinux: ""
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            manylinux: ""
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+            manylinux: ""
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust (non-Linux)
+        if: runner.os != 'Linux'
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.1
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust artifacts
+        if: runner.os != 'Linux'
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --out dist --features cli
+          rust-toolchain: 1.94.1
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheel-${{ matrix.target }}
+          path: dist/*.whl
+
+  build-sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+
+      - name: Upload sdist artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    name: Publish to ${{ github.event.inputs.repository || 'pypi' }}
+    needs: [build-wheels, build-sdist]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v6
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish to PyPI
+        if: github.event.inputs.repository != 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Publish to TestPyPI
+        if: github.event.inputs.repository == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/

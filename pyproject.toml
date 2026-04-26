@@ -1,0 +1,36 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "panache-cli"
+description = "An LSP, formatter, and linter for Pandoc markdown, Quarto, and RMarkdown"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+authors = [{ name = "Johan Larsson", email = "johan@jolars.co" }]
+keywords = ["quarto", "pandoc", "markdown", "formatter", "language-server"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://panache.bz"
+Repository = "https://github.com/jolars/panache"
+Documentation = "https://panache.bz"
+Changelog = "https://github.com/jolars/panache/blob/main/CHANGELOG.md"
+
+[tool.maturin]
+bindings = "bin"
+features = ["cli"]
+strip = true
