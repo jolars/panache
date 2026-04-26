@@ -69,6 +69,18 @@ pub struct Cli {
     #[arg(help = "Disable colored output (equivalent to --color never)")]
     pub no_color: bool,
 
+    /// Suppress informational output
+    #[arg(short = 'q', long, global = true, help_heading = "Global options")]
+    #[arg(help = "Suppress informational output (errors and primary results still print)")]
+    #[arg(
+        long_help = "Suppress informational status messages on stdout (e.g. \"Formatted X\", \
+        \"N file left unchanged\", \"All files are correctly formatted\", \"No issues found\"). \
+        Errors are still written to stderr, and primary command output (such as formatted content \
+        when reading from stdin, lint diagnostics, JSON/Markdown reports, or the parsed CST) \
+        continues to print so that pipelines keep working."
+    )]
+    pub quiet: bool,
+
     /// Ignore all discovered configuration files
     #[arg(long, global = true, help_heading = "Global options")]
     #[arg(help = "Ignore all discovered configuration files")]
@@ -204,15 +216,6 @@ pub enum Commands {
             The output includes node kinds, text ranges, and token text."
         )]
         json: Option<PathBuf>,
-
-        /// Suppress CST output to stdout
-        #[arg(long)]
-        #[arg(help = "Do not print CST output")]
-        #[arg(
-            long_help = "Suppress CST output to stdout. Useful with --verify for smoke-testing \
-            large files without terminal spam. Verification failures still print diagnostics and exit non-zero."
-        )]
-        quiet: bool,
 
         /// Verify parser losslessness (input must equal CST text)
         #[arg(long)]

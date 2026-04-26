@@ -36,6 +36,7 @@ For help with a specific command, see: `panache help <command>`.
   Possible values: `auto`, `always`, `never`
 
 * `--no-color` — Disable colored output (equivalent to --color never)
+* `-q`, `--quiet` — Suppress informational status messages on stdout (e.g. "Formatted X", "N file left unchanged", "All files are correctly formatted", "No issues found"). Errors are still written to stderr, and primary command output (such as formatted content when reading from stdin, lint diagnostics, JSON/Markdown reports, or the parsed CST) continues to print so that pipelines keep working.
 * `--isolated` — Ignore all discovered configuration files
 * `--no-cache` — Disable all lint/format cache reads and writes for this run. Can also be enabled with PANACHE_NO_CACHE.
 * `--cache-dir <CACHE_DIR>` — Path to the cache directory for this invocation. Overrides config `cache-dir`. Can also be set with PANACHE_CACHE_DIR.
@@ -81,7 +82,6 @@ Parse a document and display its Concrete Syntax Tree (CST) for debugging and un
 ###### **Options:**
 
 * `--json <PATH>` — Write the parsed CST to the given JSON file instead of printing the debug tree. The output includes node kinds, text ranges, and token text.
-* `--quiet` — Suppress CST output to stdout. Useful with --verify for smoke-testing large files without terminal spam. Verification failures still print diagnostics and exit non-zero.
 * `--verify` — Run parser losslessness verification (input == parsed CST text). Exits with code 1 when verification fails. 
 
    Deprecated: prefer `panache debug format --checks losslessness`.

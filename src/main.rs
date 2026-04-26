@@ -670,12 +670,7 @@ fn main() -> io::Result<()> {
     init_logger(debug_log.as_deref());
 
     match cli.command {
-        Commands::Parse {
-            file,
-            json,
-            quiet,
-            verify,
-        } => {
+        Commands::Parse { file, json, verify } => {
             if verify {
                 eprintln!(
                     "Warning: `panache parse --verify` is deprecated; use `panache debug format --checks losslessness`."
@@ -715,7 +710,7 @@ fn main() -> io::Result<()> {
                 let json_output =
                     serde_json::to_string_pretty(&json_value).map_err(io::Error::other)?;
                 fs::write(json_path, json_output)?;
-            } else if !quiet {
+            } else if !cli.quiet {
                 println!("{:#?}", tree);
             }
             Ok(())
@@ -846,7 +841,9 @@ fn main() -> io::Result<()> {
                     eprintln!("Error: No supported files found");
                     std::process::exit(1);
                 }
-                println!("No supported files found");
+                if !cli.quiet {
+                    println!("No supported files found");
+                }
                 return Ok(());
             }
 
@@ -1005,13 +1002,15 @@ fn main() -> io::Result<()> {
                         let file_name = o.file_path.to_str().unwrap_or("<unknown>");
                         print_diff(file_name, &o.input, &o.output, use_color);
                         all_formatted = false;
-                    } else if expanded_files.len() == 1 {
+                    } else if expanded_files.len() == 1 && !cli.quiet {
                         println!("{} is correctly formatted", o.file_path.display());
                     }
                 } else if !verify {
                     if o.input != o.output {
                         fs::write(&o.file_path, &o.output)?;
-                        println!("Formatted {}", o.file_path.display());
+                        if !cli.quiet {
+                            println!("Formatted {}", o.file_path.display());
+                        }
                         reformatted_count += 1;
                     } else {
                         unchanged_count += 1;
@@ -1021,13 +1020,13 @@ fn main() -> io::Result<()> {
 
             if check {
                 if all_formatted {
-                    if expanded_files.len() > 1 {
+                    if expanded_files.len() > 1 && !cli.quiet {
                         println!("All {} files are correctly formatted", expanded_files.len());
                     }
                 } else {
                     std::process::exit(1);
                 }
-            } else if !verify {
+            } else if !verify && !cli.quiet {
                 if reformatted_count == 0 {
                     println!(
                         "{}",
@@ -1069,40 +1068,61 @@ fn main() -> io::Result<()> {
                 None,
             )?;
 
+            let report_clean = |message: String| {
+                if !cli.quiet {
+                    println!("{message}");
+                }
+            };
+
             if all {
                 if cfg.cache_dir.is_some() {
                     let cache_dir =
                         resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
                     let removed = remove_dir_if_exists(&cache_dir)?;
                     if removed {
-                        println!("Removed cache directory {}", cache_dir.display());
+                        report_clean(format!("Removed cache directory {}", cache_dir.display()));
                     } else {
-                        println!("No cache directory found at {}", cache_dir.display());
+                        report_clean(format!(
+                            "No cache directory found at {}",
+                            cache_dir.display()
+                        ));
                     }
                 } else if let Some(global_base) = global_cache_base_dir() {
                     let removed = remove_dir_if_exists(&global_base)?;
                     if removed {
-                        println!("Removed all cache buckets at {}", global_base.display());
+                        report_clean(format!(
+                            "Removed all cache buckets at {}",
+                            global_base.display()
+                        ));
                     } else {
-                        println!("No cache buckets found at {}", global_base.display());
+                        report_clean(format!(
+                            "No cache buckets found at {}",
+                            global_base.display()
+                        ));
                     }
                 } else {
                     let cache_dir =
                         resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
                     let removed = remove_dir_if_exists(&cache_dir)?;
                     if removed {
-                        println!("Removed cache directory {}", cache_dir.display());
+                        report_clean(format!("Removed cache directory {}", cache_dir.display()));
                     } else {
-                        println!("No cache directory found at {}", cache_dir.display());
+                        report_clean(format!(
+                            "No cache directory found at {}",
+                            cache_dir.display()
+                        ));
                     }
                 }
             } else {
                 let cache_dir = resolve_cache_dir_for_cli(&cfg, cli.config.as_deref(), &start_dir)?;
                 let removed = remove_dir_if_exists(&cache_dir)?;
                 if removed {
-                    println!("Removed cache directory {}", cache_dir.display());
+                    report_clean(format!("Removed cache directory {}", cache_dir.display()));
                 } else {
-                    println!("No cache directory found at {}", cache_dir.display());
+                    report_clean(format!(
+                        "No cache directory found at {}",
+                        cache_dir.display()
+                    ));
                 }
             }
 
@@ -1172,7 +1192,7 @@ fn main() -> io::Result<()> {
                             "{}",
                             serde_json::to_string_pretty(&output).map_err(io::Error::other)?
                         );
-                    } else {
+                    } else if !cli.quiet {
                         println!("No supported files found");
                     }
                     return Ok(());
@@ -1271,7 +1291,7 @@ fn main() -> io::Result<()> {
                     let markdown =
                         build_debug_failure_report(checks, files_checked, &collected_failures);
                     println!("{markdown}");
-                } else if failure_count == 0 {
+                } else if failure_count == 0 && !cli.quiet {
                     println!(
                         "All checks passed (checks: {}, files: {})",
                         format!("{:?}", checks).to_lowercase(),
@@ -1281,12 +1301,13 @@ fn main() -> io::Result<()> {
 
                 if dump_passes
                     && !json
+                    && !cli.quiet
                     && let Some(dir) = dump_dir.as_ref()
                 {
                     eprintln!("Wrote debug artifacts to {}", dir.display());
                 }
 
-                if failure_count > 0 && !json && !report && dump_dir.is_none() {
+                if failure_count > 0 && !json && !report && !cli.quiet && dump_dir.is_none() {
                     eprintln!(
                         "Tip: rerun with --dump-dir <DIR> --dump-passes to inspect input, parse, and format passes."
                     );
@@ -1357,7 +1378,7 @@ fn main() -> io::Result<()> {
                 merge_missing_diagnostics(&mut diagnostics, yaml_diags);
 
                 if diagnostics.is_empty() {
-                    if !check {
+                    if !check && !cli.quiet {
                         println!("No issues found");
                     }
                     return Ok(());
@@ -1420,7 +1441,9 @@ fn main() -> io::Result<()> {
                     eprintln!("Error: No supported files found");
                     std::process::exit(1);
                 }
-                println!("No supported files found");
+                if !cli.quiet {
+                    println!("No supported files found");
+                }
                 return Ok(());
             }
 
@@ -1557,11 +1580,13 @@ fn main() -> io::Result<()> {
                     if fix {
                         let fixed_output = apply_fixes(&root_doc.input, &root_doc.diagnostics);
                         fs::write(&file_path, fixed_output)?;
-                        println!(
-                            "Fixed {} issue(s) in {}",
-                            root_doc.diagnostics.len(),
-                            file_path.display()
-                        );
+                        if !cli.quiet {
+                            println!(
+                                "Fixed {} issue(s) in {}",
+                                root_doc.diagnostics.len(),
+                                file_path.display()
+                            );
+                        }
                     } else {
                         print_diagnostics(
                             &root_doc.diagnostics,
@@ -1594,7 +1619,7 @@ fn main() -> io::Result<()> {
                 cache_ref.save_if_dirty()?;
             }
 
-            if !any_issues && !check {
+            if !any_issues && !check && !cli.quiet {
                 println!("No issues found in {} file(s)", expanded_files.len());
             }
 

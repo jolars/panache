@@ -533,3 +533,99 @@ fn test_format_ignores_unwritable_global_cache_dir() {
     restore.set_mode(0o700);
     fs::set_permissions(&cache_home, restore).unwrap();
 }
+
+#[test]
+fn test_format_quiet_suppresses_reformatted_message() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n\nParagraph.").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", "--quiet", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let content = fs::read_to_string(&test_file).unwrap();
+    assert!(content.contains("# Heading"));
+}
+
+#[test]
+fn test_format_quiet_short_alias() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", "-q", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+}
+
+#[test]
+fn test_format_quiet_suppresses_unchanged_summary() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", "--quiet", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+}
+
+#[test]
+fn test_format_quiet_check_suppresses_correctly_formatted() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", "--check", "--quiet", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+}
+
+#[test]
+fn test_format_quiet_check_still_prints_diff_on_failure() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(
+        &test_file,
+        "# Heading\n\nThis is a very long line that exceeds the default line width of 80 characters and should be wrapped when formatted.",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["format", "--check", "--quiet", test_file.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("Diff in"));
+}
+
+#[test]
+fn test_format_quiet_stdin_still_outputs_formatted_content() {
+    cargo_bin_cmd!("panache")
+        .args(["format", "--quiet"])
+        .write_stdin("# Heading\n\nParagraph.")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("# Heading"))
+        .stdout(predicate::str::contains("Paragraph."));
+}
+
+#[test]
+fn test_format_quiet_global_flag_before_subcommand() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n\nParagraph.\n").unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args(["--quiet", "format", test_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+}
