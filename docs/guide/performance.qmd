@@ -162,6 +162,93 @@ html`${data.documents.map(doc => {
 })}`
 ```
 
+## Directory-scale formatting
+
+The numbers above measure single-document formatting. In real projects, you
+format hundreds of files in one invocation -- on save across a workspace, in
+pre-commit, or in CI. Panache parallelises file-level work across CPU cores when
+given more than one file (controlled via `--jobs`, defaulting to the machine's
+parallelism).
+
+The benchmark below formats every Markdown file in this repository (`*.md`,
+currently `${multifile.corpus.file_count}` files) in a single invocation per
+tool. Each tool runs end-to-end against the same corpus, re-staged from disk
+between samples. Pandoc is excluded -- it has no batch mode, so a fair
+comparison would mostly measure shell-loop overhead.
+
+```{bash}
+#| label: run-multifile
+#| echo: false
+#| output: false
+
+cd ../..
+bash benches/compare_multifile.sh --out docs/guide/performance_multifile_data.json
+```
+
+```{ojs}
+//| echo: false
+
+multifile = FileAttachment("performance_multifile_data.json").json()
+```
+
+```{ojs}
+//| echo: false
+
+multifileToolLabel = ({
+  "panache-jobs1": "panache --jobs 1 (serial)",
+  "panache-jobs0": "panache --jobs 0 (auto)",
+  prettier: "prettier",
+  rumdl: "rumdl"
+})
+multifileResults = multifile.results
+  .filter(r => !r.failed && r.mean_ms != null)
+  .map(r => ({...r, label: multifileToolLabel[r.tool] ?? r.tool}))
+multifileBaseline = multifileResults.find(r => r.tool === "panache-jobs0")?.mean_ms
+```
+
+```{ojs}
+//| echo: false
+
+Plot.plot({
+  marginLeft: 200,
+  marginBottom: 50,
+  height: 240,
+  x: {label: "Mean time (ms, log)", type: "log"},
+  y: {label: null},
+  color: {legend: false},
+  marks: [
+    Plot.barX(multifileResults, {
+      x: "mean_ms",
+      y: "label",
+      fill: d => d.tool.startsWith("panache") ? "#2a9d8f" : "#264653",
+      sort: {y: "x"}
+    }),
+    Plot.ruleX([1])
+  ]
+})
+```
+
+```{ojs}
+//| echo: false
+
+multifileTable = multifileResults
+  .slice()
+  .sort((a, b) => a.mean_ms - b.mean_ms)
+  .map(r => ({
+    Tool: r.label,
+    "Mean (ms)": r.mean_ms.toFixed(1),
+    "vs panache --jobs 0": r.tool === "panache-jobs0"
+      ? "baseline"
+      : `${(r.mean_ms / multifileBaseline).toFixed(2)}x slower`,
+    Runs: r.runs
+  }))
+Inputs.table(multifileTable, {rows: multifileTable.length})
+```
+
+`panache --jobs 0` parallelises across all available cores; `--jobs 1` keeps the
+outer loop serial (the pre-parallelism baseline). The gap between the two shows
+the speedup file-level parallelism contributes on this corpus.
+
 ## Key Takeaways
 
 ### 🚀 Faster Than Alternatives
