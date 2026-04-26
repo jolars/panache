@@ -1,13 +1,5 @@
 # Changelog
 
-## [2.39.0](https://github.com/jolars/panache/compare/v2.38.0...v2.39.0) (2026-04-26)
-
-### Features
-- **cli:** add `--quiet` command to suppress output ([`78818a1`](https://github.com/jolars/panache/commit/78818a18caace649d8eb064c1d5530c78b69a4e4)), closes [#221](https://github.com/jolars/panache/issues/221)
-- **cli:** lint and format in parallel ([`c7560a0`](https://github.com/jolars/panache/commit/c7560a0fc3b68b694c7193dcb1a871537be1f1d4))
-
-### Bug Fixes
-- **cli:** disable color mode when `TERM=dumb` ([`eb8f12a`](https://github.com/jolars/panache/commit/eb8f12ab66e77d894cfe7c6b4488dfadcfb6f643)), fixes [#222](https://github.com/jolars/panache/issues/222)
 ## [2.38.0](https://github.com/jolars/panache/compare/v2.37.0...v2.38.0) (2026-04-24)
 
 ### Features

@@ -1,11 +1,11 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "85ed34d02eb1b8cf16c4e417cc267c1c7bf43858",
+  "baseline-sha": "6e51f14377597b8c145354823c066ab567ead64d",
   "release-targets": [
     {
       "path": ".",
-      "version": "2.39.0",
-      "tag": "v2.39.0"
+      "version": "2.38.0",
+      "tag": "v2.38.0"
     },
     {
       "path": "crates/panache-formatter",
