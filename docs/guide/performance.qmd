@@ -186,12 +186,14 @@ bash benches/compare_multifile.sh --out docs/guide/performance_multifile_data.js
 ```
 
 ```{ojs}
+//| label: load-multifile-data
 //| echo: false
 
 multifile = FileAttachment("performance_multifile_data.json").json()
 ```
 
 ```{ojs}
+//| label: prepare-multifile-results
 //| echo: false
 
 multifileToolLabel = ({
@@ -207,6 +209,7 @@ multifileBaseline = multifileResults.find(r => r.tool === "panache-jobs0")?.mean
 ```
 
 ```{ojs}
+//| label: plot-multifile-results
 //| echo: false
 
 Plot.plot({
@@ -229,6 +232,7 @@ Plot.plot({
 ```
 
 ```{ojs}
+//| label: render-multifile-table
 //| echo: false
 
 multifileTable = multifileResults
