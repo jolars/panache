@@ -375,12 +375,21 @@ fn generate_man_pages() -> Result<()> {
         let mut buffer = Vec::new();
         man.render(&mut buffer)?;
 
-        // Post-process to fix nested subcommand references
+        // Post-process: fix NAME, SYNOPSIS, and nested subcommand references
         let content = String::from_utf8_lossy(&buffer);
-        let fixed_content = content.replace(
-            &format!("{}\\-", subcommand_name),
-            &format!("panache\\-{}\\-", subcommand_name),
-        );
+        let fixed_content = content
+            .replace(
+                &format!("{} \\-", subcommand_name),
+                &format!("{} \\-", name),
+            )
+            .replace(
+                &format!("\\fB{}\\fR", subcommand_name),
+                &format!("\\fBpanache {}\\fR", subcommand_name),
+            )
+            .replace(
+                &format!("{}\\-", subcommand_name),
+                &format!("panache\\-{}\\-", subcommand_name),
+            );
 
         fs::write(
             out_dir.join(format!("{}.1", name)),
