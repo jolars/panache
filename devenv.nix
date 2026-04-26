@@ -31,6 +31,7 @@
     pkgs.yamlfmt
     pkgs.go
     pkgs.vsce
+    pkgs.maturin
     (pkgs.rWrapper.override {
       packages = with pkgs.rPackages; [
         knitr
