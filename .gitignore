@@ -21,6 +21,10 @@ result-*
 
 /target
 
+# maturin / Python wheel build outputs
+/dist
+*.egg-info
+
 # Coverage files
 lcov.info
 
