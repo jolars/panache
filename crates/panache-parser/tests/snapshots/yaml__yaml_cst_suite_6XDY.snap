@@ -1,19 +1,19 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
 expression: snapshot
 ---
-case_id: 52DL
-input: "---\n! a\n"
+case_id: 6XDY
+input: "---\n---\n"
 diagnostics:
 
 cst:
 DOCUMENT@0..8
   YAML_METADATA_CONTENT@0..8
     YAML_STREAM@0..8
-      YAML_DOCUMENT@0..8
+      YAML_DOCUMENT@0..4
         YAML_DOCUMENT_START@0..3 "---"
         NEWLINE@3..4 "\n"
-        YAML_TAG@4..5 "!"
-        WHITESPACE@5..6 " "
-        YAML_SCALAR@6..7 "a"
+      YAML_DOCUMENT@4..8
+        YAML_DOCUMENT_START@4..7 "---"
         NEWLINE@7..8 "\n"

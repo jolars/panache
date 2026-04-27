@@ -9,20 +9,22 @@ diagnostics:
 cst:
 DOCUMENT@0..58
   YAML_METADATA_CONTENT@0..58
-    YAML_BLOCK_MAP@0..58
-      YAML_BLOCK_MAP_ENTRY@0..33
-        YAML_BLOCK_MAP_KEY@0..29
-          YAML_KEY@0..28 "\"foo\\nbar:baz\\tx \\\\$% ..."
-          YAML_COLON@28..29 ":"
-        YAML_BLOCK_MAP_VALUE@29..32
-          WHITESPACE@29..30 " "
-          YAML_SCALAR@30..32 "23"
-        NEWLINE@32..33 "\n"
-      YAML_BLOCK_MAP_ENTRY@33..58
-        YAML_BLOCK_MAP_KEY@33..54
-          YAML_KEY@33..53 "'x\\ny:z\\tx $%^&*()x'"
-          YAML_COLON@53..54 ":"
-        YAML_BLOCK_MAP_VALUE@54..57
-          WHITESPACE@54..55 " "
-          YAML_SCALAR@55..57 "24"
-        NEWLINE@57..58 "\n"
+    YAML_STREAM@0..58
+      YAML_DOCUMENT@0..58
+        YAML_BLOCK_MAP@0..58
+          YAML_BLOCK_MAP_ENTRY@0..33
+            YAML_BLOCK_MAP_KEY@0..29
+              YAML_KEY@0..28 "\"foo\\nbar:baz\\tx \\\\$% ..."
+              YAML_COLON@28..29 ":"
+            YAML_BLOCK_MAP_VALUE@29..32
+              WHITESPACE@29..30 " "
+              YAML_SCALAR@30..32 "23"
+            NEWLINE@32..33 "\n"
+          YAML_BLOCK_MAP_ENTRY@33..58
+            YAML_BLOCK_MAP_KEY@33..54
+              YAML_KEY@33..53 "'x\\ny:z\\tx $%^&*()x'"
+              YAML_COLON@53..54 ":"
+            YAML_BLOCK_MAP_VALUE@54..57
+              WHITESPACE@54..55 " "
+              YAML_SCALAR@55..57 "24"
+            NEWLINE@57..58 "\n"

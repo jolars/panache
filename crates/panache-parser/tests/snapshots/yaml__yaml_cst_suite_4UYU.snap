@@ -9,6 +9,8 @@ diagnostics:
 cst:
 DOCUMENT@0..18
   YAML_METADATA_CONTENT@0..18
-    YAML_BLOCK_MAP@0..18
-      YAML_SCALAR@0..17 "\"foo: bar\\\": baz\""
-      NEWLINE@17..18 "\n"
+    YAML_STREAM@0..18
+      YAML_DOCUMENT@0..18
+        YAML_BLOCK_MAP@0..18
+          YAML_SCALAR@0..17 "\"foo: bar\\\": baz\""
+          NEWLINE@17..18 "\n"

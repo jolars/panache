@@ -142,19 +142,21 @@ pub enum SyntaxKind {
     // YAML nodes
     YAML_METADATA,
     YAML_METADATA_CONTENT,    // Content lines inside YAML metadata block
-    YAML_BLOCK_MAP,           // YAML block mapping container (prototype shadow parser)
-    YAML_BLOCK_MAP_ENTRY,     // YAML block mapping entry (key: value)
-    YAML_BLOCK_MAP_KEY,       // YAML block mapping key wrapper
-    YAML_BLOCK_MAP_VALUE,     // YAML block mapping value wrapper
-    YAML_FLOW_MAP,            // YAML flow mapping container ({key: value, ...})
-    YAML_FLOW_MAP_ENTRY,      // YAML flow mapping entry
-    YAML_FLOW_MAP_KEY,        // YAML flow mapping key wrapper
-    YAML_FLOW_MAP_VALUE,      // YAML flow mapping value wrapper
-    YAML_FLOW_SEQUENCE,       // YAML flow sequence container ([a, b, ...])
-    YAML_FLOW_SEQUENCE_ITEM,  // YAML flow sequence item wrapper
-    YAML_BLOCK_SEQUENCE,      // YAML block sequence container (- item ...)
+    YAML_STREAM, // Shadow parser only: YAML 1.2 stream wrapper (zero or more YAML_DOCUMENT children + trivia)
+    YAML_DOCUMENT, // Shadow parser only: a single YAML document (markers + body)
+    YAML_BLOCK_MAP, // YAML block mapping container (prototype shadow parser)
+    YAML_BLOCK_MAP_ENTRY, // YAML block mapping entry (key: value)
+    YAML_BLOCK_MAP_KEY, // YAML block mapping key wrapper
+    YAML_BLOCK_MAP_VALUE, // YAML block mapping value wrapper
+    YAML_FLOW_MAP, // YAML flow mapping container ({key: value, ...})
+    YAML_FLOW_MAP_ENTRY, // YAML flow mapping entry
+    YAML_FLOW_MAP_KEY, // YAML flow mapping key wrapper
+    YAML_FLOW_MAP_VALUE, // YAML flow mapping value wrapper
+    YAML_FLOW_SEQUENCE, // YAML flow sequence container ([a, b, ...])
+    YAML_FLOW_SEQUENCE_ITEM, // YAML flow sequence item wrapper
+    YAML_BLOCK_SEQUENCE, // YAML block sequence container (- item ...)
     YAML_BLOCK_SEQUENCE_ITEM, // YAML block sequence item wrapper
-    YAML_BLOCK_SEQ_ENTRY,     // YAML block sequence entry marker (-)
+    YAML_BLOCK_SEQ_ENTRY, // YAML block sequence entry marker (-)
 
     PANDOC_TITLE_BLOCK,
     MMD_TITLE_BLOCK,

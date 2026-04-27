@@ -653,3 +653,21 @@ fn yaml_flat_map_with_empty_value_projected_events() {
         ]
     );
 }
+
+/// Pins the post-PR-C empty-stream contract: inputs that contain only
+/// trivia (comments / whitespace / a bare `...` marker) produce a
+/// `YAML_STREAM` with no `YAML_DOCUMENT` children, which the events
+/// projection emits as just `+STR -STR`. Regressing this would re-introduce
+/// the comment-only-document bug fixed at the start of the shadow parser
+/// refactor sequence.
+#[test]
+fn yaml_empty_stream_projects_no_document_events() {
+    for input in ["# Comment only.\n", "...\n", "# comment\n...\n"] {
+        let events = project_events(input);
+        assert_eq!(
+            events,
+            vec!["+STR", "-STR"],
+            "input {input:?} should project to an empty stream"
+        );
+    }
+}

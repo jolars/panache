@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 955
 expression: snapshot
 ---
 case_id: QT73
@@ -10,7 +9,7 @@ diagnostics:
 cst:
 DOCUMENT@0..14
   YAML_METADATA_CONTENT@0..14
-    YAML_BLOCK_MAP@0..14
+    YAML_STREAM@0..14
       YAML_COMMENT@0..9 "# comment"
       NEWLINE@9..10 "\n"
       YAML_DOCUMENT_END@10..13 "..."

@@ -9,20 +9,22 @@ diagnostics:
 cst:
 DOCUMENT@0..30
   YAML_METADATA_CONTENT@0..30
-    YAML_BLOCK_MAP@0..30
-      YAML_BLOCK_MAP_ENTRY@0..15
-        YAML_BLOCK_MAP_KEY@0..7
-          YAML_KEY@0..6 "single"
-          YAML_COLON@6..7 ":"
-        YAML_BLOCK_MAP_VALUE@7..14
-          WHITESPACE@7..8 " "
-          YAML_SCALAR@8..14 "'text'"
-        NEWLINE@14..15 "\n"
-      YAML_BLOCK_MAP_ENTRY@15..30
-        YAML_BLOCK_MAP_KEY@15..22
-          YAML_KEY@15..21 "double"
-          YAML_COLON@21..22 ":"
-        YAML_BLOCK_MAP_VALUE@22..29
-          WHITESPACE@22..23 " "
-          YAML_SCALAR@23..29 "\"text\""
-        NEWLINE@29..30 "\n"
+    YAML_STREAM@0..30
+      YAML_DOCUMENT@0..30
+        YAML_BLOCK_MAP@0..30
+          YAML_BLOCK_MAP_ENTRY@0..15
+            YAML_BLOCK_MAP_KEY@0..7
+              YAML_KEY@0..6 "single"
+              YAML_COLON@6..7 ":"
+            YAML_BLOCK_MAP_VALUE@7..14
+              WHITESPACE@7..8 " "
+              YAML_SCALAR@8..14 "'text'"
+            NEWLINE@14..15 "\n"
+          YAML_BLOCK_MAP_ENTRY@15..30
+            YAML_BLOCK_MAP_KEY@15..22
+              YAML_KEY@15..21 "double"
+              YAML_COLON@21..22 ":"
+            YAML_BLOCK_MAP_VALUE@22..29
+              WHITESPACE@22..23 " "
+              YAML_SCALAR@23..29 "\"text\""
+            NEWLINE@29..30 "\n"

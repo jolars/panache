@@ -1,0 +1,34 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: S4JQ
+input: "# Assuming conventional resolution:\n- \"12\"\n- 12\n- ! 12\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..55
+  YAML_METADATA_CONTENT@0..55
+    YAML_STREAM@0..55
+      YAML_COMMENT@0..35 "# Assuming convention ..."
+      NEWLINE@35..36 "\n"
+      YAML_DOCUMENT@36..55
+        YAML_BLOCK_SEQUENCE@36..55
+          YAML_BLOCK_SEQUENCE_ITEM@36..43
+            YAML_BLOCK_SEQ_ENTRY@36..37 "-"
+            WHITESPACE@37..38 " "
+            YAML_SCALAR@38..42 "\"12\""
+            NEWLINE@42..43 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@43..48
+            YAML_BLOCK_SEQ_ENTRY@43..44 "-"
+            WHITESPACE@44..45 " "
+            YAML_SCALAR@45..47 "12"
+            NEWLINE@47..48 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@48..55
+            YAML_BLOCK_SEQ_ENTRY@48..49 "-"
+            WHITESPACE@49..50 " "
+            YAML_TAG@50..51 "!"
+            WHITESPACE@51..52 " "
+            YAML_SCALAR@52..54 "12"
+            NEWLINE@54..55 "\n"

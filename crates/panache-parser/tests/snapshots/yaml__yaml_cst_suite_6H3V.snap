@@ -9,12 +9,14 @@ diagnostics:
 cst:
 DOCUMENT@0..18
   YAML_METADATA_CONTENT@0..18
-    YAML_BLOCK_MAP@0..18
-      YAML_BLOCK_MAP_ENTRY@0..18
-        YAML_BLOCK_MAP_KEY@0..12
-          YAML_KEY@0..11 "'foo: bar\\'"
-          YAML_COLON@11..12 ":"
-        YAML_BLOCK_MAP_VALUE@12..17
-          WHITESPACE@12..13 " "
-          YAML_SCALAR@13..17 "baz'"
-        NEWLINE@17..18 "\n"
+    YAML_STREAM@0..18
+      YAML_DOCUMENT@0..18
+        YAML_BLOCK_MAP@0..18
+          YAML_BLOCK_MAP_ENTRY@0..18
+            YAML_BLOCK_MAP_KEY@0..12
+              YAML_KEY@0..11 "'foo: bar\\'"
+              YAML_COLON@11..12 ":"
+            YAML_BLOCK_MAP_VALUE@12..17
+              WHITESPACE@12..13 " "
+              YAML_SCALAR@13..17 "baz'"
+            NEWLINE@17..18 "\n"

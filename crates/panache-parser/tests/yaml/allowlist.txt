@@ -131,3 +131,17 @@ Q88A
 HWV9
 # Comment followed by document-end marker yields no DOC events.
 QT73
+# Block sequence with tagged scalars and a leading-space top-level indent.
+2AUY
+# Two bare document-start markers yielding two empty documents.
+6XDY
+# Bare scalar document, `...` end marker, then a new implicit-start document.
+7Z25
+# Two block-sequence documents separated by `---` with stream-level comments.
+JHB9
+# Document start marker on the last line yields a trailing empty document.
+PUW8
+# Block sequence including a tag-only-bang scalar (`! 12`) with a leading comment.
+S4JQ
+# Two-document stream of block maps separated by `---`/`...` markers.
+U9NS

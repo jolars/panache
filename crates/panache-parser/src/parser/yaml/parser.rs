@@ -369,8 +369,9 @@ fn emit_scalar_document<'a>(
     while *i < tokens.len() {
         let kind = match tokens[*i].kind {
             YamlToken::Newline => SyntaxKind::NEWLINE,
-            YamlToken::DocumentStart => SyntaxKind::YAML_DOCUMENT_START,
-            YamlToken::DocumentEnd => SyntaxKind::YAML_DOCUMENT_END,
+            // Document boundaries close the scalar body; the stream loop will
+            // emit them at the YAML_DOCUMENT level.
+            YamlToken::DocumentStart | YamlToken::DocumentEnd => break,
             YamlToken::Tag => SyntaxKind::YAML_TAG,
             YamlToken::Comment => SyntaxKind::YAML_COMMENT,
             YamlToken::Whitespace => SyntaxKind::WHITESPACE,
@@ -406,14 +407,9 @@ fn emit_block_seq<'a>(
                 builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
                 *i += 1;
             }
-            YamlToken::DocumentStart => {
-                builder.token(SyntaxKind::YAML_DOCUMENT_START.into(), tokens[*i].text);
-                *i += 1;
-            }
-            YamlToken::DocumentEnd => {
-                builder.token(SyntaxKind::YAML_DOCUMENT_END.into(), tokens[*i].text);
-                *i += 1;
-            }
+            // Document boundaries close the body; the stream loop will pick
+            // them up at the YAML_DOCUMENT level.
+            YamlToken::DocumentStart | YamlToken::DocumentEnd => break,
             YamlToken::Whitespace => {
                 // Between-item indentation in a nested sequence.
                 builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
@@ -494,14 +490,9 @@ fn emit_block_map<'a>(
                 builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
                 *i += 1;
             }
-            YamlToken::DocumentStart => {
-                builder.token(SyntaxKind::YAML_DOCUMENT_START.into(), tokens[*i].text);
-                *i += 1;
-            }
-            YamlToken::DocumentEnd => {
-                builder.token(SyntaxKind::YAML_DOCUMENT_END.into(), tokens[*i].text);
-                *i += 1;
-            }
+            // Document boundaries close the body; the stream loop picks them
+            // up at the YAML_DOCUMENT level.
+            YamlToken::DocumentStart | YamlToken::DocumentEnd => break,
             YamlToken::Directive | YamlToken::Comma => {
                 builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
                 *i += 1;
@@ -799,63 +790,199 @@ pub fn parse_yaml_report(input: &str) -> YamlParseReport {
         };
     }
 
-    let is_sequence = tokens
-        .iter()
-        .find(|t| {
-            !matches!(
-                t.kind,
-                YamlToken::Newline
-                    | YamlToken::Whitespace
-                    | YamlToken::Comment
-                    | YamlToken::DocumentStart
-                    | YamlToken::DocumentEnd
-                    | YamlToken::Directive
-            )
-        })
-        .is_some_and(|t| t.kind == YamlToken::BlockSeqEntry);
-
-    // Scalar document with an explicit tag (e.g. `! a`, `!!str foo`): the token
-    // stream has a Tag but no Colon and no BlockSeqEntry, so emit_block_map's
-    // key/colon expectation would reject it. Tagless scalar documents still go
-    // through emit_block_map to keep existing CST shapes unchanged.
-    let has_colon = tokens.iter().any(|t| t.kind == YamlToken::Colon);
-    let has_tag = tokens.iter().any(|t| t.kind == YamlToken::Tag);
-    let is_scalar_document = !is_sequence && !has_colon && has_tag;
-
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(SyntaxKind::DOCUMENT.into());
     builder.start_node(SyntaxKind::YAML_METADATA_CONTENT.into());
-    let mut i = 0usize;
-    if is_sequence {
-        builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE.into());
-        if let Err(err) = emit_block_seq(&mut builder, &tokens, &mut i, false) {
-            return YamlParseReport {
-                tree: None,
-                diagnostics: vec![err],
-            };
-        }
-        builder.finish_node(); // YAML_BLOCK_SEQUENCE
-    } else if is_scalar_document {
-        if let Err(err) = emit_scalar_document(&mut builder, &tokens, &mut i) {
-            return YamlParseReport {
-                tree: None,
-                diagnostics: vec![err],
-            };
-        }
-    } else {
-        builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
-        if let Err(err) = emit_block_map(&mut builder, &tokens, &mut i, false) {
-            return YamlParseReport {
-                tree: None,
-                diagnostics: vec![err],
-            };
-        }
-        builder.finish_node(); // YAML_BLOCK_MAP
+    builder.start_node(SyntaxKind::YAML_STREAM.into());
+    if let Err(err) = parse_stream(&mut builder, &tokens) {
+        return YamlParseReport {
+            tree: None,
+            diagnostics: vec![err],
+        };
     }
+    builder.finish_node(); // YAML_STREAM
     builder.finish_node(); // YAML_METADATA_CONTENT
     builder.finish_node(); // DOCUMENT
     YamlParseReport {
         tree: Some(SyntaxNode::new_root(builder.finish())),
         diagnostics: Vec::new(),
     }
+}
+
+/// Outer stream loop. Walks every token and emits zero or more `YAML_DOCUMENT`
+/// nodes interleaved with stream-level trivia (newlines, whitespace, comments,
+/// and bare `...` markers that don't bracket a document body).
+fn parse_stream<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+) -> Result<(), YamlDiagnostic> {
+    let mut i = 0usize;
+    while i < tokens.len() {
+        match tokens[i].kind {
+            YamlToken::Newline => {
+                builder.token(SyntaxKind::NEWLINE.into(), tokens[i].text);
+                i += 1;
+            }
+            YamlToken::Whitespace => {
+                builder.token(SyntaxKind::WHITESPACE.into(), tokens[i].text);
+                i += 1;
+            }
+            YamlToken::Comment => {
+                builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[i].text);
+                i += 1;
+            }
+            // Indent/Dedent are zero-width balance markers from the lexer.
+            // If they leak out of a body emitter (e.g. trailing Dedent at
+            // end of input), absorb them silently — they carry no bytes.
+            YamlToken::Indent | YamlToken::Dedent => {
+                i += 1;
+            }
+            // Bare `...` at stream level — no preceding document body, no
+            // following body before another `...`/EOF — is stream-level
+            // trivia, not its own document.
+            YamlToken::DocumentEnd if !document_follows(tokens, i + 1) => {
+                builder.token(SyntaxKind::YAML_DOCUMENT_END.into(), tokens[i].text);
+                i += 1;
+            }
+            _ => {
+                builder.start_node(SyntaxKind::YAML_DOCUMENT.into());
+                emit_document(builder, tokens, &mut i)?;
+                builder.finish_node(); // YAML_DOCUMENT
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Returns `true` if the tokens at or after `start` contain any
+/// document-defining token (directive, doc-start, body content, doc-end). We
+/// use this to decide whether a bare `...` is "the end of nothing" (stream
+/// trivia) or actually closes a document yet to come (still trivia, just at
+/// stream level).
+fn document_follows(tokens: &[YamlTokenSpan<'_>], start: usize) -> bool {
+    tokens[start..].iter().any(|t| {
+        !matches!(
+            t.kind,
+            YamlToken::Newline
+                | YamlToken::Whitespace
+                | YamlToken::Comment
+                | YamlToken::DocumentEnd
+        )
+    })
+}
+
+/// Emit a single `YAML_DOCUMENT`. Optionally consumes leading directives and a
+/// `---` marker, dispatches to the body emitter, then optionally consumes a
+/// trailing `...` marker. Each phase is forgiving: an absent `---`, absent
+/// `...`, or empty body is fine.
+fn emit_document<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Result<(), YamlDiagnostic> {
+    // Phase 1: optional directives + `---` marker (with intervening trivia).
+    let mut saw_marker = false;
+    while *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlToken::Directive => {
+                builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Newline => {
+                builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Whitespace => {
+                builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Comment => {
+                builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::DocumentStart => {
+                builder.token(SyntaxKind::YAML_DOCUMENT_START.into(), tokens[*i].text);
+                *i += 1;
+                saw_marker = true;
+                if *i < tokens.len() && tokens[*i].kind == YamlToken::Newline {
+                    builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+                    *i += 1;
+                }
+                break;
+            }
+            _ => break,
+        }
+    }
+    let _ = saw_marker;
+
+    // Phase 2: body.
+    let next_significant = tokens[*i..].iter().find(|t| {
+        !matches!(
+            t.kind,
+            YamlToken::Newline | YamlToken::Whitespace | YamlToken::Comment
+        )
+    });
+
+    let body_kind = match next_significant.map(|t| t.kind) {
+        Some(YamlToken::DocumentStart) | Some(YamlToken::DocumentEnd) | None => DocumentBody::Empty,
+        Some(YamlToken::BlockSeqEntry) => DocumentBody::BlockSequence,
+        _ => {
+            // Tagless scalar documents continue to dispatch to the block-map
+            // emitter for byte-level CST stability. Tagged scalar documents
+            // (e.g. `! a`, `!!str foo`) take the dedicated path because they
+            // lack a colon and would trip the key/colon expectation.
+            let mut has_colon = false;
+            let mut has_tag = false;
+            for tok in &tokens[*i..] {
+                match tok.kind {
+                    YamlToken::DocumentStart | YamlToken::DocumentEnd => break,
+                    YamlToken::Colon => has_colon = true,
+                    YamlToken::Tag => has_tag = true,
+                    _ => {}
+                }
+            }
+            if !has_colon && has_tag {
+                DocumentBody::Scalar
+            } else {
+                DocumentBody::BlockMap
+            }
+        }
+    };
+
+    match body_kind {
+        DocumentBody::Empty => {}
+        DocumentBody::BlockSequence => {
+            builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE.into());
+            emit_block_seq(builder, tokens, i, false)?;
+            builder.finish_node(); // YAML_BLOCK_SEQUENCE
+        }
+        DocumentBody::Scalar => emit_scalar_document(builder, tokens, i)?,
+        DocumentBody::BlockMap => {
+            builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
+            emit_block_map(builder, tokens, i, false)?;
+            builder.finish_node(); // YAML_BLOCK_MAP
+        }
+    }
+
+    // Phase 3: optional `...` marker (and its trailing newline). Trivia
+    // between the body and the marker that we did NOT consume into the body
+    // belongs to the stream, not this document, so we don't drain it here.
+    if *i < tokens.len() && tokens[*i].kind == YamlToken::DocumentEnd {
+        builder.token(SyntaxKind::YAML_DOCUMENT_END.into(), tokens[*i].text);
+        *i += 1;
+        if *i < tokens.len() && tokens[*i].kind == YamlToken::Newline {
+            builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+            *i += 1;
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum DocumentBody {
+    Empty,
+    BlockSequence,
+    BlockMap,
+    Scalar,
 }

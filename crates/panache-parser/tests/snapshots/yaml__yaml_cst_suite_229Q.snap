@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 641
 expression: snapshot
 ---
 case_id: 229Q
@@ -10,66 +9,68 @@ diagnostics:
 cst:
 DOCUMENT@0..94
   YAML_METADATA_CONTENT@0..94
-    YAML_BLOCK_SEQUENCE@0..94
-      YAML_BLOCK_SEQUENCE_ITEM@0..48
-        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
-        NEWLINE@1..2 "\n"
-        YAML_BLOCK_MAP@2..48
-          YAML_BLOCK_MAP_ENTRY@2..23
-            YAML_BLOCK_MAP_KEY@2..9
-              WHITESPACE@2..4 "  "
-              YAML_KEY@4..8 "name"
-              YAML_COLON@8..9 ":"
-            YAML_BLOCK_MAP_VALUE@9..22
-              WHITESPACE@9..10 " "
-              YAML_SCALAR@10..22 "Mark McGwire"
-            NEWLINE@22..23 "\n"
-          YAML_BLOCK_MAP_ENTRY@23..34
-            YAML_BLOCK_MAP_KEY@23..28
-              WHITESPACE@23..25 "  "
-              YAML_KEY@25..27 "hr"
-              YAML_COLON@27..28 ":"
-            YAML_BLOCK_MAP_VALUE@28..33
-              WHITESPACE@28..31 "   "
-              YAML_SCALAR@31..33 "65"
-            NEWLINE@33..34 "\n"
-          YAML_BLOCK_MAP_ENTRY@34..48
-            YAML_BLOCK_MAP_KEY@34..40
-              WHITESPACE@34..36 "  "
-              YAML_KEY@36..39 "avg"
-              YAML_COLON@39..40 ":"
-            YAML_BLOCK_MAP_VALUE@40..47
-              WHITESPACE@40..42 "  "
-              YAML_SCALAR@42..47 "0.278"
-            NEWLINE@47..48 "\n"
-      YAML_BLOCK_SEQUENCE_ITEM@48..94
-        YAML_BLOCK_SEQ_ENTRY@48..49 "-"
-        NEWLINE@49..50 "\n"
-        YAML_BLOCK_MAP@50..94
-          YAML_BLOCK_MAP_ENTRY@50..69
-            YAML_BLOCK_MAP_KEY@50..57
-              WHITESPACE@50..52 "  "
-              YAML_KEY@52..56 "name"
-              YAML_COLON@56..57 ":"
-            YAML_BLOCK_MAP_VALUE@57..68
-              WHITESPACE@57..58 " "
-              YAML_SCALAR@58..68 "Sammy Sosa"
-            NEWLINE@68..69 "\n"
-          YAML_BLOCK_MAP_ENTRY@69..80
-            YAML_BLOCK_MAP_KEY@69..74
-              WHITESPACE@69..71 "  "
-              YAML_KEY@71..73 "hr"
-              YAML_COLON@73..74 ":"
-            YAML_BLOCK_MAP_VALUE@74..79
-              WHITESPACE@74..77 "   "
-              YAML_SCALAR@77..79 "63"
-            NEWLINE@79..80 "\n"
-          YAML_BLOCK_MAP_ENTRY@80..94
-            YAML_BLOCK_MAP_KEY@80..86
-              WHITESPACE@80..82 "  "
-              YAML_KEY@82..85 "avg"
-              YAML_COLON@85..86 ":"
-            YAML_BLOCK_MAP_VALUE@86..93
-              WHITESPACE@86..88 "  "
-              YAML_SCALAR@88..93 "0.288"
-            NEWLINE@93..94 "\n"
+    YAML_STREAM@0..94
+      YAML_DOCUMENT@0..94
+        YAML_BLOCK_SEQUENCE@0..94
+          YAML_BLOCK_SEQUENCE_ITEM@0..48
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            NEWLINE@1..2 "\n"
+            YAML_BLOCK_MAP@2..48
+              YAML_BLOCK_MAP_ENTRY@2..23
+                YAML_BLOCK_MAP_KEY@2..9
+                  WHITESPACE@2..4 "  "
+                  YAML_KEY@4..8 "name"
+                  YAML_COLON@8..9 ":"
+                YAML_BLOCK_MAP_VALUE@9..22
+                  WHITESPACE@9..10 " "
+                  YAML_SCALAR@10..22 "Mark McGwire"
+                NEWLINE@22..23 "\n"
+              YAML_BLOCK_MAP_ENTRY@23..34
+                YAML_BLOCK_MAP_KEY@23..28
+                  WHITESPACE@23..25 "  "
+                  YAML_KEY@25..27 "hr"
+                  YAML_COLON@27..28 ":"
+                YAML_BLOCK_MAP_VALUE@28..33
+                  WHITESPACE@28..31 "   "
+                  YAML_SCALAR@31..33 "65"
+                NEWLINE@33..34 "\n"
+              YAML_BLOCK_MAP_ENTRY@34..48
+                YAML_BLOCK_MAP_KEY@34..40
+                  WHITESPACE@34..36 "  "
+                  YAML_KEY@36..39 "avg"
+                  YAML_COLON@39..40 ":"
+                YAML_BLOCK_MAP_VALUE@40..47
+                  WHITESPACE@40..42 "  "
+                  YAML_SCALAR@42..47 "0.278"
+                NEWLINE@47..48 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@48..94
+            YAML_BLOCK_SEQ_ENTRY@48..49 "-"
+            NEWLINE@49..50 "\n"
+            YAML_BLOCK_MAP@50..94
+              YAML_BLOCK_MAP_ENTRY@50..69
+                YAML_BLOCK_MAP_KEY@50..57
+                  WHITESPACE@50..52 "  "
+                  YAML_KEY@52..56 "name"
+                  YAML_COLON@56..57 ":"
+                YAML_BLOCK_MAP_VALUE@57..68
+                  WHITESPACE@57..58 " "
+                  YAML_SCALAR@58..68 "Sammy Sosa"
+                NEWLINE@68..69 "\n"
+              YAML_BLOCK_MAP_ENTRY@69..80
+                YAML_BLOCK_MAP_KEY@69..74
+                  WHITESPACE@69..71 "  "
+                  YAML_KEY@71..73 "hr"
+                  YAML_COLON@73..74 ":"
+                YAML_BLOCK_MAP_VALUE@74..79
+                  WHITESPACE@74..77 "   "
+                  YAML_SCALAR@77..79 "63"
+                NEWLINE@79..80 "\n"
+              YAML_BLOCK_MAP_ENTRY@80..94
+                YAML_BLOCK_MAP_KEY@80..86
+                  WHITESPACE@80..82 "  "
+                  YAML_KEY@82..85 "avg"
+                  YAML_COLON@85..86 ":"
+                YAML_BLOCK_MAP_VALUE@86..93
+                  WHITESPACE@86..88 "  "
+                  YAML_SCALAR@88..93 "0.288"
+                NEWLINE@93..94 "\n"

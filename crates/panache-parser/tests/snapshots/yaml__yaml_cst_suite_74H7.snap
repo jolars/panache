@@ -9,54 +9,56 @@ diagnostics:
 cst:
 DOCUMENT@0..62
   YAML_METADATA_CONTENT@0..62
-    YAML_BLOCK_MAP@0..62
-      YAML_BLOCK_MAP_ENTRY@0..11
-        YAML_BLOCK_MAP_KEY@0..8
-          YAML_TAG@0..5 "!!str"
-          WHITESPACE@5..6 " "
-          YAML_KEY@6..7 "a"
-          YAML_COLON@7..8 ":"
-        YAML_BLOCK_MAP_VALUE@8..10
-          WHITESPACE@8..9 " "
-          YAML_SCALAR@9..10 "b"
-        NEWLINE@10..11 "\n"
-      YAML_BLOCK_MAP_ENTRY@11..23
-        YAML_BLOCK_MAP_KEY@11..13
-          YAML_KEY@11..12 "c"
-          YAML_COLON@12..13 ":"
-        YAML_BLOCK_MAP_VALUE@13..22
-          WHITESPACE@13..14 " "
-          YAML_TAG@14..19 "!!int"
-          WHITESPACE@19..20 " "
-          YAML_SCALAR@20..22 "42"
-        NEWLINE@22..23 "\n"
-      YAML_BLOCK_MAP_ENTRY@23..34
-        YAML_BLOCK_MAP_KEY@23..25
-          YAML_KEY@23..24 "e"
-          YAML_COLON@24..25 ":"
-        YAML_BLOCK_MAP_VALUE@25..33
-          WHITESPACE@25..26 " "
-          YAML_TAG@26..31 "!!str"
-          WHITESPACE@31..32 " "
-          YAML_SCALAR@32..33 "f"
-        NEWLINE@33..34 "\n"
-      YAML_BLOCK_MAP_ENTRY@34..39
-        YAML_BLOCK_MAP_KEY@34..36
-          YAML_KEY@34..35 "g"
-          YAML_COLON@35..36 ":"
-        YAML_BLOCK_MAP_VALUE@36..38
-          WHITESPACE@36..37 " "
-          YAML_SCALAR@37..38 "h"
-        NEWLINE@38..39 "\n"
-      YAML_BLOCK_MAP_ENTRY@39..62
-        YAML_BLOCK_MAP_KEY@39..48
-          YAML_TAG@39..44 "!!str"
-          WHITESPACE@44..45 " "
-          YAML_KEY@45..47 "23"
-          YAML_COLON@47..48 ":"
-        YAML_BLOCK_MAP_VALUE@48..61
-          WHITESPACE@48..49 " "
-          YAML_TAG@49..55 "!!bool"
-          WHITESPACE@55..56 " "
-          YAML_SCALAR@56..61 "false"
-        NEWLINE@61..62 "\n"
+    YAML_STREAM@0..62
+      YAML_DOCUMENT@0..62
+        YAML_BLOCK_MAP@0..62
+          YAML_BLOCK_MAP_ENTRY@0..11
+            YAML_BLOCK_MAP_KEY@0..8
+              YAML_TAG@0..5 "!!str"
+              WHITESPACE@5..6 " "
+              YAML_KEY@6..7 "a"
+              YAML_COLON@7..8 ":"
+            YAML_BLOCK_MAP_VALUE@8..10
+              WHITESPACE@8..9 " "
+              YAML_SCALAR@9..10 "b"
+            NEWLINE@10..11 "\n"
+          YAML_BLOCK_MAP_ENTRY@11..23
+            YAML_BLOCK_MAP_KEY@11..13
+              YAML_KEY@11..12 "c"
+              YAML_COLON@12..13 ":"
+            YAML_BLOCK_MAP_VALUE@13..22
+              WHITESPACE@13..14 " "
+              YAML_TAG@14..19 "!!int"
+              WHITESPACE@19..20 " "
+              YAML_SCALAR@20..22 "42"
+            NEWLINE@22..23 "\n"
+          YAML_BLOCK_MAP_ENTRY@23..34
+            YAML_BLOCK_MAP_KEY@23..25
+              YAML_KEY@23..24 "e"
+              YAML_COLON@24..25 ":"
+            YAML_BLOCK_MAP_VALUE@25..33
+              WHITESPACE@25..26 " "
+              YAML_TAG@26..31 "!!str"
+              WHITESPACE@31..32 " "
+              YAML_SCALAR@32..33 "f"
+            NEWLINE@33..34 "\n"
+          YAML_BLOCK_MAP_ENTRY@34..39
+            YAML_BLOCK_MAP_KEY@34..36
+              YAML_KEY@34..35 "g"
+              YAML_COLON@35..36 ":"
+            YAML_BLOCK_MAP_VALUE@36..38
+              WHITESPACE@36..37 " "
+              YAML_SCALAR@37..38 "h"
+            NEWLINE@38..39 "\n"
+          YAML_BLOCK_MAP_ENTRY@39..62
+            YAML_BLOCK_MAP_KEY@39..48
+              YAML_TAG@39..44 "!!str"
+              WHITESPACE@44..45 " "
+              YAML_KEY@45..47 "23"
+              YAML_COLON@47..48 ":"
+            YAML_BLOCK_MAP_VALUE@48..61
+              WHITESPACE@48..49 " "
+              YAML_TAG@49..55 "!!bool"
+              WHITESPACE@55..56 " "
+              YAML_SCALAR@56..61 "false"
+            NEWLINE@61..62 "\n"

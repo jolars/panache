@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 740
 expression: snapshot
 ---
 case_id: 652Z
@@ -10,23 +9,25 @@ diagnostics:
 cst:
 DOCUMENT@0..23
   YAML_METADATA_CONTENT@0..23
-    YAML_BLOCK_MAP@0..23
-      YAML_FLOW_MAP@0..22
-        YAML_SCALAR@0..1 "{"
-        YAML_FLOW_MAP_ENTRY@1..11
-          YAML_FLOW_MAP_KEY@1..7
-            YAML_KEY@1..6 " ?foo"
-            YAML_COLON@6..7 ":"
-          YAML_FLOW_MAP_VALUE@7..11
-            YAML_SCALAR@7..11 " bar"
-        YAML_SCALAR@11..12 ","
-        YAML_SCALAR@12..13 "\n"
-        YAML_FLOW_MAP_ENTRY@13..21
-          YAML_FLOW_MAP_KEY@13..17
-            YAML_KEY@13..16 "bar"
-            YAML_COLON@16..17 ":"
-          YAML_FLOW_MAP_VALUE@17..21
-            YAML_SCALAR@17..20 " 42"
-            YAML_SCALAR@20..21 "\n"
-        YAML_SCALAR@21..22 "}"
-      NEWLINE@22..23 "\n"
+    YAML_STREAM@0..23
+      YAML_DOCUMENT@0..23
+        YAML_BLOCK_MAP@0..23
+          YAML_FLOW_MAP@0..22
+            YAML_SCALAR@0..1 "{"
+            YAML_FLOW_MAP_ENTRY@1..11
+              YAML_FLOW_MAP_KEY@1..7
+                YAML_KEY@1..6 " ?foo"
+                YAML_COLON@6..7 ":"
+              YAML_FLOW_MAP_VALUE@7..11
+                YAML_SCALAR@7..11 " bar"
+            YAML_SCALAR@11..12 ","
+            YAML_SCALAR@12..13 "\n"
+            YAML_FLOW_MAP_ENTRY@13..21
+              YAML_FLOW_MAP_KEY@13..17
+                YAML_KEY@13..16 "bar"
+                YAML_COLON@16..17 ":"
+              YAML_FLOW_MAP_VALUE@17..21
+                YAML_SCALAR@17..20 " 42"
+                YAML_SCALAR@20..21 "\n"
+            YAML_SCALAR@21..22 "}"
+          NEWLINE@22..23 "\n"

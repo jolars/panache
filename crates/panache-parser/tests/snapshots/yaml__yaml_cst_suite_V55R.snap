@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 929
 expression: snapshot
 ---
 case_id: V55R
@@ -10,24 +9,26 @@ diagnostics:
 cst:
 DOCUMENT@0..24
   YAML_METADATA_CONTENT@0..24
-    YAML_BLOCK_SEQUENCE@0..24
-      YAML_BLOCK_SEQUENCE_ITEM@0..7
-        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
-        WHITESPACE@1..2 " "
-        YAML_SCALAR@2..6 "&a a"
-        NEWLINE@6..7 "\n"
-      YAML_BLOCK_SEQUENCE_ITEM@7..14
-        YAML_BLOCK_SEQ_ENTRY@7..8 "-"
-        WHITESPACE@8..9 " "
-        YAML_SCALAR@9..13 "&b b"
-        NEWLINE@13..14 "\n"
-      YAML_BLOCK_SEQUENCE_ITEM@14..19
-        YAML_BLOCK_SEQ_ENTRY@14..15 "-"
-        WHITESPACE@15..16 " "
-        YAML_SCALAR@16..18 "*a"
-        NEWLINE@18..19 "\n"
-      YAML_BLOCK_SEQUENCE_ITEM@19..24
-        YAML_BLOCK_SEQ_ENTRY@19..20 "-"
-        WHITESPACE@20..21 " "
-        YAML_SCALAR@21..23 "*b"
-        NEWLINE@23..24 "\n"
+    YAML_STREAM@0..24
+      YAML_DOCUMENT@0..24
+        YAML_BLOCK_SEQUENCE@0..24
+          YAML_BLOCK_SEQUENCE_ITEM@0..7
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..6 "&a a"
+            NEWLINE@6..7 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@7..14
+            YAML_BLOCK_SEQ_ENTRY@7..8 "-"
+            WHITESPACE@8..9 " "
+            YAML_SCALAR@9..13 "&b b"
+            NEWLINE@13..14 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@14..19
+            YAML_BLOCK_SEQ_ENTRY@14..15 "-"
+            WHITESPACE@15..16 " "
+            YAML_SCALAR@16..18 "*a"
+            NEWLINE@18..19 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@19..24
+            YAML_BLOCK_SEQ_ENTRY@19..20 "-"
+            WHITESPACE@20..21 " "
+            YAML_SCALAR@21..23 "*b"
+            NEWLINE@23..24 "\n"

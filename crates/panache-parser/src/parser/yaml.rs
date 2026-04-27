@@ -36,12 +36,8 @@ mod tests {
         assert_eq!(tree.kind(), SyntaxKind::DOCUMENT);
         assert_eq!(tree.text().to_string(), "title: My Title\nauthor: Me\n");
 
-        let content = tree
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_METADATA_CONTENT)
-            .expect("yaml metadata content");
-        let mapping = content
-            .children()
+        let mapping = tree
+            .descendants()
             .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
             .expect("yaml block map");
         let entries: Vec<_> = mapping
@@ -75,12 +71,8 @@ mod tests {
     #[test]
     fn mapping_nodes_preserve_entry_text_boundaries() {
         let tree = parse_yaml_tree("title: A\nauthor: B\n").expect("tree");
-        let content = tree
-            .children()
-            .find(|n| n.kind() == SyntaxKind::YAML_METADATA_CONTENT)
-            .expect("yaml metadata content");
-        let mapping = content
-            .children()
+        let mapping = tree
+            .descendants()
             .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
             .expect("yaml block map");
 

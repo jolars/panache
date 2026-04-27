@@ -20,151 +20,142 @@ pub fn project_events(input: &str) -> Vec<String> {
         return Vec::new();
     };
 
-    let has_explicit_doc_start = tree
-        .descendants_with_tokens()
+    let mut events = vec!["+STR".to_string()];
+    let stream = tree
+        .descendants()
+        .find(|n| n.kind() == SyntaxKind::YAML_STREAM);
+    if let Some(stream) = stream {
+        for doc in stream
+            .children()
+            .filter(|n| n.kind() == SyntaxKind::YAML_DOCUMENT)
+        {
+            project_document(&doc, &mut events);
+        }
+    }
+    events.push("-STR".to_string());
+    events
+}
+
+fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
+    let has_doc_start = doc
+        .children_with_tokens()
         .filter_map(|el| el.into_token())
         .any(|tok| tok.kind() == SyntaxKind::YAML_DOCUMENT_START);
-    let doc_open = if has_explicit_doc_start {
+    let has_doc_end = doc
+        .children_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|tok| tok.kind() == SyntaxKind::YAML_DOCUMENT_END);
+    out.push(if has_doc_start {
         "+DOC ---".to_string()
     } else {
         "+DOC".to_string()
-    };
-    let has_explicit_doc_end = tree
-        .descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .any(|tok| tok.kind() == SyntaxKind::YAML_DOCUMENT_END);
-    let doc_close = if has_explicit_doc_end {
-        "-DOC ...".to_string()
-    } else {
-        "-DOC".to_string()
-    };
+    });
 
-    // Inputs that contain only comments, whitespace, and/or a document-end
-    // marker (no content, no `---` document-start) yield no document at all.
-    // The yaml-test-suite represents these as `+STR -STR` with nothing in
-    // between (e.g. `# Comment only.\n`, `...\n`, `# comment\n...\n`).
-    let has_any_content = tree.descendants().any(|n| {
-        matches!(
-            n.kind(),
-            SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
-                | SyntaxKind::YAML_BLOCK_MAP_ENTRY
-                | SyntaxKind::YAML_FLOW_MAP
-                | SyntaxKind::YAML_FLOW_SEQUENCE
-        )
-    }) || tree
-        .descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .any(|tok| matches!(tok.kind(), SyntaxKind::YAML_SCALAR | SyntaxKind::YAML_TAG));
-    if !has_any_content && !has_explicit_doc_start {
-        return vec!["+STR".to_string(), "-STR".to_string()];
-    }
-
-    if let Some(seq_node) = tree
+    if let Some(seq_node) = doc
         .descendants()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
     {
-        let mut events = Vec::new();
-        events.push("+STR".to_string());
-        events.push(doc_open);
-        events.push("+SEQ".to_string());
-        project_block_sequence_items(&seq_node, &mut events);
-        events.push("-SEQ".to_string());
-        events.push(doc_close);
-        events.push("-STR".to_string());
-        return events;
-    }
-
-    let mut values = Vec::new();
-    let mut map_header = "+MAP".to_string();
-    if let Some(root_map) = tree
+        out.push("+SEQ".to_string());
+        project_block_sequence_items(&seq_node, out);
+        out.push("-SEQ".to_string());
+    } else if let Some(root_map) = doc
         .descendants()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
     {
+        let mut values = Vec::new();
         project_block_map_entries(&root_map, &mut values);
-    }
-
-    if values.is_empty()
-        && let Some(flow_map) = tree
+        if !values.is_empty() {
+            out.push("+MAP".to_string());
+            out.append(&mut values);
+            out.push("-MAP".to_string());
+        } else if let Some(flow_map) = doc
             .descendants()
             .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
-    {
-        map_header = "+MAP {}".to_string();
-        project_flow_map_entries(&flow_map, &mut values);
-    }
-
-    if values.is_empty()
-        && let Some(flow_seq) = tree
+        {
+            let mut flow_values = Vec::new();
+            project_flow_map_entries(&flow_map, &mut flow_values);
+            out.push("+MAP {}".to_string());
+            out.append(&mut flow_values);
+            out.push("-MAP".to_string());
+        } else if let Some(flow_seq) = doc
             .descendants()
             .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
+            && let Some(items) = simple_flow_sequence_items(&flow_seq.text().to_string())
+        {
+            out.push("+SEQ []".to_string());
+            for item in items {
+                if item.starts_with('"') || item.starts_with('\'') {
+                    out.push(quoted_val_event(&item));
+                } else {
+                    out.push(plain_val_event(&item));
+                }
+            }
+            out.push("-SEQ".to_string());
+        } else if let Some(scalar) = scalar_document_value(doc) {
+            out.push(scalar);
+        } else {
+            out.push("=VAL :".to_string());
+        }
+    } else if let Some(flow_map) = doc
+        .descendants()
+        .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
+    {
+        out.push("+MAP {}".to_string());
+        project_flow_map_entries(&flow_map, out);
+        out.push("-MAP".to_string());
+    } else if let Some(flow_seq) = doc
+        .descendants()
+        .find(|n| n.kind() == SyntaxKind::YAML_FLOW_SEQUENCE)
         && let Some(items) = simple_flow_sequence_items(&flow_seq.text().to_string())
     {
-        let mut seq_events: Vec<String> = items
-            .iter()
-            .map(|item| {
-                if item.starts_with('"') || item.starts_with('\'') {
-                    quoted_val_event(item)
-                } else {
-                    plain_val_event(item)
-                }
-            })
-            .collect();
-        let mut events = Vec::with_capacity(seq_events.len() + 7);
-        events.push("+STR".to_string());
-        events.push(doc_open);
-        events.push("+SEQ []".to_string());
-        events.append(&mut seq_events);
-        events.push("-SEQ".to_string());
-        events.push(doc_close);
-        events.push("-STR".to_string());
-        return events;
-    }
-
-    let scalar_document_value = if values.is_empty() {
-        let text = tree
-            .descendants_with_tokens()
-            .filter_map(|el| el.into_token())
-            .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
-            .map(|tok| tok.text().to_string())
-            .collect::<Vec<_>>()
-            .join("");
-        (!text.is_empty()).then_some(text)
+        out.push("+SEQ []".to_string());
+        for item in items {
+            if item.starts_with('"') || item.starts_with('\'') {
+                out.push(quoted_val_event(&item));
+            } else {
+                out.push(plain_val_event(&item));
+            }
+        }
+        out.push("-SEQ".to_string());
+    } else if let Some(scalar) = scalar_document_value(doc) {
+        out.push(scalar);
     } else {
-        None
-    };
-
-    if let Some(text) = scalar_document_value {
-        let tag_text = tree
-            .descendants_with_tokens()
-            .filter_map(|el| el.into_token())
-            .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
-            .map(|tok| tok.text().to_string());
-        let scalar_event = if let Some(tag) = tag_text
-            && let Some(long) = long_tag(&tag)
-        {
-            format!("=VAL {long} :{text}")
-        } else if text.starts_with('"') || text.starts_with('\'') {
-            quoted_val_event(&text)
-        } else {
-            plain_val_event(&text)
-        };
-        return vec![
-            "+STR".to_string(),
-            doc_open.clone(),
-            scalar_event,
-            doc_close,
-            "-STR".to_string(),
-        ];
+        out.push("=VAL :".to_string());
     }
 
-    let mut events = Vec::with_capacity(values.len() + 6);
-    events.push("+STR".to_string());
-    events.push(doc_open);
-    events.push(map_header);
-    events.append(&mut values);
-    events.push("-MAP".to_string());
-    events.push(doc_close);
-    events.push("-STR".to_string());
-    events
+    out.push(if has_doc_end {
+        "-DOC ...".to_string()
+    } else {
+        "-DOC".to_string()
+    });
+}
+
+fn scalar_document_value(doc: &SyntaxNode) -> Option<String> {
+    let text = doc
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+        .map(|tok| tok.text().to_string())
+        .collect::<Vec<_>>()
+        .join("");
+    if text.is_empty() {
+        return None;
+    }
+    let tag_text = doc
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
+        .map(|tok| tok.text().to_string());
+    let event = if let Some(tag) = tag_text
+        && let Some(long) = long_tag(&tag)
+    {
+        format!("=VAL {long} :{text}")
+    } else if text.starts_with('"') || text.starts_with('\'') {
+        quoted_val_event(&text)
+    } else {
+        plain_val_event(&text)
+    };
+    Some(event)
 }
 
 fn plain_val_event(text: &str) -> String {

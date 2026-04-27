@@ -239,6 +239,13 @@
       "event_parity": false
     },
     {
+      "case_id": "GT5M",
+      "diagnostic_codes": [
+        "YAML_PARSE_INVALID_KEY_TOKEN"
+      ],
+      "event_parity": false
+    },
+    {
       "case_id": "H7J7",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
@@ -428,12 +435,6 @@
       "tree": true
     },
     {
-      "case_id": "GT5M",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "H7TQ",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -540,12 +541,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "2AUY",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "2EBW",
@@ -854,12 +849,6 @@
       "tree": false
     },
     {
-      "case_id": "6XDY",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "6ZKB",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -934,12 +923,6 @@
       "tree": true
     },
     {
-      "case_id": "7Z25",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "7ZZ5",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
@@ -995,11 +978,9 @@
     },
     {
       "case_id": "93JH",
-      "diagnostic_codes": [
-        "YAML_PARSE_UNEXPECTED_INDENT"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "93WF",
@@ -1412,12 +1393,6 @@
       "tree": false
     },
     {
-      "case_id": "JHB9",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "JQ4R",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
@@ -1688,12 +1663,6 @@
       "tree": false
     },
     {
-      "case_id": "PUW8",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "PW8X",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -1796,12 +1765,6 @@
       "tree": false
     },
     {
-      "case_id": "S4JQ",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "S9E8",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -1878,12 +1841,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "U9NS",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "UGM3",
@@ -2014,6 +1971,7 @@
   ],
   "passes_now": [
     "229Q",
+    "2AUY",
     "33X3",
     "3ALJ",
     "3GZX",
@@ -2031,7 +1989,9 @@
     "6H3V",
     "6KGN",
     "6SLA",
+    "6XDY",
     "74H7",
+    "7Z25",
     "8KB6",
     "8MK2",
     "8XYN",
@@ -2051,18 +2011,22 @@
     "HWV9",
     "J5UC",
     "J7VC",
+    "JHB9",
     "JS2J",
     "K4SU",
     "KMK3",
     "M29M",
     "MXS3",
+    "PUW8",
     "Q88A",
     "QT73",
+    "S4JQ",
     "S4T7",
     "S7BG",
     "SSW6",
     "SYW4",
     "TE2A",
+    "U9NS",
     "UDM2",
     "UDR7",
     "V55R",
@@ -2072,10 +2036,10 @@
     "ZH7C"
   ],
   "summary": {
-    "error_contract_ok_count": 53,
-    "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 198,
-    "passes_now_count": 57,
+    "error_contract_ok_count": 54,
+    "fails_needs_error_path_count": 24,
+    "fails_needs_feature_count": 191,
+    "passes_now_count": 64,
     "total_cases": 352
   }
 }

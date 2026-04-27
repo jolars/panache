@@ -9,14 +9,16 @@ diagnostics:
 cst:
 DOCUMENT@0..35
   YAML_METADATA_CONTENT@0..35
-    YAML_BLOCK_MAP@0..35
-      YAML_DOCUMENT_START@0..3 "---"
-      NEWLINE@3..4 "\n"
-      YAML_BLOCK_MAP_ENTRY@4..35
-        YAML_BLOCK_MAP_KEY@4..11
-          YAML_KEY@4..10 "wanted"
-          YAML_COLON@10..11 ":"
-        YAML_BLOCK_MAP_VALUE@11..34
-          WHITESPACE@11..12 " "
-          YAML_SCALAR@12..34 "love ♥ and peace ☮"
-        NEWLINE@34..35 "\n"
+    YAML_STREAM@0..35
+      YAML_DOCUMENT@0..35
+        YAML_DOCUMENT_START@0..3 "---"
+        NEWLINE@3..4 "\n"
+        YAML_BLOCK_MAP@4..35
+          YAML_BLOCK_MAP_ENTRY@4..35
+            YAML_BLOCK_MAP_KEY@4..11
+              YAML_KEY@4..10 "wanted"
+              YAML_COLON@10..11 ":"
+            YAML_BLOCK_MAP_VALUE@11..34
+              WHITESPACE@11..12 " "
+              YAML_SCALAR@12..34 "love ♥ and peace ☮"
+            NEWLINE@34..35 "\n"

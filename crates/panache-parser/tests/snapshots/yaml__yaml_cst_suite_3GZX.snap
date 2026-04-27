@@ -9,36 +9,38 @@ diagnostics:
 cst:
 DOCUMENT@0..108
   YAML_METADATA_CONTENT@0..108
-    YAML_BLOCK_MAP@0..108
-      YAML_BLOCK_MAP_ENTRY@0..30
-        YAML_BLOCK_MAP_KEY@0..17
-          YAML_KEY@0..16 "First occurrence"
-          YAML_COLON@16..17 ":"
-        YAML_BLOCK_MAP_VALUE@17..29
-          WHITESPACE@17..18 " "
-          YAML_SCALAR@18..29 "&anchor Foo"
-        NEWLINE@29..30 "\n"
-      YAML_BLOCK_MAP_ENTRY@30..57
-        YAML_BLOCK_MAP_KEY@30..48
-          YAML_KEY@30..47 "Second occurrence"
-          YAML_COLON@47..48 ":"
-        YAML_BLOCK_MAP_VALUE@48..56
-          WHITESPACE@48..49 " "
-          YAML_SCALAR@49..56 "*anchor"
-        NEWLINE@56..57 "\n"
-      YAML_BLOCK_MAP_ENTRY@57..86
-        YAML_BLOCK_MAP_KEY@57..73
-          YAML_KEY@57..72 "Override anchor"
-          YAML_COLON@72..73 ":"
-        YAML_BLOCK_MAP_VALUE@73..85
-          WHITESPACE@73..74 " "
-          YAML_SCALAR@74..85 "&anchor Bar"
-        NEWLINE@85..86 "\n"
-      YAML_BLOCK_MAP_ENTRY@86..108
-        YAML_BLOCK_MAP_KEY@86..99
-          YAML_KEY@86..98 "Reuse anchor"
-          YAML_COLON@98..99 ":"
-        YAML_BLOCK_MAP_VALUE@99..107
-          WHITESPACE@99..100 " "
-          YAML_SCALAR@100..107 "*anchor"
-        NEWLINE@107..108 "\n"
+    YAML_STREAM@0..108
+      YAML_DOCUMENT@0..108
+        YAML_BLOCK_MAP@0..108
+          YAML_BLOCK_MAP_ENTRY@0..30
+            YAML_BLOCK_MAP_KEY@0..17
+              YAML_KEY@0..16 "First occurrence"
+              YAML_COLON@16..17 ":"
+            YAML_BLOCK_MAP_VALUE@17..29
+              WHITESPACE@17..18 " "
+              YAML_SCALAR@18..29 "&anchor Foo"
+            NEWLINE@29..30 "\n"
+          YAML_BLOCK_MAP_ENTRY@30..57
+            YAML_BLOCK_MAP_KEY@30..48
+              YAML_KEY@30..47 "Second occurrence"
+              YAML_COLON@47..48 ":"
+            YAML_BLOCK_MAP_VALUE@48..56
+              WHITESPACE@48..49 " "
+              YAML_SCALAR@49..56 "*anchor"
+            NEWLINE@56..57 "\n"
+          YAML_BLOCK_MAP_ENTRY@57..86
+            YAML_BLOCK_MAP_KEY@57..73
+              YAML_KEY@57..72 "Override anchor"
+              YAML_COLON@72..73 ":"
+            YAML_BLOCK_MAP_VALUE@73..85
+              WHITESPACE@73..74 " "
+              YAML_SCALAR@74..85 "&anchor Bar"
+            NEWLINE@85..86 "\n"
+          YAML_BLOCK_MAP_ENTRY@86..108
+            YAML_BLOCK_MAP_KEY@86..99
+              YAML_KEY@86..98 "Reuse anchor"
+              YAML_COLON@98..99 ":"
+            YAML_BLOCK_MAP_VALUE@99..107
+              WHITESPACE@99..100 " "
+              YAML_SCALAR@100..107 "*anchor"
+            NEWLINE@107..108 "\n"

@@ -9,20 +9,22 @@ diagnostics:
 cst:
 DOCUMENT@0..43
   YAML_METADATA_CONTENT@0..43
-    YAML_BLOCK_MAP@0..43
-      YAML_BLOCK_MAP_ENTRY@0..26
-        YAML_BLOCK_MAP_KEY@0..2
-          YAML_KEY@0..1 "a"
-          YAML_COLON@1..2 ":"
-        YAML_BLOCK_MAP_VALUE@2..25
-          WHITESPACE@2..3 " "
-          YAML_SCALAR@3..25 "&:@*!$\"<foo>: scalar a"
-        NEWLINE@25..26 "\n"
-      YAML_BLOCK_MAP_ENTRY@26..43
-        YAML_BLOCK_MAP_KEY@26..28
-          YAML_KEY@26..27 "b"
-          YAML_COLON@27..28 ":"
-        YAML_BLOCK_MAP_VALUE@28..42
-          WHITESPACE@28..29 " "
-          YAML_SCALAR@29..42 "*:@*!$\"<foo>:"
-        NEWLINE@42..43 "\n"
+    YAML_STREAM@0..43
+      YAML_DOCUMENT@0..43
+        YAML_BLOCK_MAP@0..43
+          YAML_BLOCK_MAP_ENTRY@0..26
+            YAML_BLOCK_MAP_KEY@0..2
+              YAML_KEY@0..1 "a"
+              YAML_COLON@1..2 ":"
+            YAML_BLOCK_MAP_VALUE@2..25
+              WHITESPACE@2..3 " "
+              YAML_SCALAR@3..25 "&:@*!$\"<foo>: scalar a"
+            NEWLINE@25..26 "\n"
+          YAML_BLOCK_MAP_ENTRY@26..43
+            YAML_BLOCK_MAP_KEY@26..28
+              YAML_KEY@26..27 "b"
+              YAML_COLON@27..28 ":"
+            YAML_BLOCK_MAP_VALUE@28..42
+              WHITESPACE@28..29 " "
+              YAML_SCALAR@29..42 "*:@*!$\"<foo>:"
+            NEWLINE@42..43 "\n"

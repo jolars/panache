@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 904
 expression: snapshot
 ---
 case_id: 5BVJ
@@ -10,28 +9,30 @@ diagnostics:
 cst:
 DOCUMENT@0..49
   YAML_METADATA_CONTENT@0..49
-    YAML_BLOCK_MAP@0..49
-      YAML_BLOCK_MAP_ENTRY@0..25
-        YAML_BLOCK_MAP_KEY@0..8
-          YAML_KEY@0..7 "literal"
-          YAML_COLON@7..8 ":"
-        YAML_BLOCK_MAP_VALUE@8..25
-          WHITESPACE@8..9 " "
-          YAML_SCALAR@9..10 "|"
-          NEWLINE@10..11 "\n"
-          YAML_SCALAR@11..17 "  some"
-          NEWLINE@17..18 "\n"
-          YAML_SCALAR@18..24 "  text"
-          NEWLINE@24..25 "\n"
-      YAML_BLOCK_MAP_ENTRY@25..49
-        YAML_BLOCK_MAP_KEY@25..32
-          YAML_KEY@25..31 "folded"
-          YAML_COLON@31..32 ":"
-        YAML_BLOCK_MAP_VALUE@32..49
-          WHITESPACE@32..33 " "
-          YAML_SCALAR@33..34 ">"
-          NEWLINE@34..35 "\n"
-          YAML_SCALAR@35..41 "  some"
-          NEWLINE@41..42 "\n"
-          YAML_SCALAR@42..48 "  text"
-          NEWLINE@48..49 "\n"
+    YAML_STREAM@0..49
+      YAML_DOCUMENT@0..49
+        YAML_BLOCK_MAP@0..49
+          YAML_BLOCK_MAP_ENTRY@0..25
+            YAML_BLOCK_MAP_KEY@0..8
+              YAML_KEY@0..7 "literal"
+              YAML_COLON@7..8 ":"
+            YAML_BLOCK_MAP_VALUE@8..25
+              WHITESPACE@8..9 " "
+              YAML_SCALAR@9..10 "|"
+              NEWLINE@10..11 "\n"
+              YAML_SCALAR@11..17 "  some"
+              NEWLINE@17..18 "\n"
+              YAML_SCALAR@18..24 "  text"
+              NEWLINE@24..25 "\n"
+          YAML_BLOCK_MAP_ENTRY@25..49
+            YAML_BLOCK_MAP_KEY@25..32
+              YAML_KEY@25..31 "folded"
+              YAML_COLON@31..32 ":"
+            YAML_BLOCK_MAP_VALUE@32..49
+              WHITESPACE@32..33 " "
+              YAML_SCALAR@33..34 ">"
+              NEWLINE@34..35 "\n"
+              YAML_SCALAR@35..41 "  some"
+              NEWLINE@41..42 "\n"
+              YAML_SCALAR@42..48 "  text"
+              NEWLINE@48..49 "\n"

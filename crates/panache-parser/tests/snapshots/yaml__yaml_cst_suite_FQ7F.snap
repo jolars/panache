@@ -9,19 +9,21 @@ diagnostics:
 cst:
 DOCUMENT@0..42
   YAML_METADATA_CONTENT@0..42
-    YAML_BLOCK_SEQUENCE@0..42
-      YAML_BLOCK_SEQUENCE_ITEM@0..15
-        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
-        WHITESPACE@1..2 " "
-        YAML_SCALAR@2..14 "Mark McGwire"
-        NEWLINE@14..15 "\n"
-      YAML_BLOCK_SEQUENCE_ITEM@15..28
-        YAML_BLOCK_SEQ_ENTRY@15..16 "-"
-        WHITESPACE@16..17 " "
-        YAML_SCALAR@17..27 "Sammy Sosa"
-        NEWLINE@27..28 "\n"
-      YAML_BLOCK_SEQUENCE_ITEM@28..42
-        YAML_BLOCK_SEQ_ENTRY@28..29 "-"
-        WHITESPACE@29..30 " "
-        YAML_SCALAR@30..41 "Ken Griffey"
-        NEWLINE@41..42 "\n"
+    YAML_STREAM@0..42
+      YAML_DOCUMENT@0..42
+        YAML_BLOCK_SEQUENCE@0..42
+          YAML_BLOCK_SEQUENCE_ITEM@0..15
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_SCALAR@2..14 "Mark McGwire"
+            NEWLINE@14..15 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@15..28
+            YAML_BLOCK_SEQ_ENTRY@15..16 "-"
+            WHITESPACE@16..17 " "
+            YAML_SCALAR@17..27 "Sammy Sosa"
+            NEWLINE@27..28 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@28..42
+            YAML_BLOCK_SEQ_ENTRY@28..29 "-"
+            WHITESPACE@29..30 " "
+            YAML_SCALAR@30..41 "Ken Griffey"
+            NEWLINE@41..42 "\n"

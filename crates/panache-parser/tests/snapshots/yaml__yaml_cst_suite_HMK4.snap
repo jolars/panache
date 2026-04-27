@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 904
 expression: snapshot
 ---
 case_id: HMK4
@@ -10,36 +9,38 @@ diagnostics:
 cst:
 DOCUMENT@0..138
   YAML_METADATA_CONTENT@0..138
-    YAML_BLOCK_MAP@0..138
-      YAML_BLOCK_MAP_ENTRY@0..19
-        YAML_BLOCK_MAP_KEY@0..5
-          YAML_KEY@0..4 "name"
-          YAML_COLON@4..5 ":"
-        YAML_BLOCK_MAP_VALUE@5..18
-          WHITESPACE@5..6 " "
-          YAML_SCALAR@6..18 "Mark McGwire"
-        NEWLINE@18..19 "\n"
-      YAML_BLOCK_MAP_ENTRY@19..90
-        YAML_BLOCK_MAP_KEY@19..34
-          YAML_KEY@19..33 "accomplishment"
-          YAML_COLON@33..34 ":"
-        YAML_BLOCK_MAP_VALUE@34..90
-          WHITESPACE@34..35 " "
-          YAML_SCALAR@35..36 ">"
-          NEWLINE@36..37 "\n"
-          YAML_SCALAR@37..62 "  Mark set a major le ..."
-          NEWLINE@62..63 "\n"
-          YAML_SCALAR@63..89 "  home run record in  ..."
-          NEWLINE@89..90 "\n"
-      YAML_BLOCK_MAP_ENTRY@90..138
-        YAML_BLOCK_MAP_KEY@90..96
-          YAML_KEY@90..95 "stats"
-          YAML_COLON@95..96 ":"
-        YAML_BLOCK_MAP_VALUE@96..138
-          WHITESPACE@96..97 " "
-          YAML_SCALAR@97..98 "|"
-          NEWLINE@98..99 "\n"
-          YAML_SCALAR@99..113 "  65 Home Runs"
-          NEWLINE@113..114 "\n"
-          YAML_SCALAR@114..137 "  0.278 Batting Average"
-          NEWLINE@137..138 "\n"
+    YAML_STREAM@0..138
+      YAML_DOCUMENT@0..138
+        YAML_BLOCK_MAP@0..138
+          YAML_BLOCK_MAP_ENTRY@0..19
+            YAML_BLOCK_MAP_KEY@0..5
+              YAML_KEY@0..4 "name"
+              YAML_COLON@4..5 ":"
+            YAML_BLOCK_MAP_VALUE@5..18
+              WHITESPACE@5..6 " "
+              YAML_SCALAR@6..18 "Mark McGwire"
+            NEWLINE@18..19 "\n"
+          YAML_BLOCK_MAP_ENTRY@19..90
+            YAML_BLOCK_MAP_KEY@19..34
+              YAML_KEY@19..33 "accomplishment"
+              YAML_COLON@33..34 ":"
+            YAML_BLOCK_MAP_VALUE@34..90
+              WHITESPACE@34..35 " "
+              YAML_SCALAR@35..36 ">"
+              NEWLINE@36..37 "\n"
+              YAML_SCALAR@37..62 "  Mark set a major le ..."
+              NEWLINE@62..63 "\n"
+              YAML_SCALAR@63..89 "  home run record in  ..."
+              NEWLINE@89..90 "\n"
+          YAML_BLOCK_MAP_ENTRY@90..138
+            YAML_BLOCK_MAP_KEY@90..96
+              YAML_KEY@90..95 "stats"
+              YAML_COLON@95..96 ":"
+            YAML_BLOCK_MAP_VALUE@96..138
+              WHITESPACE@96..97 " "
+              YAML_SCALAR@97..98 "|"
+              NEWLINE@98..99 "\n"
+              YAML_SCALAR@99..113 "  65 Home Runs"
+              NEWLINE@113..114 "\n"
+              YAML_SCALAR@114..137 "  0.278 Batting Average"
+              NEWLINE@137..138 "\n"

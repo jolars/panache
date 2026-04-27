@@ -9,6 +9,8 @@ diagnostics:
 cst:
 DOCUMENT@0..22
   YAML_METADATA_CONTENT@0..22
-    YAML_BLOCK_MAP@0..22
-      YAML_SCALAR@0..21 "'here''s to \"quotes\"'"
-      NEWLINE@21..22 "\n"
+    YAML_STREAM@0..22
+      YAML_DOCUMENT@0..22
+        YAML_BLOCK_MAP@0..22
+          YAML_SCALAR@0..21 "'here''s to \"quotes\"'"
+          NEWLINE@21..22 "\n"

@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 904
 expression: snapshot
 ---
 case_id: YD5X
@@ -10,49 +9,51 @@ diagnostics:
 cst:
 DOCUMENT@0..84
   YAML_METADATA_CONTENT@0..84
-    YAML_BLOCK_SEQUENCE@0..84
-      YAML_BLOCK_SEQUENCE_ITEM@0..28
-        YAML_BLOCK_SEQ_ENTRY@0..1 "-"
-        WHITESPACE@1..2 " "
-        YAML_FLOW_SEQUENCE@2..27
-          YAML_SCALAR@2..3 "["
-          YAML_FLOW_SEQUENCE_ITEM@3..15
-            YAML_SCALAR@3..15 "name        "
-          YAML_SCALAR@15..16 ","
-          YAML_FLOW_SEQUENCE_ITEM@16..19
-            YAML_SCALAR@16..19 " hr"
-          YAML_SCALAR@19..20 ","
-          YAML_FLOW_SEQUENCE_ITEM@20..26
-            YAML_SCALAR@20..26 " avg  "
-          YAML_SCALAR@26..27 "]"
-        NEWLINE@27..28 "\n"
-      YAML_BLOCK_SEQUENCE_ITEM@28..56
-        YAML_BLOCK_SEQ_ENTRY@28..29 "-"
-        WHITESPACE@29..30 " "
-        YAML_FLOW_SEQUENCE@30..55
-          YAML_SCALAR@30..31 "["
-          YAML_FLOW_SEQUENCE_ITEM@31..43
-            YAML_SCALAR@31..43 "Mark McGwire"
-          YAML_SCALAR@43..44 ","
-          YAML_FLOW_SEQUENCE_ITEM@44..47
-            YAML_SCALAR@44..47 " 65"
-          YAML_SCALAR@47..48 ","
-          YAML_FLOW_SEQUENCE_ITEM@48..54
-            YAML_SCALAR@48..54 " 0.278"
-          YAML_SCALAR@54..55 "]"
-        NEWLINE@55..56 "\n"
-      YAML_BLOCK_SEQUENCE_ITEM@56..84
-        YAML_BLOCK_SEQ_ENTRY@56..57 "-"
-        WHITESPACE@57..58 " "
-        YAML_FLOW_SEQUENCE@58..83
-          YAML_SCALAR@58..59 "["
-          YAML_FLOW_SEQUENCE_ITEM@59..71
-            YAML_SCALAR@59..71 "Sammy Sosa  "
-          YAML_SCALAR@71..72 ","
-          YAML_FLOW_SEQUENCE_ITEM@72..75
-            YAML_SCALAR@72..75 " 63"
-          YAML_SCALAR@75..76 ","
-          YAML_FLOW_SEQUENCE_ITEM@76..82
-            YAML_SCALAR@76..82 " 0.288"
-          YAML_SCALAR@82..83 "]"
-        NEWLINE@83..84 "\n"
+    YAML_STREAM@0..84
+      YAML_DOCUMENT@0..84
+        YAML_BLOCK_SEQUENCE@0..84
+          YAML_BLOCK_SEQUENCE_ITEM@0..28
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_FLOW_SEQUENCE@2..27
+              YAML_SCALAR@2..3 "["
+              YAML_FLOW_SEQUENCE_ITEM@3..15
+                YAML_SCALAR@3..15 "name        "
+              YAML_SCALAR@15..16 ","
+              YAML_FLOW_SEQUENCE_ITEM@16..19
+                YAML_SCALAR@16..19 " hr"
+              YAML_SCALAR@19..20 ","
+              YAML_FLOW_SEQUENCE_ITEM@20..26
+                YAML_SCALAR@20..26 " avg  "
+              YAML_SCALAR@26..27 "]"
+            NEWLINE@27..28 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@28..56
+            YAML_BLOCK_SEQ_ENTRY@28..29 "-"
+            WHITESPACE@29..30 " "
+            YAML_FLOW_SEQUENCE@30..55
+              YAML_SCALAR@30..31 "["
+              YAML_FLOW_SEQUENCE_ITEM@31..43
+                YAML_SCALAR@31..43 "Mark McGwire"
+              YAML_SCALAR@43..44 ","
+              YAML_FLOW_SEQUENCE_ITEM@44..47
+                YAML_SCALAR@44..47 " 65"
+              YAML_SCALAR@47..48 ","
+              YAML_FLOW_SEQUENCE_ITEM@48..54
+                YAML_SCALAR@48..54 " 0.278"
+              YAML_SCALAR@54..55 "]"
+            NEWLINE@55..56 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@56..84
+            YAML_BLOCK_SEQ_ENTRY@56..57 "-"
+            WHITESPACE@57..58 " "
+            YAML_FLOW_SEQUENCE@58..83
+              YAML_SCALAR@58..59 "["
+              YAML_FLOW_SEQUENCE_ITEM@59..71
+                YAML_SCALAR@59..71 "Sammy Sosa  "
+              YAML_SCALAR@71..72 ","
+              YAML_FLOW_SEQUENCE_ITEM@72..75
+                YAML_SCALAR@72..75 " 63"
+              YAML_SCALAR@75..76 ","
+              YAML_FLOW_SEQUENCE_ITEM@76..82
+                YAML_SCALAR@76..82 " 0.288"
+              YAML_SCALAR@82..83 "]"
+            NEWLINE@83..84 "\n"

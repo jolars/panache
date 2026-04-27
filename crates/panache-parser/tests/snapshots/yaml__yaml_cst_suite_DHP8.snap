@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/yaml.rs
-assertion_line: 904
 expression: snapshot
 ---
 case_id: DHP8
@@ -10,16 +9,18 @@ diagnostics:
 cst:
 DOCUMENT@0..15
   YAML_METADATA_CONTENT@0..15
-    YAML_BLOCK_MAP@0..15
-      YAML_FLOW_SEQUENCE@0..14
-        YAML_SCALAR@0..1 "["
-        YAML_FLOW_SEQUENCE_ITEM@1..4
-          YAML_SCALAR@1..4 "foo"
-        YAML_SCALAR@4..5 ","
-        YAML_FLOW_SEQUENCE_ITEM@5..9
-          YAML_SCALAR@5..9 " bar"
-        YAML_SCALAR@9..10 ","
-        YAML_FLOW_SEQUENCE_ITEM@10..13
-          YAML_SCALAR@10..13 " 42"
-        YAML_SCALAR@13..14 "]"
-      NEWLINE@14..15 "\n"
+    YAML_STREAM@0..15
+      YAML_DOCUMENT@0..15
+        YAML_BLOCK_MAP@0..15
+          YAML_FLOW_SEQUENCE@0..14
+            YAML_SCALAR@0..1 "["
+            YAML_FLOW_SEQUENCE_ITEM@1..4
+              YAML_SCALAR@1..4 "foo"
+            YAML_SCALAR@4..5 ","
+            YAML_FLOW_SEQUENCE_ITEM@5..9
+              YAML_SCALAR@5..9 " bar"
+            YAML_SCALAR@9..10 ","
+            YAML_FLOW_SEQUENCE_ITEM@10..13
+              YAML_SCALAR@10..13 " 42"
+            YAML_SCALAR@13..14 "]"
+          NEWLINE@14..15 "\n"

@@ -1,0 +1,51 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: JHB9
+input: "# Ranking of 1998 home runs\n---\n- Mark McGwire\n- Sammy Sosa\n- Ken Griffey\n\n# Team ranking\n---\n- Chicago Cubs\n- St Louis Cardinals\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..130
+  YAML_METADATA_CONTENT@0..130
+    YAML_STREAM@0..130
+      YAML_COMMENT@0..27 "# Ranking of 1998 hom ..."
+      NEWLINE@27..28 "\n"
+      YAML_DOCUMENT@28..75
+        YAML_DOCUMENT_START@28..31 "---"
+        NEWLINE@31..32 "\n"
+        YAML_BLOCK_SEQUENCE@32..75
+          YAML_BLOCK_SEQUENCE_ITEM@32..47
+            YAML_BLOCK_SEQ_ENTRY@32..33 "-"
+            WHITESPACE@33..34 " "
+            YAML_SCALAR@34..46 "Mark McGwire"
+            NEWLINE@46..47 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@47..60
+            YAML_BLOCK_SEQ_ENTRY@47..48 "-"
+            WHITESPACE@48..49 " "
+            YAML_SCALAR@49..59 "Sammy Sosa"
+            NEWLINE@59..60 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@60..74
+            YAML_BLOCK_SEQ_ENTRY@60..61 "-"
+            WHITESPACE@61..62 " "
+            YAML_SCALAR@62..73 "Ken Griffey"
+            NEWLINE@73..74 "\n"
+          NEWLINE@74..75 "\n"
+      YAML_COMMENT@75..89 "# Team ranking"
+      NEWLINE@89..90 "\n"
+      YAML_DOCUMENT@90..130
+        YAML_DOCUMENT_START@90..93 "---"
+        NEWLINE@93..94 "\n"
+        YAML_BLOCK_SEQUENCE@94..130
+          YAML_BLOCK_SEQUENCE_ITEM@94..109
+            YAML_BLOCK_SEQ_ENTRY@94..95 "-"
+            WHITESPACE@95..96 " "
+            YAML_SCALAR@96..108 "Chicago Cubs"
+            NEWLINE@108..109 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@109..130
+            YAML_BLOCK_SEQ_ENTRY@109..110 "-"
+            WHITESPACE@110..111 " "
+            YAML_SCALAR@111..129 "St Louis Cardinals"
+            NEWLINE@129..130 "\n"
