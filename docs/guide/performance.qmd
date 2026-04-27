@@ -7,7 +7,6 @@ description: >
   documents. The benchmarks highlight Panache's efficiency and suitability for
   on-save formatting and fast repository-wide checks.
 engine: knitr
-freeze: true
 ---
 
 ## Overview
@@ -99,6 +98,7 @@ formatterRanges = d3.rollup(
 prettierRange = formatterRanges.get("prettier") ?? "n/a"
 pandocRange = formatterRanges.get("pandoc") ?? "n/a"
 rumdlRange = formatterRanges.get("rumdl") ?? "n/a"
+mdformatRange = formatterRanges.get("mdformat") ?? "n/a"
 ```
 
 ```{ojs}
@@ -200,7 +200,7 @@ prepareRepoSuiteRows = (data, toolLabels) => {
 }
 ```
 
-### Repository-Wide Benchmarks
+### Repository-Wide
 
 ```{bash}
 #| label: run-repo-markdown-format
@@ -506,9 +506,10 @@ repoMarkdownLintRepoMeta = new Map(repoMarkdownLint.repos.map(r => [r.id, r]))
 ```{ojs}
 //| label: fig-repo-markdown-lint
 //| echo: false
-//| fig-cap: "Repository-wide linting benchmarks on standard Markdown repos.
-//|   Each dot is one repo/tool pair; the y-axis shows time relative to
-//|   panache lint within that repo (×, lower is faster)."
+//| fig-cap: "Repository-wide linting benchmarks on standard Markdown repos,
+//|   comparing panache lint to rumdl check, mado check, markdownlint, and
+//|   markdownlint-cli2. Each dot is one repo/tool pair; the y-axis shows time
+//|   relative to panache lint within that repo (×, lower is faster)."
 
 Plot.plot({
   marginLeft: 60,

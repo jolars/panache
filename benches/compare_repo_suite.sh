@@ -89,7 +89,7 @@ MARKDOWNLINT_CLI2_VER=""
 [[ "$HAVE_MDFORMAT" == yes ]] && MDFORMAT_VER=$(mdformat --version | awk '{print $2}')
 [[ "$HAVE_MADO" == yes ]] && MADO_VER=$(mado --version | awk '{print $2}')
 [[ "$HAVE_MARKDOWNLINT" == yes ]] && MARKDOWNLINT_VER=$(markdownlint --version)
-[[ "$HAVE_MARKDOWNLINT_CLI2" == yes ]] && MARKDOWNLINT_CLI2_VER=$(markdownlint-cli2 --version 2>&1 | head -1 | awk '{print $2}' | sed 's/^v//')
+[[ "$HAVE_MARKDOWNLINT_CLI2" == yes ]] && MARKDOWNLINT_CLI2_VER=$(markdownlint-cli2 --version 2>&1 | awk 'NR==1{gsub(/^v/,"",$2); print $2}')
 
 HOST_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 HOST_ARCH=$(uname -m)

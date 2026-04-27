@@ -1,12 +1,15 @@
 {
   "schema_version": 1,
   "meta": {
-    "generated_at": "2026-04-27T13:20:11Z",
+    "generated_at": "2026-04-27T17:26:32Z",
     "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor"},
     "min_runs": 3,
     "tools": {
       "panache": {"version": "2.39.0"},
-      "rumdl":   {"version": "0.1.67"}
+      "rumdl":   {"version": "0.1.67"},
+      "mado":    {"version": "0.3.0"},
+      "markdownlint": {"version": "0.48.0"},
+      "markdownlint-cli2": {"version": "0.21.0"}
     }
   },
   "documents": [
@@ -18,17 +21,35 @@
     {"id":"pandoc_manual","name":"Pandoc Manual (large reference doc)","file":"pandoc_manual.md","size_bytes":299536,"lines":8036}
   ],
   "results": [
-    {"document":"pandoc_testsuite","tool":"panache","mean_ms":4.3579,"stddev_ms":0.4254,"min_ms":3.7673,"max_ms":6.3347,"runs":364},
-    {"document":"pandoc_testsuite","tool":"rumdl","mean_ms":17.5924,"stddev_ms":1.0383,"min_ms":15.9267,"max_ms":22.2399,"runs":160},
-    {"document":"tables","tool":"panache","mean_ms":5.3555,"stddev_ms":0.3799,"min_ms":4.7373,"max_ms":6.6649,"runs":428},
-    {"document":"tables","tool":"rumdl","mean_ms":11.5759,"stddev_ms":0.7537,"min_ms":10.4974,"max_ms":13.8574,"runs":219},
-    {"document":"configuration","tool":"panache","mean_ms":7.5423,"stddev_ms":0.4768,"min_ms":6.7135,"max_ms":9.0967,"runs":313},
-    {"document":"configuration","tool":"rumdl","mean_ms":12.9047,"stddev_ms":0.7870,"min_ms":11.5143,"max_ms":15.4953,"runs":216},
-    {"document":"math","tool":"panache","mean_ms":5.7271,"stddev_ms":0.4074,"min_ms":5.0259,"max_ms":7.4476,"runs":367},
-    {"document":"math","tool":"rumdl","mean_ms":16.2469,"stddev_ms":0.8589,"min_ms":14.5256,"max_ms":21.0411,"runs":172},
-    {"document":"large","tool":"panache","mean_ms":5.7115,"stddev_ms":0.4191,"min_ms":5.0050,"max_ms":7.4438,"runs":421},
-    {"document":"large","tool":"rumdl","mean_ms":13.6087,"stddev_ms":0.6878,"min_ms":12.4095,"max_ms":15.6239,"runs":197},
-    {"document":"pandoc_manual","tool":"panache","mean_ms":49.1069,"stddev_ms":1.3337,"min_ms":46.8782,"max_ms":53.5709,"runs":58},
-    {"document":"pandoc_manual","tool":"rumdl","mean_ms":133.5557,"stddev_ms":2.4070,"min_ms":129.9751,"max_ms":137.7818,"runs":22}
+    {"document":"pandoc_testsuite","tool":"panache","mean_ms":4.1129,"stddev_ms":0.3886,"min_ms":3.5508,"max_ms":6.1190,"runs":463},
+    {"document":"pandoc_testsuite","tool":"rumdl","mean_ms":17.4704,"stddev_ms":0.8862,"min_ms":15.9697,"max_ms":19.7324,"runs":152},
+    {"document":"pandoc_testsuite","tool":"mado","mean_ms":4.9456,"stddev_ms":0.5406,"min_ms":3.8552,"max_ms":6.3542,"runs":414},
+    {"document":"pandoc_testsuite","tool":"markdownlint","mean_ms":148.2265,"stddev_ms":3.2279,"min_ms":142.5803,"max_ms":155.2807,"runs":20},
+    {"document":"pandoc_testsuite","tool":"markdownlint-cli2","mean_ms":164.2488,"stddev_ms":2.5922,"min_ms":160.6284,"max_ms":169.7486,"runs":17},
+    {"document":"tables","tool":"panache","mean_ms":5.2068,"stddev_ms":0.3913,"min_ms":4.6463,"max_ms":6.8795,"runs":456},
+    {"document":"tables","tool":"rumdl","mean_ms":11.8696,"stddev_ms":0.5558,"min_ms":10.6501,"max_ms":13.5698,"runs":209},
+    {"document":"tables","tool":"mado","mean_ms":3.8466,"stddev_ms":0.2687,"min_ms":3.3964,"max_ms":4.9423,"runs":492},
+    {"document":"tables","tool":"markdownlint","mean_ms":142.4493,"stddev_ms":2.7355,"min_ms":135.6300,"max_ms":145.6303,"runs":21},
+    {"document":"tables","tool":"markdownlint-cli2","mean_ms":158.2270,"stddev_ms":3.5723,"min_ms":153.1920,"max_ms":166.5314,"runs":19},
+    {"document":"configuration","tool":"panache","mean_ms":7.5947,"stddev_ms":0.4078,"min_ms":6.7939,"max_ms":9.9251,"runs":292},
+    {"document":"configuration","tool":"rumdl","mean_ms":12.6878,"stddev_ms":0.6695,"min_ms":11.5819,"max_ms":14.7185,"runs":205},
+    {"document":"configuration","tool":"mado","mean_ms":4.1545,"stddev_ms":0.3073,"min_ms":3.5235,"max_ms":5.6475,"runs":449},
+    {"document":"configuration","tool":"markdownlint","mean_ms":150.8600,"stddev_ms":3.2733,"min_ms":144.1263,"max_ms":157.4290,"runs":19},
+    {"document":"configuration","tool":"markdownlint-cli2","mean_ms":169.9313,"stddev_ms":3.7824,"min_ms":163.6128,"max_ms":179.1888,"runs":16},
+    {"document":"math","tool":"panache","mean_ms":5.6845,"stddev_ms":0.3958,"min_ms":5.0871,"max_ms":7.6935,"runs":432},
+    {"document":"math","tool":"rumdl","mean_ms":16.0756,"stddev_ms":0.8907,"min_ms":14.2043,"max_ms":19.0551,"runs":168},
+    {"document":"math","tool":"mado","mean_ms":4.0808,"stddev_ms":0.2906,"min_ms":3.6482,"max_ms":6.3743,"runs":503},
+    {"document":"math","tool":"markdownlint","mean_ms":150.6118,"stddev_ms":2.9709,"min_ms":146.0442,"max_ms":155.3990,"runs":19},
+    {"document":"math","tool":"markdownlint-cli2","mean_ms":166.3421,"stddev_ms":3.4229,"min_ms":159.2260,"max_ms":172.4025,"runs":17},
+    {"document":"large","tool":"panache","mean_ms":5.6987,"stddev_ms":0.4178,"min_ms":5.0306,"max_ms":9.7451,"runs":397},
+    {"document":"large","tool":"rumdl","mean_ms":14.1479,"stddev_ms":0.6628,"min_ms":12.9149,"max_ms":17.3909,"runs":188},
+    {"document":"large","tool":"mado","mean_ms":4.1371,"stddev_ms":0.2523,"min_ms":3.6729,"max_ms":4.9624,"runs":472},
+    {"document":"large","tool":"markdownlint","mean_ms":144.8618,"stddev_ms":4.0527,"min_ms":138.6515,"max_ms":153.3472,"runs":20},
+    {"document":"large","tool":"markdownlint-cli2","mean_ms":162.9509,"stddev_ms":4.2316,"min_ms":154.3353,"max_ms":170.1823,"runs":18},
+    {"document":"pandoc_manual","tool":"panache","mean_ms":49.7838,"stddev_ms":1.4248,"min_ms":46.8179,"max_ms":52.1033,"runs":56},
+    {"document":"pandoc_manual","tool":"rumdl","mean_ms":134.5240,"stddev_ms":2.0126,"min_ms":130.8723,"max_ms":138.0882,"runs":21},
+    {"document":"pandoc_manual","tool":"mado","mean_ms":10.6701,"stddev_ms":0.5427,"min_ms":9.3403,"max_ms":12.4812,"runs":238},
+    {"document":"pandoc_manual","tool":"markdownlint","mean_ms":391.8121,"stddev_ms":8.2824,"min_ms":379.9939,"max_ms":403.3269,"runs":7},
+    {"document":"pandoc_manual","tool":"markdownlint-cli2","mean_ms":408.4585,"stddev_ms":8.4289,"min_ms":398.9433,"max_ms":421.0701,"runs":7}
   ]
 }

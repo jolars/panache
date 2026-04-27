@@ -56,6 +56,9 @@ HAVE_PRETTIER=$(command -v prettier >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_PANDOC=$(command -v pandoc >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_RUMDL=$(command -v rumdl >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_MDFORMAT=$(command -v mdformat >/dev/null 2>&1 && echo "yes" || echo "no")
+HAVE_MADO=$(command -v mado >/dev/null 2>&1 && echo "yes" || echo "no")
+HAVE_MARKDOWNLINT=$(command -v markdownlint >/dev/null 2>&1 && echo "yes" || echo "no")
+HAVE_MARKDOWNLINT_CLI2=$(command -v markdownlint-cli2 >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_HYPERFINE=$(command -v hyperfine >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_JQ=$(command -v jq >/dev/null 2>&1 && echo "yes" || echo "no")
 
@@ -83,6 +86,9 @@ log "  panache: yes (building...)"
 [ "$HAVE_PANDOC" = "yes" ] && log "  pandoc: yes ($(pandoc --version | head -1 | cut -d' ' -f2))"
 [ "$HAVE_RUMDL" = "yes" ] && log "  rumdl: yes ($(rumdl --version | awk '{print $2}'))"
 [ "$HAVE_MDFORMAT" = "yes" ] && log "  mdformat: yes ($(mdformat --version | awk '{print $2}'))"
+[ "$HAVE_MADO" = "yes" ] && log "  mado: yes ($(mado --version | awk '{print $2}'))"
+[ "$HAVE_MARKDOWNLINT" = "yes" ] && log "  markdownlint: yes ($(markdownlint --version))"
+[ "$HAVE_MARKDOWNLINT_CLI2" = "yes" ] && log "  markdownlint-cli2: yes ($(markdownlint-cli2 --version 2>&1 | awk 'NR==1{gsub(/^v/,"",$2); print $2}'))"
 if [ "$JSON_MODE" = "1" ]; then
     log "  backend: $BACKEND"
     if [ "$BACKEND" = "shell-loop" ] && [ "$HAVE_HYPERFINE" = "no" ]; then
@@ -101,10 +107,16 @@ PRETTIER_VER=""
 PANDOC_VER=""
 RUMDL_VER=""
 MDFORMAT_VER=""
+MADO_VER=""
+MARKDOWNLINT_VER=""
+MARKDOWNLINT_CLI2_VER=""
 [ "$HAVE_PRETTIER" = "yes" ] && PRETTIER_VER=$(prettier --version)
 [ "$HAVE_PANDOC" = "yes" ] && PANDOC_VER=$(pandoc --version | head -1 | awk '{print $2}')
 [ "$HAVE_RUMDL" = "yes" ] && RUMDL_VER=$(rumdl --version | awk '{print $2}')
 [ "$HAVE_MDFORMAT" = "yes" ] && MDFORMAT_VER=$(mdformat --version | awk '{print $2}')
+[ "$HAVE_MADO" = "yes" ] && MADO_VER=$(mado --version | awk '{print $2}')
+[ "$HAVE_MARKDOWNLINT" = "yes" ] && MARKDOWNLINT_VER=$(markdownlint --version)
+[ "$HAVE_MARKDOWNLINT_CLI2" = "yes" ] && MARKDOWNLINT_CLI2_VER=$(markdownlint-cli2 --version 2>&1 | awk 'NR==1{gsub(/^v/,"",$2); print $2}')
 
 # Host info
 HOST_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -301,6 +313,15 @@ if [ "$JSON_MODE" = "1" ]; then
         fi
         if [ "$HAVE_MDFORMAT" = "yes" ]; then
             printf ',\n      "mdformat": {"version": "%s"}' "$(json_escape "$MDFORMAT_VER")"
+        fi
+        if [ "$HAVE_MADO" = "yes" ]; then
+            printf ',\n      "mado":     {"version": "%s"}' "$(json_escape "$MADO_VER")"
+        fi
+        if [ "$HAVE_MARKDOWNLINT" = "yes" ]; then
+            printf ',\n      "markdownlint": {"version": "%s"}' "$(json_escape "$MARKDOWNLINT_VER")"
+        fi
+        if [ "$HAVE_MARKDOWNLINT_CLI2" = "yes" ]; then
+            printf ',\n      "markdownlint-cli2": {"version": "%s"}' "$(json_escape "$MARKDOWNLINT_CLI2_VER")"
         fi
         printf '\n    }\n'
         printf '  },\n'
