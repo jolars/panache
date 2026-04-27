@@ -24,16 +24,16 @@ LSP role.
 ### Roles
 
   | Tool              | Formatter | Linter | LSP | Implementation |
-  | ----------------- | --------- | ------ | --- | -------------- |
-  | Panache           | ●         | ●      | ●   | Rust           |
-  | mado              | ○         | ●      | ○   | Rust           |
-  | markdownlint      | ○         | ●      | ○   | Ruby           |
-  | markdownlint-cli2 | ◐[^1]     | ●      | ○   | JavaScript     |
-  | marksman          | ○         | ◐[^2]  | ●   | F# / .NET      |
-  | mdformat          | ●         | ○      | ○   | Python         |
-  | Pandoc            | ◐[^3]     | ○      | ○   | Haskell        |
-  | Prettier          | ●         | ○      | ○   | JavaScript     |
-  | rumdl             | ◐[^4]     | ●      | ●   | Rust           |
+  | ----------------- | :-------: | :----: | :-: | -------------- |
+  | Panache           |     ●     |   ●    |  ●  | Rust           |
+  | mado              |     ○     |   ●    |  ○  | Rust           |
+  | markdownlint      |     ○     |   ●    |  ○  | Ruby           |
+  | markdownlint-cli2 |   ◐[^1]   |   ●    |  ○  | JavaScript     |
+  | marksman          |     ○     | ◐[^2]  |  ●  | F# / .NET      |
+  | mdformat          |     ●     |   ○    |  ○  | Python         |
+  | Pandoc            |   ◐[^3]   |   ○    |  ○  | Haskell        |
+  | Prettier          |     ●     |   ○    |  ○  | JavaScript     |
+  | rumdl             |   ◐[^4]   |   ●    |  ●  | Rust           |
 
   : Tooling roles covered by each project. Marks: ● full, ◐ partial, ○ none.
 
@@ -61,16 +61,16 @@ longer accepts.
 ::: {.column-page}
 
   | Tool              | CommonMark | GFM   | Pandoc | Quarto | R Markdown | MultiMarkdown | MDX | Wikilinks |
-  | ----------------- | ---------- | ----- | ------ | ------ | ---------- | ------------- | --- | --------- |
-  | Panache           | ●          | ●     | ●      | ●      | ●          | ●             | ○   | ◐[^5]     |
-  | mado              | ●          | ●     | ○      | ○      | ○          | ○             | ○   | ○         |
-  | markdownlint      | ◐[^6]      | ◐[^6] | ○      | ○      | ○          | ○             | ○   | ○         |
-  | markdownlint-cli2 | ●          | ●     | ○      | ○      | ○          | ○             | ○   | ○         |
-  | marksman          | ●          | ●     | ◐[^7]  | ○      | ○          | ○             | ○   | ●         |
-  | mdformat          | ●          | ◐[^8] | ○      | ○      | ○          | ○             | ○   | ○         |
-  | Pandoc            | ●          | ●     | ●      | ◐[^9]  | ◐[^9]      | ◐[^10]        | ○   | ◐[^11]    |
-  | Prettier          | ●          | ●     | ○      | ○      | ○          | ○             | ●   | ○         |
-  | rumdl             | ●          | ●     | ○      | ◐[^12] | ◐[^12]     | ○             | ○   | ○         |
+  | ----------------- | :--------: | :---: | :----: | :----: | :--------: | :-----------: | :-: | :-------: |
+  | Panache           |     ●      |   ●   |   ●    |   ●    |     ●      |       ●       |  ○  |   ◐[^5]   |
+  | mado              |     ●      |   ●   |   ○    |   ○    |     ○      |       ○       |  ○  |     ○     |
+  | markdownlint      |   ◐[^6]    | ◐[^6] |   ○    |   ○    |     ○      |       ○       |  ○  |     ○     |
+  | markdownlint-cli2 |     ●      |   ●   |   ○    |   ○    |     ○      |       ○       |  ○  |     ○     |
+  | marksman          |     ●      |   ●   | ◐[^7]  |   ○    |     ○      |       ○       |  ○  |     ●     |
+  | mdformat          |     ●      | ◐[^8] |   ○    |   ○    |     ○      |       ○       |  ○  |     ○     |
+  | Pandoc            |     ●      |   ●   |   ●    | ◐[^9]  |   ◐[^9]    |    ◐[^10]     |  ○  |  ◐[^11]   |
+  | Prettier          |     ●      |   ●   |   ○    |   ○    |     ○      |       ○       |  ●  |     ○     |
+  | rumdl             |     ●      |   ●   |   ○    | ◐[^12] |   ◐[^12]   |       ○       |  ○  |     ○     |
 
   : Markdown dialect coverage across the tools.
 
