@@ -634,6 +634,32 @@ fn cst_yaml_projected_events(input: &str) -> Vec<String> {
         "-DOC".to_string()
     };
 
+    // Inputs that contain only comments, whitespace, and/or a document-end
+    // marker (no content, no `---` document-start) yield no document at all.
+    // The yaml-test-suite represents these as `+STR -STR` with nothing in
+    // between (e.g. `# Comment only.\n`, `...\n`, `# comment\n...\n`).
+    let has_any_content = tree.descendants().any(|n| {
+        matches!(
+            n.kind(),
+            panache_parser::syntax::SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM
+                | panache_parser::syntax::SyntaxKind::YAML_BLOCK_MAP_ENTRY
+                | panache_parser::syntax::SyntaxKind::YAML_FLOW_MAP
+                | panache_parser::syntax::SyntaxKind::YAML_FLOW_SEQUENCE
+        )
+    }) || tree
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+        .any(|tok| {
+            matches!(
+                tok.kind(),
+                panache_parser::syntax::SyntaxKind::YAML_SCALAR
+                    | panache_parser::syntax::SyntaxKind::YAML_TAG
+            )
+        });
+    if !has_any_content && !has_explicit_doc_start {
+        return vec!["+STR".to_string(), "-STR".to_string()];
+    }
+
     if let Some(seq_node) = tree
         .descendants()
         .find(|n| n.kind() == panache_parser::syntax::SyntaxKind::YAML_BLOCK_SEQUENCE)

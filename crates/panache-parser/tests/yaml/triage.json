@@ -841,11 +841,9 @@
     },
     {
       "case_id": "6WLZ",
-      "diagnostic_codes": [
-        "YAML_PARSE_DIRECTIVE_AFTER_CONTENT"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "6WPF",
@@ -1020,12 +1018,6 @@
       "tree": false
     },
     {
-      "case_id": "98YD",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "9BXH",
       "diagnostic_codes": [
         "YAML_PARSE_UNTERMINATED_FLOW_MAP"
@@ -1073,19 +1065,15 @@
     },
     {
       "case_id": "9U5K",
-      "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "9WXW",
-      "diagnostic_codes": [
-        "YAML_PARSE_DIRECTIVE_AFTER_CONTENT"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "9YRD",
@@ -1223,11 +1211,9 @@
     },
     {
       "case_id": "DBG4",
-      "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "DC7X",
@@ -1404,12 +1390,6 @@
       "tree": false
     },
     {
-      "case_id": "HWV9",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "J3BT",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -1433,11 +1413,9 @@
     },
     {
       "case_id": "JHB9",
-      "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "JQ4R",
@@ -1742,19 +1720,13 @@
     {
       "case_id": "Q9WF",
       "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
+        "YAML_PARSE_UNEXPECTED_INDENT"
       ],
       "event_parity": false,
       "tree": false
     },
     {
       "case_id": "QF4Y",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "QT73",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -1825,11 +1797,9 @@
     },
     {
       "case_id": "S4JQ",
-      "diagnostic_codes": [
-        "YAML_PARSE_INVALID_KEY_TOKEN"
-      ],
+      "diagnostic_codes": [],
       "event_parity": false,
-      "tree": false
+      "tree": true
     },
     {
       "case_id": "S9E8",
@@ -2065,6 +2035,7 @@
     "8KB6",
     "8MK2",
     "8XYN",
+    "98YD",
     "9FMG",
     "9J7A",
     "9SHH",
@@ -2077,6 +2048,7 @@
     "FQ7F",
     "H3Z8",
     "HMK4",
+    "HWV9",
     "J5UC",
     "J7VC",
     "JS2J",
@@ -2085,6 +2057,7 @@
     "M29M",
     "MXS3",
     "Q88A",
+    "QT73",
     "S4T7",
     "S7BG",
     "SSW6",
@@ -2101,8 +2074,8 @@
   "summary": {
     "error_contract_ok_count": 53,
     "fails_needs_error_path_count": 25,
-    "fails_needs_feature_count": 201,
-    "passes_now_count": 54,
+    "fails_needs_feature_count": 198,
+    "passes_now_count": 57,
     "total_cases": 352
   }
 }

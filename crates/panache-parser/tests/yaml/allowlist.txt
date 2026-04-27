@@ -125,3 +125,9 @@ V55R
 Q88A
 # Block sequence with a unicode anchor name.
 8XYN
+# Comment-only document yields no DOC events (just +STR -STR).
+98YD
+# Document-end-marker-only input yields no DOC events.
+HWV9
+# Comment followed by document-end marker yields no DOC events.
+QT73

@@ -529,6 +529,14 @@ fn lex_mapping_line_tokens<'a>(
         return Ok(());
     }
 
+    if content.starts_with('#') {
+        push_token(out, YamlToken::Comment, content);
+        if !newline.is_empty() {
+            push_token(out, YamlToken::Newline, newline);
+        }
+        return Ok(());
+    }
+
     if content == "-" || content.starts_with("- ") || content.starts_with("-\t") {
         // A line may pack multiple nested block-sequence entries (`- - x`). The
         // inner `-` starts a fresh nested YAML block sequence whose column is
