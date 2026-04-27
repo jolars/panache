@@ -23,8 +23,13 @@ yaml-test-suite case to the allowlist, or pick "the next best case" to work on.
 
 - `crates/panache-parser/src/parser/yaml/lexer.rs` — indentation-aware lexer,
   block/flow token emission, block-scalar handling.
-- `crates/panache-parser/src/parser/yaml/parser.rs` — rowan CST builder, block
-  map/sequence and flow collection parsing, diagnostics.
+- `crates/panache-parser/src/parser/yaml/parser.rs` — rowan CST builder. Outer
+  `parse_stream` / `emit_document` produce `YAML_STREAM > YAML_DOCUMENT*`;
+  `emit_block_map` / `emit_block_seq` / `emit_scalar_document` build per-doc
+  bodies and break on `---` / `...` boundaries.
+- `crates/panache-parser/src/parser/yaml/events.rs` — event projection
+  (`project_events` plus `project_*` helpers). Walks the CST and produces a
+  yaml-test-suite event stream.
 - `crates/panache-parser/src/parser/yaml/model.rs` — token enum, diagnostic
   codes, shadow report shape.
 - `crates/panache-parser/tests/yaml.rs` — fixture-driven tests, including:
@@ -81,15 +86,20 @@ case is in before touching it:
 
 3. **Probe the gap** if not obvious. A throwaway `#[ignore]` test in
    `tests/yaml.rs` printing `parse_yaml_tree(input)` and
-   `cst_yaml_projected_events(input)` is cheap and informative. Remove the
-   probe before finishing.
+   `project_events(input)` is cheap and informative. Remove the probe before
+   finishing.
 
 4. **Classify the fix** before coding:
-   - Projection-only → edit `tests/yaml.rs` helpers
-     (`project_block_map_entries`, `project_block_sequence_items`,
-     `project_flow_map_entries`, `cst_yaml_projected_events`).
-   - Parser-shape issue → edit `parser.rs` emitters
-     (`emit_block_map`, `emit_block_seq`, `emit_flow_map`, etc.).
+   - Projection-only → edit `parser/yaml/events.rs` helpers
+     (`project_document`, `project_block_map_entries`,
+     `project_block_sequence_items`, `project_flow_map_entries`,
+     `scalar_document_value`).
+   - Parser-shape issue → edit `parser/yaml/parser.rs` emitters. Outer:
+     `parse_stream`, `emit_document`. Bodies: `emit_block_map`
+     (+ `emit_block_map_entry` / `_key` / `_value` / `consume_block_scalar`),
+     `emit_block_seq` (+ `emit_block_seq_item`), `emit_flow_map`,
+     `emit_flow_sequence`, `emit_scalar_document`. Body emitters break on
+     `DocumentStart` / `DocumentEnd`; the stream loop owns boundaries.
    - Lexer gap → edit `lexer.rs`; consider indent/flow/block-scalar state
      interactions.
    - Diagnostic gap → add a code in `model.rs::diagnostic_codes` and surface

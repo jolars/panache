@@ -18,5 +18,6 @@ YAML test-suite harness changes must stay fixture-driven and parity-oriented.
   rationale.
 - Keep `blocked.txt` reasons specific and actionable so future work can target
   concrete parser gaps.
-- Prefer structured snapshots for CST/parity data (e.g. JSON snapshot of
-  `cst_to_json`) over ad-hoc freeform text.
+- Prefer structured snapshots for CST/parity data (rowan's `{:#?}` debug tree
+  via `insta`, or projected event streams from
+  `parser::yaml::project_events`) over ad-hoc freeform text.
