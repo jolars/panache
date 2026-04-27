@@ -153,3 +153,15 @@ U9NS
 C2DT
 # Flow map across multiple lines with mixed quoted/plain values.
 LP6E
+# Flow sequence containing implicit `key: value` map entries.
+QF4Y
+# Flow sequence containing flow-map entries with empty keys (`[: v]`).
+CFD4
+# Flow sequence with explicit-key indicator (`?`) and multi-line plain key.
+CT4Q
+# Block-map with quoted (single) key whose value is a multi-line flow seq of map entries.
+87E4
+# Block-map with plain key whose value is a multi-line flow seq of map entries.
+L9U5
+# Block-map with quoted (double) key whose value is a multi-line flow seq of map entries.
+LQZ7

@@ -84,11 +84,7 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
         {
             out.push("+SEQ []".to_string());
             for item in items {
-                if item.starts_with('"') || item.starts_with('\'') {
-                    out.push(quoted_val_event(&item));
-                } else {
-                    out.push(plain_val_event(&item));
-                }
+                project_flow_seq_item(&item, out);
             }
             out.push("-SEQ".to_string());
         } else if let Some(scalar) = scalar_document_value(doc) {
@@ -110,11 +106,7 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
     {
         out.push("+SEQ []".to_string());
         for item in items {
-            if item.starts_with('"') || item.starts_with('\'') {
-                out.push(quoted_val_event(&item));
-            } else {
-                out.push(plain_val_event(&item));
-            }
+            project_flow_seq_item(&item, out);
         }
         out.push("-SEQ".to_string());
     } else if let Some(scalar) = scalar_document_value(doc) {
@@ -172,6 +164,90 @@ fn flow_scalar_event(text: &str) -> String {
     } else {
         plain_val_event(&fold_plain_scalar(text))
     }
+}
+
+/// Locate a flow-context key/value `:` indicator within a flow-sequence item.
+/// Per YAML 1.2 a `:` is the mapping-key indicator only when followed by
+/// whitespace or by end of the item; otherwise it's part of a plain scalar
+/// (e.g. `http://foo.com`). Quoted regions are skipped.
+fn flow_kv_split(item: &str) -> Option<(usize, usize)> {
+    let bytes = item.as_bytes();
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut escaped_double = false;
+    for (idx, ch) in item.char_indices() {
+        if in_double {
+            if escaped_double {
+                escaped_double = false;
+                continue;
+            }
+            match ch {
+                '\\' => escaped_double = true,
+                '"' => in_double = false,
+                _ => {}
+            }
+            continue;
+        }
+        if in_single {
+            if ch == '\'' {
+                in_single = false;
+            }
+            continue;
+        }
+        match ch {
+            '\'' => in_single = true,
+            '"' => in_double = true,
+            ':' => {
+                let next_off = idx + ch.len_utf8();
+                let after_is_break = next_off >= bytes.len()
+                    || matches!(bytes[next_off], b' ' | b'\t' | b'\n' | b'\r');
+                if after_is_break {
+                    return Some((idx, next_off));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Emit events for a single flow-sequence item: either `+MAP {} key val -MAP`
+/// when the item is a flow-map entry (`key: value`, possibly with empty key
+/// or value), or a single `=VAL` for a bare scalar.
+fn project_flow_seq_item(item: &str, out: &mut Vec<String>) {
+    if let Some((colon, after)) = flow_kv_split(item) {
+        let raw_key_full = item[..colon].trim();
+        // Strip the explicit-key `?` indicator (followed by whitespace or
+        // end-of-key) when present.
+        let raw_key = strip_explicit_key_indicator(raw_key_full);
+        let raw_value = item[after..].trim();
+        out.push("+MAP {}".to_string());
+        if raw_key.is_empty() {
+            out.push("=VAL :".to_string());
+        } else {
+            out.push(flow_scalar_event(raw_key));
+        }
+        if raw_value.is_empty() {
+            out.push("=VAL :".to_string());
+        } else {
+            out.push(flow_scalar_event(raw_value));
+        }
+        out.push("-MAP".to_string());
+    } else if item.trim_start().starts_with('"') || item.trim_start().starts_with('\'') {
+        out.push(quoted_val_event(item.trim()));
+    } else {
+        out.push(plain_val_event(&fold_plain_scalar(item)));
+    }
+}
+
+fn strip_explicit_key_indicator(key: &str) -> &str {
+    let trimmed = key.trim_start();
+    if let Some(rest) = trimmed.strip_prefix('?')
+        && (rest.is_empty() || rest.starts_with([' ', '\t', '\n']))
+    {
+        return rest.trim_start();
+    }
+    key
 }
 
 fn quoted_val_event(text: &str) -> String {
@@ -476,11 +552,7 @@ fn project_block_sequence_items(seq_node: &SyntaxNode, out: &mut Vec<String>) {
             if let Some(flow_items) = simple_flow_sequence_items(&flow_text) {
                 out.push("+SEQ []".to_string());
                 for value in flow_items {
-                    if value.starts_with('"') || value.starts_with('\'') {
-                        out.push(quoted_val_event(&value));
-                    } else {
-                        out.push(plain_val_event(&value));
-                    }
+                    project_flow_seq_item(&value, out);
                 }
                 out.push("-SEQ".to_string());
                 continue;
@@ -552,7 +624,7 @@ fn project_block_map_entries(map_node: &SyntaxNode, out: &mut Vec<String>) {
             .children_with_tokens()
             .filter_map(|el| el.into_token())
             .find(|tok| tok.kind() == SyntaxKind::YAML_KEY)
-            .map(|tok| tok.text().to_string())
+            .map(|tok| tok.text().trim_end().to_string())
             .expect("key token");
 
         let key_event = if let Some(tag) = key_tag {
@@ -620,11 +692,7 @@ fn project_block_map_entries(map_node: &SyntaxNode, out: &mut Vec<String>) {
         {
             out.push("+SEQ []".to_string());
             for item in items {
-                if item.starts_with('"') || item.starts_with('\'') {
-                    out.push(quoted_val_event(&item));
-                } else {
-                    out.push(plain_val_event(&item));
-                }
+                project_flow_seq_item(&item, out);
             }
             out.push("-SEQ".to_string());
         } else if value_text.is_empty() {

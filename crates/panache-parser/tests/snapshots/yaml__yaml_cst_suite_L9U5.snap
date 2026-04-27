@@ -1,0 +1,35 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: L9U5
+input: "implicit block key : [\n  implicit flow key : value,\n ]\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..55
+  YAML_METADATA_CONTENT@0..55
+    YAML_STREAM@0..55
+      YAML_DOCUMENT@0..55
+        YAML_BLOCK_MAP@0..55
+          YAML_BLOCK_MAP_ENTRY@0..55
+            YAML_BLOCK_MAP_KEY@0..20
+              YAML_KEY@0..19 "implicit block key "
+              YAML_COLON@19..20 ":"
+            YAML_BLOCK_MAP_VALUE@20..54
+              WHITESPACE@20..21 " "
+              YAML_FLOW_SEQUENCE@21..54
+                YAML_SCALAR@21..22 "["
+                YAML_FLOW_SEQUENCE_ITEM@22..50
+                  YAML_SCALAR@22..23 "\n"
+                  YAML_SCALAR@23..23 ""
+                  WHITESPACE@23..25 "  "
+                  YAML_SCALAR@25..50 "implicit flow key : v ..."
+                YAML_SCALAR@50..51 ","
+                YAML_FLOW_SEQUENCE_ITEM@51..53
+                  YAML_SCALAR@51..52 "\n"
+                  YAML_SCALAR@52..52 ""
+                  WHITESPACE@52..53 " "
+                YAML_SCALAR@53..54 "]"
+            NEWLINE@54..55 "\n"
