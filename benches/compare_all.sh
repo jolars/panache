@@ -55,6 +55,7 @@ fi
 HAVE_PRETTIER=$(command -v prettier >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_PANDOC=$(command -v pandoc >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_RUMDL=$(command -v rumdl >/dev/null 2>&1 && echo "yes" || echo "no")
+HAVE_MDFORMAT=$(command -v mdformat >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_HYPERFINE=$(command -v hyperfine >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_JQ=$(command -v jq >/dev/null 2>&1 && echo "yes" || echo "no")
 
@@ -81,6 +82,7 @@ log "  panache: yes (building...)"
 [ "$HAVE_PRETTIER" = "yes" ] && log "  prettier: yes ($(prettier --version))"
 [ "$HAVE_PANDOC" = "yes" ] && log "  pandoc: yes ($(pandoc --version | head -1 | cut -d' ' -f2))"
 [ "$HAVE_RUMDL" = "yes" ] && log "  rumdl: yes ($(rumdl --version | awk '{print $2}'))"
+[ "$HAVE_MDFORMAT" = "yes" ] && log "  mdformat: yes ($(mdformat --version | awk '{print $2}'))"
 if [ "$JSON_MODE" = "1" ]; then
     log "  backend: $BACKEND"
     if [ "$BACKEND" = "shell-loop" ] && [ "$HAVE_HYPERFINE" = "no" ]; then
@@ -98,9 +100,11 @@ PANACHE_VER=$("$PANACHE" --version | awk '{print $2}')
 PRETTIER_VER=""
 PANDOC_VER=""
 RUMDL_VER=""
+MDFORMAT_VER=""
 [ "$HAVE_PRETTIER" = "yes" ] && PRETTIER_VER=$(prettier --version)
 [ "$HAVE_PANDOC" = "yes" ] && PANDOC_VER=$(pandoc --version | head -1 | awk '{print $2}')
 [ "$HAVE_RUMDL" = "yes" ] && RUMDL_VER=$(rumdl --version | awk '{print $2}')
+[ "$HAVE_MDFORMAT" = "yes" ] && MDFORMAT_VER=$(mdformat --version | awk '{print $2}')
 
 # Host info
 HOST_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -208,12 +212,14 @@ benchmark_document() {
         [prettier]="prettier --parser markdown $DOCS_DIR/$file"
         [pandoc]="pandoc $DOCS_DIR/$file -f markdown -t markdown"
         [rumdl]="rumdl fmt --fix --stdin --no-cache --silent < $DOCS_DIR/$file"
+        [mdformat]="mdformat - < $DOCS_DIR/$file"
     )
 
     local formatters=("panache")
     [ "$HAVE_PRETTIER" = "yes" ] && formatters+=("prettier")
-    [ "$HAVE_PANDOC" = "yes" ]  && formatters+=("pandoc")
-    [ "$HAVE_RUMDL" = "yes" ]   && formatters+=("rumdl")
+    [ "$HAVE_PANDOC" = "yes" ]   && formatters+=("pandoc")
+    [ "$HAVE_RUMDL" = "yes" ]    && formatters+=("rumdl")
+    [ "$HAVE_MDFORMAT" = "yes" ] && formatters+=("mdformat")
 
     local panache_us=""
     local fmt cmd
@@ -292,6 +298,9 @@ if [ "$JSON_MODE" = "1" ]; then
         fi
         if [ "$HAVE_RUMDL" = "yes" ]; then
             printf ',\n      "rumdl":    {"version": "%s"}' "$(json_escape "$RUMDL_VER")"
+        fi
+        if [ "$HAVE_MDFORMAT" = "yes" ]; then
+            printf ',\n      "mdformat": {"version": "%s"}' "$(json_escape "$MDFORMAT_VER")"
         fi
         printf '\n    }\n'
         printf '  },\n'

@@ -2,8 +2,8 @@
 title: "Performance"
 description: >
   This page presents performance benchmarks for Panache, comparing its formatting
-  and linting speed against popular alternatives like Prettier, Pandoc, and
-  rumdl on real Quarto and Markdown documents. The benchmarks highlight
+  and linting speed against popular alternatives like Prettier, Pandoc, rumdl,
+  and mdformat on real Quarto and Markdown documents. The benchmarks highlight
   Panache's efficiency and suitability for on-save formatting and fast
   repository-wide checks.
 engine: knitr
@@ -15,9 +15,10 @@ freeze: true
 **Panache** is designed for speed without compromising on correctness. Built in
 Rust and compiled to native code, it delivers fast formatting with zero startup
 overhead. In this document, we present benchmarks comparing Panache's formatting
-and linting performance against popular alternatives like Prettier, Pandoc, and
-rumdl on a realistic corpus of Quarto and Markdown documents. We don't include R
-Markdown benchmarks here because no other tool supports that format.
+and linting performance against popular alternatives like Prettier, Pandoc,
+rumdl, and mdformat on a realistic corpus of Quarto and Markdown documents. We
+don't include R Markdown benchmarks here because no other tool supports that
+format.
 
 We have split the benchmarks into two suites: per-document benchmarks that run
 each formatter on each document in the corpus individually, and repository-wide
@@ -110,7 +111,7 @@ html`<div class="callout-note">
     <li>Generated: ${new Date(data.meta.generated_at).toUTCString()}</li>
     <li>Host: ${data.meta.host.cpu} (${data.meta.host.os}/${data.meta.host.arch})</li>
     <li>Minimum runs: ${data.meta.min_runs}</li>
-    <li>panache ${data.meta.tools.panache.version}, prettier ${data.meta.tools.prettier?.version ?? "n/a"}, pandoc ${data.meta.tools.pandoc?.version ?? "n/a"}, rumdl ${data.meta.tools.rumdl?.version ?? "n/a"}</li>
+    <li>panache ${data.meta.tools.panache.version}, prettier ${data.meta.tools.prettier?.version ?? "n/a"}, pandoc ${data.meta.tools.pandoc?.version ?? "n/a"}, rumdl ${data.meta.tools.rumdl?.version ?? "n/a"}, mdformat ${data.meta.tools.mdformat?.version ?? "n/a"}</li>
   </ul>
 </div>`
 ```
@@ -120,18 +121,18 @@ html`<div class="callout-note">
 ### Single-Document
 
 In @fig-plot-results, we compare formatting time per document across panache,
-Prettier, Pandoc, and rumdl. Each dot is one document; the y-axis shows time
-relative to panache (×, lower is faster). Panache sits at 1× by construction
-(dashed baseline) and other formatters land above it. Hover a point to see the
-absolute wall-clock time in milliseconds. Formatters are ordered left-to-right
-from fastest to slowest on average.
+Prettier, Pandoc, rumdl, and mdformat. Each dot is one document; the y-axis
+shows time relative to panache (×, lower is faster). Panache sits at 1× by
+construction (dashed baseline) and other formatters land above it. Hover a point
+to see the absolute wall-clock time in milliseconds. Formatters are ordered
+left-to-right from fastest to slowest on average.
 
 ```{ojs}
 //| label: fig-plot-results
 //| echo: false
 //| fig-cap: "Formatting time per document, comparing panache to Prettier,
-//|   Pandoc, and rumdl. Each dot is one document; the y-axis shows time
-//|   relative to panache (×, lower is faster)."
+//|   Pandoc, rumdl, and mdformat. Each dot is one document; the y-axis shows
+//|   time relative to panache (×, lower is faster)."
 
 Plot.plot({
   marginLeft: 60,
@@ -225,7 +226,8 @@ repoMarkdownFormat = FileAttachment("performance_repo_markdown_format_data.json"
 repoMarkdownFormatResults = prepareRepoSuiteRows(repoMarkdownFormat, {
   panache: "panache",
   prettier: "prettier",
-  rumdl: "rumdl"
+  rumdl: "rumdl",
+  mdformat: "mdformat"
 })
 repoMarkdownFormatTools = Array.from(
   d3.rollup(repoMarkdownFormatResults, v => d3.mean(v, d => d.ratio), d => d.toolLabel)
@@ -235,14 +237,16 @@ repoMarkdownFormatRepoMeta = new Map(repoMarkdownFormat.repos.map(r => [r.id, r]
 ```
 
 In @fig-repo-markdown-format, we compare formatting time across panache,
-Prettier, and rumdl on tracked Markdown files from several repositories.
+Prettier, rumdl, and mdformat on tracked Markdown files from several
+repositories.
 
 ```{ojs}
 //| label: fig-repo-markdown-format
 //| echo: false
-//| fig-cap: "Repository-wide formatting benchmarks on standard Markdown repos.
-//|   Each dot is one repo/tool pair; the y-axis shows time relative to panache
-//|   within that repo (×, lower is faster)."
+//| fig-cap: "Repository-wide formatting benchmarks on standard Markdown repos,
+//|   comparing panache to Prettier, rumdl, and mdformat. Each dot is one
+//|   repo/tool pair; the y-axis shows time relative to panache within that repo
+//|   (×, lower is faster)."
 
 Plot.plot({
   marginLeft: 60,

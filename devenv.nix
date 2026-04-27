@@ -27,6 +27,7 @@
     pkgs.wasm-pack
     pkgs.stylua
     pkgs.shellcheck
+    pkgs.mdformat
     pkgs.eslint
     pkgs.go-tools
     pkgs.yamlfmt

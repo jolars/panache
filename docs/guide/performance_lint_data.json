@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "meta": {
-    "generated_at": "2026-04-27T13:00:48Z",
+    "generated_at": "2026-04-27T13:19:22Z",
     "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
     "min_runs": 3,
     "tools": {
@@ -11,7 +11,7 @@
   },
   "corpus": {"file_count": 483, "total_bytes": 804549, "extension": "md"},
   "results": [
-    {"tool":"panache","mean_ms":69.5428,"stddev_ms":2.6502,"min_ms":64.6729,"max_ms":75.3971,"runs":43,"failed":false},
-    {"tool":"rumdl","mean_ms":160.0636,"stddev_ms":3.8664,"min_ms":146.7334,"max_ms":164.6514,"runs":18,"failed":false}
+    {"tool":"panache","mean_ms":70.8810,"stddev_ms":2.2675,"min_ms":67.1449,"max_ms":76.0158,"runs":39,"failed":false},
+    {"tool":"rumdl","mean_ms":161.5602,"stddev_ms":4.1315,"min_ms":148.4032,"max_ms":167.3078,"runs":18,"failed":false}
   ]
 }

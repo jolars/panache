@@ -3,7 +3,8 @@
   "meta": {
     "mode": "format",
     "track": "quarto",
-    "generated_at": "2026-04-27T11:18:04Z",
+    "panache_flavor": "quarto",
+    "generated_at": "2026-04-27T13:20:48Z",
     "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
     "min_runs": 3,
     "tools": {
@@ -19,13 +20,13 @@
     {"id":"jolars__panache","name":"jolars/panache","file_count":108,"total_bytes":173620,"extension":"qmd"}
   ],
   "results": [
-    {"repo":"quarto-dev__quarto-web","tool":"panache","mean_ms":32.0387,"stddev_ms":0.7866,"min_ms":30.9354,"max_ms":32.7993,"runs":4,"failed":false},
-    {"repo":"quarto-dev__quarto-web","tool":"rumdl","mean_ms":164.3703,"stddev_ms":1.9435,"min_ms":162.1895,"max_ms":165.9195,"runs":3,"failed":false},
-    {"repo":"mlr-org__mlr3book","tool":"panache","mean_ms":19.0544,"stddev_ms":1.2612,"min_ms":16.2547,"max_ms":24.4429,"runs":48,"failed":false},
-    {"repo":"mlr-org__mlr3book","tool":"rumdl","mean_ms":79.9886,"stddev_ms":3.3427,"min_ms":74.6728,"max_ms":87.3178,"runs":23,"failed":false},
-    {"repo":"RohanAlexander__tswd","tool":"panache","mean_ms":18.2720,"stddev_ms":1.1169,"min_ms":16.7560,"max_ms":20.8414,"runs":47,"failed":false},
-    {"repo":"RohanAlexander__tswd","tool":"rumdl","mean_ms":92.1885,"stddev_ms":5.2391,"min_ms":79.3178,"max_ms":103.8581,"runs":21,"failed":false},
-    {"repo":"jolars__panache","tool":"panache","mean_ms":8.6037,"stddev_ms":0.4033,"min_ms":7.9465,"max_ms":9.6253,"runs":23,"failed":false},
-    {"repo":"jolars__panache","tool":"rumdl","mean_ms":28.7154,"stddev_ms":1.4802,"min_ms":26.6550,"max_ms":32.3558,"runs":20,"failed":false}
+    {"repo":"quarto-dev__quarto-web","tool":"panache","mean_ms":30.3363,"stddev_ms":0.4699,"min_ms":29.7717,"max_ms":30.8726,"runs":5,"failed":false},
+    {"repo":"quarto-dev__quarto-web","tool":"rumdl","mean_ms":160.9382,"stddev_ms":3.5442,"min_ms":156.4280,"max_ms":165.0884,"runs":4,"failed":false},
+    {"repo":"mlr-org__mlr3book","tool":"panache","mean_ms":18.4417,"stddev_ms":0.8116,"min_ms":17.0859,"max_ms":20.8224,"runs":54,"failed":false},
+    {"repo":"mlr-org__mlr3book","tool":"rumdl","mean_ms":80.3580,"stddev_ms":2.7616,"min_ms":74.8181,"max_ms":87.0073,"runs":24,"failed":false},
+    {"repo":"RohanAlexander__tswd","tool":"panache","mean_ms":17.8887,"stddev_ms":0.9413,"min_ms":15.9129,"max_ms":20.9954,"runs":52,"failed":false},
+    {"repo":"RohanAlexander__tswd","tool":"rumdl","mean_ms":90.7765,"stddev_ms":3.8736,"min_ms":84.1089,"max_ms":103.3642,"runs":23,"failed":false},
+    {"repo":"jolars__panache","tool":"panache","mean_ms":8.1720,"stddev_ms":0.3308,"min_ms":7.6688,"max_ms":9.1146,"runs":25,"failed":false},
+    {"repo":"jolars__panache","tool":"rumdl","mean_ms":27.8302,"stddev_ms":1.8281,"min_ms":26.0061,"max_ms":35.1047,"runs":22,"failed":false}
   ]
 }

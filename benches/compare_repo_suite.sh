@@ -63,6 +63,7 @@ HAVE_HYPERFINE=$(command -v hyperfine >/dev/null 2>&1 && echo yes || echo no)
 HAVE_JQ=$(command -v jq >/dev/null 2>&1 && echo yes || echo no)
 HAVE_PRETTIER=$(command -v prettier >/dev/null 2>&1 && echo yes || echo no)
 HAVE_RUMDL=$(command -v rumdl >/dev/null 2>&1 && echo yes || echo no)
+HAVE_MDFORMAT=$(command -v mdformat >/dev/null 2>&1 && echo yes || echo no)
 
 if [[ "$HAVE_HYPERFINE" != yes || "$HAVE_JQ" != yes ]]; then
     log "compare_repo_suite.sh requires hyperfine and jq"
@@ -76,8 +77,10 @@ PANACHE="$REPO_ROOT/target/release/panache"
 PANACHE_VER=$("$PANACHE" --version | awk '{print $2}')
 PRETTIER_VER=""
 RUMDL_VER=""
+MDFORMAT_VER=""
 [[ "$HAVE_PRETTIER" == yes ]] && PRETTIER_VER=$(prettier --version)
 [[ "$HAVE_RUMDL" == yes ]] && RUMDL_VER=$(rumdl --version | awk '{print $2}')
+[[ "$HAVE_MDFORMAT" == yes ]] && MDFORMAT_VER=$(mdformat --version | awk '{print $2}')
 
 HOST_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 HOST_ARCH=$(uname -m)
@@ -93,9 +96,17 @@ cleanup() {
 trap cleanup EXIT
 
 declare -a REPOS=()
+# Per-track panache flavor. The defaults reflect what each corpus actually is:
+# the Markdown-track repos (jgm/pandoc fixtures, rust-lang/book, rust-lang/reference)
+# are all GFM/CommonMark, so running them under panache's default Pandoc flavor
+# costs extra parser+lint work for syntax that is never present (citations,
+# crossrefs, fenced divs, ...). Quarto-track repos keep Quarto. The flavor is
+# applied via a per-corpus panache.toml below.
+PANACHE_FLAVOR=""
 case "$TRACK" in
     markdown)
         FILE_GLOB='*.md'
+        PANACHE_FLAVOR="gfm"
         REPOS=(
             "jgm/pandoc"
             "rust-lang/book"
@@ -104,6 +115,7 @@ case "$TRACK" in
         ;;
     quarto)
         FILE_GLOB='*.qmd'
+        PANACHE_FLAVOR="quarto"
         REPOS=(
             "quarto-dev/quarto-web"
             "mlr-org/mlr3book"
@@ -183,6 +195,13 @@ for repo in "${REPOS[@]}"; do
             flat="${src//\//__}"
             echo "cp '$repo_dir/$src' '$corpus_dir/$flat'"
         done
+        # Per-corpus panache.toml so the bench measures the realistic flavor
+        # for the corpus (gfm for plain Markdown, quarto for .qmd) instead of
+        # the default Pandoc flavor, which would force panache to run rules
+        # and parser paths that don't apply to the corpus content.
+        if [[ -n "$PANACHE_FLAVOR" ]]; then
+            echo "printf 'flavor = \"%s\"\n' '$PANACHE_FLAVOR' > '$corpus_root/panache.toml'"
+        fi
     } > "$prepare_script"
 
     REPOS_JSON+=("$(printf '{"id":"%s","name":"%s","file_count":%d,"total_bytes":%d,"extension":"%s"}' \
@@ -195,8 +214,16 @@ for repo in "${REPOS[@]}"; do
     declare -A TOOL_CMD=()
     declare -a TOOLS=()
 
+    # Drop --isolated when a corpus panache.toml is present so panache picks
+    # up the per-track flavor; --no-cache still skips the on-disk cache so
+    # we measure cold work, not cache lookups.
+    panache_iso_flag=""
+    if [[ -z "$PANACHE_FLAVOR" ]]; then
+        panache_iso_flag="--isolated"
+    fi
+
     if [[ "$MODE" == "format" ]]; then
-        TOOL_CMD[panache]="$PANACHE format --isolated --no-cache '$corpus_dir' >/dev/null"
+        TOOL_CMD[panache]="$PANACHE format $panache_iso_flag --no-cache '$corpus_dir' >/dev/null"
         TOOLS=(panache)
         if [[ "$TRACK" == "markdown" && "$HAVE_PRETTIER" == yes ]]; then
             TOOL_CMD[prettier]="prettier --write --log-level silent '$corpus_dir'/*.md >/dev/null 2>&1 || true"
@@ -206,8 +233,12 @@ for repo in "${REPOS[@]}"; do
             TOOL_CMD[rumdl]="rumdl fmt --isolated --no-cache '$corpus_dir' >/dev/null 2>&1 || true"
             TOOLS+=(rumdl)
         fi
+        if [[ "$TRACK" == "markdown" && "$HAVE_MDFORMAT" == yes ]]; then
+            TOOL_CMD[mdformat]="mdformat '$corpus_dir'/*.md >/dev/null 2>&1 || true"
+            TOOLS+=(mdformat)
+        fi
     else
-        TOOL_CMD[panache]="$PANACHE lint --isolated --no-cache --quiet '$corpus_dir' >/dev/null 2>&1"
+        TOOL_CMD[panache]="$PANACHE lint $panache_iso_flag --no-cache --quiet '$corpus_dir' >/dev/null 2>&1"
         TOOLS=(panache)
         if [[ "$HAVE_RUMDL" == yes ]]; then
             TOOL_CMD[rumdl]="rumdl check --isolated --no-cache --silent --fail-on never '$corpus_dir' >/dev/null 2>&1"
@@ -237,6 +268,7 @@ mkdir -p "$(dirname "$JSON_OUT")"
     printf '  "meta": {\n'
     printf '    "mode": "%s",\n' "$MODE"
     printf '    "track": "%s",\n' "$TRACK"
+    printf '    "panache_flavor": "%s",\n' "$(json_escape "${PANACHE_FLAVOR:-pandoc}")"
     printf '    "generated_at": "%s",\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf '    "host": {"os": "%s", "arch": "%s", "cpu": "%s", "cores": %s},\n' \
         "$(json_escape "$HOST_OS")" "$(json_escape "$HOST_ARCH")" "$(json_escape "$HOST_CPU")" "$HOST_CORES"
@@ -248,6 +280,9 @@ mkdir -p "$(dirname "$JSON_OUT")"
     fi
     if [[ -n "$RUMDL_VER" ]]; then
         printf ',\n      "rumdl": {"version": "%s"}' "$(json_escape "$RUMDL_VER")"
+    fi
+    if [[ -n "$MDFORMAT_VER" ]]; then
+        printf ',\n      "mdformat": {"version": "%s"}' "$(json_escape "$MDFORMAT_VER")"
     fi
     printf '\n    }\n'
     printf '  },\n'
