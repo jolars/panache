@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/jolars/panache/compare/panache-formatter-v0.2.1...panache-formatter-v0.3.0) (2026-04-27)
+
+### Features
+- **cli:** make `--debug` actually useful in release builds ([`92a54ec`](https://github.com/jolars/panache/commit/92a54ecc087a10347a94fccfb7210dfdc345220f))
+
+### Bug Fixes
+- **formatter:** avoid quote character collisions ([`3c04c34`](https://github.com/jolars/panache/commit/3c04c3406eb4c84d1e1ef9a4dfe4051b33a6d111)), closes [#225](https://github.com/jolars/panache/issues/225)
+
 ## [0.2.1](https://github.com/jolars/panache/compare/panache-formatter-v0.2.0...panache-formatter-v0.2.1) (2026-04-24)
 
 ### Bug Fixes

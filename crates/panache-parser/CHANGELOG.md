@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/jolars/panache/compare/panache-parser-v0.4.2...panache-parser-v0.5.0) (2026-04-27)
+
+### Features
+- **cli:** make `--debug` actually useful in release builds ([`92a54ec`](https://github.com/jolars/panache/commit/92a54ecc087a10347a94fccfb7210dfdc345220f))
+
+### Bug Fixes
+- **parser:** emit empty cells for degenerate cells ([`095ada7`](https://github.com/jolars/panache/commit/095ada7da13f020de9856ae0ac06d2d441d451cd)), fixes [#224](https://github.com/jolars/panache/issues/224)
+
 ## [0.4.2](https://github.com/jolars/panache/compare/panache-parser-v0.4.1...panache-parser-v0.4.2) (2026-04-24)
 
 ### Bug Fixes
