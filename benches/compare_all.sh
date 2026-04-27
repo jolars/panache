@@ -18,6 +18,7 @@ RESULTS_FILE="benches/benchmark_results.txt"
 
 JSON_MODE=0
 JSON_OUT="docs/guide/performance_data.json"
+HYPERFINE_MIN_RUNS=3
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -128,11 +129,11 @@ run_one_json() {
     if [ "$BACKEND" = "hyperfine" ]; then
         local tmp
         tmp=$(mktemp)
-        # --shell=default uses bash; --style=none silences progress UI;
-        # --show-output=false discards command stdout/stderr.
+        # --style=none silences the progress UI. Hyperfine hides command
+        # stdout/stderr by default; `--show-output` is an opt-in flag.
         hyperfine --warmup 1 \
-            --min-runs "$iterations" --max-runs "$iterations" \
-            --export-json "$tmp" --style=none --show-output=false \
+            --min-runs "$HYPERFINE_MIN_RUNS" \
+            --export-json "$tmp" --style=none \
             "$cmd" >/dev/null 2>&1
         local mean stddev min max runs
         mean=$(jq -r '.results[0].mean' "$tmp")
@@ -190,7 +191,11 @@ benchmark_document() {
     log "${BLUE}$name${NC}"
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     log "File: $file ($size bytes, $lines lines)"
-    log "Iterations: $iterations"
+    if [ "$JSON_MODE" = "1" ] && [ "$BACKEND" = "hyperfine" ]; then
+        log "Minimum runs: $HYPERFINE_MIN_RUNS"
+    else
+        log "Iterations: $iterations"
+    fi
     log
 
     if [ "$JSON_MODE" = "1" ]; then
@@ -199,7 +204,7 @@ benchmark_document() {
     fi
 
     declare -A FORMATTER_CMD=(
-        [panache]="$PANACHE format < $DOCS_DIR/$file"
+        [panache]="$PANACHE format --isolated --stdin-filename '$DOCS_DIR/$file' < '$DOCS_DIR/$file'"
         [prettier]="prettier --parser markdown $DOCS_DIR/$file"
         [pandoc]="pandoc $DOCS_DIR/$file -f markdown -t markdown"
         [rumdl]="rumdl fmt --fix --stdin --no-cache --silent < $DOCS_DIR/$file"
@@ -252,12 +257,12 @@ if [ "$JSON_MODE" = "0" ]; then
 fi
 
 # Document set
-benchmark_document "small"         "small.qmd"             "Small Document (747 bytes)"           50
-benchmark_document "medium"        "medium_quarto.qmd"     "Medium Document (9 KB)"               20
-benchmark_document "tables"        "tables.qmd"            "Tables Document (19 KB)"              20
-benchmark_document "math"          "math.qmd"              "Math Document (29 KB)"                20
-benchmark_document "large"         "large_authoring.qmd"   "Large Document (30 KB)"               10
-benchmark_document "pandoc_manual" "pandoc_manual.md"      "Pandoc Manual (large reference doc)"  3
+benchmark_document "pandoc_testsuite" "pandoc_testsuite.md" "Pandoc Testsuite Fixture (9 KB)"      20
+benchmark_document "tables"           "tables.qmd"          "Tables Document (19 KB)"              20
+benchmark_document "configuration"    "configuration.qmd"   "Configuration Guide (24 KB)"          10
+benchmark_document "math"             "math.qmd"            "Math Document (29 KB)"                10
+benchmark_document "large"            "large_authoring.qmd" "Large Document (30 KB)"               10
+benchmark_document "pandoc_manual"    "pandoc_manual.md"    "Pandoc Manual (large reference doc)"  3
 
 log "================================"
 log "Benchmark Complete"
@@ -276,6 +281,7 @@ if [ "$JSON_MODE" = "1" ]; then
             "$(json_escape "$HOST_ARCH")" \
             "$(json_escape "$HOST_CPU")"
         printf '    "backend": "%s",\n' "$BACKEND"
+        printf '    "min_runs": %d,\n' "$HYPERFINE_MIN_RUNS"
         printf '    "tools": {\n'
         printf '      "panache":  {"version": "%s"}' "$(json_escape "$PANACHE_VER")"
         if [ "$HAVE_PRETTIER" = "yes" ]; then

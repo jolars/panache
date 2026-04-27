@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "mode": "lint",
+    "track": "markdown",
+    "generated_at": "2026-04-27T11:18:36Z",
+    "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
+    "min_runs": 3,
+    "tools": {
+      "panache": {"version": "2.39.0"},
+      "prettier": {"version": "3.6.2"},
+      "rumdl": {"version": "0.1.67"}
+    }
+  },
+  "repos": [
+    {"id":"jgm__pandoc","name":"jgm/pandoc","file_count":1113,"total_bytes":2782992,"extension":"md"},
+    {"id":"rust-lang__book","name":"rust-lang/book","file_count":478,"total_bytes":2762055,"extension":"md"},
+    {"id":"rust-lang__reference","name":"rust-lang/reference","file_count":153,"total_bytes":1139492,"extension":"md"}
+  ],
+  "results": [
+    {"repo":"jgm__pandoc","tool":"panache","mean_ms":1055.0462,"stddev_ms":22.4951,"min_ms":1041.5011,"max_ms":1081.0132,"runs":3,"failed":false},
+    {"repo":"jgm__pandoc","tool":"rumdl","mean_ms":218.8614,"stddev_ms":9.9692,"min_ms":208.0294,"max_ms":227.6518,"runs":3,"failed":false},
+    {"repo":"rust-lang__book","tool":"panache","mean_ms":101.3904,"stddev_ms":3.0890,"min_ms":96.8744,"max_ms":103.4331,"runs":4,"failed":false},
+    {"repo":"rust-lang__book","tool":"rumdl","mean_ms":71.1304,"stddev_ms":2.2826,"min_ms":69.8373,"max_ms":75.2000,"runs":5,"failed":false},
+    {"repo":"rust-lang__reference","tool":"panache","mean_ms":145.9982,"stddev_ms":2.9847,"min_ms":141.4331,"max_ms":150.6794,"runs":9,"failed":false},
+    {"repo":"rust-lang__reference","tool":"rumdl","mean_ms":43.8333,"stddev_ms":3.1343,"min_ms":38.1396,"max_ms":51.1920,"runs":14,"failed":false}
+  ]
+}

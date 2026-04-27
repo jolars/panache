@@ -1,5 +1,6 @@
 extend-exclude = [
   "assets/*",
+  "benches/**/*",
   "docs/changelog.md",
   "docs/reference/_formatter-presets-details.qmd",
   "docs/reference/_linter-presets-details.qmd",

@@ -4,18 +4,20 @@ This directory contains documents used for benchmarking panache performance.
 
 ## Document Sources
 
-Documents are not committed to the repository to keep it lightweight. Instead,
-they are downloaded on-demand using the setup script.
+The benchmark corpus mixes realistic project documents, upstream test fixtures,
+and a few targeted stress cases. The setup script refreshes the copied or
+downloaded files into this directory.
 
 ### Standard Benchmark Suite
 
 The benchmark suite includes:
 
-1. **Small document** (\~1KB) - Simple mixed content
-2. **Medium document** (\~50KB) - Real-world Quarto tutorial
-3. **Large document** (\~200KB) - Complex academic paper with tables/math
-4. **Table-heavy** (\~30KB) - Document with many complex tables
-5. **Math-heavy** (\~20KB) - Document with extensive mathematical notation
+1. **Pandoc testsuite fixture** (\~9KB) - downloaded from upstream pandoc
+   `test/testsuite.txt` as `pandoc_testsuite.md`
+2. **Configuration guide** (\~24KB) - copied from `docs/guide/configuration.qmd`
+3. **Table-heavy** (\~19KB) - Quarto tables documentation
+4. **Math-heavy** (\~29KB) - Quarto computational document with extensive math
+5. **Large authoring guide** (\~30KB) - Quarto markdown authoring guide
 6. **Pandoc MANUAL stress doc** (\~8000 lines) - downloaded from upstream pandoc
    `MANUAL.txt` as `pandoc_manual.md`
 
@@ -30,8 +32,9 @@ Download the benchmark documents:
 Or manually:
 
 ```bash
-# Medium: Quarto tutorial
-curl -o medium_quarto.qmd https://raw.githubusercontent.com/quarto-dev/quarto-web/main/docs/get-started/hello/rstudio.qmd
+# Local realistic doc + upstream fixture
+cp ../../docs/guide/configuration.qmd configuration.qmd
+curl -o pandoc_testsuite.md https://raw.githubusercontent.com/jgm/pandoc/main/test/testsuite.txt
 
 # Large: Quarto authoring guide (complex)
 curl -o large_authoring.qmd https://raw.githubusercontent.com/quarto-dev/quarto-web/main/docs/authoring/markdown-basics.qmd
@@ -60,8 +63,8 @@ cargo bench --bench formatting
 benches/documents/
 ├── README.md           # This file
 ├── download.sh         # Download script
-├── small.qmd           # Committed - small synthetic document
-├── medium_quarto.qmd   # Downloaded - not in git
+├── configuration.qmd   # Copied from docs/guide/configuration.qmd
+├── pandoc_testsuite.md # Downloaded from upstream pandoc testsuite
 ├── large_authoring.qmd # Downloaded - not in git
 ├── tables.qmd          # Downloaded - not in git
 ├── math.qmd            # Downloaded - not in git

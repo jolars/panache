@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "generated_at": "2026-04-27T11:25:59Z",
+    "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor"},
+    "min_runs": 3,
+    "tools": {
+      "panache": {"version": "2.39.0"},
+      "rumdl":   {"version": "0.1.67"}
+    }
+  },
+  "documents": [
+    {"id":"pandoc_testsuite","name":"Pandoc Testsuite Fixture (9 KB)","file":"pandoc_testsuite.md","size_bytes":9207,"lines":724},
+    {"id":"tables","name":"Tables Document (19 KB)","file":"tables.qmd","size_bytes":18833,"lines":636},
+    {"id":"configuration","name":"Configuration Guide (24 KB)","file":"configuration.qmd","size_bytes":24435,"lines":1028},
+    {"id":"math","name":"Math Document (29 KB)","file":"math.qmd","size_bytes":28562,"lines":664},
+    {"id":"large","name":"Large Document (30 KB)","file":"large_authoring.qmd","size_bytes":29858,"lines":592},
+    {"id":"pandoc_manual","name":"Pandoc Manual (large reference doc)","file":"pandoc_manual.md","size_bytes":299536,"lines":8036}
+  ],
+  "results": [
+    {"document":"pandoc_testsuite","tool":"panache","mean_ms":9.0901,"stddev_ms":0.5934,"min_ms":7.8039,"max_ms":11.3406,"runs":261},
+    {"document":"pandoc_testsuite","tool":"rumdl","mean_ms":18.5511,"stddev_ms":0.8390,"min_ms":16.5859,"max_ms":21.3354,"runs":149},
+    {"document":"tables","tool":"panache","mean_ms":11.1333,"stddev_ms":0.5444,"min_ms":9.9839,"max_ms":13.2707,"runs":223},
+    {"document":"tables","tool":"rumdl","mean_ms":12.0758,"stddev_ms":0.6856,"min_ms":10.6771,"max_ms":14.9299,"runs":225},
+    {"document":"configuration","tool":"panache","mean_ms":17.4043,"stddev_ms":0.7877,"min_ms":16.1110,"max_ms":23.7674,"runs":160},
+    {"document":"configuration","tool":"rumdl","mean_ms":13.6345,"stddev_ms":0.7039,"min_ms":11.8052,"max_ms":15.2246,"runs":190},
+    {"document":"math","tool":"panache","mean_ms":12.6462,"stddev_ms":0.6559,"min_ms":11.2950,"max_ms":14.8673,"runs":209},
+    {"document":"math","tool":"rumdl","mean_ms":16.7432,"stddev_ms":0.8055,"min_ms":14.6556,"max_ms":18.7314,"runs":153},
+    {"document":"large","tool":"panache","mean_ms":12.6017,"stddev_ms":0.6022,"min_ms":11.5224,"max_ms":14.5996,"runs":200},
+    {"document":"large","tool":"rumdl","mean_ms":14.6440,"stddev_ms":0.6826,"min_ms":13.2279,"max_ms":16.7535,"runs":168},
+    {"document":"pandoc_manual","tool":"panache","mean_ms":179.7764,"stddev_ms":9.3118,"min_ms":162.8454,"max_ms":189.4774,"runs":16},
+    {"document":"pandoc_manual","tool":"rumdl","mean_ms":135.8876,"stddev_ms":3.1662,"min_ms":131.3022,"max_ms":143.4654,"runs":21}
+  ]
+}

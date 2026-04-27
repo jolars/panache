@@ -8,10 +8,13 @@ cd "$DOCS_DIR"
 echo "Downloading benchmark documents..."
 echo
 
-# Medium: Quarto getting started tutorial
-echo "📄 Downloading medium_quarto.qmd..."
-curl -sL -o medium_quarto.qmd \
-  https://raw.githubusercontent.com/quarto-dev/quarto-web/main/docs/get-started/hello/rstudio.qmd
+# Local realistic doc + upstream fixture
+echo "📄 Copying configuration.qmd..."
+cp ../../docs/guide/configuration.qmd configuration.qmd
+
+echo "📄 Downloading pandoc_testsuite.md..."
+curl -sL -o pandoc_testsuite.md \
+  https://raw.githubusercontent.com/jgm/pandoc/main/test/testsuite.txt
 
 # Large: Markdown basics (comprehensive)
 echo "📄 Downloading large_authoring.qmd..."

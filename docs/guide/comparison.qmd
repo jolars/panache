@@ -1,0 +1,168 @@
+---
+title: "Comparison with Other Tools"
+description: >
+  This page compares Panache to other tools that overlap with parts of its
+  scope -- formatting, linting, and language-server features for Markdown,
+  Pandoc, and Quarto. The goal is to clarify what each tool is built for, so
+  you can pick the right one (or combine them) for your project.
+---
+
+## At a Glance
+
+Panache is a single binary that aims to cover the full authoring loop for
+Pandoc-flavoured Markdown: a *formatter*, a *linter*, and a *language server*
+that all share the same lossless concrete syntax tree. Most other tools in this
+space only cover one of these roles, and most do not understand
+Pandoc/Quarto-specific syntax (fenced divs, attributed code blocks,
+bracketed-span attributes, raw blocks, table captions, frontmatter, math
+environments, citation keys, and so on).
+
+### Overview
+
+The first table covers what each tool *is*: formatter, linter, language server,
+or some combination.
+
+  | Capability     | Panache | marksman  | rumdl | Prettier |
+  | -------------- | ------- | --------- | ----- | -------- |
+  | Formatter      | ●       | ○         | ◐[^1] | ●        |
+  | Linter         | ●       | ◐[^2]     | ●     | ○        |
+  | LSP            | ●       | ●         | ●     | ○        |
+  | Implementation | Rust    | F# / .NET | Rust  | TS       |
+
+  : Tooling roles covered by each project. Marks: ● full, ◐ partial, ○ none.
+
+[^1]: rumdl has no dedicated formatting pipeline; `rumdl fmt` is an alias for
+    `check --fix` and applies whichever fixes the enabled lint rules produced.
+
+[^2]: marksman emits diagnostics for broken wikilinks, duplicate headings, and a
+    handful of structural issues, but it is not a general style linter.
+
+### Markdown Flavors
+
+Markdown is not one language but a family of flavors (dialects), and the
+differences matter: a "format" pass that does not understand a construct will,
+at best, preserve it verbatim and, at worst, rewrite it into something the
+renderer no longer accepts. Panache parses and formats every dialect in the
+table below; the other tools cover a narrower slice.
+
+  | Dialect       | Panache | marksman | rumdl | Prettier |
+  | ------------- | ------- | -------- | ----- | -------- |
+  | CommonMark    | ●       | ●        | ●     | ●        |
+  | GFM           | ●       | ●        | ●     | ●        |
+  | Pandoc        | ●       | ◐[^3]    | ○     | ○        |
+  | Quarto        | ●       | ○        | ◐[^4] | ○        |
+  | R Markdown    | ●       | ○        | ◐[^4] | ○        |
+  | MultiMarkdown | ●       | ○        | ○     | ○        |
+  | MDX           | ○       | ○        | ○     | ●        |
+  | Wikilinks[^5] | ◐       | ●        | ○     | ○        |
+
+  : Markdown dialect coverage across the four tools.
+
+[^3]: marksman recognises YAML frontmatter and code fences but does not parse
+    Pandoc-specific block constructs (fenced divs, bracketed spans, attribute
+    syntax, definition lists, table captions, etc.).
+
+[^4]: rumdl will lint `.qmd` and `.Rmd` files and skip YAML frontmatter, but it
+    does not parse Quarto/R Markdown executable code blocks, shortcodes, or
+    cross-reference syntax -- those are treated as plain Markdown.
+
+[^5]: Obsidian/Foam-style `[[wikilinks]]`. Panache preserves them verbatim;
+    marksman builds its cross-reference graph around them.
+
+For raw speed numbers, see [Performance](performance.qmd). This page focuses on
+*scope* and *behaviour* differences, not benchmarks.
+
+## Marksman
+
+[Marksman](https://github.com/artempyanykh/marksman) is a language server for
+Markdown, with first-class support for wikilink-style cross-file references. It
+is a great fit for note-taking workflows (Obsidian/Foam/Zettelkasten-style
+vaults) where the document graph matters as much as any individual file.
+
+**What it does well**
+
+- Workspace-wide indexing: jump-to-definition and find-references across
+  headings, wikilinks, and footnotes.
+- Completion for headings, wikilinks, and reference links.
+- Diagnostics for broken or ambiguous links and duplicate headings.
+- Document and workspace symbol providers, suitable for outline views.
+
+**Where it differs from panache**
+
+- *Not a formatter.* marksman has no `format` command and no formatting code
+  actions; you still need a separate tool to normalise whitespace, wrap
+  paragraphs, or align tables.
+- *Not a style linter.* It catches structural problems (broken refs, duplicate
+  anchors), but it will not warn about, say, skipped heading levels or mixed
+  list markers.
+- *Markdown-flavoured, not Pandoc-flavoured.* Pandoc-only constructs such as
+  `::: callout-note` fenced divs, `[text]{.class}` bracketed spans,
+  `{#id .class}` block attributes, definition lists, line blocks, and
+  `Table: caption` syntax are treated as plain text. Quarto shortcodes and
+  cross-references behave the same way.
+
+## rumdl
+
+[rumdl](https://github.com/rvben/rumdl) is a Rust-native Markdown *linter* with
+a `rumdl fmt` command that re-uses the lint engine to apply auto-fixes. It is
+heavily inspired by `markdownlint` and ports many of its rules.
+
+**What it does well**
+
+- A large catalogue of style rules (heading style, list indentation, line
+  length, trailing whitespace, blank lines, etc.) compatible with the
+  `markdownlint` rule numbering.
+- Native compilation gives it fast startup and per-file throughput.
+- Configurable per-rule severity and per-file disable comments.
+
+**Where it differs from panache**
+
+- *Lint-engine formatter, not a formatter.* `rumdl fmt` is documented as an
+  alias for `check --fix`. There is no dedicated formatting pipeline: every
+  "format" run goes through the lint engine and applies whichever fixes the
+  enabled rules produced. That means the output depends on which rules are on,
+  and rules that do not produce fixes leave their target untouched.
+- *No Pandoc/Quarto syntax model.* rumdl operates on CommonMark + GFM
+  extensions. Fenced divs, bracketed spans, block attributes, raw blocks, Pandoc
+  tables with captions, and similar constructs are either rewritten as plain
+  Markdown or left untouched in ways that can break downstream Pandoc rendering.
+- *Idempotency is rule-dependent.* Because formatting is a side effect of fix
+  application, idempotency depends on the rule set; panache guarantees
+  `format(format(x)) == format(x)` regardless of configuration.
+- *No language server.* rumdl is a CLI; editor integration is via generic task
+  runners or external wrappers.
+
+## Prettier
+
+[Prettier](https://prettier.io) is a polyglot opinionated formatter for many
+languages, with first-party Markdown support. It is the most widely deployed
+Markdown formatter in the JavaScript ecosystem.
+
+**What it does well**
+
+- Mature, opinionated formatting with very few knobs to turn.
+- Strong CommonMark and GFM support, including tables, task lists, and
+  strikethrough.
+- Frontmatter (YAML/TOML) is recognised and preserved.
+- Massive ecosystem of editor integrations and pre-commit hooks.
+
+**Where it differs from panache**
+
+- *Markdown-only formatter.* Prettier has no linter and no language server
+  features. For diagnostics, navigation, or code actions you need other tools.
+- *No Pandoc/Quarto extensions.* Fenced divs, bracketed spans, block attributes,
+  raw blocks, definition lists, line blocks, math blocks beyond inline `$...$`,
+  and Pandoc-style table captions are not part of Prettier's Markdown grammar.
+  The default behaviour is to either pass them through verbatim or to rewrap
+  them in ways that can change semantics for Pandoc.
+- *Node.js startup overhead.* For one-off CLI invocations, the Node.js runtime
+  dominates the wall-clock time. See [Performance](performance.qmd) for numbers;
+  the gap shrinks for long-running processes (editor integrations, the Prettier
+  daemon) but does not close entirely.
+- *Opinionated wrapping only.* Prettier has a single `proseWrap` setting
+  (`always` / `never` / `preserve`); panache adds `sentence`-wrapping for
+  diff-friendly prose, plus configurable line width per file or directory.
+
+## Performance
+
+For head-to-head timing, see [Performance](performance.qmd).

@@ -92,6 +92,8 @@ website:
               text: Integrations
             - href: guide/performance.qmd
               text: Performance
+            - href: guide/comparison.qmd
+              text: Comparison
         - section: "Reference"
           style: floating
           href: reference/index.qmd

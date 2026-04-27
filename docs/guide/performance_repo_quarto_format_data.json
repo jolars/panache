@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "mode": "format",
+    "track": "quarto",
+    "generated_at": "2026-04-27T11:18:04Z",
+    "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
+    "min_runs": 3,
+    "tools": {
+      "panache": {"version": "2.39.0"},
+      "prettier": {"version": "3.6.2"},
+      "rumdl": {"version": "0.1.67"}
+    }
+  },
+  "repos": [
+    {"id":"quarto-dev__quarto-web","name":"quarto-dev/quarto-web","file_count":568,"total_bytes":2349853,"extension":"qmd"},
+    {"id":"mlr-org__mlr3book","name":"mlr-org/mlr3book","file_count":31,"total_bytes":974193,"extension":"qmd"},
+    {"id":"RohanAlexander__tswd","name":"RohanAlexander/tswd","file_count":34,"total_bytes":1475505,"extension":"qmd"},
+    {"id":"jolars__panache","name":"jolars/panache","file_count":108,"total_bytes":173620,"extension":"qmd"}
+  ],
+  "results": [
+    {"repo":"quarto-dev__quarto-web","tool":"panache","mean_ms":32.0387,"stddev_ms":0.7866,"min_ms":30.9354,"max_ms":32.7993,"runs":4,"failed":false},
+    {"repo":"quarto-dev__quarto-web","tool":"rumdl","mean_ms":164.3703,"stddev_ms":1.9435,"min_ms":162.1895,"max_ms":165.9195,"runs":3,"failed":false},
+    {"repo":"mlr-org__mlr3book","tool":"panache","mean_ms":19.0544,"stddev_ms":1.2612,"min_ms":16.2547,"max_ms":24.4429,"runs":48,"failed":false},
+    {"repo":"mlr-org__mlr3book","tool":"rumdl","mean_ms":79.9886,"stddev_ms":3.3427,"min_ms":74.6728,"max_ms":87.3178,"runs":23,"failed":false},
+    {"repo":"RohanAlexander__tswd","tool":"panache","mean_ms":18.2720,"stddev_ms":1.1169,"min_ms":16.7560,"max_ms":20.8414,"runs":47,"failed":false},
+    {"repo":"RohanAlexander__tswd","tool":"rumdl","mean_ms":92.1885,"stddev_ms":5.2391,"min_ms":79.3178,"max_ms":103.8581,"runs":21,"failed":false},
+    {"repo":"jolars__panache","tool":"panache","mean_ms":8.6037,"stddev_ms":0.4033,"min_ms":7.9465,"max_ms":9.6253,"runs":23,"failed":false},
+    {"repo":"jolars__panache","tool":"rumdl","mean_ms":28.7154,"stddev_ms":1.4802,"min_ms":26.6550,"max_ms":32.3558,"runs":20,"failed":false}
+  ]
+}

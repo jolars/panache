@@ -2,35 +2,49 @@
 title: "Performance"
 description: >
   This page presents performance benchmarks for Panache, comparing its formatting
-  speed against popular alternatives like Prettier, Pandoc, and rumdl on real
-  Quarto documents. The benchmarks highlight Panache's efficiency and suitability
-  for on-save formatting in editors.
+  and linting speed against popular alternatives like Prettier, Pandoc, and
+  rumdl on real Quarto and Markdown documents. The benchmarks highlight
+  Panache's efficiency and suitability for on-save formatting and fast
+  repository-wide checks.
 engine: knitr
 freeze: true
 ---
 
 ## Overview
 
-**panache** is designed for speed without compromising on correctness. Built in
+**Panache** is designed for speed without compromising on correctness. Built in
 Rust and compiled to native code, it delivers fast formatting with zero startup
-overhead.
+overhead. In this document, we present benchmarks comparing Panache's formatting
+and linting performance against popular alternatives like Prettier, Pandoc, and
+rumdl on a realistic corpus of Quarto and Markdown documents. We don't include R
+Markdown benchmarks here because no other tool supports that format.
 
-The numbers on this page are produced by the script in
-[`benches/compare_all.sh`](https://github.com/jolars/panache/blob/main/benches/compare_all.sh)
-and read from the JSON file written next to this document. Quarto's `freeze`
-caches the benchmark run; to refresh the numbers, delete
-`docs/_freeze/guide/performance/` and re-render.
+We have split the benchmarks into two suites: per-document benchmarks that run
+each formatter on each document in the corpus individually, and repository-wide
+benchmarks that run formatters on entire repositories of tracked documents. The
+former highlights raw formatting speed on a variety of real-world documents; the
+latter captures the overhead of processing multiple files in a single run, which
+is more representative of on-save formatting or large-scale linting. Caches are
+disabled for all benchmarks to show worst-case performance.
+
+The numbers on this page are produced by the scripts in
+[`benches/`](https://github.com/jolars/panache/tree/main/benches) and read from
+the JSON files written next to this document. The benchmark chunks on this page
+are intentionally not executed during preview or render, so small content edits
+reuse the existing JSON files instead of rerunning the benchmarks. Refresh the
+benchmark data explicitly with the commands at the bottom of this page, then
+delete `docs/_freeze/guide/performance/` and re-render if you want the page to
+pick up newly generated results.
 
 ```{bash}
 #| label: run-benchmarks
 #| echo: false
 #| output: false
+#| eval: false
 
 cd ../..
 bash benches/compare_all.sh --json --out docs/guide/performance_data.json
 ```
-
-## Benchmark Results
 
 ```{ojs}
 //| label: load-data
@@ -40,45 +54,50 @@ data = FileAttachment("performance_data.json").json()
 ```
 
 ```{ojs}
-//| label: prepare-panache-data
+//| label: prepare-records
 //| echo: false
 
-panacheBy = new Map(
-  data.results
-    .filter(r => r.formatter === "panache")
-    .map(r => [r.document, r.mean_ms])
+documentMeta = new Map(data.documents.map(d => [d.id, d]))
+
+panacheByDoc = d3.rollup(
+  data.results.filter(r => r.formatter === "panache"),
+  v => v[0].mean_ms,
+  r => r.document
 )
-```
 
-```{ojs}
-//| label: compute-ratios-by-formatter
-//| echo: false
+records = data.results.map(r => ({
+  formatter: r.formatter,
+  document: r.document,
+  documentName: documentMeta.get(r.document)?.name ?? r.document,
+  mean_ms: r.mean_ms,
+  runs: r.runs,
+  ratio: r.mean_ms / panacheByDoc.get(r.document)
+}))
 
-ratiosByFormatter = {
-  const out = {};
-  for (const r of data.results) {
-    if (r.formatter === "panache") continue;
-    const base = panacheBy.get(r.document);
-    if (!base) continue;
-    (out[r.formatter] ??= []).push(r.mean_ms / base);
-  }
-  return out;
-}
+formatters = Array.from(
+  d3.rollup(records, v => d3.mean(v, d => d.ratio), d => d.formatter)
+).sort(([, a], [, b]) => a - b).map(([k]) => k)
+
+documentIds = data.documents.map(d => d.id)
 ```
 
 ```{ojs}
 //| label: compute-ratios
 //| echo: false
 
-range = (formatter) => {
-  const xs = ratiosByFormatter[formatter] ?? [];
-  if (!xs.length) return "n/a";
-  const lo = Math.min(...xs), hi = Math.max(...xs);
-  return `${Math.round(lo)}\u2013${Math.round(hi)}x`;
-}
-prettierRange = range("prettier")
-pandocRange = range("pandoc")
-rumdlRange = range("rumdl")
+formatterRanges = d3.rollup(
+  records.filter(r => r.formatter !== "panache"),
+  v => {
+    const lo = Math.round(d3.min(v, d => d.ratio));
+    const hi = Math.round(d3.max(v, d => d.ratio));
+    return `${lo}\u2013${hi}x`;
+  },
+  d => d.formatter
+)
+
+prettierRange = formatterRanges.get("prettier") ?? "n/a"
+pandocRange = formatterRanges.get("pandoc") ?? "n/a"
+rumdlRange = formatterRanges.get("rumdl") ?? "n/a"
 ```
 
 ```{ojs}
@@ -90,216 +109,519 @@ html`<div class="callout-note">
   <ul style="margin: 0">
     <li>Generated: ${new Date(data.meta.generated_at).toUTCString()}</li>
     <li>Host: ${data.meta.host.cpu} (${data.meta.host.os}/${data.meta.host.arch})</li>
-    <li>Backend: <code>${data.meta.backend}</code>${
-      data.meta.backend === "shell-loop"
-        ? html` <span style="opacity:.7">(install <code>hyperfine</code> for stddev/min/max)</span>`
-        : ""
-    }</li>
+    <li>Minimum runs: ${data.meta.min_runs}</li>
     <li>panache ${data.meta.tools.panache.version}, prettier ${data.meta.tools.prettier?.version ?? "n/a"}, pandoc ${data.meta.tools.pandoc?.version ?? "n/a"}, rumdl ${data.meta.tools.rumdl?.version ?? "n/a"}</li>
-    <li>Documents: real Quarto/Markdown files (see <code>benches/documents/download.sh</code>)</li>
   </ul>
 </div>`
 ```
 
+## Formatting
+
+### Single-Document
+
+In @fig-plot-results, we compare formatting time per document across panache,
+Prettier, Pandoc, and rumdl. Each dot is one document; the y-axis shows time
+relative to panache (×, lower is faster). Panache sits at 1× by construction
+(dashed baseline) and other formatters land above it. Hover a point to see the
+absolute wall-clock time in milliseconds. Formatters are ordered left-to-right
+from fastest to slowest on average.
+
 ```{ojs}
-//| label: plot-results
+//| label: fig-plot-results
 //| echo: false
+//| fig-cap: "Formatting time per document, comparing panache to Prettier,
+//|   Pandoc, and rumdl. Each dot is one document; the y-axis shows time
+//|   relative to panache (×, lower is faster)."
 
 Plot.plot({
   marginLeft: 60,
-  marginBottom: 60,
+  marginRight: 20,
+  marginBottom: 40,
+  marginTop: 20,
   height: 360,
-  x: {label: null, tickRotate: -20},
-  y: {type: "log", label: "Mean time (ms, log)"},
+  x: {label: null, domain: formatters},
+  y: {label: "Mean time relative to panache (×, lower is faster)", grid: true},
   color: {
     legend: true,
-    domain: ["panache", "rumdl", "pandoc", "prettier"],
-    range: ["#2a9d8f", "#264653", "#e76f51", "#f4a261"]
+    domain: documentIds,
+    tickFormat: id => documentMeta.get(id)?.name ?? id,
+    scheme: "tableau10"
   },
   marks: [
-    Plot.barY(data.results, {
+    Plot.ruleY([1], {stroke: "#2a9d8f", strokeWidth: 2, strokeDasharray: "4 3"}),
+    Plot.dot(records, {
       x: "formatter",
-      y: "mean_ms",
-      fill: "formatter",
-      fx: "document",
-      sort: {fx: null}
-    }),
-    Plot.ruleY([1])
+      y: "ratio",
+      fill: "document",
+      r: 6,
+      fillOpacity: 0.85,
+      stroke: "white",
+      strokeWidth: 1,
+      channels: {
+        document: "documentName",
+        "time (ms)": d => d.mean_ms.toFixed(1),
+        "× panache": d => d.ratio.toFixed(2)
+      },
+      tip: true
+    })
   ]
 })
 ```
 
-### Per-document timings
-
 ```{ojs}
-//| label: per-document-timings
+//| label: prepare-repo-suite-helper
 //| echo: false
 
-html`${data.documents.map(doc => {
-  const sizeKb = doc.size_bytes >= 1024
-    ? (doc.size_bytes / 1024).toFixed(1) + " KB"
-    : doc.size_bytes + " B";
-  const base = panacheBy.get(doc.id);
-  const rows = data.results
-    .filter(r => r.document === doc.id)
-    .sort((a, b) => a.mean_ms - b.mean_ms)
-    .map(r => ({
-      Formatter: r.formatter,
-      "Mean (ms)": r.mean_ms.toFixed(1),
-      "vs panache": r.formatter === "panache"
-        ? "baseline"
-        : `${(r.mean_ms / base).toFixed(1)}x slower`,
-      Runs: r.runs
-    }));
-  return html`<h4>${doc.name}</h4>
-              <p style="opacity:.7;margin-top:-.5em">
-                ${doc.file} \u2014 ${sizeKb}, ${doc.lines} lines, ${doc.iterations} iterations
-              </p>
-              ${Inputs.table(rows, {
-                rows: rows.length,
-                width: {Formatter: 120, "Mean (ms)": 100, "vs panache": 140, Runs: 80}
-              })}`;
-})}`
+prepareRepoSuiteRows = (data, toolLabels) => {
+  const repoMeta = new Map(data.repos.map(r => [r.id, r]))
+  const baselineByRepo = new Map(
+    data.results
+      .filter(r => r.tool === "panache" && !r.failed && r.mean_ms != null)
+      .map(r => [r.repo, r.mean_ms])
+  )
+
+  return data.results
+    .filter(r => !r.failed && r.mean_ms != null && baselineByRepo.has(r.repo))
+    .map(r => {
+      const repo = repoMeta.get(r.repo)
+      const repoLabel = repo?.name ?? r.repo
+      const toolLabel = toolLabels[r.tool] ?? r.tool
+      return {
+        ...r,
+        repoLabel,
+        toolLabel,
+        fileCount: repo?.file_count ?? null,
+        totalBytes: repo?.total_bytes ?? null,
+        barLabel: `${repoLabel} — ${toolLabel}`,
+        ratio: r.mean_ms / baselineByRepo.get(r.repo)
+      }
+    })
+}
 ```
 
-## Directory-scale formatting
-
-The numbers above measure single-document formatting. In real projects, you
-format hundreds of files in one invocation -- on save across a workspace, in
-pre-commit, or in CI. Panache parallelises file-level work across CPU cores when
-given more than one file (controlled via `--jobs`, defaulting to the machine's
-parallelism).
-
-The benchmark below formats every Markdown file in this repository (`*.md`,
-currently `${multifile.corpus.file_count}` files) in a single invocation per
-tool. Each tool runs end-to-end against the same corpus, re-staged from disk
-between samples. Pandoc is excluded -- it has no batch mode, so a fair
-comparison would mostly measure shell-loop overhead.
+### Repository-Wide Benchmarks
 
 ```{bash}
-#| label: run-multifile
+#| label: run-repo-markdown-format
 #| echo: false
 #| output: false
+#| eval: false
 
 cd ../..
-bash benches/compare_multifile.sh --out docs/guide/performance_multifile_data.json
+bash benches/compare_repo_suite.sh --mode format --track markdown --out docs/guide/performance_repo_markdown_format_data.json
 ```
 
 ```{ojs}
-//| label: load-multifile-data
+//| label: load-repo-markdown-format
 //| echo: false
 
-multifile = FileAttachment("performance_multifile_data.json").json()
+repoMarkdownFormat = FileAttachment("performance_repo_markdown_format_data.json").json()
 ```
 
 ```{ojs}
-//| label: prepare-multifile-results
+//| label: prepare-repo-markdown-format
 //| echo: false
 
-multifileToolLabel = ({
-  "panache-jobs1": "panache --jobs 1 (serial)",
-  "panache-jobs0": "panache --jobs 0 (auto)",
+repoMarkdownFormatResults = prepareRepoSuiteRows(repoMarkdownFormat, {
+  panache: "panache",
   prettier: "prettier",
   rumdl: "rumdl"
 })
-multifileResults = multifile.results
-  .filter(r => !r.failed && r.mean_ms != null)
-  .map(r => ({...r, label: multifileToolLabel[r.tool] ?? r.tool}))
-multifileBaseline = multifileResults.find(r => r.tool === "panache-jobs0")?.mean_ms
+repoMarkdownFormatTools = Array.from(
+  d3.rollup(repoMarkdownFormatResults, v => d3.mean(v, d => d.ratio), d => d.toolLabel)
+).sort(([, a], [, b]) => a - b).map(([k]) => k)
+repoMarkdownFormatRepos = repoMarkdownFormat.repos.map(r => r.id)
+repoMarkdownFormatRepoMeta = new Map(repoMarkdownFormat.repos.map(r => [r.id, r]))
 ```
 
+In @fig-repo-markdown-format, we compare formatting time across panache,
+Prettier, and rumdl on tracked Markdown files from several repositories.
+
 ```{ojs}
-//| label: plot-multifile-results
+//| label: fig-repo-markdown-format
 //| echo: false
+//| fig-cap: "Repository-wide formatting benchmarks on standard Markdown repos.
+//|   Each dot is one repo/tool pair; the y-axis shows time relative to panache
+//|   within that repo (×, lower is faster)."
 
 Plot.plot({
-  marginLeft: 200,
-  marginBottom: 50,
-  height: 240,
-  x: {label: "Mean time (ms, log)", type: "log"},
-  y: {label: null},
-  color: {legend: false},
+  marginLeft: 60,
+  marginRight: 20,
+  marginBottom: 40,
+  marginTop: 20,
+  height: 320,
+  x: {label: null, domain: repoMarkdownFormatTools},
+  y: {label: "Mean time relative to panache within each repo (×, lower is faster)", grid: true},
+  color: {
+    legend: true,
+    domain: repoMarkdownFormatRepos,
+    tickFormat: id => repoMarkdownFormatRepoMeta.get(id)?.name ?? id,
+    scheme: "tableau10"
+  },
   marks: [
-    Plot.barX(multifileResults, {
-      x: "mean_ms",
-      y: "label",
-      fill: d => d.tool.startsWith("panache") ? "#2a9d8f" : "#264653",
-      sort: {y: "x"}
-    }),
-    Plot.ruleX([1])
+    Plot.ruleY([1], {stroke: "#2a9d8f", strokeWidth: 2, strokeDasharray: "4 3"}),
+    Plot.dot(repoMarkdownFormatResults, {
+      x: "toolLabel",
+      y: "ratio",
+      fill: "repo",
+      r: 6,
+      fillOpacity: 0.85,
+      stroke: "white",
+      strokeWidth: 1,
+      channels: {
+        repo: "repoLabel",
+        tool: "toolLabel",
+        files: d => d.fileCount,
+        "time (ms)": d => d.mean_ms.toFixed(1),
+        "× panache": d => d.ratio.toFixed(2)
+      },
+      tip: true
+    })
   ]
 })
 ```
 
-```{ojs}
-//| label: render-multifile-table
-//| echo: false
+```{bash}
+#| label: run-repo-quarto-format
+#| echo: false
+#| output: false
+#| eval: false
 
-multifileTable = multifileResults
-  .slice()
-  .sort((a, b) => a.mean_ms - b.mean_ms)
-  .map(r => ({
-    Tool: r.label,
-    "Mean (ms)": r.mean_ms.toFixed(1),
-    "vs panache --jobs 0": r.tool === "panache-jobs0"
-      ? "baseline"
-      : `${(r.mean_ms / multifileBaseline).toFixed(2)}x slower`,
-    Runs: r.runs
-  }))
-Inputs.table(multifileTable, {rows: multifileTable.length})
+cd ../..
+bash benches/compare_repo_suite.sh --mode format --track quarto --out docs/guide/performance_repo_quarto_format_data.json
 ```
 
-`panache --jobs 0` parallelises across all available cores; `--jobs 1` keeps the
-outer loop serial (the pre-parallelism baseline). The gap between the two shows
-the speedup file-level parallelism contributes on this corpus.
+```{ojs}
+//| label: load-repo-quarto-format
+//| echo: false
 
-## Key Takeaways
+repoQuartoFormat = FileAttachment("performance_repo_quarto_format_data.json").json()
+```
 
-### 🚀 Faster Than Alternatives
+```{ojs}
+//| label: prepare-repo-quarto-format
+//| echo: false
 
-- **${prettierRange} faster than Prettier** -- Zero Node.js startup overhead
-- **${pandocRange} faster than Pandoc** -- Optimized for formatting (Pandoc is
-  general-purpose)
-- **${rumdlRange} faster than rumdl** -- Another Rust-native markdown tool, but
-  with a different design focus
-- **Sub-10ms formatting** for typical documents -- imperceptible latency for
-  on-save formatting
+repoQuartoFormatResults = prepareRepoSuiteRows(repoQuartoFormat, {
+  panache: "panache",
+  rumdl: "rumdl"
+})
+repoQuartoFormatTools = Array.from(
+  d3.rollup(repoQuartoFormatResults, v => d3.mean(v, d => d.ratio), d => d.toolLabel)
+).sort(([, a], [, b]) => a - b).map(([k]) => k)
+repoQuartoFormatRepos = repoQuartoFormat.repos.map(r => r.id)
+repoQuartoFormatRepoMeta = new Map(repoQuartoFormat.repos.map(r => [r.id, r]))
+```
 
-### 💪 Why So Fast?
+In @fig-repo-quarto-format, we compare formatting time across panache and rumdl
+on tracked `.qmd` files from several Quarto repositories.
 
-1. **Native compilation** -- Rust compiles to machine code, no interpreter
-   overhead
-2. **Zero startup time** -- unlike Node.js/JVM-based tools
-3. **Efficient parsing** -- single-pass parser with integrated inline handling
-4. **Optimized data structures** -- lossless CST built with `rowan` crate
+```{ojs}
+//| label: fig-repo-quarto-format
+//| echo: false
+//| fig-cap: "Repository-wide formatting benchmarks on Quarto repos. Each dot
+//|   is one repo/tool pair; the y-axis shows time relative to panache within
+//|   that repo (×, lower is faster)."
 
-### 📊 What About Prettier?
+Plot.plot({
+  marginLeft: 60,
+  marginRight: 20,
+  marginBottom: 40,
+  marginTop: 20,
+  height: 320,
+  x: {label: null, domain: repoQuartoFormatTools},
+  y: {label: "Mean time relative to panache within each repo (×, lower is faster)", grid: true},
+  color: {
+    legend: true,
+    domain: repoQuartoFormatRepos,
+    tickFormat: id => repoQuartoFormatRepoMeta.get(id)?.name ?? id,
+    scheme: "tableau10"
+  },
+  marks: [
+    Plot.ruleY([1], {stroke: "#2a9d8f", strokeWidth: 2, strokeDasharray: "4 3"}),
+    Plot.dot(repoQuartoFormatResults, {
+      x: "toolLabel",
+      y: "ratio",
+      fill: "repo",
+      r: 6,
+      fillOpacity: 0.85,
+      stroke: "white",
+      strokeWidth: 1,
+      channels: {
+        repo: "repoLabel",
+        tool: "toolLabel",
+        files: d => d.fileCount,
+        "time (ms)": d => d.mean_ms.toFixed(1),
+        "× panache": d => d.ratio.toFixed(2)
+      },
+      tip: true
+    })
+  ]
+})
+```
 
-Prettier's time is dominated by Node.js startup (\~60-70ms), not formatting
-logic. For one-off CLI invocations, panache wins decisively. For long-running
-processes (e.g., editor integration), Prettier's startup cost is amortized, but
-panache remains faster.
+Each dot is one repo/tool pair. Panache sits at 1× by construction (dashed
+baseline), and points above it are slower on that repository. Hover a point to
+see the absolute wall-clock time in milliseconds and the corpus size.
 
-### 🎯 What About Pandoc?
+## Linting
 
-Pandoc is a general-purpose document converter supporting 40+ formats. panache
-is specialized for markdown/Quarto formatting, enabling focused optimizations.
-Pandoc remains the gold standard for syntax correctness, but panache delivers
-substantially faster formatting.
+### Single-Document
 
-### 🦀 What About rumdl?
+```{bash}
+#| label: run-lint-single-benchmark
+#| echo: false
+#| output: false
+#| eval: false
 
-[rumdl](https://github.com/rvben/rumdl) is another Rust-native markdown tool,
-primarily a *linter* whose `rumdl fmt` command is documented as an alias for
-`check --fix`. There is no dedicated formatting code path: every "format" run
-goes through the full lint engine and applies whichever fixes the rules
-produced. Both tools benefit from native compilation and zero startup overhead,
-so the gap is much smaller than with Node.js- or Haskell-based alternatives, but
-panache's narrower focus on formatting Quarto/Pandoc markdown still wins.
+cd ../..
+bash benches/compare_lint_single.sh --out docs/guide/performance_lint_single_data.json
+```
 
-## Reproducing Benchmarks
+```{ojs}
+//| label: load-lint-single-data
+//| echo: false
 
-All benchmarks are reproducible:
+lintSingleData = FileAttachment("performance_lint_single_data.json").json()
+```
+
+```{ojs}
+//| label: prepare-lint-single-records
+//| echo: false
+
+lintDocumentMeta = new Map(lintSingleData.documents.map(d => [d.id, d]))
+lintPanacheByDoc = d3.rollup(
+  lintSingleData.results.filter(r => r.tool === "panache"),
+  v => v[0].mean_ms,
+  r => r.document
+)
+lintSingleRecords = lintSingleData.results.map(r => ({
+  tool: r.tool,
+  document: r.document,
+  documentName: lintDocumentMeta.get(r.document)?.name ?? r.document,
+  mean_ms: r.mean_ms,
+  runs: r.runs,
+  ratio: r.mean_ms / lintPanacheByDoc.get(r.document)
+}))
+lintTools = Array.from(
+  d3.rollup(lintSingleRecords, v => d3.mean(v, d => d.ratio), d => d.tool)
+).sort(([, a], [, b]) => a - b).map(([k]) => k)
+lintDocumentIds = lintSingleData.documents.map(d => d.id)
+```
+
+In @fig-lint-single-results, we compare linting time per document across panache
+lint and rumdl check. Each dot is one document; the y-axis shows time relative
+to panache lint (×, lower is faster). Panache sits at 1× by construction.
+
+```{ojs}
+//| label: fig-lint-single-results
+//| echo: false
+//| fig-cap: "Linting time per document, comparing panache lint to rumdl check.
+//|   Each dot is one document; the y-axis shows time relative to panache lint
+//|   (×, lower is faster)."
+
+Plot.plot({
+  marginLeft: 60,
+  marginRight: 20,
+  marginBottom: 40,
+  marginTop: 20,
+  height: 300,
+  x: {label: null, domain: lintTools},
+  y: {label: "Mean time relative to panache lint (×, lower is faster)", grid: true},
+  color: {
+    legend: true,
+    domain: lintDocumentIds,
+    tickFormat: id => lintDocumentMeta.get(id)?.name ?? id,
+    scheme: "tableau10"
+  },
+  marks: [
+    Plot.ruleY([1], {stroke: "#2a9d8f", strokeWidth: 2, strokeDasharray: "4 3"}),
+    Plot.dot(lintSingleRecords, {
+      x: "tool",
+      y: "ratio",
+      fill: "document",
+      r: 6,
+      fillOpacity: 0.85,
+      stroke: "white",
+      strokeWidth: 1,
+      channels: {
+        document: "documentName",
+        "time (ms)": d => d.mean_ms.toFixed(1),
+        "× panache lint": d => d.ratio.toFixed(2)
+      },
+      tip: true
+    })
+  ]
+})
+```
+
+### Repository-Wide
+
+This suite benchmarks linting on the same standard Markdown repositories as the
+formatting comparison, using `panache lint` and `rumdl check`. In
+@fig-repo-markdown-lint, each dot is one repo/tool pair; the y-axis shows time
+relative to panache lint within that repo (×, lower is faster).
+
+```{bash}
+#| label: run-repo-markdown-lint
+#| echo: false
+#| output: false
+#| eval: false
+
+cd ../..
+bash benches/compare_repo_suite.sh --mode lint --track markdown --out docs/guide/performance_repo_markdown_lint_data.json
+```
+
+```{ojs}
+//| label: load-repo-markdown-lint
+//| echo: false
+
+repoMarkdownLint = FileAttachment("performance_repo_markdown_lint_data.json").json()
+```
+
+```{ojs}
+//| label: prepare-repo-markdown-lint
+//| echo: false
+
+repoMarkdownLintResults = prepareRepoSuiteRows(repoMarkdownLint, {
+  panache: "panache lint",
+  rumdl: "rumdl check"
+})
+repoMarkdownLintTools = Array.from(
+  d3.rollup(repoMarkdownLintResults, v => d3.mean(v, d => d.ratio), d => d.toolLabel)
+).sort(([, a], [, b]) => a - b).map(([k]) => k)
+repoMarkdownLintRepos = repoMarkdownLint.repos.map(r => r.id)
+repoMarkdownLintRepoMeta = new Map(repoMarkdownLint.repos.map(r => [r.id, r]))
+```
+
+```{ojs}
+//| label: fig-repo-markdown-lint
+//| echo: false
+//| fig-cap: "Repository-wide linting benchmarks on standard Markdown repos.
+//|   Each dot is one repo/tool pair; the y-axis shows time relative to
+//|   panache lint within that repo (×, lower is faster)."
+
+Plot.plot({
+  marginLeft: 60,
+  marginRight: 20,
+  marginBottom: 40,
+  marginTop: 20,
+  height: 300,
+  x: {label: null, domain: repoMarkdownLintTools},
+  y: {label: "Mean time relative to panache lint within each repo (×, lower is faster)", grid: true},
+  color: {
+    legend: true,
+    domain: repoMarkdownLintRepos,
+    tickFormat: id => repoMarkdownLintRepoMeta.get(id)?.name ?? id,
+    scheme: "tableau10"
+  },
+  marks: [
+    Plot.ruleY([1], {stroke: "#2a9d8f", strokeWidth: 2, strokeDasharray: "4 3"}),
+    Plot.dot(repoMarkdownLintResults, {
+      x: "toolLabel",
+      y: "ratio",
+      fill: "repo",
+      r: 6,
+      fillOpacity: 0.85,
+      stroke: "white",
+      strokeWidth: 1,
+      channels: {
+        repo: "repoLabel",
+        tool: "toolLabel",
+        files: d => d.fileCount,
+        "time (ms)": d => d.mean_ms.toFixed(1),
+        "× panache lint": d => d.ratio.toFixed(2)
+      },
+      tip: true
+    })
+  ]
+})
+```
+
+In @fig-repo-quarto-lint, we compare linting time across panache and rumdl on
+tracked `.qmd` files from several Quarto repositories.
+
+```{bash}
+#| label: run-repo-quarto-lint
+#| echo: false
+#| output: false
+#| eval: false
+
+cd ../..
+bash benches/compare_repo_suite.sh --mode lint --track quarto --out docs/guide/performance_repo_quarto_lint_data.json
+```
+
+```{ojs}
+//| label: load-repo-quarto-lint
+//| echo: false
+
+repoQuartoLint = FileAttachment("performance_repo_quarto_lint_data.json").json()
+```
+
+```{ojs}
+//| label: prepare-repo-quarto-lint
+//| echo: false
+
+repoQuartoLintResults = prepareRepoSuiteRows(repoQuartoLint, {
+  panache: "panache lint",
+  rumdl: "rumdl check"
+})
+repoQuartoLintTools = Array.from(
+  d3.rollup(repoQuartoLintResults, v => d3.mean(v, d => d.ratio), d => d.toolLabel)
+).sort(([, a], [, b]) => a - b).map(([k]) => k)
+repoQuartoLintRepos = repoQuartoLint.repos.map(r => r.id)
+repoQuartoLintRepoMeta = new Map(repoQuartoLint.repos.map(r => [r.id, r]))
+```
+
+```{ojs}
+//| label: fig-repo-quarto-lint
+//| echo: false
+//| fig-cap: "Repository-wide linting benchmarks on Quarto repos. Each dot is
+//|   one repo/tool pair; the y-axis shows time relative to panache lint within
+//|   that repo (×, lower is faster)."
+
+Plot.plot({
+  marginLeft: 60,
+  marginRight: 20,
+  marginBottom: 40,
+  marginTop: 20,
+  height: 320,
+  x: {label: null, domain: repoQuartoLintTools},
+  y: {label: "Mean time relative to panache lint within each repo (×, lower is faster)", grid: true},
+  color: {
+    legend: true,
+    domain: repoQuartoLintRepos,
+    tickFormat: id => repoQuartoLintRepoMeta.get(id)?.name ?? id,
+    scheme: "tableau10"
+  },
+  marks: [
+    Plot.ruleY([1], {stroke: "#2a9d8f", strokeWidth: 2, strokeDasharray: "4 3"}),
+    Plot.dot(repoQuartoLintResults, {
+      x: "toolLabel",
+      y: "ratio",
+      fill: "repo",
+      r: 6,
+      fillOpacity: 0.85,
+      stroke: "white",
+      strokeWidth: 1,
+      channels: {
+        repo: "repoLabel",
+        tool: "toolLabel",
+        files: d => d.fileCount,
+        "time (ms)": d => d.mean_ms.toFixed(1),
+        "× panache lint": d => d.ratio.toFixed(2)
+      },
+      tip: true
+    })
+  ]
+})
+```
+
+## Reproducing
+
+All benchmarks are reproducible and require
+[`hyperfine`](https://github.com/sharkdp/hyperfine) to run. The scripts in
+`benches/` are designed to be run from the repository root:
 
 ```bash
 # Download test documents (idempotent)
@@ -307,6 +629,21 @@ cd benches/documents && ./download.sh && cd ../..
 
 # Run comparison benchmark and write JSON
 bash benches/compare_all.sh --json --out docs/guide/performance_data.json
+
+# Run repository-wide Markdown formatting benchmark
+bash benches/compare_repo_suite.sh --mode format --track markdown --out docs/guide/performance_repo_markdown_format_data.json
+
+# Run repository-wide Quarto formatting benchmark
+bash benches/compare_repo_suite.sh --mode format --track quarto --out docs/guide/performance_repo_quarto_format_data.json
+
+# Run repository-wide Markdown lint benchmark
+bash benches/compare_repo_suite.sh --mode lint --track markdown --out docs/guide/performance_repo_markdown_lint_data.json
+
+# Run repository-wide Quarto lint benchmark
+bash benches/compare_repo_suite.sh --mode lint --track quarto --out docs/guide/performance_repo_quarto_lint_data.json
+
+# Run per-document lint benchmark
+bash benches/compare_lint_single.sh --out docs/guide/performance_lint_single_data.json
 
 # Or run the human-readable text variant
 bash benches/compare_all.sh
@@ -318,6 +655,3 @@ quarto render docs/guide/performance.qmd
 rm -rf docs/_freeze/guide/performance
 quarto render docs/guide/performance.qmd
 ```
-
-For best statistics, install [hyperfine](https://github.com/sharkdp/hyperfine)
--- the script will detect it and use it for warmup + stddev/min/max.

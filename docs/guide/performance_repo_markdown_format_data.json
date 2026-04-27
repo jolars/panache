@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "mode": "format",
+    "track": "markdown",
+    "generated_at": "2026-04-27T11:27:33Z",
+    "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
+    "min_runs": 3,
+    "tools": {
+      "panache": {"version": "2.39.0"},
+      "prettier": {"version": "3.6.2"},
+      "rumdl": {"version": "0.1.67"}
+    }
+  },
+  "repos": [
+    {"id":"jgm__pandoc","name":"jgm/pandoc","file_count":1113,"total_bytes":2782992,"extension":"md"},
+    {"id":"rust-lang__book","name":"rust-lang/book","file_count":478,"total_bytes":2762055,"extension":"md"},
+    {"id":"rust-lang__reference","name":"rust-lang/reference","file_count":153,"total_bytes":1139492,"extension":"md"}
+  ],
+  "results": [
+    {"repo":"jgm__pandoc","tool":"panache","mean_ms":162.7710,"stddev_ms":2.5582,"min_ms":161.0308,"max_ms":165.7083,"runs":3,"failed":false},
+    {"repo":"jgm__pandoc","tool":"prettier","mean_ms":3517.7840,"stddev_ms":35.6965,"min_ms":3476.6040,"max_ms":3539.9217,"runs":3,"failed":false},
+    {"repo":"jgm__pandoc","tool":"rumdl","mean_ms":6370.5860,"stddev_ms":38.7613,"min_ms":6348.1791,"max_ms":6415.3436,"runs":3,"failed":false},
+    {"repo":"rust-lang__book","tool":"panache","mean_ms":34.5922,"stddev_ms":2.0963,"min_ms":31.0338,"max_ms":36.2216,"runs":5,"failed":false},
+    {"repo":"rust-lang__book","tool":"prettier","mean_ms":3463.1205,"stddev_ms":44.5413,"min_ms":3429.4786,"max_ms":3513.6326,"runs":3,"failed":false},
+    {"repo":"rust-lang__book","tool":"rumdl","mean_ms":189.8171,"stddev_ms":7.3047,"min_ms":180.6057,"max_ms":198.4204,"runs":4,"failed":false},
+    {"repo":"rust-lang__reference","tool":"panache","mean_ms":16.8065,"stddev_ms":1.5984,"min_ms":15.2752,"max_ms":19.7156,"runs":15,"failed":false},
+    {"repo":"rust-lang__reference","tool":"prettier","mean_ms":1340.4636,"stddev_ms":20.5008,"min_ms":1326.4355,"max_ms":1363.9911,"runs":3,"failed":false},
+    {"repo":"rust-lang__reference","tool":"rumdl","mean_ms":118.2216,"stddev_ms":5.7147,"min_ms":111.2988,"max_ms":131.3810,"runs":10,"failed":false}
+  ]
+}
