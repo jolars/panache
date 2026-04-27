@@ -1223,7 +1223,14 @@ fn parse_inline_range_impl(
                     EscapeType::HardLineBreak => config.extensions.escaped_line_breaks,
                     EscapeType::NonbreakingSpace => config.extensions.all_symbols_escapable,
                     EscapeType::Literal => {
-                        const BASE_ESCAPABLE: &str = "\\`*_{}[]()>#+-.!";
+                        // BASE_ESCAPABLE matches Pandoc's markdown_strict /
+                        // original Markdown set, plus `|` and `~` which the
+                        // formatter emits as escapes for pipe-table separators
+                        // and strikethrough delimiters. Recognising those here
+                        // keeps round-trips idempotent in flavors that don't
+                        // enable all_symbols_escapable (notably GFM/CommonMark,
+                        // which per spec allow any ASCII punctuation anyway).
+                        const BASE_ESCAPABLE: &str = "\\`*_{}[]()>#+-.!|~";
                         BASE_ESCAPABLE.contains(ch) || config.extensions.all_symbols_escapable
                     }
                 };
