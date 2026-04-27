@@ -325,6 +325,12 @@ use Prettier as well as mdformat, but both fail to handle some of the particular
 syntax used in Quarto documents, such as fenced divs and some of the table
 syntax.
 
+For a side-by-side overview of how Panache compares to Prettier, Pandoc, rumdl,
+mdformat, mado, markdownlint, markdownlint-cli2, and marksman, see the
+[comparison page](https://panache.bz/guide/comparison). For benchmarks against
+the same set of tools, see the [performance
+page](https://panache.bz/guide/performance).
+
 ## Design Goals and Scope
 
 - Full LSP implementation with formatting, diagnostics, code actions, and more

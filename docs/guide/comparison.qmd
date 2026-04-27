@@ -9,74 +9,185 @@ description: >
 
 ## At a Glance
 
-Panache is a single binary that aims to cover the full authoring loop for
-Pandoc-flavoured Markdown: a *formatter*, a *linter*, and a *language server*
-that all share the same lossless concrete syntax tree. Most other tools in this
-space only cover one of these roles, and most do not understand
-Pandoc/Quarto-specific syntax (fenced divs, attributed code blocks,
-bracketed-span attributes, raw blocks, table captions, frontmatter, math
-environments, citation keys, and so on).
+Panache aims to cover the formatter, linter, and language-server roles for
+Pandoc-flavoured Markdown from a single, lossless concrete syntax tree. Most
+other tools in this space focus on one of those roles, and most do not parse
+Pandoc/Quarto-specific constructs (fenced divs, bracketed spans, block
+attributes, raw blocks, definition lists, line blocks, table captions, citation
+keys, math environments).
 
-### Overview
+The tables below cover the same set of programs as the
+[Performance](performance.qmd) page, plus marksman -- a Markdown language server
+that does not appear in the benchmarks but is the closest neighbour to Panache's
+LSP role.
 
-The first table covers what each tool *is*: formatter, linter, language server,
-or some combination.
+### Roles
 
-  | Capability     | Panache | marksman  | rumdl | Prettier |
-  | -------------- | ------- | --------- | ----- | -------- |
-  | Formatter      | ●       | ○         | ◐[^1] | ●        |
-  | Linter         | ●       | ◐[^2]     | ●     | ○        |
-  | LSP            | ●       | ●         | ●     | ○        |
-  | Implementation | Rust    | F# / .NET | Rust  | TS       |
+  | Tool              | Formatter | Linter | LSP | Implementation |
+  | ----------------- | --------- | ------ | --- | -------------- |
+  | Panache           | ●         | ●      | ●   | Rust           |
+  | mado              | ○         | ●      | ○   | Rust           |
+  | markdownlint      | ○         | ●      | ○   | Ruby           |
+  | markdownlint-cli2 | ◐[^1]     | ●      | ○   | JavaScript     |
+  | marksman          | ○         | ◐[^2]  | ●   | F# / .NET      |
+  | mdformat          | ●         | ○      | ○   | Python         |
+  | Pandoc            | ◐[^3]     | ○      | ○   | Haskell        |
+  | Prettier          | ●         | ○      | ○   | JavaScript     |
+  | rumdl             | ◐[^4]     | ●      | ●   | Rust           |
 
   : Tooling roles covered by each project. Marks: ● full, ◐ partial, ○ none.
 
-[^1]: rumdl has no dedicated formatting pipeline; `rumdl fmt` is an alias for
-    `check --fix` and applies whichever fixes the enabled lint rules produced.
+[^1]: markdownlint-cli2's `--fix` applies whichever fixes the enabled rules
+    produce; there is no separate reflow pass, so output depends on which rules
+    are active.
 
 [^2]: marksman emits diagnostics for broken wikilinks, duplicate headings, and a
     handful of structural issues, but it is not a general style linter.
 
+[^3]: Pandoc is a document converter; `pandoc -f markdown -t markdown`
+    round-trips through Pandoc's AST, which normalises but is not designed as a
+    formatter and is not in general lossless.
+
+[^4]: `rumdl fmt` reuses the lint engine to apply auto-fixes; it is not a
+    separate reflow pass, and the output depends on rule configuration.
+
 ### Markdown Flavors
 
-Markdown is not one language but a family of flavors (dialects), and the
-differences matter: a "format" pass that does not understand a construct will,
-at best, preserve it verbatim and, at worst, rewrite it into something the
-renderer no longer accepts. Panache parses and formats every dialect in the
-table below; the other tools cover a narrower slice.
+Markdown is not one language but a family of dialects, and the differences
+matter: a "format" pass that does not understand a construct will, at best,
+preserve it verbatim and, at worst, rewrite it into something the renderer no
+longer accepts.
 
-  | Dialect       | Panache | marksman | rumdl | Prettier |
-  | ------------- | ------- | -------- | ----- | -------- |
-  | CommonMark    | ●       | ●        | ●     | ●        |
-  | GFM           | ●       | ●        | ●     | ●        |
-  | Pandoc        | ●       | ◐[^3]    | ○     | ○        |
-  | Quarto        | ●       | ○        | ◐[^4] | ○        |
-  | R Markdown    | ●       | ○        | ◐[^4] | ○        |
-  | MultiMarkdown | ●       | ○        | ○     | ○        |
-  | MDX           | ○       | ○        | ○     | ●        |
-  | Wikilinks[^5] | ◐       | ●        | ○     | ○        |
+::: {.column-page}
 
-  : Markdown dialect coverage across the four tools.
+  | Tool              | CommonMark | GFM   | Pandoc | Quarto | R Markdown | MultiMarkdown | MDX | Wikilinks |
+  | ----------------- | ---------- | ----- | ------ | ------ | ---------- | ------------- | --- | --------- |
+  | Panache           | ●          | ●     | ●      | ●      | ●          | ●             | ○   | ◐[^5]     |
+  | mado              | ●          | ●     | ○      | ○      | ○          | ○             | ○   | ○         |
+  | markdownlint      | ◐[^6]      | ◐[^6] | ○      | ○      | ○          | ○             | ○   | ○         |
+  | markdownlint-cli2 | ●          | ●     | ○      | ○      | ○          | ○             | ○   | ○         |
+  | marksman          | ●          | ●     | ◐[^7]  | ○      | ○          | ○             | ○   | ●         |
+  | mdformat          | ●          | ◐[^8] | ○      | ○      | ○          | ○             | ○   | ○         |
+  | Pandoc            | ●          | ●     | ●      | ◐[^9]  | ◐[^9]      | ◐[^10]        | ○   | ◐[^11]    |
+  | Prettier          | ●          | ●     | ○      | ○      | ○          | ○             | ●   | ○         |
+  | rumdl             | ●          | ●     | ○      | ◐[^12] | ◐[^12]     | ○             | ○   | ○         |
 
-[^3]: marksman recognises YAML frontmatter and code fences but does not parse
-    Pandoc-specific block constructs (fenced divs, bracketed spans, attribute
-    syntax, definition lists, table captions, etc.).
+  : Markdown dialect coverage across the tools.
 
-[^4]: rumdl will lint `.qmd` and `.Rmd` files and skip YAML frontmatter, but it
-    does not parse Quarto/R Markdown executable code blocks, shortcodes, or
-    cross-reference syntax -- those are treated as plain Markdown.
+:::
 
 [^5]: Obsidian/Foam-style `[[wikilinks]]`. Panache preserves them verbatim;
     marksman builds its cross-reference graph around them.
 
+[^6]: markdownlint (the Ruby `mdl` gem) targets generic Markdown style rather
+    than a specific spec; rules apply equally to CommonMark and GFM input but
+    the tool does not parse to either spec.
+
+[^7]: marksman recognises YAML frontmatter and code fences but does not parse
+    Pandoc-specific block constructs (fenced divs, bracketed spans, attribute
+    syntax, definition lists, table captions, etc.).
+
+[^8]: mdformat is CommonMark-only by default; GFM, frontmatter, and similar
+    constructs require loading the matching plugin (`mdformat-gfm`,
+    `mdformat-frontmatter`, etc.).
+
+[^9]: Pandoc reads `.qmd`/`.Rmd` as Markdown but does not interpret Quarto or
+    knitr executable code blocks, shortcodes, or cross-reference syntax; those
+    round-trip as plain text.
+
+[^10]: Pandoc reads `markdown_mmd` but its writer emits its own dialect;
+    round-tripping a MultiMarkdown document does not preserve MMD-specific
+    syntax.
+
+[^11]: Pandoc supports wikilinks via the `+wikilinks_title_after_pipe` /
+    `+wikilinks_title_before_pipe` extensions, off by default.
+
+[^12]: rumdl will lint `.qmd` and `.Rmd` files and skip YAML frontmatter, but it
+    does not parse Quarto/R Markdown executable code blocks, shortcodes, or
+    cross-reference syntax -- those are treated as plain Markdown.
+
 For raw speed numbers, see [Performance](performance.qmd). This page focuses on
 *scope* and *behaviour* differences, not benchmarks.
+
+## mado
+
+[mado](https://github.com/akiomik/mado) is a Rust-native Markdown linter
+inspired by the `markdownlint` rule numbering, built on
+[comrak](https://github.com/kivikakk/comrak) for parsing.
+
+**What it does well**
+
+- Native compilation gives it fast startup and per-file throughput.
+- Implements a sizeable subset of the `markdownlint` rule numbers;
+  `mado   check` reports violations.
+- Configuration via `mado.toml`.
+
+**Where it differs from panache**
+
+- *Linter only.* mado has no formatter mode and no `--fix`; it reports issues
+  but does not modify files.
+- *No Pandoc/Quarto syntax model.* Pandoc-only constructs are treated as plain
+  Markdown.
+- *No language server.*
+- *Subset of rules.* A number of `markdownlint`-cli2 rule numbers are not yet
+  implemented, and several of the implemented rules are marked unstable
+  upstream.
+
+## markdownlint (Ruby)
+
+[markdownlint](https://github.com/markdownlint/markdownlint) -- installed as the
+`mdl` gem -- is the original Ruby Markdown style checker by Mark Harrison and
+the ancestor of the `markdownlint` rule numbering used elsewhere in this family.
+
+**What it does well**
+
+- Long-established rule catalog covering heading style, list indentation, line
+  length, trailing whitespace, and similar style concerns.
+- Style files configure which rules apply.
+
+**Where it differs from panache**
+
+- *Linter only.* No formatter or `--fix` mode; `mdl` reports violations and
+  leaves files unchanged.
+- *No specific Markdown flavor target.* Rules apply to generic Markdown;
+  Pandoc/Quarto extensions are not modelled.
+- *No language server.*
+- *Ruby runtime.* Per-invocation startup is dominated by the Ruby interpreter.
+
+## markdownlint-cli2
+
+[markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) is a
+Node.js CLI wrapping David Anson's
+[`markdownlint`](https://github.com/DavidAnson/markdownlint) library. The
+library is the engine behind the `vscode-markdownlint` extension and the most
+widely deployed implementation of the `MD0xx` rule family.
+
+**What it does well**
+
+- Large, actively maintained rule catalog with the canonical `MD0xx` rule
+  numbering.
+- Configuration via `.markdownlint-cli2.{jsonc,yaml,cjs,mjs}` or
+  `.markdownlint.{json,jsonc,yaml,yml,cjs,mjs}`, with per-directory overrides.
+- `--fix` applies the library's rule-level auto-fixes.
+- Built on `micromark`, with extensions for footnotes, math, and directives on
+  top of CommonMark + GFM.
+
+**Where it differs from panache**
+
+- *Linter with rule-level fixes, not a reflowing formatter.* `--fix` applies
+  what each rule's fix routine produces; there is no separate formatting pass
+  and no line-width reflow.
+- *No Pandoc/Quarto syntax model.* Fenced divs, bracketed spans, block
+  attributes, and similar constructs are not parsed.
+- *No language server.* The companion VS Code extension embeds the library
+  directly rather than speaking LSP.
+- *Node.js runtime.* Same per-invocation startup characteristics as Prettier.
 
 ## Marksman
 
 [Marksman](https://github.com/artempyanykh/marksman) is a language server for
 Markdown, with first-class support for wikilink-style cross-file references. It
-is a great fit for note-taking workflows (Obsidian/Foam/Zettelkasten-style
+is a good fit for note-taking workflows (Obsidian/Foam/Zettelkasten-style
 vaults) where the document graph matters as much as any individual file.
 
 **What it does well**
@@ -101,36 +212,60 @@ vaults) where the document graph matters as much as any individual file.
   `Table: caption` syntax are treated as plain text. Quarto shortcodes and
   cross-references behave the same way.
 
-## rumdl
+## mdformat
 
-[rumdl](https://github.com/rvben/rumdl) is a Rust-native Markdown *linter* with
-a `rumdl fmt` command that re-uses the lint engine to apply auto-fixes. It is
-heavily inspired by `markdownlint` and ports many of its rules.
+[mdformat](https://github.com/hukkin/mdformat) is an opinionated CommonMark
+formatter written in Python and built on `markdown-it-py`. It produces a single
+canonical form for any CommonMark input.
 
 **What it does well**
 
-- A large catalogue of style rules (heading style, list indentation, line
-  length, trailing whitespace, blank lines, etc.) compatible with the
-  `markdownlint` rule numbering.
-- Native compilation gives it fast startup and per-file throughput.
-- Configurable per-rule severity and per-file disable comments.
+- Strict CommonMark compliance and a small surface of options.
+- Plugin system for non-core syntax: `mdformat-gfm`, `mdformat-tables`,
+  `mdformat-frontmatter`, etc.
+- Validates output by re-rendering and comparing, catching cases where
+  formatting would change rendered HTML (`--no-validate` to disable).
 
 **Where it differs from panache**
 
-- *Lint-engine formatter, not a formatter.* `rumdl fmt` is documented as an
-  alias for `check --fix`. There is no dedicated formatting pipeline: every
-  "format" run goes through the lint engine and applies whichever fixes the
-  enabled rules produced. That means the output depends on which rules are on,
-  and rules that do not produce fixes leave their target untouched.
-- *No Pandoc/Quarto syntax model.* rumdl operates on CommonMark + GFM
-  extensions. Fenced divs, bracketed spans, block attributes, raw blocks, Pandoc
-  tables with captions, and similar constructs are either rewritten as plain
-  Markdown or left untouched in ways that can break downstream Pandoc rendering.
-- *Idempotency is rule-dependent.* Because formatting is a side effect of fix
-  application, idempotency depends on the rule set; panache guarantees
-  `format(format(x)) == format(x)` regardless of configuration.
-- *No language server.* rumdl is a CLI; editor integration is via generic task
-  runners or external wrappers.
+- *Formatter only.* No linter, no language server.
+- *CommonMark-first, plugin-extended.* GFM tables, frontmatter, and similar
+  constructs require plugins; Pandoc and Quarto syntax is not part of the
+  supported set.
+- *Escape-on-unknown-syntax.* Constructs outside CommonMark (or whatever plugins
+  are loaded) are typically backslash-escaped to keep rendered output stable,
+  which can mangle Pandoc-flavoured input.
+- *Python runtime.* Adds interpreter startup overhead per invocation.
+
+## Pandoc
+
+[Pandoc](https://pandoc.org) is a document converter that translates between
+dozens of markup formats. It is not a formatter or linter in the dedicated
+sense, but `pandoc -f markdown -t markdown` is sometimes used as a normalisation
+step, which is why it appears on the [Performance](performance.qmd) page.
+
+**What it does well**
+
+- Reads many Markdown dialects directly: `markdown` (Pandoc), `commonmark`,
+  `commonmark_x`, `gfm`, `markdown_mmd`, `markdown_phpextra`, `markdown_strict`.
+- Comprehensive coverage of Pandoc-specific syntax -- fenced divs, bracketed
+  spans, block attributes, definition lists, line blocks, table captions, math,
+  citations.
+- `--wrap=auto|none|preserve` and `--columns` control line wrapping in the
+  Markdown writer.
+
+**Where it differs from panache**
+
+- *Converter, not a formatter.* The Markdown writer normalises output, but this
+  is a side effect of round-tripping through Pandoc's AST. Pandoc's manual notes
+  that round-tripping is not in general lossless: comments, raw HTML, attribute
+  placement, and similar details can move or disappear.
+- *No idempotency guarantee.* `format(format(x)) == format(x)` is not part of
+  Pandoc's design contract; whether it holds depends on the input.
+- *No linter.* No rule-based diagnostics or style enforcement.
+- *No language server.*
+- *No in-place mutation.* The CLI writes to stdout (or `-o`), not into the
+  source file.
 
 ## Prettier
 
@@ -144,7 +279,7 @@ Markdown formatter in the JavaScript ecosystem.
 - Strong CommonMark and GFM support, including tables, task lists, and
   strikethrough.
 - Frontmatter (YAML/TOML) is recognised and preserved.
-- Massive ecosystem of editor integrations and pre-commit hooks.
+- Wide ecosystem of editor integrations and pre-commit hooks.
 
 **Where it differs from panache**
 
@@ -158,10 +293,41 @@ Markdown formatter in the JavaScript ecosystem.
 - *Node.js startup overhead.* For one-off CLI invocations, the Node.js runtime
   dominates the wall-clock time. See [Performance](performance.qmd) for numbers;
   the gap shrinks for long-running processes (editor integrations, the Prettier
-  daemon) but does not close entirely.
+  daemon) but may not close entirely.
 - *Opinionated wrapping only.* Prettier has a single `proseWrap` setting
   (`always` / `never` / `preserve`); panache adds `sentence`-wrapping for
   diff-friendly prose, plus configurable line width per file or directory.
+
+## rumdl
+
+[rumdl](https://github.com/rvben/rumdl) is a Rust-native Markdown linter with a
+`rumdl fmt` command that reuses the lint engine to apply auto-fixes and a
+`rumdl server` subcommand that exposes diagnostics and fixes over LSP. It is
+heavily inspired by `markdownlint` and ports many of its rules.
+
+**What it does well**
+
+- Large catalogue of style rules (heading style, list indentation, line length,
+  trailing whitespace, blank lines, etc.) compatible with the `markdownlint`
+  rule numbering.
+- Native compilation gives it fast startup and per-file throughput.
+- Configurable per-rule severity and per-file disable comments.
+- Ships an LSP server (`rumdl server`) for editor integration.
+
+**Where it differs from panache**
+
+- *Lint-engine formatter, not a reflowing formatter.* `rumdl fmt` shares fix
+  logic with `rumdl check --fix` (the documented difference is exit-code
+  semantics intended for editor integration). Either way, every "format" run
+  goes through the lint engine and applies whichever fixes the enabled rules
+  produce; rules that do not produce fixes leave their target untouched.
+- *No Pandoc/Quarto syntax model.* rumdl operates on CommonMark + GFM
+  extensions. Fenced divs, bracketed spans, block attributes, raw blocks, Pandoc
+  tables with captions, and similar constructs are either rewritten as plain
+  Markdown or left untouched in ways that can break downstream Pandoc rendering.
+- *Idempotency is rule-dependent.* Because formatting is a side effect of fix
+  application, idempotency depends on the rule set; panache aims for
+  `format(format(x)) == format(x)` regardless of configuration.
 
 ## Performance
 
