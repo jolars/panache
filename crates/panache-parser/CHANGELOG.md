@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.1](https://github.com/jolars/panache/compare/panache-parser-v0.5.0...panache-parser-v0.5.1) (2026-04-27)
+
+### Bug Fixes
+- **parser:** include `~` in set of escapables ([`cfc0bfc`](https://github.com/jolars/panache/commit/cfc0bfcd5cf1e02fd7ef16b712d666df61e260b6)), closes [#231](https://github.com/jolars/panache/issues/231)
+- **parser:** handle consecutive footnote definitions ([`e694627`](https://github.com/jolars/panache/commit/e694627654c497b66328d6062aa392af7337ce34))
+
 ## [0.5.0](https://github.com/jolars/panache/compare/panache-parser-v0.4.2...panache-parser-v0.5.0) (2026-04-27)
 
 ### Features

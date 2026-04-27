@@ -185,9 +185,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.6.2"
+version = "4.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff7a1dccbdd8b078c2bdebff47e404615151534d5043da397ec50286816f9cb"
+checksum = "660c0520455b1013b9bcb0393d5f643d7e4454fb69c915b8d6d2aa0e9a45acc3"
 dependencies = [
  "clap",
 ]
@@ -841,7 +841,7 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "panache"
-version = "2.39.0"
+version = "2.40.0"
 dependencies = [
  "annotate-snippets",
  "assert_cmd",
@@ -881,7 +881,7 @@ dependencies = [
 
 [[package]]
 name = "panache-formatter"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "insta",
  "log",
@@ -894,7 +894,7 @@ dependencies = [
 
 [[package]]
 name = "panache-parser"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "insta",
  "log",
