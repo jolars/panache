@@ -3,9 +3,9 @@ title: "Performance"
 description: >
   This page presents performance benchmarks for Panache, comparing its formatting
   and linting speed against popular alternatives like Prettier, Pandoc, rumdl,
-  and mdformat on real Quarto and Markdown documents. The benchmarks highlight
-  Panache's efficiency and suitability for on-save formatting and fast
-  repository-wide checks.
+  mdformat, mado, markdownlint, and markdownlint-cli2 on real Quarto and Markdown
+  documents. The benchmarks highlight Panache's efficiency and suitability for
+  on-save formatting and fast repository-wide checks.
 engine: knitr
 freeze: true
 ---
@@ -16,9 +16,9 @@ freeze: true
 Rust and compiled to native code, it delivers fast formatting with zero startup
 overhead. In this document, we present benchmarks comparing Panache's formatting
 and linting performance against popular alternatives like Prettier, Pandoc,
-rumdl, and mdformat on a realistic corpus of Quarto and Markdown documents. We
-don't include R Markdown benchmarks here because no other tool supports that
-format.
+rumdl, mdformat, mado, markdownlint, and markdownlint-cli2 on a realistic corpus
+of Quarto and Markdown documents. We don't include R Markdown benchmarks here
+because no other tool supports that format.
 
 We have split the benchmarks into two suites: per-document benchmarks that run
 each formatter on each document in the corpus individually, and repository-wide
@@ -111,7 +111,7 @@ html`<div class="callout-note">
     <li>Generated: ${new Date(data.meta.generated_at).toUTCString()}</li>
     <li>Host: ${data.meta.host.cpu} (${data.meta.host.os}/${data.meta.host.arch})</li>
     <li>Minimum runs: ${data.meta.min_runs}</li>
-    <li>panache ${data.meta.tools.panache.version}, prettier ${data.meta.tools.prettier?.version ?? "n/a"}, pandoc ${data.meta.tools.pandoc?.version ?? "n/a"}, rumdl ${data.meta.tools.rumdl?.version ?? "n/a"}, mdformat ${data.meta.tools.mdformat?.version ?? "n/a"}</li>
+    <li>panache ${data.meta.tools.panache.version}, prettier ${data.meta.tools.prettier?.version ?? "n/a"}, pandoc ${data.meta.tools.pandoc?.version ?? "n/a"}, rumdl ${data.meta.tools.rumdl?.version ?? "n/a"}, mdformat ${data.meta.tools.mdformat?.version ?? "n/a"}, mado ${data.meta.tools.mado?.version ?? "n/a"}, markdownlint ${data.meta.tools.markdownlint?.version ?? "n/a"}, markdownlint-cli2 ${data.meta.tools["markdownlint-cli2"]?.version ?? "n/a"}</li>
   </ul>
 </div>`
 ```
@@ -414,15 +414,16 @@ lintDocumentIds = lintSingleData.documents.map(d => d.id)
 ```
 
 In @fig-lint-single-results, we compare linting time per document across panache
-lint and rumdl check. Each dot is one document; the y-axis shows time relative
-to panache lint (×, lower is faster). Panache sits at 1× by construction.
+lint, rumdl check, mado check, markdownlint, and markdownlint-cli2. Each dot is
+one document; the y-axis shows time relative to panache lint (×, lower is
+faster). Panache sits at 1× by construction.
 
 ```{ojs}
 //| label: fig-lint-single-results
 //| echo: false
-//| fig-cap: "Linting time per document, comparing panache lint to rumdl check.
-//|   Each dot is one document; the y-axis shows time relative to panache lint
-//|   (×, lower is faster)."
+//| fig-cap: "Linting time per document, comparing panache lint to rumdl check,
+//|   mado check, markdownlint, and markdownlint-cli2. Each dot is one document;
+//|   the y-axis shows time relative to panache lint (×, lower is faster)."
 
 Plot.plot({
   marginLeft: 60,
@@ -462,9 +463,10 @@ Plot.plot({
 ### Repository-Wide
 
 This suite benchmarks linting on the same standard Markdown repositories as the
-formatting comparison, using `panache lint` and `rumdl check`. In
-@fig-repo-markdown-lint, each dot is one repo/tool pair; the y-axis shows time
-relative to panache lint within that repo (×, lower is faster).
+formatting comparison, using `panache lint`, `rumdl check`, `mado check`,
+`markdownlint`, and `markdownlint-cli2`. In @fig-repo-markdown-lint, each dot is
+one repo/tool pair; the y-axis shows time relative to panache lint within that
+repo (×, lower is faster).
 
 ```{bash}
 #| label: run-repo-markdown-lint
@@ -489,7 +491,10 @@ repoMarkdownLint = FileAttachment("performance_repo_markdown_lint_data.json").js
 
 repoMarkdownLintResults = prepareRepoSuiteRows(repoMarkdownLint, {
   panache: "panache lint",
-  rumdl: "rumdl check"
+  rumdl: "rumdl check",
+  mado: "mado check",
+  markdownlint: "markdownlint",
+  "markdownlint-cli2": "markdownlint-cli2"
 })
 repoMarkdownLintTools = Array.from(
   d3.rollup(repoMarkdownLintResults, v => d3.mean(v, d => d.ratio), d => d.toolLabel)

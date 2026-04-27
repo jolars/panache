@@ -36,6 +36,9 @@ json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 HAVE_HYPERFINE=$(command -v hyperfine >/dev/null 2>&1 && echo yes || echo no)
 HAVE_JQ=$(command -v jq >/dev/null 2>&1 && echo yes || echo no)
 HAVE_RUMDL=$(command -v rumdl >/dev/null 2>&1 && echo yes || echo no)
+HAVE_MADO=$(command -v mado >/dev/null 2>&1 && echo yes || echo no)
+HAVE_MARKDOWNLINT=$(command -v markdownlint >/dev/null 2>&1 && echo yes || echo no)
+HAVE_MARKDOWNLINT_CLI2=$(command -v markdownlint-cli2 >/dev/null 2>&1 && echo yes || echo no)
 
 if [[ "$HAVE_HYPERFINE" != yes || "$HAVE_JQ" != yes ]]; then
     log "compare_lint_single.sh requires hyperfine and jq"
@@ -48,7 +51,13 @@ PANACHE="$REPO_ROOT/target/release/panache"
 
 PANACHE_VER=$("$PANACHE" --version | awk '{print $2}')
 RUMDL_VER=""
+MADO_VER=""
+MARKDOWNLINT_VER=""
+MARKDOWNLINT_CLI2_VER=""
 [[ "$HAVE_RUMDL" == yes ]] && RUMDL_VER=$(rumdl --version | awk '{print $2}')
+[[ "$HAVE_MADO" == yes ]] && MADO_VER=$(mado --version | awk '{print $2}')
+[[ "$HAVE_MARKDOWNLINT" == yes ]] && MARKDOWNLINT_VER=$(markdownlint --version)
+[[ "$HAVE_MARKDOWNLINT_CLI2" == yes ]] && MARKDOWNLINT_CLI2_VER=$(markdownlint-cli2 --version 2>&1 | head -1 | awk '{print $2}' | sed 's/^v//')
 
 HOST_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 HOST_ARCH=$(uname -m)
@@ -108,6 +117,18 @@ benchmark_document() {
         TOOL_CMD[rumdl]="rumdl check --isolated --no-cache --silent --fail-on never '$DOCS_DIR/$file' >/dev/null 2>&1"
         tools+=(rumdl)
     fi
+    if [[ "$HAVE_MADO" == yes ]]; then
+        TOOL_CMD[mado]="mado check --quiet '$DOCS_DIR/$file' >/dev/null 2>&1 || true"
+        tools+=(mado)
+    fi
+    if [[ "$HAVE_MARKDOWNLINT" == yes ]]; then
+        TOOL_CMD[markdownlint]="markdownlint --quiet '$DOCS_DIR/$file' >/dev/null 2>&1 || true"
+        tools+=(markdownlint)
+    fi
+    if [[ "$HAVE_MARKDOWNLINT_CLI2" == yes ]]; then
+        TOOL_CMD[markdownlint-cli2]="markdownlint-cli2 '$DOCS_DIR/$file' >/dev/null 2>&1 || true"
+        tools+=(markdownlint-cli2)
+    fi
 
     local tool cmd mean stddev min max runs
     for tool in "${tools[@]}"; do
@@ -139,6 +160,9 @@ mkdir -p "$(dirname "$JSON_OUT")"
     printf '    "tools": {\n'
     printf '      "panache": {"version": "%s"}' "$(json_escape "$PANACHE_VER")"
     [[ -n "$RUMDL_VER" ]] && printf ',\n      "rumdl":   {"version": "%s"}' "$(json_escape "$RUMDL_VER")"
+    [[ -n "$MADO_VER" ]] && printf ',\n      "mado":    {"version": "%s"}' "$(json_escape "$MADO_VER")"
+    [[ -n "$MARKDOWNLINT_VER" ]] && printf ',\n      "markdownlint": {"version": "%s"}' "$(json_escape "$MARKDOWNLINT_VER")"
+    [[ -n "$MARKDOWNLINT_CLI2_VER" ]] && printf ',\n      "markdownlint-cli2": {"version": "%s"}' "$(json_escape "$MARKDOWNLINT_CLI2_VER")"
     printf '\n    }\n'
     printf '  },\n'
     printf '  "documents": [\n'

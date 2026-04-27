@@ -64,6 +64,9 @@ HAVE_JQ=$(command -v jq >/dev/null 2>&1 && echo yes || echo no)
 HAVE_PRETTIER=$(command -v prettier >/dev/null 2>&1 && echo yes || echo no)
 HAVE_RUMDL=$(command -v rumdl >/dev/null 2>&1 && echo yes || echo no)
 HAVE_MDFORMAT=$(command -v mdformat >/dev/null 2>&1 && echo yes || echo no)
+HAVE_MADO=$(command -v mado >/dev/null 2>&1 && echo yes || echo no)
+HAVE_MARKDOWNLINT=$(command -v markdownlint >/dev/null 2>&1 && echo yes || echo no)
+HAVE_MARKDOWNLINT_CLI2=$(command -v markdownlint-cli2 >/dev/null 2>&1 && echo yes || echo no)
 
 if [[ "$HAVE_HYPERFINE" != yes || "$HAVE_JQ" != yes ]]; then
     log "compare_repo_suite.sh requires hyperfine and jq"
@@ -78,9 +81,15 @@ PANACHE_VER=$("$PANACHE" --version | awk '{print $2}')
 PRETTIER_VER=""
 RUMDL_VER=""
 MDFORMAT_VER=""
+MADO_VER=""
+MARKDOWNLINT_VER=""
+MARKDOWNLINT_CLI2_VER=""
 [[ "$HAVE_PRETTIER" == yes ]] && PRETTIER_VER=$(prettier --version)
 [[ "$HAVE_RUMDL" == yes ]] && RUMDL_VER=$(rumdl --version | awk '{print $2}')
 [[ "$HAVE_MDFORMAT" == yes ]] && MDFORMAT_VER=$(mdformat --version | awk '{print $2}')
+[[ "$HAVE_MADO" == yes ]] && MADO_VER=$(mado --version | awk '{print $2}')
+[[ "$HAVE_MARKDOWNLINT" == yes ]] && MARKDOWNLINT_VER=$(markdownlint --version)
+[[ "$HAVE_MARKDOWNLINT_CLI2" == yes ]] && MARKDOWNLINT_CLI2_VER=$(markdownlint-cli2 --version 2>&1 | head -1 | awk '{print $2}' | sed 's/^v//')
 
 HOST_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 HOST_ARCH=$(uname -m)
@@ -244,6 +253,18 @@ for repo in "${REPOS[@]}"; do
             TOOL_CMD[rumdl]="rumdl check --isolated --no-cache --silent --fail-on never '$corpus_dir' >/dev/null 2>&1"
             TOOLS+=(rumdl)
         fi
+        if [[ "$TRACK" == "markdown" && "$HAVE_MADO" == yes ]]; then
+            TOOL_CMD[mado]="mado check --quiet '$corpus_dir' >/dev/null 2>&1 || true"
+            TOOLS+=(mado)
+        fi
+        if [[ "$TRACK" == "markdown" && "$HAVE_MARKDOWNLINT" == yes ]]; then
+            TOOL_CMD[markdownlint]="markdownlint --quiet '$corpus_dir'/*.md >/dev/null 2>&1 || true"
+            TOOLS+=(markdownlint)
+        fi
+        if [[ "$TRACK" == "markdown" && "$HAVE_MARKDOWNLINT_CLI2" == yes ]]; then
+            TOOL_CMD[markdownlint-cli2]="markdownlint-cli2 '$corpus_dir/*.md' >/dev/null 2>&1 || true"
+            TOOLS+=(markdownlint-cli2)
+        fi
     fi
 
     for tool in "${TOOLS[@]}"; do
@@ -283,6 +304,15 @@ mkdir -p "$(dirname "$JSON_OUT")"
     fi
     if [[ -n "$MDFORMAT_VER" ]]; then
         printf ',\n      "mdformat": {"version": "%s"}' "$(json_escape "$MDFORMAT_VER")"
+    fi
+    if [[ -n "$MADO_VER" ]]; then
+        printf ',\n      "mado": {"version": "%s"}' "$(json_escape "$MADO_VER")"
+    fi
+    if [[ -n "$MARKDOWNLINT_VER" ]]; then
+        printf ',\n      "markdownlint": {"version": "%s"}' "$(json_escape "$MARKDOWNLINT_VER")"
+    fi
+    if [[ -n "$MARKDOWNLINT_CLI2_VER" ]]; then
+        printf ',\n      "markdownlint-cli2": {"version": "%s"}' "$(json_escape "$MARKDOWNLINT_CLI2_VER")"
     fi
     printf '\n    }\n'
     printf '  },\n'

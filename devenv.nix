@@ -26,6 +26,8 @@
     pkgs.shfmt
     pkgs.wasm-pack
     pkgs.stylua
+    pkgs.markdownlint-cli
+    pkgs.markdownlint-cli2
     pkgs.shellcheck
     pkgs.mdformat
     pkgs.eslint
