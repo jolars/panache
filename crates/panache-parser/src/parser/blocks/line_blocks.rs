@@ -24,7 +24,7 @@ pub fn parse_line_block(
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
 ) -> usize {
-    log::debug!("Parsing line block at line {}", start_pos + 1);
+    log::trace!("Parsing line block at line {}", start_pos + 1);
 
     builder.start_node(SyntaxKind::LINE_BLOCK.into());
 
@@ -92,7 +92,7 @@ pub fn parse_line_block(
 
     builder.finish_node(); // LineBlock
 
-    log::debug!("Parsed line block: lines {}-{}", start_pos + 1, pos);
+    log::trace!("Parsed line block: lines {}-{}", start_pos + 1, pos);
 
     pos
 }

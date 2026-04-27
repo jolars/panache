@@ -565,7 +565,7 @@ pub(crate) fn try_parse_simple_table(
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
 ) -> Option<usize> {
-    log::debug!("try_parse_simple_table at line {}", start_pos + 1);
+    log::trace!("try_parse_simple_table at line {}", start_pos + 1);
 
     if start_pos >= lines.len() {
         return None;
@@ -573,7 +573,7 @@ pub(crate) fn try_parse_simple_table(
 
     // Look for a separator line
     let separator_pos = find_separator_line(lines, start_pos)?;
-    log::debug!("  found separator at line {}", separator_pos + 1);
+    log::trace!("  found separator at line {}", separator_pos + 1);
 
     let separator_line = lines[separator_pos];
     let mut columns = try_parse_table_separator(separator_line)?;
@@ -688,12 +688,12 @@ pub(crate) fn try_parse_simple_table(
 
 /// Find the position of a separator line starting from pos.
 fn find_separator_line(lines: &[&str], start_pos: usize) -> Option<usize> {
-    log::debug!("  find_separator_line from line {}", start_pos + 1);
+    log::trace!("  find_separator_line from line {}", start_pos + 1);
 
     // Check first line
-    log::debug!("    checking first line: {:?}", lines[start_pos]);
+    log::trace!("    checking first line: {:?}", lines[start_pos]);
     if try_parse_table_separator(lines[start_pos]).is_some() {
-        log::debug!("    separator found at first line");
+        log::trace!("    separator found at first line");
         return Some(start_pos);
     }
 

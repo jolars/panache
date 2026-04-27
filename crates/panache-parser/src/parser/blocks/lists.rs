@@ -1167,7 +1167,7 @@ pub(in crate::parser) fn add_list_item(
 ) {
     let (content_col, text_to_buffer) = emit_list_item(builder, item);
 
-    log::debug!(
+    log::trace!(
         "add_list_item: content={:?}, text_to_buffer={:?}",
         item.content,
         text_to_buffer

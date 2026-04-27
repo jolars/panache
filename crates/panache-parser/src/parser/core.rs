@@ -86,7 +86,7 @@ impl<'a> Parser<'a> {
                     // Clone buffer to avoid borrow issues
                     let buffer_clone = buffer.clone();
 
-                    log::debug!(
+                    log::trace!(
                         "Closing ListItem with buffer (is_empty={}, segment_count={})",
                         buffer_clone.is_empty(),
                         buffer_clone.segment_count()
@@ -112,7 +112,7 @@ impl<'a> Parser<'a> {
                     let use_paragraph =
                         parent_list_is_loose || buffer_clone.has_blank_lines_between_content();
 
-                    log::debug!(
+                    log::trace!(
                         "Emitting ListItem buffer: use_paragraph={} (parent_list_is_loose={}, item_has_blanks={})",
                         use_paragraph,
                         parent_list_is_loose,
@@ -127,7 +127,7 @@ impl<'a> Parser<'a> {
                 }
                 // Handle ListItem without content
                 Some(Container::ListItem { .. }) => {
-                    log::debug!("Closing empty ListItem (no buffer content)");
+                    log::trace!("Closing empty ListItem (no buffer content)");
                     // Just close normally (empty list item)
                     self.containers.stack.pop();
                     self.builder.finish_node();
@@ -1016,14 +1016,14 @@ impl<'a> Parser<'a> {
     fn parse_document_stack(&mut self) {
         self.builder.start_node(SyntaxKind::DOCUMENT.into());
 
-        log::debug!("Starting document parse");
+        log::trace!("Starting document parse");
 
         // Pandoc title block is handled via the block dispatcher.
 
         while self.pos < self.lines.len() {
             let line = self.lines[self.pos];
 
-            log::debug!("Parsing line {}: {}", self.pos + 1, line);
+            log::trace!("Parsing line {}: {}", self.pos + 1, line);
 
             if self.parse_line(line) {
                 continue;
@@ -1101,7 +1101,7 @@ impl<'a> Parser<'a> {
             None
         };
 
-        log::debug!(
+        log::trace!(
             "parse_line [{}]: bq_depth={}, current_bq={}, depth={}, line={:?}",
             self.pos,
             bq_depth,
@@ -1191,7 +1191,7 @@ impl<'a> Parser<'a> {
                 match self.containers.last() {
                     Some(Container::ListItem { .. }) => {
                         // levels_to_keep wants to close the ListItem - blank line is between items
-                        log::debug!(
+                        log::trace!(
                             "Closing ListItem at blank line (levels_to_keep={} < depth={})",
                             levels_to_keep,
                             self.containers.depth()
@@ -1205,7 +1205,7 @@ impl<'a> Parser<'a> {
                     | Some(Container::Definition { .. })
                     | Some(Container::DefinitionItem { .. })
                     | Some(Container::DefinitionList { .. }) => {
-                        log::debug!(
+                        log::trace!(
                             "Closing {:?} at blank line (depth {} > levels_to_keep {})",
                             self.containers.last(),
                             self.containers.depth(),
@@ -1555,7 +1555,7 @@ impl<'a> Parser<'a> {
                 if is_new_item_at_outer_level
                     || (effective_indent < content_col && !has_explicit_same_depth_marker)
                 {
-                    log::debug!(
+                    log::trace!(
                         "Closing ListItem: is_new_item={}, effective_indent={} < content_col={}",
                         is_new_item_at_outer_level,
                         effective_indent,
@@ -1563,7 +1563,7 @@ impl<'a> Parser<'a> {
                     );
                     self.close_containers_to(self.containers.depth() - 1);
                 } else {
-                    log::debug!(
+                    log::trace!(
                         "Keeping ListItem: effective_indent={} >= content_col={}",
                         effective_indent,
                         content_col
@@ -1721,7 +1721,7 @@ impl<'a> Parser<'a> {
     /// `line_to_append` - Optional line to use when appending to paragraphs.
     ///                    If None, uses self.lines[self.pos]
     fn parse_inner_content(&mut self, content: &str, line_to_append: Option<&str>) -> bool {
-        log::debug!(
+        log::trace!(
             "parse_inner_content [{}]: depth={}, last={:?}, content={:?}",
             self.pos,
             self.containers.depth(),
@@ -2245,7 +2245,7 @@ impl<'a> Parser<'a> {
             // parse_line_block on raw lines in that state would consume 0 lines.
             && try_parse_line_block_start(self.lines[self.pos]).is_some()
         {
-            log::debug!("Parsed line block at line {}", self.pos);
+            log::trace!("Parsed line block at line {}", self.pos);
             // Close paragraph before opening line block
             self.close_paragraph_if_open();
 
@@ -2259,7 +2259,7 @@ impl<'a> Parser<'a> {
         // Paragraph or list item continuation
         // Check if we're inside a ListItem - if so, buffer the content instead of emitting
         if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
-            log::debug!(
+            log::trace!(
                 "Inside ListItem - buffering content: {:?}",
                 line_to_append.unwrap_or(self.lines[self.pos]).trim_end()
             );
@@ -2275,7 +2275,7 @@ impl<'a> Parser<'a> {
             return true;
         }
 
-        log::debug!(
+        log::trace!(
             "Not in ListItem - creating paragraph for: {:?}",
             line_to_append.unwrap_or(self.lines[self.pos]).trim_end()
         );

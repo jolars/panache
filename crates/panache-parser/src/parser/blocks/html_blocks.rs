@@ -235,7 +235,7 @@ pub(crate) fn parse_html_block(
     let closes_on_first_line = is_closing_marker(first_line, &block_type);
 
     if closes_on_first_line {
-        log::debug!(
+        log::trace!(
             "HTML block at line {} opens and closes on same line",
             start_pos + 1
         );
@@ -259,7 +259,7 @@ pub(crate) fn parse_html_block(
 
         // Check for closing marker
         if is_closing_marker(line, &block_type) {
-            log::debug!("Found HTML block closing at line {}", current_pos + 1);
+            log::trace!("Found HTML block closing at line {}", current_pos + 1);
             found_closing = true;
 
             // Emit content
@@ -307,7 +307,7 @@ pub(crate) fn parse_html_block(
 
     // If we didn't find a closing marker, emit what we collected
     if !found_closing {
-        log::debug!("HTML block at line {} has no closing marker", start_pos + 1);
+        log::trace!("HTML block at line {} has no closing marker", start_pos + 1);
         if !content_lines.is_empty() {
             builder.start_node(SyntaxKind::HTML_BLOCK_CONTENT.into());
             for content_line in &content_lines {

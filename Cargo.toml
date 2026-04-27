@@ -50,7 +50,7 @@ env_logger = "0.11.10"
 emojis = "0.8.0"
 globset = "0.4"
 ignore = { version = "0.4", optional = true }
-log = { version = "0.4.28", features = ["release_max_level_info"] }
+log = { version = "0.4.28", features = ["release_max_level_debug"] }
 regex = "1.12.2"
 rowan = "0.16.1"
 salsa = "0.26.0"

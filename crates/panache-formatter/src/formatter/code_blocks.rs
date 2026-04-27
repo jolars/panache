@@ -100,7 +100,7 @@ pub(super) fn format_code_block(
     // Format the info string based on config and block type (traditional inline)
     let formatted_info = format_info_string(&info_node, &info);
 
-    log::debug!("formatted_info = '{}'", formatted_info);
+    log::trace!("formatted_info = '{}'", formatted_info);
 
     // Output normalized code block
     for _ in 0..fence_length {
@@ -417,7 +417,7 @@ fn format_chunk_options_inline(options: &[(Option<String>, Option<String>, bool)
 
 /// Format the info string based on block type and config preferences
 fn format_info_string(info_node: &SyntaxNode, info: &InfoString) -> String {
-    log::debug!(
+    log::trace!(
         "format_info_string: block_type={:?}, raw='{}'",
         info.block_type,
         info.raw

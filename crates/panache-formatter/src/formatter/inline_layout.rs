@@ -1138,7 +1138,7 @@ pub(super) fn wrapped_lines_for_paragraph(
             .map(ToString::to_string)
             .collect();
     }
-    log::debug!("wrapped_lines_for_paragraph called with width={}", width);
+    log::trace!("wrapped_lines_for_paragraph called with width={}", width);
     let out_lines = wrapped_lines_for_node(
         _config,
         node,
@@ -1146,7 +1146,7 @@ pub(super) fn wrapped_lines_for_paragraph(
         format_inline_fn,
         WrapStrategy::ParagraphReflow,
     );
-    log::debug!("Wrapped into {} lines", out_lines.len());
+    log::trace!("Wrapped into {} lines", out_lines.len());
     out_lines
 }
 
@@ -1164,7 +1164,7 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
             .map(ToString::to_string)
             .collect();
     }
-    log::debug!("wrapped_lines_for_paragraph_with_widths called");
+    log::trace!("wrapped_lines_for_paragraph_with_widths called");
     let out_lines = wrapped_lines_for_node(
         _config,
         node,
@@ -1172,7 +1172,7 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
         format_inline_fn,
         WrapStrategy::ParagraphReflow,
     );
-    log::debug!("Wrapped into {} lines", out_lines.len());
+    log::trace!("Wrapped into {} lines", out_lines.len());
     out_lines
 }
 
@@ -1181,7 +1181,7 @@ pub(super) fn sentence_lines_for_paragraph(
     node: &SyntaxNode,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
-    log::debug!("sentence_lines_for_paragraph called");
+    log::trace!("sentence_lines_for_paragraph called");
     wrapped_lines_for_node(
         _config,
         node,

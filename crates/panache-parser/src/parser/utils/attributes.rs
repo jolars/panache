@@ -45,7 +45,7 @@ pub fn try_parse_trailing_attributes_with_pos(text: &str) -> Option<(AttributeBl
     // If the { is immediately after ] (with optional whitespace), this should be parsed as a span
     let before_brace = &trimmed[..open_brace];
     if before_brace.trim_end().ends_with(']') {
-        log::debug!("Skipping attribute parsing for bracketed span: {}", text);
+        log::trace!("Skipping attribute parsing for bracketed span: {}", text);
         return None;
     }
 

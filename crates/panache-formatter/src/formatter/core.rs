@@ -1254,7 +1254,7 @@ impl Formatter {
 
             SyntaxKind::PARAGRAPH => {
                 let text = node.text().to_string();
-                log::debug!("Formatting paragraph, text length: {}", text.len());
+                log::trace!("Formatting paragraph, text length: {}", text.len());
                 let paragraph_indent = " ".repeat(indent);
 
                 if self.is_grid_table_continuation_paragraph(node) {
@@ -1357,7 +1357,7 @@ impl Formatter {
                     }
                     return;
                 }
-                log::debug!(
+                log::trace!(
                     "Paragraph wrap mode: {:?}, line_width: {}",
                     wrap_mode,
                     line_width
@@ -1431,7 +1431,7 @@ impl Formatter {
 
             SyntaxKind::FIGURE => {
                 // Figure is a standalone image - format the inline content directly
-                log::debug!("Formatting figure");
+                log::trace!("Formatting figure");
                 let text = self.format_inline_node(node);
                 let trimmed = text.trim();
                 if indent > 0 {
@@ -1445,7 +1445,7 @@ impl Formatter {
                 // Plain is like PARAGRAPH but for tight contexts (definition lists, table cells)
                 // Apply wrapping with continuation indentation
                 let text = node.text().to_string();
-                log::debug!("Formatting Plain block, text length: {}", text.len());
+                log::trace!("Formatting Plain block, text length: {}", text.len());
 
                 let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
                 let needs_indent = indent > 0
@@ -1589,7 +1589,7 @@ impl Formatter {
             }
 
             SyntaxKind::LINE_BLOCK => {
-                log::debug!("Formatting line block");
+                log::trace!("Formatting line block");
                 // Add blank line before line blocks if not at start
                 if !self.output.is_empty() && !self.output.ends_with("\n\n") {
                     self.output.push('\n');

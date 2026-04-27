@@ -14,7 +14,7 @@ categories = ["text-processing"]
 
 [dependencies]
 panache-parser = { path = "../panache-parser", version = "0.4.2" }
-log = { version = "0.4.28", features = ["release_max_level_info"] }
+log = { version = "0.4.28", features = ["release_max_level_debug"] }
 rowan = "0.16.1"
 yaml_parser = "0.3.0"
 pretty_yaml = "0.6.0"

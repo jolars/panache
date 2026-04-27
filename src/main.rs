@@ -33,24 +33,24 @@ const SUPPORTED_EXTENSIONS: &[&str] = &[
 ];
 
 fn init_logger(debug_log: Option<&Path>) {
-    if let Some(path) = debug_log {
-        let mut builder = env_logger::Builder::new();
-        if let Ok(file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-        {
-            builder.target(env_logger::Target::Pipe(Box::new(file)));
-        }
-        builder.filter_level(log::LevelFilter::Info);
-        builder.filter_module("panache::lsp", log::LevelFilter::Debug);
-        builder.filter_module("panache::includes", log::LevelFilter::Debug);
-        builder.format_timestamp_millis();
-        builder.init();
-        log::info!("LSP debug logging enabled at {}", path.display());
+    let Some(path) = debug_log else {
+        env_logger::Builder::from_default_env().init();
         return;
+    };
+
+    let mut builder = env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("panache=debug"),
+    );
+    if let Ok(file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        builder.target(env_logger::Target::Pipe(Box::new(file)));
     }
-    env_logger::Builder::from_default_env().init();
+    builder.format_timestamp_millis();
+    builder.init();
+    log::info!("LSP debug logging enabled at {}", path.display());
 }
 
 fn init_lsp_debug_log() -> io::Result<PathBuf> {

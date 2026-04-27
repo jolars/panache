@@ -84,7 +84,7 @@ pub fn parse_inline_text_recursive(
     text: &str,
     config: &ParserOptions,
 ) {
-    log::debug!(
+    log::trace!(
         "Recursive inline parsing: {:?} ({} bytes)",
         &text[..text.len().min(40)],
         text.len()
@@ -92,7 +92,7 @@ pub fn parse_inline_text_recursive(
 
     parse_inline_range(text, 0, text.len(), config, builder);
 
-    log::debug!("Recursive inline parsing complete");
+    log::trace!("Recursive inline parsing complete");
 }
 
 /// Parse inline elements from text content.
@@ -166,7 +166,7 @@ pub fn try_parse_emphasis(
 
     let after_pos = pos + count;
 
-    log::debug!(
+    log::trace!(
         "try_parse_emphasis: '{}' x {} at pos {}",
         delim_char,
         count,
@@ -242,7 +242,7 @@ fn try_parse_emphasis_nested(
         count += 1;
     }
 
-    log::debug!(
+    log::trace!(
         "try_parse_emphasis_nested: '{}' x {} at pos {}",
         delim_char,
         count,
@@ -295,7 +295,7 @@ fn try_parse_three(
     let one = delim_char.to_string();
     let two = one.repeat(2);
 
-    log::debug!("try_parse_three: '{}' x 3 at pos {}", delim_char, pos);
+    log::trace!("try_parse_three: '{}' x 3 at pos {}", delim_char, pos);
 
     // Pandoc algorithm (line 1695): Parse content UNTIL we see a VALID ender
     // We loop through potential enders, checking if each is valid.
@@ -312,7 +312,7 @@ fn try_parse_three(
             }
         };
 
-        log::debug!("Potential ender at pos {}", closer_start);
+        log::trace!("Potential ender at pos {}", closer_start);
 
         // Count how many delimiters we have at closer_start
         let bytes = text.as_bytes();
@@ -323,7 +323,7 @@ fn try_parse_three(
             check_pos += 1;
         }
 
-        log::debug!(
+        log::trace!(
             "Found {} x {} at pos {}",
             delim_char,
             closer_count,
@@ -334,7 +334,7 @@ fn try_parse_three(
 
         // Try *** (line 1696)
         if closer_count >= 3 && is_valid_ender(text, closer_start, delim_char, 3) {
-            log::debug!("Matched *** closer, emitting Strong[Emph[content]]");
+            log::trace!("Matched *** closer, emitting Strong[Emph[content]]");
 
             builder.start_node(SyntaxKind::STRONG.into());
             builder.token(SyntaxKind::STRONG_MARKER.into(), &two);
@@ -353,14 +353,14 @@ fn try_parse_three(
 
         // Try ** (line 1697)
         if closer_count >= 2 && is_valid_ender(text, closer_start, delim_char, 2) {
-            log::debug!("Matched ** closer, wrapping as Strong and continuing with one");
+            log::trace!("Matched ** closer, wrapping as Strong and continuing with one");
 
             let continue_pos = closer_start + 2;
 
             if let Some(final_closer_pos) =
                 parse_until_closer_with_nested_two(text, continue_pos, delim_char, 1, end, config)
             {
-                log::debug!(
+                log::trace!(
                     "Found * closer at pos {}, emitting Emph[Strong[...], ...]",
                     final_closer_pos
                 );
@@ -384,7 +384,7 @@ fn try_parse_three(
             }
 
             // Fallback: emit * + STRONG
-            log::debug!("No * closer found after **, emitting * + STRONG");
+            log::trace!("No * closer found after **, emitting * + STRONG");
             builder.token(SyntaxKind::TEXT.into(), &one);
 
             builder.start_node(SyntaxKind::STRONG.into());
@@ -398,14 +398,14 @@ fn try_parse_three(
 
         // Try * (line 1698)
         if closer_count >= 1 && is_valid_ender(text, closer_start, delim_char, 1) {
-            log::debug!("Matched * closer, wrapping as Emph and continuing with two");
+            log::trace!("Matched * closer, wrapping as Emph and continuing with two");
 
             let continue_pos = closer_start + 1;
 
             if let Some(final_closer_pos) =
                 parse_until_closer_with_nested_one(text, continue_pos, delim_char, 2, end, config)
             {
-                log::debug!(
+                log::trace!(
                     "Found ** closer at pos {}, emitting Strong[Emph[...], ...]",
                     final_closer_pos
                 );
@@ -428,7 +428,7 @@ fn try_parse_three(
             }
 
             // Fallback: emit ** + EMPH
-            log::debug!("No ** closer found after *, emitting ** + EMPH");
+            log::trace!("No ** closer found after *, emitting ** + EMPH");
             builder.token(SyntaxKind::TEXT.into(), &two);
 
             builder.start_node(SyntaxKind::EMPHASIS.into());
@@ -441,7 +441,7 @@ fn try_parse_three(
         }
 
         // No valid ender at this position - continue searching after this delimiter run
-        log::debug!(
+        log::trace!(
             "No valid ender at pos {}, continuing search from {}",
             closer_start,
             closer_start + closer_count
@@ -551,13 +551,13 @@ fn try_parse_two(
 ) -> Option<usize> {
     let content_start = pos + 2;
 
-    log::debug!("try_parse_two: '{}' x 2 at pos {}", delim_char, pos);
+    log::trace!("try_parse_two: '{}' x 2 at pos {}", delim_char, pos);
 
     // Try to find ** closer, checking for nested * emphasis along the way
     if let Some(closer_pos) =
         parse_until_closer_with_nested_one(text, content_start, delim_char, 2, end, config)
     {
-        log::debug!("Found ** closer at pos {}", closer_pos);
+        log::trace!("Found ** closer at pos {}", closer_pos);
 
         // Emit STRONG(content)
         builder.start_node(SyntaxKind::STRONG.into());
@@ -597,13 +597,13 @@ fn try_parse_one(
 ) -> Option<usize> {
     let content_start = pos + 1;
 
-    log::debug!("try_parse_one: '{}' x 1 at pos {}", delim_char, pos);
+    log::trace!("try_parse_one: '{}' x 1 at pos {}", delim_char, pos);
 
     // Try to find * closer using Pandoc's algorithm with nested two attempts
     if let Some(closer_pos) =
         parse_until_closer_with_nested_two(text, content_start, delim_char, 1, end, config)
     {
-        log::debug!("Found * closer at pos {}", closer_pos);
+        log::trace!("Found * closer at pos {}", closer_pos);
 
         // Emit EMPH(content)
         builder.start_node(SyntaxKind::EMPHASIS.into());
@@ -744,7 +744,7 @@ fn parse_until_closer_with_nested_two(
                 {
                     // `two` succeeded! Those ** delimiters are consumed.
                     // We skip past the `two` and continue searching for our `*` closer.
-                    log::debug!(
+                    log::trace!(
                         "Nested two succeeded, consumed {} bytes, continuing search",
                         two_consumed
                     );
@@ -966,7 +966,7 @@ fn parse_until_closer_with_nested_one(
                 {
                     // `one` succeeded! Those * delimiters are consumed.
                     // We skip past the `one` and continue searching for our `**` closer.
-                    log::debug!(
+                    log::trace!(
                         "Nested one succeeded, consumed {} bytes, continuing search",
                         one_consumed
                     );
@@ -979,7 +979,7 @@ fn parse_until_closer_with_nested_one(
                 // delimiter "poisons" the outer emphasis.
                 // Example: `**foo *bar**` - the `*` can't find a closer, so the
                 // outer `**` should fail and the whole thing becomes literal.
-                log::debug!(
+                log::trace!(
                     "Nested one failed at pos {}, poisoning outer two (no closer found)",
                     pos
                 );
@@ -1120,7 +1120,7 @@ fn parse_inline_range_impl(
     builder: &mut GreenNodeBuilder,
     nested_emphasis: bool,
 ) {
-    log::debug!(
+    log::trace!(
         "parse_inline_range: start={}, end={}, text={:?}",
         start,
         end,
@@ -1141,7 +1141,7 @@ fn parse_inline_range_impl(
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
-                    log::debug!("Matched double backslash display math at pos {}", pos);
+                    log::trace!("Matched double backslash display math at pos {}", pos);
                     emit_double_backslash_display_math(builder, content);
                     pos += len;
                     text_start = pos;
@@ -1153,7 +1153,7 @@ fn parse_inline_range_impl(
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
-                    log::debug!("Matched double backslash inline math at pos {}", pos);
+                    log::trace!("Matched double backslash inline math at pos {}", pos);
                     emit_double_backslash_inline_math(builder, content);
                     pos += len;
                     text_start = pos;
@@ -1168,7 +1168,7 @@ fn parse_inline_range_impl(
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
-                    log::debug!("Matched single backslash display math at pos {}", pos);
+                    log::trace!("Matched single backslash display math at pos {}", pos);
                     emit_single_backslash_display_math(builder, content);
                     pos += len;
                     text_start = pos;
@@ -1180,7 +1180,7 @@ fn parse_inline_range_impl(
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
-                    log::debug!("Matched single backslash inline math at pos {}", pos);
+                    log::trace!("Matched single backslash inline math at pos {}", pos);
                     emit_single_backslash_inline_math(builder, content);
                     pos += len;
                     text_start = pos;
@@ -1196,7 +1196,7 @@ fn parse_inline_range_impl(
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
-                log::debug!("Matched math environment at pos {}", pos);
+                log::trace!("Matched math environment at pos {}", pos);
                 emit_display_math_environment(builder, begin_marker, content, end_marker);
                 pos += len;
                 text_start = pos;
@@ -1210,7 +1210,7 @@ fn parse_inline_range_impl(
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
-                log::debug!("Matched bookdown reference at pos {}: {}", pos, label);
+                log::trace!("Matched bookdown reference at pos {}: {}", pos, label);
                 super::citations::emit_bookdown_crossref(builder, label);
                 pos += len;
                 text_start = pos;
@@ -1239,7 +1239,7 @@ fn parse_inline_range_impl(
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
 
-                log::debug!("Matched escape at pos {}: \\{}", pos, ch);
+                log::trace!("Matched escape at pos {}: \\{}", pos, ch);
                 emit_escape(builder, ch, escape_type);
                 pos += len;
                 text_start = pos;
@@ -1253,7 +1253,7 @@ fn parse_inline_range_impl(
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
-                log::debug!("Matched LaTeX command at pos {}", pos);
+                log::trace!("Matched LaTeX command at pos {}", pos);
                 parse_latex_command(builder, &text[pos..], len);
                 pos += len;
                 text_start = pos;
@@ -1270,7 +1270,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched shortcode at pos {}: {}", pos, &name);
+            log::trace!("Matched shortcode at pos {}: {}", pos, &name);
             emit_shortcode(builder, &name, attrs);
             pos += len;
             text_start = pos;
@@ -1288,7 +1288,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched inline executable code at pos {}", pos);
+            log::trace!("Matched inline executable code at pos {}", pos);
             emit_inline_executable(builder, &m);
             pos += m.total_len;
             text_start = pos;
@@ -1305,7 +1305,7 @@ fn parse_inline_range_impl(
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
 
-            log::debug!(
+            log::trace!(
                 "Matched code span at pos {}: {} backticks",
                 pos,
                 backtick_count
@@ -1317,7 +1317,7 @@ fn parse_inline_range_impl(
                 && let Some(format) = is_raw_inline(attrs)
             {
                 use super::raw_inline::emit_raw_inline;
-                log::debug!("Matched raw inline span at pos {}: format={}", pos, format);
+                log::trace!("Matched raw inline span at pos {}: format={}", pos, format);
                 emit_raw_inline(builder, content, backtick_count, format);
             } else if !config.extensions.inline_code_attributes && attributes.is_some() {
                 let code_span_len = backtick_count * 2 + content.len();
@@ -1343,7 +1343,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched emoji at pos {}", pos);
+            log::trace!("Matched emoji at pos {}", pos);
             emit_emoji(builder, &text[pos..pos + len]);
             pos += len;
             text_start = pos;
@@ -1360,7 +1360,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched inline footnote at pos {}", pos);
+            log::trace!("Matched inline footnote at pos {}", pos);
             emit_inline_footnote(builder, content, config);
             pos += len;
             text_start = pos;
@@ -1375,7 +1375,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched superscript at pos {}", pos);
+            log::trace!("Matched superscript at pos {}", pos);
             emit_superscript(builder, content, config);
             pos += len;
             text_start = pos;
@@ -1388,7 +1388,7 @@ fn parse_inline_range_impl(
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
-                log::debug!("Matched bookdown definition at pos {}: {}", pos, label);
+                log::trace!("Matched bookdown definition at pos {}: {}", pos, label);
                 builder.token(SyntaxKind::TEXT.into(), &text[pos..pos + len]);
                 pos += len;
                 text_start = pos;
@@ -1398,7 +1398,7 @@ fn parse_inline_range_impl(
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
-                log::debug!("Matched bookdown text reference at pos {}: {}", pos, label);
+                log::trace!("Matched bookdown text reference at pos {}: {}", pos, label);
                 builder.token(SyntaxKind::TEXT.into(), &text[pos..pos + len]);
                 pos += len;
                 text_start = pos;
@@ -1414,7 +1414,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched subscript at pos {}", pos);
+            log::trace!("Matched subscript at pos {}", pos);
             emit_subscript(builder, content, config);
             pos += len;
             text_start = pos;
@@ -1429,7 +1429,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched strikeout at pos {}", pos);
+            log::trace!("Matched strikeout at pos {}", pos);
             emit_strikeout(builder, content, config);
             pos += len;
             text_start = pos;
@@ -1444,7 +1444,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched mark at pos {}", pos);
+            log::trace!("Matched mark at pos {}", pos);
             emit_mark(builder, content, config);
             pos += len;
             text_start = pos;
@@ -1459,7 +1459,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched GFM inline math at pos {}", pos);
+            log::trace!("Matched GFM inline math at pos {}", pos);
             emit_gfm_inline_math(builder, content);
             pos += len;
             text_start = pos;
@@ -1476,7 +1476,7 @@ fn parse_inline_range_impl(
                 }
 
                 let dollar_count = text[pos..].chars().take_while(|&c| c == '$').count();
-                log::debug!(
+                log::trace!(
                     "Matched display math at pos {}: {} dollars",
                     pos,
                     dollar_count
@@ -1538,7 +1538,7 @@ fn parse_inline_range_impl(
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
 
-                log::debug!("Matched inline math at pos {}", pos);
+                log::trace!("Matched inline math at pos {}", pos);
                 emit_inline_math(builder, content);
                 pos += len;
                 text_start = pos;
@@ -1564,7 +1564,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched autolink at pos {}", pos);
+            log::trace!("Matched autolink at pos {}", pos);
             emit_autolink(builder, &text[pos..pos + len], url);
             pos += len;
             text_start = pos;
@@ -1577,7 +1577,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched bare URI at pos {}", pos);
+            log::trace!("Matched bare URI at pos {}", pos);
             emit_bare_uri_link(builder, url, config);
             pos += len;
             text_start = pos;
@@ -1592,7 +1592,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched native span at pos {}", pos);
+            log::trace!("Matched native span at pos {}", pos);
             emit_native_span(builder, content, &attributes, config);
             pos += len;
             text_start = pos;
@@ -1606,7 +1606,7 @@ fn parse_inline_range_impl(
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
-                log::debug!("Matched inline image at pos {}", pos);
+                log::trace!("Matched inline image at pos {}", pos);
                 emit_inline_image(
                     builder,
                     &text[pos..pos + len],
@@ -1629,7 +1629,7 @@ fn parse_inline_range_impl(
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
-                    log::debug!("Matched reference image at pos {}", pos);
+                    log::trace!("Matched reference image at pos {}", pos);
                     emit_reference_image(builder, alt_text, &reference, is_implicit, config);
                     pos += len;
                     text_start = pos;
@@ -1647,7 +1647,7 @@ fn parse_inline_range_impl(
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
-                log::debug!("Matched footnote reference at pos {}", pos);
+                log::trace!("Matched footnote reference at pos {}", pos);
                 emit_footnote_reference(builder, &id);
                 pos += len;
                 text_start = pos;
@@ -1662,7 +1662,7 @@ fn parse_inline_range_impl(
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
-                log::debug!("Matched inline link at pos {}", pos);
+                log::trace!("Matched inline link at pos {}", pos);
                 emit_inline_link(
                     builder,
                     &text[pos..pos + len],
@@ -1685,7 +1685,7 @@ fn parse_inline_range_impl(
                     if pos > text_start {
                         builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                     }
-                    log::debug!("Matched reference link at pos {}", pos);
+                    log::trace!("Matched reference link at pos {}", pos);
                     emit_reference_link(builder, link_text, &reference, is_implicit, config);
                     pos += len;
                     text_start = pos;
@@ -1700,7 +1700,7 @@ fn parse_inline_range_impl(
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
-                log::debug!("Matched bracketed citation at pos {}", pos);
+                log::trace!("Matched bracketed citation at pos {}", pos);
                 emit_bracketed_citation(builder, content);
                 pos += len;
                 text_start = pos;
@@ -1717,7 +1717,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::debug!("Matched bracketed span at pos {}", pos);
+            log::trace!("Matched bracketed span at pos {}", pos);
             emit_bracketed_span(builder, &text_content, &attrs, config);
             pos += len;
             text_start = pos;
@@ -1736,10 +1736,10 @@ fn parse_inline_range_impl(
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
                 if is_crossref {
-                    log::debug!("Matched Quarto crossref at pos {}: {}", pos, &key);
+                    log::trace!("Matched Quarto crossref at pos {}: {}", pos, &key);
                     super::citations::emit_crossref(builder, key, has_suppress);
                 } else {
-                    log::debug!("Matched bare citation at pos {}: {}", pos, &key);
+                    log::trace!("Matched bare citation at pos {}: {}", pos, &key);
                     emit_bare_citation(builder, key, has_suppress);
                 }
                 pos += len;
@@ -1762,10 +1762,10 @@ fn parse_inline_range_impl(
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
                 if is_crossref {
-                    log::debug!("Matched Quarto crossref at pos {}: {}", pos, &key);
+                    log::trace!("Matched Quarto crossref at pos {}: {}", pos, &key);
                     super::citations::emit_crossref(builder, key, has_suppress);
                 } else {
-                    log::debug!("Matched suppress-author citation at pos {}: {}", pos, &key);
+                    log::trace!("Matched suppress-author citation at pos {}: {}", pos, &key);
                     emit_bare_citation(builder, key, has_suppress);
                 }
                 pos += len;
@@ -1785,7 +1785,7 @@ fn parse_inline_range_impl(
 
             // Emit any accumulated text before the delimiter
             if pos > text_start {
-                log::debug!(
+                log::trace!(
                     "Emitting TEXT before delimiter: {:?}",
                     &text[text_start..pos]
                 );
@@ -1803,7 +1803,7 @@ fn parse_inline_range_impl(
 
             if let Some((consumed, _)) = emphasis_result {
                 // Successfully parsed emphasis
-                log::debug!(
+                log::trace!(
                     "Parsed emphasis, consumed {} bytes from pos {}",
                     consumed,
                     pos
@@ -1813,7 +1813,7 @@ fn parse_inline_range_impl(
             } else {
                 // Failed to parse, delimiter run will be treated as regular text
                 // Skip the ENTIRE delimiter run to avoid re-parsing parts of it
-                log::debug!(
+                log::trace!(
                     "Failed to parse emphasis at pos {}, skipping {} delimiters as literal",
                     pos,
                     delim_count
@@ -1912,11 +1912,11 @@ fn parse_inline_range_impl(
 
     // Emit any remaining text
     if pos > text_start && text_start < end {
-        log::debug!("Emitting remaining TEXT: {:?}", &text[text_start..end]);
+        log::trace!("Emitting remaining TEXT: {:?}", &text[text_start..end]);
         builder.token(SyntaxKind::TEXT.into(), &text[text_start..end]);
     }
 
-    log::debug!("parse_inline_range complete: start={}, end={}", start, end);
+    log::trace!("parse_inline_range complete: start={}, end={}", start, end);
 }
 
 #[cfg(test)]

@@ -252,7 +252,7 @@ impl Formatter {
         });
         let is_loose = (has_blank_between_items || has_blockquote_children) && !has_nested_lists;
 
-        log::debug!("Formatting list: is_loose={}", is_loose);
+        log::trace!("Formatting list: is_loose={}", is_loose);
 
         let mut item_count = 0;
         let total_items = node

@@ -2178,7 +2178,7 @@ impl BlockParserRegistry {
     ) -> Option<PreparedBlockMatch> {
         for (i, parser) in self.parsers.iter().enumerate() {
             if let Some((detection, payload)) = parser.detect_prepared(ctx, lines, line_pos) {
-                log::debug!("Block detected by: {}", parser.name());
+                log::trace!("Block detected by: {}", parser.name());
                 return Some(PreparedBlockMatch {
                     parser_index: i,
                     detection,
@@ -2203,7 +2203,7 @@ impl BlockParserRegistry {
         line_pos: usize,
     ) -> usize {
         let parser = &self.parsers[block_match.parser_index];
-        log::debug!("Block parsed by: {}", parser.name());
+        log::trace!("Block parsed by: {}", parser.name());
         parser.parse_prepared(
             ctx,
             builder,

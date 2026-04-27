@@ -134,7 +134,7 @@ pub fn parse_raw_tex_block(
     start_pos: usize,
     blockquote_depth: usize,
 ) -> usize {
-    log::debug!("Starting raw TeX block at line {}", start_pos);
+    log::trace!("Starting raw TeX block at line {}", start_pos);
 
     builder.start_node(SyntaxKind::TEX_BLOCK.into());
 
@@ -147,7 +147,7 @@ pub fn parse_raw_tex_block(
         && extract_environment_name(first_line_inner).is_none()
     {
         builder.finish_node();
-        log::debug!("Finished raw TeX block, consumed 0 lines");
+        log::trace!("Finished raw TeX block, consumed 0 lines");
         return 0;
     }
 
@@ -162,7 +162,7 @@ pub fn parse_raw_tex_block(
 
     builder.finish_node(); // TEX_BLOCK
 
-    log::debug!("Finished raw TeX block, consumed {} lines", lines_consumed);
+    log::trace!("Finished raw TeX block, consumed {} lines", lines_consumed);
     lines_consumed
 }
 
