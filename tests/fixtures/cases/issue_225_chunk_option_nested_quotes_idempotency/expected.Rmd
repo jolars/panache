@@ -1,0 +1,6 @@
+```{r, out.extra='class="cover"'}
+#| out-width: "349px"
+#| echo: false
+
+knitr::include_graphics('images/cover.png', dpi = NA)
+```

@@ -395,8 +395,15 @@ fn format_chunk_options_inline(options: &[(Option<String>, Option<String>, bool)
             (Some(k), Some(v)) => {
                 // Key=value
                 if *is_quoted {
-                    // Re-add quotes
-                    parts.push(format!("{}=\"{}\"", k, v));
+                    // Re-add quotes. Pick a quote char that won't collide with
+                    // the value contents so we don't produce broken syntax like
+                    // `key="class="cover""` for an original `key='class="cover"'`.
+                    let quote = if v.contains('"') && !v.contains('\'') {
+                        '\''
+                    } else {
+                        '"'
+                    };
+                    parts.push(format!("{}={}{}{}", k, quote, v, quote));
                 } else {
                     parts.push(format!("{}={}", k, v));
                 }
