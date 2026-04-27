@@ -17,6 +17,7 @@
     pkgs.jarl
     pkgs.llvmPackages.bintools
     pkgs.rumdl
+    pkgs.mado
     pkgs.prettier
     pkgs.hyperfine
     pkgs.quartoMinimal
