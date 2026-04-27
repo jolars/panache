@@ -57,6 +57,30 @@ pub fn resolve_label(db: &dyn Db, label: InternedLabel<'_>) -> String {
     label.label(db).clone()
 }
 
+/// Parse a `(file, config)` pair to a CST exactly once per `SalsaDb`. All
+/// salsa-tracked queries below funnel their parses through this entry point so
+/// a single document's lint pipeline (built-in plan, project graph, metadata,
+/// definition/usage indexes, ...) shares one parse instead of repeating it
+/// per query. The host (`lint_loaded_document_with_includes`) reads the same
+/// cached tree directly to avoid an additional standalone parse.
+///
+/// We cache `GreenNode` (Arc-backed, `Send + Sync`) rather than `SyntaxNode`
+/// (which holds non-Send cursor state). Callers wrap the returned green tree
+/// in a fresh `SyntaxNode` via [`parsed_tree_root`] — that is cheap (a single
+/// atomic clone) and gives each caller its own cursor without leaking the
+/// salsa cell.
+#[salsa::tracked(returns(ref), lru = 64)]
+pub fn parsed_tree(db: &dyn Db, file: FileText, config: FileConfig) -> rowan::GreenNode {
+    crate::parse(file.text(db), Some(config.config(db).clone()))
+        .green()
+        .into_owned()
+}
+
+/// Materialize the cached parse for `(file, config)` as a fresh `SyntaxNode`.
+pub fn parsed_tree_root(db: &dyn Db, file: FileText, config: FileConfig) -> SyntaxNode {
+    SyntaxNode::new_root(parsed_tree(db, file, config).clone())
+}
+
 #[salsa::tracked(returns(ref), no_eq, unsafe(non_update_types))]
 pub fn metadata(
     db: &dyn Db,
@@ -64,7 +88,7 @@ pub fn metadata(
     config: FileConfig,
     path: PathBuf,
 ) -> DocumentMetadata {
-    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    let tree = parsed_tree_root(db, file, config);
     let mut metadata =
         crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path)
             .unwrap_or_else(|_| crate::metadata::DocumentMetadata {
@@ -122,7 +146,7 @@ pub fn yaml_metadata_parse_result(
     config: FileConfig,
     path: PathBuf,
 ) -> Result<(), crate::metadata::YamlError> {
-    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    let tree = parsed_tree_root(db, file, config);
     crate::metadata::extract_project_metadata_without_bibliography_parse(&tree, &path).map(|_| ())
 }
 
@@ -140,7 +164,7 @@ pub fn parsed_yaml_regions_for_file(
     file: FileText,
     config: FileConfig,
 ) -> Vec<ParsedYamlRegionSnapshot> {
-    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    let tree = parsed_tree_root(db, file, config);
     collect_parsed_yaml_region_snapshots(&tree)
 }
 
@@ -194,7 +218,7 @@ pub fn built_in_lint_plan(
 ) -> BuiltInLintPlan {
     let text = file.text(db);
     let cfg = config.config(db).clone();
-    let tree = crate::parse(text, Some(cfg.clone()));
+    let tree = parsed_tree_root(db, file, config);
     let parsed_yaml_regions: Vec<_> = parsed_yaml_regions_for_file(db, file, config).to_vec();
     let frontmatter = parsed_yaml_regions
         .iter()
@@ -498,7 +522,7 @@ pub fn symbol_usage_index(
     config: FileConfig,
     _path: PathBuf,
 ) -> SymbolUsageIndex {
-    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    let tree = parsed_tree_root(db, file, config);
     symbol_usage_index_from_tree(db, &tree, &config.config(db).extensions)
 }
 
@@ -509,7 +533,7 @@ pub fn heading_outline(
     config: FileConfig,
     _path: PathBuf,
 ) -> Vec<HeadingOutlineEntry> {
-    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    let tree = parsed_tree_root(db, file, config);
     tree.descendants()
         .filter_map(crate::syntax::Heading::cast)
         .filter(|heading| is_structural_heading_node(heading.syntax()))
@@ -909,7 +933,7 @@ pub fn definition_index(
     config: FileConfig,
     path: PathBuf,
 ) -> DefinitionIndex {
-    let tree = crate::parse(file.text(db), Some(config.config(db).clone()));
+    let tree = parsed_tree_root(db, file, config);
     let mut index = InternedDefinitionIndex::default();
 
     for def in tree.descendants().filter_map(ReferenceDefinition::cast) {
@@ -1506,7 +1530,7 @@ fn visit_document<'db>(
     }
     graph.add_document(db, path);
     let text = file.text(db);
-    let tree = crate::parse(text, Some(config.config(db).clone()));
+    let tree = parsed_tree_root(db, *file, config);
     let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
     let project_root = crate::includes::find_project_roots(path).quarto_first();
     let resolution = crate::includes::collect_includes(

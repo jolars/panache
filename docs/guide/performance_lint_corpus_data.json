@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "meta": {
-    "generated_at": "2026-04-27T12:33:32Z",
+    "generated_at": "2026-04-27T13:01:11Z",
     "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
     "min_runs": 3,
     "replicas_per_source": 8,
@@ -15,9 +15,9 @@
     {"id":"single_pandoc_manual","kind":"single_file","file":"pandoc_manual.md","size_bytes":299536}
   ],
   "results": [
-    {"scenario":"synthetic_corpus","tool":"panache","mean_ms":164.9119,"stddev_ms":11.0574,"min_ms":154.9227,"max_ms":199.1176,"runs":16,"failed":false},
-    {"scenario":"synthetic_corpus","tool":"rumdl","mean_ms":298.8916,"stddev_ms":45.6142,"min_ms":260.5631,"max_ms":417.9815,"runs":10,"failed":false},
-    {"scenario":"single_pandoc_manual","tool":"panache","mean_ms":109.6274,"stddev_ms":1.9315,"min_ms":107.0285,"max_ms":113.4277,"runs":27,"failed":false},
-    {"scenario":"single_pandoc_manual","tool":"rumdl","mean_ms":133.7625,"stddev_ms":1.7224,"min_ms":130.5115,"max_ms":136.2003,"runs":21,"failed":false}
+    {"scenario":"synthetic_corpus","tool":"panache","mean_ms":73.1126,"stddev_ms":5.0363,"min_ms":67.2147,"max_ms":87.8949,"runs":38,"failed":false},
+    {"scenario":"synthetic_corpus","tool":"rumdl","mean_ms":369.7958,"stddev_ms":77.1274,"min_ms":260.8218,"max_ms":482.7054,"runs":8,"failed":false},
+    {"scenario":"single_pandoc_manual","tool":"panache","mean_ms":48.0113,"stddev_ms":1.3419,"min_ms":45.5788,"max_ms":51.7999,"runs":61,"failed":false},
+    {"scenario":"single_pandoc_manual","tool":"rumdl","mean_ms":133.5434,"stddev_ms":1.3119,"min_ms":131.1503,"max_ms":135.9779,"runs":22,"failed":false}
   ]
 }

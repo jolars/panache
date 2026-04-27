@@ -1707,19 +1707,23 @@ fn lint_loaded_document_with_includes(
     let file_text =
         file_text.unwrap_or_else(|| panache::salsa::FileText::new(db, input.to_string()));
 
-    let tree = parse(input, Some(cfg.clone()));
-    let metadata = panache::metadata::extract_project_metadata(&tree, doc_path).ok();
-    let mut diagnostics =
-        panache::linter::lint_with_external_sync_and_metadata(&tree, input, cfg, metadata.as_ref());
-    let yaml_diags =
-        panache::salsa::built_in_lint_plan(db, file_text, file_config, doc_path.clone())
-            .diagnostics
-            .iter()
-            .filter(|d| d.code == "yaml-parse-error")
-            .cloned()
-            .collect::<Vec<_>>();
-    merge_missing_diagnostics(&mut diagnostics, yaml_diags);
+    // Source built-in diagnostics from the salsa-tracked plan rather than
+    // running the rule registry a second time in the host. Salsa's plan
+    // already covers built-in rules, frontmatter-yaml errors, and the metadata
+    // pipeline; the host adds external linters (sync) and project-graph
+    // diagnostics on top.
+    let plan =
+        panache::salsa::built_in_lint_plan(db, file_text, file_config, doc_path.clone()).clone();
+    let mut diagnostics = plan.diagnostics;
+    if !plan.external_jobs.is_empty() {
+        diagnostics.extend(run_external_lint_jobs_sync(&plan.external_jobs, input));
+        diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
+    }
 
+    // Re-materialize the cached tree for the include scan; it is shared with
+    // built_in_lint_plan/project_graph via salsa so this is a refcount bump,
+    // not a parse.
+    let tree = panache::salsa::parsed_tree_root(db, file_text, file_config);
     let base_dir = doc_path.parent().unwrap_or(Path::new("."));
     let roots = panache::includes::find_project_roots(doc_path);
     let project_root = roots.quarto.clone();
@@ -1830,6 +1834,35 @@ fn merge_missing_diagnostics(
         }
         diagnostics.push(diag);
     }
+}
+
+/// Synchronously dispatch the external-linter jobs collected by
+/// `built_in_lint_plan` and return their diagnostics. Mirrors the LSP path
+/// (`diagnostics.rs`), so the CLI and LSP share the same pre-computed plan
+/// instead of re-running the rule registry per-host.
+fn run_external_lint_jobs_sync(
+    jobs: &[panache::salsa::ExternalLintJob],
+    input: &str,
+) -> Vec<panache::linter::Diagnostic> {
+    use panache::linter::external_linters::ExternalLinterRegistry;
+    use panache::linter::external_linters_sync::run_linter_sync;
+
+    let registry = ExternalLinterRegistry::new();
+    let mut out = Vec::new();
+    for job in jobs {
+        match run_linter_sync(
+            &job.linter_name,
+            &job.language,
+            &job.content,
+            input,
+            &registry,
+            Some(&job.mappings),
+        ) {
+            Ok(diags) => out.extend(diags),
+            Err(err) => log::warn!("External linter '{}' failed: {}", job.linter_name, err),
+        }
+    }
+    out
 }
 
 fn cached_lint_documents_are_fresh(documents: &[CachedLintDocument]) -> bool {

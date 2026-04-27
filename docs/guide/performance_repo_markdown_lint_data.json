@@ -3,7 +3,7 @@
   "meta": {
     "mode": "lint",
     "track": "markdown",
-    "generated_at": "2026-04-27T12:34:32Z",
+    "generated_at": "2026-04-27T13:01:45Z",
     "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
     "min_runs": 3,
     "tools": {
@@ -18,11 +18,11 @@
     {"id":"rust-lang__reference","name":"rust-lang/reference","file_count":153,"total_bytes":1139492,"extension":"md"}
   ],
   "results": [
-    {"repo":"jgm__pandoc","tool":"panache","mean_ms":565.1515,"stddev_ms":6.1477,"min_ms":558.7226,"max_ms":570.9729,"runs":3,"failed":false},
-    {"repo":"jgm__pandoc","tool":"rumdl","mean_ms":214.5305,"stddev_ms":10.0584,"min_ms":202.9598,"max_ms":221.1879,"runs":3,"failed":false},
-    {"repo":"rust-lang__book","tool":"panache","mean_ms":82.4941,"stddev_ms":3.1796,"min_ms":78.0556,"max_ms":85.3008,"runs":5,"failed":false},
-    {"repo":"rust-lang__book","tool":"rumdl","mean_ms":66.6576,"stddev_ms":2.7618,"min_ms":61.9676,"max_ms":68.8824,"runs":5,"failed":false},
-    {"repo":"rust-lang__reference","tool":"panache","mean_ms":68.0469,"stddev_ms":5.0401,"min_ms":62.8722,"max_ms":76.6644,"runs":13,"failed":false},
-    {"repo":"rust-lang__reference","tool":"rumdl","mean_ms":42.1292,"stddev_ms":2.7255,"min_ms":36.9840,"max_ms":45.3699,"runs":15,"failed":false}
+    {"repo":"jgm__pandoc","tool":"panache","mean_ms":261.5676,"stddev_ms":3.4626,"min_ms":257.7564,"max_ms":264.5198,"runs":3,"failed":false},
+    {"repo":"jgm__pandoc","tool":"rumdl","mean_ms":206.5423,"stddev_ms":5.9271,"min_ms":200.7427,"max_ms":212.5891,"runs":3,"failed":false},
+    {"repo":"rust-lang__book","tool":"panache","mean_ms":45.8969,"stddev_ms":0.9832,"min_ms":44.4790,"max_ms":47.2969,"runs":6,"failed":false},
+    {"repo":"rust-lang__book","tool":"rumdl","mean_ms":66.9263,"stddev_ms":2.4712,"min_ms":63.5109,"max_ms":70.4737,"runs":5,"failed":false},
+    {"repo":"rust-lang__reference","tool":"panache","mean_ms":35.7982,"stddev_ms":2.3357,"min_ms":31.8058,"max_ms":39.9993,"runs":16,"failed":false},
+    {"repo":"rust-lang__reference","tool":"rumdl","mean_ms":43.3522,"stddev_ms":4.4862,"min_ms":33.2576,"max_ms":52.9848,"runs":16,"failed":false}
   ]
 }
