@@ -426,58 +426,58 @@ fn emit_block_seq<'a>(
                 }
                 break;
             }
-            YamlToken::BlockSeqEntry => {
-                builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM.into());
-                builder.token(SyntaxKind::YAML_BLOCK_SEQ_ENTRY.into(), tokens[*i].text);
-                *i += 1;
-                let mut closed_via_nested_seq = false;
-                while *i < tokens.len() && tokens[*i].kind != YamlToken::Newline {
-                    match tokens[*i].kind {
-                        YamlToken::FlowSeqStart => emit_flow_sequence(builder, tokens, i)?,
-                        YamlToken::FlowMapStart => emit_flow_map(builder, tokens, i)?,
-                        YamlToken::Indent => {
-                            // Nested block sequence triggered by `- - ...`: the
-                            // lexer emitted an Indent between the outer `- ` and
-                            // the inner `-`. Recurse; the nested emitter
-                            // consumes through the matching Dedent (including
-                            // any intervening Newlines), so the outer item has
-                            // no trailing Newline to emit.
-                            *i += 1;
-                            builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE.into());
-                            emit_block_seq(builder, tokens, i, true)?;
-                            builder.finish_node(); // YAML_BLOCK_SEQUENCE
-                            closed_via_nested_seq = true;
-                            break;
-                        }
-                        _ => {
-                            emit_token_as_yaml(builder, &tokens[*i]);
-                            *i += 1;
-                        }
-                    }
-                }
-                if !closed_via_nested_seq
-                    && *i < tokens.len()
-                    && tokens[*i].kind == YamlToken::Newline
-                {
-                    builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
-                    *i += 1;
-                }
-                // Nested block map following a bare `-\n` entry: lexer has
-                // emitted an Indent after the Newline, terminated by a Dedent.
-                if !closed_via_nested_seq
-                    && *i < tokens.len()
-                    && tokens[*i].kind == YamlToken::Indent
-                {
-                    *i += 1;
-                    builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
-                    emit_block_map(builder, tokens, i, true)?;
-                    builder.finish_node(); // YAML_BLOCK_MAP
-                }
-                builder.finish_node(); // YAML_BLOCK_SEQUENCE_ITEM
-            }
+            YamlToken::BlockSeqEntry => emit_block_seq_item(builder, tokens, i)?,
             _ => break,
         }
     }
+    Ok(())
+}
+
+fn emit_block_seq_item<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Result<(), YamlDiagnostic> {
+    builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM.into());
+    builder.token(SyntaxKind::YAML_BLOCK_SEQ_ENTRY.into(), tokens[*i].text);
+    *i += 1;
+    let mut closed_via_nested_seq = false;
+    while *i < tokens.len() && tokens[*i].kind != YamlToken::Newline {
+        match tokens[*i].kind {
+            YamlToken::FlowSeqStart => emit_flow_sequence(builder, tokens, i)?,
+            YamlToken::FlowMapStart => emit_flow_map(builder, tokens, i)?,
+            YamlToken::Indent => {
+                // Nested block sequence triggered by `- - ...`: the lexer
+                // emitted an Indent between the outer `- ` and the inner
+                // `-`. Recurse; the nested emitter consumes through the
+                // matching Dedent (including any intervening Newlines), so
+                // the outer item has no trailing Newline to emit.
+                *i += 1;
+                builder.start_node(SyntaxKind::YAML_BLOCK_SEQUENCE.into());
+                emit_block_seq(builder, tokens, i, true)?;
+                builder.finish_node(); // YAML_BLOCK_SEQUENCE
+                closed_via_nested_seq = true;
+                break;
+            }
+            _ => {
+                emit_token_as_yaml(builder, &tokens[*i]);
+                *i += 1;
+            }
+        }
+    }
+    if !closed_via_nested_seq && *i < tokens.len() && tokens[*i].kind == YamlToken::Newline {
+        builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+        *i += 1;
+    }
+    // Nested block map following a bare `-\n` entry: lexer has emitted an
+    // Indent after the Newline, terminated by a Dedent.
+    if !closed_via_nested_seq && *i < tokens.len() && tokens[*i].kind == YamlToken::Indent {
+        *i += 1;
+        builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
+        emit_block_map(builder, tokens, i, true)?;
+        builder.finish_node(); // YAML_BLOCK_MAP
+    }
+    builder.finish_node(); // YAML_BLOCK_SEQUENCE_ITEM
     Ok(())
 }
 
@@ -562,147 +562,7 @@ fn emit_block_map<'a>(
                     "unexpected dedent token while parsing block map",
                 ));
             }
-            _ => {
-                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
-                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_KEY.into());
-
-                let mut saw_colon = false;
-                while *i < tokens.len() {
-                    match tokens[*i].kind {
-                        YamlToken::Key => {
-                            builder.token(SyntaxKind::YAML_KEY.into(), tokens[*i].text);
-                            *i += 1;
-                        }
-                        YamlToken::Tag => {
-                            builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);
-                            *i += 1;
-                        }
-                        YamlToken::Whitespace => {
-                            builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
-                            *i += 1;
-                        }
-                        YamlToken::Colon => {
-                            builder.token(SyntaxKind::YAML_COLON.into(), tokens[*i].text);
-                            *i += 1;
-                            saw_colon = true;
-                            break;
-                        }
-                        _ => {
-                            return Err(diag_at_token(
-                                &tokens[*i],
-                                diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
-                                "invalid token while parsing block map key",
-                            ));
-                        }
-                    }
-                }
-                if !saw_colon {
-                    return Err(diag_at_token(
-                        &tokens[(*i).saturating_sub(1)],
-                        diagnostic_codes::PARSE_MISSING_COLON,
-                        "missing colon in block map entry",
-                    ));
-                }
-                builder.finish_node(); // YAML_BLOCK_MAP_KEY
-
-                builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
-                while *i < tokens.len() {
-                    match tokens[*i].kind {
-                        YamlToken::Scalar => {
-                            builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
-                            *i += 1;
-                        }
-                        YamlToken::FlowMapStart => {
-                            emit_flow_map(builder, tokens, i)?;
-                        }
-                        YamlToken::FlowSeqStart => {
-                            emit_flow_sequence(builder, tokens, i)?;
-                        }
-                        YamlToken::Anchor | YamlToken::Alias => {
-                            builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
-                            *i += 1;
-                        }
-                        YamlToken::BlockScalarHeader => {
-                            // Emit the header, then consume the header line's
-                            // trailing newline plus all following content
-                            // lines (BlockScalarContent + Newline) into this
-                            // value so the block scalar body is structurally
-                            // part of YAML_BLOCK_MAP_VALUE.
-                            builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
-                            *i += 1;
-                            while *i < tokens.len() {
-                                match tokens[*i].kind {
-                                    YamlToken::Newline => {
-                                        builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
-                                        *i += 1;
-                                        // Continue while subsequent tokens
-                                        // belong to the scalar (more content
-                                        // or another blank-line newline).
-                                        if *i < tokens.len()
-                                            && matches!(
-                                                tokens[*i].kind,
-                                                YamlToken::BlockScalarContent | YamlToken::Newline
-                                            )
-                                        {
-                                            continue;
-                                        }
-                                        break;
-                                    }
-                                    YamlToken::BlockScalarContent => {
-                                        builder
-                                            .token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
-                                        *i += 1;
-                                    }
-                                    _ => break,
-                                }
-                            }
-                        }
-                        YamlToken::BlockScalarContent => {
-                            builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
-                            *i += 1;
-                        }
-                        YamlToken::FlowMapEnd | YamlToken::FlowSeqEnd | YamlToken::Comma => {
-                            break;
-                        }
-                        YamlToken::Tag => {
-                            builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);
-                            *i += 1;
-                        }
-                        YamlToken::Comment => {
-                            builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[*i].text);
-                            *i += 1;
-                        }
-                        YamlToken::Whitespace => {
-                            builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
-                            *i += 1;
-                        }
-                        _ => break,
-                    }
-                }
-
-                let mut trailing_newline: Option<&str> = None;
-                if *i < tokens.len() && tokens[*i].kind == YamlToken::Newline {
-                    trailing_newline = Some(tokens[*i].text);
-                    *i += 1;
-                }
-
-                if *i < tokens.len() && tokens[*i].kind == YamlToken::Indent {
-                    *i += 1;
-                    // Emit trailing newline before nested content to preserve byte order
-                    if let Some(newline) = trailing_newline.take() {
-                        builder.token(SyntaxKind::NEWLINE.into(), newline);
-                    }
-                    builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
-                    emit_block_map(builder, tokens, i, true)?;
-                    builder.finish_node(); // YAML_BLOCK_MAP
-                }
-
-                builder.finish_node(); // YAML_BLOCK_MAP_VALUE
-                if let Some(newline) = trailing_newline {
-                    builder.token(SyntaxKind::NEWLINE.into(), newline);
-                }
-                builder.finish_node(); // YAML_BLOCK_MAP_ENTRY
-            }
+            _ => emit_block_map_entry(builder, tokens, i)?,
         }
     }
 
@@ -720,6 +580,171 @@ fn emit_block_map<'a>(
     }
 
     Ok(())
+}
+
+fn emit_block_map_entry<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Result<(), YamlDiagnostic> {
+    builder.start_node(SyntaxKind::YAML_BLOCK_MAP_ENTRY.into());
+    emit_block_map_key(builder, tokens, i)?;
+    let trailing_newline = emit_block_map_value(builder, tokens, i)?;
+    if let Some(newline) = trailing_newline {
+        builder.token(SyntaxKind::NEWLINE.into(), newline);
+    }
+    builder.finish_node(); // YAML_BLOCK_MAP_ENTRY
+    Ok(())
+}
+
+fn emit_block_map_key<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Result<(), YamlDiagnostic> {
+    builder.start_node(SyntaxKind::YAML_BLOCK_MAP_KEY.into());
+
+    let mut saw_colon = false;
+    while *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlToken::Key => {
+                builder.token(SyntaxKind::YAML_KEY.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Tag => {
+                builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Whitespace => {
+                builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Colon => {
+                builder.token(SyntaxKind::YAML_COLON.into(), tokens[*i].text);
+                *i += 1;
+                saw_colon = true;
+                break;
+            }
+            _ => {
+                return Err(diag_at_token(
+                    &tokens[*i],
+                    diagnostic_codes::PARSE_INVALID_KEY_TOKEN,
+                    "invalid token while parsing block map key",
+                ));
+            }
+        }
+    }
+    if !saw_colon {
+        return Err(diag_at_token(
+            &tokens[(*i).saturating_sub(1)],
+            diagnostic_codes::PARSE_MISSING_COLON,
+            "missing colon in block map entry",
+        ));
+    }
+    builder.finish_node(); // YAML_BLOCK_MAP_KEY
+    Ok(())
+}
+
+/// Emit `YAML_BLOCK_MAP_VALUE` and return the trailing newline (if any) that
+/// the caller should emit after the value node closes. The newline is held
+/// back so that a nested block map can be wired in after the newline rather
+/// than before, preserving byte order in the CST.
+fn emit_block_map_value<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) -> Result<Option<&'a str>, YamlDiagnostic> {
+    builder.start_node(SyntaxKind::YAML_BLOCK_MAP_VALUE.into());
+    while *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlToken::Scalar => {
+                builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::FlowMapStart => emit_flow_map(builder, tokens, i)?,
+            YamlToken::FlowSeqStart => emit_flow_sequence(builder, tokens, i)?,
+            YamlToken::Anchor | YamlToken::Alias => {
+                builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::BlockScalarHeader => {
+                consume_block_scalar(builder, tokens, i);
+            }
+            YamlToken::BlockScalarContent => {
+                builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::FlowMapEnd | YamlToken::FlowSeqEnd | YamlToken::Comma => break,
+            YamlToken::Tag => {
+                builder.token(SyntaxKind::YAML_TAG.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Comment => {
+                builder.token(SyntaxKind::YAML_COMMENT.into(), tokens[*i].text);
+                *i += 1;
+            }
+            YamlToken::Whitespace => {
+                builder.token(SyntaxKind::WHITESPACE.into(), tokens[*i].text);
+                *i += 1;
+            }
+            _ => break,
+        }
+    }
+
+    let mut trailing_newline: Option<&str> = None;
+    if *i < tokens.len() && tokens[*i].kind == YamlToken::Newline {
+        trailing_newline = Some(tokens[*i].text);
+        *i += 1;
+    }
+
+    if *i < tokens.len() && tokens[*i].kind == YamlToken::Indent {
+        *i += 1;
+        // Emit trailing newline before nested content to preserve byte order.
+        if let Some(newline) = trailing_newline.take() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
+        builder.start_node(SyntaxKind::YAML_BLOCK_MAP.into());
+        emit_block_map(builder, tokens, i, true)?;
+        builder.finish_node(); // YAML_BLOCK_MAP
+    }
+
+    builder.finish_node(); // YAML_BLOCK_MAP_VALUE
+    Ok(trailing_newline)
+}
+
+/// Consume a literal/folded block-scalar header (`|` / `>`) and the
+/// following content lines. Each line is emitted as a `YAML_SCALAR` token
+/// with `NEWLINE` separators. Blank-line newlines that belong to the scalar
+/// body are absorbed so the entire body lives inside the value node.
+fn consume_block_scalar<'a>(
+    builder: &mut GreenNodeBuilder<'_>,
+    tokens: &[YamlTokenSpan<'a>],
+    i: &mut usize,
+) {
+    builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+    *i += 1;
+    while *i < tokens.len() {
+        match tokens[*i].kind {
+            YamlToken::Newline => {
+                builder.token(SyntaxKind::NEWLINE.into(), tokens[*i].text);
+                *i += 1;
+                if *i < tokens.len()
+                    && matches!(
+                        tokens[*i].kind,
+                        YamlToken::BlockScalarContent | YamlToken::Newline
+                    )
+                {
+                    continue;
+                }
+                break;
+            }
+            YamlToken::BlockScalarContent => {
+                builder.token(SyntaxKind::YAML_SCALAR.into(), tokens[*i].text);
+                *i += 1;
+            }
+            _ => break,
+        }
+    }
 }
 
 /// Parse prototype YAML tree structure from input
