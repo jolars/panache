@@ -1,0 +1,73 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: LP6E
+input: "- [a, b , c ]\n- { \"a\"  : b\n   , c : 'd' ,\n   e   : \"f\"\n  }\n- [      ]\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..70
+  YAML_METADATA_CONTENT@0..70
+    YAML_STREAM@0..70
+      YAML_DOCUMENT@0..70
+        YAML_BLOCK_SEQUENCE@0..70
+          YAML_BLOCK_SEQUENCE_ITEM@0..14
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_FLOW_SEQUENCE@2..13
+              YAML_SCALAR@2..3 "["
+              YAML_FLOW_SEQUENCE_ITEM@3..4
+                YAML_SCALAR@3..4 "a"
+              YAML_SCALAR@4..5 ","
+              YAML_FLOW_SEQUENCE_ITEM@5..8
+                YAML_SCALAR@5..8 " b "
+              YAML_SCALAR@8..9 ","
+              YAML_FLOW_SEQUENCE_ITEM@9..12
+                YAML_SCALAR@9..12 " c "
+              YAML_SCALAR@12..13 "]"
+            NEWLINE@13..14 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@14..59
+            YAML_BLOCK_SEQ_ENTRY@14..15 "-"
+            WHITESPACE@15..16 " "
+            YAML_FLOW_MAP@16..58
+              YAML_SCALAR@16..17 "{"
+              YAML_FLOW_MAP_ENTRY@17..30
+                YAML_FLOW_MAP_KEY@17..24
+                  YAML_KEY@17..23 " \"a\"  "
+                  YAML_COLON@23..24 ":"
+                YAML_FLOW_MAP_VALUE@24..30
+                  YAML_SCALAR@24..26 " b"
+                  YAML_SCALAR@26..27 "\n"
+                  YAML_SCALAR@27..27 ""
+                  WHITESPACE@27..30 "   "
+              YAML_SCALAR@30..31 ","
+              YAML_FLOW_MAP_ENTRY@31..40
+                YAML_FLOW_MAP_KEY@31..35
+                  YAML_KEY@31..34 " c "
+                  YAML_COLON@34..35 ":"
+                YAML_FLOW_MAP_VALUE@35..40
+                  YAML_SCALAR@35..40 " 'd' "
+              YAML_SCALAR@40..41 ","
+              YAML_SCALAR@41..42 "\n"
+              WHITESPACE@42..45 "   "
+              YAML_FLOW_MAP_ENTRY@45..57
+                YAML_FLOW_MAP_KEY@45..50
+                  YAML_KEY@45..49 "e   "
+                  YAML_COLON@49..50 ":"
+                YAML_FLOW_MAP_VALUE@50..57
+                  YAML_SCALAR@50..54 " \"f\""
+                  YAML_SCALAR@54..55 "\n"
+                  YAML_SCALAR@55..55 ""
+                  WHITESPACE@55..57 "  "
+              YAML_SCALAR@57..58 "}"
+            NEWLINE@58..59 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@59..70
+            YAML_BLOCK_SEQ_ENTRY@59..60 "-"
+            WHITESPACE@60..61 " "
+            YAML_FLOW_SEQUENCE@61..69
+              YAML_SCALAR@61..62 "["
+              YAML_SCALAR@62..68 "      "
+              YAML_SCALAR@68..69 "]"
+            NEWLINE@69..70 "\n"

@@ -162,6 +162,18 @@ fn plain_val_event(text: &str) -> String {
     format!("=VAL :{}", text.replace('\\', "\\\\"))
 }
 
+/// Project a flow-collection scalar token, preserving quoted-scalar
+/// classification when the source uses `"..."` or `'...'`. Plain scalars are
+/// folded just like outside flow context.
+fn flow_scalar_event(text: &str) -> String {
+    let trimmed = text.trim();
+    if trimmed.starts_with('"') || trimmed.starts_with('\'') {
+        quoted_val_event(trimmed)
+    } else {
+        plain_val_event(&fold_plain_scalar(text))
+    }
+}
+
 fn quoted_val_event(text: &str) -> String {
     if text.starts_with('\'') {
         let trimmed = text.trim_end_matches('\'');
@@ -423,8 +435,8 @@ fn project_flow_map_entries(flow_map: &SyntaxNode, out: &mut Vec<String>) {
             .join("");
 
         if has_explicit_colon {
-            out.push(plain_val_event(&fold_plain_scalar(&raw_key)));
-            out.push(plain_val_event(&fold_plain_scalar(&raw_value)));
+            out.push(flow_scalar_event(&raw_key));
+            out.push(flow_scalar_event(&raw_value));
         } else {
             let combined = format!("{raw_key}{raw_value}");
             out.push(plain_val_event(&fold_plain_scalar(&combined)));

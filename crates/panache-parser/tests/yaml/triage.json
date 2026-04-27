@@ -693,12 +693,6 @@
       "tree": false
     },
     {
-      "case_id": "5C5M",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "5GBF",
       "diagnostic_codes": [
         "YAML_LEX_ERROR"
@@ -721,12 +715,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "5T43",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "5TYM",
@@ -1143,12 +1131,6 @@
       "tree": false
     },
     {
-      "case_id": "C2DT",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "C4HZ",
       "diagnostic_codes": [
         "YAML_LEX_TRAILING_CONTENT_AFTER_DOCUMENT_START"
@@ -1484,12 +1466,6 @@
     },
     {
       "case_id": "LE5A",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
-      "case_id": "LP6E",
       "diagnostic_codes": [],
       "event_parity": false,
       "tree": true
@@ -1983,7 +1959,9 @@
     "54T7",
     "58MP",
     "5BVJ",
+    "5C5M",
     "5KJE",
+    "5T43",
     "652Z",
     "65WH",
     "6H3V",
@@ -1999,6 +1977,7 @@
     "9FMG",
     "9J7A",
     "9SHH",
+    "C2DT",
     "CPZ3",
     "CUP7",
     "D88J",
@@ -2015,6 +1994,7 @@
     "JS2J",
     "K4SU",
     "KMK3",
+    "LP6E",
     "M29M",
     "MXS3",
     "PUW8",
@@ -2038,8 +2018,8 @@
   "summary": {
     "error_contract_ok_count": 54,
     "fails_needs_error_path_count": 24,
-    "fails_needs_feature_count": 191,
-    "passes_now_count": 64,
+    "fails_needs_feature_count": 187,
+    "passes_now_count": 68,
     "total_cases": 352
   }
 }

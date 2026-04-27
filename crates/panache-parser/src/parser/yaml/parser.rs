@@ -217,9 +217,13 @@ fn emit_flow_map<'a>(
     *i += 1;
 
     loop {
-        // Skip inter-entry whitespace and newlines
+        // Skip inter-entry whitespace and newlines. The flow lexer chunks
+        // text between flow indicators into Scalar tokens, including
+        // whitespace-only chunks like the space in `, }` — treat those as
+        // trivia here so they do not synthesize phantom entries.
         while *i < tokens.len()
-            && matches!(tokens[*i].kind, YamlToken::Whitespace | YamlToken::Newline)
+            && (matches!(tokens[*i].kind, YamlToken::Whitespace | YamlToken::Newline)
+                || (tokens[*i].kind == YamlToken::Scalar && tokens[*i].text.trim().is_empty()))
         {
             emit_token_as_yaml(builder, &tokens[*i]);
             *i += 1;

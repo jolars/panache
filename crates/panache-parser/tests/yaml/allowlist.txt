@@ -145,3 +145,11 @@ PUW8
 S4JQ
 # Two-document stream of block maps separated by `---`/`...` markers.
 U9NS
+# Flow map with trailing comma before `}` (no phantom empty entry).
+5C5M
+# Flow map with quoted key and adjacent/spaced colons.
+5T43
+# Flow map with quoted keys and quoted scalar values projection.
+C2DT
+# Flow map across multiple lines with mixed quoted/plain values.
+LP6E
