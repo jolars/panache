@@ -8,6 +8,8 @@
 //! - enable shadow-mode comparison against the existing YAML engine before rollout.
 //! - prepare for first-class YAML formatting support once parser parity is proven.
 
+#[path = "yaml/events.rs"]
+mod events;
 #[path = "yaml/lexer.rs"]
 mod lexer;
 #[path = "yaml/model.rs"]
@@ -15,6 +17,7 @@ mod model;
 #[path = "yaml/parser.rs"]
 mod parser;
 
+pub use events::project_events;
 pub use lexer::lex_mapping_tokens;
 pub use model::{
     ShadowYamlOptions, ShadowYamlOutcome, ShadowYamlReport, YamlDiagnostic, YamlInputKind,
