@@ -85,8 +85,20 @@ pub async fn lint_with_external_and_metadata(
 }
 
 /// Create the default rule registry with all built-in rules.
+///
+/// Rules whose diagnostics can only fire when a specific extension/flavor is
+/// active are gated at registration time. The rule bodies themselves still
+/// early-out defensively, but skipping registration avoids the per-rule
+/// dispatch + tree-walk entry cost on each lint invocation. This pays off on
+/// large flat-Markdown corpora where most rules would otherwise run for
+/// nothing.
 fn default_registry(config: &Config) -> RuleRegistry {
+    use crate::config::Flavor;
+
     let mut registry = RuleRegistry::new();
+    let ext = &config.extensions;
+    let flavor_has_chunks = matches!(config.flavor, Flavor::Quarto | Flavor::RMarkdown);
+
     if config.lint.is_rule_enabled("heading-hierarchy") {
         registry.register(Box::new(rules::heading_hierarchy::HeadingHierarchyRule));
     }
@@ -103,23 +115,23 @@ fn default_registry(config: &Config) -> RuleRegistry {
     if config.lint.is_rule_enabled("unused-definitions") {
         registry.register(Box::new(rules::unused_definitions::UnusedDefinitionsRule));
     }
-    if config.lint.is_rule_enabled("citation-keys") {
+    if ext.citations && config.lint.is_rule_enabled("citation-keys") {
         registry.register(Box::new(rules::citation_keys::CitationKeysRule));
     }
-    if config.lint.is_rule_enabled("chunk-label-spaces") {
+    if ext.fenced_code_attributes && config.lint.is_rule_enabled("chunk-label-spaces") {
         registry.register(Box::new(rules::chunk_label_spaces::ChunkLabelSpacesRule));
     }
-    if config.lint.is_rule_enabled("missing-chunk-labels") {
+    if flavor_has_chunks && config.lint.is_rule_enabled("missing-chunk-labels") {
         registry.register(Box::new(
             rules::missing_chunk_labels::MissingChunkLabelsRule,
         ));
     }
-    if config.lint.is_rule_enabled("figure-crossref-captions") {
+    if flavor_has_chunks && config.lint.is_rule_enabled("figure-crossref-captions") {
         registry.register(Box::new(
             rules::figure_crossref_captions::FigureCrossrefCaptionsRule,
         ));
     }
-    if config.lint.is_rule_enabled("unknown-emoji-alias") {
+    if ext.emoji && config.lint.is_rule_enabled("unknown-emoji-alias") {
         registry.register(Box::new(rules::emoji_aliases::EmojiAliasesRule));
     }
     registry
