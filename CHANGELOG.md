@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.39.0](https://github.com/jolars/panache/compare/v2.38.0...v2.39.0) (2026-04-27)
+
+### Features
+- **cli:** make `--debug` actually useful in release builds ([`92a54ec`](https://github.com/jolars/panache/commit/92a54ecc087a10347a94fccfb7210dfdc345220f))
+- **cli:** add `--quiet` command to suppress output ([`78818a1`](https://github.com/jolars/panache/commit/78818a18caace649d8eb064c1d5530c78b69a4e4)), closes [#221](https://github.com/jolars/panache/issues/221)
+- **cli:** lint and format in parallel ([`c7560a0`](https://github.com/jolars/panache/commit/c7560a0fc3b68b694c7193dcb1a871537be1f1d4))
+
+### Bug Fixes
+- **formatter:** avoid quote character collisions ([`3c04c34`](https://github.com/jolars/panache/commit/3c04c3406eb4c84d1e1ef9a4dfe4051b33a6d111)), closes [#225](https://github.com/jolars/panache/issues/225)
+- **cli:** disable color mode when `TERM=dumb` ([`eb8f12a`](https://github.com/jolars/panache/commit/eb8f12ab66e77d894cfe7c6b4488dfadcfb6f643)), fixes [#222](https://github.com/jolars/panache/issues/222)
+- **parser:** emit empty cells for degenerate cells ([`095ada7`](https://github.com/jolars/panache/commit/095ada7da13f020de9856ae0ac06d2d441d451cd)), fixes [#224](https://github.com/jolars/panache/issues/224)
+
+### Dependencies
+- updated crates/panache-formatter to v0.3.0
+- updated crates/panache-parser to v0.5.0
 ## [2.38.0](https://github.com/jolars/panache/compare/v2.37.0...v2.38.0) (2026-04-24)
 
 ### Features
