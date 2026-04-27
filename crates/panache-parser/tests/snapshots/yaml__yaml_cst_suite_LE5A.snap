@@ -1,0 +1,42 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: LE5A
+input: "- !!str \"a\"\n- 'b'\n- &anchor \"c\"\n- *anchor\n- !!str\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..50
+  YAML_METADATA_CONTENT@0..50
+    YAML_STREAM@0..50
+      YAML_DOCUMENT@0..50
+        YAML_BLOCK_SEQUENCE@0..50
+          YAML_BLOCK_SEQUENCE_ITEM@0..12
+            YAML_BLOCK_SEQ_ENTRY@0..1 "-"
+            WHITESPACE@1..2 " "
+            YAML_TAG@2..7 "!!str"
+            WHITESPACE@7..8 " "
+            YAML_SCALAR@8..11 "\"a\""
+            NEWLINE@11..12 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@12..18
+            YAML_BLOCK_SEQ_ENTRY@12..13 "-"
+            WHITESPACE@13..14 " "
+            YAML_SCALAR@14..17 "'b'"
+            NEWLINE@17..18 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@18..32
+            YAML_BLOCK_SEQ_ENTRY@18..19 "-"
+            WHITESPACE@19..20 " "
+            YAML_SCALAR@20..31 "&anchor \"c\""
+            NEWLINE@31..32 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@32..42
+            YAML_BLOCK_SEQ_ENTRY@32..33 "-"
+            WHITESPACE@33..34 " "
+            YAML_SCALAR@34..41 "*anchor"
+            NEWLINE@41..42 "\n"
+          YAML_BLOCK_SEQUENCE_ITEM@42..50
+            YAML_BLOCK_SEQ_ENTRY@42..43 "-"
+            WHITESPACE@43..44 " "
+            YAML_TAG@44..49 "!!str"
+            NEWLINE@49..50 "\n"

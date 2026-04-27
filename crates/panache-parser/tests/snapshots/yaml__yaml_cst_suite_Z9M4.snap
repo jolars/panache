@@ -1,0 +1,26 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: Z9M4
+input: "%TAG !e! tag:example.com,2000:app/\n---\n- !e!foo \"bar\"\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..54
+  YAML_METADATA_CONTENT@0..54
+    YAML_STREAM@0..54
+      YAML_DOCUMENT@0..54
+        YAML_SCALAR@0..34 "%TAG !e! tag:example. ..."
+        NEWLINE@34..35 "\n"
+        YAML_DOCUMENT_START@35..38 "---"
+        NEWLINE@38..39 "\n"
+        YAML_BLOCK_SEQUENCE@39..54
+          YAML_BLOCK_SEQUENCE_ITEM@39..54
+            YAML_BLOCK_SEQ_ENTRY@39..40 "-"
+            WHITESPACE@40..41 " "
+            YAML_TAG@41..47 "!e!foo"
+            WHITESPACE@47..48 " "
+            YAML_SCALAR@48..53 "\"bar\""
+            NEWLINE@53..54 "\n"

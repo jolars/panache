@@ -1,0 +1,22 @@
+---
+source: crates/panache-parser/tests/yaml.rs
+assertion_line: 278
+expression: snapshot
+---
+case_id: U3C3
+input: "%TAG !yaml! tag:yaml.org,2002:\n---\n!yaml!str \"foo\"\n"
+diagnostics:
+
+cst:
+DOCUMENT@0..51
+  YAML_METADATA_CONTENT@0..51
+    YAML_STREAM@0..51
+      YAML_DOCUMENT@0..51
+        YAML_SCALAR@0..30 "%TAG !yaml! tag:yaml. ..."
+        NEWLINE@30..31 "\n"
+        YAML_DOCUMENT_START@31..34 "---"
+        NEWLINE@34..35 "\n"
+        YAML_TAG@35..44 "!yaml!str"
+        WHITESPACE@44..45 " "
+        YAML_SCALAR@45..50 "\"foo\""
+        NEWLINE@50..51 "\n"

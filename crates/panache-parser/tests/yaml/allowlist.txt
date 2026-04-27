@@ -165,3 +165,13 @@ CT4Q
 L9U5
 # Block-map with quoted (double) key whose value is a multi-line flow seq of map entries.
 LQZ7
+# Single-document scalar with `%TAG` shorthand resolving to a custom prefix (handle + suffix).
+CC74
+# Single-document scalar with `%TAG !yaml!` directive overriding to the secondary YAML prefix.
+U3C3
+# Block-sequence item with `%TAG` handle shorthand on a quoted scalar.
+Z9M4
+# Block sequence with anchors and tags interleaved in any order (`&a !!str a`, `!!int &c 4`).
+F2C7
+# Block sequence with mixed quoted scalars + tags + anchors + alias + tag-only-empty.
+LE5A

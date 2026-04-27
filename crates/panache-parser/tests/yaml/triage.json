@@ -1133,12 +1133,6 @@
       "tree": false
     },
     {
-      "case_id": "CC74",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "CN3R",
       "diagnostic_codes": [
         "YAML_PARSE_UNEXPECTED_INDENT"
@@ -1213,12 +1207,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "F2C7",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "F3CP",
@@ -1439,12 +1427,6 @@
       ],
       "event_parity": false,
       "tree": false
-    },
-    {
-      "case_id": "LE5A",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
     },
     {
       "case_id": "LX3P",
@@ -1769,12 +1751,6 @@
       "tree": false
     },
     {
-      "case_id": "U3C3",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "U3XV",
       "diagnostic_codes": [
         "YAML_PARSE_INVALID_KEY_TOKEN"
@@ -1883,12 +1859,6 @@
       "tree": false
     },
     {
-      "case_id": "Z9M4",
-      "diagnostic_codes": [],
-      "event_parity": false,
-      "tree": true
-    },
-    {
       "case_id": "ZF4X",
       "diagnostic_codes": [],
       "event_parity": false,
@@ -1943,6 +1913,7 @@
     "9J7A",
     "9SHH",
     "C2DT",
+    "CC74",
     "CFD4",
     "CPZ3",
     "CT4Q",
@@ -1951,6 +1922,7 @@
     "D9TU",
     "DHP8",
     "E76Z",
+    "F2C7",
     "FQ7F",
     "H3Z8",
     "HMK4",
@@ -1962,6 +1934,7 @@
     "K4SU",
     "KMK3",
     "L9U5",
+    "LE5A",
     "LP6E",
     "LQZ7",
     "M29M",
@@ -1976,6 +1949,7 @@
     "SSW6",
     "SYW4",
     "TE2A",
+    "U3C3",
     "U9NS",
     "UDM2",
     "UDR7",
@@ -1983,13 +1957,14 @@
     "W5VH",
     "Y2GN",
     "YD5X",
+    "Z9M4",
     "ZH7C"
   ],
   "summary": {
     "error_contract_ok_count": 54,
     "fails_needs_error_path_count": 24,
-    "fails_needs_feature_count": 181,
-    "passes_now_count": 74,
+    "fails_needs_feature_count": 176,
+    "passes_now_count": 79,
     "total_cases": 352
   }
 }

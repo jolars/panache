@@ -9,9 +9,67 @@
 //! splitting). The intent is to keep the projection adjacent to the parser so
 //! CST shape is the single source of truth for events.
 
+use std::collections::HashMap;
+
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 use super::parser::parse_yaml_tree;
+
+/// Per-document tag handle map: handle (`!!`, `!yaml!`, `!e!`) → URI prefix.
+/// The secondary handle `!!` always defaults to `tag:yaml.org,2002:` per the
+/// YAML 1.2 spec. Per-document `%TAG` directives override and add to this map.
+type TagHandles = HashMap<String, String>;
+
+fn default_tag_handles() -> TagHandles {
+    let mut handles = HashMap::new();
+    handles.insert("!!".to_string(), "tag:yaml.org,2002:".to_string());
+    handles
+}
+
+/// Scan a `YAML_DOCUMENT` for `%TAG` directive lines and merge them into
+/// the default handle map.
+fn collect_tag_handles(doc: &SyntaxNode) -> TagHandles {
+    let mut handles = default_tag_handles();
+    for tok in doc
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token())
+    {
+        if tok.kind() != SyntaxKind::YAML_SCALAR {
+            continue;
+        }
+        let line = tok.text().trim_start();
+        let Some(rest) = line.strip_prefix("%TAG") else {
+            continue;
+        };
+        let mut parts = rest.split_whitespace();
+        let Some(handle) = parts.next() else { continue };
+        let Some(prefix) = parts.next() else { continue };
+        handles.insert(handle.to_string(), prefix.to_string());
+    }
+    handles
+}
+
+/// Resolve a tag shorthand (e.g. `!!str`, `!yaml!str`, `!e!foo`, `!local`) to
+/// the long-form `<tag:...>` event token, consulting the per-document handle
+/// map. Falls back to the built-in handling for unknown handles.
+fn resolve_long_tag(tag: &str, handles: &TagHandles) -> Option<String> {
+    if let Some(s) = long_tag_builtin(tag) {
+        return Some(s);
+    }
+    let mut best: Option<(&str, &String)> = None;
+    for (h, p) in handles {
+        if tag.starts_with(h)
+            && best.is_none_or(|(b_handle, _): (&str, _)| h.len() > b_handle.len())
+        {
+            best = Some((h.as_str(), p));
+        }
+    }
+    if let Some((handle, prefix)) = best {
+        let suffix = &tag[handle.len()..];
+        return Some(format!("<{prefix}{suffix}>"));
+    }
+    None
+}
 
 /// Walk the shadow CST for `input` and return the projected yaml-test-suite
 /// event stream. Returns an empty vector if the input fails to parse.
@@ -50,20 +108,21 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
     } else {
         "+DOC".to_string()
     });
+    let handles = collect_tag_handles(doc);
 
     if let Some(seq_node) = doc
         .descendants()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
     {
         out.push("+SEQ".to_string());
-        project_block_sequence_items(&seq_node, out);
+        project_block_sequence_items(&seq_node, &handles, out);
         out.push("-SEQ".to_string());
     } else if let Some(root_map) = doc
         .descendants()
         .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
     {
         let mut values = Vec::new();
-        project_block_map_entries(&root_map, &mut values);
+        project_block_map_entries(&root_map, &handles, &mut values);
         if !values.is_empty() {
             out.push("+MAP".to_string());
             out.append(&mut values);
@@ -73,7 +132,7 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
             .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
         {
             let mut flow_values = Vec::new();
-            project_flow_map_entries(&flow_map, &mut flow_values);
+            project_flow_map_entries(&flow_map, &handles, &mut flow_values);
             out.push("+MAP {}".to_string());
             out.append(&mut flow_values);
             out.push("-MAP".to_string());
@@ -84,10 +143,10 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
         {
             out.push("+SEQ []".to_string());
             for item in items {
-                project_flow_seq_item(&item, out);
+                project_flow_seq_item(&item, &handles, out);
             }
             out.push("-SEQ".to_string());
-        } else if let Some(scalar) = scalar_document_value(doc) {
+        } else if let Some(scalar) = scalar_document_value(doc, &handles) {
             out.push(scalar);
         } else {
             out.push("=VAL :".to_string());
@@ -97,7 +156,7 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
         .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
     {
         out.push("+MAP {}".to_string());
-        project_flow_map_entries(&flow_map, out);
+        project_flow_map_entries(&flow_map, &handles, out);
         out.push("-MAP".to_string());
     } else if let Some(flow_seq) = doc
         .descendants()
@@ -106,10 +165,10 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
     {
         out.push("+SEQ []".to_string());
         for item in items {
-            project_flow_seq_item(&item, out);
+            project_flow_seq_item(&item, &handles, out);
         }
         out.push("-SEQ".to_string());
-    } else if let Some(scalar) = scalar_document_value(doc) {
+    } else if let Some(scalar) = scalar_document_value(doc, &handles) {
         out.push(scalar);
     } else {
         out.push("=VAL :".to_string());
@@ -122,15 +181,30 @@ fn project_document(doc: &SyntaxNode, out: &mut Vec<String>) {
     });
 }
 
-fn scalar_document_value(doc: &SyntaxNode) -> Option<String> {
+fn scalar_document_value(doc: &SyntaxNode, handles: &TagHandles) -> Option<String> {
+    // Skip `%TAG`/`%YAML` directive lines: those are document-level metadata,
+    // not part of the scalar body.
     let text = doc
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
         .filter(|tok| tok.kind() == SyntaxKind::YAML_SCALAR)
+        .filter(|tok| !tok.text().trim_start().starts_with('%'))
         .map(|tok| tok.text().to_string())
         .collect::<Vec<_>>()
         .join("");
-    if text.is_empty() {
+    let trimmed_text = text.trim();
+    if trimmed_text.is_empty() {
+        // Tagged-but-empty scalar document still emits a `=VAL <tag> :` event.
+        let tag_only = doc
+            .descendants_with_tokens()
+            .filter_map(|el| el.into_token())
+            .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
+            .map(|tok| tok.text().to_string());
+        if let Some(tag) = tag_only
+            && let Some(long) = resolve_long_tag(&tag, handles)
+        {
+            return Some(format!("=VAL {long} :"));
+        }
         return None;
     }
     let tag_text = doc
@@ -139,10 +213,16 @@ fn scalar_document_value(doc: &SyntaxNode) -> Option<String> {
         .find(|tok| tok.kind() == SyntaxKind::YAML_TAG)
         .map(|tok| tok.text().to_string());
     let event = if let Some(tag) = tag_text
-        && let Some(long) = long_tag(&tag)
+        && let Some(long) = resolve_long_tag(&tag, handles)
     {
-        format!("=VAL {long} :{text}")
-    } else if text.starts_with('"') || text.starts_with('\'') {
+        if trimmed_text.starts_with('"') || trimmed_text.starts_with('\'') {
+            let quoted = quoted_val_event(trimmed_text);
+            // quoted_val_event returns `=VAL "body` — splice the tag in.
+            quoted.replacen("=VAL ", &format!("=VAL {long} "), 1)
+        } else {
+            format!("=VAL {long} :{trimmed_text}")
+        }
+    } else if trimmed_text.starts_with('"') || trimmed_text.starts_with('\'') {
         quoted_val_event(&text)
     } else {
         plain_val_event(&text)
@@ -156,14 +236,45 @@ fn plain_val_event(text: &str) -> String {
 
 /// Project a flow-collection scalar token, preserving quoted-scalar
 /// classification when the source uses `"..."` or `'...'`. Plain scalars are
-/// folded just like outside flow context.
-fn flow_scalar_event(text: &str) -> String {
+/// folded just like outside flow context. A leading tag shorthand (`!!str`,
+/// `!handle!suffix`, `!local`) is resolved through `handles`.
+fn flow_scalar_event(text: &str, handles: &TagHandles) -> String {
     let trimmed = text.trim();
     if trimmed.starts_with('"') || trimmed.starts_with('\'') {
-        quoted_val_event(trimmed)
-    } else {
-        plain_val_event(&fold_plain_scalar(text))
+        return quoted_val_event(trimmed);
     }
+    let (anchor, long_tag, body) = decompose_scalar(trimmed, handles);
+    if anchor.is_some() || long_tag.is_some() {
+        return scalar_event(anchor, long_tag.as_deref(), body);
+    }
+    plain_val_event(&fold_plain_scalar(text))
+}
+
+/// Split a leading tag shorthand (`!handle!suffix` or `!local`) off `text`,
+/// returning `(tag, remainder)`. The tag must be terminated by whitespace or
+/// end of input; otherwise `text` is returned as-is.
+fn split_leading_tag(text: &str) -> Option<(&str, &str)> {
+    let rest = text.strip_prefix('!')?;
+    let mut i = 0usize;
+    let mut bangs = 0usize;
+    for (idx, ch) in rest.char_indices() {
+        if ch == '!' {
+            bangs += 1;
+            if bangs > 1 {
+                return None;
+            }
+            i = idx + 1;
+            continue;
+        }
+        if matches!(ch, ' ' | '\t' | '\n' | ',' | '}' | ']') {
+            i = idx;
+            break;
+        }
+        i = idx + ch.len_utf8();
+    }
+    let tag_len = 1 + i;
+    let (tag, remainder) = text.split_at(tag_len);
+    Some((tag, remainder))
 }
 
 /// Locate a flow-context key/value `:` indicator within a flow-sequence item.
@@ -214,7 +325,7 @@ fn flow_kv_split(item: &str) -> Option<(usize, usize)> {
 /// Emit events for a single flow-sequence item: either `+MAP {} key val -MAP`
 /// when the item is a flow-map entry (`key: value`, possibly with empty key
 /// or value), or a single `=VAL` for a bare scalar.
-fn project_flow_seq_item(item: &str, out: &mut Vec<String>) {
+fn project_flow_seq_item(item: &str, handles: &TagHandles, out: &mut Vec<String>) {
     if let Some((colon, after)) = flow_kv_split(item) {
         let raw_key_full = item[..colon].trim();
         // Strip the explicit-key `?` indicator (followed by whitespace or
@@ -225,12 +336,12 @@ fn project_flow_seq_item(item: &str, out: &mut Vec<String>) {
         if raw_key.is_empty() {
             out.push("=VAL :".to_string());
         } else {
-            out.push(flow_scalar_event(raw_key));
+            out.push(flow_scalar_event(raw_key, handles));
         }
         if raw_value.is_empty() {
             out.push("=VAL :".to_string());
         } else {
-            out.push(flow_scalar_event(raw_value));
+            out.push(flow_scalar_event(raw_value, handles));
         }
         out.push("-MAP".to_string());
     } else if item.trim_start().starts_with('"') || item.trim_start().starts_with('\'') {
@@ -283,25 +394,15 @@ fn quoted_val_event(text: &str) -> String {
     }
 }
 
-fn long_tag(tag: &str) -> Option<String> {
-    let builtin: Option<&'static str> = match tag {
-        "!!str" => Some("<tag:yaml.org,2002:str>"),
-        "!!int" => Some("<tag:yaml.org,2002:int>"),
-        "!!bool" => Some("<tag:yaml.org,2002:bool>"),
-        "!!null" => Some("<tag:yaml.org,2002:null>"),
-        "!!float" => Some("<tag:yaml.org,2002:float>"),
-        "!!seq" => Some("<tag:yaml.org,2002:seq>"),
-        "!!map" => Some("<tag:yaml.org,2002:map>"),
-        _ => None,
-    };
-    if let Some(s) = builtin {
-        return Some(s.to_string());
-    }
+fn long_tag_builtin(tag: &str) -> Option<String> {
     if tag == "!" {
         return Some("<!>".to_string());
     }
-    if tag.starts_with('!') && !tag.starts_with("!!") {
-        return Some(format!("<{tag}>"));
+    // Bare local tag: `!local` (single leading `!`, no second `!`).
+    if let Some(rest) = tag.strip_prefix('!')
+        && !rest.contains('!')
+    {
+        return Some(format!("<!{rest}>"));
     }
     None
 }
@@ -476,7 +577,8 @@ fn fold_plain_scalar(text: &str) -> String {
     pieces.join(" ")
 }
 
-fn project_flow_map_entries(flow_map: &SyntaxNode, out: &mut Vec<String>) {
+fn project_flow_map_entries(flow_map: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
+    let _ = handles;
     for entry in flow_map
         .children()
         .filter(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP_ENTRY)
@@ -511,8 +613,8 @@ fn project_flow_map_entries(flow_map: &SyntaxNode, out: &mut Vec<String>) {
             .join("");
 
         if has_explicit_colon {
-            out.push(flow_scalar_event(&raw_key));
-            out.push(flow_scalar_event(&raw_value));
+            out.push(flow_scalar_event(&raw_key, handles));
+            out.push(flow_scalar_event(&raw_value, handles));
         } else {
             let combined = format!("{raw_key}{raw_value}");
             out.push(plain_val_event(&fold_plain_scalar(&combined)));
@@ -521,7 +623,11 @@ fn project_flow_map_entries(flow_map: &SyntaxNode, out: &mut Vec<String>) {
     }
 }
 
-fn project_block_sequence_items(seq_node: &SyntaxNode, out: &mut Vec<String>) {
+fn project_block_sequence_items(
+    seq_node: &SyntaxNode,
+    handles: &TagHandles,
+    out: &mut Vec<String>,
+) {
     for item in seq_node
         .children()
         .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE_ITEM)
@@ -531,7 +637,7 @@ fn project_block_sequence_items(seq_node: &SyntaxNode, out: &mut Vec<String>) {
             .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_SEQUENCE)
         {
             out.push("+SEQ".to_string());
-            project_block_sequence_items(&nested_seq, out);
+            project_block_sequence_items(&nested_seq, handles, out);
             out.push("-SEQ".to_string());
             continue;
         }
@@ -540,7 +646,7 @@ fn project_block_sequence_items(seq_node: &SyntaxNode, out: &mut Vec<String>) {
             .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
         {
             out.push("+MAP".to_string());
-            project_block_map_entries(&nested_map, out);
+            project_block_map_entries(&nested_map, handles, out);
             out.push("-MAP".to_string());
             continue;
         }
@@ -552,7 +658,7 @@ fn project_block_sequence_items(seq_node: &SyntaxNode, out: &mut Vec<String>) {
             if let Some(flow_items) = simple_flow_sequence_items(&flow_text) {
                 out.push("+SEQ []".to_string());
                 for value in flow_items {
-                    project_flow_seq_item(&value, out);
+                    project_flow_seq_item(&value, handles, out);
                 }
                 out.push("-SEQ".to_string());
                 continue;
@@ -563,7 +669,7 @@ fn project_block_sequence_items(seq_node: &SyntaxNode, out: &mut Vec<String>) {
             .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
         {
             out.push("+MAP {}".to_string());
-            project_flow_map_entries(&flow_map, out);
+            project_flow_map_entries(&flow_map, handles, out);
             out.push("-MAP".to_string());
             continue;
         }
@@ -579,29 +685,87 @@ fn project_block_sequence_items(seq_node: &SyntaxNode, out: &mut Vec<String>) {
             .map(|tok| tok.text().to_string())
             .collect::<Vec<_>>()
             .join("");
-        let scalar_trimmed = scalar_text.trim_end();
-        let event = if let Some(tag) = item_tag
-            && let Some(long) = long_tag(&tag)
-        {
-            format!("=VAL {long} :{scalar_text}")
-        } else if let Some(rest) = scalar_trimmed.strip_prefix('&') {
-            if let Some((anchor, value)) = rest.split_once(' ') {
-                format!("=VAL &{anchor} :{value}")
-            } else {
-                format!("=VAL &{rest} :")
-            }
-        } else if scalar_trimmed.starts_with('*') {
+        let scalar_trimmed = scalar_text.trim();
+        let event = if scalar_trimmed.starts_with('*') {
             format!("=ALI {scalar_trimmed}")
-        } else if scalar_text.starts_with('"') || scalar_text.starts_with('\'') {
-            quoted_val_event(&scalar_text)
         } else {
-            plain_val_event(&scalar_text)
+            // Combine the optional `YAML_TAG` token (already separated from
+            // the scalar text by the parser) with anchors/tags found in the
+            // scalar body, and render the YAML event in canonical
+            // `&anchor <tag> :body` order.
+            let item_long_tag = item_tag
+                .as_deref()
+                .and_then(|t| resolve_long_tag(t, handles));
+            let (anchor, body_tag, body) = decompose_scalar(scalar_trimmed, handles);
+            let long_tag = item_long_tag.or(body_tag);
+            scalar_event(anchor, long_tag.as_deref(), body)
         };
         out.push(event);
     }
 }
 
-fn project_block_map_entries(map_node: &SyntaxNode, out: &mut Vec<String>) {
+/// Decompose a node-property + scalar string into `(anchor, long_tag, body)`,
+/// peeling off any leading `&anchor` and tag shorthand in either order
+/// (`&a !!str foo` or `!!str &a foo`). Returns the raw body trimmed.
+fn decompose_scalar<'a>(
+    text: &'a str,
+    handles: &TagHandles,
+) -> (Option<&'a str>, Option<String>, &'a str) {
+    let mut anchor: Option<&str> = None;
+    let mut long_tag: Option<String> = None;
+    let mut rest = text.trim();
+    loop {
+        if anchor.is_none()
+            && let Some(after) = rest.strip_prefix('&')
+        {
+            let end = after
+                .find(|c: char| c.is_whitespace() || matches!(c, ',' | '}' | ']'))
+                .unwrap_or(after.len());
+            let (name, tail) = after.split_at(end);
+            anchor = Some(name);
+            rest = tail.trim_start();
+            continue;
+        }
+        if long_tag.is_none()
+            && let Some((tag, tail)) = split_leading_tag(rest)
+            && let Some(long) = resolve_long_tag(tag, handles)
+        {
+            long_tag = Some(long);
+            rest = tail.trim_start();
+            continue;
+        }
+        break;
+    }
+    (anchor, long_tag, rest)
+}
+
+/// Render a scalar event from its decomposed parts: optional anchor,
+/// optional long-form tag (already in `<...>` form), and the scalar body.
+/// Handles plain, double-quoted, and single-quoted bodies; quoted bodies
+/// share the same escape normalization as [`quoted_val_event`].
+fn scalar_event(anchor: Option<&str>, long_tag: Option<&str>, body: &str) -> String {
+    let mut prefix = String::new();
+    if let Some(a) = anchor {
+        prefix.push_str(&format!("&{a} "));
+    }
+    if let Some(t) = long_tag {
+        prefix.push_str(t);
+        prefix.push(' ');
+    }
+    let body = body.trim();
+    if body.is_empty() {
+        return format!("=VAL {prefix}:");
+    }
+    if body.starts_with('"') || body.starts_with('\'') {
+        // Reuse the shared escape/normalization rules; splice the prefix in
+        // place of the leading `=VAL ` token.
+        let quoted = quoted_val_event(body);
+        return quoted.replacen("=VAL ", &format!("=VAL {prefix}"), 1);
+    }
+    format!("=VAL {prefix}:{body}")
+}
+
+fn project_block_map_entries(map_node: &SyntaxNode, handles: &TagHandles, out: &mut Vec<String>) {
     for entry in map_node
         .children()
         .filter(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP_ENTRY)
@@ -627,24 +791,15 @@ fn project_block_map_entries(map_node: &SyntaxNode, out: &mut Vec<String>) {
             .map(|tok| tok.text().trim_end().to_string())
             .expect("key token");
 
-        let key_event = if let Some(tag) = key_tag {
-            if let Some(long) = long_tag(&tag) {
-                format!("=VAL {long} :{key_text}")
-            } else {
-                plain_val_event(&key_text)
-            }
-        } else if let Some(rest) = key_text.strip_prefix('&') {
-            if let Some((anchor, value)) = rest.split_once(' ') {
-                format!("=VAL &{} :{}", anchor, value)
-            } else {
-                format!("=VAL &{} :", rest)
-            }
-        } else if key_text.starts_with('"') || key_text.starts_with('\'') {
-            quoted_val_event(&key_text)
-        } else if key_text.starts_with('*') {
+        let key_event = if key_text.starts_with('*') {
             format!("=ALI {}", key_text.trim_end())
         } else {
-            plain_val_event(&key_text)
+            let key_long_tag = key_tag
+                .as_deref()
+                .and_then(|t| resolve_long_tag(t, handles));
+            let (anchor, body_tag, body) = decompose_scalar(key_text.trim(), handles);
+            let long_tag = key_long_tag.or(body_tag);
+            scalar_event(anchor, long_tag.as_deref(), body)
         };
         out.push(key_event);
 
@@ -653,7 +808,7 @@ fn project_block_map_entries(map_node: &SyntaxNode, out: &mut Vec<String>) {
             .find(|n| n.kind() == SyntaxKind::YAML_BLOCK_MAP)
         {
             out.push("+MAP".to_string());
-            project_block_map_entries(&nested_map, out);
+            project_block_map_entries(&nested_map, handles, out);
             out.push("-MAP".to_string());
             continue;
         }
@@ -663,7 +818,7 @@ fn project_block_map_entries(map_node: &SyntaxNode, out: &mut Vec<String>) {
             .find(|n| n.kind() == SyntaxKind::YAML_FLOW_MAP)
         {
             out.push("+MAP {}".to_string());
-            project_flow_map_entries(&flow_map, out);
+            project_flow_map_entries(&flow_map, handles, out);
             out.push("-MAP".to_string());
             continue;
         }
@@ -692,40 +847,26 @@ fn project_block_map_entries(map_node: &SyntaxNode, out: &mut Vec<String>) {
         {
             out.push("+SEQ []".to_string());
             for item in items {
-                project_flow_seq_item(&item, out);
+                project_flow_seq_item(&item, handles, out);
             }
             out.push("-SEQ".to_string());
-        } else if value_text.is_empty() {
-            out.push("=VAL :".to_string());
-        } else {
-            let value_event = if let Some(tag) = value_tag {
-                if let Some(long) = long_tag(&tag) {
-                    if let Some(rest) = value_text.strip_prefix('&') {
-                        if let Some((anchor, tail)) = rest.split_once(' ') {
-                            format!("=VAL &{anchor} {long} :{tail}")
-                        } else {
-                            format!("=VAL &{rest} {long} :")
-                        }
-                    } else {
-                        format!("=VAL {long} :{value_text}")
-                    }
-                } else {
-                    plain_val_event(&value_text)
-                }
-            } else if value_text.starts_with('"') || value_text.starts_with('\'') {
-                quoted_val_event(&value_text)
-            } else if let Some(rest) = value_text.strip_prefix('&') {
-                if let Some((anchor, value)) = rest.split_once(' ') {
-                    format!("=VAL &{} :{}", anchor, value)
-                } else {
-                    format!("=VAL &{} :", rest)
-                }
-            } else if value_text.starts_with('*') {
-                format!("=ALI {value_text}")
+        } else if value_text.trim().is_empty() {
+            if let Some(tag) = value_tag
+                && let Some(long) = resolve_long_tag(&tag, handles)
+            {
+                out.push(format!("=VAL {long} :"));
             } else {
-                plain_val_event(&value_text)
-            };
-            out.push(value_event);
+                out.push("=VAL :".to_string());
+            }
+        } else if value_text.trim_start().starts_with('*') {
+            out.push(format!("=ALI {}", value_text.trim()));
+        } else {
+            let value_long_tag = value_tag
+                .as_deref()
+                .and_then(|t| resolve_long_tag(t, handles));
+            let (anchor, body_tag, body) = decompose_scalar(value_text.trim(), handles);
+            let long_tag = value_long_tag.or(body_tag);
+            out.push(scalar_event(anchor, long_tag.as_deref(), body));
         }
     }
 }
