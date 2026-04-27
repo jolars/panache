@@ -340,6 +340,18 @@ impl<'a> Parser<'a> {
         self.close_paragraph_if_open();
     }
 
+    /// Close any open `FootnoteDefinition` container before a new footnote definition
+    /// is emitted into the green tree. Without this, a back-to-back `[^a]:`/`[^b]:`
+    /// pair would nest the second `FOOTNOTE_DEFINITION` node inside the first.
+    fn close_open_footnote_definition(&mut self) {
+        while matches!(
+            self.containers.last(),
+            Some(Container::FootnoteDefinition { .. })
+        ) {
+            self.close_containers_to(self.containers.depth() - 1);
+        }
+    }
+
     fn handle_footnote_open_effect(
         &mut self,
         block_match: &super::block_dispatcher::PreparedBlockMatch,
@@ -351,13 +363,6 @@ impl<'a> Parser<'a> {
             .and_then(|p| p.downcast_ref::<super::block_dispatcher::FootnoteDefinitionPrepared>())
             .map(|p| p.content_start)
             .unwrap_or(0);
-
-        while matches!(
-            self.containers.last(),
-            Some(Container::FootnoteDefinition { .. })
-        ) {
-            self.close_containers_to(self.containers.depth() - 1);
-        }
 
         let content_col = 4;
         self.containers
@@ -2068,6 +2073,10 @@ impl<'a> Parser<'a> {
                     self.close_containers_to_fenced_div();
                 }
 
+                if matches!(block_match.effect, BlockEffect::OpenFootnoteDefinition) {
+                    self.close_open_footnote_definition();
+                }
+
                 let lines_consumed = self.block_registry.parse_prepared(
                     block_match,
                     &dispatcher_ctx,
@@ -2190,6 +2199,10 @@ impl<'a> Parser<'a> {
             if !matches!(block_match.detection, BlockDetectionResult::No) {
                 if matches!(block_match.effect, BlockEffect::CloseFencedDiv) {
                     self.close_containers_to_fenced_div();
+                }
+
+                if matches!(block_match.effect, BlockEffect::OpenFootnoteDefinition) {
+                    self.close_open_footnote_definition();
                 }
 
                 let lines_consumed = self.block_registry.parse_prepared(

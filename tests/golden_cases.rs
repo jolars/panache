@@ -186,6 +186,7 @@ golden_test_cases!(
     footnote_tex_block_boundary_idempotency_134,
     footnote_def_paragraph,
     footnote_definition_list,
+    footnote_defs_consecutive_no_blanks,
     headings,
     setext_headings,
     headerless_table,
