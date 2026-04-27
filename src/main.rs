@@ -1387,7 +1387,7 @@ fn main() -> io::Result<()> {
                 if fix {
                     let fixed_output = apply_fixes(&input, &diagnostics);
                     print!("{}", fixed_output);
-                } else {
+                } else if !cli.quiet {
                     print_diagnostics(&diagnostics, None, Some(&input), use_color, message_format);
                 }
 
@@ -1587,7 +1587,7 @@ fn main() -> io::Result<()> {
                                 file_path.display()
                             );
                         }
-                    } else {
+                    } else if !cli.quiet {
                         print_diagnostics(
                             &root_doc.diagnostics,
                             Some(file_path.as_path()),
@@ -1605,13 +1605,15 @@ fn main() -> io::Result<()> {
                         }
                         any_issues = true;
                         total_issues += doc.diagnostics.len();
-                        print_diagnostics(
-                            &doc.diagnostics,
-                            Some(doc.path.as_path()),
-                            Some(&doc.input),
-                            use_color,
-                            message_format,
-                        );
+                        if !cli.quiet {
+                            print_diagnostics(
+                                &doc.diagnostics,
+                                Some(doc.path.as_path()),
+                                Some(&doc.input),
+                                use_color,
+                                message_format,
+                            );
+                        }
                     }
                 }
             }
@@ -1655,19 +1657,26 @@ fn lint_documents_with_includes(
     let mut visited = HashSet::new();
     let mut active = HashSet::new();
     let db = panache::salsa::SalsaDb::default();
-    let graph = {
-        let file = panache::salsa::FileText::new(&db, root_input.to_string());
-        let config = panache::salsa::FileConfig::new(&db, cfg.clone());
-        panache::salsa::project_graph(&db, file, config, root_path.clone()).clone()
-    };
+    // Construct one FileConfig handle per batch and one FileText per file.
+    // Salsa cache keys are handle identity, not value equality, so reusing
+    // these across built_in_lint_plan / project_graph::accumulated within a
+    // single file's lint is the only way to get cache hits.
+    //
+    // The eager project_graph call was removed: project_graph is salsa-tracked
+    // and computed on demand by project_graph::accumulated when (and only when)
+    // we determine the document participates in a project. For flat directories
+    // of standalone files this avoids 1+ parse per file.
+    let file_config = panache::salsa::FileConfig::new(&db, cfg.clone());
+    let root_file_text = panache::salsa::FileText::new(&db, root_input.to_string());
     lint_loaded_document_with_includes(
         root_path,
         root_input,
+        Some(root_file_text),
         cfg,
+        file_config,
         &mut results,
         &mut visited,
         &mut active,
-        &graph,
         &db,
     )?;
     Ok(results)
@@ -1677,11 +1686,12 @@ fn lint_documents_with_includes(
 fn lint_loaded_document_with_includes(
     doc_path: &PathBuf,
     input: &str,
+    file_text: Option<panache::salsa::FileText>,
     cfg: &panache::Config,
+    file_config: panache::salsa::FileConfig,
     results: &mut Vec<LintedDocument>,
     visited: &mut std::collections::HashSet<PathBuf>,
     active: &mut std::collections::HashSet<PathBuf>,
-    graph: &panache::salsa::ProjectGraph,
     db: &panache::salsa::SalsaDb,
 ) -> io::Result<()> {
     if !visited.insert(doc_path.clone()) {
@@ -1690,38 +1700,46 @@ fn lint_loaded_document_with_includes(
 
     active.insert(doc_path.clone());
 
+    // Reuse the root file's FileText handle (constructed in
+    // lint_documents_with_includes) so the salsa cache hits across
+    // project_graph and built_in_lint_plan. For included files we mint a
+    // single fresh FileText and reuse it for both calls below.
+    let file_text =
+        file_text.unwrap_or_else(|| panache::salsa::FileText::new(db, input.to_string()));
+
     let tree = parse(input, Some(cfg.clone()));
     let metadata = panache::metadata::extract_project_metadata(&tree, doc_path).ok();
     let mut diagnostics =
         panache::linter::lint_with_external_sync_and_metadata(&tree, input, cfg, metadata.as_ref());
-    let yaml_diags = panache::salsa::built_in_lint_plan(
-        db,
-        panache::salsa::FileText::new(db, input.to_string()),
-        panache::salsa::FileConfig::new(db, cfg.clone()),
-        doc_path.clone(),
-    )
-    .diagnostics
-    .iter()
-    .filter(|d| d.code == "yaml-parse-error")
-    .cloned()
-    .collect::<Vec<_>>();
+    let yaml_diags =
+        panache::salsa::built_in_lint_plan(db, file_text, file_config, doc_path.clone())
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "yaml-parse-error")
+            .cloned()
+            .collect::<Vec<_>>();
     merge_missing_diagnostics(&mut diagnostics, yaml_diags);
 
     let base_dir = doc_path.parent().unwrap_or(Path::new("."));
-    let project_root = panache::includes::find_quarto_root(doc_path);
+    let roots = panache::includes::find_project_roots(doc_path);
+    let project_root = roots.quarto.clone();
     let resolution =
         panache::includes::collect_includes(&tree, input, base_dir, project_root.as_deref(), cfg);
 
     diagnostics.extend(resolution.diagnostics);
-    let graph_diags = panache::salsa::project_graph::accumulated::<panache::salsa::GraphDiagnostic>(
-        db,
-        panache::salsa::FileText::new(db, input.to_string()),
-        panache::salsa::FileConfig::new(db, cfg.clone()),
-        doc_path.clone(),
-    );
-    for entry in graph_diags {
-        if entry.0.path == *doc_path {
-            diagnostics.push(entry.0.diagnostic.clone());
+    // Project-graph diagnostics only apply to documents that participate in a
+    // project (Quarto/bookdown root) or that pull in includes. For the
+    // overwhelmingly common flat-directory case (e.g. linting a folder of
+    // standalone .md files) skip the salsa accumulator entirely; this is the
+    // dominant per-file cost on large many-file batches.
+    if roots.quarto.is_some() || roots.bookdown.is_some() || !resolution.includes.is_empty() {
+        let graph_diags = panache::salsa::project_graph::accumulated::<
+            panache::salsa::GraphDiagnostic,
+        >(db, file_text, file_config, doc_path.clone());
+        for entry in graph_diags {
+            if entry.0.path == *doc_path {
+                diagnostics.push(entry.0.diagnostic.clone());
+            }
         }
     }
 
@@ -1742,11 +1760,12 @@ fn lint_loaded_document_with_includes(
                 lint_loaded_document_with_includes(
                     &include.path,
                     &include_input,
+                    None,
                     cfg,
+                    file_config,
                     results,
                     visited,
                     active,
-                    graph,
                     db,
                 )?;
             }

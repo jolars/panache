@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "generated_at": "2026-04-27T12:33:32Z",
+    "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
+    "min_runs": 3,
+    "replicas_per_source": 8,
+    "tools": {
+      "panache": {"version": "2.39.0"},
+      "rumdl":   {"version": "0.1.67"}
+    }
+  },
+  "scenarios": [
+    {"id":"synthetic_corpus","kind":"directory","file_count":56,"total_bytes":3165160,"sources":["small.qmd","medium_quarto.qmd","tables.qmd","math.qmd","large_authoring.qmd","pandoc_testsuite.md","pandoc_manual.md"]},
+    {"id":"single_pandoc_manual","kind":"single_file","file":"pandoc_manual.md","size_bytes":299536}
+  ],
+  "results": [
+    {"scenario":"synthetic_corpus","tool":"panache","mean_ms":164.9119,"stddev_ms":11.0574,"min_ms":154.9227,"max_ms":199.1176,"runs":16,"failed":false},
+    {"scenario":"synthetic_corpus","tool":"rumdl","mean_ms":298.8916,"stddev_ms":45.6142,"min_ms":260.5631,"max_ms":417.9815,"runs":10,"failed":false},
+    {"scenario":"single_pandoc_manual","tool":"panache","mean_ms":109.6274,"stddev_ms":1.9315,"min_ms":107.0285,"max_ms":113.4277,"runs":27,"failed":false},
+    {"scenario":"single_pandoc_manual","tool":"rumdl","mean_ms":133.7625,"stddev_ms":1.7224,"min_ms":130.5115,"max_ms":136.2003,"runs":21,"failed":false}
+  ]
+}

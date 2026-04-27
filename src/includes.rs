@@ -277,25 +277,87 @@ pub fn include_read_error_diagnostic(
 }
 
 pub fn find_quarto_root(doc_path: &Path) -> Option<PathBuf> {
-    let mut current = doc_path.parent()?;
-    loop {
-        let quarto = current.join("_quarto.yml");
-        if quarto.exists() {
-            return Some(current.to_path_buf());
-        }
-        current = current.parent()?;
-    }
+    find_project_roots(doc_path).quarto
 }
 
 pub fn find_bookdown_root(doc_path: &Path) -> Option<PathBuf> {
-    let mut current = doc_path.parent()?;
-    loop {
-        let bookdown = current.join("_bookdown.yml");
-        if bookdown.exists() {
-            return Some(current.to_path_buf());
+    find_project_roots(doc_path).bookdown
+}
+
+/// Combined project-root lookup. Walks ancestors **once** searching for both
+/// `_quarto.yml` and `_bookdown.yml` markers, then caches the result by parent
+/// directory in a thread-local memo. Multiple files in the same directory only
+/// pay the filesystem cost once per worker thread.
+///
+/// The memo lives for the lifetime of the thread; it does not invalidate on
+/// filesystem changes. Long-running hosts (LSP) call [`clear_project_roots_cache`]
+/// at session boundaries when project membership may have changed.
+pub fn find_project_roots(doc_path: &Path) -> ProjectRoots {
+    let key: PathBuf = doc_path.parent().unwrap_or(doc_path).to_path_buf();
+    PROJECT_ROOTS_CACHE.with(|cache| {
+        if let Some(roots) = cache.borrow().get(&key) {
+            return roots.clone();
         }
-        current = current.parent()?;
+        let roots = find_project_roots_uncached(doc_path);
+        cache.borrow_mut().insert(key, roots.clone());
+        roots
+    })
+}
+
+/// Drops any cached `ProjectRoots` entries on the current thread. Long-running
+/// hosts should call this when project membership might have changed
+/// (e.g., between LSP requests where workspace files may have been
+/// added/removed/edited).
+pub fn clear_project_roots_cache() {
+    PROJECT_ROOTS_CACHE.with(|cache| cache.borrow_mut().clear());
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ProjectRoots {
+    pub quarto: Option<PathBuf>,
+    pub bookdown: Option<PathBuf>,
+}
+
+impl ProjectRoots {
+    /// Quarto wins over bookdown when both are present, matching the order
+    /// used by `project_graph` and `visit_document`. Use [`Self::bookdown_first`]
+    /// for call sites that historically prefer bookdown (e.g.
+    /// `undefined_references` rule).
+    pub fn quarto_first(&self) -> Option<PathBuf> {
+        self.quarto.clone().or_else(|| self.bookdown.clone())
     }
+
+    pub fn bookdown_first(&self) -> Option<PathBuf> {
+        self.bookdown.clone().or_else(|| self.quarto.clone())
+    }
+}
+
+fn find_project_roots_uncached(doc_path: &Path) -> ProjectRoots {
+    let mut roots = ProjectRoots::default();
+    let Some(mut current) = doc_path.parent() else {
+        return roots;
+    };
+    loop {
+        if roots.quarto.is_none() && current.join("_quarto.yml").exists() {
+            roots.quarto = Some(current.to_path_buf());
+        }
+        if roots.bookdown.is_none() && current.join("_bookdown.yml").exists() {
+            roots.bookdown = Some(current.to_path_buf());
+        }
+        if roots.quarto.is_some() && roots.bookdown.is_some() {
+            break;
+        }
+        let Some(parent) = current.parent() else {
+            break;
+        };
+        current = parent;
+    }
+    roots
+}
+
+thread_local! {
+    static PROJECT_ROOTS_CACHE: std::cell::RefCell<HashMap<PathBuf, ProjectRoots>> =
+        std::cell::RefCell::new(HashMap::new());
 }
 
 pub fn find_project_documents(

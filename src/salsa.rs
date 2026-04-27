@@ -1457,8 +1457,6 @@ pub fn project_graph(
     let mut graph = InternedProjectGraph::default();
     let mut visited = HashSet::new();
     let mut definitions = crate::includes::DefinitionIndex::default();
-    let _project_root = crate::includes::find_quarto_root(&root_path)
-        .or_else(|| crate::includes::find_bookdown_root(&root_path));
     visit_document(
         db,
         &root_file,
@@ -1468,10 +1466,9 @@ pub fn project_graph(
         &mut visited,
         &mut definitions,
     );
-    if let Some(project_root) = crate::includes::find_quarto_root(&root_path)
-        .or_else(|| crate::includes::find_bookdown_root(&root_path))
-    {
-        let is_bookdown = crate::includes::find_bookdown_root(&root_path).is_some();
+    let roots = crate::includes::find_project_roots(&root_path);
+    if let Some(project_root) = roots.quarto_first() {
+        let is_bookdown = roots.bookdown.is_some();
         for path in
             crate::includes::find_project_documents(&project_root, config.config(db), is_bookdown)
         {
@@ -1511,8 +1508,7 @@ fn visit_document<'db>(
     let text = file.text(db);
     let tree = crate::parse(text, Some(config.config(db).clone()));
     let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
-    let project_root = crate::includes::find_quarto_root(path)
-        .or_else(|| crate::includes::find_bookdown_root(path));
+    let project_root = crate::includes::find_project_roots(path).quarto_first();
     let resolution = crate::includes::collect_includes(
         &tree,
         text,

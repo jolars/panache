@@ -636,6 +636,144 @@ fn test_lint_reports_unused_definitions() {
 }
 
 #[test]
+fn test_lint_quiet_suppresses_diagnostic_output() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n\n### Subheading\n").unwrap();
+
+    let output = cargo_bin_cmd!("panache")
+        .args([
+            "lint",
+            "--quiet",
+            "--color",
+            "never",
+            test_file.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.is_empty(),
+        "--quiet should suppress diagnostic output, got: {stdout}"
+    );
+}
+
+#[test]
+fn test_lint_quiet_check_mode_still_signals_via_exit_code() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.qmd");
+    fs::write(&test_file, "# Heading\n\n### Subheading\n").unwrap();
+
+    let output = cargo_bin_cmd!("panache")
+        .args([
+            "lint",
+            "--check",
+            "--quiet",
+            "--color",
+            "never",
+            test_file.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "--check with violations must fail"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.is_empty(),
+        "--quiet --check should not print diagnostics to stdout, got: {stdout}"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Found"),
+        "--check summary should still be on stderr even with --quiet, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_lint_includes_cycle_reports_single_diagnostic() {
+    let temp_dir = TempDir::new().unwrap();
+    let parent_path = temp_dir.path().join("parent.qmd");
+    let child_path = temp_dir.path().join("_child.qmd");
+
+    fs::write(&parent_path, "{{< include _child.qmd >}}\n").unwrap();
+    fs::write(&child_path, "{{< include parent.qmd >}}\n").unwrap();
+
+    let output = cargo_bin_cmd!("panache")
+        .args(["lint", "--color", "never", parent_path.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let occurrences = stdout.matches("[include-cycle]").count();
+    assert_eq!(
+        occurrences, 1,
+        "expected exactly one include-cycle diagnostic header, got {occurrences}: {stdout}"
+    );
+}
+
+#[test]
+fn test_lint_hashpipe_yaml_parse_error_reported_once() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".panache.toml");
+    let doc_path = temp_dir.path().join("doc.qmd");
+    fs::write(
+        &config_path,
+        r#"flavor = "quarto"
+
+[lint.rules]
+missing-chunk-labels = false
+"#,
+    )
+    .unwrap();
+    fs::write(&doc_path, "```{r}\n#| echo: [\n1 + 1\n```\n").unwrap();
+
+    let output = cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["lint", "--color", "never", doc_path.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let occurrences = stdout.matches("[yaml-parse-error]").count();
+    assert_eq!(
+        occurrences, 1,
+        "expected yaml-parse-error to be reported exactly once, got {occurrences}: {stdout}"
+    );
+}
+
+#[test]
+fn test_lint_bookdown_cross_file_definitions_resolve() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("_bookdown.yml"),
+        "book_filename: book\n",
+    )
+    .unwrap();
+    fs::write(
+        temp_dir.path().join("01-intro.Rmd"),
+        "# Intro\n\n[link-target]: https://example.com\n",
+    )
+    .unwrap();
+    let referencing = temp_dir.path().join("02-body.Rmd");
+    fs::write(&referencing, "# Body\n\nSee [link-target][].\n").unwrap();
+
+    let output = cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args(["lint", "--color", "never", referencing.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("undefined-reference-label"),
+        "definition declared in sibling file should resolve via bookdown project: {stdout}"
+    );
+}
+
+#[test]
 fn test_lint_includes_missing_file_reports_diagnostic() {
     let temp_dir = TempDir::new().unwrap();
     let parent_path = temp_dir.path().join("parent.qmd");

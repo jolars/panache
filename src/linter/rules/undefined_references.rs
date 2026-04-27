@@ -116,12 +116,11 @@ fn collect_definition_labels(
         .source_path
         .canonicalize()
         .unwrap_or_else(|_| metadata.source_path.clone());
-    let project_root = crate::includes::find_bookdown_root(&doc_path)
-        .or_else(|| crate::includes::find_quarto_root(&doc_path));
-    let Some(project_root) = project_root else {
+    let roots = crate::includes::find_project_roots(&doc_path);
+    let Some(project_root) = roots.bookdown_first() else {
         return labels;
     };
-    let is_bookdown = crate::includes::find_bookdown_root(&doc_path).is_some();
+    let is_bookdown = roots.bookdown.is_some();
 
     for path in crate::includes::find_project_documents(&project_root, config, is_bookdown) {
         if path == doc_path {
