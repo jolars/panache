@@ -1,0 +1,118 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..676
+  SIMPLE_TABLE@0..676
+    TABLE_CAPTION@0..178
+      TABLE_CAPTION_PREFIX@0..7 "Table: "
+      TEXT@7..8 "("
+      ESCAPED_CHAR@8..10 "\\#"
+      TEXT@10..177 "tab:boxoffice-gross)H ..."
+      NEWLINE@177..178 "\n"
+    BLANK_LINE@178..179
+      BLANK_LINE@178..179 "\n"
+    TABLE_HEADER@179..250
+      WHITESPACE@179..185 "      "
+      TABLE_CELL@185..185
+      TABLE_CELL@185..189
+        TEXT@185..189 "Rank"
+      WHITESPACE@189..192 "   "
+      TABLE_CELL@192..197
+        TEXT@192..197 "Title"
+      WHITESPACE@197..226 "                      ..."
+      TABLE_CELL@226..239
+        TEXT@226..239 "Weekend gross"
+      WHITESPACE@239..244 "     "
+      TABLE_CELL@244..244
+      WHITESPACE@244..249 "     "
+      TABLE_CELL@249..249
+      NEWLINE@249..250 "\n"
+    TABLE_SEPARATOR@250..321
+      TEXT@250..320 "---  ------  -------- ..."
+      NEWLINE@320..321 "\n"
+    TABLE_ROW@321..392
+      WHITESPACE@321..328 "       "
+      TABLE_CELL@328..328
+      TABLE_CELL@328..329
+        TEXT@328..329 "1"
+      WHITESPACE@329..334 "     "
+      TABLE_CELL@334..358
+        TEXT@334..358 "Star Wars: The Last Jedi"
+      WHITESPACE@358..370 "            "
+      TABLE_CELL@370..381
+        TEXT@370..371 "$"
+        TEXT@371..381 "71,565,498"
+      WHITESPACE@381..386 "     "
+      TABLE_CELL@386..386
+      WHITESPACE@386..391 "     "
+      TABLE_CELL@391..391
+      NEWLINE@391..392 "\n"
+    TABLE_ROW@392..463
+      WHITESPACE@392..399 "       "
+      TABLE_CELL@399..399
+      TABLE_CELL@399..400
+        TEXT@399..400 "2"
+      WHITESPACE@400..405 "     "
+      TABLE_CELL@405..435
+        TEXT@405..435 "Jumanji: Welcome to t ..."
+      WHITESPACE@435..441 "      "
+      TABLE_CELL@441..452
+        TEXT@441..442 "$"
+        TEXT@442..452 "36,169,328"
+      WHITESPACE@452..457 "     "
+      TABLE_CELL@457..457
+      WHITESPACE@457..462 "     "
+      TABLE_CELL@462..462
+      NEWLINE@462..463 "\n"
+    TABLE_ROW@463..534
+      WHITESPACE@463..470 "       "
+      TABLE_CELL@470..470
+      TABLE_CELL@470..471
+        TEXT@470..471 "3"
+      WHITESPACE@471..476 "     "
+      TABLE_CELL@476..491
+        TEXT@476..491 "Pitch Perfect 3"
+      WHITESPACE@491..512 "                     "
+      TABLE_CELL@512..523
+        TEXT@512..513 "$"
+        TEXT@513..523 "19,928,525"
+      WHITESPACE@523..528 "     "
+      TABLE_CELL@528..528
+      WHITESPACE@528..533 "     "
+      TABLE_CELL@533..533
+      NEWLINE@533..534 "\n"
+    TABLE_ROW@534..605
+      WHITESPACE@534..541 "       "
+      TABLE_CELL@541..541
+      TABLE_CELL@541..542
+        TEXT@541..542 "4"
+      WHITESPACE@542..547 "     "
+      TABLE_CELL@547..567
+        TEXT@547..567 "The Greatest Showman"
+      WHITESPACE@567..584 "                 "
+      TABLE_CELL@584..594
+        TEXT@584..585 "$"
+        TEXT@585..594 "8,805,843"
+      WHITESPACE@594..599 "     "
+      TABLE_CELL@599..599
+      WHITESPACE@599..604 "     "
+      TABLE_CELL@604..604
+      NEWLINE@604..605 "\n"
+    TABLE_ROW@605..676
+      WHITESPACE@605..612 "       "
+      TABLE_CELL@612..612
+      TABLE_CELL@612..613
+        TEXT@612..613 "5"
+      WHITESPACE@613..618 "     "
+      TABLE_CELL@618..627
+        TEXT@618..627 "Ferdinand"
+      WHITESPACE@627..655 "                      ..."
+      TABLE_CELL@655..665
+        TEXT@655..656 "$"
+        TEXT@656..665 "7,316,746"
+      WHITESPACE@665..670 "     "
+      TABLE_CELL@670..670
+      WHITESPACE@670..675 "     "
+      TABLE_CELL@675..675
+      NEWLINE@675..676 "\n"

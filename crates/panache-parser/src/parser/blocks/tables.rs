@@ -765,11 +765,12 @@ fn emit_table_row(
             0
         };
 
-        // Extract cell text from column bounds
+        // Extract cell text from column bounds. When the column lies entirely
+        // before the trimmed content (col.end <= leading_ws_len) both bounds
+        // clamp to 0; treat that as an empty cell rather than re-emitting the
+        // whole row.
         let cell_text = if cell_start < cell_end && cell_start < trimmed.len() {
             &trimmed[cell_start..cell_end]
-        } else if cell_start < trimmed.len() {
-            &trimmed[cell_start..]
         } else {
             ""
         };
