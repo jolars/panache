@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::linter::diagnostics::Diagnostic;
 use crate::syntax::SyntaxNode;
 
+pub mod adjacent_footnote_refs;
 pub mod chunk_label_spaces;
 pub mod citation_keys;
 pub mod duplicate_references;

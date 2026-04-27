@@ -397,6 +397,38 @@ warning[unknown-emoji-alias]: Unknown emoji alias ':not-a-real-emoji:'
   --> document.qmd:1:40
 ```
 
+### `adjacent-footnote-refs`
+
+Detects footnote references placed back-to-back (`[^a][^b]`) where the rendered
+superscripts run together (e.g. footnotes 7 and 8 look like footnote 78).
+
+Severity
+:   Warning
+
+Auto-fix
+:   Yes (inserts a space between the references)
+
+Requirements
+:   Requires `extensions.footnotes = true` in configuration
+
+Description
+:   When two footnote references appear with no intervening character, most
+    renderers emit the superscript markers as a single visually-merged run.
+    Inserting a single space between them keeps the markers distinct without
+    changing the prose.
+
+**Example violation:**
+
+```markdown
+See the prior reports[^a][^b] for context.
+```
+
+**Auto-fix output:**
+
+```markdown
+See the prior reports[^a] [^b] for context.
+```
+
 ## YAML parse diagnostics
 
 Panache emits `yaml-parse-error` diagnostics when embedded YAML content is
@@ -479,6 +511,8 @@ Auto-fixes are available for select rules where the correction is unambiguous:
 Currently supported:
 
 - `heading-hierarchy`: Adjusts heading levels to fix skipped levels
+- `adjacent-footnote-refs`: Inserts a space between back-to-back footnote
+  references
 
 Currently unsupported:
 

@@ -102,6 +102,11 @@ fn default_registry(config: &Config) -> RuleRegistry {
     if config.lint.is_rule_enabled("heading-hierarchy") {
         registry.register(Box::new(rules::heading_hierarchy::HeadingHierarchyRule));
     }
+    if ext.footnotes && config.lint.is_rule_enabled("adjacent-footnote-refs") {
+        registry.register(Box::new(
+            rules::adjacent_footnote_refs::AdjacentFootnoteRefsRule,
+        ));
+    }
     if config.lint.is_rule_enabled("duplicate-reference-labels") {
         registry.register(Box::new(
             rules::duplicate_references::DuplicateReferencesRule,

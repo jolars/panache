@@ -520,3 +520,20 @@ fn test_unused_definitions_resolved_across_project_files() {
         "Definition used in sibling project document should not be flagged unused"
     );
 }
+
+#[test]
+fn test_adjacent_footnote_refs() {
+    let diagnostics = lint_file("adjacent_footnote_refs.md");
+    let issues: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == "adjacent-footnote-refs")
+        .collect();
+
+    // One gap between [^a][^b] and two gaps in [^e][^f][^g] = 3 total.
+    assert_eq!(issues.len(), 3, "expected 3 diagnostics, got {:?}", issues);
+    for diag in &issues {
+        let fix = diag.fix.as_ref().expect("rule provides an auto-fix");
+        assert_eq!(fix.edits.len(), 1);
+        assert_eq!(fix.edits[0].replacement, " ");
+    }
+}
