@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.40.0](https://github.com/jolars/panache/compare/v2.39.0...v2.40.0) (2026-04-27)
+
+### Features
+- **linter:** add adjacents footnote lint ([`9729418`](https://github.com/jolars/panache/commit/972941810bc18fe251b606e9d82c46e790952f7d)), closes [#229](https://github.com/jolars/panache/issues/229)
+
+### Bug Fixes
+- **parser:** include `~` in set of escapables ([`cfc0bfc`](https://github.com/jolars/panache/commit/cfc0bfcd5cf1e02fd7ef16b712d666df61e260b6)), closes [#231](https://github.com/jolars/panache/issues/231)
+- **parser:** handle consecutive footnote definitions ([`e694627`](https://github.com/jolars/panache/commit/e694627654c497b66328d6062aa392af7337ce34))
+- **linter:** gate lints by extensions ([`1a03e9b`](https://github.com/jolars/panache/commit/1a03e9b6b838602bc0fcce5b68d22b04ceca773c))
+- **linter:** de-duplicate linter diagnostics ([`9c63e7e`](https://github.com/jolars/panache/commit/9c63e7ec8759759b9677c844528f82f12875c17d))
+- **linter:** de-duplicate parsing calls, avoid extra parses ([`45407fe`](https://github.com/jolars/panache/commit/45407fedf049c2b127d40c6c4df7263af4a8cad1))
+
+### Dependencies
+- updated crates/panache-parser to v0.5.1
 ## [2.39.0](https://github.com/jolars/panache/compare/v2.38.0...v2.39.0) (2026-04-27)
 
 ### Features

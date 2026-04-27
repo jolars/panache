@@ -1,6 +1,6 @@
 [package]
 name = "panache-parser"
-version = "0.5.0"
+version = "0.5.1"
 edition.workspace = true
 readme = "README.md"
 description = "Lossless CST parser and syntax wrappers for Pandoc markdown, Quarto, and RMarkdown"
