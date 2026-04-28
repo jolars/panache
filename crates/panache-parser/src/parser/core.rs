@@ -344,6 +344,95 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// CommonMark §5.2: when a list item's first line (after the marker) is a
+    /// fenced code block opener, the content of the item *is* the code block —
+    /// not buffered text. The list-item open path normally pushes the
+    /// post-marker text into the item's buffer; this helper detects an opening
+    /// fence in that buffered first line and converts it into a CODE_BLOCK
+    /// inside the LIST_ITEM, consuming subsequent lines until the closing
+    /// fence (or end of document under CommonMark dialect, per §4.5).
+    ///
+    /// Pandoc-markdown also reaches this path: a bare fence still requires a
+    /// matching closer to register as a code block, matching
+    /// `FencedCodeBlockParser::detect_prepared` (`bare_fence_in_list_with_closer`).
+    fn maybe_open_fenced_code_in_new_list_item(&mut self) {
+        let Some(Container::ListItem {
+            content_col,
+            buffer,
+        }) = self.containers.stack.last()
+        else {
+            return;
+        };
+        let content_col = *content_col;
+        let Some(text) = buffer.first_text() else {
+            return;
+        };
+        if buffer.segment_count() != 1 {
+            return;
+        }
+        let text_owned = text.to_string();
+        let Some(fence) = code_blocks::try_parse_fence_open(&text_owned) else {
+            return;
+        };
+        let common_mark_dialect = self.config.dialect == crate::options::Dialect::CommonMark;
+        let has_info = !fence.info_string.trim().is_empty();
+        let bq_depth = self.current_blockquote_depth();
+        let has_matching_closer = self.has_matching_fence_closer(&fence, bq_depth, content_col);
+        if !(has_info || has_matching_closer || common_mark_dialect) {
+            return;
+        }
+        // Gate fences by extension flags, mirroring the dispatcher.
+        if (fence.fence_char == '`' && !self.config.extensions.backtick_code_blocks)
+            || (fence.fence_char == '~' && !self.config.extensions.fenced_code_blocks)
+        {
+            return;
+        }
+        if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+            buffer.clear();
+        }
+        let new_pos = code_blocks::parse_fenced_code_block(
+            &mut self.builder,
+            &self.lines,
+            self.pos,
+            fence,
+            bq_depth,
+            content_col,
+            Some(&text_owned),
+        );
+        // The dispatcher caller will advance pos by lines_consumed (= 1 from
+        // the list parser) after we return. Compensate so the final pos lands
+        // on `new_pos`.
+        self.pos = new_pos.saturating_sub(1);
+    }
+
+    fn has_matching_fence_closer(
+        &self,
+        fence: &code_blocks::FenceInfo,
+        bq_depth: usize,
+        content_col: usize,
+    ) -> bool {
+        for raw_line in self.lines.iter().skip(self.pos + 1) {
+            let (line_bq_depth, inner) = count_blockquote_markers(raw_line);
+            if line_bq_depth < bq_depth {
+                break;
+            }
+            let candidate = if content_col > 0 && !inner.is_empty() {
+                let idx = byte_index_at_column(inner, content_col);
+                if idx <= inner.len() {
+                    &inner[idx..]
+                } else {
+                    inner
+                }
+            } else {
+                inner
+            };
+            if code_blocks::is_closing_fence(candidate, fence) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Check if a paragraph is currently open.
     fn is_paragraph_open(&self) -> bool {
         matches!(self.containers.last(), Some(Container::Paragraph { .. }))
@@ -533,6 +622,7 @@ impl<'a> Parser<'a> {
                     } else {
                         lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
                     }
+                    self.maybe_open_fenced_code_in_new_list_item();
                     return;
                 }
             }
@@ -546,6 +636,7 @@ impl<'a> Parser<'a> {
                 &list_item,
                 indent_to_emit,
             );
+            self.maybe_open_fenced_code_in_new_list_item();
             return;
         }
 
@@ -574,6 +665,7 @@ impl<'a> Parser<'a> {
             } else {
                 lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
             }
+            self.maybe_open_fenced_code_in_new_list_item();
             return;
         }
 
@@ -608,6 +700,7 @@ impl<'a> Parser<'a> {
         } else {
             lists::add_list_item(&mut self.containers, &mut self.builder, &list_item);
         }
+        self.maybe_open_fenced_code_in_new_list_item();
     }
 
     fn handle_definition_list_effect(

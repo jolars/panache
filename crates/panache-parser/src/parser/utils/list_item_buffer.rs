@@ -74,6 +74,14 @@ impl ListItemBuffer {
         self.segments.len()
     }
 
+    /// Return the text of the first segment, if it is a `Text` segment.
+    pub(crate) fn first_text(&self) -> Option<&str> {
+        match self.segments.first()? {
+            ListItemContent::Text(t) => Some(t.as_str()),
+            ListItemContent::BlockquoteMarker { .. } => None,
+        }
+    }
+
     /// Determine if this list item has blank lines between content.
     ///
     /// Used to decide between Plain (tight) and PARAGRAPH (loose).

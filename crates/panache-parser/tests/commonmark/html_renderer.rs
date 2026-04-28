@@ -517,6 +517,15 @@ fn code_block_content(node: &SyntaxNode) -> String {
                 } else {
                     raw
                 };
+                // Inside a list item the parser keeps the list-item content
+                // column on each content line for losslessness. Strip it
+                // before applying the opener-indent rule so the rendered
+                // payload matches what the source meant.
+                let raw = if li_indent > 0 {
+                    strip_leading_spaces_per_line(&raw, li_indent)
+                } else {
+                    raw
+                };
                 if opener_indent == 0 {
                     content.push_str(&raw);
                 } else {
