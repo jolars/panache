@@ -130,6 +130,23 @@ fn commonmark_allowlist() {
 }
 
 #[test]
+#[ignore = "probe specific examples"]
+fn probe_examples() {
+    let examples = read_spec(&manifest_path(SPEC_FIXTURE_REL));
+    let by_number: std::collections::HashMap<u32, &SpecExample> =
+        examples.iter().map(|e| (e.number, e)).collect();
+    for n in [342u32, 344, 31, 41, 480, 481, 488, 490] {
+        let example = by_number[&n];
+        let rendered = render_example(example);
+        eprintln!("=== #{n} ({}) ===", example.section);
+        eprintln!("MD: {:?}", example.markdown);
+        eprintln!("EXPECTED:\n{}", example.expected_html);
+        eprintln!("GOT:\n{}", rendered);
+        eprintln!("MATCH: {}", matches_expected(example, &rendered));
+    }
+}
+
+#[test]
 #[ignore = "manual: run to generate triage report and seed/grow the allowlist"]
 fn commonmark_full_report() {
     let examples = read_spec(&manifest_path(SPEC_FIXTURE_REL));

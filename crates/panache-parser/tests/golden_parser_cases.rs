@@ -222,6 +222,8 @@ golden_test_cases!(
     ignore_directives,
     images,
     indented_code,
+    inline_link_dest_strict_commonmark,
+    inline_link_dest_strict_pandoc,
     inline_code,
     inline_footnotes,
     inline_math,

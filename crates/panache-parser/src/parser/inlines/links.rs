@@ -290,7 +290,16 @@ pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
 /// Inline links have the form `[text](url)` or `[text](url "title")`.
 /// Can also have trailing attributes: `[text](url){#id .class}`.
 /// Returns Some((length, text_content, dest_content, raw_attributes)) if a valid link is found.
-pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str, Option<&str>)> {
+///
+/// `strict_dest` enables CommonMark §6.4 destination-and-title validation:
+/// the bare destination form may not contain spaces or ASCII control
+/// characters and must have balanced parentheses; if a title follows it
+/// must be properly delimited; only whitespace is allowed before/after.
+/// Pandoc-markdown is more permissive, so leave this off for that dialect.
+pub fn try_parse_inline_link(
+    text: &str,
+    strict_dest: bool,
+) -> Option<(usize, &str, &str, Option<&str>)> {
     if !text.starts_with('[') {
         return None;
     }
@@ -362,6 +371,10 @@ pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str, Option<&s
     let close_paren = close_paren_pos?;
     let dest_content = &remaining[..close_paren];
 
+    if strict_dest && !dest_and_title_ok_commonmark(dest_content) {
+        return None;
+    }
+
     // Check for trailing attributes {#id .class key=value}
     let after_paren = dest_start + close_paren + 1;
     let after_close = &text[after_paren..];
@@ -384,6 +397,120 @@ pub fn try_parse_inline_link(text: &str) -> Option<(usize, &str, &str, Option<&s
     // No attributes, just return the link
     let total_len = after_paren;
     Some((total_len, link_text, dest_content, None))
+}
+
+/// CommonMark §6.4 destination + optional title validation. The text passed
+/// in is whatever the parser captured between `(` and `)`. A valid form is:
+/// `[ws] destination [ws title [ws]]` where:
+/// - bare destination has no spaces, tabs, ASCII control chars, and balanced
+///   parentheses (escaped parens permitted);
+/// - bracketed destination is `<...>` with no newlines and no unescaped `<>`;
+/// - the optional title is delimited by `"..."`, `'...'`, or `(...)`;
+/// - any text outside that structure invalidates the link.
+fn dest_and_title_ok_commonmark(content: &str) -> bool {
+    let trimmed = content.trim_start_matches([' ', '\t', '\n']);
+    if trimmed.is_empty() {
+        return true;
+    }
+
+    let after_dest = if let Some(rest) = trimmed.strip_prefix('<') {
+        let mut escape = false;
+        let mut end_byte = None;
+        for (i, c) in rest.char_indices() {
+            if escape {
+                escape = false;
+                continue;
+            }
+            match c {
+                '\\' => escape = true,
+                '\n' | '<' => return false,
+                '>' => {
+                    end_byte = Some(i);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        match end_byte {
+            Some(e) => &rest[e + 1..],
+            None => return false,
+        }
+    } else {
+        let mut escape = false;
+        let mut depth: i32 = 0;
+        let mut end = trimmed.len();
+        for (i, c) in trimmed.char_indices() {
+            if escape {
+                escape = false;
+                continue;
+            }
+            match c {
+                '\\' => escape = true,
+                ' ' | '\t' | '\n' => {
+                    end = i;
+                    break;
+                }
+                _ if c.is_ascii_control() => return false,
+                '(' => depth += 1,
+                ')' => {
+                    if depth == 0 {
+                        end = i;
+                        break;
+                    }
+                    depth -= 1;
+                }
+                _ => {}
+            }
+        }
+        if depth != 0 {
+            return false;
+        }
+        if end == 0 {
+            // bare destination must be nonempty if the field is non-blank
+            return false;
+        }
+        &trimmed[end..]
+    };
+
+    let after_dest = after_dest.trim_start_matches([' ', '\t', '\n']);
+    if after_dest.is_empty() {
+        return true;
+    }
+
+    let bytes = after_dest.as_bytes();
+    let close = match bytes[0] {
+        b'"' => b'"',
+        b'\'' => b'\'',
+        b'(' => b')',
+        _ => return false,
+    };
+    let opens_paren = bytes[0] == b'(';
+    let mut escape = false;
+    let mut title_close_pos = None;
+    for (i, &b) in after_dest.as_bytes().iter().enumerate().skip(1) {
+        if escape {
+            escape = false;
+            continue;
+        }
+        if b == b'\\' {
+            escape = true;
+            continue;
+        }
+        if opens_paren && b == b'(' {
+            return false;
+        }
+        if b == close {
+            title_close_pos = Some(i);
+            break;
+        }
+    }
+    let close_idx = match title_close_pos {
+        Some(p) => p,
+        None => return false,
+    };
+
+    let after_title = &after_dest[close_idx + 1..];
+    after_title.trim_matches([' ', '\t', '\n']).is_empty()
 }
 
 /// Emit an inline link node to the builder.
@@ -772,56 +899,56 @@ mod tests {
     #[test]
     fn test_parse_inline_link_simple() {
         let input = "[text](url)";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(result, Some((11, "text", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_with_title() {
         let input = r#"[text](url "title")"#;
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(result, Some((19, "text", r#"url "title""#, None)));
     }
 
     #[test]
     fn test_parse_inline_link_with_nested_brackets() {
         let input = "[outer [inner] text](url)";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(result, Some((25, "outer [inner] text", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_no_space_between_brackets_and_parens() {
         let input = "[text] (url)";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_inline_link_no_closing_bracket() {
         let input = "[text(url)";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_inline_link_no_closing_paren() {
         let input = "[text](url";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_parse_inline_link_escaped_bracket() {
         let input = r"[text\]more](url)";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(result, Some((17, r"text\]more", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_parens_in_url() {
         let input = "[text](url(with)parens)";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(result, Some((23, "text", "url(with)parens", None)));
     }
 
@@ -925,7 +1052,7 @@ mod tests {
     #[test]
     fn test_parse_inline_link_with_id() {
         let input = "[text](url){#link-1}";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         let (len, text, dest, attrs) = result.unwrap();
         assert_eq!(len, 20);
         assert_eq!(text, "text");
@@ -938,7 +1065,7 @@ mod tests {
     #[test]
     fn test_parse_inline_link_with_full_attributes() {
         let input = "[text](url){#link .external target=\"_blank\"}";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         let (len, text, dest, attrs) = result.unwrap();
         assert_eq!(len, 44);
         assert_eq!(text, "text");
@@ -952,14 +1079,14 @@ mod tests {
     fn test_parse_inline_link_attributes_must_be_adjacent() {
         // Space between ) and { should not parse as attributes
         let input = "[text](url) {.class}";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(result, Some((11, "text", "url", None)));
     }
 
     #[test]
     fn test_parse_inline_link_with_title_and_attributes() {
         let input = r#"[text](url "title"){.external}"#;
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         let (len, text, dest, attrs) = result.unwrap();
         assert_eq!(len, 30);
         assert_eq!(text, "text");
@@ -1121,7 +1248,7 @@ mod tests {
     fn test_parse_inline_link_multiline_text() {
         // Per Pandoc spec, link text CAN contain newlines (soft breaks)
         let input = "[text on\nline two](url)";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert_eq!(
             result,
             Some((23, "text on\nline two", "url", None)),
@@ -1134,7 +1261,7 @@ mod tests {
         // Link text with newlines and other inline elements
         let input =
             "[A network graph. Different edges\nwith probability](../images/networkfig.png)";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert!(result.is_some(), "Link text with newlines should parse");
         let (len, text, _dest, _attrs) = result.unwrap();
         assert!(text.contains('\n'), "Link text should preserve newline");
@@ -1174,7 +1301,7 @@ mod tests {
         // Test for regression: when text is concatenated with newlines,
         // attributes after ) should still be recognized
         let input = "[A network graph.](../images/networkfig.png){width=70%}\nA word\n";
-        let result = try_parse_inline_link(input);
+        let result = try_parse_inline_link(input, false);
         assert!(
             result.is_some(),
             "Link with attributes should parse even with following text"

@@ -689,7 +689,10 @@ fn parse_until_closer_with_nested_two(
 
         // Skip over links - their content is protected from delimiter matching
         if bytes[pos] == b'['
-            && let Some((len, _, _, _)) = try_parse_inline_link(&text[pos..])
+            && let Some((len, _, _, _)) = try_parse_inline_link(
+                &text[pos..],
+                config.dialect == crate::options::Dialect::CommonMark,
+            )
         {
             log::trace!("Skipping inline link of {} bytes at pos {}", len, pos);
             pos += len;
@@ -897,7 +900,10 @@ fn parse_until_closer_with_nested_one(
 
         // Skip over links - their content is protected from delimiter matching
         if bytes[pos] == b'['
-            && let Some((len, _, _, _)) = try_parse_inline_link(&text[pos..])
+            && let Some((len, _, _, _)) = try_parse_inline_link(
+                &text[pos..],
+                config.dialect == crate::options::Dialect::CommonMark,
+            )
         {
             log::trace!("Skipping inline link of {} bytes at pos {}", len, pos);
             pos += len;
@@ -1686,8 +1692,10 @@ fn parse_inline_range_impl(
 
             // Try inline link: [text](url)
             if config.extensions.inline_links
-                && let Some((len, link_text, dest, attributes)) =
-                    try_parse_inline_link(&text[pos..])
+                && let Some((len, link_text, dest, attributes)) = try_parse_inline_link(
+                    &text[pos..],
+                    config.dialect == crate::options::Dialect::CommonMark,
+                )
             {
                 if pos > text_start {
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);

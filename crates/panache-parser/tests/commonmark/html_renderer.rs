@@ -428,10 +428,10 @@ fn code_block_language(node: &SyntaxNode) -> String {
     for desc in open.descendants_with_tokens() {
         match desc {
             NodeOrToken::Node(n) if n.kind() == SyntaxKind::CODE_LANGUAGE => {
-                return decode_entities(n.text().to_string().trim());
+                return decode_backslash_escapes(&decode_entities(n.text().to_string().trim()));
             }
             NodeOrToken::Token(t) if t.kind() == SyntaxKind::CODE_LANGUAGE => {
-                return decode_entities(t.text().trim());
+                return decode_backslash_escapes(&decode_entities(t.text().trim()));
             }
             _ => {}
         }
@@ -467,7 +467,7 @@ fn code_block_content(node: &SyntaxNode) -> String {
             }
         }
     }
-    if !content.ends_with('\n') {
+    if !content.is_empty() && !content.ends_with('\n') {
         content.push('\n');
     }
     content
@@ -736,7 +736,12 @@ fn render_autolink(node: &SyntaxNode, out: &mut String) {
         .filter(|t| t.kind() == SyntaxKind::TEXT)
         .map(|t| t.text().to_string())
         .collect();
-    let href = if target.contains('@') && !target.starts_with("mailto:") {
+    // Per CommonMark §6.4–6.5, an autolink is a URI autolink if its content has
+    // a valid scheme (2–32 chars: letter then letter/digit/+./-, then `:`).
+    // Otherwise, if it contains `@`, it's an email autolink (prepend mailto:).
+    let href = if has_uri_scheme(&target) {
+        target.clone()
+    } else if target.contains('@') {
         format!("mailto:{}", target)
     } else {
         target.clone()
@@ -746,6 +751,22 @@ fn render_autolink(node: &SyntaxNode, out: &mut String) {
     out.push_str("\">");
     out.push_str(&escape_html(&target));
     out.push_str("</a>");
+}
+
+fn has_uri_scheme(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    if bytes.is_empty() || !bytes[0].is_ascii_alphabetic() {
+        return false;
+    }
+    for (i, &b) in bytes.iter().enumerate() {
+        if b == b':' {
+            return (2..=32).contains(&i);
+        }
+        if !(b.is_ascii_alphanumeric() || b == b'+' || b == b'.' || b == b'-') {
+            return false;
+        }
+    }
+    false
 }
 
 fn normalize_code_span(raw: &str) -> String {
@@ -826,11 +847,14 @@ fn is_hex(b: u8) -> bool {
 }
 
 fn is_url_safe(b: u8) -> bool {
-    // Per CommonMark: alphanumerics + the URI-reserved characters.
+    // Per CommonMark: alphanumerics + URI-reserved characters, *minus* `[` and
+    // `]` which carry markdown-specific meaning and so are always
+    // percent-encoded in rendered HTML output (e.g. spec §6.4 example with
+    // `https://example.com/?search=][ref]` → `%5D%5Bref%5D`).
     matches!(b,
         b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9'
         | b'-' | b'.' | b'_' | b'~'
-        | b':' | b'/' | b'?' | b'#' | b'[' | b']' | b'@'
+        | b':' | b'/' | b'?' | b'#' | b'@'
         | b'!' | b'$' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'='
     )
 }

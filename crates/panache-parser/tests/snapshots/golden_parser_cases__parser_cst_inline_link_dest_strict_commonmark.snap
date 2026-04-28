@@ -1,0 +1,8 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..16
+  PARAGRAPH@0..16
+    TEXT@0..15 "[link](/my uri)"
+    NEWLINE@15..16 "\n"
